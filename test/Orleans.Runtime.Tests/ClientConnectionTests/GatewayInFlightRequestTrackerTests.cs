@@ -50,6 +50,28 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Same(request, claimed);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReleasedAttemptTransfersOriginalRequestForRejection(bool markedUntracked)
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        tracker.Release();
+        if (markedUntracked)
+        {
+            request.GatewayRequestAttempt = -request.GatewayRequestAttempt;
+        }
+
+        Assert.True(tracker.TryClaimForRejection(request, Silo1, out var claimed));
+
+        Assert.Same(request, claimed);
+        Assert.Equal(0, tracker.Count);
+        Assert.False(tracker.HasEntries);
+        Assert.False(tracker.TryClaimForRejection(request, Silo1, out _));
+    }
+
     [Fact]
     public void RequestsWithoutFinalDestinationAreNotTracked()
     {

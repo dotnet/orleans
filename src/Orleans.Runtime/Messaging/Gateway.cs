@@ -846,6 +846,7 @@ namespace Orleans.Runtime.Messaging
 
             public void RejectRequest(Message request, SiloAddress deadSilo)
             {
+                var ownsRequest = true;
                 try
                 {
                     Message? requestToReject;
@@ -859,12 +860,16 @@ namespace Orleans.Runtime.Messaging
                     EmitRequestTrackingStopped(requestTrackingStopped);
                     if (requestToReject is not null)
                     {
+                        ownsRequest = !ReferenceEquals(requestToReject, request);
                         RejectClaimedRequest(requestToReject, deadSilo);
                     }
                 }
                 finally
                 {
-                    request.Dispose();
+                    if (ownsRequest)
+                    {
+                        request.Dispose();
+                    }
                 }
             }
 

@@ -12,6 +12,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Invocation;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Diagnostics;
@@ -483,6 +484,100 @@ namespace UnitTests.MembershipTests
 
             client.ClearPendingRequests();
             Assert.Equal(0, gateway.TrackedRequestClientCount);
+        }
+
+        [Theory, TestCategory("Liveness")]
+        [InlineData("untracked")]
+        [InlineData("tracked")]
+        [InlineData("released")]
+        [InlineData("superseded")]
+        public void GatewayDeadSiloRejectionReturnsBufferedRequestOnce(string ownership)
+        {
+            var services = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
+            var gateway = services.GetRequiredService<MessageCenter>().Gateway!;
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
+            var targetSilo = HostedCluster.SecondarySilos[0].SiloAddress;
+            using var shared = ActivatorUtilities.CreateInstance<MessageHandlerShared>(services);
+            using var request = new Message
+            {
+                Id = new CorrelationId(-3),
+                Direction = Message.Directions.Request,
+                SendingSilo = HostedCluster.Primary.SiloAddress,
+                SendingGrain = clientId,
+                TargetSilo = targetSilo,
+                TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
+            };
+            using var buffer = new ArcBufferWriter();
+            buffer.Write([1, 2, 3]);
+            var readRequest = shared.GetReceiveMessageHandler();
+            readRequest.Body = buffer.ConsumeSlice(3);
+            typeof(MessageReadRequest).GetField("_bodyLength", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(readRequest, 3);
+            request.SetMessageReadRequest(readRequest);
+            Assert.True(gateway.TryGetClientState(request, out var client));
+            var connection = Assert.IsType<GatewayInboundConnection>(client.Connection);
+            try
+            {
+                if (ownership != "untracked")
+                {
+                    var destination = new RecordingConnection(services.GetRequiredService<ConnectionCommon>());
+                    client.SendRequest(request, destination);
+                    Assert.Same(request, Assert.Single(destination.Messages));
+                    Assert.True(request.GatewayRequestAttempt > 0);
+                }
+
+                if (ownership == "released")
+                {
+                    client.RecordDisconnection();
+                }
+                else if (ownership == "superseded")
+                {
+                    client.ClearPendingRequests();
+                }
+
+                using var gatewayEvents = new DiagnosticEventCollector(GatewayEvents.ListenerName);
+
+                client.RejectRequest(request, targetSilo);
+
+                Assert.Null(request._bodyObject);
+                Assert.Equal(0, readRequest.BodyLength);
+                Assert.Equal(0, readRequest.Body.Length);
+                var first = shared.GetReceiveMessageHandler();
+                var second = shared.GetReceiveMessageHandler();
+                try
+                {
+                    Assert.Same(readRequest, first);
+                    Assert.NotSame(first, second);
+                }
+                finally
+                {
+                    first.Reset();
+                    second.Reset();
+                }
+
+                var rejections = gatewayEvents.GetEvents(nameof(GatewayEvents.DeadSiloRequestRejected))
+                    .Where(diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.DeadSiloRequestRejected rejected
+                        && rejected.ClientId.Equals(clientId)
+                        && rejected.Rejection.Id.Equals(request.Id));
+                if (ownership == "superseded")
+                {
+                    Assert.Empty(rejections);
+                }
+                else
+                {
+                    Assert.Single(rejections);
+                }
+
+                Assert.Equal(0, gateway.TrackedRequestClientCount);
+            }
+            finally
+            {
+                client.ClearPendingRequests();
+                if (client.Connection is null)
+                {
+                    client.RecordConnection(connection);
+                }
+            }
         }
 
         [Theory, TestCategory("Liveness")]
