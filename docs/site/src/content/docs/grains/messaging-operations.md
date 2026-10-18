@@ -162,8 +162,8 @@ carries a `grain_type` tag; counters with outcomes also carry a `status` tag.
 
 | Instrument | Type | Interpretation |
 | --- | --- | --- |
-| `orleans-messaging-inbox-messages-received` | Counter | Delivery outcomes at the receiver: `accepted`, `duplicate`, `backpressured`, or `handler_not_found`. Messages a grain sends to itself record `accepted` or `duplicate` when sent. Messages an inbox sink receives record `accepted`. |
-| `orleans-messaging-inbox-messages-processed` | Counter | Handler outcomes: `success`, `retry`, or `dead_lettered`. A sink acceptance records `success`; a sink exception records `dead_lettered`. |
+| `orleans-messaging-inbox-messages-received` | Counter | Delivery outcomes at the receiver: `accepted`, `duplicate`, `backpressured`, or `handler_not_found`. Messages a grain sends to itself record `accepted` or `duplicate` when sent. Messages an inbox sink takes record `accepted`, or `dead_lettered` when the sink dead-letters them. |
+| `orleans-messaging-inbox-messages-processed` | Counter | Handler outcomes: `success`, `retry`, or `dead_lettered`. A sink acceptance records `success`; a sink dead-letter records `dead_lettered`. |
 | `orleans-messaging-outbox-messages-sent` | Counter | Messages staged with `Send`, including messages a grain sends to itself, which bypass the outbox. |
 | `orleans-messaging-outbox-messages-delivered` | Counter | Delivery outcomes at the sender: `accepted`, `duplicate`, `deadlettered`, `backpressured`, `handler_not_found`, `error`, `withdrawn` for a source-provided message which its source withdrew, or `source_error` for a source-provided message which its source failed to provide and the outbox dead-lettered. |
 | `orleans-messaging-inbox-processing-duration` | Histogram, ms | Handler processing duration. |
