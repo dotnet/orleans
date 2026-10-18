@@ -9,6 +9,7 @@ using Microsoft.Extensions.Time.Testing;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
+using Orleans.Messaging.Configuration;
 using Orleans.Messaging.Diagnostics;
 using Orleans.Messaging.Tests.Support;
 using Orleans.Runtime;
@@ -326,6 +327,34 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.True(Cluster.TryGetGrainContext(sender.GetGrainId(), out var senderContext));
         await sender.DeactivateAsync();
         await senderContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        Assert.Equal(0, await sender.GetOutboxCountAsync());
+    }
+
+    [Fact]
+    public async Task SourceMessages_WithdrawnBeyondTheBatchSize_AreRemovedOneBatchPerWrite()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        Assert.Equal(0, await sender.GetOutboxCountAsync());
+        var batchSize = await OnGrainAsync(
+            sender,
+            context => context.ActivationServices.GetRequiredService<IOptions<DurableMessagingOptions>>().Value.OutboxBatchSize);
+        var messageIds = Enumerable.Range(0, 2 * batchSize + 3).Select(_ => NewMessageId("withdrawn")).ToArray();
+        foreach (var messageId in messageIds)
+        {
+            await sender.StageFromSourceAsync(receiver.GetGrainId(), messageId, NewPayload(), write: false);
+            await sender.WithdrawAsync(messageId);
+        }
+
+        await sender.WriteAsync();
+
+        // Each removal write removes at most one batch of entries, and later passes remove the rest.
+        await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Writes(sender).Length == 4);
+        var removals = Writes(sender)[1..]
+            .Select(write => messageIds.Count(messageId => write.AsSpan().IndexOf(Encoding.UTF8.GetBytes(messageId.ToString())) >= 0))
+            .ToArray();
+        Assert.Equal(new[] { batchSize, batchSize, 3 }, removals);
+        Assert.Equal(0, Probe.For(receiver).SinkOffers);
         Assert.Equal(0, await sender.GetOutboxCountAsync());
     }
 

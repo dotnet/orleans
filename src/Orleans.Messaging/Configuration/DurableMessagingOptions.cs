@@ -161,6 +161,10 @@ public class DurableMessagingOptions
     /// <summary>
     /// Gets or sets the maximum number of outbox messages processed by one messaging pump pass.
     /// </summary>
+    /// <remarks>
+    /// Each pass delivers, removes, or dead-letters at most this many messages. Messages which their outbox message sources
+    /// withdrew or failed to provide count toward the limit, and later passes process the remaining messages.
+    /// </remarks>
     public int OutboxBatchSize { get; set; } = 32;
 
     /// <summary>

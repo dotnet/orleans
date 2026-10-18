@@ -308,28 +308,30 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     {
         var now = TimeProvider.GetUtcNow();
         List<(OutboxEntry Entry, OutboxMessage Message)>? candidates = null;
+        var examined = 0;
         foreach (var entry in _messages.Values)
         {
             if (entry.Sequence <= _durableSequence && IsReadyForAttempt(entry.State, now))
             {
-                OutboxMessage message;
                 try
                 {
-                    if (!TryGetMessage(entry, out message))
+                    if (TryGetMessage(entry, out var message))
+                    {
+                        (candidates ??= []).Add((entry, message));
+                    }
+                    else
                     {
                         (withdrawn ??= []).Add(entry);
-                        continue;
                     }
                 }
                 catch (Exception exception)
                 {
                     // The entry is durable, so a source which can't provide a valid message dead-letters only that entry.
                     (failed ??= []).Add((entry, exception));
-                    continue;
                 }
 
-                (candidates ??= []).Add((entry, message));
-                if (candidates.Count == Options.OutboxBatchSize) break;
+                // Withdrawn and failed entries count toward the batch, so a pass removes at most a batch of entries.
+                if (++examined == Options.OutboxBatchSize) break;
             }
         }
         if (candidates is null)
