@@ -6,7 +6,7 @@ public sealed class StockGrain : DurableGrain
     // <orleans0110_violation>
     public async DurableTask<bool> ReserveAllAsync(int[] productIds)
     {
-        // Each lambda schedules its child when it starts running, so the children are created in thread order.
+        // Each lambda schedules its child in input order, with a separate journal write for each invocation.
         var reserved = await Task.WhenAll(productIds.Select(async id => await Reserve(id).WithId($"reserve-{id}")));
         return reserved.All(r => r);
     }
