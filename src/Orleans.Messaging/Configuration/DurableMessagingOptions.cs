@@ -110,7 +110,8 @@ public class DurableMessagingOptions
     /// The timeout starts with the first failed attempt, and the last attempt runs when it elapses. A handler exception
     /// leaves the message's outcome unknown, so retries span transient faults, such as outages and deployments which
     /// fix a bug; a handler calls <c>IInboxHandlerContext.Fail</c> to dead-letter a message at once. A retrying message
-    /// keeps its place in <see cref="MaxCapacity"/>.
+    /// keeps its place in <see cref="MaxCapacity"/>. The timeout and retry backoff follow the Durable Jobs clock, which
+    /// schedules the wake-up for each retry.
     /// </remarks>
     /// <value>
     /// Must be greater than or equal to <see cref="TimeSpan.Zero"/>, which dead-letters a message at its first failure.
