@@ -65,7 +65,7 @@ public static class MessagingExtensions
                     options.Validate();
                     return true;
                 }
-                catch (ArgumentOutOfRangeException)
+                catch (ArgumentException)
                 {
                     return false;
                 }
