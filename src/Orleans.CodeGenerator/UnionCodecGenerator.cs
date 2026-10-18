@@ -260,7 +260,7 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         for (var i = 0; i < cases.Count; i++)
         {
             var unionCase = cases[i];
-            if (LibraryTypes.IsShallowCopyable(unionCase.CaseType))
+            if (type.IsImmutable || LibraryTypes.IsShallowCopyable(unionCase.CaseType))
             {
                 continue;
             }
