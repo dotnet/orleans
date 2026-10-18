@@ -303,7 +303,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                 var functionGraph = graph.GetAnonymousFunctionControlFlowGraph(function, context.CancellationToken);
                 var functionKind = ClassifyAnonymousFunction(function, functionGraph, kind);
 
-                // ORLEANS0122 reports async void delegates which DurableTask.RunInline and DurableTask.Run receive.
+                // ORLEANS0222 reports async void delegates which DurableTask.RunInline and DurableTask.Run receive.
                 if (analyzed && function.Symbol.IsAsync && function.Symbol.ReturnsVoid && !IsDurableTaskDelegate(function))
                 {
                     Report(DurableTaskDiagnostics.AsyncVoidInBody, function.Syntax.GetLocation(), "async lambda");

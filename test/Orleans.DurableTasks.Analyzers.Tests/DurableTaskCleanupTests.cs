@@ -25,16 +25,16 @@ public class DurableTaskCleanupTests
                 }
                 catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
                 {
-                    await ReleaseAsync({|ORLEANS0117:DurableTask.Current.CancellationToken|});
+                    await ReleaseAsync({|ORLEANS0217:DurableTask.Current.CancellationToken|});
                     await ReleaseAsync(DurableTask.Current.AttemptCancellationToken);
-                    using var linked = CancellationTokenSource.CreateLinkedTokenSource({|ORLEANS0117:context.CancellationToken|});
+                    using var linked = CancellationTokenSource.CreateLinkedTokenSource({|ORLEANS0217:context.CancellationToken|});
                     try
                     {
-                        await ReleaseAsync({|ORLEANS0117:context.CancellationToken|});
+                        await ReleaseAsync({|ORLEANS0217:context.CancellationToken|});
                     }
                     finally
                     {
-                        await ReleaseAsync({|ORLEANS0117:context.CancellationToken|});
+                        await ReleaseAsync({|ORLEANS0217:context.CancellationToken|});
                     }
 
                     return 0;
@@ -46,20 +46,20 @@ public class DurableTaskCleanupTests
                 }
                 catch (OperationCanceledException) when (compensate && (context.IsTaskCancellationRequested && context.UtcNow.Year > 2000))
                 {
-                    await ReleaseAsync({|ORLEANS0117:context.CancellationToken|});
+                    await ReleaseAsync({|ORLEANS0217:context.CancellationToken|});
                     throw;
                 }
 
                 if (context.IsTaskCancellationRequested)
                 {
-                    await ReleaseAsync({|ORLEANS0117:context.CancellationToken|});
+                    await ReleaseAsync({|ORLEANS0217:context.CancellationToken|});
                 }
 
                 if (compensate && DurableTask.Current.IsTaskCancellationRequested)
-                    await ReleaseAsync({|ORLEANS0117:DurableTask.Current.CancellationToken|});
+                    await ReleaseAsync({|ORLEANS0217:DurableTask.Current.CancellationToken|});
 
                 var release = DurableTask.Current.IsTaskCancellationRequested
-                    ? ReleaseAsync({|ORLEANS0117:context.CancellationToken|})
+                    ? ReleaseAsync({|ORLEANS0217:context.CancellationToken|})
                     : ReleaseAsync(context.CancellationToken);
                 await release;
                 return 1;
@@ -78,7 +78,7 @@ public class DurableTaskCleanupTests
                 {
                     await Step(1).WithId("first");
                 }
-                {|ORLEANS0112:catch|} (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+                {|ORLEANS0212:catch|} (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
                 {
                     await ReleaseAsync(context.CancellationToken);
                 }
@@ -134,8 +134,8 @@ public class DurableTaskCleanupTests
                 }
                 catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
                 {
-                    await ReleaseAsync({|ORLEANS0117:DurableTask.Current.CancellationToken|});
-                    await ReleaseAsync({|ORLEANS0117:context
+                    await ReleaseAsync({|ORLEANS0217:DurableTask.Current.CancellationToken|});
+                    await ReleaseAsync({|ORLEANS0217:context
                         .CancellationToken|});
                     return 0;
                 }
