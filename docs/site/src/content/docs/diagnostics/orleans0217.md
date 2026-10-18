@@ -1,11 +1,11 @@
 ---
-title: "ORLEANS0117: Pass AttemptCancellationToken to calls in task-cancellation cleanup"
-description: Understand ORLEANS0117, which reports cleanup code that runs after task cancellation and passes the already-canceled DurableTaskContext.CancellationToken to a call, and fix it with AttemptCancellationToken.
+title: "ORLEANS0217: Pass AttemptCancellationToken to calls in task-cancellation cleanup"
+description: Understand ORLEANS0217, which reports cleanup code that runs after task cancellation and passes the already-canceled DurableTaskContext.CancellationToken to a call, and fix it with AttemptCancellationToken.
 ms.date: 10/16/2026
 ms.topic: reference
 ---
 
-# ORLEANS0117: Pass AttemptCancellationToken to calls in task-cancellation cleanup
+# ORLEANS0217: Pass AttemptCancellationToken to calls in task-cancellation cleanup
 
 | Property | Value |
 | --- | --- |
@@ -22,7 +22,7 @@ Code which runs only after task cancellation passes `DurableTaskContext.Cancella
 
 The rule doesn't inspect lambdas and local functions in those regions, because they can run in another task's context, such as a `DurableTask.Run` step.
 
-:::code source="snippets/durable-tasks/Orleans0117.cs" id="orleans0117_violation" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0217.cs" id="orleans0217_violation" language="csharp":::
 
 ## Rule description
 
@@ -39,7 +39,7 @@ For both kinds of cancellation, see [Task cancellation and attempt cancellation]
 
 **Pass `AttemptCancellationToken` to the cleanup's calls.** The call runs to completion, and still ends promptly when the host cancels the attempt; when the activation stops, the task's next attempt runs the cleanup again. Release in-process resources, such as semaphores and disposables, in `finally` blocks and `using` statements, which run for both kinds of cancellation:
 
-:::code source="snippets/durable-tasks/Orleans0117.cs" id="orleans0117_fix" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0217.cs" id="orleans0217_fix" language="csharp":::
 
 The code fix replaces `CancellationToken` with `AttemptCancellationToken` and keeps the receiver, such as `DurableTask.Current` or a context variable. Fix all occurrences in a document, project, or solution at once.
 

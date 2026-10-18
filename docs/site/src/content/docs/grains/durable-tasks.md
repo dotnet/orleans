@@ -72,7 +72,7 @@ once that write completes:
 An `async DurableTask` method body is a deferred definition: calling the method creates
 the definition, and the durable task runtime runs it under the task's identity. A body
 which completes without awaiting is a normal step; the durable task analyzers suppress CS1998
-for such methods, as described in [ORLEANS0028](../diagnostics/orleans0028.md).
+for such methods, as described in [ORLEANS0224](../diagnostics/orleans0224.md).
 
 Inside a durable task, awaiting a durable call runs it as a child task of the running
 execution. From a client or an ordinary grain method, awaiting it or
@@ -536,7 +536,7 @@ when the caller continues:
   parties look up starts with `ScheduleAsync`. Inside a durable task, the start is recorded like a `DurableTask.RunInline` effect, so a
   replay returns the same handle, and awaiting the handle later observes the result. A
   client has no outbox, so `Post` throws `InvalidOperationException` there, and
-  [ORLEANS0116](../diagnostics/orleans0116.md) reports it.
+  [ORLEANS0216](../diagnostics/orleans0216.md) reports it.
 - Inside a durable task, the record of a detached task, `$detach:{target}:{rootId}`,
   commits with the start, so a replay which reaches the record starts nothing. The
   starter holds the invocation, which carries the request, until its target accepts it,

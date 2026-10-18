@@ -1,11 +1,11 @@
 ---
-title: "ORLEANS0118: Pass constant version names and ranges"
-description: Understand ORLEANS0118, which reports a DurableTask.GetVersion call whose change name or supported range isn't a constant, and fix it with constants.
+title: "ORLEANS0218: Pass constant version names and ranges"
+description: Understand ORLEANS0218, which reports a DurableTask.GetVersion call whose change name or supported range isn't a constant, and fix it with constants.
 ms.date: 10/16/2026
 ms.topic: reference
 ---
 
-# ORLEANS0118: Pass constant version names and ranges
+# ORLEANS0218: Pass constant version names and ranges
 
 | Property | Value |
 | --- | --- |
@@ -17,7 +17,7 @@ ms.topic: reference
 
 A call to `DurableTask.GetVersion` passes a change name, a minimum supported version, or a maximum supported version which isn't a compile-time constant:
 
-:::code source="snippets/durable-tasks/Orleans0118.cs" id="orleans0118_violation" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0218.cs" id="orleans0218_violation" language="csharp":::
 
 ## Rule description
 
@@ -31,7 +31,7 @@ For versioning, see [Version durable tasks](../grains/durable-tasks-versioning.m
 
 Name the change with a string literal or a constant, and pass the range as constants next to the branches which they describe:
 
-:::code source="snippets/durable-tasks/Orleans0118.cs" id="orleans0118_fix" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0218.cs" id="orleans0218_fix" language="csharp":::
 
 ## When to suppress
 

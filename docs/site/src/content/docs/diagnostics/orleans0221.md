@@ -1,11 +1,11 @@
 ---
-title: "ORLEANS0121: Run synchronous work with DurableTask.RunInline"
-description: Understand ORLEANS0121, which reports a DurableTask.Run step whose delegate neither awaits nor observes its CancellationToken, and fix it with DurableTask.RunInline.
+title: "ORLEANS0221: Run synchronous work with DurableTask.RunInline"
+description: Understand ORLEANS0221, which reports a DurableTask.Run step whose delegate neither awaits nor observes its CancellationToken, and fix it with DurableTask.RunInline.
 ms.date: 10/17/2026
 ms.topic: reference
 ---
 
-# ORLEANS0121: Run synchronous work with DurableTask.RunInline
+# ORLEANS0221: Run synchronous work with DurableTask.RunInline
 
 | Property | Value |
 | --- | --- |
@@ -17,7 +17,7 @@ ms.topic: reference
 
 A durable task body awaits a `DurableTask.Run` step, optionally named or shielded, whose lambda doesn't await, doesn't return a task, and doesn't read the `CancellationToken` which it receives:
 
-:::code source="snippets/durable-tasks/Orleans0121.cs" id="orleans0121_violation" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0221.cs" id="orleans0221_violation" language="csharp":::
 
 Steps which a body schedules, posts, detaches, or passes to a combinator aren't reported.
 
@@ -31,7 +31,7 @@ For the two kinds of recorded work, see [Recorded effects](../grains/durable-tas
 
 Run the work with `DurableTask.RunInline`, under the name which the step had:
 
-:::code source="snippets/durable-tasks/Orleans0121.cs" id="orleans0121_fix" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0221.cs" id="orleans0221_fix" language="csharp":::
 
 An effect and a step with the same name share an identifier, and a replay which finds a step recorded where the body now runs an effect diverges, which keeps the task pending until code which matches its record replays it. A deployment which changes a step of pending executions into an effect branches the change on `DurableTask.GetVersion`; see [Version durable tasks](../grains/durable-tasks-versioning.md).
 

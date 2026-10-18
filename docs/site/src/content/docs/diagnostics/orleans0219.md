@@ -1,11 +1,11 @@
 ---
-title: "ORLEANS0119: Await, combine, or return the handles of scheduled children"
-description: Understand ORLEANS0119, which reports the handle of an attached child which a durable task body schedules and never observes, and fix it by awaiting the handle or detaching the task.
+title: "ORLEANS0219: Await, combine, or return the handles of scheduled children"
+description: Understand ORLEANS0219, which reports the handle of an attached child which a durable task body schedules and never observes, and fix it by awaiting the handle or detaching the task.
 ms.date: 10/17/2026
 ms.topic: reference
 ---
 
-# ORLEANS0119: Await, combine, or return the handles of scheduled children
+# ORLEANS0219: Await, combine, or return the handles of scheduled children
 
 | Property | Value |
 | --- | --- |
@@ -17,7 +17,7 @@ ms.topic: reference
 
 A durable task body awaits `ScheduleAsync` on a definition which isn't `Detached()`, and discards the handle, or keeps it in a local which no code awaits, passes on, or returns:
 
-:::code source="snippets/durable-tasks/Orleans0119.cs" id="orleans0119_violation" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0219.cs" id="orleans0219_violation" language="csharp":::
 
 A local whose only uses read the handle's properties, such as `Id` or `TargetTaskId`, is reported too.
 
@@ -31,11 +31,11 @@ For ownership and lifetimes, see [Structured concurrency](../grains/durable-task
 
 **Await the handle** before the body completes, or pass it to a combinator, such as `ScheduledTask.WhenAll`, or return it. The child runs concurrently with the work between the start and the await:
 
-:::code source="snippets/durable-tasks/Orleans0119.cs" id="orleans0119_fix_await" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0219.cs" id="orleans0219_fix_await" language="csharp":::
 
 **Detach work which outlives the execution.** `Detached()` applies to durable grain calls. A detached task is an independent root, which continues after its starter completes and which its starter's deletion doesn't reach. Name it with `WithId`, so other parties can address it:
 
-:::code source="snippets/durable-tasks/Orleans0119.cs" id="orleans0119_fix_detach" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0219.cs" id="orleans0219_fix_detach" language="csharp":::
 
 ## When to suppress
 

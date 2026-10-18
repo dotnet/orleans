@@ -117,10 +117,6 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 
 [Grain interface member removed from source](orleans0027.md) — Warning. The manifest retains an RPC signature which is absent from source.
 
-## ORLEANS0224
-
-[Suppress CS1998 for async durable task methods](orleans0224.md) — Suppressor. An `async DurableTask` method which completes without awaiting is a normal durable step.
-
 ## ORLEANS0200
 
 [Access grain state in recorded effects or after the last durable operation](orleans0200.md) — Warning. Durable task code reads or changes grain state where a replay runs it again.
@@ -216,3 +212,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 ## ORLEANS0223
 
 [Assign new values to grain state instead of changing them in place](orleans0223.md) — Warning. Durable task code changes an object which journaled or persistent grain state holds instead of assigning a new value.
+
+## ORLEANS0224
+
+[Suppress CS1998 for async durable task methods](orleans0224.md) — Suppressor. An `async DurableTask` method which completes without awaiting is a normal durable step.

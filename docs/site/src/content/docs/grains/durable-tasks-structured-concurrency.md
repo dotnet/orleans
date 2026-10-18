@@ -118,7 +118,7 @@ A handler which compensates for cancellation filters by
 `DurableTask.Current.IsTaskCancellationRequested`, so it runs for task cancellation and not
 for the cancellation of an attempt; see
 [Task cancellation and attempt cancellation](#task-cancellation-and-attempt-cancellation)
-and [ORLEANS0112](../diagnostics/orleans0112.md).
+and [ORLEANS0212](../diagnostics/orleans0212.md).
 
 ### Shield the work which must finish
 
@@ -170,7 +170,7 @@ statements, which run for both kinds of cancellation:
 
 Journaled state changes pass through the state's API, which records each one. A change made in place to a mutable object which a durable value holds bypasses
 that API, so store immutable values, such as records, and assign a new value to change
-it. [ORLEANS0117](../diagnostics/orleans0117.md) reports cleanup which passes the
+it. [ORLEANS0217](../diagnostics/orleans0217.md) reports cleanup which passes the
 already-canceled `CancellationToken`.
 
 ## Detach the work which outlives its starter

@@ -60,7 +60,7 @@ that every execution reaches it with the operations which its version expects.
 - The check runs on the activation's scheduler, as `DurableTask.RunInline` does. Outside a
   durable task, it returns `maxSupported`.
 - Names follow the rules for operation names: they're non-empty and don't contain `$`.
-  [ORLEANS0118](../diagnostics/orleans0118.md) reports names and ranges which aren't
+  [ORLEANS0218](../diagnostics/orleans0218.md) reports names and ranges which aren't
   constants.
 
 ### Evolve a change

@@ -1,11 +1,11 @@
 ---
-title: "ORLEANS0120: Name durable operations whose position can change"
-description: Understand ORLEANS0120, which reports an unnamed durable operation in a loop, in a condition, or after another unnamed operation, whose generated identifier can shift, and fix it with WithId.
+title: "ORLEANS0220: Name durable operations whose position can change"
+description: Understand ORLEANS0220, which reports an unnamed durable operation in a loop, in a condition, or after another unnamed operation, whose generated identifier can shift, and fix it with WithId.
 ms.date: 10/17/2026
 ms.topic: reference
 ---
 
-# ORLEANS0120: Name durable operations whose position can change
+# ORLEANS0220: Name durable operations whose position can change
 
 | Property | Value |
 | --- | --- |
@@ -17,7 +17,7 @@ ms.topic: reference
 
 A durable task body starts an operation without a name, and the operation is in a loop or a condition, or follows another unnamed operation of its kind in the body:
 
-:::code source="snippets/durable-tasks/Orleans0120.cs" id="orleans0120_violation" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0220.cs" id="orleans0220_violation" language="csharp":::
 
 The rule covers awaited, scheduled, and posted children without `WithId`, including detached starts and delays; awaited combinators, such as `WhenAll`, `WhenAny`, `Race`, and timeouts; and `DurableTask.RunInline` effects without a name. A signal's `WaitAsync` takes no identifier, and a combinator's inputs are identified by their index, so neither is reported. The first unnamed operation of each kind in a body is reported only when it's in a loop or a condition.
 
@@ -33,7 +33,7 @@ For identifiers, see [Durable task identity and references](../grains/durable-ta
 
 Name the operation with `WithId`, and pass a name to `DurableTask.RunInline`. A name identifies the operation by its call site, and a call site which a loop repeats keeps one name, whose later occurrences the runtime numbers, `price`, `price$2`, and so on:
 
-:::code source="snippets/durable-tasks/Orleans0120.cs" id="orleans0120_fix" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0220.cs" id="orleans0220_fix" language="csharp":::
 
 The code fix adds `WithId` with a name derived from the method which defines the operation, such as `charge` for `ChargeAsync`, and a suffix such as `charge-2` when the body already uses the name. It doesn't name `DurableTask.RunInline` effects. Fix all occurrences in a document, project, or solution at once.
 

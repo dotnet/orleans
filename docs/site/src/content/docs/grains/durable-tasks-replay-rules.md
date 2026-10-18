@@ -1,6 +1,6 @@
 ---
 title: Replay-safety rules for durable tasks
-description: Reference for the rules which keep durable task bodies correct under replay, the failures each rule prevents, and the analyzer diagnostics ORLEANS0100 to ORLEANS0123 which enforce them.
+description: Reference for the rules which keep durable task bodies correct under replay, the failures each rule prevents, and the analyzer diagnostics ORLEANS0200 to ORLEANS0223 which enforce them.
 ms.date: 10/16/2026
 ms.topic: reference
 ---
@@ -11,7 +11,7 @@ A durable task resumes after a deactivation or a failure by running its body aga
 the start, while each recorded operation returns its recorded outcome. The rules on this
 page keep that replay equivalent to the run which recorded the operations. The
 `Microsoft.Orleans.DurableTasks.Abstractions` package carries analyzers which check them
-at build time and report diagnostics ORLEANS0100 to ORLEANS0123; each diagnostic's page
+at build time and report diagnostics ORLEANS0200 to ORLEANS0223; each diagnostic's page
 shows the code which triggers it and common fixes.
 
 For the model behind the rules, see
@@ -67,33 +67,33 @@ awaiting, or helpers in other assemblies.
 
 | Rule | Failure which it prevents | Diagnostic |
 | --- | --- | --- |
-| Read and change grain state in recorded effects, steps, or the tail. | A replay applies a change again, or decides from state which later operations wrote. | [ORLEANS0100](../diagnostics/orleans0100.md) |
-| Produce clock, random, and environment values in recorded effects, steps, or the tail, and read time from `DurableTask.Current.UtcNow`. Produce a value which the tail sends to an external service, such as an idempotency key, in a recorded effect or a step, because a tail whose result didn't commit runs again. | A replay computes other arguments, IDs, keys, or deadlines, and diverges or repeats an external effect. | [ORLEANS0101](../diagnostics/orleans0101.md) |
-| Await external operations in steps or the tail. | A replay repeats the operation, observes another result, or fails while the service is unavailable. | [ORLEANS0102](../diagnostics/orleans0102.md) |
-| Change state after the last external await of a step or the tail. | The change commits without the result, and the next run applies it again. | [ORLEANS0103](../diagnostics/orleans0103.md) |
-| Return the outputs of a `DurableTask.RunInline` effect. | A replay skips the effect, and the body's variables keep their initial values. | [ORLEANS0104](../diagnostics/orleans0104.md) |
-| Await, schedule, or post every durable task definition. | The task never runs. | [ORLEANS0105](../diagnostics/orleans0105.md) |
-| Run each `async DurableTask` definition once. | The second run throws `InvalidOperationException`. | [ORLEANS0106](../diagnostics/orleans0106.md) |
-| Name operations without `$`. | The runtime rejects the name with `ArgumentException`. | [ORLEANS0107](../diagnostics/orleans0107.md) |
-| Give each call site its own name. | Removing or reordering a call site shifts the recorded IDs of the others. | [ORLEANS0108](../diagnostics/orleans0108.md) |
-| Keep bodies on the activation's scheduler. | Work races with the grain, and `RunInline` and `Post` throw off the scheduler. | [ORLEANS0109](../diagnostics/orleans0109.md) |
-| Run concurrent durable work through durable combinators. | Children receive IDs in thread order, which a replay can change, and losing inputs keep running. | [ORLEANS0110](../diagnostics/orleans0110.md) |
-| Wait with `DurableTask.Delay` and `DelayUntil`. | A deactivation loses the wait, and a replay waits the whole duration again. | [ORLEANS0111](../diagnostics/orleans0111.md) |
-| Filter cancellation handlers by `DurableTask.Current.IsTaskCancellationRequested`. | The cancellation of an attempt, such as a deactivation, runs compensation for a task which nobody canceled. | [ORLEANS0112](../diagnostics/orleans0112.md) |
-| Return a task from asynchronous code in bodies. | Work continues after the body completed, and its failures escape. | [ORLEANS0113](../diagnostics/orleans0113.md) |
-| Derive a signal name for each repeated wait. | Every wait returns the first value which the signal received. | [ORLEANS0114](../diagnostics/orleans0114.md) |
-| Log replayed code through `logger.ReplaySafe()`. | Each replay logs the events of the completed operations again. | [ORLEANS0115](../diagnostics/orleans0115.md) |
-| Post from grains and durable task bodies, and schedule from clients. | `Post` throws, because a client has no durable outbox. | [ORLEANS0116](../diagnostics/orleans0116.md) |
-| Pass `AttemptCancellationToken` to the calls which task-cancellation cleanup makes. | The cleanup's calls end at once, because `CancellationToken` is already canceled. | [ORLEANS0117](../diagnostics/orleans0117.md) |
-| Pass constant names and ranges to version checks. | One change records several decisions, or a deployment records versions which no branch handles. | [ORLEANS0118](../diagnostics/orleans0118.md) |
-| Await, combine, or return the handle of each scheduled child. | The child's failure goes unobserved, and deleting the execution's tree cancels it. | [ORLEANS0119](../diagnostics/orleans0119.md) |
-| Name operations in loops and conditions, and after other unnamed operations. | A loop, a condition, or a deployment shifts generated identifiers, and a replay diverges. | [ORLEANS0120](../diagnostics/orleans0120.md) |
-| Run synchronous work with `DurableTask.RunInline`. | A step adds a child execution and a journal write without running asynchronous work. | [ORLEANS0121](../diagnostics/orleans0121.md) |
-| Pass delegates which return a task to `DurableTask.Run` and `DurableTask.RunInline`. | The task records an `async void` delegate as complete at its first `await`, before its work runs. | [ORLEANS0122](../diagnostics/orleans0122.md) |
-| Assign new immutable values to grain state. | A change in place bypasses the journal, so the recovered state differs from the state in memory. | [ORLEANS0123](../diagnostics/orleans0123.md) |
+| Read and change grain state in recorded effects, steps, or the tail. | A replay applies a change again, or decides from state which later operations wrote. | [ORLEANS0200](../diagnostics/orleans0200.md) |
+| Produce clock, random, and environment values in recorded effects, steps, or the tail, and read time from `DurableTask.Current.UtcNow`. Produce a value which the tail sends to an external service, such as an idempotency key, in a recorded effect or a step, because a tail whose result didn't commit runs again. | A replay computes other arguments, IDs, keys, or deadlines, and diverges or repeats an external effect. | [ORLEANS0201](../diagnostics/orleans0201.md) |
+| Await external operations in steps or the tail. | A replay repeats the operation, observes another result, or fails while the service is unavailable. | [ORLEANS0202](../diagnostics/orleans0202.md) |
+| Change state after the last external await of a step or the tail. | The change commits without the result, and the next run applies it again. | [ORLEANS0203](../diagnostics/orleans0203.md) |
+| Return the outputs of a `DurableTask.RunInline` effect. | A replay skips the effect, and the body's variables keep their initial values. | [ORLEANS0204](../diagnostics/orleans0204.md) |
+| Await, schedule, or post every durable task definition. | The task never runs. | [ORLEANS0205](../diagnostics/orleans0205.md) |
+| Run each `async DurableTask` definition once. | The second run throws `InvalidOperationException`. | [ORLEANS0206](../diagnostics/orleans0206.md) |
+| Name operations without `$`. | The runtime rejects the name with `ArgumentException`. | [ORLEANS0207](../diagnostics/orleans0207.md) |
+| Give each call site its own name. | Removing or reordering a call site shifts the recorded IDs of the others. | [ORLEANS0208](../diagnostics/orleans0208.md) |
+| Keep bodies on the activation's scheduler. | Work races with the grain, and `RunInline` and `Post` throw off the scheduler. | [ORLEANS0209](../diagnostics/orleans0209.md) |
+| Run concurrent durable work through durable combinators. | Children receive IDs in thread order, which a replay can change, and losing inputs keep running. | [ORLEANS0210](../diagnostics/orleans0210.md) |
+| Wait with `DurableTask.Delay` and `DelayUntil`. | A deactivation loses the wait, and a replay waits the whole duration again. | [ORLEANS0211](../diagnostics/orleans0211.md) |
+| Filter cancellation handlers by `DurableTask.Current.IsTaskCancellationRequested`. | The cancellation of an attempt, such as a deactivation, runs compensation for a task which nobody canceled. | [ORLEANS0212](../diagnostics/orleans0212.md) |
+| Return a task from asynchronous code in bodies. | Work continues after the body completed, and its failures escape. | [ORLEANS0213](../diagnostics/orleans0213.md) |
+| Derive a signal name for each repeated wait. | Every wait returns the first value which the signal received. | [ORLEANS0214](../diagnostics/orleans0214.md) |
+| Log replayed code through `logger.ReplaySafe()`. | Each replay logs the events of the completed operations again. | [ORLEANS0215](../diagnostics/orleans0215.md) |
+| Post from grains and durable task bodies, and schedule from clients. | `Post` throws, because a client has no durable outbox. | [ORLEANS0216](../diagnostics/orleans0216.md) |
+| Pass `AttemptCancellationToken` to the calls which task-cancellation cleanup makes. | The cleanup's calls end at once, because `CancellationToken` is already canceled. | [ORLEANS0217](../diagnostics/orleans0217.md) |
+| Pass constant names and ranges to version checks. | One change records several decisions, or a deployment records versions which no branch handles. | [ORLEANS0218](../diagnostics/orleans0218.md) |
+| Await, combine, or return the handle of each scheduled child. | The child's failure goes unobserved, and deleting the execution's tree cancels it. | [ORLEANS0219](../diagnostics/orleans0219.md) |
+| Name operations in loops and conditions, and after other unnamed operations. | A loop, a condition, or a deployment shifts generated identifiers, and a replay diverges. | [ORLEANS0220](../diagnostics/orleans0220.md) |
+| Run synchronous work with `DurableTask.RunInline`. | A step adds a child execution and a journal write without running asynchronous work. | [ORLEANS0221](../diagnostics/orleans0221.md) |
+| Pass delegates which return a task to `DurableTask.Run` and `DurableTask.RunInline`. | The task records an `async void` delegate as complete at its first `await`, before its work runs. | [ORLEANS0222](../diagnostics/orleans0222.md) |
+| Assign new immutable values to grain state. | A change in place bypasses the journal, so the recovered state differs from the state in memory. | [ORLEANS0223](../diagnostics/orleans0223.md) |
 
 The analyzers also suppress CS1998 for `async DurableTask` methods without an `await`,
-which are ordinary steps; see [ORLEANS0028](../diagnostics/orleans0028.md).
+which are ordinary steps; see [ORLEANS0224](../diagnostics/orleans0224.md).
 
 ### State, values, and external work
 
@@ -157,7 +157,7 @@ rule's severity in `.editorconfig`, for example to fail the build on replayed lo
 
 ```ini
 [*.cs]
-dotnet_diagnostic.ORLEANS0115.severity = error
+dotnet_diagnostic.ORLEANS0215.severity = error
 ```
 
 Each diagnostic's page describes when suppressing it is appropriate.

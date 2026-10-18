@@ -2,8 +2,8 @@ namespace Documentation.Diagnostics.DurableTasks;
 
 public sealed class BillingGrain : DurableGrain
 {
-#pragma warning disable ORLEANS0120
-    // <orleans0120_violation>
+#pragma warning disable ORLEANS0220
+    // <orleans0220_violation>
     public async DurableTask<decimal> BillAsync(string[] items, bool express)
     {
         if (express)
@@ -23,10 +23,10 @@ public sealed class BillingGrain : DurableGrain
         await Charge(total);
         return total;
     }
-    // </orleans0120_violation>
-#pragma warning restore ORLEANS0120
+    // </orleans0220_violation>
+#pragma warning restore ORLEANS0220
 
-    // <orleans0120_fix>
+    // <orleans0220_fix>
     public async DurableTask<decimal> BillByNameAsync(string[] items, bool express)
     {
         if (express)
@@ -44,7 +44,7 @@ public sealed class BillingGrain : DurableGrain
         await Charge(total).WithId("charge");
         return total;
     }
-    // </orleans0120_fix>
+    // </orleans0220_fix>
 
     private static async DurableTask<bool> Reserve(string carrier) => true;
 

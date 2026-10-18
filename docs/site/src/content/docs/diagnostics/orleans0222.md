@@ -1,11 +1,11 @@
 ---
-title: "ORLEANS0122: Pass delegates which return a task for asynchronous work"
-description: Understand ORLEANS0122, which reports an async void delegate passed to DurableTask.Run or DurableTask.RunInline, and fix it with a delegate which returns a Task.
+title: "ORLEANS0222: Pass delegates which return a task for asynchronous work"
+description: Understand ORLEANS0222, which reports an async void delegate passed to DurableTask.Run or DurableTask.RunInline, and fix it with a delegate which returns a Task.
 ms.date: 10/17/2026
 ms.topic: reference
 ---
 
-# ORLEANS0122: Pass delegates which return a task for asynchronous work
+# ORLEANS0222: Pass delegates which return a task for asynchronous work
 
 | Property | Value |
 | --- | --- |
@@ -17,7 +17,7 @@ ms.topic: reference
 
 `DurableTask.Run` or `DurableTask.RunInline` receives an asynchronous delegate which returns `void`: an `async` lambda cast to `Action` or `Action<CancellationToken>`, an `async void` method, or a local which a declaration initializes with one of them:
 
-:::code source="snippets/durable-tasks/Orleans0122.cs" id="orleans0122_violation" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0222.cs" id="orleans0222_violation" language="csharp":::
 
 An `async` lambda written directly in the call binds to the overloads which take a `Task`, so the C# compiler rejects it for `DurableTask.RunInline` and runs it as an asynchronous step for `DurableTask.Run`.
 
@@ -29,7 +29,7 @@ An `async void` delegate returns to its caller at its first incomplete `await`. 
 
 Pass a delegate which returns the task of the work, so the step completes when the work completes:
 
-:::code source="snippets/durable-tasks/Orleans0122.cs" id="orleans0122_fix" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0222.cs" id="orleans0222_fix" language="csharp":::
 
 `DurableTask.RunInline` records synchronous work only; run asynchronous work as an awaited step, with `DurableTask.Run` or an `async DurableTask` method.
 

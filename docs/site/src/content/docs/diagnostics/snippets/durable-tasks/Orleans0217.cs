@@ -9,8 +9,8 @@ public interface IReservationService
 
 public sealed class ReservationGrain(IReservationService reservations) : DurableGrain
 {
-#pragma warning disable ORLEANS0117
-    // <orleans0117_violation>
+#pragma warning disable ORLEANS0217
+    // <orleans0217_violation>
     public async DurableTask<bool> HoldAsync(string reservationId)
     {
         try
@@ -26,10 +26,10 @@ public sealed class ReservationGrain(IReservationService reservations) : Durable
             return false;
         }
     }
-    // </orleans0117_violation>
-#pragma warning restore ORLEANS0117
+    // </orleans0217_violation>
+#pragma warning restore ORLEANS0217
 
-    // <orleans0117_fix>
+    // <orleans0217_fix>
     public async DurableTask<bool> HoldOrReleaseAsync(string reservationId)
     {
         try
@@ -45,5 +45,5 @@ public sealed class ReservationGrain(IReservationService reservations) : Durable
             return false;
         }
     }
-    // </orleans0117_fix>
+    // </orleans0217_fix>
 }

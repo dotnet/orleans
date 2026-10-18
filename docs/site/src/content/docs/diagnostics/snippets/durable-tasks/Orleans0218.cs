@@ -8,8 +8,8 @@ public sealed class ShippingGrain : DurableGrain
 
     private static async DurableTask Ship(string orderId) => await Task.CompletedTask;
 
-#pragma warning disable ORLEANS0118
-    // <orleans0118_violation>
+#pragma warning disable ORLEANS0218
+    // <orleans0218_violation>
     public async DurableTask ShipAsync(string orderId, string region, int newestVersion)
     {
         // A name which depends on the region records a separate decision for each region, and the range follows the
@@ -24,10 +24,10 @@ public sealed class ShippingGrain : DurableGrain
             await Ship(orderId).WithId("ship");
         }
     }
-    // </orleans0118_violation>
-#pragma warning restore ORLEANS0118
+    // </orleans0218_violation>
+#pragma warning restore ORLEANS0218
 
-    // <orleans0118_fix>
+    // <orleans0218_fix>
     public async DurableTask ShipWithCarrierAsync(string orderId)
     {
         // The name identifies the change, and the range states the branches which this code keeps.
@@ -41,5 +41,5 @@ public sealed class ShippingGrain : DurableGrain
             await Ship(orderId).WithId("ship");
         }
     }
-    // </orleans0118_fix>
+    // </orleans0218_fix>
 }
