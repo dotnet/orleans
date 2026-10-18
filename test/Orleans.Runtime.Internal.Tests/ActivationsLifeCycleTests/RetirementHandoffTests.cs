@@ -779,7 +779,7 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task CancellationWhileRequestIsInTransit_IsHeldAndFollowsTheRequestOnceTheMigrationCompletes()
+    public async Task CancellationWhileRequestIsInTransit_FollowsTheRequestAsARequest()
     {
         // Hold the migration before the destination creates the new activation, so that the caller cancels while its request is in transit.
         // The caller does not wait for acknowledgement, so it forgets the call as soon as it cancels.
@@ -798,6 +798,14 @@ public sealed class RetirementHandoffTests
                 case nameof(IGrainCallCancellationManagerSystemTarget.CancelCallsAsync):
                     await context.Invoke();
                     if (context.Request.GetArgument(0) is List<GrainCallCancellationRequest> requests && requests.Any(request => request.TargetGrainId == grainId))
+                    {
+                        cancellationsDelivered.Enqueue(context.TargetContext.Address.SiloAddress!);
+                    }
+
+                    return;
+                case nameof(IGrainCallCancellationExtension.CancelRequestAsync):
+                    await context.Invoke();
+                    if (context.TargetContext.GrainId == grainId)
                     {
                         cancellationsDelivered.Enqueue(context.TargetContext.Address.SiloAddress!);
                     }
@@ -827,7 +835,8 @@ public sealed class RetirementHandoffTests
 
         try
         {
-            // The caller cancels the call, which still targets the retiring silo. The retiring activation is deactivating, so it holds the cancellation.
+            // The caller cancels the call, which still targets the retiring silo. The retiring activation is deactivating and no longer holds the request,
+            // so it sends the cancellation to the grain as a request, which it queues with its other requests.
             var destination = await acceptArrived.Task.WaitAsync(Timeout, Cancellation);
             var activation = Assert.IsType<ActivationData>(FindActivation(retiring, grainId));
             state.Cancellation.Cancel();
@@ -835,7 +844,7 @@ public sealed class RetirementHandoffTests
             await WaitUntilAsync(() => cancellationsDelivered.Contains(retiring.SiloAddress));
             await activation.RunOrQueueTask(() => Task.CompletedTask);
 
-            // Once it finishes deactivating, the retiring activation forwards the cancellation to the destination, which holds the migrated request,
+            // Once it finishes deactivating, the retiring activation forwards the queued cancellation to the destination, which holds the migrated request,
             // and the request is canceled whether or not it has started running.
             releaseAccept.TrySetResult();
             await activation.Deactivated.WaitAsync(Timeout, Cancellation);
@@ -902,7 +911,7 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task CancellationHeldDuringDeclinedMigration_CancelsTheRetainedRequestWithoutForwardingIt()
+    public async Task CancellationDuringDeclinedMigration_FollowsTheRetainedRequest()
     {
         // The target declines the migrated request, after the caller cancels while the request is in transit.
         var acceptArrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -953,7 +962,7 @@ public sealed class RetirementHandoffTests
         var (_, messageId) = FindPendingCall(caller, grain.GetGrainId());
         try
         {
-            // The deactivating source holds the cancellation, since its request is in transit.
+            // The deactivating source no longer holds the request, so it queues the cancellation with its other requests.
             await acceptArrived.Task.WaitAsync(Timeout, Cancellation);
             state.Cancellation.Cancel();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => call.WaitAsync(Timeout, Cancellation));
@@ -965,35 +974,37 @@ public sealed class RetirementHandoffTests
             releaseAccept.TrySetResult();
         }
 
-        // The declined request returns to the source's queue, where the held cancellation cancels it, so neither the request nor its cancellation is forwarded.
-        await activation.Deactivated.WaitAsync(Timeout, Cancellation);
-        var fence = new CorrelationId(long.MaxValue);
-        source.ServiceProvider.GetRequiredService<GrainCallCancellationManager>().SignalCancellation(target.SiloAddress, GrainId.Create("test", "fence"), GrainId.Create("test", "caller"), fence);
-        await WaitUntilAsync(() => delivered.Contains((target.SiloAddress, fence)));
-        Assert.DoesNotContain((target.SiloAddress, messageId), delivered);
-        Assert.False(state.HoldEntered.Task.IsCompleted);
-        state.ReleaseHold.TrySetResult();
+        // The declined request returns to the front of the source's queue, ahead of its cancellation, and both are forwarded to the grain's next activation,
+        // which the grain directory places, where the cancellation cancels the request whether or not it has started running.
+        try
+        {
+            await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+            await WaitUntilAsync(() => state.HoldCanceled.Task.IsCompleted
+                || !state.HoldEntered.Task.IsCompleted
+                    && cluster.Silos.Select(silo => FindActivation(silo, grain.GetGrainId())).OfType<ActivationData>().SingleOrDefault() is { State: ActivationState.Valid } next
+                    && next.GetRequestCount() == 0);
+        }
+        finally
+        {
+            state.ReleaseHold.TrySetResult();
+        }
     }
 
     [Fact]
-    public async Task UnmatchedCancellation_IsNotForwardedByAnActivationWhichIsNotDeactivating()
+    public async Task UnmatchedCancellation_IsNotSentOnByAnActiveActivation()
     {
-        // Observe the cancellations which reach the other silo.
-        var delivered = new ConcurrentQueue<CorrelationId>();
-        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
+        // Observe cancellations which are sent to grains as requests.
+        var sent = new ConcurrentQueue<GrainId>();
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddOutgoingGrainCallFilter(async context =>
         {
-            await context.Invoke();
-            if (context.Request.GetMethodName() == nameof(IGrainCallCancellationManagerSystemTarget.CancelCallsAsync)
-                && context.Request.GetArgument(0) is List<GrainCallCancellationRequest> requests)
+            if (context.Request.GetMethodName() == nameof(IGrainCallCancellationExtension.CancelRequestAsync))
             {
-                foreach (var request in requests)
-                {
-                    delivered.Enqueue(request.MessageId);
-                }
+                sent.Enqueue(context.TargetId);
             }
+
+            await context.Invoke();
         })));
         var silo = cluster.Silos[1];
-        var other = cluster.Silos[2];
         var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
         var key = Guid.NewGuid();
         RetirementHandoffState.Create(key);
@@ -1001,18 +1012,17 @@ public sealed class RetirementHandoffTests
         await PlaceOnAsync(silo, () => grain.GetLocation());
         var activation = Assert.IsType<ActivationData>(FindActivation(silo, grain.GetGrainId()));
 
-        // This activation has a forwarding address but has not forwarded its requests there, so it does not forward unmatched cancellations there either.
-        activation.ForwardingAddress = other.SiloAddress;
-        var sender = GrainId.Create("test", "caller");
-        var unmatched = new CorrelationId(1);
-        _ = ((IGrainCallCancellationExtension)activation).CancelRequestAsync(sender, unmatched, CancellationToken.None).AsTask();
+        // An active activation processes requests, so a cancellation which does not find its request is retried briefly and dropped, rather than sent on,
+        // which would deliver it back to this activation repeatedly.
+        _ = ((IGrainCallCancellationExtension)activation).CancelRequestAsync(GrainId.Create("test", "caller"), new CorrelationId(1), CancellationToken.None).AsTask();
         await activation.RunOrQueueTask(() => Task.CompletedTask);
+        Assert.DoesNotContain(grain.GetGrainId(), sent);
 
-        // Cancellations sent to one silo are delivered in order, so once a later cancellation arrives, an earlier forwarded one would have arrived too.
-        var fence = new CorrelationId(2);
-        silo.ServiceProvider.GetRequiredService<GrainCallCancellationManager>().SignalCancellation(other.SiloAddress, GrainId.Create("test", "fence"), sender, fence);
-        await WaitUntilAsync(() => delivered.Contains(fence));
-        Assert.DoesNotContain(unmatched, delivered);
+        // The same cancellation reaching a deactivating activation is sent on as a request.
+        activation.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationRequested, "Test"), Cancellation);
+        await WaitUntilAsync(() => activation.State is not ActivationState.Valid);
+        _ = ((IGrainCallCancellationExtension)activation).CancelRequestAsync(GrainId.Create("test", "caller"), new CorrelationId(2), CancellationToken.None).AsTask();
+        await WaitUntilAsync(() => sent.Contains(grain.GetGrainId()));
     }
 
     [Fact]
@@ -1545,6 +1555,93 @@ public sealed class RetirementHandoffTests
         Assert.Equal(0, Volatile.Read(ref migrationsReceived));
     }
 
+    [Fact]
+    public async Task RequestWhichCannotBeRestored_FailsAndTheOthersAreRetained()
+    {
+        const int MaxMessageBodySize = 1024 * 1024;
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
+            silo.Configure<SiloMessagingOptions>(options => options.MaxMessageBodySize = MaxMessageBodySize)));
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var migrationManager = source.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
+        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        RetirementHandoffState.Create(key);
+        var grainId = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName).GetGrainId();
+
+        // The requests do not fit in a message together, so the migration carries none of them and restores them for forwarding.
+        // The first request's body serializes but cannot be deserialized, so it cannot be restored.
+        var payload = Enumerable.Repeat((byte)0x5A, MaxMessageBodySize * 3 / 5).ToArray();
+        var unrestorable = CreateRequest(cluster, grainId, 1, new UnrestorableValue());
+        var second = CreateRequest(cluster, grainId, 2, CreatePooledBuffer(payload));
+        var third = CreateRequest(cluster, grainId, 3, CreatePooledBuffer(payload));
+        List<Message> requests = [unrestorable, second, third];
+        var migration = migrationManager.MigrateAsync(target.SiloAddress, grainId, new MigrationContext(source.ServiceProvider.GetRequiredService<SerializerSessionPool>()), requests, out var carriesRequests);
+        Assert.False(carriesRequests);
+
+        // The unrestorable request fails, and the others are restored with their original bodies.
+        Assert.Equal([second, third], requests);
+        Assert.All(requests, request => Assert.Equal(payload, ((Orleans.Serialization.Buffers.PooledBuffer)request.BodyObject!).ToArray()));
+        Assert.True((await migration.AsTask().WaitAsync(Timeout, Cancellation)).Migrated);
+    }
+
+    [Fact]
+    public async Task DeclinedRequestWhichCannotBeRestored_FailsWithoutAffectingTheBatch()
+    {
+        await using var cluster = await DeployAsync();
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var migrationManager = source.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
+        var pool = source.ServiceProvider.GetRequiredService<SerializerSessionPool>();
+        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var acceptedKey = Guid.NewGuid();
+        var declinedKey = Guid.NewGuid();
+        RetirementHandoffState.Create(acceptedKey);
+        RetirementHandoffState.Create(declinedKey);
+        var acceptedGrain = grainFactory.GetGrain<IRetirementHandoffGrain>(acceptedKey, typeof(RetirementHandoffGrain).FullName).GetGrainId();
+        var declined = grainFactory.GetGrain<IRetirementHandoffGrain>(declinedKey, typeof(RetirementHandoffGrain).FullName);
+
+        // The declined grain is already active on the target, which therefore declines its requests, one of which cannot be restored.
+        await PlaceOnAsync(target, () => declined.GetLocation());
+        var retained = CreateRequest(cluster, declined.GetGrainId(), 3, new List<string> { "value" });
+        List<Message> declinedRequests = [CreateRequest(cluster, declined.GetGrainId(), 2, new UnrestorableValue()), retained];
+
+        // Both migrations travel in one batch.
+        ValueTask<MigrationResult> acceptedMigration = default;
+        ValueTask<MigrationResult> declinedMigration = default;
+        await migrationManager.RunOrQueueTask(() =>
+        {
+            acceptedMigration = migrationManager.MigrateAsync(target.SiloAddress, acceptedGrain, new MigrationContext(pool), [CreateRequest(cluster, acceptedGrain, 1, new List<string> { "value" })], out var acceptedCarries);
+            declinedMigration = migrationManager.MigrateAsync(target.SiloAddress, declined.GetGrainId(), new MigrationContext(pool), declinedRequests, out var declinedCarries);
+            Assert.True(acceptedCarries);
+            Assert.True(declinedCarries);
+            return Task.CompletedTask;
+        });
+
+        // The decline stands: the unrestorable request fails, the other request is restored for forwarding, and the accepted grain is unaffected.
+        Assert.Equal(MigratedRequestsOutcome.Retained, (await declinedMigration.AsTask().WaitAsync(Timeout, Cancellation)).Requests);
+        Assert.Same(retained, Assert.Single(declinedRequests));
+        Assert.Equal(["value"], Assert.IsType<List<string>>(retained.BodyObject));
+        Assert.Equal(MigratedRequestsOutcome.Accepted, (await acceptedMigration.AsTask().WaitAsync(Timeout, Cancellation)).Requests);
+    }
+
+    private static Message CreateRequest(InProcessTestCluster cluster, GrainId grainId, long id, object body) => new()
+    {
+        Direction = Message.Directions.Request,
+        Id = new CorrelationId(id),
+        SendingGrain = GrainId.Create("test", "caller"),
+        SendingSilo = cluster.Silos[0].SiloAddress,
+        TargetGrain = grainId,
+        BodyObject = body,
+    };
+
+    private static Orleans.Serialization.Buffers.PooledBuffer CreatePooledBuffer(byte[] contents)
+    {
+        var buffer = new Orleans.Serialization.Buffers.PooledBuffer();
+        buffer.Write(contents);
+        return buffer;
+    }
+
     private sealed class UnserializableValue;
 
     [Fact]
@@ -1926,4 +2023,24 @@ public sealed class RetirementHandoffState
     public static RetirementHandoffState Create(Guid key) => States[key] = new();
 
     public static RetirementHandoffState Get(Guid key) => States[key];
+}
+
+/// <summary>
+/// A value which serializes but cannot be deserialized.
+/// </summary>
+public sealed class UnrestorableValue;
+
+[Orleans.RegisterSerializer]
+internal sealed class UnrestorableValueCodec : Orleans.Serialization.Codecs.IFieldCodec<UnrestorableValue>
+{
+    public void WriteField<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, Type? expectedType, UnrestorableValue? value)
+        where TBufferWriter : System.Buffers.IBufferWriter<byte>
+    {
+        Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(writer.Session);
+        writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(UnrestorableValue), Orleans.Serialization.WireProtocol.WireType.VarInt);
+        writer.WriteVarUInt32(0);
+    }
+
+    public UnrestorableValue ReadValue<TInput>(ref Orleans.Serialization.Buffers.Reader<TInput> reader, Orleans.Serialization.WireProtocol.Field field)
+        => throw new InvalidOperationException("This value cannot be deserialized.");
 }

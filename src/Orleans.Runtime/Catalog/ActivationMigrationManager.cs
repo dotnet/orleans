@@ -530,7 +530,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             && TryPackageRequests(targetSilo, ref package, requests, out packaged, out routes, out size);
 
         var workItem = _workItemPool.Get();
-        workItem.Initialize(package, carriesRequests ? requests : null, packaged, routes, size, _serializer.SessionPool);
+        workItem.Initialize(package, carriesRequests ? requests : null, packaged, routes, size, this);
         var workItemWriter = GetOrCreateWorker(targetSilo);
         if (!workItemWriter.TryWrite(workItem))
         {
@@ -636,7 +636,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
 
         bool Decline(List<Message> requests, ref List<MigratedRequest>? packaged, out List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes)
         {
-            RestoreRequests(requests, packaged!, _serializer.SessionPool);
+            RestoreRequests(requests, packaged!);
             packaged = null;
             routes = null;
             return false;
@@ -666,11 +666,25 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     /// <summary>
     /// Restores requests which were captured for migration but remain with this silo, since capturing them may have released the storage of their values.
     /// </summary>
-    private static void RestoreRequests(List<Message> requests, List<MigratedRequest> packaged, SerializerSessionPool sessionPool)
+    /// <remarks>
+    /// A request whose values cannot be restored cannot be delivered, so it is removed and failed. The other requests are restored regardless.
+    /// </remarks>
+    private void RestoreRequests(List<Message> requests, List<MigratedRequest> packaged)
     {
-        for (var i = 0; i < packaged.Count; i++)
+        // The captured requests correspond to the first requests in order. Restoring from the last keeps earlier indices valid as failed requests are removed.
+        for (var i = packaged.Count - 1; i >= 0; i--)
         {
-            packaged[i].RestoreTo(requests[i], sessionPool);
+            try
+            {
+                packaged[i].RestoreTo(requests[i], _serializer.SessionPool);
+            }
+            catch (Exception exception)
+            {
+                var request = requests[i];
+                requests.RemoveAt(i);
+                LogWarningMigratedRequestNotRestorable(exception, request.Id, request.TargetGrain);
+                FailRequest(request, exception);
+            }
         }
     }
 
@@ -966,7 +980,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
 
         private List<Message>? _requests;
         private List<MigratedRequest>? _packaged;
-        private SerializerSessionPool? _sessionPool;
+        private ActivationMigrationManager? _owner;
 
         public void Initialize(
             GrainMigrationPackage package,
@@ -974,12 +988,12 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             List<MigratedRequest>? packaged,
             List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes,
             long size,
-            SerializerSessionPool sessionPool)
+            ActivationMigrationManager owner)
         {
             _migrationPackage = package;
             _requests = requests;
             _packaged = packaged;
-            _sessionPool = sessionPool;
+            _owner = owner;
             Routes = routes;
             Size = size;
         }
@@ -990,7 +1004,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             _migrationPackage = default;
             _requests = null;
             _packaged = null;
-            _sessionPool = null;
+            _owner = null;
             Routes = null;
             Size = 0;
         }
@@ -1012,7 +1026,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             // Requests which the migration carried but which remain with the source are restored before the source forwards them.
             if (result.Requests is MigratedRequestsOutcome.Retained && _requests is not null && _packaged is { } packaged)
             {
-                RestoreRequests(_requests, packaged, _sessionPool!);
+                _owner!.RestoreRequests(_requests, packaged);
             }
 
             _core.SetResult(result);
@@ -1113,6 +1127,12 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         Message = "{Count} queued requests for migrating grain {GrainId} cannot be serialized together, so they are forwarded instead of migrating with it."
     )]
     private partial void LogDebugMigratedRequestsNotSerializable(Exception exception, int count, GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Request {MessageId} for grain {GrainId} stayed with this silo when its activation migrated, but its values cannot be restored, so it fails."
+    )]
+    private partial void LogWarningMigratedRequestNotRestorable(Exception exception, CorrelationId messageId, GrainId grainId);
 
     [LoggerMessage(
         Level = LogLevel.Debug,
