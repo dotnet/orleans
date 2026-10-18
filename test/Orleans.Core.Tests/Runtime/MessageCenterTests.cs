@@ -12,6 +12,7 @@ using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Connections;
 using Orleans.Connections.Transport;
+using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Messaging;
 using Orleans.Placement.Repartitioning;
@@ -221,7 +222,7 @@ public class MessageCenterTests
             routingServices.AddLogging();
             routingServices.AddSingleton(TimeProvider.System);
             routingServices.AddOptions<SiloMessagingOptions>().Configure(options => options.PlacementMaxRetries = 0);
-            routingServices.AddOrleansRuntimeResiliencePolicies();
+            OrleansRuntimeResiliencePolicies.AddOrleansRuntimeResiliencePolicies(routingServices);
             _routingServices = routingServices.BuildServiceProvider();
             var resolver = new GrainDirectoryResolver(
                 _routingServices, new GrainPropertiesResolver(services.GetRequiredService<IClusterManifestProvider>()), []);
