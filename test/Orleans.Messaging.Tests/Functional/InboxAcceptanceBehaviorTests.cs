@@ -75,6 +75,28 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
     }
 
     [Fact]
+    public async Task DuplicateOfCompletedMessage_WaitsUntilCompletionIsDurable()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+        var journalId = JournalId.FromGrainId(receiver.GetGrainId());
+        var envelope = CreateEnvelope(receiver, NewMessage(12, "completion-durability"));
+
+        // The first write accepts the message and the second records its completion.
+        var barrier = Fixture.Storage.BlockWrite(journalId, matchingWrite: 2);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        await barrier.WaitUntilEnteredAsync();
+
+        var duplicate = DeliverAsync(receiver, envelope);
+        await Task.WhenAny(duplicate, Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken));
+        Assert.False(duplicate.IsCompleted);
+
+        barrier.Release();
+        Assert.Equal(DeliveryStatus.Duplicate, (await duplicate).Status);
+        Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
+    }
+
+    [Fact]
     public async Task DuplicateAfterReactivationWithinRetention_RemainsEffectivelyOnce()
     {
         var receiver = NewGrain();
