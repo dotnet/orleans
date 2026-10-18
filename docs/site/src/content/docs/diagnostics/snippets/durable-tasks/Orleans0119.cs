@@ -1,6 +1,6 @@
 namespace Documentation.Diagnostics.DurableTasks;
 
-public sealed class NotificationGrain(IEmailSender email) : DurableGrain
+public sealed class NotificationGrain(IShipmentNotifier notifier) : DurableGrain
 {
 #pragma warning disable ORLEANS0119
     // <orleans0119_violation>
@@ -8,7 +8,7 @@ public sealed class NotificationGrain(IEmailSender email) : DurableGrain
     {
         // Starts the notification and never observes it: a failure goes unnoticed, and deleting this task's tree
         // cancels a notification which is still running.
-        await Notify(customer).WithId("notify").ScheduleAsync();
+        await notifier.NotifyShippedAsync(customer).WithId("notify").ScheduleAsync();
         await Pack().WithId("pack");
     }
     // </orleans0119_violation>
@@ -18,7 +18,7 @@ public sealed class NotificationGrain(IEmailSender email) : DurableGrain
     public async DurableTask ShipWhileNotifyingAsync(string customer)
     {
         // Notifies while the order is packed, and observes the notification's outcome before the task completes.
-        var notification = await Notify(customer).WithId("notify").ScheduleAsync();
+        var notification = await notifier.NotifyShippedAsync(customer).WithId("notify").ScheduleAsync();
         await Pack().WithId("pack");
         await notification;
     }
@@ -29,13 +29,16 @@ public sealed class NotificationGrain(IEmailSender email) : DurableGrain
     {
         await Pack().WithId("pack");
 
-        // Starts the notification as an independent task, which continues after this task completes.
-        _ = Notify(customer).Detached().WithId($"notify-{customer}").Post();
+        // Starts the notifier grain's durable call as an independent task, which continues after this task completes.
+        _ = notifier.NotifyShippedAsync(customer).Detached().WithId($"notify-{customer}").Post();
     }
     // </orleans0119_fix_detach>
 
     private static async DurableTask<bool> Pack() => true;
+}
 
-    private async DurableTask Notify(string customer) =>
-        await email.SendAsync(customer, "Your order shipped", DurableTask.Current.CancellationToken);
+// Stands in for a notifier grain's interface. Detaching applies to durable grain calls.
+public interface IShipmentNotifier
+{
+    DurableTask NotifyShippedAsync(string customer);
 }
