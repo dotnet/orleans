@@ -302,7 +302,9 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             {
                 var functionGraph = graph.GetAnonymousFunctionControlFlowGraph(function, context.CancellationToken);
                 var functionKind = ClassifyAnonymousFunction(function, functionGraph, kind);
-                if (analyzed && function.Symbol.IsAsync && function.Symbol.ReturnsVoid)
+
+                // ORLEANS0122 reports async void delegates which DurableTask.RunInline and DurableTask.Run receive.
+                if (analyzed && function.Symbol.IsAsync && function.Symbol.ReturnsVoid && !IsDurableTaskDelegate(function))
                 {
                     Report(DurableTaskDiagnostics.AsyncVoidInBody, function.Syntax.GetLocation(), "async lambda");
                 }
@@ -311,10 +313,12 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             }
         }
 
+        private bool IsDurableTaskDelegate(IFlowAnonymousFunctionOperation function) =>
+            DurableTaskSymbols.GetDelegateReceiver(function) is { } invocation && (symbols.IsRunInline(invocation) || symbols.IsRun(invocation));
 
         private FunctionKind ClassifyAnonymousFunction(IFlowAnonymousFunctionOperation function, ControlFlowGraph graph, FunctionKind enclosing)
         {
-            if (GetReceivingInvocation(function) is { } invocation)
+            if (DurableTaskSymbols.GetDelegateReceiver(function) is { } invocation)
             {
                 if (symbols.IsRunInline(invocation))
                 {
@@ -338,26 +342,6 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             }
 
             return PerformsDirectDurableOperations(symbols, graph) ? FunctionKind.Helper : FunctionKind.None;
-        }
-
-        /// <summary>Returns the invocation which receives a lambda as an argument, if any.</summary>
-        private static IInvocationOperation? GetReceivingInvocation(IOperation function)
-        {
-            for (var current = function.Parent; current is not null; current = current.Parent)
-            {
-                switch (current)
-                {
-                    case IDelegateCreationOperation:
-                    case IConversionOperation:
-                        continue;
-                    case IArgumentOperation { Parent: IInvocationOperation invocation }:
-                        return invocation;
-                    default:
-                        return null;
-                }
-            }
-
-            return null;
         }
 
         private static IEnumerable<IFlowAnonymousFunctionOperation> AnonymousFunctions(ControlFlowGraph graph)

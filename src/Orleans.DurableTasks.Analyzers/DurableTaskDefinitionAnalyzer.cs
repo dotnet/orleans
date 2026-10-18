@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
@@ -9,12 +10,14 @@ namespace Orleans.DurableTasks.Analyzers;
 
 /// <summary>
 /// Reports durable task definitions which never run, which run more than once, or which are posted from code without a
-/// durable outbox.
+/// durable outbox, and handles of scheduled children which nothing observes.
 /// </summary>
 /// <remarks>
 /// A method which returns <c>DurableTask</c> creates a definition, which runs when it is awaited, scheduled, or posted.
 /// An <c>async DurableTask</c> method's definition is single-use: it runs its state machine once. <c>Post</c> stages a
-/// start in the durable outbox of the grain which runs the calling code.
+/// start in the durable outbox of the grain which runs the calling code. In a durable task body, <c>ScheduleAsync</c>
+/// starts an attached child, which the execution owns. The analysis of locals reports only definite cases: a local which
+/// any reference passes on, or which code assigns again, counts as observed.
 /// </remarks>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
@@ -23,7 +26,8 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(
         DurableTaskDiagnostics.UnobservedDefinition,
         DurableTaskDiagnostics.ReusedDefinition,
-        DurableTaskDiagnostics.PostWithoutOutbox);
+        DurableTaskDiagnostics.PostWithoutOutbox,
+        DurableTaskDiagnostics.UnobservedHandle);
 
     /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
@@ -51,12 +55,16 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
             value = discard.Value;
         }
 
-        if (DurableTaskSymbols.Unwrap(value) is IInvocationOperation invocation && symbols.ReturnsDefinition(invocation.TargetMethod))
+        if (IsDefinition(value, symbols))
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 DurableTaskDiagnostics.UnobservedDefinition,
                 context.Operation.Syntax.GetLocation(),
-                invocation.TargetMethod.Name));
+                GetDefinitionName(value)));
+        }
+        else if (GetOwnedSchedule(value, context.ContainingSymbol, symbols) is { } schedule)
+        {
+            ReportUnobservedHandle(context.ReportDiagnostic, schedule);
         }
     }
 
@@ -66,7 +74,7 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
         var invocation = (IInvocationOperation)context.Operation;
         if (!DurableTaskSymbols.IsPost(invocation)
             || symbols.IsGrain(context.ContainingSymbol.ContainingType)
-            || RunsInDurableBody(invocation, context.ContainingSymbol, symbols))
+            || symbols.IsInDurableBody(invocation, context.ContainingSymbol))
         {
             return;
         }
@@ -74,58 +82,57 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             DurableTaskDiagnostics.PostWithoutOutbox,
             invocation.Syntax.GetLocation(),
-            GetDefinitionName(invocation)));
+            DurableTaskSymbols.GetExtensionReceiver(invocation) is { } receiver ? GetDefinitionName(receiver) : invocation.TargetMethod.Name));
     }
 
+    /// <summary>Returns whether a value creates a definition or configures one.</summary>
+    private static bool IsDefinition(IOperation value, DurableTaskSymbols symbols) =>
+        DurableTaskSymbols.Unwrap(value) is IInvocationOperation invocation && symbols.ReturnsDefinition(invocation.TargetMethod);
+
+    /// <summary>Returns the name of the method which defines a task, through any configuration calls.</summary>
+    private static string GetDefinitionName(IOperation value) =>
+        DurableTaskSymbols.GetDefinition(value, "WithId", out _) switch
+        {
+            IInvocationOperation invocation => invocation.TargetMethod.Name,
+            var definition => definition.Syntax.ToString(),
+        };
+
     /// <summary>
-    /// Returns whether an operation runs in a durable task body: an <c>async DurableTask</c> method, or a delegate which a
-    /// durable task factory, such as <c>DurableTask.Run</c>, runs, including code which such a body contains.
+    /// Returns the <c>ScheduleAsync</c> call which a value awaits when it starts a child which a durable task body owns: a
+    /// definition which isn't detached, scheduled in a durable task body.
     /// </summary>
-    private static bool RunsInDurableBody(IOperation operation, ISymbol containingSymbol, DurableTaskSymbols symbols)
+    private static IInvocationOperation? GetOwnedSchedule(IOperation value, ISymbol containingSymbol, DurableTaskSymbols symbols)
     {
-        for (var current = operation.Parent; current is not null; current = current.Parent)
+        if (DurableTaskSymbols.Unwrap(value) is not IAwaitOperation await
+            || DurableTaskSymbols.Unwrap(await.Operation) is not IInvocationOperation { TargetMethod.Name: "ScheduleAsync" } schedule
+            || !DurableTaskSymbols.IsDurableTasksType(schedule.TargetMethod.ContainingType)
+            || !(DurableTaskSymbols.IsDurableTasksType(await.Type) && await.Type!.Name == "ScheduledTask")
+            || DurableTaskSymbols.GetExtensionReceiver(schedule) is not { } receiver)
         {
-            switch (current)
-            {
-                case IAnonymousFunctionOperation function
-                    when symbols.IsDurableBody(function.Symbol) || IsDurableTaskFactoryArgument(function):
-                    return true;
-                case ILocalFunctionOperation local when symbols.IsDurableBody(local.Symbol):
-                    return true;
-            }
+            return null;
         }
 
-        return containingSymbol is IMethodSymbol method && symbols.IsDurableBody(method);
+        DurableTaskSymbols.GetDefinition(receiver, "Detached", out var detached);
+        return detached || !symbols.IsInDurableBody(await, containingSymbol) ? null : schedule;
     }
 
-    private static bool IsDurableTaskFactoryArgument(IAnonymousFunctionOperation function) =>
-        function.Parent is IDelegateCreationOperation { Parent: IArgumentOperation { Parent: IInvocationOperation factory } }
-        && DurableTaskSymbols.IsDurableTasksType(factory.TargetMethod.ContainingType);
-
-    /// <summary>Returns the name of the method which defines the posted task, through any configuration calls.</summary>
-    private static string GetDefinitionName(IInvocationOperation post)
-    {
-        var current = DurableTaskSymbols.GetExtensionReceiver(post);
-        while (current is not null && DurableTaskSymbols.Unwrap(current) is IInvocationOperation invocation)
-        {
-            if (!DurableTaskSymbols.IsConfiguration(invocation))
-            {
-                return invocation.TargetMethod.Name;
-            }
-
-            current = DurableTaskSymbols.GetExtensionReceiver(invocation);
-        }
-
-        return post.TargetMethod.Name;
-    }
+    private static void ReportUnobservedHandle(Action<Diagnostic> report, IInvocationOperation schedule) =>
+        report(Diagnostic.Create(
+            DurableTaskDiagnostics.UnobservedHandle,
+            schedule.Syntax.GetLocation(),
+            GetDefinitionName(DurableTaskSymbols.GetExtensionReceiver(schedule)!)));
 
     /// <summary>
-    /// Reports the second run of a local which holds a single-use definition: a second reference, or a reference in a loop
-    /// which doesn't create the definition.
+    /// Reports locals which hold a definition that never runs or the handle of an owned child which nothing observes, and
+    /// the second run of a local which holds a single-use definition: a second reference, or a reference in a loop which
+    /// doesn't create the definition.
     /// </summary>
     private static void AnalyzeLocals(OperationBlockAnalysisContext context, DurableTaskSymbols symbols)
     {
+        var definitions = new Dictionary<ILocalSymbol, IVariableDeclaratorOperation>(SymbolEqualityComparer.Default);
         var singleUse = new Dictionary<ILocalSymbol, SyntaxNode>(SymbolEqualityComparer.Default);
+        var handles = new Dictionary<ILocalSymbol, IInvocationOperation>(SymbolEqualityComparer.Default);
+        var aliases = new Dictionary<IOperation, ILocalSymbol>();
         var reassigned = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
         var references = new Dictionary<ILocalSymbol, List<ILocalReferenceOperation>>(SymbolEqualityComparer.Default);
         foreach (var block in context.OperationBlocks)
@@ -134,9 +141,28 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
             {
                 switch (operation)
                 {
-                    case IVariableDeclaratorOperation { Initializer.Value: { } initializer } declarator
-                        when IsSingleUseDefinition(initializer, symbols):
-                        singleUse[declarator.Symbol] = declarator.Syntax;
+                    case IVariableDeclaratorOperation { Initializer.Value: { } initializer } declarator:
+                        if (DurableTaskSymbols.GetDefinition(initializer, "WithId", out _) is ILocalReferenceOperation source
+                            && symbols.IsDefinitionType(source.Type))
+                        {
+                            aliases[source] = declarator.Symbol;
+                        }
+                        else if (IsDefinition(initializer, symbols))
+                        {
+                            definitions[declarator.Symbol] = declarator;
+                        }
+
+                        if (IsSingleUseDefinition(initializer, symbols))
+                        {
+                            singleUse[declarator.Symbol] = declarator.Syntax;
+                        }
+
+
+                        if (GetOwnedSchedule(initializer, context.OwningSymbol, symbols) is { } schedule)
+                        {
+                            handles[declarator.Symbol] = schedule;
+                        }
+
                         break;
                     case ISimpleAssignmentOperation { Target: ILocalReferenceOperation target }:
                         reassigned.Add(target.Local);
@@ -150,6 +176,25 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
                         list.Add(reference);
                         break;
                 }
+            }
+        }
+
+        foreach (var pair in definitions)
+        {
+            if (IsUnobserved(pair.Key, []))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DurableTaskDiagnostics.UnobservedDefinition,
+                    pair.Value.Syntax.GetLocation(),
+                    GetDefinitionName(pair.Value.Initializer!.Value)));
+            }
+        }
+
+        foreach (var pair in handles)
+        {
+            if (!reassigned.Contains(pair.Key) && (!references.TryGetValue(pair.Key, out var uses) || uses.TrueForAll(IsPropertyRead)))
+            {
+                ReportUnobservedHandle(context.ReportDiagnostic, pair.Value);
             }
         }
 
@@ -171,32 +216,40 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
                 }
             }
         }
+
+        // A local's definition never runs when the local is never assigned again and its only references initialize
+        // aliases whose definitions never run either.
+        bool IsUnobserved(ILocalSymbol local, HashSet<ILocalSymbol> visited)
+        {
+            if (!visited.Add(local) || reassigned.Contains(local))
+            {
+                return false;
+            }
+
+            if (references.TryGetValue(local, out var uses))
+            {
+                foreach (var use in uses)
+                {
+                    if (!aliases.TryGetValue(use, out var alias) || !IsUnobserved(alias, visited))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
     }
+
+    private static bool IsPropertyRead(ILocalReferenceOperation reference) =>
+        reference.Parent is IPropertyReferenceOperation property && property.Instance == reference && !IsAssignmentTarget(property);
 
     /// <summary>
     /// Returns whether a value is a single-use definition: a call to an async method in this compilation which returns
     /// <c>DurableTask</c>, optionally configured with <c>WithId</c>, <c>Detached</c>, or <c>Shielded</c>.
     /// </summary>
-    private static bool IsSingleUseDefinition(IOperation value, DurableTaskSymbols symbols)
-    {
-        var current = DurableTaskSymbols.Unwrap(value);
-        while (current is IInvocationOperation invocation)
-        {
-            if (symbols.IsDurableBody(invocation.TargetMethod))
-            {
-                return true;
-            }
-
-            if (!DurableTaskSymbols.IsConfiguration(invocation) || DurableTaskSymbols.GetExtensionReceiver(invocation) is not { } receiver)
-            {
-                return false;
-            }
-
-            current = DurableTaskSymbols.Unwrap(receiver);
-        }
-
-        return false;
-    }
+    private static bool IsSingleUseDefinition(IOperation value, DurableTaskSymbols symbols) =>
+        DurableTaskSymbols.GetDefinition(value, "WithId", out _) is IInvocationOperation invocation && symbols.IsDurableBody(invocation.TargetMethod);
 
     private static bool IsAssignmentTarget(IOperation reference) =>
         reference.Parent is ISimpleAssignmentOperation assignment && assignment.Target == reference;

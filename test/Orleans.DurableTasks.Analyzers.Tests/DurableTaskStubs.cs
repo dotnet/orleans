@@ -117,6 +117,7 @@ internal static class DurableTaskStubs
                 public static ConfiguredDurableTask Shielded(this DurableTask task) => default;
                 public static ConfiguredDurableTask<TResult> Shielded<TResult>(this DurableTask<TResult> task) => default;
                 public static Task<ScheduledTask> ScheduleAsync(this DurableTask task, CancellationToken cancellationToken = default) => null!;
+                public static Task<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, CancellationToken cancellationToken = default) => null!;
                 public static ScheduledTask Post(this DurableTask task) => null!;
                 public static ScheduledTask<TResult> Post<TResult>(this DurableTask<TResult> task) => null!;
                 public static DurableTask<TResult> WaitAsync<TResult>(this DurableTask<TResult> task, TimeSpan timeout) => null!;
@@ -124,10 +125,14 @@ internal static class DurableTaskStubs
 
             public abstract class ScheduledTask
             {
+                public string Id => string.Empty;
+                public DurableTaskAwaiter GetAwaiter() => default;
+                public static Task WhenAll(IReadOnlyList<ScheduledTask> tasks, CancellationToken cancellationToken = default) => null!;
             }
 
             public abstract class ScheduledTask<TResult> : ScheduledTask
             {
+                public new DurableTaskAwaiter<TResult> GetAwaiter() => default;
                 public Task<TResult> WaitUntilAsync(DateTimeOffset dueTime, CancellationToken cancellationToken = default) => null!;
             }
 
@@ -136,6 +141,7 @@ internal static class DurableTaskStubs
                 public DurableSignal(string name) { }
                 public DurableSignal<T> For(string suffix) => this;
                 public DurableTask<T> WaitAsync() => null!;
+                public DurableTask<(bool Received, T Value)> TryWaitAsync(DateTimeOffset deadline) => null!;
             }
 
             public sealed class DurableVersion
