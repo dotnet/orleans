@@ -27,7 +27,7 @@ A replay runs the body from the start, so it produces another value:
 
 - **Another deadline.** The replay computes a deadline from the current clock. The recorded wait keeps its recorded due time, so the value which the body computed disagrees with the wait which it scheduled.
 - **Another key.** A replay which reaches the `charge` step before it recorded a result runs the step with a new key, so the payment provider can't recognize the retry and charges again.
-- **Divergence.** A value which reaches a durable call's arguments, a `WithId` name, or a branch makes the replay schedule a different operation than the one which the first run recorded, and the operation fails with a divergence error.
+- **Divergence.** A value which reaches a durable call's arguments, a `WithId` name, or a branch makes the replay schedule a different operation than the one which the first run recorded, and the execution diverges and stalls until code which matches the record replays it.
 
 For the rules and the replay model, see [Replay-safety rules](../grains/durable-tasks-replay-rules.md).
 

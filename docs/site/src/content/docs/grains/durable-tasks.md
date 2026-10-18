@@ -223,8 +223,9 @@ current work item instead of being scheduled.
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_effect_and_step" language="csharp":::
 
-A replay which finds one kind recorded where the body now runs the other fails with a
-divergence error which names both, instead of running the work again. A deployment
+A replay which finds one kind recorded where the body now runs the other diverges
+instead of running the work again: its execution stalls, and `ExecutionStalled` names
+both kinds. A deployment
 which changes an effect into a step, or a step into an effect, branches on
 [`DurableTask.GetVersion`](durable-tasks-versioning.md) so that executions which
 recorded the old kind keep it.
@@ -347,8 +348,10 @@ run which ended before a journal write committed its work is replayed, so code w
 only while `IsReplaying` is `false` can run twice or never, and code which branches on it
 schedules different operations in different runs.
 
-A replay which schedules a different operation under a recorded ID fails with an
-`InvalidOperationException` which names the recorded and the requested operations. See
+A replay which schedules a different operation under a recorded ID, or which can't decode
+a recorded outcome, diverges: the runtime stalls its execution, which stays pending until
+code which matches the record replays it, and raises `ExecutionStalled`, which names the
+recorded and the requested operations. See
 [Diagnose replay divergence](durable-tasks-operations.md#diagnose-replay-divergence).
 To change a workflow while executions are pending, branch on
 `DurableTask.GetVersion`, which gives each execution the version of the change which it

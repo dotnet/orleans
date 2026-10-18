@@ -48,6 +48,15 @@ that every execution reaches it with the operations which its version expects.
   history.
 - Version decisions are scoped to an invoked task's execution tree: a call to another
   grain decides its own versions.
+- A decision applies to the execution which records it and to the steps beneath it. A
+  step which checks a change before its parent does records its own decision, which
+  doesn't bind the parent: the parent's later check decides from the parent's history.
+- A task whose cancellation was requested replays with the request in place from its
+  start, so its body takes its compensation path at once. A check which only
+  compensation reaches, and which no earlier run recorded, finds the operations which the
+  earlier run recorded ahead of it and decides `0`. Check the change before the body
+  branches on cancellation, such as at the start of the body, when compensation depends on
+  the version.
 - The check runs on the activation's scheduler, as `DurableTask.RunInline` does. Outside a
   durable task, it returns `maxSupported`.
 - Names follow the rules for operation names: they're non-empty and don't contain `$`.
@@ -99,36 +108,48 @@ old name would decide version `0` for it.
 
 ## Stalled executions
 
-An execution whose recorded version lies outside the range which the running code
-supports stalls. The runtime cancels the attempt with the reason
-`UnsupportedVersion`, as it cancels the attempts of a stopping activation; see
-[Task cancellation and attempt cancellation](durable-tasks-structured-concurrency.md#task-cancellation-and-attempt-cancellation).
+An execution stalls when the running code can't replay it. The runtime cancels the
+attempt with one of two reasons, as it cancels the attempts of a stopping activation;
+see
+[Task cancellation and attempt cancellation](durable-tasks-structured-concurrency.md#task-cancellation-and-attempt-cancellation):
+
+| Reason | Cause | Inner exception |
+| --- | --- | --- |
+| `UnsupportedVersion` | The execution recorded a version outside the range which the running code supports. | A `DurableTaskVersionException`, which names the change, the recorded version, and the supported range |
+| `Diverged` | The replay requested another operation under a recorded ID, or a recorded outcome no longer decodes. See [Diagnose replay divergence](durable-tasks-operations.md#diagnose-replay-divergence). | An `InvalidOperationException` which names the recorded and the requested operations, or the decoding failure |
+
 The runtime:
 
-- Throws `DurableTaskAttemptCanceledException` from the check, with a
-  `DurableTaskVersionException` as its inner exception, which names the change, the
-  recorded version, and the supported range. The attempt's later durable operations and
-  journaled state changes throw the same cancellation, and `AttemptCancellationToken`
-  is canceled, so the attempt unwinds through its `finally` blocks.
+- Throws `DurableTaskAttemptCanceledException` from the operation which found the stall,
+  with the inner exception above. The attempt's later durable operations throw the same
+  cancellation, and `AttemptCancellationToken` is canceled,
+  so the attempt unwinds through its `finally` blocks.
 - Discards the attempt's result, whatever the body does with the exception.
 - Keeps the task pending. Callers which await it keep waiting.
-- Logs a warning and raises the `ExecutionStalled` event, which carries the
-  `DurableTaskVersionException`.
-- Keeps a wake-up for the grain, so a later activation replays the task, for example on
-  the silos of the next deployment.
+- Logs a warning and raises the `ExecutionStalled` event, which carries the `Reason` and
+  the `Exception`.
+- Keeps a wake-up for the grain every `DurableTaskOptions.StalledExecutionRetryInterval`,
+  one minute by default, so a later activation replays the task, for example on the silos
+  of the next deployment.
 
-A stall happens when a deployment raises `minSupported` while executions follow the
-retired version, or when code which supports fewer versions replays an execution, such
-as during a rollback. Deploy code which supports the recorded version, or abort the task;
+A version stall happens when a deployment raises `minSupported` while executions follow
+the retired version, or when code which supports fewer versions replays an execution,
+such as during a rollback. Deploy code which supports the recorded version, or code which
+matches the record of a diverged execution, and the execution resumes; or abort the task,
 see [Abort stuck tasks](durable-tasks-operations.md#abort-stuck-tasks).
 
 ### Rolling deployments
 
 During a rolling deployment, a grain can activate on a silo which runs the previous
 code. That code stalls executions which recorded a version newer than its
-`maxSupported`. Code from before a change's first check has no check, so it continues
-every execution on the code before the change. Let a deployment which adds a change's
-first check complete on every silo before work depends on the new version.
+`maxSupported`, and resumes none of them until a silo with newer code activates the
+grain. Code from before a change's first check has no check, so it continues every
+execution on the code before the change, including executions which newer code started.
+
+Drain old executions first. Let a deployment which adds a change's first check, or raises
+`maxSupported`, complete on every silo before work depends on the new version, and let
+executions which earlier code started complete before a later deployment retires their
+version.
 
 ## Monitor versions
 
@@ -140,7 +161,8 @@ stalls:
 
 `VersionRecorded` reports the execution, the change's name, and the version: `0` for an
 execution which earlier code ran past the check. `ExecutionStalled` reports the stalled
-execution and its `DurableTaskVersionException`.
+execution, the `Reason`, `UnsupportedVersion` or `Diverged`, and the `Exception` which
+describes the stall.
 
 ## Choose versions or new methods
 

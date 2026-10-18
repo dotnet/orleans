@@ -24,7 +24,7 @@ A durable task body awaits an operation which isn't durable, such as an `HttpCli
 A replay runs the code before the body's last durable operation again, including each await in it. An external await then:
 
 - **Repeats its effects.** A call which changes another system, such as sending a message or creating a record, runs once per replay.
-- **Observes another result.** The replay receives another exchange rate and passes another amount to the recorded `bill` step, which fails with a divergence error when the step is a call to another grain, and otherwise returns the recorded total for a different amount.
+- **Observes another result.** The replay receives another exchange rate and passes another amount to the recorded `bill` step, which diverges and stalls the execution when the step is a call to another grain, and otherwise returns the recorded total for a different amount.
 - **Fails where the first run succeeded.** A replay which runs while the service is unavailable fails the task, although every recorded operation succeeded.
 
 A step records its result, so a replay returns the result without awaiting the operation again.

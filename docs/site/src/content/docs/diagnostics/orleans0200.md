@@ -24,7 +24,7 @@ A durable task body reads or changes grain state at a point from which the body 
 A replay runs the body from the start, and each recorded operation returns its recorded outcome. Grain state isn't rebuilt: it holds every committed change, including the changes which later operations made. The code before the body's last durable operation therefore runs again against newer state:
 
 - **Writes apply again.** After a deactivation, the replay of `RemindAsync` increments `_remindersSent` a second time, although the reminder was sent once.
-- **Reads observe later writes.** The replay of `ShipWhenPaidAsync` reads `Shipped`, which the recorded `ship` step wrote, and skips the branch which the first run took. A replay which schedules different operations, or the same operations with different arguments, returns a different result or fails with a divergence error.
+- **Reads observe later writes.** The replay of `ShipWhenPaidAsync` reads `Shipped`, which the recorded `ship` step wrote, and skips the branch which the first run took. A replay which schedules different operations, or the same operations with different arguments, returns a different result or diverges and stalls the execution.
 
 Three places access grain state once:
 

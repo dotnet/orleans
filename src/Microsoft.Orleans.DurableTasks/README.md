@@ -163,7 +163,7 @@ var placement = await order.PlaceOrderAsync(request).WithId(PlaceOrderTaskId(ord
 - A detached call is an independent root task on its target. The execution records it under
   `{taskId}/$detach:{target}:{rootId}`, whose fingerprint covers the root ID and the request, so a
   replay which reaches the record doesn't start the task again and one which starts another request
-  under the same record fails as a divergence. The invocation carries the request and names the record
+  under the same record diverges. The invocation carries the request and names the record
   as a subscriber, and the target adds the record to the task's completion destinations when it stores
   the task.
   The record observes the task like a `GetDurableTask` subscription: the task's result completes it,
@@ -460,9 +460,18 @@ synchronously on the activation which makes them, when the runtime stages them: 
   `x`, as `WithId("x")` names a child, and an unnamed effect,
   `DurableTask.RunInline(effect)`, takes the execution's next generated child
   identifier, such as `$child-3`. A replay which finds a child where an effect
-  runs, or an effect where a child starts, fails as a divergence which names both
+  runs, or an effect where a child starts, diverges, and the divergence names both
   kinds; so does a named combinator's input beneath an effect's identifier, or an
   effect where a named combinator recorded its inputs.
+- A replay which diverges from its execution's record, by requesting another operation
+  under a recorded identifier or by finding a recorded outcome which no longer decodes,
+  stalls: the runtime cancels the attempt with
+  `DurableTaskAttemptCancellationReason.Diverged`, as it does with `UnsupportedVersion`
+  for an unsupported version, discards its result, keeps the task pending, and raises
+  `ExecutionStalled` with the reason and the divergence. The grain wakes every
+  `DurableTaskOptions.StalledExecutionRetryInterval`, so a later activation replays the
+  execution with the code it runs. A caller whose start conflicts with a different
+  request under the same root identifier still receives `DurableTaskConflictException`.
 - `DurableTask.GetVersion(name, minSupported, maxSupported)` records the version of a
   change which an execution follows as a terminal entry of its tree,
   `{taskId}/$version:{name}`, at the execution's first check of the name, staged like
