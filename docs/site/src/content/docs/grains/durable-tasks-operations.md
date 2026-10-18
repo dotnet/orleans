@@ -177,8 +177,9 @@ replay under the new code:
 
 - Keep existing steps, `Once` effects, and detached starts, with their IDs and arguments. A
   changed `Once` delegate doesn't affect executions which recorded it: they return the
-  recorded result. Turning a recorded step into an effect under the same name, or the
-  reverse, fails as a divergence.
+  recorded result. An effect and a step with the same name share an ID, so turning a
+  recorded step into an effect, or the reverse, fails as a divergence; branch that
+  change on `DurableTask.GetVersion`.
 - Give new steps new IDs, and place steps which depend on new behavior after the
   existing ones.
 - Name every child and combinator which a later change might move, so generated IDs

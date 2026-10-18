@@ -41,7 +41,7 @@ public sealed class ReportGrain(IDurableTaskManager tasks) : DurableGrain, IRepo
     // The caller starts this task under the root ID "publish-{reportId}", which DurableTask.Current.Id reports.
     public async DurableTask<PublishReceipt> PublishAsync(string[] sections)
     {
-        // publish-{reportId}/$once:version, a named recorded effect.
+        // publish-{reportId}/version, a named recorded effect, as WithId("version") names a step.
         var version = DurableTask.Once("version", () => DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
         // publish-{reportId}/$child-1, the execution's first unnamed operation.
