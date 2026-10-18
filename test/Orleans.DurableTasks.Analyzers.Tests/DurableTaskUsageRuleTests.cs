@@ -25,8 +25,8 @@ public class DurableTaskUsageRuleTests
             public async DurableTask<int> RunAsync()
             {
                 var captured = 0;
-                DurableTask.RunInline("assign", () => { {|ORLEANS0104:captured = 1|}; });
-                DurableTask.RunInline("increment", () => { {|ORLEANS0104:captured++|}; });
+                DurableTask.RunInline("assign", () => { {|ORLEANS0204:captured = 1|}; });
+                DurableTask.RunInline("increment", () => { {|ORLEANS0204:captured++|}; });
                 var returned = DurableTask.RunInline("return", () =>
                 {
                     var local = 2;
@@ -48,22 +48,22 @@ public class DurableTaskUsageRuleTests
             public async DurableTask<int> RunAsync()
             {
                 var captured = 0;
-                DurableTask.RunInline(() => { {|ORLEANS0104:captured = 1|}; });
-                DurableTask.{|ORLEANS0120:RunInline|}(() => { {|ORLEANS0104:captured++|}; });
-                var returned = DurableTask.{|ORLEANS0120:RunInline|}(() =>
+                DurableTask.RunInline(() => { {|ORLEANS0204:captured = 1|}; });
+                DurableTask.{|ORLEANS0220:RunInline|}(() => { {|ORLEANS0204:captured++|}; });
+                var returned = DurableTask.{|ORLEANS0220:RunInline|}(() =>
                 {
                     var local = 2;
                     local++;
                     _status.Value = local;
                     return local;
                 });
-                DurableTask.{|ORLEANS0120:RunInline|}(() => {|ORLEANS0109:Task.Run(() => 1)|}.Result);
+                DurableTask.{|ORLEANS0220:RunInline|}(() => {|ORLEANS0209:Task.Run(() => 1)|}.Result);
 
                 // Unnamed effects take generated identifiers, so neither a result which contains '$' nor a repeated call
                 // site is a name.
-                DurableTask.{|ORLEANS0120:RunInline|}(() => "$value");
-                DurableTask.{|ORLEANS0120:RunInline|}(() => 3);
-                DurableTask.{|ORLEANS0120:RunInline|}(() => 3);
+                DurableTask.{|ORLEANS0220:RunInline|}(() => "$value");
+                DurableTask.{|ORLEANS0220:RunInline|}(() => 3);
+                DurableTask.{|ORLEANS0220:RunInline|}(() => 3);
                 await Step(captured + returned).WithId("step");
                 return returned;
             }
@@ -77,13 +77,13 @@ public class DurableTaskUsageRuleTests
         {{Members}}
             public async DurableTask RunAsync()
             {
-                {|ORLEANS0105:Step(1);|}
-                {|ORLEANS0105:_ = LocalStep(2);|}
-                {|ORLEANS0105:Step(3).WithId("unobserved");|}
-                {|ORLEANS0105:Step(3).Detached().Shielded();|}
+                {|ORLEANS0205:Step(1);|}
+                {|ORLEANS0205:_ = LocalStep(2);|}
+                {|ORLEANS0205:Step(3).WithId("unobserved");|}
+                {|ORLEANS0205:Step(3).Detached().Shielded();|}
                 await Step(4).WithId("awaited");
                 Step(5).Detached().Post();
-                _ = await {|ORLEANS0119:Step(5).WithId("discarded").ScheduleAsync()|};
+                _ = await {|ORLEANS0219:Step(5).WithId("discarded").ScheduleAsync()|};
                 var definition = Step(6);
                 await definition.WithId("later");
             }
@@ -101,9 +101,9 @@ public class DurableTaskUsageRuleTests
 
             public async DurableTask RunAsync(bool condition)
             {
-                var {|ORLEANS0105:write = DurableTask.Run(SaveAsync)|};
-                var {|ORLEANS0105:named = Step(1).WithId("named")|};
-                var {|ORLEANS0105:original = Step(2)|};
+                var {|ORLEANS0205:write = DurableTask.Run(SaveAsync)|};
+                var {|ORLEANS0205:named = Step(1).WithId("named")|};
+                var {|ORLEANS0205:original = Step(2)|};
                 var alias = original;
                 var configured = alias.WithId("alias");
 
@@ -147,9 +147,9 @@ public class DurableTaskUsageRuleTests
 
             public async DurableTask RunAsync()
             {
-                await {|ORLEANS0119:Step(1).WithId("discarded").ScheduleAsync()|};
-                var unobserved = await {|ORLEANS0119:Step(2).WithId("unobserved").ScheduleAsync()|};
-                var identified = await {|ORLEANS0119:Step(3).WithId("identified").ScheduleAsync()|};
+                await {|ORLEANS0219:Step(1).WithId("discarded").ScheduleAsync()|};
+                var unobserved = await {|ORLEANS0219:Step(2).WithId("unobserved").ScheduleAsync()|};
+                var identified = await {|ORLEANS0219:Step(3).WithId("identified").ScheduleAsync()|};
                 _ = identified.Id;
 
                 var awaited = await Step(4).WithId("awaited").ScheduleAsync();
@@ -175,12 +175,12 @@ public class DurableTaskUsageRuleTests
             {
                 var once = LocalStep(1);
                 await once.WithId("first");
-                await {|ORLEANS0106:once|}.WithId("second");
+                await {|ORLEANS0206:once|}.WithId("second");
 
                 var outside = LocalStep(2);
                 foreach (var item in items)
                 {
-                    await {|ORLEANS0106:outside|}.WithId($"loop-{item}");
+                    await {|ORLEANS0206:outside|}.WithId($"loop-{item}");
                 }
 
                 foreach (var item in items)
@@ -195,7 +195,7 @@ public class DurableTaskUsageRuleTests
 
                 var configured = LocalStep(3).Detached();
                 configured.Post();
-                {|ORLEANS0106:configured|}.Post();
+                {|ORLEANS0206:configured|}.Post();
             }
         }
         """);
@@ -207,8 +207,8 @@ public class DurableTaskUsageRuleTests
         {{Members}}
             public async DurableTask RunAsync()
             {
-                await Step(1).WithId({|ORLEANS0107:"line$2"|});
-                DurableTask.RunInline({|ORLEANS0107:"$effect"|}, () => 1);
+                await Step(1).WithId({|ORLEANS0207:"line$2"|});
+                DurableTask.RunInline({|ORLEANS0207:"$effect"|}, () => 1);
                 await Step(2).WithId("valid");
             }
         }
@@ -227,7 +227,7 @@ public class DurableTaskUsageRuleTests
             }
 
             // A DurableTask.RunInline name identifies an effect only in a durable task, which runs this helper.
-            private static int Record() => DurableTask.RunInline({|ORLEANS0107:"record$1"|}, () => 1);
+            private static int Record() => DurableTask.RunInline({|ORLEANS0207:"record$1"|}, () => 1);
         }
         """);
     [Fact]
@@ -238,8 +238,8 @@ public class DurableTaskUsageRuleTests
             public async DurableTask RunAsync(bool condition, int[] items)
             {
                 await Step(1).WithId("pay");
-                await Step(2).WithId({|ORLEANS0108:"pay"|});
-                DurableTask.RunInline({|ORLEANS0108:"pay"|}, () => 3);
+                await Step(2).WithId({|ORLEANS0208:"pay"|});
+                DurableTask.RunInline({|ORLEANS0208:"pay"|}, () => 3);
 
                 if (condition)
                 {
@@ -266,9 +266,9 @@ public class DurableTaskUsageRuleTests
             public async DurableTask RunAsync()
             {
                 await Step(1).WithId("step");
-                await {|ORLEANS0109:Task.Run(() => { })|};
-                var thread = {|ORLEANS0109:new Thread(() => { })|};
-                DurableTask.RunInline("effect", () => {|ORLEANS0109:Task.Run(() => 1)|}.Result);
+                await {|ORLEANS0209:Task.Run(() => { })|};
+                var thread = {|ORLEANS0209:new Thread(() => { })|};
+                DurableTask.RunInline("effect", () => {|ORLEANS0209:Task.Run(() => 1)|}.Result);
             }
 
             public async Task OrdinaryAsync() => await Task.Run(() => { });
@@ -283,7 +283,7 @@ public class DurableTaskUsageRuleTests
             public async DurableTask RunAsync(int[] items)
             {
                 await DurableTask.WhenAll(items.Select(item => Step(item))).WithId("durable");
-                await {|ORLEANS0110:Task.WhenAll(items.Select(async item => await Step(item).WithId($"task-{item}")))|};
+                await {|ORLEANS0210:Task.WhenAll(items.Select(async item => await Step(item).WithId($"task-{item}")))|};
             }
 
             public async DurableTask OtherAsync(int[] items)
@@ -305,7 +305,7 @@ public class DurableTaskUsageRuleTests
                 {
                     await Step(1).WithId("first");
                 }
-                {|ORLEANS0112:catch|} (OperationCanceledException)
+                {|ORLEANS0212:catch|} (OperationCanceledException)
                 {
                 }
 
@@ -322,7 +322,7 @@ public class DurableTaskUsageRuleTests
                 {
                     await Step(3).WithId("third");
                 }
-                {|ORLEANS0112:catch|} (OperationCanceledException) when (DurableTask.Current.CancellationToken.IsCancellationRequested)
+                {|ORLEANS0212:catch|} (OperationCanceledException) when (DurableTask.Current.CancellationToken.IsCancellationRequested)
                 {
                     return 0;
                 }
@@ -338,7 +338,7 @@ public class DurableTaskUsageRuleTests
 
                 try
                 {
-                    {|ORLEANS0102:await FetchAsync()|};
+                    {|ORLEANS0202:await FetchAsync()|};
                 }
                 catch (OperationCanceledException)
                 {
@@ -364,11 +364,11 @@ public class DurableTaskUsageRuleTests
         {{Members}}
             public async DurableTask RunAsync()
             {
-                Action handler = {|ORLEANS0113:async () => await Task.Yield()|};
+                Action handler = {|ORLEANS0213:async () => await Task.Yield()|};
                 Func<Task> task = async () => await Task.Yield();
                 await Step(1).WithId("step");
 
-                async void {|ORLEANS0113:Fire|}() => await Task.Yield();
+                async void {|ORLEANS0213:Fire|}() => await Task.Yield();
             }
         }
         """);
@@ -382,7 +382,7 @@ public class DurableTaskUsageRuleTests
             {
                 for (var round = 0; round < rounds; round++)
                 {
-                    await {|ORLEANS0114:Approved.WaitAsync()|};
+                    await {|ORLEANS0214:Approved.WaitAsync()|};
                     await Approved.For($"round-{round}").WaitAsync();
                 }
 
@@ -407,8 +407,8 @@ public class DurableTaskUsageRuleTests
 
             public async DurableTask RunAsync(ILogger parameter)
             {
-                {|ORLEANS0115:_plain.LogInformation("replayed")|};
-                {|ORLEANS0115:parameter.LogInformation("replayed")|};
+                {|ORLEANS0215:_plain.LogInformation("replayed")|};
+                {|ORLEANS0215:parameter.LogInformation("replayed")|};
                 _safe.LogInformation("once");
                 parameter.ReplaySafe().LogInformation("once");
                 await Step(1).WithId("step");
@@ -437,12 +437,12 @@ public class DurableTaskUsageRuleTests
 
             public Task<ScheduledTask<int>> ScheduleAsync() => Step(1).WithId("order").ScheduleAsync();
 
-            public void Start() => {|ORLEANS0116:Step(1).WithId("order").Post()|};
+            public void Start() => {|ORLEANS0216:Step(1).WithId("order").Post()|};
 
             public async DurableTask RunAsync(int[] items)
             {
                 Step(2).Detached().Post();
-                await DurableTask.{|ORLEANS0121:Run|}(_ => { Step(3).WithId("in-step").Post(); }).WithId("step");
+                await DurableTask.{|ORLEANS0221:Run|}(_ => { Step(3).WithId("in-step").Post(); }).WithId("step");
                 foreach (var item in items.Where(item => Step(item).WithId("filter").Post() is not null))
                 {
                 }
@@ -456,7 +456,7 @@ public class DurableTaskUsageRuleTests
                 await LocalAsync().WithId("local");
             }
 
-            public static void Helper() => {|ORLEANS0116:Step(5).Post()|};
+            public static void Helper() => {|ORLEANS0216:Step(5).Post()|};
         }
         """);
 }
