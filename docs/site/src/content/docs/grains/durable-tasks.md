@@ -144,14 +144,14 @@ task's own grain is rejected.
 ## Recorded effects, local steps, and calls to other grains
 
 A *recorded effect*,
-<xref:Orleans.DurableTasks.DurableTask.Once*?displayProperty=nameWithType>, runs
+<xref:Orleans.DurableTasks.DurableTask.RunInline*?displayProperty=nameWithType>, runs
 synchronous code in the caller's current work item before it returns, with no
 suspension and no child execution, and records its result, or the exception it threw,
 in the task's tree under its name. The record commits in the same journal write as the
 journaled state which the effect changed, and a replay returns the recorded result
 without running the effect again. The order workflow changes its status this way:
 
-:::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_once" language="csharp":::
+:::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_run_inline" language="csharp":::
 
 - An effect changes grain state exactly once, reads state which later operations change,
   and produces identifiers, random values, and wall-clock times which every replay
@@ -169,14 +169,14 @@ without running the effect again. The order workflow changes its status this way
   compensation records its effects.
 - A name identifies an effect as `WithId` identifies a step: `pay`, then `pay$2` for a
   later occurrence in the same run.
-- `DurableTask.Once(effect)` omits the name, such as
-  `var reference = DurableTask.Once(Guid.NewGuid);`. The effect takes the execution's
+- `DurableTask.RunInline(effect)` omits the name, such as
+  `var reference = DurableTask.RunInline(Guid.NewGuid);`. The effect takes the execution's
   next generated child ID, such as `$child-3`, which unnamed effects share with unnamed
   children, so it finds its record when every run creates its unnamed operations in the
   same order. Name effects whose position can change between runs or deployments.
 - Effects are synchronous: asynchronous and durable effects don't compile, and the
   error shows the replacement, `await DurableTask.Run(async () => ...)`. An effect runs
-  on the activation's scheduler, so `Once` after `ConfigureAwait(false)` throws
+  on the activation's scheduler, so `RunInline` after `ConfigureAwait(false)` throws
   `InvalidOperationException` without running it.
 - The record applies only within a durable task. Outside one, such as in a helper which
   an ordinary grain method shares, the effect runs every time.
@@ -206,12 +206,14 @@ so the delegate's external effect needs its own idempotency.
 
 ### Effects and steps
 
-`DurableTask.Once("hold-id", Guid.NewGuid)` and
+`DurableTask.RunInline("hold-id", Guid.NewGuid)` and
 `await DurableTask.Run(async () => ...).WithId("hold-id")` use the same identifier,
 `{taskId}/hold-id`, and both record their outcome once. They differ in when the code
-runs, and the other differences follow from that:
+runs, and the other differences follow from that. "Inline" means what it means elsewhere
+in .NET, as in `TaskScheduler.TryExecuteTaskInline`: the code runs synchronously in the
+current work item instead of being scheduled.
 
-- An effect runs immediately, in the current work item, before `Once` returns. So
+- An effect runs immediately, in the current work item, before `RunInline` returns. So
   consecutive effects commit together with the state they change, the effect observes
   the caller's `DurableTask.Current`, and it runs after task cancellation.
 - A step runs when it's awaited, scheduled, or posted, possibly in a later turn, as a
@@ -236,7 +238,7 @@ A workflow publishes progress to observers through a journaled
 describes reading, resuming, and trimming logs.
 
 To publish an entry, append it in a recorded effect,
-`DurableTask.Once(() => log.Append(item))`. The effect appends once for its position in
+`DurableTask.RunInline(() => log.Append(item))`. The effect appends once for its position in
 the task, and the entry commits together with the effect's record in the task's next
 durable write. A replay returns the recorded sequence number without appending again, so
 a reader in the committed mode receives each entry once, in the order in which the task
@@ -294,7 +296,7 @@ three kinds of code:
 
 - **Recorded operations** run once per execution, and a replay returns their recorded
   outcomes: durable calls to other grains, local steps, `DurableTask.Run` delegates,
-  delays, signal waits and sends, detached and posted starts, and `DurableTask.Once`
+  delays, signal waits and sends, detached and posted starts, and `DurableTask.RunInline`
   effects.
 - **Re-executed code** precedes the body's last recorded operation and runs again in
   every replay. It computes values from the method's arguments, recorded results, the
@@ -527,7 +529,7 @@ when the caller continues:
   invocation in the caller's outbox, which commits with the grain's next journal write,
   together with the state changes which the calling code made, and delivers it once. The
   target holds the task once the invocation is delivered, so a task whose ID other
-  parties look up starts with `ScheduleAsync`. Inside a durable task, the start is recorded like a `DurableTask.Once` effect, so a
+  parties look up starts with `ScheduleAsync`. Inside a durable task, the start is recorded like a `DurableTask.RunInline` effect, so a
   replay returns the same handle, and awaiting the handle later observes the result. A
   client has no outbox, so `Post` throws `InvalidOperationException` there, and
   [ORLEANS0116](../diagnostics/orleans0116.md) reports it.
@@ -664,7 +666,7 @@ describes which tasks have addresses and how long they resolve.
   first durable terminal result wins a race between completion and cancellation.
 - A body's result is staged in the work item which runs the body's final code on the
   activation, so it commits in the same journal write as the state which that code
-  changed, whichever operation requests the write. A `DurableTask.Once` record is
+  changed, whichever operation requests the write. A `DurableTask.RunInline` record is
   staged in the same work item as the effect's state changes, and commits with them.
 
 Durability covers state and messages which participate in Orleans Journaling and
@@ -676,7 +678,7 @@ their own idempotency, for example a request key derived from the task ID; see
 
 An *invoked task*, which a client or another grain scheduled, owns an execution tree:
 the task and its descendants which aren't invoked tasks themselves, such as local
-steps, delays, `DurableTask.Once` records, records of detached tasks, signal-send
+steps, delays, `DurableTask.RunInline` records, records of detached tasks, signal-send
 markers, subscriptions, and the records of calls to other grains. Once an invoked task is
 terminal, its grain deletes the tree:
 

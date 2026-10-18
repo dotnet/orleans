@@ -24,7 +24,7 @@ The analyzers divide each durable task body into regions:
 
 - **Recorded operations** run once per execution, and a replay returns their outcomes:
   awaits of durable calls, local steps, `DurableTask.Run` delegates, delays, signal
-  waits, combinators, and handles; `DurableTask.Once` effects; and `Post`. An await of a
+  waits, combinators, and handles; `DurableTask.RunInline` effects; and `Post`. An await of a
   `Task`-returning helper in the same project which performs durable operations counts
   as one.
 - **Replayed code** is code from which a recorded operation is still reachable. A
@@ -33,11 +33,11 @@ The analyzers divide each durable task body into regions:
 - **The synchronous tail** is code from which no recorded operation is reachable. It runs
   only in the run which completes the body, and its state changes commit with the task's
   result.
-- **Recorded bodies**, the delegates which `DurableTask.Once` and `DurableTask.Run`
+- **Recorded bodies**, the delegates which `DurableTask.RunInline` and `DurableTask.Run`
   receive and the bodies of local steps, run once per recorded result. A step's body is
   itself a durable task body, with its own regions.
 
-A `DurableTask.Once` effect runs immediately, in the current work item, before it
+A `DurableTask.RunInline` effect runs immediately, in the current work item, before it
 returns; a `DurableTask.Run` step runs when it's awaited, scheduled, or posted, possibly
 in a later turn, as a child execution. Consecutive effects in one synchronous block
 therefore commit in the same journal write with the state which they change, and no
@@ -64,12 +64,12 @@ awaiting, or helpers in other assemblies.
 | Produce clock, random, and environment values in recorded effects, steps, or the tail, and read time from `DurableTask.Current.UtcNow`. Produce a value which the tail sends to an external service, such as an idempotency key, in a recorded effect or a step, because a tail whose result didn't commit runs again. | A replay computes other arguments, IDs, keys, or deadlines, and diverges or repeats an external effect. | [ORLEANS0101](../diagnostics/orleans0101.md) |
 | Await external operations in steps or the tail. | A replay repeats the operation, observes another result, or fails while the service is unavailable. | [ORLEANS0102](../diagnostics/orleans0102.md) |
 | Change state after the last external await of a step or the tail. | The change commits without the result, and the next run applies it again. | [ORLEANS0103](../diagnostics/orleans0103.md) |
-| Return the outputs of a `DurableTask.Once` effect. | A replay skips the effect, and the body's variables keep their initial values. | [ORLEANS0104](../diagnostics/orleans0104.md) |
+| Return the outputs of a `DurableTask.RunInline` effect. | A replay skips the effect, and the body's variables keep their initial values. | [ORLEANS0104](../diagnostics/orleans0104.md) |
 | Await, schedule, or post every durable task definition. | The task never runs. | [ORLEANS0105](../diagnostics/orleans0105.md) |
 | Run each `async DurableTask` definition once. | The second run throws `InvalidOperationException`. | [ORLEANS0106](../diagnostics/orleans0106.md) |
 | Name operations without `$`. | The runtime rejects the name with `ArgumentException`. | [ORLEANS0107](../diagnostics/orleans0107.md) |
 | Give each call site its own name. | Removing or reordering a call site shifts the recorded IDs of the others. | [ORLEANS0108](../diagnostics/orleans0108.md) |
-| Keep bodies on the activation's scheduler. | Work races with the grain, and `Once` and `Post` throw off the scheduler. | [ORLEANS0109](../diagnostics/orleans0109.md) |
+| Keep bodies on the activation's scheduler. | Work races with the grain, and `RunInline` and `Post` throw off the scheduler. | [ORLEANS0109](../diagnostics/orleans0109.md) |
 | Run concurrent durable work through durable combinators. | Children receive IDs in thread order, which a replay can change, and losing inputs keep running. | [ORLEANS0110](../diagnostics/orleans0110.md) |
 | Wait with `DurableTask.Delay` and `DelayUntil`. | A deactivation loses the wait, and a replay waits the whole duration again. | [ORLEANS0111](../diagnostics/orleans0111.md) |
 | Filter cancellation handlers by `DurableTask.Current.IsTaskCancellationRequested`. | The cancellation of an attempt, such as a deactivation, runs compensation for a task which nobody canceled. | [ORLEANS0112](../diagnostics/orleans0112.md) |
@@ -87,7 +87,7 @@ which are ordinary steps; see [ORLEANS0028](../diagnostics/orleans0028.md).
 
 The first four rules keep each side effect in exactly one run. Grain state holds every
 committed change, so replayed code reads newer state and applies its writes again. A
-`DurableTask.Once` effect, a step's final code, and the tail each commit their changes
+`DurableTask.RunInline` effect, a step's final code, and the tail each commit their changes
 with a record, so no replay repeats them. External calls run in steps, whose results the
 replay returns, and they send an idempotency key derived from the task, because a step
 whose result didn't commit runs again; see

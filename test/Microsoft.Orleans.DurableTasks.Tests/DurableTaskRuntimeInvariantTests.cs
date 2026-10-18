@@ -2308,7 +2308,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
-    public Task OnceCommitsItsRecordWithTheNextWriteAndReplayReturnsItWithoutRunningTheEffect() => ActivationScheduler.RunAsync(async () =>
+    public Task RunInlineCommitsItsRecordWithTheNextWriteAndReplayReturnsItWithoutRunningTheEffect() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var taskId = TaskId.Parse("root");
@@ -2319,7 +2319,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             1,
             () => DurableTask.Run(async _ =>
             {
-                var value = DurableTask.Once("effect", () => 40 + Interlocked.Increment(ref runs));
+                var value = DurableTask.RunInline("effect", () => 40 + Interlocked.Increment(ref runs));
                 observed.TrySetResult(value);
                 await DurableTask.Delay(TimeSpan.FromDays(1));
                 return value;
@@ -2363,7 +2363,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 var run = Interlocked.Increment(ref runs);
                 var context = DurableTask.Current;
                 observations.Enqueue((run, "start", context.IsReplaying));
-                DurableTask.Once("effect", () => 1);
+                DurableTask.RunInline("effect", () => 1);
                 observations.Enqueue((run, "effect", context.IsReplaying));
                 await DurableTask.Run(static _ => 2).WithId("step");
                 observations.Enqueue((run, "step", context.IsReplaying));
@@ -2410,10 +2410,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 {
                     // A deployment added an effect before the recorded ones.
                     observations.Enqueue((run, "start", context.IsReplaying));
-                    DurableTask.Once("added", () => 0);
+                    DurableTask.RunInline("added", () => 0);
                 }
 
-                DurableTask.Once("effect", () => 1);
+                DurableTask.RunInline("effect", () => 1);
                 observations.Enqueue((run, "effect", context.IsReplaying));
                 waiting[run - 1].TrySetResult();
                 await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("delay");
@@ -2452,7 +2452,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("detached").Post();
                 _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("detached").Post();
                 observations.Enqueue((run, "detached", context.IsReplaying));
-                DurableTask.Once("effect", () => 1);
+                DurableTask.RunInline("effect", () => 1);
                 observations.Enqueue((run, "effect", context.IsReplaying));
                 waiting[run - 1].TrySetResult();
                 await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("delay");
@@ -2473,7 +2473,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
-    public Task OnceOffTheActivationSchedulerFails() => ActivationScheduler.RunAsync(async () =>
+    public Task RunInlineOffTheActivationSchedulerFails() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/local");
@@ -2484,7 +2484,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             DurableTask.Run(async token =>
             {
                 await Task.Delay(1, token).ConfigureAwait(false);
-                return DurableTask.Once("effect", () => ++runs);
+                return DurableTask.RunInline("effect", () => ++runs);
             }),
             TestContext.Current.CancellationToken);
         var response = await handle.WaitAsync(TestContext.Current.CancellationToken).AsTask()
@@ -2496,7 +2496,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
-    public Task OnceUnderAnIdentifierRecordedForAnotherOperationDiverges() => ActivationScheduler.RunAsync(async () =>
+    public Task RunInlineUnderAnIdentifierRecordedForAnotherOperationDiverges() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/local");
@@ -2506,13 +2506,13 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         var handle = await runtime.ScheduleChildAsync(
             taskId,
-            DurableTask.Run(_ => DurableTask.Once("effect", () => ++runs)),
+            DurableTask.Run(_ => DurableTask.RunInline("effect", () => ++runs)),
             TestContext.Current.CancellationToken);
         var response = await handle.WaitAsync(TestContext.Current.CancellationToken).AsTask()
             .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("a DurableTask.Once effect", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("a DurableTask.RunInline effect", exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, runs);
     });
 

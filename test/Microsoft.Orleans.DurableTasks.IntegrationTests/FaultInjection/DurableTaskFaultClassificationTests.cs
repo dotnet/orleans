@@ -61,7 +61,7 @@ public abstract class DurableTaskFaultClassificationTests(string journalFormatKe
     }
 
     [Fact]
-    public async Task OnceEffectFailureIsRecordedOnceWithItsStateAndSurfacesUnchanged()
+    public async Task RunInlineEffectFailureIsRecordedOnceWithItsStateAndSurfacesUnchanged()
     {
         var workflow = _harness.Client.GetGrain<IFaultWorkflowGrain>(Guid.NewGuid());
 

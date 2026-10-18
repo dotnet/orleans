@@ -152,14 +152,12 @@ Durable tasks distinguish two kinds of cancellation:
 | Exception which durable operations throw | `OperationCanceledException` from the canceled work | <xref:Orleans.DurableTasks.DurableTaskAttemptCanceledException>, with its `Reason` |
 
 Once an attempt is canceled, every durable operation of its code throws
-`DurableTaskAttemptCanceledException`: `DurableTask.Once`, starting or awaiting children,
+`DurableTaskAttemptCanceledException`: `DurableTask.RunInline`, starting or awaiting children,
 including shielded and detached ones, `Post`, `ScheduleAsync`, signal sends and waits,
-delays, subscriptions, and combinators. Changes to the grain's journaled state throw it
-too, before they change memory: durable values and collections,
-`IDurableTaskCompletionSource<T>`, `IPersistentState<T>`, and journal writes. The
-exception derives from `OperationCanceledException`, so the attempt's code unwinds like
-any canceled .NET code, and nothing which it does on the way out commits. A stopping
-activation's task replays from its records in the next activation, which runs any
+delays, subscriptions, and combinators. The exception derives from
+`OperationCanceledException`, so the attempt's code unwinds like any canceled .NET code.
+Changes which that code makes to the grain's journaled state on the way out, such as
+cleanup, commit with the grain's next journal write. A stopping activation's task replays from its records in the next activation, which runs any
 compensation again.
 
 The canonical pattern passes `CancellationToken` to the calls which the body makes, runs

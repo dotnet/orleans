@@ -51,7 +51,7 @@ multi-silo deployments; see [Journaling configuration](journaling/configuration.
 ## Retention and deletion
 
 Each invoked task owns an execution tree: the task, its local steps, delays,
-combinator records, `DurableTask.Once` records, version decisions, signal records, subscriptions to other tasks,
+combinator records, `DurableTask.RunInline` records, version decisions, signal records, subscriptions to other tasks,
 records of detached tasks, signal-send markers, and its records of calls to other grains. The grain
 deletes the tree in one journal write:
 
@@ -154,12 +154,12 @@ same arguments, under each identifier; new workflow steps use new identifiers.
 ```
 
 The message names the recorded operation, such as a call to a grain, a delay, a
-`WhenAny` decision, a `DurableTask.Once` effect, a detached task's start, or a signal,
+`WhenAny` decision, a `DurableTask.RunInline` effect, a detached task's start, or a signal,
 and the requested one. Typical causes:
 
 - Code between children reads a value which differs on replay, such as
   `DateTime.UtcNow`, a random number, or mutable grain state, and passes it to a child.
-  `DurableTask.Once` records such a value, so every replay passes the same one.
+  `DurableTask.RunInline` records such a value, so every replay passes the same one.
 - A deployment changed a step's arguments, reordered unnamed children, or added an
   unnamed child or combinator before existing ones. Branch such changes on
   `DurableTask.GetVersion`, so pending executions keep their recorded operations.
@@ -175,8 +175,8 @@ caller observe the failure.
 When a deployment changes a workflow while executions are pending, those executions
 replay under the new code:
 
-- Keep existing steps, `Once` effects, and detached starts, with their IDs and arguments. A
-  changed `Once` delegate doesn't affect executions which recorded it: they return the
+- Keep existing steps, `RunInline` effects, and detached starts, with their IDs and arguments. A
+  changed `RunInline` delegate doesn't affect executions which recorded it: they return the
   recorded result. An effect and a step with the same name share an ID, so turning a
   recorded step into an effect, or the reverse, fails as a divergence; branch that
   change on `DurableTask.GetVersion`.
@@ -273,7 +273,7 @@ caller's token or the wait's timeout ends it.
 
 ## Capacity and throughput
 
-- A recorded effect, `DurableTask.Once`, adds no journal write: its record and the state
+- A recorded effect, `DurableTask.RunInline`, adds no journal write: its record and the state
   it changed commit with the task's next durable write. Each effect retains one record,
   holding its result, until the task's tree is deleted.
 - A local step costs one journal write: its record commits with its first durable

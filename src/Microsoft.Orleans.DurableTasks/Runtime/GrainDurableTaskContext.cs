@@ -614,7 +614,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         if (TaskScheduler.Current != _scheduler)
         {
             throw new InvalidOperationException(
-                $"DurableTask.Once runs on the scheduler of the grain activation which runs durable task '{Id}', so its record commits with the state which it changes. Code which continues elsewhere, for example after ConfigureAwait(false), can't record effects.");
+                $"DurableTask.RunInline runs on the scheduler of the grain activation which runs durable task '{Id}', so its record commits with the state which it changes. Code which continues elsewhere, for example after ConfigureAwait(false), can't record effects.");
         }
 
         ThrowIfNotChildTaskId(effectId);

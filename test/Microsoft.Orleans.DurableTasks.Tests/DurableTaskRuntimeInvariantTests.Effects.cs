@@ -16,7 +16,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var reference = Guid.NewGuid();
         var request = CreateRequest(
             1,
-            () => DurableTask.Run(_ => DurableTask.Once("reference", () => reference)));
+            () => DurableTask.Run(_ => DurableTask.RunInline("reference", () => reference)));
 
         runtime.ScheduleFromInbox(taskId, request);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -24,7 +24,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await WaitUntilIdleAsync(runtime);
 
         var effect = storage.Get(effectId);
-        Assert.Equal("$once", effect.RequestFingerprint);
+        Assert.Equal("$effect", effect.RequestFingerprint);
         Assert.Equal(reference, effect.Result!.GetResult<Guid>());
         Assert.Null(effect.Request);
         Assert.True(effect.RemoteTarget.IsDefault);
@@ -41,7 +41,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     public Task CallUnderAnEffectsIdentifierDiverges() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, transport) = CreateRuntime();
-        ((IDurableTaskGrainStorage)storage).AddRecord(TaskId.Parse("root/local/charge"), "$once", DurableTaskResponse.FromResult(1));
+        ((IDurableTaskGrainStorage)storage).AddRecord(TaskId.Parse("root/local/charge"), "$effect", DurableTaskResponse.FromResult(1));
 
         var handle = await runtime.ScheduleChildAsync(
             TaskId.Parse("root/local"),
@@ -51,7 +51,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("It records a DurableTask.Once effect, and this attempt requested a call to grain", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a DurableTask.RunInline effect, and this attempt requested a call to grain", exception.Message, StringComparison.Ordinal);
         Assert.Empty(transport.Invocations);
     });
 
@@ -59,7 +59,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     public Task DelayUnderAnEffectsIdentifierDiverges() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, transport) = CreateRuntime();
-        ((IDurableTaskGrainStorage)storage).AddRecord(TaskId.Parse("root/local/wait"), "$once", DurableTaskResponse.FromResult(1));
+        ((IDurableTaskGrainStorage)storage).AddRecord(TaskId.Parse("root/local/wait"), "$effect", DurableTaskResponse.FromResult(1));
 
         var handle = await runtime.ScheduleChildAsync(
             TaskId.Parse("root/local"),
@@ -69,7 +69,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("It records a DurableTask.Once effect", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a DurableTask.RunInline effect", exception.Message, StringComparison.Ordinal);
         Assert.Empty(transport.Resumes);
     });
 }

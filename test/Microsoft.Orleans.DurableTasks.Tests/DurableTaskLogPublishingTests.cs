@@ -54,7 +54,7 @@ public sealed class DurableTaskLogPublishingTests
 
         static async DurableTask<long> Workflow(ReplayGrain grain)
         {
-            var sequence = DurableTask.Once(() => grain.Log.Append(10));
+            var sequence = DurableTask.RunInline(() => grain.Log.Append(10));
             await grain.WaitAtGateAsync();
             return sequence;
         }

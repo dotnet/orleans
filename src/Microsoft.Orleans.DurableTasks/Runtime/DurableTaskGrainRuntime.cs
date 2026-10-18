@@ -413,7 +413,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalSendFingerprintPrefix, StringComparison.Ordinal) => "a signal's send",
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalFingerprintPrefix, StringComparison.Ordinal) => "a signal's value",
         { RequestFingerprint: { } fingerprint } when TryParseIdentity(SubscriptionFingerprintPrefix, fingerprint, out var target, out var subscribed) => DescribeSubscription(target, subscribed),
-        { RequestFingerprint: EffectFingerprint } => "a DurableTask.Once effect",
+        { RequestFingerprint: EffectFingerprint } => "a DurableTask.RunInline effect",
         { RequestFingerprint: VersionFingerprint } => "a version decision",
         { RequestFingerprint: { } fingerprint } => $"a request ({AbbreviateFingerprint(fingerprint)})",
         { CancellationRequestedAt: not null, CompletedAt: null } => "a cancellation which arrived before its request",
@@ -801,7 +801,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     // Fingerprints of operations in an execution tree begin with '$', so they never equal a hexadecimal request fingerprint.
-    private const string EffectFingerprint = "$once";
+    private const string EffectFingerprint = "$effect";
 
     private static bool IsEffectRecord(IDurableTaskState state) =>
         string.Equals(state.RequestFingerprint, EffectFingerprint, StringComparison.Ordinal);
@@ -831,7 +831,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 throw CreateDivergenceException(
                     $"Durable child task '{effectId}' is already associated with a different operation.",
                     record,
-                    "a DurableTask.Once effect");
+                    "a DurableTask.RunInline effect");
             }
 
             return outcome;
@@ -843,7 +843,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             throw CreateDivergenceException(
                 $"Durable child task '{effectId}' holds '{inputId}', which an earlier run recorded.",
                 input,
-                "a DurableTask.Once effect");
+                "a DurableTask.RunInline effect");
         }
 
         var response = effect(state);

@@ -448,7 +448,7 @@ synchronously on the activation which makes them, when the runtime stages them: 
   it commits in the same journal write as the journaled state which that code
   changed, whichever operation requests the write. A replay which returns the
   recorded result therefore finds those changes applied once.
-- A `DurableTask.Once` effect runs on the activation, and its outcome is recorded
+- A `DurableTask.RunInline` effect runs on the activation, and its outcome is recorded
   as a terminal entry of the execution's tree, `{taskId}/{name}`, staged in
   the same work item as the journaled state the effect changed. Both commit in the
   next journal write, and a replay returns the recorded outcome without running
@@ -456,9 +456,9 @@ synchronously on the activation which makes them, when the runtime stages them: 
   before that write loses both, so the next attempt runs the effect again. A result
   which doesn't serialize is recorded as that failure. Code which continues off the
   activation, for example after `ConfigureAwait(false)`, can't record effects.
-  Effects and children share identifiers: `DurableTask.Once("x", f)` records under
+  Effects and children share identifiers: `DurableTask.RunInline("x", f)` records under
   `x`, as `WithId("x")` names a child, and an unnamed effect,
-  `DurableTask.Once(effect)`, takes the execution's next generated child
+  `DurableTask.RunInline(effect)`, takes the execution's next generated child
   identifier, such as `$child-3`. A replay which finds a child where an effect
   runs, or an effect where a child starts, fails as a divergence which names both
   kinds; so does a named combinator's input beneath an effect's identifier, or an
@@ -478,7 +478,7 @@ synchronously on the activation which makes them, when the runtime stages them: 
   `DurableTaskVersionException`. The attempt's result is discarded, the task stays
   pending, and the grain keeps a one-minute wake-up so that a later activation replays it.
 - A durable task publishes progress to an `IDurableLog<T>` of its grain. It
-  appends an entry with `DurableTask.Once(() => log.Append(item))`, whose entry
+  appends an entry with `DurableTask.RunInline(() => log.Append(item))`, whose entry
   commits with the effect's record. A step which streams content writes it to a
   draft from `BeginDraft()`, which readers with `DurableWatchMode.Drafts` receive
   live, and commits the draft in its final synchronous code, so the entries commit
