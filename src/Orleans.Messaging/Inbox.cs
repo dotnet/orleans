@@ -237,12 +237,11 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             return false;
         }
 
-        var now = TimeProvider.GetUtcNow();
         var jobNow = Shared.JobTimeProvider.GetUtcNow();
         var batch = new List<InboxEntry>(Math.Min(Options.InboxBatchSize, _messages.Count));
         foreach (var entry in _messages.Values)
         {
-            if (IsDurable(entry) && GetDelay(entry, now, jobNow) == TimeSpan.Zero)
+            if (IsDurable(entry) && GetDelay(entry, jobNow) == TimeSpan.Zero)
             {
                 batch.Add(entry);
                 if (batch.Count == Options.InboxBatchSize) break;
@@ -317,8 +316,9 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
             // An exception leaves the outcome unknown, so the message retries until InboxRetryTimeout after its first
             // failure. The last attempt runs when the timeout elapses; Fail(reason) dead-letters a message at once.
+            // Retry deadlines follow the Durable Jobs clock, which schedules the wake-up for the next attempt.
             var attempts = checked(entry.State.AttemptCount + 1);
-            var now = TimeProvider.GetUtcNow();
+            var now = Shared.JobTimeProvider.GetUtcNow();
             var expirationTime = entry.State.ExpirationTime ?? MessagingTime.AddClamped(now, Options.InboxRetryTimeout);
             if (expirationTime <= now)
             {
@@ -418,10 +418,9 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     {
         var next = GetWorkSourceDelay();
         if (_messages.Count == 0 || _handlers.IsEmpty || next <= TimeSpan.Zero) return next;
-        var now = TimeProvider.GetUtcNow();
         foreach (var entry in _messages.Values)
         {
-            var delay = GetDelay(entry, now, jobNow);
+            var delay = GetDelay(entry, jobNow);
             if (delay == TimeSpan.Zero) return delay;
             if (next is null || delay < next) next = delay;
         }
@@ -440,13 +439,17 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         return next;
     }
 
-    // DeliverAt is in the Durable Jobs time domain, which schedules wake-ups; retry backoff follows the grain clock.
-    private static TimeSpan GetDelay(InboxEntry entry, DateTimeOffset now, DateTimeOffset jobNow)
+    // DeliverAt and retry deadlines are in the Durable Jobs time domain, which schedules wake-ups.
+    private static TimeSpan GetDelay(InboxEntry entry, DateTimeOffset jobNow)
     {
-        var delay = TimeSpan.Zero;
-        if (entry.Message.Envelope.DeliverAt is { } deliverAt && deliverAt > jobNow) delay = deliverAt - jobNow;
-        if (entry.State.NextAttemptAt is { } retryAt && retryAt > now && retryAt - now > delay) delay = retryAt - now;
-        return delay;
+        var dueTime = GetDueTime(entry);
+        return dueTime > jobNow ? dueTime - jobNow : TimeSpan.Zero;
+    }
+
+    private static DateTimeOffset GetDueTime(InboxEntry entry)
+    {
+        var dueTime = entry.Message.Envelope.DeliverAt ?? DateTimeOffset.MinValue;
+        return entry.State.NextAttemptAt is { } retryAt && retryAt > dueTime ? retryAt : dueTime;
     }
 
     internal async Task StartAsync(CancellationToken cancellationToken)

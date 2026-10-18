@@ -49,6 +49,10 @@ public class MessagingClusterFixture : IAsyncLifetime
             });
             siloBuilder.Services.AddSingleton<TimeProvider>(Clock);
             siloBuilder.Services.UseTimeProviderForBackgroundAreas(TimeProvider.System);
+            // Advancing the test clock also advances the Durable Jobs clock, which inbox retry deadlines follow.
+            siloBuilder.Services.AddKeyedSingleton<TimeProvider>(
+                DurableJobTimeProviderNames.DurableJobs,
+                new FollowingJobClock(Clock, Clock.GetUtcNow()));
             siloBuilder.Services.AddSingleton(HandlerProbe);
             siloBuilder.Services.AddSingleton(new TestHandlerConfiguration());
             siloBuilder.Services.AddSingleton(SnapshotProbe);
@@ -83,6 +87,24 @@ public class MessagingClusterFixture : IAsyncLifetime
             ConfigureServices(siloBuilder.Services);
         });
         Cluster = builder.Build();
+    }
+
+    /// <summary>
+    /// Makes the Durable Jobs clock read <see cref="Clock"/>, so retry deadlines are exact test-clock times. Durable Jobs
+    /// timers keep following real time and run each wake-up once the test clock reaches its due time.
+    /// </summary>
+    protected void UseTestClockForDurableJobs(IServiceCollection services) =>
+        services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs, new TestJobClock(Clock));
+
+    /// <summary>A Durable Jobs clock which follows real time plus the test clock's advance since the fixture started.</summary>
+    private sealed class FollowingJobClock(TimeProvider clock, DateTimeOffset clockStart) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => System.GetUtcNow() + (clock.GetUtcNow() - clockStart);
+    }
+
+    private sealed class TestJobClock(TimeProvider clock) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => clock.GetUtcNow();
     }
 
     public InProcessTestCluster Cluster { get; }
@@ -284,5 +306,11 @@ public sealed class InboxCapacityClusterFixture : MessagingClusterFixture
         options.MaxCapacity = 1;
         options.InboxRetryTimeout = TimeSpan.FromHours(1);
         options.RetryInitialInterval = TimeSpan.FromHours(1);
+    }
+
+    protected override void ConfigureServices(IServiceCollection services)
+    {
+        base.ConfigureServices(services);
+        UseTestClockForDurableJobs(services);
     }
 }
