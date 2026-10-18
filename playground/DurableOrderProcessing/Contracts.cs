@@ -38,6 +38,10 @@ public sealed record CatalogItem(
     int ReservedStock,
     int SoldStock);
 
+/// <summary>Retains an order's reservation request and outcome independently of its durable task.</summary>
+[GenerateSerializer, Immutable]
+public sealed record StockReservation(int Units, bool Confirmed);
+
 [GenerateSerializer, Immutable]
 public sealed record BasketItem(int ProductId, string ProductName, decimal UnitPrice, int Quantity);
 
@@ -145,6 +149,7 @@ public sealed class OrderingOptions
 [JsonSerializable(typeof(int))]
 [JsonSerializable(typeof(Guid))]
 [JsonSerializable(typeof(CatalogItem))]
+[JsonSerializable(typeof(StockReservation))]
 [JsonSerializable(typeof(BasketItem))]
 [JsonSerializable(typeof(OrderDetails))]
 [JsonSerializable(typeof(StockLine))]

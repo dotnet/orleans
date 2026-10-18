@@ -10,6 +10,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\playground\DurableOrderProcessing\CatalogData.cs" Link="OrderProcessing\CatalogData.cs" />
+    <Compile Include="..\..\playground\DurableOrderProcessing\Contracts.cs" Link="OrderProcessing\Contracts.cs" />
+    <Compile Include="..\..\playground\DurableOrderProcessing\Grains\CatalogItemGrain.cs" Link="OrderProcessing\CatalogItemGrain.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Microsoft.Orleans.DurableTasks\Microsoft.Orleans.DurableTasks.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
