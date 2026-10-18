@@ -35,11 +35,16 @@ public sealed class CatalogItemGrain : DurableGrain, ICatalogItemGrain
 
     public Task<CatalogItem?> GetAsync() => Task.FromResult(Item);
 
+    // The reply is staged before stock changes, so a failed send leaves stock untouched for the retry.
+    // An order which already holds a reservation is confirmed without reserving again.
     private void HandleReserve(ReserveStock request, IInboxHandlerContext context)
     {
         var item = Item;
-        var confirmed = item is not null && request.Units > 0 && item.AvailableStock >= request.Units;
-        if (confirmed)
+        var reserved = _reservations.ContainsKey(request.OrderId);
+        var reserve = !reserved && item is not null && request.Units > 0 && item.AvailableStock >= request.Units;
+        _outbox.SendReply(_messages.StockResult, context, request.ReplyTo, new StockResult(ProductId, reserved || reserve));
+
+        if (reserve)
         {
             _item.Value = item! with
             {
@@ -49,7 +54,6 @@ public sealed class CatalogItemGrain : DurableGrain, ICatalogItemGrain
             _reservations[request.OrderId] = request.Units;
         }
 
-        _outbox.SendReply(_messages.StockResult, context, request.ReplyTo, new StockResult(ProductId, confirmed));
         context.Complete();
     }
 
