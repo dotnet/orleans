@@ -18,6 +18,14 @@ public enum DurableTaskAttemptCancellationReason
     /// exception is a <see cref="DurableTaskVersionException"/>.
     /// </summary>
     UnsupportedVersion,
+
+    /// <summary>
+    /// The attempt diverged from what an earlier attempt of the task recorded: it requested another operation under a
+    /// recorded identifier, or a recorded outcome no longer decodes. The task stays pending until code which replays the
+    /// recorded execution runs it; the <see cref="DurableTaskAttemptCanceledException"/>'s inner exception describes the
+    /// divergence.
+    /// </summary>
+    Diverged,
 }
 
 /// <summary>
@@ -27,11 +35,14 @@ public enum DurableTaskAttemptCancellationReason
 /// <remarks>
 /// <para>
 /// An attempt is one in-memory run of a task's body. A host cancels the attempt, rather than the task, when the attempt's
-/// work can't be recorded any more: its grain activation is stopping, or the task was aborted or deleted. From then on,
+/// work can't be recorded any more: its grain activation is stopping, the task was aborted or deleted, or the running code
+/// can't replay the task's recorded execution, because it doesn't support a recorded version or diverged from the record.
+/// From then on,
 /// the attempt's durable operations, such as <see cref="DurableTask.RunInline{TResult}(string, Func{TResult})"/>, starting or
-/// awaiting tasks, signals, delays, and combinators, throw this exception, and so do changes to the grain's journaled
-/// state. The host records nothing the attempt does after its cancellation: a stopping activation's task replays in a new
-/// attempt, and an aborted or deleted task already has its outcome.
+/// awaiting tasks, signals, delays, and combinators, throw this exception, and the host discards the attempt's response:
+/// a stopping activation's task replays in a new attempt, and an aborted or deleted task already has its outcome. Changes
+/// which the attempt's code makes to the grain's journaled state, such as cleanup, commit with the grain's next journal
+/// write.
 /// </para>
 /// <para>
 /// <see cref="DurableTaskContext.AttemptCancellationToken"/> and <see cref="DurableTaskContext.CancellationToken"/> are
@@ -100,6 +111,7 @@ public sealed class DurableTaskAttemptCanceledException : OperationCanceledExcep
         DurableTaskAttemptCancellationReason.TaskAborted => "The durable task attempt was canceled because the task was aborted.",
         DurableTaskAttemptCancellationReason.TaskDeleted => "The durable task attempt was canceled because the task was deleted with its execution tree.",
         DurableTaskAttemptCancellationReason.UnsupportedVersion => "The durable task attempt was canceled because its execution recorded a version which the running code doesn't support. The task stays pending until code which supports the version replays it.",
+        DurableTaskAttemptCancellationReason.Diverged => "The durable task attempt was canceled because it diverged from its recorded execution. The task stays pending until code which replays the recorded execution runs it.",
         _ => "The durable task attempt was canceled.",
     };
 }
