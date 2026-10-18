@@ -51,10 +51,12 @@ and `DeliverAt` time.
 Inject <xref:Orleans.Messaging.IInbox> into the grain and add handlers with
 <xref:Orleans.Messaging.IInbox.Register*>. An
 <xref:Orleans.Messaging.IInboxHandler> has two members:
-<xref:Orleans.Messaging.IInboxHandler.CanHandle*> selects the messages the handler
+<xref:Orleans.Messaging.IInboxHandler.CanHandle*> receives the
+<xref:Orleans.Messaging.InboxMessage> and selects the messages the handler
 accepts, and <xref:Orleans.Messaging.IInboxHandler.HandleAsync*> processes one message.
 The inbox dispatches each message to the first registered handler whose `CanHandle`
-returns `true`, in registration order.
+returns `true`, in registration order. The selected handler stages the message's
+terminal outcome from `HandleAsync`.
 
 Typed handlers register through the
 <xref:Orleans.Messaging.InboxExtensions.Register*> extension methods. Each overload
