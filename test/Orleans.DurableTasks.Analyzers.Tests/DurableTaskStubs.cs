@@ -29,6 +29,8 @@ internal static class DurableTaskStubs
                 public static DurableTask<T> Run<T>(Func<CancellationToken, T> function) => null!;
                 public static DurableTask Run(Func<CancellationToken, Task> function) => null!;
                 public static DurableTask<T> Run<T>(Func<CancellationToken, Task<T>> function) => null!;
+                public static DurableTask Run(Func<Task> function) => null!;
+                public static DurableTask<T> Run<T>(Func<Task<T>> function) => null!;
                 public static T Once<T>(string name, Func<T> effect) => effect();
                 public static void Once(string name, Action effect) => effect();
                 public static T Once<T>(Func<T> effect) => effect();

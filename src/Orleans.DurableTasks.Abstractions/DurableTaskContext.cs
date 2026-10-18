@@ -561,22 +561,17 @@ public abstract class DurableTaskContext
 
     /// <summary>
     /// Creates the identifier of a named operation of this execution: the first occurrence of <paramref name="name"/> in
-    /// this attempt is <c>{prefix}{name}</c>, and each later occurrence appends its ordinal, such as <c>reserve$2</c>.
+    /// this attempt is <c>{name}</c>, and each later occurrence appends its ordinal, such as <c>reserve$2</c>.
     /// </summary>
     /// <param name="name">The caller-supplied name.</param>
-    /// <param name="kindPrefix">
-    /// The prefix which distinguishes the kind of operation, such as <c>$once:</c> for a recorded effect, or empty for a
-    /// child or a combinator.
-    /// </param>
     /// <remarks>
     /// Occurrences are numbered in the order in which the attempt creates them, so a replay which creates the same named
     /// operations in the same order assigns the same identifiers, and adding a later occurrence doesn't rename earlier
-    /// ones. Every kind of named operation shares one count per name, so the same occurrence of a name has the same
-    /// ordinal whichever kind of operation uses it: <c>x$2</c> and <c>$once:x$2</c> identify the same occurrence. A host
-    /// which finds the other kind recorded for an occurrence reports the replay's divergence rather than running the
-    /// operation again.
+    /// ones. Children, combinators, and effects share one count per name, so an occurrence of a name has the same
+    /// identifier whichever kind of operation uses it. A host which finds another kind of operation recorded under an
+    /// identifier reports the replay's divergence rather than running the operation.
     /// </remarks>
-    internal TaskId CreateNamedChildId(string name, string kindPrefix = "")
+    internal TaskId CreateNamedChildId(string name)
     {
         int occurrence;
         lock (_lock)
@@ -587,8 +582,8 @@ public abstract class DurableTaskContext
         }
 
         return Id.Child(occurrence == 1
-            ? kindPrefix + name
-            : $"{kindPrefix}{name}{GeneratedSegmentPrefix}{occurrence.ToString(CultureInfo.InvariantCulture)}");
+            ? name
+            : $"{name}{GeneratedSegmentPrefix}{occurrence.ToString(CultureInfo.InvariantCulture)}");
     }
 
     /// <summary>
@@ -612,9 +607,9 @@ public abstract class DurableTaskContext
     /// A host which can't store the outcome, for example because its result doesn't serialize, records and returns that
     /// failure instead, so every run observes the same failure. A host throws <see cref="InvalidOperationException"/>
     /// without running the effect when it can't stage the record with the effect's state changes, for example when it is
-    /// called off the host's scheduler, or when an earlier run recorded another kind of operation under the effect's name
-    /// and occurrence, which is how a replay which diverges from its recorded execution surfaces. Hosts which don't
-    /// support recorded effects keep this default implementation, which throws <see cref="NotSupportedException"/>.
+    /// called off the host's scheduler, or when an earlier run recorded another kind of operation, such as a step, under
+    /// the effect's identifier, which is how a replay which diverges from its recorded execution surfaces. Hosts which
+    /// don't support recorded effects keep this default implementation, which throws <see cref="NotSupportedException"/>.
     /// </para>
     /// </remarks>
     protected internal virtual DurableTaskResponse RunEffect<TState>(

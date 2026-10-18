@@ -605,7 +605,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             private readonly List<BasicBlock>[] _successors;
             private readonly bool[] _reachesDurable;
             private readonly bool[] _reachesExternal;
-            private readonly List<(string Key, string Name, int Block, int Index, Location Location)> _names = [];
+            private readonly List<(string Name, int Block, int Index, Location Location)> _names = [];
 
             public Region(BodyAnalysis analysis, ControlFlowGraph graph)
             {
@@ -733,8 +733,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                     _analysis.Report(DurableTaskDiagnostics.RepeatedSignalWait, invocation.Syntax.GetLocation(), signal.Syntax.ToString());
                 }
 
-                var isOnce = Symbols.IsOnce(invocation);
-                if ((isOnce || DurableTaskSymbols.IsWithId(invocation)) && GetName(invocation) is { } name)
+                if ((Symbols.IsOnce(invocation) || DurableTaskSymbols.IsWithId(invocation)) && GetName(invocation) is { } name)
                 {
                     if (name.Value.IndexOf('$') >= 0)
                     {
@@ -742,7 +741,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                     }
                     else
                     {
-                        _names.Add((isOnce ? "once:" + name.Value : name.Value, name.Value, position.Block, position.Index, name.Location));
+                        _names.Add((name.Value, position.Block, position.Index, name.Location));
                     }
                 }
             }
@@ -783,7 +782,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
 
             private void ReportDuplicateNames()
             {
-                foreach (var group in _names.GroupBy(static name => name.Key))
+                foreach (var group in _names.GroupBy(static name => name.Name))
                 {
                     var sites = group.OrderBy(static site => site.Location.SourceSpan.Start).ToArray();
                     for (var later = 1; later < sites.Length; later++)
@@ -801,8 +800,8 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             }
 
             private bool CanRunInOneRun(
-                (string Key, string Name, int Block, int Index, Location Location) first,
-                (string Key, string Name, int Block, int Index, Location Location) second)
+                (string Name, int Block, int Index, Location Location) first,
+                (string Name, int Block, int Index, Location Location) second)
             {
                 if (first.Block == second.Block)
                 {

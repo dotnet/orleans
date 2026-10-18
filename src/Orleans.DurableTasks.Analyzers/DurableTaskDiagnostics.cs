@@ -61,7 +61,7 @@ internal static class DurableTaskDiagnostics
         "Use durable operation names without '$'",
         "Remove '$' from the name '{0}': generated identifiers use it",
         DiagnosticSeverity.Error,
-        "Generated identifiers, such as $child-1, $once:pay, and reserve$2, contain '$', so the runtime rejects names with '$' which WithId and DurableTask.Once receive. Use another separator, such as '-'.");
+        "Generated identifiers, such as $child-1 and reserve$2, contain '$', so the runtime rejects names with '$' which WithId and DurableTask.Once receive. Use another separator, such as '-'.");
 
     public static readonly DiagnosticDescriptor DuplicateName = Create(
         "ORLEANS0108",

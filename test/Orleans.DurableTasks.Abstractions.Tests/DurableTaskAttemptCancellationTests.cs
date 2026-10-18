@@ -157,7 +157,7 @@ public class DurableTaskAttemptCancellationTests
             context);
 
         Assert.Equal(43, response.GetResult<int>());
-        Assert.True(host.Effects.ContainsKey(TaskId.Parse("root/$once:refund")));
+        Assert.True(host.Effects.ContainsKey(TaskId.Parse("root/refund")));
         Assert.Contains(ChildId, host.EntryIds);
     }
 
@@ -387,7 +387,7 @@ public class DurableTaskAttemptCancellationTests
 
         Assert.Same(expected, response.Exception);
         Assert.Same(expected, replay.Exception);
-        Assert.Equal(DurableTaskStatus.Canceled, host.Effects[TaskId.Parse("root/$once:effect")].Status);
+        Assert.Equal(DurableTaskStatus.Canceled, host.Effects[TaskId.Parse("root/effect")].Status);
     }
 
     [Theory]

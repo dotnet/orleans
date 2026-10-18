@@ -404,9 +404,10 @@ Follow these rules in re-executed code:
 
 ## Recorded effects
 
-`DurableTask.Once(name, effect)` runs a synchronous effect once for the running task and records its
-outcome. Every later run of the body, including a replay, returns the recorded result, or throws the
-recorded exception, without running the effect:
+`DurableTask.Once(name, effect)` runs a synchronous effect in the caller's current work item before
+it returns, with no suspension and no child execution, and records its outcome. Every later run of
+the body, including a replay, returns the recorded result, or throws the recorded exception, without
+running the effect:
 
 ```csharp
 var summary = DurableTask.Once("pay", () => SetStatus(OrderStatus.Paid));
@@ -422,10 +423,17 @@ var paymentId = DurableTask.Once("payment-id", Guid.NewGuid);
 - A failure is recorded too, because journaled state has no rollback: changes made before the throw
   commit with the recorded exception. A result which the host can't store, for example because it
   doesn't serialize, is recorded as that failure.
-- A name repeated in one run identifies later occurrences by their order: `pay`, then `pay$2`. Names
-  don't contain `$`. Effects share the count with names which `WithId` assigns, so a replay which
-  finds a step where a deployment now runs an effect, or the reverse, fails with a divergence error
-  instead of running the work again.
+- Consecutive `DurableTask.Once` calls in one synchronous block, and the journaled state which they
+  change, commit in the same journal write, and no other turn of the grain runs between them. The
+  effect runs after task cancellation too, and returning doesn't mean that its record has committed.
+- A name identifies the effect as `WithId` identifies a step: `pay`, then `pay$2` for a later
+  occurrence in the same run. Names don't contain `$`. `DurableTask.Once("get-id", Guid.NewGuid)`
+  and `await DurableTask.Run(async () => Guid.NewGuid()).WithId("get-id")` use the same identifier,
+  `get-id`, but run differently: the step runs when it is awaited, possibly in a later turn, as a
+  child execution with its own `DurableTask.Current` and cancellation scope, and commits in a
+  journal write of its own. A replay which finds one kind recorded where the body now runs the
+  other fails with a divergence error instead of running the work again, so a deployment which
+  changes one into the other branches on `DurableTask.GetVersion`.
 - `DurableTask.Once(effect)` omits the name for terseness, such as
   `var paymentId = DurableTask.Once(Guid.NewGuid);`. The effect takes the execution's next generated
   identifier, `$child-1`, `$child-2`, and so on, which unnamed effects share with unnamed children,
@@ -433,8 +441,8 @@ var paymentId = DurableTask.Once("payment-id", Guid.NewGuid);
   whose position can change between runs or deployments.
 - The effect is synchronous. Asynchronous and durable effects don't compile, and a result type which
   is asynchronous through generic code, such as `ValueTask<T>`, throws `NotSupportedException`
-  before the effect runs. Asynchronous work runs as an awaited child, such as an `async DurableTask`
-  step.
+  before the effect runs. Asynchronous work runs as an awaited step, such as
+  `await DurableTask.Run(async () => ...)` or an `async DurableTask` method.
 - The record applies only within a durable task. Outside one, the effect runs every time, so helpers
   which ordinary methods share with durable task bodies can call it.
 
