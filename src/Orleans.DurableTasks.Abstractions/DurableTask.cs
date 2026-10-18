@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -32,33 +33,125 @@ public abstract partial class DurableTask
     /// <remarks>A due time at or before the current logical time completes the delay promptly.</remarks>
     public static DurableTask DelayUntil(DateTimeOffset dueTime) => new DelayUntilDurableTask(dueTime);
 
-    /// <summary>Creates a durable task which invokes <paramref name="action"/>.</summary>
+    /// <summary>Creates an unstarted step which runs <paramref name="action"/> as a child execution when it is awaited, scheduled, or posted.</summary>
     public static DurableTask Run(Action<CancellationToken> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         return new DelegateDurableTask(action);
     }
 
-    /// <summary>Creates a durable task which invokes <paramref name="function"/>.</summary>
+    /// <summary>Creates an unstarted step which runs <paramref name="function"/> as a child execution when it is awaited, scheduled, or posted.</summary>
     public static DurableTask<TResult> Run<TResult>(Func<CancellationToken, TResult> function)
     {
         ArgumentNullException.ThrowIfNull(function);
         return new DelegateDurableTask<TResult>(function);
     }
 
-    /// <summary>Creates a durable task which invokes asynchronous <paramref name="function"/>.</summary>
+    /// <summary>Creates an unstarted step which runs asynchronous <paramref name="function"/> as a child execution when it is awaited, scheduled, or posted.</summary>
+    /// <remarks>An asynchronous lambda also converts to other delegates which <c>Run</c> accepts, and this overload takes precedence.</remarks>
+    [OverloadResolutionPriority(1)]
     public static DurableTask Run(Func<CancellationToken, Task> function)
     {
         ArgumentNullException.ThrowIfNull(function);
         return new AsyncDelegateDurableTask(function);
     }
 
-    /// <summary>Creates a durable task which invokes asynchronous <paramref name="function"/>.</summary>
+    /// <summary>Creates an unstarted step which runs asynchronous <paramref name="function"/> as a child execution when it is awaited, scheduled, or posted.</summary>
+    /// <remarks>An asynchronous lambda also converts to other delegates which <c>Run</c> accepts, and this overload takes precedence.</remarks>
+    [OverloadResolutionPriority(1)]
     public static DurableTask<TResult> Run<TResult>(Func<CancellationToken, Task<TResult>> function)
     {
         ArgumentNullException.ThrowIfNull(function);
         return new AsyncDelegateDurableTask<TResult>(function);
     }
+
+    /// <summary>
+    /// Creates an unstarted step. It runs <paramref name="function"/> when it is awaited, scheduled, or posted, possibly in
+    /// a later turn, as a child execution with its own <see cref="Current"/> and cancellation scope. Unlike
+    /// <see cref="Task.Run(Func{Task})"/>, creating it starts nothing, and nothing runs on the thread pool.
+    /// </summary>
+    /// <typeparam name="TResult">The type of the function's result, which the host stores with the child.</typeparam>
+    /// <param name="function">The asynchronous function which the child runs.</param>
+    /// <returns>A definition which runs the function each time it is awaited, scheduled, or posted.</returns>
+    /// <remarks>
+    /// <para>
+    /// The child records the result of the function's task, or the exception which it threw, and a replay returns the
+    /// recorded outcome without running the function. <see cref="Once{TResult}(string, Func{TResult})"/> runs a
+    /// synchronous effect in the caller's work item instead. Because the step runs later, as a child, a step which
+    /// isn't shielded completes as canceled when the parent's cancellation was requested before it starts, and its
+    /// record commits in a journal write of its own. A step and an effect with the same name share an identifier, and a
+    /// replay which finds the other kind recorded under it is a divergence.
+    /// </para>
+    /// <para>
+    /// An asynchronous lambda also converts to other delegates which <c>Run</c> accepts, and this overload takes
+    /// precedence.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="function"/> is <see langword="null"/>.</exception>
+    [OverloadResolutionPriority(1)]
+    public static DurableTask<TResult> Run<TResult>(Func<Task<TResult>> function)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        return new AsyncDelegateDurableTask<TResult>(_ => function());
+    }
+
+    /// <summary>Creates an unstarted step which runs asynchronous <paramref name="function"/> as a child execution when it is awaited, scheduled, or posted.</summary>
+    /// <param name="function">The asynchronous function which the child runs.</param>
+    /// <returns>A definition which runs the function each time it is awaited, scheduled, or posted.</returns>
+    /// <remarks>The child runs and records its outcome as <see cref="Run{TResult}(Func{Task{TResult}})"/> describes.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="function"/> is <see langword="null"/>.</exception>
+    [OverloadResolutionPriority(1)]
+    public static DurableTask Run(Func<Task> function)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        return new AsyncDelegateDurableTask(_ => function());
+    }
+
+    /// <summary>Creates an unstarted step which runs asynchronous <paramref name="function"/> as a child execution when it is awaited, scheduled, or posted.</summary>
+    /// <typeparam name="TResult">The type of the function's result, which the host stores with the child.</typeparam>
+    /// <param name="function">The asynchronous function which the child runs.</param>
+    /// <returns>A definition which runs the function each time it is awaited, scheduled, or posted.</returns>
+    /// <remarks>The child runs and records its outcome as <see cref="Run{TResult}(Func{Task{TResult}})"/> describes.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="function"/> is <see langword="null"/>.</exception>
+    public static DurableTask<TResult> Run<TResult>(Func<ValueTask<TResult>> function)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        return new AsyncDelegateDurableTask<TResult>(_ => function().AsTask());
+    }
+
+    /// <summary>Creates an unstarted step which runs asynchronous <paramref name="function"/> as a child execution when it is awaited, scheduled, or posted.</summary>
+    /// <param name="function">The asynchronous function which the child runs.</param>
+    /// <returns>A definition which runs the function each time it is awaited, scheduled, or posted.</returns>
+    /// <remarks>The child runs and records its outcome as <see cref="Run{TResult}(Func{Task{TResult}})"/> describes.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="function"/> is <see langword="null"/>.</exception>
+    public static DurableTask Run(Func<ValueTask> function)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        return new AsyncDelegateDurableTask(_ => function().AsTask());
+    }
+
+    private const string RunAwaitsDurableTasks =
+        "DurableTask.Run runs a delegate as a durable child, and a durable task already runs as one. Await the durable task directly.";
+
+    /// <summary>Rejects a delegate which returns a durable task, which runs as a durable child when it is awaited.</summary>
+    [Obsolete(RunAwaitsDurableTasks, error: true)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static DurableTask<TResult> Run<TResult>(Func<DurableTask<TResult>> function) => throw new NotSupportedException(RunAwaitsDurableTasks);
+
+    /// <summary>Rejects a delegate which returns a durable task, which runs as a durable child when it is awaited.</summary>
+    [Obsolete(RunAwaitsDurableTasks, error: true)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static DurableTask Run(Func<DurableTask> function) => throw new NotSupportedException(RunAwaitsDurableTasks);
+
+    /// <summary>Rejects a delegate which returns a durable task, which runs as a durable child when it is awaited.</summary>
+    [Obsolete(RunAwaitsDurableTasks, error: true)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static DurableTask<TResult> Run<TResult>(Func<CancellationToken, DurableTask<TResult>> function) => throw new NotSupportedException(RunAwaitsDurableTasks);
+
+    /// <summary>Rejects a delegate which returns a durable task, which runs as a durable child when it is awaited.</summary>
+    [Obsolete(RunAwaitsDurableTasks, error: true)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static DurableTask Run(Func<CancellationToken, DurableTask> function) => throw new NotSupportedException(RunAwaitsDurableTasks);
 
     /// <summary>Creates a durable task which invokes <paramref name="action"/> with captured <paramref name="state"/>.</summary>
     public static DurableTask Run<TState>(Action<TState, CancellationToken> action, TState state)

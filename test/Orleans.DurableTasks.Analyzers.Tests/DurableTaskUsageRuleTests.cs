@@ -147,7 +147,7 @@ public class DurableTaskUsageRuleTests
             {
                 await Step(1).WithId("pay");
                 await Step(2).WithId({|ORLEANS0108:"pay"|});
-                DurableTask.Once("pay", () => 3);
+                DurableTask.Once({|ORLEANS0108:"pay"|}, () => 3);
 
                 if (condition)
                 {

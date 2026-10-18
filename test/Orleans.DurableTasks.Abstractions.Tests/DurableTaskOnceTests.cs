@@ -30,7 +30,7 @@ public class DurableTaskOnceTests
 
         Assert.Equal(1, runs);
         Assert.Equal(first, replayed);
-        Assert.Equal([TaskId.Parse("root/$once:id")], host.Effects.Keys);
+        Assert.Equal([TaskId.Parse("root/id")], host.Effects.Keys);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class DurableTaskOnceTests
         Assert.Equal(new[] { 0, 10, 20 }, replayed);
         Assert.Equal(3, runs);
         Assert.Equal(
-            ["root/$once:line", "root/$once:line$2", "root/$once:line$3"],
+            ["root/line", "root/line$2", "root/line$3"],
             host.Effects.Keys.Select(id => id.ToString()).Order(StringComparer.Ordinal));
     }
 
@@ -163,14 +163,14 @@ public class DurableTaskOnceTests
         var host = new TestHost(Now);
         var runs = 0;
 
-        // Asynchronous lambdas don't compile; a delegate whose result type is asynchronous through generic code is
+        // Asynchronous delegates don't compile; a delegate whose result type is asynchronous through generic code is
         // rejected when it runs, inside and outside a durable task.
         var response = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.Run(_ => DurableTask.Once("value-task", () => ValueTask.FromResult(++runs))),
+            DurableTask.Run(_ => Once<ValueTask<int>>(() => ValueTask.FromResult(++runs))),
             host.CreateContext(TaskId.CreateRoot("root")));
 
         Assert.IsType<NotSupportedException>(response.Exception);
-        Assert.Throws<NotSupportedException>(() => DurableTask.Once("value-task", () => new ValueTask(Task.FromResult(++runs))));
+        Assert.Throws<NotSupportedException>(() => Once<ValueTask>(() => new ValueTask(Task.FromResult(++runs))));
         Assert.Throws<NotSupportedException>(() => { _ = Once<Task<int>>(() => Task.FromResult(++runs)); });
         Assert.Throws<NotSupportedException>(() => Once<DurableTask<int>>(() => DurableTask.FromResult(++runs)));
         Assert.Equal(0, runs);
@@ -188,7 +188,7 @@ public class DurableTaskOnceTests
         var response = await DurableTaskRuntimeHelper.RunAsync(Body(), context);
 
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
-        Assert.Equal(["effect", "record root/$once:step", "after"], log);
+        Assert.Equal(["effect", "record root/step", "after"], log);
 
         async DurableTask Body()
         {
@@ -205,11 +205,11 @@ public class DurableTaskOnceTests
 
         var response = await DurableTaskRuntimeHelper.RunAsync(Body(), host.CreateContext(TaskId.CreateRoot("root")));
 
-        // The same occurrence of a name has the same ordinal whichever kind of operation uses it, so a host can detect a
+        // An occurrence of a name has the same identifier whichever kind of operation uses it, so a host can detect a
         // deployment which changes the kind of an occurrence.
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
         Assert.Equal(
-            ["root/$once:step", "root/$once:step$4"],
+            ["root/step", "root/step$4"],
             host.Effects.Keys.Select(id => id.ToString()).Order(StringComparer.Ordinal));
         Assert.Contains(TaskId.Parse("root/step$2"), host.EntryIds);
         Assert.Contains(TaskId.Parse("root/step$3/0"), host.EntryIds);
@@ -221,6 +221,25 @@ public class DurableTaskOnceTests
             await DurableTask.WhenAll([DurableTask.Run(static _ => { })]).WithId("step");
             DurableTask.Once("step", () => 2);
         }
+    }
+
+    [Fact]
+    public async Task OnceAndAStepWithTheSameNameUseOneIdentifier()
+    {
+        var onceHost = new TestHost(Now);
+        var stepHost = new TestHost(Now);
+
+        var once = await DurableTaskRuntimeHelper.RunAsync(
+            DurableTask.Run(_ => DurableTask.Once("get-id", Guid.NewGuid)),
+            onceHost.CreateContext(TaskId.CreateRoot("root")));
+        var step = await DurableTaskRuntimeHelper.RunAsync(StepBody(), stepHost.CreateContext(TaskId.CreateRoot("root")));
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, once.Status);
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, step.Status);
+        Assert.Equal([TaskId.Parse("root/get-id")], onceHost.Effects.Keys);
+        Assert.Contains(TaskId.Parse("root/get-id"), stepHost.EntryIds);
+
+        static async DurableTask<Guid> StepBody() => await DurableTask.Run(async () => Guid.NewGuid()).WithId("get-id");
     }
 
     [Fact]
@@ -273,7 +292,7 @@ public class DurableTaskOnceTests
         Assert.Equal(2, effectRuns);
         Assert.Equal(1, childRuns);
         Assert.Equal(
-            ["root/$child-1", "root/$child-3", "root/$once:named"],
+            ["root/$child-1", "root/$child-3", "root/named"],
             host.Effects.Keys.Select(id => id.ToString()).Order(StringComparer.Ordinal));
         Assert.Contains(TaskId.Parse("root/$child-2"), host.EntryIds);
 
@@ -343,13 +362,13 @@ public class DurableTaskOnceTests
         var runs = 0;
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.Run(_ => DurableTask.Once(() => ValueTask.FromResult(++runs))),
+            DurableTask.Run(_ => Once<ValueTask<int>>(() => ValueTask.FromResult(++runs))),
             host.CreateContext(TaskId.CreateRoot("root")));
 
         Assert.IsType<NotSupportedException>(response.Exception);
         Assert.Throws<ArgumentNullException>(() => DurableTask.Once((Func<int>)null!));
         Assert.Throws<ArgumentNullException>(() => DurableTask.Once((Action)null!));
-        Assert.Throws<NotSupportedException>(() => DurableTask.Once(() => new ValueTask(Task.FromResult(++runs))));
+        Assert.Throws<NotSupportedException>(() => Once<ValueTask>(() => new ValueTask(Task.FromResult(++runs))));
         Assert.Throws<NotSupportedException>(() => { _ = Once<Task<int>>(() => Task.FromResult(++runs)); });
         Assert.Throws<NotSupportedException>(() => Once<DurableTask<int>>(() => DurableTask.FromResult(++runs)));
         Assert.Equal(0, runs);

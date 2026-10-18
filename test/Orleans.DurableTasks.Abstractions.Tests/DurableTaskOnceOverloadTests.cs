@@ -45,25 +45,48 @@ public class DurableTaskOnceOverloadTests
         // A lambda whose expression has a value converts to Action and to Func<T>; the effect returns the value.
         "int counter = 0; int value = DurableTask.Once(() => counter++);",
         "int value = DurableTask.Once(() => Compute());",
+        "_ = DurableTask.Once(() => 1);",
+
+        // A lambda which only throws also converts to Func<Task>, which the rejecting overload takes; a cast selects Action.
+        "DurableTask.Once((Action)(() => throw new InvalidOperationException()));",
+        "DurableTask.Once(\"a\", (Action)(() => { throw new InvalidOperationException(); }));",
+
+        // Explicit type arguments select the synchronous overload, whose result-type check rejects the effect when it runs.
+        "_ = DurableTask.Once<Task<int>>(() => Task.FromResult(1));",
     };
 
-    public static TheoryData<string> AsynchronousEffects => new()
+    private const string UseRun = "For asynchronous work, use await DurableTask.Run(async () => ...).";
+    private const string AwaitDirectly = "Await the durable task directly.";
+
+    public static TheoryData<string, string> AsynchronousEffects => new()
     {
-        "_ = DurableTask.Once(\"a\", async () => { await Task.Yield(); return 1; });",
-        "DurableTask.Once(\"a\", async () => await Task.Yield());",
-        "_ = DurableTask.Once(\"a\", () => Task.FromResult(1));",
-        "_ = DurableTask.Once(\"a\", ComputeAsync);",
-        "_ = DurableTask.Once(\"a\", () => DurableTask.FromResult(1));",
-        "_ = DurableTask.Once(\"a\", Step);",
-        "_ = DurableTask.Once(async () => { await Task.Yield(); return 1; });",
-        "DurableTask.Once(async () => await Task.Yield());",
-        "DurableTask.Once(async () => { });",
-        "_ = DurableTask.Once(() => Task.FromResult(1));",
-        "DurableTask.Once(() => Task.CompletedTask);",
-        "_ = DurableTask.Once(ComputeAsync);",
-        "_ = DurableTask.Once(() => DurableTask.FromResult(1));",
-        "_ = DurableTask.Once(Step);",
-        "DurableTask.Once(Run);",
+        { "_ = DurableTask.Once(\"a\", async () => { await Task.Yield(); return 1; });", UseRun },
+        { "DurableTask.Once(\"a\", async () => await Task.Yield());", UseRun },
+        { "_ = DurableTask.Once(\"a\", () => Task.FromResult(1));", UseRun },
+        { "_ = DurableTask.Once(\"a\", ComputeAsync);", UseRun },
+        { "_ = DurableTask.Once(\"a\", () => DurableTask.FromResult(1));", AwaitDirectly },
+        { "_ = DurableTask.Once(\"a\", Step);", AwaitDirectly },
+        { "_ = DurableTask.Once(async () => { await Task.Yield(); return 1; });", UseRun },
+        { "DurableTask.Once(async () => await Task.Yield());", UseRun },
+        { "DurableTask.Once(async () => { });", UseRun },
+        { "_ = DurableTask.Once(() => Task.FromResult(1));", UseRun },
+        { "DurableTask.Once(() => Task.CompletedTask);", UseRun },
+        { "_ = DurableTask.Once(ComputeAsync);", UseRun },
+        { "_ = DurableTask.Once(() => DurableTask.FromResult(1));", AwaitDirectly },
+        { "_ = DurableTask.Once(Step);", AwaitDirectly },
+        { "DurableTask.Once(Run);", AwaitDirectly },
+        { "_ = DurableTask.Once(() => ValueTask.FromResult(1));", UseRun },
+        { "_ = DurableTask.Once(\"a\", () => ValueTask.FromResult(1));", UseRun },
+        { "_ = DurableTask.Once(ComputeValueAsync);", UseRun },
+        { "DurableTask.Once(() => ValueTask.CompletedTask);", UseRun },
+        { "DurableTask.Once(\"a\", MarkValueAsync);", UseRun },
+
+        // An asynchronous lambda without a result also converts to Action, which would run as async void.
+        { "DurableTask.Once(\"a\", async () => { await Task.Yield(); });", UseRun },
+
+        // A lambda which only throws also converts to Func<Task>; casting it to Action records the exception.
+        { "DurableTask.Once(() => throw new InvalidOperationException());", UseRun },
+        { "DurableTask.Once(\"a\", () => { throw new InvalidOperationException(); });", UseRun },
     };
 
     [Theory]
@@ -75,16 +98,16 @@ public class DurableTaskOnceOverloadTests
 
     [Theory]
     [MemberData(nameof(AsynchronousEffects))]
-    public void AsynchronousAndDurableEffectsFailWithGuidance(string statement)
+    public void AsynchronousAndDurableEffectsFailWithGuidance(string statement, string guidance)
     {
         var error = Assert.Single(GetErrors(statement));
         if (CompilerSupportsOverloadPriority || error.Id != "CS0121")
         {
             Assert.Equal("CS0619", error.Id);
-            Assert.Contains("DurableTask.Once runs a synchronous effect", error.GetMessage(), StringComparison.Ordinal);
+            Assert.Contains("DurableTask.Once stores a synchronous result", error.GetMessage(), StringComparison.Ordinal);
+            Assert.Contains(guidance, error.GetMessage(), StringComparison.Ordinal);
         }
     }
-
     // Compilers which predate C# 13 ignore OverloadResolutionPriorityAttribute, so they reject an asynchronous lambda as
     // ambiguous between the rejecting overloads rather than selecting the one which carries the guidance.
     private static bool CompilerSupportsOverloadPriority => Enum.TryParse<LanguageVersion>("CSharp13", out _);
@@ -108,6 +131,10 @@ public class DurableTaskOnceOverloadTests
                 private static void Mark() { }
 
                 private static Task<int> ComputeAsync() => Task.FromResult(1);
+
+                private static ValueTask<int> ComputeValueAsync() => ValueTask.FromResult(1);
+
+                private static ValueTask MarkValueAsync() => ValueTask.CompletedTask;
 
                 private static async DurableTask<int> Step() => 1;
 

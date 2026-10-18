@@ -105,43 +105,59 @@ namespace Orleans.DurableTasks
 
         public static void Once(System.Action effect) { }
 
-        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.Obsolete("DurableTask.Once stores a synchronous result, and a durable task runs as a step. Await the durable task directly.", true)]
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static void Once(System.Func<DurableTask> effect) { }
 
-        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static void Once(System.Func<System.Threading.Tasks.Task> effect) { }
 
+        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static void Once(System.Func<System.Threading.Tasks.ValueTask> effect) { }
+
         public static void Once(string name, System.Action effect) { }
 
-        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.Obsolete("DurableTask.Once stores a synchronous result, and a durable task runs as a step. Await the durable task directly.", true)]
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static void Once(string name, System.Func<DurableTask> effect) { }
 
-        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static void Once(string name, System.Func<System.Threading.Tasks.Task> effect) { }
 
+        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static void Once(string name, System.Func<System.Threading.Tasks.ValueTask> effect) { }
+
         public static TResult Once<TResult>(System.Func<TResult> effect) { throw null; }
 
-        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.Obsolete("DurableTask.Once stores a synchronous result, and a durable task runs as a step. Await the durable task directly.", true)]
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static TResult Once<TResult>(System.Func<DurableTask<TResult>> effect) { throw null; }
 
-        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static TResult Once<TResult>(System.Func<System.Threading.Tasks.Task<TResult>> effect) { throw null; }
 
+        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static TResult Once<TResult>(System.Func<System.Threading.Tasks.ValueTask<TResult>> effect) { throw null; }
+
         public static TResult Once<TResult>(string name, System.Func<TResult> effect) { throw null; }
 
-        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.Obsolete("DurableTask.Once stores a synchronous result, and a durable task runs as a step. Await the durable task directly.", true)]
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static TResult Once<TResult>(string name, System.Func<DurableTask<TResult>> effect) { throw null; }
 
-        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static TResult Once<TResult>(string name, System.Func<System.Threading.Tasks.Task<TResult>> effect) { throw null; }
+
+        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static TResult Once<TResult>(string name, System.Func<System.Threading.Tasks.ValueTask<TResult>> effect) { throw null; }
 
         public static DurableTask<int> Race(System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
 
@@ -153,15 +169,39 @@ namespace Orleans.DurableTasks
 
         public static DurableTask Run(System.Action<System.Threading.CancellationToken> action) { throw null; }
 
+        [System.Obsolete("DurableTask.Run runs a delegate as a durable child, and a durable task already runs as one. Await the durable task directly.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static DurableTask Run(System.Func<DurableTask> function) { throw null; }
+
+        [System.Obsolete("DurableTask.Run runs a delegate as a durable child, and a durable task already runs as one. Await the durable task directly.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static DurableTask Run(System.Func<System.Threading.CancellationToken, DurableTask> function) { throw null; }
+
         public static DurableTask Run(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> function) { throw null; }
+
+        public static DurableTask Run(System.Func<System.Threading.Tasks.Task> function) { throw null; }
+
+        public static DurableTask Run(System.Func<System.Threading.Tasks.ValueTask> function) { throw null; }
 
         public static DurableTask Run<TState>(System.Action<TState, System.Threading.CancellationToken> action, TState state) { throw null; }
 
         public static DurableTask Run<TState>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> function, TState state) { throw null; }
 
+        [System.Obsolete("DurableTask.Run runs a delegate as a durable child, and a durable task already runs as one. Await the durable task directly.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static DurableTask<TResult> Run<TResult>(System.Func<DurableTask<TResult>> function) { throw null; }
+
         public static DurableTask<TResult> Run<TResult>(System.Func<System.Threading.CancellationToken, TResult> function) { throw null; }
 
+        [System.Obsolete("DurableTask.Run runs a delegate as a durable child, and a durable task already runs as one. Await the durable task directly.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static DurableTask<TResult> Run<TResult>(System.Func<System.Threading.CancellationToken, DurableTask<TResult>> function) { throw null; }
+
         public static DurableTask<TResult> Run<TResult>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> function) { throw null; }
+
+        public static DurableTask<TResult> Run<TResult>(System.Func<System.Threading.Tasks.Task<TResult>> function) { throw null; }
+
+        public static DurableTask<TResult> Run<TResult>(System.Func<System.Threading.Tasks.ValueTask<TResult>> function) { throw null; }
 
         public static DurableTask<TResult> Run<TState, TResult>(System.Func<TState, System.Threading.CancellationToken, TResult> function, TState state) { throw null; }
 

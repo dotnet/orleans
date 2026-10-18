@@ -276,7 +276,14 @@ public class DurableTaskReplayRegionTests
                     return value;
                 }).WithId("fetch");
 
-                return await Local();
+                var tokenless = await DurableTask.Run(async () =>
+                {
+                    var value = {|ORLEANS0102:await FetchAsync()|};
+                    await Step(value).WithId("tokenless-inner");
+                    return value + DateTime.UtcNow.Second;
+                }).WithId("tokenless");
+
+                return fetched + tokenless + await Local();
 
                 async DurableTask<int> Local()
                 {
