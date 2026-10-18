@@ -779,7 +779,7 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task CancellationWhileRequestIsInTransit_FollowsTheRequestOnceTheMigrationCompletes()
+    public async Task CancellationWhileRequestIsInTransit_IsHeldAndFollowsTheRequestOnceTheMigrationCompletes()
     {
         // Hold the migration before the destination creates the new activation, so that the caller cancels while its request is in transit.
         // The caller does not wait for acknowledgement, so it forgets the call as soon as it cancels.
@@ -827,21 +827,21 @@ public sealed class RetirementHandoffTests
 
         try
         {
-            // The caller cancels the call, which still targets the retiring silo.
+            // The caller cancels the call, which still targets the retiring silo. The retiring activation is deactivating, so it holds the cancellation.
             var destination = await acceptArrived.Task.WaitAsync(Timeout, Cancellation);
+            var activation = Assert.IsType<ActivationData>(FindActivation(retiring, grainId));
             state.Cancellation.Cancel();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => call.WaitAsync(Timeout, Cancellation));
             await WaitUntilAsync(() => cancellationsDelivered.Contains(retiring.SiloAddress));
+            await activation.RunOrQueueTask(() => Task.CompletedTask);
 
-            // The activation which will hold the request does not exist yet, so the cancellation reaches the destination before the request does.
-            // The retiring activation keeps the cancellation until the migration completes.
-            await WaitUntilAsync(() => cancellationsDelivered.Contains(destination));
-
-            // Once the migration completes, the cancellation follows the request again, and the request is canceled whether or not it has started running.
+            // Once it finishes deactivating, the retiring activation forwards the cancellation to the destination, which holds the migrated request,
+            // and the request is canceled whether or not it has started running.
             releaseAccept.TrySetResult();
+            await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+            await WaitUntilAsync(() => cancellationsDelivered.Contains(destination));
             await WaitUntilAsync(() => state.HoldCanceled.Task.IsCompleted
                 || !state.HoldEntered.Task.IsCompleted && FindActivation(cluster.Silos.Single(silo => silo.SiloAddress.Equals(destination)), grainId) is ActivationData { State: ActivationState.Valid } target && target.GetRequestCount() == 0);
-            await WaitUntilAsync(() => cancellationsDelivered.Count(silo => silo.Equals(destination)) >= 2);
         }
         finally
         {
@@ -853,14 +853,13 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task CancellationWhileNewActivationIsActivating_CancelsTheMigratedRequestBeforeItRuns()
+    public async Task CancellationReachingTheActivatingNewActivation_CancelsTheMigratedRequestBeforeItRuns()
     {
-        // The migration's outcome is known only once the new activation is valid. Extending the deactivation timeout ensures that the migration
-        // does not end early while the new activation is held, so the request is canceled only if the cancellation reaches it during activation.
         await using var cluster = await DeployAsync(ExtendShutdownTimeouts);
+        var caller = cluster.Silos[0];
         var source = cluster.Silos[1];
         var target = cluster.Silos[2];
-        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
         var key = Guid.NewGuid();
         var state = RetirementHandoffState.Create(key);
         var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
@@ -868,7 +867,7 @@ public sealed class RetirementHandoffTests
 
         var running = grain.Block().AsTask();
         await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
-        var call = grain.HoldUntilCanceled(state.Cancellation.Token).AsTask();
+        var call = grain.HoldUntilCanceled(CancellationToken.None).AsTask();
         await WaitUntilAsync(() => GetWaitingCount(source, grain.GetGrainId()) == 1);
 
         // The grain migrates with its queued request, and its new activation is held while activating, with the request queued.
@@ -876,16 +875,17 @@ public sealed class RetirementHandoffTests
         await grain.MigrateOnIdleTo(target.SiloAddress);
         state.ReleaseBlock.TrySetResult();
         await running.WaitAsync(Timeout, Cancellation);
+        var (sender, messageId) = FindPendingCall(caller, grain.GetGrainId());
         try
         {
             await state.ActivationHeld.Task.WaitAsync(Timeout, Cancellation);
             var activation = Assert.IsType<ActivationData>(FindActivation(target, grain.GetGrainId()));
             Assert.Equal(1, activation.WaitingCount);
 
-            // The caller's call still targets the source, which passes the cancellation on to the new activation, where the request is still queued.
-            state.Cancellation.Cancel();
+            // The new activation queues migrated requests before it activates, so a cancellation which reaches it now cancels the request before it runs.
+            await ((IGrainCallCancellationExtension)activation).CancelRequestAsync(sender, messageId, CancellationToken.None).AsTask().WaitAsync(Timeout, Cancellation);
+            Assert.Equal(0, activation.WaitingCount);
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => call.WaitAsync(Timeout, Cancellation));
-            await WaitUntilAsync(() => activation.WaitingCount == 0);
 
             // Once activated, the activation has no request to run.
             state.ReleaseActivation.TrySetResult();
@@ -902,7 +902,81 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task UnmatchedCancellation_IsNotForwardedByAnActivationWhoseRequestsDidNotMigrate()
+    public async Task CancellationHeldDuringDeclinedMigration_CancelsTheRetainedRequestWithoutForwardingIt()
+    {
+        // The target declines the migrated request, after the caller cancels while the request is in transit.
+        var acceptArrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseAccept = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var delivered = new ConcurrentQueue<(SiloAddress Silo, CorrelationId Id)>();
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
+        {
+            switch (context.Request.GetMethodName())
+            {
+                case nameof(IMigratingRequestsSystemTarget.AcceptMigratingGrainsWithRequests):
+                    acceptArrived.TrySetResult();
+                    await releaseAccept.Task;
+                    context.Result = new[] { false };
+                    return;
+                case nameof(IGrainCallCancellationManagerSystemTarget.CancelCallsAsync):
+                    await context.Invoke();
+                    if (context.Request.GetArgument(0) is List<GrainCallCancellationRequest> requests)
+                    {
+                        foreach (var request in requests)
+                        {
+                            delivered.Enqueue((context.TargetContext.Address.SiloAddress!, request.MessageId));
+                        }
+                    }
+
+                    return;
+            }
+
+            await context.Invoke();
+        })));
+        var caller = cluster.Silos[0];
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+        await PlaceOnAsync(source, () => grain.GetLocation());
+        var activation = Assert.IsType<ActivationData>(FindActivation(source, grain.GetGrainId()));
+
+        var running = grain.Block().AsTask();
+        await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
+        var call = grain.HoldUntilCanceled(state.Cancellation.Token).AsTask();
+        await WaitUntilAsync(() => GetWaitingCount(source, grain.GetGrainId()) == 1);
+
+        await grain.MigrateOnIdleTo(target.SiloAddress);
+        state.ReleaseBlock.TrySetResult();
+        await running.WaitAsync(Timeout, Cancellation);
+        var (_, messageId) = FindPendingCall(caller, grain.GetGrainId());
+        try
+        {
+            // The deactivating source holds the cancellation, since its request is in transit.
+            await acceptArrived.Task.WaitAsync(Timeout, Cancellation);
+            state.Cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => call.WaitAsync(Timeout, Cancellation));
+            await WaitUntilAsync(() => delivered.Contains((source.SiloAddress, messageId)));
+            await activation.RunOrQueueTask(() => Task.CompletedTask);
+        }
+        finally
+        {
+            releaseAccept.TrySetResult();
+        }
+
+        // The declined request returns to the source's queue, where the held cancellation cancels it, so neither the request nor its cancellation is forwarded.
+        await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+        var fence = new CorrelationId(long.MaxValue);
+        source.ServiceProvider.GetRequiredService<GrainCallCancellationManager>().SignalCancellation(target.SiloAddress, GrainId.Create("test", "fence"), GrainId.Create("test", "caller"), fence);
+        await WaitUntilAsync(() => delivered.Contains((target.SiloAddress, fence)));
+        Assert.DoesNotContain((target.SiloAddress, messageId), delivered);
+        Assert.False(state.HoldEntered.Task.IsCompleted);
+        state.ReleaseHold.TrySetResult();
+    }
+
+    [Fact]
+    public async Task UnmatchedCancellation_IsNotForwardedByAnActivationWhichIsNotDeactivating()
     {
         // Observe the cancellations which reach the other silo.
         var delivered = new ConcurrentQueue<CorrelationId>();
@@ -927,8 +1001,7 @@ public sealed class RetirementHandoffTests
         await PlaceOnAsync(silo, () => grain.GetLocation());
         var activation = Assert.IsType<ActivationData>(FindActivation(silo, grain.GetGrainId()));
 
-        // Like a duplicate activation, this activation has a forwarding address, but none of its requests migrated there.
-        // Forwarding unmatched cancellations from such activations could cycle between them.
+        // This activation has a forwarding address but has not forwarded its requests there, so it does not forward unmatched cancellations there either.
         activation.ForwardingAddress = other.SiloAddress;
         var sender = GrainId.Create("test", "caller");
         var unmatched = new CorrelationId(1);
@@ -973,7 +1046,7 @@ public sealed class RetirementHandoffTests
             await state.DisposeEntered.Task.WaitAsync(Timeout, Cancellation);
             Assert.Same(activation, FindActivation(source, grain.GetGrainId()));
 
-            // A cancellation which reaches the source activation follows the request to the new activation.
+            // The source activation is invalid while its disposal is held, having forwarded its requests, so a cancellation which reaches it follows the request to the new activation.
             await ((IGrainCallCancellationExtension)activation).CancelRequestAsync(sender, messageId, CancellationToken.None).AsTask().WaitAsync(Timeout, Cancellation);
             await state.HoldCanceled.Task.WaitAsync(Timeout, Cancellation);
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => call.WaitAsync(Timeout, Cancellation));
@@ -982,15 +1055,6 @@ public sealed class RetirementHandoffTests
         {
             state.ReleaseDispose.TrySetResult();
             state.ReleaseHold.TrySetResult();
-        }
-
-        static (GrainId Sender, CorrelationId Id) FindPendingCall(InProcessSiloHandle silo, GrainId target)
-        {
-            var callbacks = (ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>)typeof(InsideRuntimeClient)
-                .GetField("callbacks", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
-                .GetValue(silo.ServiceProvider.GetRequiredService<InsideRuntimeClient>())!;
-            var pending = Assert.Single(callbacks, entry => entry.Value.Message.TargetGrain == target);
-            return pending.Key;
         }
     }
 
@@ -1575,6 +1639,15 @@ public sealed class RetirementHandoffTests
                 return key;
             }
         }
+    }
+
+    private static (GrainId Sender, CorrelationId Id) FindPendingCall(InProcessSiloHandle silo, GrainId target)
+    {
+        var callbacks = (ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>)typeof(InsideRuntimeClient)
+            .GetField("callbacks", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(silo.ServiceProvider.GetRequiredService<InsideRuntimeClient>())!;
+        var pending = Assert.Single(callbacks, entry => entry.Value.Message.TargetGrain == target);
+        return pending.Key;
     }
 
     private static byte[] SerializeRequests(InProcessSiloHandle silo, List<MigratedRequest> requests)

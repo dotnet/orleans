@@ -35,8 +35,7 @@ internal sealed partial class ActivationData
     /// </summary>
     /// <returns>The requests, or <see langword="null"/> if there are none.</returns>
     /// <remarks>
-    /// While the requests are in transit, a cancellation for one of them is kept until the migration's outcome is known, since the new activation may not exist yet.
-    /// <see cref="EndRequestMigration"/> ends the transit.
+    /// While the requests are in transit, this activation is deactivating, so it holds a cancellation for one of them until it finishes deactivating.
     /// </remarks>
     private List<Message>? TakeRequestsForMigration()
     {
@@ -56,12 +55,6 @@ internal sealed partial class ActivationData
                 (requests ??= []).Add(entry.Message);
                 return true;
             });
-
-            if (requests is not null)
-            {
-                _extras ??= new();
-                _extras.IsMigratingRequests = true;
-            }
         }
 
         return requests;
@@ -70,10 +63,6 @@ internal sealed partial class ActivationData
     /// <summary>
     /// Disposes of the requests which were taken for migration, according to the migration's outcome.
     /// </summary>
-    /// <remarks>
-    /// Cancellations which arrived while the requests were in transit were sent to the target as they arrived, which could precede the migration.
-    /// They are applied here if the requests stay, or sent again if the target may own the requests.
-    /// </remarks>
     private void EndRequestMigration(List<Message>? requests, MigratedRequestsOutcome outcome)
     {
         if (requests is null)
@@ -81,64 +70,29 @@ internal sealed partial class ActivationData
             return;
         }
 
-        HashSet<(GrainId SendingGrain, CorrelationId MessageId)>? cancellations;
-        if (outcome is not MigratedRequestsOutcome.Retained)
+        if (outcome is MigratedRequestsOutcome.Retained)
         {
-            SiloAddress? target;
+            // The requests return to the front of the queue, from which deactivation forwards them.
             lock (_lock)
             {
-                cancellations = EndInTransitCancellations();
-                _extras!.HasMigratedRequests = true;
-                target = ForwardingAddress;
-            }
-
-            // The target owns the requests, or may own them. Requests which this silo received still hold their serialized bodies, which the migration copied.
-            // Requests from callers on this silo share their body with the caller's pending call, so they are left intact.
-            foreach (var request in requests)
-            {
-                request.ReleaseBodyBuffer();
-            }
-
-            if (cancellations is not null)
-            {
-                var cancellationManager = _shared.InternalRuntime.RuntimeClient.CancellationManager;
-                foreach (var (sendingGrain, messageId) in cancellations)
+                var queuedTime = CoarseStopwatch.StartNew();
+                var retained = new List<(Message, CoarseStopwatch)>(requests.Count);
+                foreach (var request in requests)
                 {
-                    cancellationManager.SignalCancellation(target, GrainId, sendingGrain, messageId);
+                    retained.Add((request, queuedTime));
                 }
+
+                _waitingRequests.InsertRange(0, retained);
             }
 
             return;
         }
 
-        // The requests return to the front of the queue, except those canceled while in transit.
-        List<Message>? canceled = null;
-        lock (_lock)
+        // The target owns the requests, or may own them. Requests which this silo received still hold their serialized bodies, which the migration copied.
+        // Requests from callers on this silo share their body with the caller's pending call, so they are left intact.
+        foreach (var request in requests)
         {
-            cancellations = EndInTransitCancellations();
-            var queuedTime = CoarseStopwatch.StartNew();
-            var retained = new List<(Message, CoarseStopwatch)>(requests.Count);
-            foreach (var request in requests)
-            {
-                if (cancellations?.Contains((request.SendingGrain, request.Id)) == true)
-                {
-                    (canceled ??= []).Add(request);
-                }
-                else
-                {
-                    retained.Add((request, queuedTime));
-                }
-            }
-
-            _waitingRequests.InsertRange(0, retained);
-        }
-
-        if (canceled is not null)
-        {
-            foreach (var request in canceled)
-            {
-                CompleteCanceledRequest(request);
-            }
+            request.ReleaseBodyBuffer();
         }
     }
 

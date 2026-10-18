@@ -2307,8 +2307,11 @@ internal sealed partial class ActivationData :
             try
             {
                 List<Message>? queued = null;
+                HashSet<(GrainId SendingGrain, CorrelationId MessageId)>? heldCancellations;
                 lock (_lock)
                 {
+                    // Disposal made this activation invalid, so it holds no further cancellations.
+                    Debug.Assert(State is ActivationState.Invalid);
                     if (_waitingRequests.Count > 0)
                     {
                         queued = new List<Message>(_waitingRequests.Count);
@@ -2319,9 +2322,20 @@ internal sealed partial class ActivationData :
 
                         _waitingRequests.Clear();
                     }
+
+                    heldCancellations = _extras?.HeldCancellations;
+                    if (heldCancellations is not null)
+                    {
+                        _extras!.HeldCancellations = null;
+                    }
                 }
 
-                if (queued is not null)
+                if (heldCancellations is not null)
+                {
+                    ApplyHeldCancellations(heldCancellations, queued);
+                }
+
+                if (queued is { Count: > 0 })
                 {
                     RejectOrForwardRequests(queued);
                 }
@@ -2528,8 +2542,6 @@ internal sealed partial class ActivationData :
         private const int IsStuckProcessingMessageFlag = 1 << 0;
         private const int IsStuckDeactivatingFlag = 1 << 1;
         private const int IsDisposingFlag = 1 << 2;
-        private const int IsMigratingRequestsFlag = 1 << 3;
-        private const int HasMigratedRequestsFlag = 1 << 4;
 
         private byte _flags;
 
@@ -2551,9 +2563,9 @@ internal sealed partial class ActivationData :
         public SiloAddress? ForwardingAddress { get => GetValueOrDefault<SiloAddress>(nameof(ForwardingAddress)); set => SetOrRemoveValue(nameof(ForwardingAddress), value); }
 
         /// <summary>
-        /// Cancellations which arrived while this activation's queued requests were in transit with its migration.
+        /// Cancellations which arrived while this activation was deactivating and did not find their request.
         /// </summary>
-        public HashSet<(GrainId SendingGrain, CorrelationId MessageId)>? InTransitCancellations { get => GetValueOrDefault<HashSet<(GrainId, CorrelationId)>>(nameof(InTransitCancellations)); set => SetOrRemoveValue(nameof(InTransitCancellations), value); }
+        public HashSet<(GrainId SendingGrain, CorrelationId MessageId)>? HeldCancellations { get => GetValueOrDefault<HashSet<(GrainId, CorrelationId)>>(nameof(HeldCancellations)); set => SetOrRemoveValue(nameof(HeldCancellations), value); }
 
         /// <summary>
         /// A <see cref="TaskCompletionSource{TResult}"/> which completes when a grain has deactivated.
@@ -2583,15 +2595,6 @@ internal sealed partial class ActivationData :
         public bool IsStuckDeactivating { get => GetFlag(IsStuckDeactivatingFlag); set => SetFlag(IsStuckDeactivatingFlag, value); }
         public bool IsDisposing { get => GetFlag(IsDisposingFlag); set => SetFlag(IsDisposingFlag, value); }
 
-        /// <summary>
-        /// Whether requests which were taken from this activation's queue are in transit with its migration.
-        /// </summary>
-        public bool IsMigratingRequests { get => GetFlag(IsMigratingRequestsFlag); set => SetFlag(IsMigratingRequestsFlag, value); }
-
-        /// <summary>
-        /// Whether this activation's queued requests migrated, or may have migrated, to its forwarding address.
-        /// </summary>
-        public bool HasMigratedRequests { get => GetFlag(HasMigratedRequestsFlag); set => SetFlag(HasMigratedRequestsFlag, value); }
 
 
 

@@ -78,21 +78,21 @@ internal sealed partial class ActivationData
                     }
                 }
 
-                if (message is null
-                    && _extras is { } extras
-                    && (extras.IsMigratingRequests || extras.HasMigratedRequests)
-                    && ForwardingAddress is { } forwardingAddress)
+                if (message is null)
                 {
-                    // Requests which migrated with this activation are canceled where they migrated.
-                    // The new activation queues migrated requests before it activates, so a cancellation which reaches it then cancels the request before it runs.
-                    // Only a migration source forwards cancellations. Its target holds a new activation, which a migration source cannot forward back to
-                    // while this activation remains, so forwarding cannot cycle. Other activations, such as duplicates, retry briefly and then drop the cancellation.
-                    forwardTo = forwardingAddress;
-                    if (extras.IsMigratingRequests)
+                    if (State is ActivationState.Deactivating)
                     {
-                        // The cancellation can reach the target before the migration does. It is kept until the migration's outcome is known,
-                        // then applied here if the requests stay, or sent again if they migrated.
-                        (_extras.InTransitCancellations ??= []).Add((senderGrainId, messageId));
+                        // A deactivating activation holds cancellations as it holds requests. When it finishes deactivating, it applies them to its queued requests,
+                        // which include requests which stayed when it migrated, and forwards the rest with its requests.
+                        _extras ??= new();
+                        (_extras.HeldCancellations ??= []).Add((senderGrainId, messageId));
+                        return true;
+                    }
+
+                    if (State is ActivationState.Invalid && ForwardingAddress is { } forwardingAddress)
+                    {
+                        // This activation has forwarded its requests, so the cancellation follows them.
+                        forwardTo = forwardingAddress;
                     }
                 }
             }
@@ -136,7 +136,7 @@ internal sealed partial class ActivationData
     }
 
     /// <summary>
-    /// Completes a request which was canceled while it was in transit with this activation's migration, without invoking it.
+    /// Completes a request which was canceled while it was queued, without invoking it.
     /// </summary>
     private void CompleteCanceledRequest(Message message)
     {
@@ -159,15 +159,36 @@ internal sealed partial class ActivationData
     }
 
     /// <summary>
-    /// Ends the migration of this activation's queued requests, returning the cancellations which arrived while they were in transit.
+    /// Applies the cancellations which this activation held while deactivating to the requests which it is about to forward or reject,
+    /// then forwards the remaining cancellations to wherever its requests are now sent.
     /// </summary>
-    private HashSet<(GrainId SendingGrain, CorrelationId MessageId)>? EndInTransitCancellations()
+    /// <remarks>
+    /// Called with the requests which deactivation removed from the queue, after this activation became invalid, so that it holds no further cancellations.
+    /// Without a forwarding address, the remaining cancellations are dropped, as cancellations which do not find their request are on other activations.
+    /// </remarks>
+    private void ApplyHeldCancellations(HashSet<(GrainId SendingGrain, CorrelationId MessageId)> cancellations, List<Message>? requests)
     {
-        Debug.Assert(LockIsHeld());
-        var cancellations = _extras!.InTransitCancellations;
-        _extras.InTransitCancellations = null;
-        _extras.IsMigratingRequests = false;
-        return cancellations;
+        if (requests is not null)
+        {
+            for (var i = requests.Count - 1; i >= 0; i--)
+            {
+                var request = requests[i];
+                if (cancellations.Remove((request.SendingGrain, request.Id)))
+                {
+                    requests.RemoveAt(i);
+                    CompleteCanceledRequest(request);
+                }
+            }
+        }
+
+        if (ForwardingAddress is { } forwardingAddress)
+        {
+            var cancellationManager = _shared.InternalRuntime.RuntimeClient.CancellationManager;
+            foreach (var (sendingGrain, messageId) in cancellations)
+            {
+                cancellationManager.SignalCancellation(forwardingAddress, GrainId, sendingGrain, messageId);
+            }
+        }
     }
 
     private bool LockIsHeld()
