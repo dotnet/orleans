@@ -35,6 +35,8 @@ This page describes the programming model and its guarantees. Continue with:
   task analyzers enforce.
 - [Versioning](durable-tasks-versioning.md) for changing workflow code while executions
   are pending, and retiring old versions.
+- [Test workflow changes](durable-tasks-testing.md) for replaying recorded histories against
+  changed workflow code in tests.
 - [Integrate with other systems](durable-tasks-integrations.md) for payment providers,
   databases, HTTP services, webhooks, and where to retry.
 - [Practical recipes](durable-tasks-recipes.md) for fan-out, races, compensation,
