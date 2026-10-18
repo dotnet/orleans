@@ -254,8 +254,12 @@ public class CallbackRegistryTests
         Assert.Equal(0, registry.GetRunningRequestCountForTest(default));
     }
 
-    [Fact]
-    public async Task TryCompleteResponse_ConcurrentTerminalCompletionReportsMatchingRegistration()
+    [Theory]
+    [InlineData(TerminalRace.Timeout)]
+    [InlineData(TerminalRace.TargetFailure)]
+    [InlineData(TerminalRace.Shutdown)]
+    [InlineData(TerminalRace.Cancellation)]
+    public async Task TryCompleteResponse_ConcurrentTerminalCompletionReportsMatchingRegistration(TerminalRace race)
     {
         using var serviceProvider = CreateServiceProvider();
         using var unregisterEntered = new ManualResetEventSlim();
@@ -264,6 +268,7 @@ public class CallbackRegistryTests
         var registry = new CallbackRegistry();
         var completion = new TestResponseCompletionSource();
         var request = CreateRequest(10);
+        using var response = CreateResponse(request);
         var callback = CreateCallback(
             completion,
             request,
@@ -275,13 +280,13 @@ public class CallbackRegistryTests
                 registry.TryRemove(callback);
             });
         registry.Register(callback);
-        var terminalTask = Task.Run(callback.OnTimeout, cancellationToken);
+        var terminalTask = Task.Run(() => CompleteTerminal(callback, race), cancellationToken);
         bool found;
 
         try
         {
             unregisterEntered.Wait(cancellationToken);
-            found = registry.TryCompleteResponse(CreateResponse(request));
+            found = registry.TryCompleteResponse(response);
         }
         finally
         {
@@ -290,7 +295,15 @@ public class CallbackRegistryTests
         }
 
         Assert.True(found);
-        Assert.IsType<TimeoutException>(completion.Response.Exception);
+        Assert.Null(response._bodyObject);
+        Assert.IsType(
+            race switch
+            {
+                TerminalRace.Timeout => typeof(TimeoutException),
+                TerminalRace.Cancellation => typeof(OperationCanceledException),
+                _ => typeof(SiloUnavailableException),
+            },
+            completion.Response.Exception);
         Assert.Equal(1, completion.CompletionCount);
         Assert.Equal(0, registry.GetRunningRequestCountForTest(default));
     }
@@ -420,6 +433,9 @@ public class CallbackRegistryTests
             case TerminalRace.Shutdown:
                 callback.OnHostShutdown();
                 break;
+            case TerminalRace.Cancellation:
+                callback.SubscribeForCancellation(new CancellationToken(canceled: true));
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(race));
         }
@@ -498,6 +514,7 @@ public class CallbackRegistryTests
         Timeout,
         TargetFailure,
         Shutdown,
+        Cancellation,
     }
 
     private sealed class TestResponseCompletionSource : IResponseCompletionSource

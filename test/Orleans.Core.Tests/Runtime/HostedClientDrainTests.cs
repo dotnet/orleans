@@ -54,7 +54,7 @@ public class HostedClientDrainTests
         };
         var callback = new CallbackData(
             new SharedCallbackData(
-                message => callbacks.TryRemove((message.SendingGrain, message.Id), out _),
+                callback => callbacks.TryRemove(callback),
                 NullLogger<CallbackData>.Instance,
                 fixture.Clock,
                 TimeSpan.FromMinutes(1),
@@ -69,7 +69,7 @@ public class HostedClientDrainTests
             using var response = new BufferedResponse(fixture.Runtime.ServiceProvider, request.Id, request.SendingGrain, malformed);
             if (knownRequest)
             {
-                Assert.True(callbacks.TryAdd((request.SendingGrain, request.Id), callback));
+                callbacks.Register(callback);
             }
 
             var error = Record.Exception(() => fixture.Runtime.ReceiveResponse(response.Message));
@@ -83,14 +83,14 @@ public class HostedClientDrainTests
             Assert.Equal(0, response.Request.Body.Length);
             Assert.False(callback.IsCompleted);
             Assert.Equal(0, completion.CompletionCount);
-            Assert.Equal(knownRequest, callbacks.ContainsKey((request.SendingGrain, request.Id)));
+            Assert.Equal(knownRequest, callbacks.ContainsKey(request.Id));
             if (knownRequest)
             {
                 callback.OnTimeout();
                 var timeout = Assert.IsType<TimeoutException>(completion.Exception);
                 Assert.Equal(!malformed, timeout.Message.Contains("processing", StringComparison.Ordinal));
                 Assert.Equal(1, completion.CompletionCount);
-                Assert.Empty(callbacks);
+                Assert.Equal(0, callbacks.GetRunningRequestCountForTest(default));
             }
         }
         finally
@@ -115,7 +115,7 @@ public class HostedClientDrainTests
         };
         var callback = new CallbackData(
             new SharedCallbackData(
-                message => callbacks.TryRemove((message.SendingGrain, message.Id), out _),
+                callback => callbacks.TryRemove(callback),
                 NullLogger<CallbackData>.Instance,
                 fixture.Clock,
                 TimeSpan.FromMinutes(1),
@@ -141,7 +141,7 @@ public class HostedClientDrainTests
             });
             if (knownRequest)
             {
-                Assert.True(callbacks.TryAdd((request.SendingGrain, request.Id), callback));
+                callbacks.Register(callback);
             }
 
             fixture.Runtime.ReceiveResponse(response.Message);
@@ -150,14 +150,90 @@ public class HostedClientDrainTests
             Assert.Equal(0, response.Request.Body.Length);
             Assert.False(callback.IsCompleted);
             Assert.Equal(0, completion.CompletionCount);
-            Assert.Equal(knownRequest, callbacks.ContainsKey((request.SendingGrain, request.Id)));
+            Assert.Equal(knownRequest, callbacks.ContainsKey(request.Id));
             if (knownRequest)
             {
-                Assert.Same(callback, callbacks[(request.SendingGrain, request.Id)]);
+                Assert.True(callbacks.TryGetResponseCallback(response.Message, out var registered));
+                Assert.Same(callback, registered);
                 callback.OnTimeout();
                 Assert.Equal(1, completion.CompletionCount);
-                Assert.Empty(callbacks);
+                Assert.Equal(0, callbacks.GetRunningRequestCountForTest(default));
             }
+        }
+        finally
+        {
+            await fixture.CleanupAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ReceiveResponse_ConcurrentTimeoutDisposesBufferedResponse()
+    {
+        var fixture = new HostedFixture(nameof(ReceiveResponse_ConcurrentTimeoutDisposesBufferedResponse));
+        var unregisterEntered = DrainTestHelpers.CreateSignal();
+        using var releaseUnregister = new ManualResetEventSlim();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var callbacks = ReadCallbacks(fixture.Runtime);
+        var completion = new CallbackCompletionSource();
+        using var request = new Message
+        {
+            Direction = Message.Directions.Request,
+            Id = new CorrelationId(2053),
+            SendingGrain = fixture.Hosted.GrainId
+        };
+        var callback = new CallbackData(
+            new SharedCallbackData(
+                callback =>
+                {
+                    unregisterEntered.TrySetResult();
+                    releaseUnregister.Wait(cancellationToken);
+                    callbacks.TryRemove(callback);
+                },
+                NullLogger<CallbackData>.Instance,
+                fixture.Clock,
+                TimeSpan.FromMinutes(1),
+                cancelOnTimeout: false,
+                waitForCancellationAcknowledgement: false,
+                cancellationManager: null),
+            completion,
+            request,
+            fixture.ApplicationRequests);
+        try
+        {
+            using var body = Response.FromResult(731);
+            using var response = new BufferedResponse(fixture.Runtime.ServiceProvider, new Message
+            {
+                Direction = Message.Directions.Response,
+                Result = Message.ResponseTypes.Success,
+                Id = request.Id,
+                TargetGrain = request.SendingGrain,
+                BodyObject = body
+            });
+            callbacks.Register(callback);
+            Assert.Same(response.Request, response.Message._bodyObject);
+            Assert.True(response.Request.Body.Length > 0);
+            var timeout = Task.Run(callback.OnTimeout, cancellationToken);
+            try
+            {
+                await fixture.WaitAsync(unregisterEntered.Task, "2053: timeout claimed callback before unregistering");
+                Assert.True(callback.IsCompleted);
+                Assert.True(callbacks.ContainsKey(request.Id));
+
+                fixture.Runtime.ReceiveResponse(response.Message);
+
+                Assert.False(callbacks.ContainsKey(request.Id));
+                Assert.Null(response.Message._bodyObject);
+                Assert.Equal(0, response.Request.Body.Length);
+            }
+            finally
+            {
+                releaseUnregister.Set();
+                await timeout;
+            }
+
+            Assert.IsType<TimeoutException>(completion.Exception);
+            Assert.Equal(1, completion.CompletionCount);
+            Assert.Equal(0, callbacks.GetRunningRequestCountForTest(default));
         }
         finally
         {

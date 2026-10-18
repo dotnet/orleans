@@ -47,7 +47,12 @@ internal sealed class CallbackRegistry
             }
         }
 
-        _ = callback.TryDoCallback(response);
+        // A matching registration owns the response even when terminal completion wins.
+        if (!callback.TryDoCallback(response))
+        {
+            response.Dispose();
+        }
+
         return true;
     }
 

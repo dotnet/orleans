@@ -47,7 +47,7 @@ public class ClientObserverDrainLifecycleTests
         };
         var callback = new CallbackData(
             new SharedCallbackData(
-                message => callbacks.TryRemove(message.Id, out _),
+                callback => callbacks.TryRemove(callback.Message.Id, out _),
                 NullLogger<CallbackData>.Instance,
                 fixture.TimeProvider,
                 TimeSpan.FromMinutes(1),
