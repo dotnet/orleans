@@ -3,6 +3,7 @@
   "packages": {
     "Microsoft.Orleans.DurableTasks": "The durable grain RPC adapter is awaiting its first NuGet publication.",
     "Microsoft.Orleans.DurableTasks.Abstractions": "The new durable task abstractions package is awaiting its first NuGet publication.",
+    "Microsoft.Orleans.DurableTasks.Http": "The durable task HTTP package is awaiting its first NuGet publication.",
     "Microsoft.Orleans.Messaging": "The new package is awaiting its first NuGet publication."
   }
 }

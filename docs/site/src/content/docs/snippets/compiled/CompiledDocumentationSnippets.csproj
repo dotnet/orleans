@@ -11,6 +11,7 @@
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Messaging\Orleans.Messaging.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Microsoft.Orleans.DurableTasks\Microsoft.Orleans.DurableTasks.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.DurableTasks.Http\Orleans.DurableTasks.Http.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.DurableTasks.Analyzers\Orleans.DurableTasks.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Transactions\Orleans.Transactions.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />

@@ -1,14 +1,15 @@
 ---
 title: Integrate durable tasks with other systems
-description: Call payment providers, databases, and HTTP services from durable tasks with idempotency keys, receive webhooks as signals, and choose where to retry transient failures.
-ms.date: 10/15/2026
+description: Call payment providers, databases, and HTTP services from durable tasks with idempotency keys, serve durable tasks as HTTP operations, receive webhooks as signals, and choose where to retry transient failures.
+ms.date: 10/17/2026
 ms.topic: how-to
 ---
 
 # Integrate durable tasks with other systems
 
-These recipes call systems outside Orleans from durable tasks: a payment provider, a
-database, an HTTP service with long-running operations, and webhooks which report back.
+These recipes connect durable tasks with systems outside Orleans: a payment provider, a
+database, HTTP services with long-running operations, HTTP clients which start durable
+tasks, and webhooks which report back.
 Each external call runs in a step, which records its result, and sends an idempotency
 key derived from the task, because a step whose result didn't commit runs again. The
 external clients are interfaces, so the examples compile without a provider's SDK.
@@ -25,7 +26,7 @@ which matches how long they last, and handle permanent failures as outcomes:
 | Failure | Where it's retried | How |
 | --- | --- | --- |
 | A grain call or a durable task start can't be delivered or processed | Messaging | Automatically, until `OutboxRetryTimeout` (6 hours by default), then `DurableTaskDeliveryException`. The workflow doesn't retry. |
-| A brief external fault, seconds long | Inside the step | A loop or a resilience pipeline, such as Polly's, around the call, with the same idempotency key on every attempt. |
+| A brief external fault, seconds long | Inside the step | A loop or a resilience pipeline, such as Polly's or an `IDurableHttpClient`'s resilience handler, around the call, with the same idempotency key on every attempt. |
 | An external outage, minutes to hours long | Across steps | A loop of steps with `DurableTask.Delay` backoff, which survives deactivation, bounded by a deadline in logical time. |
 | A rejection, such as a declined payment, a conflict, or a validation error | Nowhere | Return it from the step as a value, or catch its exception, and compensate or report it. |
 
@@ -141,28 +142,81 @@ a row's first and last relay.
 **Verify:** the database holds one row per operation ID, and relaying the same outbox row
 twice leaves the grain with one task named `outbox-{id}`.
 
-## Call an HTTP service and wait for a long-running operation
+## Call HTTP APIs from durable tasks
 
-**Task:** submit a label to a service which accepts the job with `202 Accepted` and a
-status URI, then poll until the label is ready.
+**Task:** submit a label to a service which runs it as a long-running operation, wait
+for the label, and cancel the job when the workflow is canceled.
+
+The `Microsoft.Orleans.DurableTasks.Http` package's `IDurableHttpClient` runs HTTP
+requests and operations as steps of the calling task. Register a named client in the
+silo, configure its `HttpClient` through the builder which `AddDurableHttpClient`
+returns, and inject the client as a keyed service:
 
 :::code source="../snippets/compiled/Grains/DurableTaskIntegrationSnippets.cs" id="durable_tasks_http" language="csharp":::
 
-- The `submit` step sends an `Idempotency-Key` header, bounds each request with a
-  timeout which it links to the step's cancellation token, and records the job's status
-  URI.
-- Each poll is a step, and the wait between polls is a durable delay, which honors the
-  service's `Retry-After` header. A poll which waits for minutes doesn't hold the grain
-  active, and a replay doesn't poll again for recorded results.
-- The deadline is computed from `DurableTask.Current.UtcNow`, so every replay computes the
-  same deadline.
+- **Idempotency keys come from step identities.** Each step's unsafe requests carry an
+  `Idempotency-Key` derived from the service, the grain, and the step's task ID, so a
+  step which runs again after a failure or a deactivation reaches the job which its
+  first attempt started. The key handler precedes the handlers which the builder adds,
+  such as a resilience handler, so their retries carry the same key.
+- **Responses are recorded.** A replay reads each step's recorded response without
+  sending its request again.
+- **Operations follow long-running operation conventions.** A `202 Accepted` response
+  locates the operation through `Operation-Location`, `Azure-AsyncOperation`, or
+  `Location`. `DurableHttpWaitMode.Events` reads the status monitor's server-sent events
+  within one step, and `DurableHttpWaitMode.Poll` polls after the interval which
+  `Retry-After` advertises, with durable delays between polls, so a long wait doesn't
+  hold the grain active. A failed or canceled operation throws
+  `DurableHttpOperationException`.
+- **Cancellation reaches the remote operation.** `CancelOperationAsync` sends
+  `POST {status monitor}:cancel` with the task's cancellation reason, shielded so it
+  runs after the workflow's cancellation. `SignalOperationAsync` delivers a signal the
+  same way.
 
-Configure `HttpClient` through `IHttpClientFactory`, with its `BaseAddress` and any
-resilience handlers, and inject it into the grain. Resilience handlers retry within one
-step's run, like the loop in the payment recipe.
+A step which sends its own requests with `DurableTask.Run` gets the same keys from an
+`HttpClient` which `AddDurableIdempotencyKey` configures. For every method and option,
+see the [package README](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Http/README.md).
 
-**Verify:** the grain lists `submit`, then alternating `poll` and `poll-wait` operations,
-and the last `poll` completes with the label's URL.
+**Verify:** the label service receives one job per step identity, however often the
+step's request is retried, and the grain lists the start and wait steps, each
+`Completed` with its recorded response.
+
+## Serve durable tasks as HTTP operations
+
+**Task:** let HTTP clients start a return as a long-running operation, retry the
+request safely, follow its progress, cancel it, and deliver an inspection result.
+
+`WithDurableOperations` makes each endpoint of a route group whose handler returns a
+durable grain call start an operation which performs it:
+
+:::code source="../snippets/compiled/Grains/DurableTaskIntegrationSnippets.cs" id="durable_tasks_http_operations" language="csharp":::
+
+- **The `Idempotency-Key` names the operation.** Each retry of a request reaches the
+  operation which its first attempt started. The operation's key combines the group's
+  path, its route values, and the identifier, and the call runs as a root task named by
+  that key. A key which another request used to start other work
+  receives `422 Unprocessable Content`.
+- **The status monitor reports progress.** A start answers `200 OK` with the result when
+  the operation completes, including within the wait which `Prefer: wait=N` requests,
+  and otherwise `202 Accepted` with an `Operation-Location` header, the URL of
+  `GET {group}/operations/{id}`. That status monitor reports `Running`, `Succeeded`,
+  `Failed`, or `Canceled`, with the result or an error, and also honors `Prefer: wait=N`.
+- **Events stream the status.** `GET {group}/operations/{id}/events` streams the status
+  monitor as server-sent events until the operation is terminal, so a browser's
+  `EventSource` follows it without polling.
+- **Clients cancel and signal the task.** `POST {group}/operations/{id}:cancel` requests
+  durable cancellation with a reason, and `POST {group}/operations/{id}/signals/{name}`
+  delivers a signal which `MapDurableSignal` maps.
+- **Authorization is the application's.** Policies and filters on the group cover its
+  starts and the routes which serve its operations.
+
+The operation's host retains a completed operation, and so deduplicates its key, for
+`ResultRetentionPeriod`. The [package README](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Http/README.md) describes every response, the
+Nexus protocol, and callbacks which deliver an operation's outcome to a webhook URL.
+
+**Verify:** a repeated `POST` with the same `Idempotency-Key` returns the same
+`Operation-Location`, the status monitor reports the operation's outcome, and its
+events stream ends with the terminal status.
 
 ## Receive webhooks and callbacks as signals
 
@@ -171,7 +225,9 @@ and the last `poll` completes with the label's URL.
 :::code source="../snippets/compiled/Grains/DurableTaskIntegrationSnippets.cs" id="durable_tasks_webhook" language="csharp":::
 
 The web endpoint verifies the webhook's signature and calls an ordinary grain method,
-which delivers the confirmation as a signal with `TrySignalAsync`. The task records the
+which delivers the confirmation as a signal with `TrySignalAsync`. For a task which runs
+as an HTTP operation, `MapDurableSignal` serves the same delivery as
+`POST {group}/operations/{id}/signals/{name}`. The task records the
 first value for the signal, so:
 
 - A webhook which arrives before the workflow waits is recorded, and the wait returns it

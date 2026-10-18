@@ -1,7 +1,10 @@
-using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.DurableTasks;
+using Orleans.DurableTasks.Http;
+using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Runtime;
 
@@ -212,68 +215,78 @@ public sealed class OutboxRelay(IClusterClient client, IOutboxTable outbox)
 
 // <durable_tasks_http>
 [GenerateSerializer, Immutable]
-public sealed record LabelJob(Uri StatusUri);
-
-[GenerateSerializer, Immutable]
-public sealed record LabelStatus(bool Done, string? LabelUrl, TimeSpan? RetryAfter);
+public sealed record LabelResult(string Url);
 
 public interface ILabelPrinterGrain : IGrainWithGuidKey
 {
     DurableTask<string> PrintLabelAsync(string address);
 }
 
-public sealed class LabelPrinterGrain(HttpClient http) : DurableGrain, ILabelPrinterGrain
+public sealed class LabelPrinterGrain([FromKeyedServices("labels")] IDurableHttpClient labels) : DurableGrain, ILabelPrinterGrain
 {
     public async DurableTask<string> PrintLabelAsync(string address)
     {
-        var key = $"{this.GetGrainId()}/{DurableTask.Current.Id}/{DurableTask.Current.Incarnation:N}/submit";
-
-        // Submits the job. The service answers 202 Accepted with the job's status URI, and deduplicates by the key.
-        var job = await DurableTask.Run(async cancellationToken =>
+        // A step: its request carries an Idempotency-Key derived from this step's identity, so a retry or a replay of
+        // the step reaches the job which its first attempt started.
+        var job = await labels.StartOperationAsync(() => new HttpRequestMessage(HttpMethod.Post, "labels")
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, "labels") { Content = JsonContent.Create(new { address }) };
-            request.Headers.Add("Idempotency-Key", key);
+            Content = JsonContent.Create(new { address }),
+        });
 
-            // Bounds each attempt; durable cancellation of the task also cancels the request.
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(TimeSpan.FromSeconds(30));
-            using var response = await http.SendAsync(request, timeout.Token);
-            response.EnsureSuccessStatusCode();
-            return new LabelJob(response.Headers.Location ?? throw new InvalidOperationException("The service returned no status URI."));
-        }).WithId("submit");
-
-        // Polls with durable delays, so a poll which waits for minutes survives deactivation.
-        var deadline = DurableTask.Current.UtcNow.AddHours(1);
-        while (true)
+        try
         {
-            var status = await DurableTask.Run(async cancellationToken =>
-            {
-                using var response = await http.GetAsync(job.StatusUri, cancellationToken);
-                if (response.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable)
-                {
-                    return new LabelStatus(false, null, response.Headers.RetryAfter?.Delta);
-                }
-
-                response.EnsureSuccessStatusCode();
-                return await response.Content.ReadFromJsonAsync<LabelStatus>(cancellationToken)
-                    ?? throw new InvalidOperationException("The service returned no status.");
-            }).WithId("poll");
-
-            if (status.Done)
-            {
-                return status.LabelUrl!;
-            }
-
-            if (DurableTask.Current.UtcNow > deadline)
-            {
-                throw new TimeoutException("The label wasn't ready within an hour.");
-            }
-
-            await DurableTask.Delay(status.RetryAfter ?? TimeSpan.FromSeconds(30)).WithId("poll-wait");
+            // Reads the job's status events within a step, which records the result.
+            var label = await labels.WaitForOperationAsync<LabelResult>(job, new() { Mode = DurableHttpWaitMode.Events });
+            return label.Url;
+        }
+        catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested && job.Location is { } location)
+        {
+            // Cancels the remote job, then lets this task end canceled.
+            await labels.CancelOperationAsync(location, DurableTask.Current.TaskCancellationReason).Shielded();
+            throw;
         }
     }
 }
+
+internal static class LabelPrinterConfiguration
+{
+    internal static void ConfigureSilo(ISiloBuilder siloBuilder, Uri labelService)
+    {
+        // The handlers which the builder adds, such as resilience handlers, follow the key handler, so their retries
+        // carry the key.
+        siloBuilder.Services.AddDurableHttpClient("labels")
+            .ConfigureHttpClient(client => client.BaseAddress = labelService);
+    }
+}
 // </durable_tasks_http>
+
+// <durable_tasks_http_operations>
+public interface IReturnGrain : IGrainWithStringKey
+{
+    DurableTask<string> ProcessReturnAsync(string reason);
+}
+
+internal static class ReturnEndpoints
+{
+    public static readonly DurableSignal<bool> Inspected = new("inspected");
+
+    internal static void Map(WebApplicationBuilder builder)
+    {
+        builder.Services.AddDurableHttp();
+        var app = builder.Build();
+
+        // Each POST starts the grain call as an operation which the request's Idempotency-Key names, and the group serves
+        // its status monitor, events, cancellation, and signals under /returns/{returnId}/operations/{id}.
+        var returns = app.MapGroup("/returns/{returnId}")
+            .WithDurableOperations()
+            .RequireAuthorization("returns");
+
+        returns.MapPost("/process", (string returnId, string reason, IGrainFactory grains) =>
+            grains.GetGrain<IReturnGrain>(returnId).ProcessReturnAsync(reason));
+        returns.MapDurableSignal(Inspected);
+    }
+}
+// </durable_tasks_http_operations>
 
 // <durable_tasks_webhook>
 [GenerateSerializer, Immutable]
