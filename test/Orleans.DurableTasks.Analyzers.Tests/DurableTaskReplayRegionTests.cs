@@ -33,14 +33,14 @@ public class DurableTaskReplayRegionTests
 
             public async DurableTask<int> PlaceOrderAsync(string buyerId, int[] lines)
             {
-                var summary = DurableTask.Once("submit", () => SetStatus(1));
+                var summary = DurableTask.RunInline("submit", () => SetStatus(1));
                 Record(buyerId, summary);
                 _log.LogInformation("Submitted at {Time}", DateTime.UtcNow);
                 bool[] confirmed;
                 try
                 {
                     await DurableTask.Delay(TimeSpan.FromSeconds(10)).WithId("grace-period");
-                    summary = DurableTask.Once("validate", () => SetStatus(2));
+                    summary = DurableTask.RunInline("validate", () => SetStatus(2));
                     confirmed = await DurableTask.WhenAll(lines.Select(line => Reserve(line))).WithId("reserve");
                 }
                 catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
@@ -54,7 +54,7 @@ public class DurableTaskReplayRegionTests
                 }
 
                 await Shipped.WaitAsync();
-                summary = DurableTask.Once("ship", () => SetStatus(3));
+                summary = DurableTask.RunInline("ship", () => SetStatus(3));
                 Record(buyerId, summary);
 
                 // The tail runs once, with the run which completes the body.
@@ -75,7 +75,7 @@ public class DurableTaskReplayRegionTests
 
             private async Task<int> CancelOrderAsync(string buyerId)
             {
-                var summary = DurableTask.Once("cancel", () => SetStatus(4));
+                var summary = DurableTask.RunInline("cancel", () => SetStatus(4));
                 await Step(summary).WithId("release").Shielded();
                 Record(buyerId, summary);
                 return summary;
@@ -103,7 +103,7 @@ public class DurableTaskReplayRegionTests
                 }
 
                 {|ORLEANS0100:_status|}.Value = 2;
-                var recorded = DurableTask.Once("read", () => _status.Value);
+                var recorded = DurableTask.RunInline("read", () => _status.Value);
                 await Step(recorded).WithId("third");
                 return _status.Value;
             }
@@ -118,10 +118,10 @@ public class DurableTaskReplayRegionTests
             public async DurableTask<string> RunAsync()
             {
                 var status = {|ORLEANS0100:_status|}.Value;
-                var id = DurableTask.Once(Guid.NewGuid);
-                var read = DurableTask.Once(() => _status.Value);
-                var now = DurableTask.Once(() => DateTime.UtcNow);
-                DurableTask.Once(() => SetStatus(status + read));
+                var id = DurableTask.RunInline(Guid.NewGuid);
+                var read = DurableTask.RunInline(() => _status.Value);
+                var now = DurableTask.RunInline(() => DateTime.UtcNow);
+                DurableTask.RunInline(() => SetStatus(status + read));
 
                 // The tail follows the last recorded effect.
                 return $"{id} {now} {_status.Value}";
@@ -155,7 +155,7 @@ public class DurableTaskReplayRegionTests
                 var id = {|ORLEANS0101:Guid.NewGuid()|};
                 var now = {|ORLEANS0101:DateTime.UtcNow|};
                 var random = {|ORLEANS0101:new Random()|};
-                var recorded = DurableTask.Once("id", Guid.NewGuid);
+                var recorded = DurableTask.RunInline("id", Guid.NewGuid);
                 var logical = DurableTask.Current.UtcNow;
                 await Step(random.Next()).WithId("first");
                 return $"{id} {now} {recorded} {logical} {Guid.NewGuid()}";
@@ -206,7 +206,7 @@ public class DurableTaskReplayRegionTests
                 {|ORLEANS0100:_state|}.State = 1;
 
                 // A recorded effect appends once, and the tail appends with the task's result.
-                var sequence = DurableTask.Once("progress", () => _log.Append(2));
+                var sequence = DurableTask.RunInline("progress", () => _log.Append(2));
                 await Step(1).WithId("step");
                 return (int)(sequence + _log.Append(3));
             }

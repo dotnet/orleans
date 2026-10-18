@@ -28,7 +28,7 @@ public enum DurableTaskAttemptCancellationReason
 /// <para>
 /// An attempt is one in-memory run of a task's body. A host cancels the attempt, rather than the task, when the attempt's
 /// work can't be recorded any more: its grain activation is stopping, or the task was aborted or deleted. From then on,
-/// the attempt's durable operations, such as <see cref="DurableTask.Once{TResult}(string, Func{TResult})"/>, starting or
+/// the attempt's durable operations, such as <see cref="DurableTask.RunInline{TResult}(string, Func{TResult})"/>, starting or
 /// awaiting tasks, signals, delays, and combinators, throw this exception, and so do changes to the grain's journaled
 /// state. The host records nothing the attempt does after its cancellation: a stopping activation's task replays in a new
 /// attempt, and an aborted or deleted task already has its outcome.

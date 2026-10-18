@@ -37,7 +37,7 @@ public abstract partial class DurableTask
     /// <para>
     /// Branch on the returned version, newest first, and keep each branch's operations and names while executions which
     /// follow it are pending. The record commits with the next durable write, as a
-    /// <see cref="Once{TResult}(string, Func{TResult})"/> effect's does.
+    /// <see cref="RunInline{TResult}(string, Func{TResult})"/> effect's does.
     /// </para>
     /// <para>
     /// To retire an old branch, raise <paramref name="minSupported"/> and remove the branch once no pending execution

@@ -10,16 +10,16 @@ internal static class DurableTaskDiagnostics
     public static readonly DiagnosticDescriptor GrainStateInReplayedCode = Create(
         "ORLEANS0100",
         "Access grain state in recorded effects or after the last durable operation",
-        "Access '{0}' in a DurableTask.Once effect or a step, or after the body's last durable operation: a replay re-runs this code with the state which later operations committed",
+        "Access '{0}' in a DurableTask.RunInline effect or a step, or after the body's last durable operation: a replay re-runs this code with the state which later operations committed",
         DiagnosticSeverity.Warning,
-        "Grain state holds every committed change, so code which a replay re-runs reads state which later operations wrote and applies its writes again. Read and change state in a DurableTask.Once effect, in a local step, or after the body's last durable operation, each of which runs once.");
+        "Grain state holds every committed change, so code which a replay re-runs reads state which later operations wrote and applies its writes again. Read and change state in a DurableTask.RunInline effect, in a local step, or after the body's last durable operation, each of which runs once.");
 
     public static readonly DiagnosticDescriptor NonDeterministicValueInReplayedCode = Create(
         "ORLEANS0101",
         "Produce non-deterministic values in recorded effects",
-        "Produce '{0}' in a DurableTask.Once effect, or read time from DurableTask.Current.UtcNow: a replay re-runs this code and observes another value",
+        "Produce '{0}' in a DurableTask.RunInline effect, or read time from DurableTask.Current.UtcNow: a replay re-runs this code and observes another value",
         DiagnosticSeverity.Warning,
-        "A replay re-runs this code, so a value which differs between runs changes the operations, identifiers, or arguments which the replay schedules. Produce the value in a DurableTask.Once effect, which records it, and read time from DurableTask.Current.UtcNow, the execution's logical time.");
+        "A replay re-runs this code, so a value which differs between runs changes the operations, identifiers, or arguments which the replay schedules. Produce the value in a DurableTask.RunInline effect, which records it, and read time from DurableTask.Current.UtcNow, the execution's logical time.");
 
     public static readonly DiagnosticDescriptor ExternalAwaitInReplayedCode = Create(
         "ORLEANS0102",
@@ -31,13 +31,13 @@ internal static class DurableTaskDiagnostics
     public static readonly DiagnosticDescriptor StateChangeBeforeExternalAwait = Create(
         "ORLEANS0103",
         "Change grain state after the last external await",
-        "Change '{0}' after the external await which follows it, or in a DurableTask.Once effect: the change commits without the body's result",
+        "Change '{0}' after the external await which follows it, or in a DurableTask.RunInline effect: the change commits without the body's result",
         DiagnosticSeverity.Warning,
-        "A body's result commits with the state changes which its final synchronous code makes. A change followed by an external await can commit in an earlier journal write than the result, so a run which ends before the result commits applies the change again. Change state after the last external await, or in a DurableTask.Once effect.");
+        "A body's result commits with the state changes which its final synchronous code makes. A change followed by an external await can commit in an earlier journal write than the result, so a run which ends before the result commits applies the change again. Change state after the last external await, or in a DurableTask.RunInline effect.");
 
-    public static readonly DiagnosticDescriptor OnceAssignsCapturedVariable = Create(
+    public static readonly DiagnosticDescriptor RunInlineAssignsCapturedVariable = Create(
         "ORLEANS0104",
-        "Return the outputs of a DurableTask.Once effect",
+        "Return the outputs of a DurableTask.RunInline effect",
         "Return '{0}' from the effect instead of assigning it: a replay returns the recorded result without running the effect",
         DiagnosticSeverity.Warning,
         "A replay returns an effect's recorded result without running the effect, so assignments to the body's variables happen only in the run which runs it. Return every output from the effect, for example as a tuple or a record.");
@@ -61,7 +61,7 @@ internal static class DurableTaskDiagnostics
         "Use durable operation names without '$'",
         "Remove '$' from the name '{0}': generated identifiers use it",
         DiagnosticSeverity.Error,
-        "Generated identifiers, such as $child-1 and reserve$2, contain '$', so the runtime rejects names with '$' which WithId and DurableTask.Once receive. Use another separator, such as '-'.");
+        "Generated identifiers, such as $child-1 and reserve$2, contain '$', so the runtime rejects names with '$' which WithId and DurableTask.RunInline receive. Use another separator, such as '-'.");
 
     public static readonly DiagnosticDescriptor DuplicateName = Create(
         "ORLEANS0108",
@@ -75,7 +75,7 @@ internal static class DurableTaskDiagnostics
         "Keep durable task bodies on their scheduler",
         "Run this work as durable children or on the body's scheduler instead of '{0}': work elsewhere schedules operations out of order and changes grain state concurrently",
         DiagnosticSeverity.Warning,
-        "A durable task body runs on its grain activation's scheduler, which orders its operations and its state changes. Threads, timers, and thread-pool work run elsewhere, where DurableTask.Once and Post throw and state changes race with the grain's other work. Run the work in the body or in a step, or await a service which runs it.");
+        "A durable task body runs on its grain activation's scheduler, which orders its operations and its state changes. Threads, timers, and thread-pool work run elsewhere, where DurableTask.RunInline and Post throw and state changes race with the grain's other work. Run the work in the body or in a step, or await a service which runs it.");
 
     public static readonly DiagnosticDescriptor NonDurableCombinator = Create(
         "ORLEANS0110",
