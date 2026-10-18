@@ -65,7 +65,9 @@ on this abstractions assembly.
   `DurableTask.Current.AttemptCancellationToken` is canceled only by attempt cancellation. Code which
   runs durable cleanup after task cancellation, in a `catch` filtered on
   `IsTaskCancellationRequested`, passes `AttemptCancellationToken` to the calls it makes, because
-  `CancellationToken` is already canceled. In-process cleanup, such as releasing a semaphore or
+  `CancellationToken` is already canceled, and
+  [ORLEANS0117](https://aka.ms/orleans/diagnostics#orleans0117) reports cleanup which passes
+  `CancellationToken`. In-process cleanup, such as releasing a semaphore or
   disposing a resource, belongs in `finally` blocks and `using` statements, which run for both.
 - Registrations on either token are ordinary synchronous .NET observers, which run when the token is
   canceled and return promptly.
@@ -97,8 +99,8 @@ var reserved = await lines.Select(line => Catalog(line.ProductId).ReserveAsync(O
     .WithId("reserve");
 ```
 
-Handles compose the same way: `handles.WhenAll(cancellationToken)`, `handles.WhenAny()`, `handles.Race()`, and
-`handles.WhenEach()`. A collection expression such as `[a, b]` has no type of its own, so pass it to the static form,
+Handles compose the same way: `handles.WhenAll(cancellationToken)`, `handles.WhenAny()`, `handles.Race()`,
+`handles.WhenAllCompleted()`, and `handles.WhenEach()`. A collection expression such as `[a, b]` has no type of its own, so pass it to the static form,
 `DurableTask.WhenAll([a, b])`.
 
 `WhenAll` follows `Task.WhenAll`: it completes only after every input is terminal, including inputs which
@@ -249,7 +251,8 @@ continues:
   during a replay, reaches the same task.
 - `ScheduleAsync()` returns once the task's host holds the task, so its ID, the handle's `TargetTaskId`,
   can be handed to other parties, which address it with lookups such as `GetDurableTask`. A start which its host rejects, for
-  example because the ID already identifies another definition, fails.
+  example because the ID already identifies another definition, fails. Within a durable execution, the execution
+  observes each attached child which it schedules by awaiting the handle, passing it to a combinator, or returning it.
 - `Post()` is synchronous: it stages the start, and the start commits with the caller's next durable
   write, together with the state changes which the calling code made, and is then delivered once.
   Within a durable execution, the start is recorded like a `DurableTask.RunInline` effect, so a replay
@@ -385,9 +388,14 @@ Follow these rules in re-executed code:
 
 - Put each side effect in a recorded operation, or in the synchronous tail. Change grain state, read
   grain state whose value decides later operations, and produce random values, identifiers, and
-  wall-clock times in `DurableTask.RunInline` or in a child, so a replay observes the values the first
-  run recorded. Read logical time from `DurableTask.Current.UtcNow`. Call external services in
+  clock and environment values in `DurableTask.RunInline`, in a child, or in the tail, so a replay
+  observes the values the first run recorded. Read logical time from `DurableTask.Current.UtcNow`. A
+  tail whose result didn't commit runs again, so a value which the tail sends to an external service,
+  such as an idempotency key, comes from `DurableTask.RunInline` or a step. Call external services in
   children, whose external effects need their own idempotency.
+- Store immutable values, such as records and immutable collections, in journaled grain state, and
+  assign a new value to change one. The state's API records each assignment, and a change made in
+  place to an object which the state holds bypasses it.
 - Give stable identifiers with `WithId` to children which are scheduled conditionally, in loops,
   or concurrently outside a combinator, and to combinators. Generated identifiers are stable only when unnamed
   children, unnamed `DurableTask.RunInline` effects, unnamed detached tasks, and combinators are created in the same order.
@@ -447,7 +455,11 @@ var paymentId = DurableTask.RunInline("payment-id", Guid.NewGuid);
 - The effect is synchronous. Asynchronous and durable effects don't compile, and a result type which
   is asynchronous through generic code, such as `ValueTask<T>`, throws `NotSupportedException`
   before the effect runs. Asynchronous work runs as an awaited step, such as
-  `await DurableTask.Run(async () => ...)` or an `async DurableTask` method.
+  `await DurableTask.Run(async () => ...)` or an `async DurableTask` method. An `async void` delegate,
+  such as an `async` lambda cast to `Action`, returns at its first `await`, so neither an effect nor a
+  step records its work.
+- Synchronous work runs as an effect rather than as a step: a step which neither awaits nor observes
+  its `CancellationToken` adds a child execution and a journal write of its own.
 - The record applies only within a durable task. Outside one, the effect runs every time, so helpers
   which ordinary methods share with durable task bodies can call it.
 
@@ -509,9 +521,9 @@ The logger reads the running task when it logs, so one instance serves durable t
 ordinary grain methods. Logs inside a `DurableTask.RunInline` effect, or inside a step which completed,
 don't repeat without it, because a replay returns their recorded results without running them.
 
-The package carries analyzers which report code that a replay would run differently, as
-diagnostics ORLEANS0100 to ORLEANS0116. Each diagnostic links to a page which describes the
-hazard and its fix.
+The package carries analyzers which report code that a replay would run differently, or which
+doesn't run as written, as diagnostics ORLEANS0100 to ORLEANS0123. Each diagnostic links to a page
+which describes the hazard and its fix.
 
 ## Host responsibilities
 
