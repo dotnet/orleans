@@ -29,6 +29,8 @@ public interface IArchiveGrain : IGrainWithStringKey
 }
 // </durable_tasks_identity_contracts>
 
+// The tree shows the generated identifier, $child-2, which an unnamed detached task's root ID derives from.
+#pragma warning disable ORLEANS0120
 // <durable_tasks_identity_tree>
 public sealed class ReportGrain(IDurableTaskManager tasks) : DurableGrain, IReportGrain
 {
@@ -85,6 +87,7 @@ public sealed class ReportGrain(IDurableTaskManager tasks) : DurableGrain, IRepo
     private IArchiveGrain Archive() => GrainFactory.GetGrain<IArchiveGrain>("archive");
 }
 // </durable_tasks_identity_tree>
+#pragma warning restore ORLEANS0120
 
 internal static class ReportClient
 {

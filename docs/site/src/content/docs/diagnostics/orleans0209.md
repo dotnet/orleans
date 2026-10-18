@@ -21,9 +21,9 @@ A durable task body, a `DurableTask.Run` delegate, or a `DurableTask.RunInline` 
 
 ## Rule description
 
-A durable task body runs on its grain activation's scheduler, which runs one piece of grain code at a time. The scheduler orders the body's durable operations, so each run creates them in the same order, and it keeps the body's state changes from racing with the grain's other work. Work on another scheduler loses both guarantees:
+A durable task body runs on its grain activation's scheduler, which runs one piece of grain code at a time. The scheduler orders the body's durable operations, so each run creates them in the same order, and it keeps the body's state changes from racing with the grain's other work. `Task.Run` executes its delegate on the thread pool; a normal `await Task.Run(...)` captures the activation's scheduler and resumes the body there. The off-scheduler delegate carries the risks:
 
-- Code which continues on a thread-pool thread, such as the code after `await Task.Run(...)`, runs outside the activation. `DurableTask.RunInline` and `Post` throw `InvalidOperationException` there, because they stage their records with the activation's state changes.
+- Code inside the delegate runs outside the activation. `DurableTask.RunInline` and `Post` throw `InvalidOperationException` there, because they stage their records with the activation's state changes.
 - Grain state which the work changes races with the grain's methods and with other executions, and its changes commit with whichever journal write follows.
 - Threads and timers outlive the run which starts them, and a replay starts them again.
 
@@ -31,7 +31,7 @@ ORLEANS0014 reports `ConfigureAwait(false)`, which also moves continuations off 
 
 ## How to fix violations
 
-**Run the work in a step.** A `DurableTask.Run` delegate runs on the activation's scheduler, and its result is recorded, so a replay returns it without computing it again:
+**Record the work in an effect.** A `DurableTask.RunInline` effect runs synchronous work on the activation's scheduler, and its result is recorded, so a replay returns it without computing it again:
 
 :::code source="snippets/durable-tasks/Orleans0209.cs" id="orleans0209_fix_inline" language="csharp":::
 
