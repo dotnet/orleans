@@ -20,6 +20,8 @@ internal static class EnvelopeValidation
             foreach (var header in headers)
             {
                 if (string.IsNullOrEmpty(header.Key)) throw new ArgumentException("Header keys must not be empty.", nameof(envelope));
+                if (!HierarchicalKey.IsWellFormedUtf16(header.Key))
+                    throw new ArgumentException("Header keys must not contain unpaired surrogate characters.", nameof(envelope));
                 if (header.Value is null) throw new ArgumentException("Header values must not be null.", nameof(envelope));
             }
         }

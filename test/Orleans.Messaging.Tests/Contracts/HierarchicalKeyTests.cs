@@ -220,7 +220,7 @@ public class HierarchicalKeyTests
     }
 
     [Fact]
-    public void Create_LiteralSegment_RejectsOnlyNullAndEmpty()
+    public void Create_LiteralSegment_RejectsNullAndEmpty()
     {
         Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Create((string)null!));
         Assert.Throws<ArgumentException>(() => HierarchicalKey.Create(""));
@@ -253,6 +253,56 @@ public class HierarchicalKeyTests
         Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Parse((string)null!));
         Assert.False(HierarchicalKey.TryParse(null, null, out var key));
         Assert.True(key.IsDefault);
+    }
+
+    // Theory data replaces unpaired surrogates during discovery serialization, so cases use placeholders.
+    [Theory]
+    [InlineData("order-{high}")]
+    [InlineData("{low}-order")]
+    [InlineData("order-{low}{high}")]
+    [InlineData("{high}\U0001F600")]
+    public void Create_UnpairedSurrogate_ThrowsArgumentException(string template)
+    {
+        var literal = WithUnpairedSurrogates(template);
+        Assert.Equal("value", Assert.Throws<ArgumentException>(() => HierarchicalKey.Create(literal)).ParamName);
+        Assert.Equal("value", Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("orders", literal)).ParamName);
+        Assert.Equal("value", Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("orders").CreateChildKey(literal)).ParamName);
+    }
+
+    [Theory]
+    [InlineData("order-{high}")]
+    [InlineData("{low}-order")]
+    [InlineData("order-{low}{high}")]
+    [InlineData("orders/{high}")]
+    [InlineData("orders/{low}")]
+    [InlineData("orders\\/{high}/x")]
+    public void Parse_UnpairedSurrogate_RejectsStringAndSpan(string template)
+    {
+        var path = WithUnpairedSurrogates(template);
+        Assert.Throws<FormatException>(() => HierarchicalKey.Parse(path));
+        Assert.Throws<FormatException>(() => HierarchicalKey.Parse(path.AsSpan()));
+        Assert.False(HierarchicalKey.TryParse(path, null, out var first));
+        Assert.True(first.IsDefault);
+        Assert.False(HierarchicalKey.TryParse(path.AsSpan(), null, out var second));
+        Assert.True(second.IsDefault);
+    }
+
+    [Fact]
+    public void SurrogatePairs_RoundTripThroughParseAndOrleansSerialization()
+    {
+        var key = HierarchicalKey.Create("order-\U0001F600", "\U0001F601/x");
+        const string canonical = "order-\U0001F600/\U0001F601\\/x";
+        Assert.Equal(canonical, key.ToString());
+        Assert.Equal(2, key.CountSegments());
+        Assert.Equal(key, HierarchicalKey.Parse(canonical));
+        Assert.True(HierarchicalKey.TryParse(canonical.AsSpan(), null, out var parsed));
+        Assert.Equal(key, parsed);
+
+        using var first = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var second = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var decoded = second.GetRequiredService<Serializer<HierarchicalKey>>().Deserialize(first.GetRequiredService<Serializer<HierarchicalKey>>().SerializeToArray(key));
+        Assert.Equal(canonical, decoded.ToString());
+        Assert.NotEqual(decoded, HierarchicalKey.Create("order-\U0001F601", "\U0001F601/x"));
     }
 
     [Theory]
@@ -403,6 +453,8 @@ public class HierarchicalKeyTests
 
     [Fact]
     public void SegmentSeparator_IsForwardSlash() => Assert.Equal('/', HierarchicalKey.SegmentSeparator);
+
+    internal static string WithUnpairedSurrogates(string template) => template.Replace("{high}", "\ud83d").Replace("{low}", "\ude00");
 
     private static List<string> Segments(HierarchicalKey key)
     {
