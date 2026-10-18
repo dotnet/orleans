@@ -355,7 +355,8 @@ internal class Program
         {
             _ = BenchmarkSwitcher.FromTypes([
                 typeof(DurableListJournalBenchmarks),
-                typeof(DurableCommandReaderBenchmarks)
+                typeof(DurableCommandReaderBenchmarks),
+                typeof(JournaledStateContextBenchmarks)
             ]).Run(args);
         },
         ["Journaling.Azure"] = args =>

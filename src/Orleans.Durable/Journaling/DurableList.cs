@@ -34,6 +34,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
 {
     private readonly IDurableListCommandCodec<T> _codec;
     private readonly List<T> _items = [];
+    private readonly JournaledStateAccessTarget _accessTarget;
     private JournalStreamWriter _writer;
 
     public DurableList(
@@ -44,6 +45,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableListCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _accessTarget = new(key, manager);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -51,26 +53,42 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
+        _accessTarget = new(key, manager);
         manager.RegisterStateMachine(key, this);
     }
 
     public T this[int index]
     {
-        get => _items[index];
+        get => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+            ? context.Read(_accessTarget, JournaledStateOperation.ListGet, (Self: this, Index: index), static state => state.Self._items[state.Index])
+            : _items[index];
 
         set
         {
-            if ((uint)index >= (uint)_items.Count)
+            if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
             {
-                ThrowIndexOutOfRange();
+                context.Write(_accessTarget, JournaledStateOperation.ListSet, (Self: this, Index: index, Value: value), static state => state.Self.SetCore(state.Index, state.Value));
+                return;
             }
 
-            _codec.WriteSet(index, value, GetWriter());
-            ApplySet(index, value);
+            SetCore(index, value);
         }
     }
 
-    public int Count => _items.Count;
+    private void SetCore(int index, T value)
+    {
+        if ((uint)index >= (uint)_items.Count)
+        {
+            ThrowIndexOutOfRange();
+        }
+
+        _codec.WriteSet(index, value, GetWriter());
+        ApplySet(index, value);
+    }
+
+    public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.ListCount, this, static self => self._items.Count)
+        : _items.Count;
 
     bool ICollection<T>.IsReadOnly => false;
 
@@ -95,21 +113,73 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
 
     public void Add(T item)
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.ListAdd, (Self: this, Item: item), static state => state.Self.AddCore(state.Item));
+            return;
+        }
+
+        AddCore(item);
+    }
+
+    private void AddCore(T item)
+    {
         _codec.WriteAdd(item, GetWriter());
         ApplyAdd(item);
     }
 
     public void Clear()
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.ListClear, this, static self => self.ClearCore());
+            return;
+        }
+
+        ClearCore();
+    }
+
+    private void ClearCore()
+    {
         _codec.WriteClear(GetWriter());
         ApplyClear();
     }
 
-    public bool Contains(T item) => _items.Contains(item);
-    public void CopyTo(T[] array, int arrayIndex) => _items.CopyTo(array, arrayIndex);
-    public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
-    public int IndexOf(T item) => _items.IndexOf(item);
+    public bool Contains(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.ListContains, (Self: this, Item: item), static state => state.Self._items.Contains(state.Item))
+        : _items.Contains(item);
+
+    public void CopyTo(T[] array, int arrayIndex)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            ReadSnapshot(context).CopyTo(array, arrayIndex);
+            return;
+        }
+
+        _items.CopyTo(array, arrayIndex);
+    }
+
+    public IEnumerator<T> GetEnumerator() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? ((IEnumerable<T>)ReadSnapshot(context)).GetEnumerator()
+        : _items.GetEnumerator();
+
+    public int IndexOf(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.ListIndexOf, (Self: this, Item: item), static state => state.Self._items.IndexOf(state.Item))
+        : _items.IndexOf(item);
+
     public void Insert(int index, T item)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.ListInsert, (Self: this, Index: index, Item: item), static state => state.Self.InsertCore(state.Index, state.Item));
+            return;
+        }
+
+        InsertCore(index, item);
+    }
+
+    private void InsertCore(int index, T item)
     {
         if ((uint)index > (uint)_items.Count)
         {
@@ -120,12 +190,16 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
         ApplyInsert(index, item);
     }
 
-    public bool Remove(T item)
+    public bool Remove(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.ListRemove, (Self: this, Item: item), static state => state.Self.RemoveCore(state.Item))
+        : RemoveCore(item);
+
+    private bool RemoveCore(T item)
     {
         var index = _items.IndexOf(item);
         if (index >= 0)
         {
-            RemoveAt(index);
+            RemoveAtCore(index);
             return true;
         }
 
@@ -133,6 +207,17 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     }
 
     public void RemoveAt(int index)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.ListRemoveAt, (Self: this, Index: index), static state => state.Self.RemoveAtCore(state.Index));
+            return;
+        }
+
+        RemoveAtCore(index);
+    }
+
+    private void RemoveAtCore(int index)
     {
         if ((uint)index >= (uint)_items.Count)
         {
@@ -143,7 +228,11 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
         ApplyRemoveAt(index);
     }
 
-    IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
+    // A context records the items which the code enumerates, so a replay enumerates the same items.
+    private T[] ReadSnapshot(JournaledStateContext context) =>
+        context.Read(_accessTarget, JournaledStateOperation.ListSnapshot, this, static self => self._items.ToArray());
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     private void ApplyAdd(T item) => _items.Add(item);
     private void ApplySet(int index, T item) => _items[index] = item;
@@ -172,13 +261,26 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
 
     public void AddRange(IEnumerable<T> collection)
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.ListAddRange, (Self: this, Items: collection), static state => state.Self.AddRangeCore(state.Items));
+            return;
+        }
+
+        AddRangeCore(collection);
+    }
+
+    private void AddRangeCore(IEnumerable<T> collection)
+    {
         foreach (var element in collection)
         {
-            Add(element);
+            AddCore(element);
         }
     }
 
-    public ReadOnlyCollection<T> AsReadOnly() => _items.AsReadOnly();
+    public ReadOnlyCollection<T> AsReadOnly() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? new ReadOnlyCollection<T>(ReadSnapshot(context))
+        : _items.AsReadOnly();
 }
 
 internal sealed class IDurableCollectionDebugView<T>
