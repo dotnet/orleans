@@ -108,6 +108,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             return false;
         }
 
+        _accessTarget.OnChanged();
         _status = DurableTaskCompletionSourceStatus.Completed;
         _writer.MarkModified();
         _value = _copier.Copy(value);
@@ -121,6 +122,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             return false;
         }
 
+        _accessTarget.OnChanged();
         _status = DurableTaskCompletionSourceStatus.Faulted;
         _writer.MarkModified();
         _exception = _exceptionCopier.Copy(exception);
@@ -134,6 +136,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             return false;
         }
 
+        _accessTarget.OnChanged();
         _status = DurableTaskCompletionSourceStatus.Canceled;
         _writer.MarkModified();
         return true;
@@ -154,8 +157,11 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _ => throw new InvalidOperationException($"Unexpected status, \"{_status}\""),
     };
 
-    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context)
+    {
+        _accessTarget.OnChanged();
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
+    }
 
     private void OnValuePersisted()
     {
@@ -188,6 +194,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
+        _accessTarget.OnChanged();
         _writer = writer;
         _status = DurableTaskCompletionSourceStatus.Pending;
         _value = default;

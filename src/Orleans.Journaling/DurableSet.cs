@@ -85,7 +85,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsSta
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
-        _items.Clear();
+        ApplyClear();
         _writer = writer;
         _hasStagedEntries = false;
         DurableStateObservation.PublishDurableResync<DurableSet<T>, SetChange<T>>(_manager, this);
@@ -192,9 +192,30 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsSta
     private T[] ReadSnapshot(JournaledStateContext context) =>
         context.Read(_accessTarget, JournaledStateOperation.SetSnapshot, this, static self => self._items.ToArray());
 
-    private bool ApplyAdd(T item) => _items.Add(item);
-    private bool ApplyRemove(T item) => _items.Remove(item);
-    private void ApplyClear() => _items.Clear();
+    private bool ApplyAdd(T item)
+    {
+        _accessTarget.OnChanged();
+        return _items.Add(item);
+    }
+
+    private bool ApplyRemove(T item)
+    {
+        _accessTarget.OnChanged();
+        return _items.Remove(item);
+    }
+
+    private void ApplyClear()
+    {
+        _accessTarget.OnChanged();
+        _items.Clear();
+    }
+
+    private void ApplyReplace(HashSet<T> items)
+    {
+        _accessTarget.OnChanged();
+        _items.Clear();
+        _items.UnionWith(items);
+    }
     void IDurableSetCommandHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
     void IDurableSetCommandHandler<T>.ApplyRemove(T item) => ApplyRemove(item);
     void IDurableSetCommandHandler<T>.ApplyClear() => ApplyClear();
@@ -239,7 +260,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsSta
 
     private bool Compare(JournaledStateOperation operation, IEnumerable<T> other, Func<HashSet<T>, IEnumerable<T>, bool> compare) =>
         JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-            ? context.Read(_accessTarget, operation, (Items: _items, Other: other, Compare: compare), static state => state.Compare(state.Items, state.Other))
+            ? context.Read(_accessTarget, operation, other, (Items: _items, Other: other, Compare: compare), static state => state.Compare(state.Items, state.Other))
             : compare(_items, other);
 
     public void IntersectWith(IEnumerable<T> other)
@@ -260,8 +281,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsSta
         if (!_items.SetEquals(next))
         {
             WriteSnapshot(next);
-            _items.Clear();
-            _items.UnionWith(next);
+            ApplyReplace(next);
             DurableStateObservation.PublishStagedResync<DurableSet<T>, SetChange<T>>(_manager, this);
         }
     }
@@ -284,8 +304,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsSta
         if (!_items.SetEquals(next))
         {
             WriteSnapshot(next);
-            _items.Clear();
-            _items.UnionWith(next);
+            ApplyReplace(next);
             DurableStateObservation.PublishStagedResync<DurableSet<T>, SetChange<T>>(_manager, this);
         }
     }

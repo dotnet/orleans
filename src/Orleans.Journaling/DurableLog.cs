@@ -129,6 +129,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
         var sequence = NextSequenceCore;
         EnsureEpoch();
         _codec.WriteAppend(new ReadOnlySpan<T>(in item), GetWriter());
+        _accessTarget.OnChanged();
         _items.Add(item);
         SignalReaders(DurableWatchMode.Staged);
         return sequence;
@@ -210,6 +211,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
 
         EnsureEpoch();
         _codec.WriteSeal(GetWriter());
+        _accessTarget.OnChanged();
         _isSealed = true;
     }
 
@@ -281,11 +283,15 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
         return DraftOutcome.Committed(_epoch, new(new(draftId, sequence, count), _draftCommitCount));
     }
 
-    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context)
+    {
+        _accessTarget.OnChanged();
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
+    }
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
+        _accessTarget.OnChanged();
         _items.Clear();
         _epoch = 0;
         _firstSequence = 0;
@@ -307,6 +313,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
 
     void IStateMachine.OnRecoveryCompleted()
     {
+        _accessTarget.OnChanged();
         _captured = _committed = Current;
         SignalAllReaders();
     }
@@ -329,7 +336,16 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
 
     // Every write captures this log before its acknowledgement. The manager publishes the write's watermark after this
     // callback, which wakes readers.
-    void IStateMachine.OnWriteCompleted() => _committed = _captured;
+    void IStateMachine.OnWriteCompleted()
+    {
+        if (_captured.NextSequence != _committed.NextSequence)
+        {
+            // Reads observe the committed sequence.
+            _accessTarget.OnChanged();
+        }
+
+        _committed = _captured;
+    }
 
     void IDurableLogCommandHandler<T>.ApplyEpoch(long epoch)
     {
@@ -340,6 +356,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
         }
 
         Debug.Assert(NextSequenceCore == 0 && !_isSealed, "A log without an epoch has no entries and is not sealed.");
+        _accessTarget.OnChanged();
         _epoch = epoch;
     }
 
@@ -424,6 +441,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
         {
             var epoch = Random.Shared.NextInt64(1, long.MaxValue);
             _codec.WriteEpoch(epoch, GetWriter());
+            _accessTarget.OnChanged();
             _epoch = epoch;
         }
     }
@@ -440,6 +458,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
         (_draftCommits ??= []).Add(record);
         if (!items.IsEmpty)
         {
+            _accessTarget.OnChanged();
             SignalReaders(DurableWatchMode.Staged);
         }
 
@@ -449,6 +468,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
     // The clear consumes one sequence number, so a reader's position shows whether it observed the replaced entries.
     private void ApplyClear()
     {
+        _accessTarget.OnChanged();
         var sequence = NextSequenceCore + 1;
         _items.Clear();
         _draftCommits?.Clear();
@@ -471,6 +491,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
             return;
         }
 
+        _accessTarget.OnChanged();
         _items.RemoveRange(0, checked((int)(sequence - _firstSequence)));
         _firstSequence = sequence;
         if (_draftCommits is { } commits)

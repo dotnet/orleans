@@ -107,16 +107,21 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
     private void SetCore(TKey key, TValue value)
     {
+        OnChanged();
         WriteSet(key, value);
         ApplySet(key, value);
         PublishSet(key, value);
     }
 
-    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context)
+    {
+        OnChanged();
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
+    }
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
+        OnChanged();
         _items.Clear();
         _writer = writer;
         _hasStagedEntries = false;
@@ -151,6 +156,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
     private void ClearCore()
     {
+        OnChanged();
         _codec.WriteClear(GetWriter());
         _hasStagedEntries = true;
         ApplyClear();
@@ -173,6 +179,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
             return false;
         }
 
+        OnChanged();
         WriteRemove(key);
         ApplyRemove(key);
         PublishRemove(key);
@@ -212,6 +219,8 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         _items.EnsureCapacity(capacityHint);
     }
 
+    private void OnChanged() => _accessTarget?.OnChanged();
+
     protected virtual JournalStreamWriter GetWriter()
     {
         Debug.Assert(_writer.IsInitialized);
@@ -236,6 +245,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
             ThrowDuplicateKey(key);
         }
 
+        OnChanged();
         WriteSet(key, value);
         _items.Add(key, value);
         OnSet(key, value);
@@ -290,6 +300,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
             return false;
         }
 
+        OnChanged();
         WriteRemove(item.Key);
         _ = ((ICollection<KeyValuePair<TKey, TValue>>)_items).Remove(item);
         PublishRemove(item.Key);
