@@ -431,6 +431,127 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         await AssertProcessedOnceAsync(receiver, message);
     }
 
+    [Fact]
+    public async Task OutboxDepth_IsReleasedByDeactivationAndRestoredByRecovery()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        Deliveries.Enqueue(DeliveryFault.Throw());
+        var message = NewMessage(12, "depth-across-activations");
+        var id = await sender.SendAsync(receiver.GetGrainId(), Route, message);
+        _ = await WaitForFailedAttemptAsync(sender, id, 1);
+        await Fixture.WaitForOutboxDepthAsync(1);
+
+        await _cluster.CrashAsync(sender);
+        await Fixture.WaitForOutboxDepthAsync(0);
+
+        // Recovery reports the pending message again, and retiring it releases that depth.
+        Assert.Equal(1, (await sender.GetSnapshotAsync()).OutboxCount);
+        await Fixture.WaitForOutboxDepthAsync(1);
+        await _cluster.AdvanceAndRunPumpAsync(sender, RetryInterval);
+        await WaitForDrainedOutboxAsync(sender);
+        await Fixture.WaitForOutboxDepthAsync(0);
+        await AssertProcessedOnceAsync(receiver, message);
+    }
+
+    [Fact]
+    public async Task OutboxDepth_AfterAFailedWrite_CountsOnlyDurableMessages()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        Deliveries.Enqueue(DeliveryFault.Throw());
+        var durable = NewMessage(13, "durable");
+        var id = await sender.SendAsync(receiver.GetGrainId(), Route, durable);
+        _ = await WaitForFailedAttemptAsync(sender, id, 1);
+        await Fixture.WaitForOutboxDepthAsync(1);
+        var previous = Fixture.GetGrainContext(sender);
+        ArmSenderWriteFailure(sender, ambiguous: false);
+
+        // The failed write fences the activation, which releases the depth of both messages.
+        await Assert.ThrowsAnyAsync<Exception>(() => sender.SendAsync(receiver.GetGrainId(), Route, NewMessage(14, "lost")));
+        await previous.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        await Fixture.WaitForOutboxDepthAsync(0);
+
+        Assert.Equal(1, (await sender.GetSnapshotAsync()).OutboxCount);
+        await Fixture.WaitForOutboxDepthAsync(1);
+        await _cluster.AdvanceAndRunPumpAsync(sender, RetryInterval);
+        await WaitForDrainedOutboxAsync(sender);
+        await Fixture.WaitForOutboxDepthAsync(0);
+        await AssertProcessedOnceAsync(receiver, durable);
+    }
+
+    [Fact]
+    public async Task EquivalentDuplicate_OfACommittedMessage_LeavesItsDeliveryUnchanged()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        Deliveries.Enqueue(DeliveryFault.Throw());
+        var message = NewMessage(15, "duplicate-after-commit");
+        var outgoing = TestApplicationProtocol.Create(Sessions, sender.GetGrainId(), receiver.GetGrainId(), Route, message);
+        var id = outgoing.Envelope.MessageId;
+        await sender.StageOutputAsync(outgoing);
+        await sender.RetryWriteStateAsync();
+        var attempt = await WaitForFailedAttemptAsync(sender, id, 1);
+        var before = await sender.GetSnapshotAsync();
+
+        // The grain call delivers a copy of the envelope, which is equivalent to the committed one.
+        await sender.StageOutputAsync(outgoing);
+        await sender.RetryWriteStateAsync();
+
+        Assert.Single(Fixture.GetStagedOutput(sender));
+        var unchanged = await Fixture.OnGrainAsync(sender, () => _cluster.GetOutboxState(sender).Attempt(id));
+        Assert.Equal(attempt.AttemptCount, unchanged.AttemptCount);
+        Assert.Equal(attempt.NextAttemptAt, unchanged.NextAttemptAt);
+        Assert.Equal(attempt.ExpirationTime, unchanged.ExpirationTime);
+        Assert.Equal(before.ActivationId, (await sender.GetSnapshotAsync()).ActivationId);
+
+        await _cluster.AdvanceAndRunPumpAsync(sender, RetryInterval);
+        await WaitForDrainedOutboxAsync(sender);
+        Assert.Equal([DeliveryStatus.Accepted], Deliveries.Answers);
+        Assert.Equal(1, Deliveries.ReceiverCalls);
+        await AssertProcessedOnceAsync(receiver, message);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConflictingDuplicate_IsRejectedWithoutChangingThePendingMessage(bool commitFirst)
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        Deliveries.Enqueue(DeliveryFault.Throw());
+        var message = NewMessage(16, "original");
+        var outgoing = TestApplicationProtocol.Create(Sessions, sender.GetGrainId(), receiver.GetGrainId(), Route, message);
+        var id = outgoing.Envelope.MessageId;
+        var conflicting = TestApplicationProtocol.Create(
+            Sessions, sender.GetGrainId(), receiver.GetGrainId(), Route, message with { Value = "conflicting" });
+        Assert.Equal(id, conflicting.Envelope.MessageId);
+        await sender.StageOutputAsync(outgoing);
+        if (commitFirst)
+        {
+            await sender.RetryWriteStateAsync();
+            _ = await WaitForFailedAttemptAsync(sender, id, 1);
+        }
+
+        var before = await sender.GetSnapshotAsync();
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => sender.StageOutputAsync(conflicting));
+        Assert.Contains(id.ToString(), error.Message);
+        Assert.Equal(outgoing.Envelope.Payload, Assert.Single(Fixture.GetStagedOutput(sender)).Envelope.Payload);
+        if (!commitFirst)
+        {
+            await sender.RetryWriteStateAsync();
+            _ = await WaitForFailedAttemptAsync(sender, id, 1);
+        }
+
+        Assert.Equal(before.ActivationId, (await sender.GetSnapshotAsync()).ActivationId);
+        await _cluster.AdvanceAndRunPumpAsync(sender, RetryInterval);
+        await WaitForDrainedOutboxAsync(sender);
+        Assert.Equal([DeliveryStatus.Accepted], Deliveries.Answers);
+        var processed = await AssertProcessedOnceAsync(receiver, message);
+        Assert.Equal(message.Value, Assert.Single(processed.Effects).Value);
+    }
+
     private void ArmSenderWriteFailure(IMessagingTestGrain sender, bool ambiguous)
     {
         var journal = JournalId.FromGrainId(sender.GetGrainId());

@@ -154,6 +154,16 @@ public class MessagingClusterFixture : IAsyncLifetime
     public Task<EndpointSnapshot> WaitForOutboxCountAsync(IMessagingTestGrain grain, int expected) =>
         SnapshotProbe.WaitAsync(grain.GetGrainId(), snapshot => snapshot.OutboxCount == expected);
 
+    /// <summary>Gets the outbox depth which the cluster's silos report through the outbox depth metric.</summary>
+    public long GetOutboxDepth() =>
+        Cluster.Silos.Sum(silo => Metrics.GetDepth(
+            silo.ServiceProvider.GetRequiredService<OrleansInstruments>().Meter,
+            "orleans-messaging-outbox-depth"));
+
+    /// <summary>Waits until the cluster's silos report an outbox depth of <paramref name="expected"/>.</summary>
+    public Task WaitForOutboxDepthAsync(long expected) =>
+        Metrics.WaitUntilAsync(() => GetOutboxDepth() == expected, TestContext.Current.CancellationToken);
+
     public EndpointSnapshot GetSnapshot(IMessagingTestGrain grain) =>
         GetGrainInstance(grain).GetSnapshotForTest();
 

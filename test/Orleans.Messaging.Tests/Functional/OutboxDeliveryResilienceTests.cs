@@ -134,6 +134,23 @@ public sealed class OutboxDeliveryResilienceTests
         Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
     }
 
+    [Fact]
+    public async Task UnrelatedDeliveryCancellation_IsAnOrdinaryFailure()
+    {
+        await using var fixture = await StartAsync(Scripted, static options => options.OutboxRetryTimeout = TimeSpan.FromMilliseconds(100));
+        fixture.Strategy.Repeat(Step.Throw(new OperationCanceledException("Receiver canceled its operation.")));
+
+        var (sender, receiver) = await SendAsync(fixture, "canceled-by-receiver");
+
+        var snapshot = await fixture.WaitForDeadLetterCountAsync(sender, 1);
+        var deadLetter = Assert.Single(snapshot.OutboxDeadLetters);
+        Assert.Contains(nameof(OperationCanceledException), deadLetter.Reason);
+        Assert.Contains("Receiver canceled its operation.", deadLetter.Reason);
+        Assert.True(deadLetter.AttemptCount > 1);
+        Assert.Equal(0, snapshot.OutboxCount);
+        Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
+    }
+
     private static ResiliencePipeline Scripted(ScriptedStrategy strategy) => new ResiliencePipelineBuilder()
         .AddStrategy(_ => strategy, new ScriptedStrategyOptions())
         .Build();
@@ -175,11 +192,13 @@ public sealed class OutboxDeliveryResilienceTests
     }
 
     /// <summary>A scripted outcome of one try: a receiver answer, or a failure without an answer.</summary>
-    private readonly record struct Step(DeliveryResult? Result, TimeSpan Delay)
+    private readonly record struct Step(DeliveryResult? Result, TimeSpan Delay, Exception? Error = null)
     {
         public static Step Answer(DeliveryResult result, TimeSpan delay = default) => new(result, delay);
 
         public static Step Unanswered(TimeSpan delay = default) => new(null, delay);
+
+        public static Step Throw(Exception error) => new(null, default, error);
     }
 
     /// <summary>Plays scripted steps in place of calling the receiver, then repeats a step or calls the receiver.</summary>
@@ -226,7 +245,7 @@ public sealed class OutboxDeliveryResilienceTests
 
             return step.Result is { } result
                 ? Outcome.FromResult((TResult)(object)result)
-                : Outcome.FromException<TResult>(new TimeoutException("Injected delivery failure."));
+                : Outcome.FromException<TResult>(step.Error ?? new TimeoutException("Injected delivery failure."));
         }
     }
 
