@@ -39,9 +39,9 @@ public sealed class ShipmentGrain : DurableGrain
     // <orleans0103_fix_split>
     public async DurableTask<int> ShipAsync(string customer)
     {
-        DurableTask.Once("shipped", () => _status.Value = OrderStatus.Shipped);
+        DurableTask.RunInline("shipped", () => _status.Value = OrderStatus.Shipped);
         await DurableTask.Run(ct => _email.SendAsync(customer, "Your order has shipped", ct)).WithId("notify");
-        return DurableTask.Once("count", () => ++_notices.Value);
+        return DurableTask.RunInline("count", () => ++_notices.Value);
     }
     // </orleans0103_fix_split>
 }

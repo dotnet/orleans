@@ -33,7 +33,7 @@ Wrap the logger with `ReplaySafe()`, typically once in the grain's constructor. 
 
 :::code source="snippets/durable-tasks/Orleans0115.cs" id="orleans0115_fix" language="csharp":::
 
-Logs in a `DurableTask.Once` effect, in a step, or in the body's synchronous tail don't repeat, because a replay returns their recorded results without running them.
+Logs in a `DurableTask.RunInline` effect, in a step, or in the body's synchronous tail don't repeat, because a replay returns their recorded results without running them.
 
 ## When to suppress
 

@@ -1,6 +1,6 @@
 ---
 title: "ORLEANS0101: Produce non-deterministic values in recorded effects"
-description: Understand ORLEANS0101, which reports durable task code which produces clock, random, or environment values where a replay runs it again, and fix it with DurableTask.Once, logical time, or task-derived keys.
+description: Understand ORLEANS0101, which reports durable task code which produces clock, random, or environment values where a replay runs it again, and fix it with DurableTask.RunInline, logical time, or task-derived keys.
 ms.date: 10/15/2026
 ms.topic: reference
 ---
@@ -33,7 +33,7 @@ For the replay model, see [Writing replay-safe workflows](https://github.com/dot
 
 ## How to fix violations
 
-**Record the value with `DurableTask.Once`, and read logical time.** The effect runs once, and every replay returns the recorded value. `DurableTask.Current.UtcNow` is the execution's logical time, which the runtime records, so a replay computes the same deadline:
+**Record the value with `DurableTask.RunInline`, and read logical time.** The effect runs once, and every replay returns the recorded value. `DurableTask.Current.UtcNow` is the execution's logical time, which the runtime records, so a replay computes the same deadline:
 
 :::code source="snippets/durable-tasks/Orleans0101.cs" id="orleans0101_fix" language="csharp":::
 
