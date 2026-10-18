@@ -184,7 +184,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                 throw;
             }
 
-            Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "accepted");
+            Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, accepted ? "accepted" : "dead_lettered");
             Shared.Instruments.OnInboxMessageProcessed(Shared.GrainType, accepted ? "success" : "dead_lettered");
             if (!accepted) return DeliveryResult.DeadLettered(reason);
             LogMessageAccepted(Logger, key, GrainContext.GrainId);
