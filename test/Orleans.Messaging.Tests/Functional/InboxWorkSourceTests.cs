@@ -35,6 +35,23 @@ public sealed class InboxWorkSourceTests() : MessagingBehaviorTestBase(receiverO
     }
 
     [Fact]
+    public async Task NegativeSourceDelay_SchedulesAPromptWakeupBeforeTheWriteIsStored()
+    {
+        var grain = NewWorkGrain();
+        await grain.GetPendingAsync();
+        using var write = Fixture.Storage.BlockWrite(Journal(grain));
+
+        var adding = grain.AddWorkAsync(TimeSpan.MinValue);
+        await write.WaitUntilEnteredAsync();
+
+        Assert.Equal(1, Fixture.JobManagerProbe.GetSuccessCount(MessagingPump.JobName, grain.GetGrainId()));
+        write.Release();
+        await adding;
+        Assert.Equal(1, await grain.GetPendingAsync());
+        await grain.CompleteWorkAsync();
+    }
+
+    [Fact]
     public async Task CrashAfterTheWriteWhichMakesWorkPending_ReactivatesTheGrain()
     {
         var grain = NewWorkGrain();
