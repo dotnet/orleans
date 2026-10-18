@@ -30,7 +30,7 @@ public readonly struct MessageId : ISpanFormattable, IEquatable<MessageId>, IPar
     /// <param name="segments">The nonempty literal segments.</param>
     /// <returns>The message identity.</returns>
     /// <exception cref="ArgumentNullException">A segment is null.</exception>
-    /// <exception cref="ArgumentException">The input or a segment is empty.</exception>
+    /// <exception cref="ArgumentException">The input or a segment is empty, or a segment contains an unpaired surrogate.</exception>
     public static MessageId Create(params ReadOnlySpan<string> segments) => new(HierarchicalKey.Create(segments));
 
     /// <inheritdoc/>
