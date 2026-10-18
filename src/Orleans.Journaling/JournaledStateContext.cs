@@ -1,0 +1,231 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+
+namespace Orleans.Journaling;
+
+/// <summary>
+/// The context in which code accesses journaled state, which runs each access against the state or supplies its outcome.
+/// </summary>
+/// <remarks>
+/// <para>
+/// A host supplies the context of a manager's states through the manager's <see cref="JournaledStateContextProvider"/>,
+/// for example the attempt of a durable task body which records the body's accesses and returns the recorded outcomes on
+/// replay. A state which takes part asks for the current context at each public operation and, when there is one, runs the
+/// operation through it; otherwise the operation runs against the state directly. Every read and write of
+/// <see cref="IDurableValue{T}"/>, the durable collections, <see cref="IDurableTaskCompletionSource{T}"/> and the Messaging
+/// outbox takes part. Observations which report the state's changes as they happen, such as a completion source's task or
+/// a log's stream, run against the state directly.
+/// </para>
+/// <para>
+/// An operation which runs within another operation of the same context, such as the removal which
+/// <c>IList{T}.Remove</c> performs through <c>RemoveAt</c>, belongs to the outer operation: a provider supplies no context
+/// while its context runs an operation.
+/// </para>
+/// </remarks>
+internal abstract class JournaledStateContext
+{
+    /// <summary>Gets the context in which the calling code accesses <paramref name="target"/>.</summary>
+    /// <param name="target">The accessed state, or <see langword="null"/> for state whose accesses always run directly.</param>
+    /// <param name="context">The context, or <see langword="null"/>.</param>
+    /// <returns><see langword="true"/> when an access runs through <paramref name="context"/>.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryGetCurrent(JournaledStateAccessTarget? target, [NotNullWhen(true)] out JournaledStateContext? context)
+    {
+        context = target?.Manager?.ContextProvider?.Current;
+        return context is not null;
+    }
+
+    /// <summary>Reads <paramref name="target"/> through this context.</summary>
+    public TResult Read<TState, TResult>(
+        JournaledStateAccessTarget target,
+        JournaledStateOperation operation,
+        TState state,
+        Func<TState, TResult> read)
+        => Access(new(target, JournaledStateAccessKind.Read, operation), state, read);
+
+    /// <summary>Changes <paramref name="target"/> through this context and returns the change's result.</summary>
+    public TResult Write<TState, TResult>(
+        JournaledStateAccessTarget target,
+        JournaledStateOperation operation,
+        TState state,
+        Func<TState, TResult> write)
+        => Access(new(target, JournaledStateAccessKind.Write, operation), state, write);
+
+    /// <summary>Changes <paramref name="target"/> through this context.</summary>
+    public void Write<TState>(
+        JournaledStateAccessTarget target,
+        JournaledStateOperation operation,
+        TState state,
+        Action<TState> write)
+        => Access(
+            new(target, JournaledStateAccessKind.Write, operation),
+            (State: state, Write: write),
+            static state =>
+            {
+                state.Write(state.State);
+                return default(JournaledStateAccessNoResult);
+            });
+
+    /// <summary>
+    /// Runs <paramref name="operation"/> against the state which <paramref name="access"/> describes, or supplies its
+    /// outcome without running it: a result, or an exception which this throws.
+    /// </summary>
+    /// <remarks>
+    /// <typeparamref name="TResult"/> is <see cref="JournaledStateAccessNoResult"/> for a write which returns nothing.
+    /// </remarks>
+    protected abstract TResult Access<TState, TResult>(in JournaledStateAccess access, TState state, Func<TState, TResult> operation);
+}
+
+/// <summary>Supplies the <see cref="JournaledStateContext"/> of the states of one manager.</summary>
+/// <remarks>A host installs one provider per manager, through <see cref="JournaledStateManager.ContextProvider"/>.</remarks>
+internal abstract class JournaledStateContextProvider
+{
+    /// <summary>Gets the context of the calling code, or <see langword="null"/> when its accesses run directly.</summary>
+    public abstract JournaledStateContext? Current { get; }
+}
+
+/// <summary>Identifies journaled state whose accesses run through a <see cref="JournaledStateContext"/>.</summary>
+/// <remarks>
+/// <see cref="Id"/> is a stable hash of <see cref="Name"/>, so a record of an access identifies its state across processes
+/// and deployments without storing the name.
+/// </remarks>
+internal sealed class JournaledStateAccessTarget
+{
+    public JournaledStateAccessTarget(string name, IJournaledStateManager manager)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        Name = name;
+        Id = ComputeId(name);
+        Manager = manager as JournaledStateManager;
+    }
+
+    /// <summary>Gets the state's journal name.</summary>
+    public string Name { get; }
+
+    /// <summary>Gets the stable hash of <see cref="Name"/>.</summary>
+    public int Id { get; }
+
+    /// <summary>Gets the manager whose provider supplies the state's context, or <see langword="null"/>.</summary>
+    public JournaledStateManager? Manager { get; }
+
+    // FNV-1a over the name's UTF-16 code units, which, unlike string.GetHashCode, is the same in every process.
+    private static int ComputeId(string name)
+    {
+        var hash = 2166136261u;
+        foreach (var character in name)
+        {
+            hash = (hash ^ character) * 16777619u;
+        }
+
+        return unchecked((int)hash);
+    }
+}
+
+/// <summary>Describes one access to journaled state.</summary>
+internal readonly struct JournaledStateAccess(JournaledStateAccessTarget target, JournaledStateAccessKind kind, JournaledStateOperation operation)
+{
+    /// <summary>Gets the accessed state.</summary>
+    public JournaledStateAccessTarget Target { get; } = target;
+
+    /// <summary>Gets whether the access reads or changes the state.</summary>
+    public JournaledStateAccessKind Kind { get; } = kind;
+
+    /// <summary>Gets the operation.</summary>
+    public JournaledStateOperation Operation { get; } = operation;
+}
+
+/// <summary>The result of a write which returns nothing.</summary>
+internal readonly struct JournaledStateAccessNoResult;
+
+/// <summary>Whether an access reads or changes journaled state.</summary>
+/// <remarks>Records of accesses store these values.</remarks>
+internal enum JournaledStateAccessKind : byte
+{
+    Read = 1,
+    Write = 2,
+}
+
+/// <summary>The operations of journaled state which run through a <see cref="JournaledStateContext"/>.</summary>
+/// <remarks>Records of accesses store these values, so existing values never change.</remarks>
+internal enum JournaledStateOperation : byte
+{
+    ValueGet = 1,
+    ValueSet = 2,
+
+    DictionaryGet = 10,
+    DictionaryTryGetValue = 11,
+    DictionaryContainsKey = 12,
+    DictionaryContainsPair = 13,
+    DictionaryCount = 14,
+    DictionarySnapshot = 15,
+    DictionaryKeys = 16,
+    DictionaryValues = 17,
+    DictionarySet = 20,
+    DictionaryAdd = 21,
+    DictionaryRemove = 22,
+    DictionaryRemovePair = 23,
+    DictionaryClear = 24,
+
+    ListGet = 30,
+    ListCount = 31,
+    ListContains = 32,
+    ListIndexOf = 33,
+    ListSnapshot = 34,
+    ListSet = 40,
+    ListAdd = 41,
+    ListInsert = 42,
+    ListRemove = 43,
+    ListRemoveAt = 44,
+    ListClear = 45,
+    ListAddRange = 46,
+
+    QueueCount = 50,
+    QueuePeek = 51,
+    QueueTryPeek = 52,
+    QueueContains = 53,
+    QueueSnapshot = 54,
+    QueueEnqueue = 60,
+    QueueDequeue = 61,
+    QueueTryDequeue = 62,
+    QueueClear = 63,
+
+    SetCount = 70,
+    SetContains = 71,
+    SetSnapshot = 72,
+    SetIsProperSubsetOf = 73,
+    SetIsProperSupersetOf = 74,
+    SetIsSubsetOf = 75,
+    SetIsSupersetOf = 76,
+    SetOverlaps = 77,
+    SetEquals = 78,
+    SetAdd = 80,
+    SetRemove = 81,
+    SetClear = 82,
+    SetUnionWith = 83,
+    SetIntersectWith = 84,
+    SetExceptWith = 85,
+    SetSymmetricExceptWith = 86,
+
+    LogCount = 90,
+    LogFirstSequence = 91,
+    LogNextSequence = 92,
+    LogCommittedSequence = 93,
+    LogIsSealed = 94,
+    LogGet = 95,
+    LogTryGet = 96,
+    LogSnapshot = 97,
+    LogEpoch = 99,
+    LogAppend = 100,
+    LogTrimBefore = 101,
+    LogClear = 102,
+    LogSeal = 103,
+    LogCommitDraft = 104,
+
+    CompletionSourceState = 110,
+    CompletionSourceTrySetResult = 111,
+    CompletionSourceTrySetException = 112,
+    CompletionSourceTrySetCanceled = 113,
+
+    OutboxSend = 120,
+    OutboxWithdraw = 121,
+}

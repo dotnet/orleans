@@ -31,10 +31,12 @@ internal sealed partial class Outbox : IStateMachine, IReportsStagedChanges, IDu
     private readonly List<DeliveryOutcome> _outcomes = [];
     private int _running;
     private TaskCompletionSource? _drained;
+    private readonly JournaledStateAccessTarget _accessTarget;
 
     public Outbox(MessagingPump pump)
     {
         _pump = pump;
+        _accessTarget = new(MessagingStateNames.Outbox, pump.StateManager);
         pump.StateManager.RegisterStateMachine(MessagingStateNames.Outbox, this);
         pump.Register(this);
     }
@@ -60,7 +62,22 @@ internal sealed partial class Outbox : IStateMachine, IReportsStagedChanges, IDu
         return this;
     }
 
+    /// <remarks>
+    /// A send runs through the caller's <see cref="JournaledStateContext"/> as a write, so a durable task body's replay
+    /// doesn't send again.
+    /// </remarks>
     public void Send(OutboxMessage message)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.OutboxSend, (Self: this, Message: message), static state => state.Self.SendCore(state.Message));
+            return;
+        }
+
+        SendCore(message);
+    }
+
+    private void SendCore(OutboxMessage message)
     {
         _pump.ShutdownToken.ThrowIfCancellationRequested();
         EnvelopeValidation.Validate(message);
@@ -93,7 +110,19 @@ internal sealed partial class Outbox : IStateMachine, IReportsStagedChanges, IDu
         }
     }
 
+    /// <remarks>A send runs through the caller's <see cref="JournaledStateContext"/> as a write.</remarks>
     public void Send(MessageId messageId)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.OutboxSend, (Self: this, MessageId: messageId), static state => state.Self.SendCore(state.MessageId));
+            return;
+        }
+
+        SendCore(messageId);
+    }
+
+    private void SendCore(MessageId messageId)
     {
         _pump.ShutdownToken.ThrowIfCancellationRequested();
         EnvelopeValidation.ValidateMessageId(messageId);
@@ -130,7 +159,12 @@ internal sealed partial class Outbox : IStateMachine, IReportsStagedChanges, IDu
         }
     }
 
-    public bool Withdraw(MessageId messageId)
+    /// <remarks>A withdrawal runs through the caller's <see cref="JournaledStateContext"/> as a write.</remarks>
+    public bool Withdraw(MessageId messageId) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.OutboxWithdraw, (Self: this, MessageId: messageId), static state => state.Self.WithdrawCore(state.MessageId))
+        : WithdrawCore(messageId);
+
+    private bool WithdrawCore(MessageId messageId)
     {
         _pump.ShutdownToken.ThrowIfCancellationRequested();
         if (!_messages.TryGetValue(messageId, out var entry)) return false;
