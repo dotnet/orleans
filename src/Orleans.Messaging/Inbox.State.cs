@@ -18,17 +18,22 @@ internal sealed partial class Inbox
     // Pending messages with a delivery time, which do not count toward MaxCapacity.
     private int _scheduledCount;
 
-    // Entries are durable once a completed write captured their sequence number.
+    // Acceptances and completions are durable once a completed write captured their sequence number.
     private long _lastSequence;
     private long _capturedSequence;
     private long _durableSequence;
+    private long _lastAcceptSequence;
+    private long _lastCompletionSequence;
 
     private bool IsDurable(InboxEntry entry) => entry.Sequence <= _durableSequence;
+
+    // Whether every processed record which deduplication relies on is durable.
+    private bool AreCompletionsDurable => _lastCompletionSequence <= _durableSequence;
 
     // Every journal write prepares every state, so a write which makes a work source's work pending ensures the wake-up
     // before it can become durable.
     ValueTask IStateMachine.PrepareWriteAsync(CancellationToken cancellationToken) =>
-        _lastSequence != _capturedSequence || GetWorkSourceDelay() is not null
+        _lastAcceptSequence > _capturedSequence || GetWorkSourceDelay() is not null
             ? _pump.EnsureWakeupAsync(cancellationToken)
             : ValueTask.CompletedTask;
 
@@ -54,7 +59,7 @@ internal sealed partial class Inbox
         _processed.Clear();
         _deadLetters.Clear();
         _scheduledCount = 0;
-        _lastSequence = _capturedSequence = _durableSequence = 0;
+        _lastSequence = _capturedSequence = _durableSequence = _lastAcceptSequence = _lastCompletionSequence = 0;
     }
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
@@ -115,7 +120,7 @@ internal sealed partial class Inbox
         {
             case InboxCommandKind.Accept:
                 var message = command.Message ?? throw new InvalidOperationException("An accept command requires its message.");
-                _messages.Add(message.Envelope.MessageId, new InboxEntry { Message = message, State = new(), Sequence = ++_lastSequence });
+                _messages.Add(message.Envelope.MessageId, new InboxEntry { Message = message, State = new(), Sequence = _lastAcceptSequence = ++_lastSequence });
                 _processed.Remove(message.Envelope.MessageId);
                 if (message.Envelope.DeliverAt is not null) _scheduledCount++;
                 ReportDepth(1);
@@ -131,6 +136,7 @@ internal sealed partial class Inbox
                 }
 
                 _processed[command.MessageId] = command.ProcessedAt;
+                _lastCompletionSequence = ++_lastSequence;
                 if (command.DeadLetter is { } letter) _deadLetters[command.MessageId] = letter;
                 break;
             case InboxCommandKind.RemoveDeadLetters:
