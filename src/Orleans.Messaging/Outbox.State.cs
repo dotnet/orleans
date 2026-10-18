@@ -16,7 +16,9 @@ internal sealed partial class Outbox
     private long _durableSequence;
 
     ValueTask IStateMachine.PrepareWriteAsync(CancellationToken cancellationToken) =>
-        _lastSequence != _capturedSequence ? _pump.EnsureWakeupAsync(cancellationToken) : ValueTask.CompletedTask;
+        _lastSequence != _capturedSequence
+            ? _pump.EnsureWakeupAsync(Shared.JobTimeProvider.GetUtcNow(), cancellationToken)
+            : ValueTask.CompletedTask;
 
     private void OnWriteCaptured() => _capturedSequence = _lastSequence;
 
