@@ -12,8 +12,20 @@ using Xunit;
 
 namespace Orleans.Messaging.Tests.Support;
 
+/// <summary>
+/// Hosts an in-process messaging test cluster.
+/// </summary>
+/// <remarks>
+/// The fixture builds and deploys the cluster in <see cref="InitializeAsync"/>, after every derived constructor has run, so
+/// <see cref="ConfigureServices"/> and <see cref="ConfigureOptions"/> overrides observe fully constructed derived state.
+/// </remarks>
 public class MessagingClusterFixture : IAsyncLifetime
 {
+    private readonly int _initialSilos;
+    private readonly bool _receiverOnly;
+    private readonly bool _useServiceCollection;
+    private InProcessTestCluster? _cluster;
+
     public MessagingClusterFixture() : this(receiverOnly: true)
     {
     }
@@ -31,9 +43,28 @@ public class MessagingClusterFixture : IAsyncLifetime
         HandlerProbe = new HandlerProbe();
         SnapshotProbe = new SnapshotProbe();
         ActivationProbe = new ActivationValidationProbe();
+        _initialSilos = initialSilos;
+        _receiverOnly = receiverOnly;
+        _useServiceCollection = useServiceCollection;
+    }
+
+    public InProcessTestCluster Cluster =>
+        _cluster ?? throw new InvalidOperationException($"The cluster is available after {nameof(InitializeAsync)} builds it.");
+
+    public IClusterClient Client => Cluster.Client!;
+    public FakeTimeProvider Clock { get; }
+    public ControlledJournalStorageProvider Storage { get; }
+    public MessagingMetricProbe Metrics { get; }
+    public DurableJobManagerProbe JobManagerProbe { get; }
+    public HandlerProbe HandlerProbe { get; }
+    public SnapshotProbe SnapshotProbe { get; }
+    public ActivationValidationProbe ActivationProbe { get; }
+
+    private InProcessTestCluster BuildCluster()
+    {
         var clusterId = $"messaging-{Guid.NewGuid():N}";
         var serviceId = $"messaging-service-{Guid.NewGuid():N}";
-        var builder = new InProcessTestClusterBuilder((short)initialSilos);
+        var builder = new InProcessTestClusterBuilder((short)_initialSilos);
         builder.ConfigureClient(clientBuilder =>
             clientBuilder.Configure<ClusterOptions>(options =>
             {
@@ -60,11 +91,11 @@ public class MessagingClusterFixture : IAsyncLifetime
             siloBuilder.UseInMemoryDurableJobs();
             // The test grains journal Orleans-serialized types.
             siloBuilder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
-            if (receiverOnly)
+            if (_receiverOnly)
             {
                 ReceiverTestServices.Add(siloBuilder.Services, ConfigureOptions);
             }
-            else if (useServiceCollection)
+            else if (_useServiceCollection)
             {
                 siloBuilder.Services.AddMessaging(ConfigureOptions);
             }
@@ -86,7 +117,7 @@ public class MessagingClusterFixture : IAsyncLifetime
                 serviceProvider => (IJournalStorageCatalog)serviceProvider.GetRequiredService<IJournalStorageProvider>());
             ConfigureServices(siloBuilder.Services);
         });
-        Cluster = builder.Build();
+        return builder.Build();
     }
 
     /// <summary>
@@ -106,16 +137,6 @@ public class MessagingClusterFixture : IAsyncLifetime
     {
         public override DateTimeOffset GetUtcNow() => clock.GetUtcNow();
     }
-
-    public InProcessTestCluster Cluster { get; }
-    public IClusterClient Client => Cluster.Client!;
-    public FakeTimeProvider Clock { get; }
-    public ControlledJournalStorageProvider Storage { get; }
-    public MessagingMetricProbe Metrics { get; }
-    public DurableJobManagerProbe JobManagerProbe { get; }
-    public HandlerProbe HandlerProbe { get; }
-    public SnapshotProbe SnapshotProbe { get; }
-    public ActivationValidationProbe ActivationProbe { get; }
 
     public Task<EndpointSnapshot> WaitForEffectCountAsync(IMessagingTestGrain grain, int expected) =>
         SnapshotProbe.WaitAsync(
@@ -290,10 +311,16 @@ public class MessagingClusterFixture : IAsyncLifetime
         options.OutboxBatchSize = 8;
     }
 
-    public ValueTask InitializeAsync() => new(Cluster.DeployAsync());
+    public ValueTask InitializeAsync()
+    {
+        if (_cluster is not null) throw new InvalidOperationException("The cluster is already initialized.");
+        _cluster = BuildCluster();
+        return new(_cluster.DeployAsync());
+    }
+
     public async ValueTask DisposeAsync()
     {
-        await Cluster.DisposeAsync();
+        if (_cluster is not null) await _cluster.DisposeAsync();
         Metrics.Dispose();
     }
 }
