@@ -135,7 +135,14 @@ internal abstract class JournaledStateContext
     /// </param>
     /// <param name="apply">Makes the change whose result <paramref name="operation"/> returned, or <see langword="null"/>.</param>
     /// <remarks>
+    /// <para>
     /// <typeparamref name="TResult"/> is <see cref="JournaledStateAccessNoResult"/> for a write which returns nothing.
+    /// </para>
+    /// <para>
+    /// While the state's <see cref="JournaledStateAccessTarget.Stamp"/> is unchanged, reads of the same operation with equal
+    /// arguments return equal results: the same instance, except for operations whose results are copies
+    /// (<see cref="JournaledStateOperations.ReturnsCopy"/>).
+    /// </para>
     /// </remarks>
     protected abstract TResult Access<TArgument, TState, TResult>(
         in JournaledStateAccess access,
@@ -190,6 +197,8 @@ internal interface IJournaledStateContextHost
 /// </remarks>
 internal sealed class JournaledStateAccessTarget
 {
+    private long _stamp;
+
     /// <exception cref="InvalidOperationException">Another state of <paramref name="manager"/> has the same identifier.</exception>
     public JournaledStateAccessTarget(string name, IJournaledStateManager manager)
     {
@@ -211,6 +220,21 @@ internal sealed class JournaledStateAccessTarget
 
     /// <summary>Gets the manager whose provider supplies the state's context, or <see langword="null"/>.</summary>
     public JournaledStateManager? Manager { get; }
+
+    /// <summary>
+    /// Gets a number which changes whenever the content which the state's reads observe changes, in this activation.
+    /// </summary>
+    /// <remarks>
+    /// The state calls <see cref="OnChanged"/> for every change of that content: its own operations, whether or not they
+    /// run through a context, journal entries which it replays, resets, and changes which storage acknowledgements make,
+    /// such as a log's committed sequence. In-place changes to a value which a read returned aren't changes of the state.
+    /// The stamp lives in memory only.
+    /// </remarks>
+    public long Stamp => _stamp;
+
+    /// <summary>Records a change of the content which the state's reads observe.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void OnChanged() => _stamp++;
 
     // FNV-1a over the name's UTF-16 code units, which, unlike string.GetHashCode, is the same in every process.
     private static int ComputeId(string name)
@@ -243,6 +267,23 @@ internal readonly struct JournaledStateAccessNoResult;
 
 /// <summary>The argument of an access which depends only on the state, or whose arguments a context doesn't examine.</summary>
 internal readonly struct JournaledStateAccessNoArgument;
+
+/// <summary>Describes the results of <see cref="JournaledStateOperation"/>s.</summary>
+internal static class JournaledStateOperations
+{
+    /// <summary>
+    /// Gets whether <paramref name="operation"/> returns a detached copy of the state's content, which differs in identity
+    /// from every other result: a snapshot of the entries, the keys or the values.
+    /// </summary>
+    public static bool ReturnsCopy(JournaledStateOperation operation) => operation is
+        JournaledStateOperation.DictionarySnapshot
+        or JournaledStateOperation.DictionaryKeys
+        or JournaledStateOperation.DictionaryValues
+        or JournaledStateOperation.ListSnapshot
+        or JournaledStateOperation.QueueSnapshot
+        or JournaledStateOperation.SetSnapshot
+        or JournaledStateOperation.LogSnapshot;
+}
 
 /// <summary>Whether an access reads or changes journaled state.</summary>
 /// <remarks>Records of accesses store these values.</remarks>

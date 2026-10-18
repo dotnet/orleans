@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -261,6 +263,146 @@ public sealed class JournaledStateContextTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task ReadsPassTheArgumentsWhichTheirResultsDependOn()
+    {
+        var sut = CreateTestSystem();
+        var provider = new TestProvider();
+        ((JournaledStateManager)sut.Manager).ContextProvider = provider;
+        var (list, dictionary, value, _, set, log, _) = CreateAllStates(sut.Manager);
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        list.Add("a");
+        dictionary["x"] = 1;
+        log.Append("e");
+        string[] other = ["a"];
+        var context = provider.Context = new RecordingContext();
+
+        _ = dictionary.TryGetValue("x", out _);
+        _ = dictionary.ContainsKey("y");
+        _ = list[0];
+        _ = list.IndexOf("a");
+        _ = log.TryGet(0, out _);
+        _ = set.IsSubsetOf(other);
+        _ = list.Count;
+        _ = value.Value;
+        _ = dictionary.Keys;
+
+        var none = default(JournaledStateAccessNoArgument);
+        Assert.Equal(["x", "y", 0, "a", 0L, other, none, none, none], context.Arguments.Select(static access => access.Argument));
+    }
+
+    [Fact]
+    public async Task EveryChangeOfAStateChangesItsStampAndReadsDont()
+    {
+        var storage = CreateStorage();
+        var sut = CreateTestSystem(storage);
+        var provider = new TestProvider();
+        ((JournaledStateManager)sut.Manager).ContextProvider = provider;
+        var (list, dictionary, value, queue, set, log, completion) = CreateAllStates(sut.Manager);
+        var acknowledged = new DurableLog<string>("acknowledged", sut.Manager, new OrleansBinaryDurableLogCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        AssertChanges(provider, () => _ = value.Value, () => value.Value = 1, () => value.Value = 1);
+        AssertChanges(
+            provider,
+            () => _ = dictionary.Count,
+            () => dictionary["a"] = 1,
+            () => dictionary.Add("b", 2),
+            () => dictionary.Remove("a"),
+            () => dictionary.Remove(new KeyValuePair<string, int>("b", 2)),
+            () => dictionary["c"] = 3,
+            () => dictionary.Clear());
+        AssertChanges(
+            provider,
+            () => _ = list.Count,
+            () => list.Add("a"),
+            () => list.Insert(0, "b"),
+            () => list[0] = "c",
+            () => list.AddRange(["d", "e"]),
+            () => list.Remove("d"),
+            () => list.RemoveAt(0),
+            () => list.Clear());
+        AssertChanges(
+            provider,
+            () => _ = queue.Count,
+            () => queue.Enqueue("a"),
+            () => queue.Enqueue("b"),
+            () => queue.Dequeue(),
+            () => queue.TryDequeue(out _),
+            () => queue.Enqueue("c"),
+            () => queue.Clear());
+        AssertChanges(
+            provider,
+            () => _ = set.Count,
+            () => set.Add("a"),
+            () => set.UnionWith(["b", "c"]),
+            () => set.Remove("a"),
+            () => set.ExceptWith(["b"]),
+            () => set.SymmetricExceptWith(["d"]),
+            () => set.IntersectWith(["d"]),
+            () => set.Clear());
+        AssertChanges(
+            provider,
+            () => _ = log.Count,
+            () => log.Append("a"),
+            () => log.Append("b"),
+            () => log.TrimBefore(1),
+            () => log.Clear(),
+            () => log.Seal());
+        AssertChanges(provider, () => _ = completion.State, () => completion.TrySetResult(1));
+
+        // Changes which don't change the state, and reads, leave the stamps as they are.
+        AssertUnchanged(provider, () => _ = dictionary.Count, () => dictionary.Remove("missing"), () => _ = dictionary.TryGetValue("x", out _), () => _ = dictionary.Keys);
+        AssertUnchanged(provider, () => _ = set.Count, () => set.Remove("missing"), () => _ = set.Overlaps(["d"]));
+        AssertUnchanged(provider, () => _ = completion.State, () => completion.TrySetResult(2));
+
+        // Acknowledging a write changes a log's committed sequence, which reads observe.
+        acknowledged.Append("a");
+        var beforeWrite = Stamp(provider, () => _ = acknowledged.CommittedSequence);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.True(Stamp(provider, () => _ = acknowledged.CommittedSequence) > beforeWrite);
+        var afterWrite = Stamp(provider, () => _ = acknowledged.CommittedSequence);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(afterWrite, Stamp(provider, () => _ = acknowledged.CommittedSequence));
+
+        // Recovery replays the journal's entries into new states, which changes their stamps.
+        var recovered = CreateTestSystem(storage);
+        var recoveredProvider = new TestProvider();
+        ((JournaledStateManager)recovered.Manager).ContextProvider = recoveredProvider;
+        var recoveredLog = new DurableLog<string>("acknowledged", recovered.Manager, new OrleansBinaryDurableLogCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        Assert.True(Stamp(recoveredProvider, () => _ = recoveredLog.Count) > 0);
+        Assert.Equal("a", Assert.Single(recoveredLog));
+
+        static void AssertChanges(TestProvider provider, Action read, params Action[] changes)
+        {
+            for (var i = 0; i < changes.Length; i++)
+            {
+                var before = Stamp(provider, read);
+
+                // Changes alternate between running directly and through a context, which runs them against the state.
+                provider.Context = i % 2 == 0 ? null : new RecordingContext();
+                changes[i]();
+                provider.Context = null;
+                Assert.True(Stamp(provider, read) > before, $"Change {i} didn't change the stamp.");
+            }
+        }
+
+        static void AssertUnchanged(TestProvider provider, Action read, params Action[] accesses)
+        {
+            var before = Stamp(provider, read);
+            foreach (var access in accesses)
+            {
+                access();
+                provider.Context = new RecordingContext();
+                access();
+                provider.Context = null;
+            }
+
+            Assert.Equal(before, Stamp(provider, read));
+        }
+    }
+
+    [Fact]
     public void TargetIdentifiersAreStableHashesOfTheirNames()
     {
         var manager = CreateTestSystem().Manager;
@@ -287,6 +429,34 @@ public sealed class JournaledStateContextTests : JournalingTestBase
         Assert.Contains("'vmXuqzvn' and 'prcxZS4u'", exception.Message, StringComparison.Ordinal);
         Assert.Contains("Rename", exception.Message, StringComparison.Ordinal);
         Assert.False(manager.TryGetStateMachine("prcxZS4u", out _));
+    }
+
+    private (DurableList<string> List, DurableDictionary<string, int> Dictionary, DurableValue<int> Value, DurableQueue<string> Queue, DurableSet<string> Set, DurableLog<string> Log, DurableTaskCompletionSource<int> Completion)
+        CreateAllStates(IJournaledStateManager manager) =>
+        (
+            new DurableList<string>("list", manager, new OrleansBinaryDurableListCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)),
+            new DurableDictionary<string, int>(
+                "dictionary",
+                manager,
+                new OrleansBinaryDurableDictionaryCommandCodec<string, int>(CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool)),
+            new DurableValue<int>("value", manager, new OrleansBinaryDurableValueCommandCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)),
+            new DurableQueue<string>("queue", manager, new OrleansBinaryDurableQueueCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)),
+            new DurableSet<string>("set", manager, new OrleansBinaryDurableSetCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)),
+            new DurableLog<string>("log", manager, new OrleansBinaryDurableLogCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)),
+            new DurableTaskCompletionSource<int>(
+                "completion",
+                manager,
+                new OrleansBinaryDurableTaskCompletionSourceCommandCodec<int>(CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<Exception>(), SessionPool),
+                ServiceProvider.GetRequiredService<DeepCopier<int>>(),
+                ServiceProvider.GetRequiredService<DeepCopier<Exception>>()));
+
+    // Reads the stamp of the state which read accesses, through a context which runs the read.
+    private static long Stamp(TestProvider provider, Action read)
+    {
+        var context = provider.Context = new RecordingContext();
+        read();
+        provider.Context = null;
+        return context.LastTarget!.Stamp;
     }
 
     private async Task<(DurableList<string> List, DurableDictionary<string, int> Dictionary, DurableValue<int> Value, TestProvider Provider)> CreateStatesAsync()
@@ -319,6 +489,12 @@ public sealed class JournaledStateContextTests : JournalingTestBase
 
         public List<(JournaledStateAccessKind Kind, JournaledStateOperation Operation, string Target, object? Outcome)> Accesses { get; } = [];
 
+        /// <summary>Gets the argument of each access which ran, and the stamp of its state before it ran.</summary>
+        public List<(object? Argument, long Stamp)> Arguments { get; } = [];
+
+        /// <summary>Gets the state of the latest access.</summary>
+        public JournaledStateAccessTarget? LastTarget { get; private set; }
+
         public Queue<object?> Recorded { get; } = new();
 
         /// <summary>Gets or sets a check which rejects a result before its change applies, as a context which can't record it does.</summary>
@@ -331,6 +507,7 @@ public sealed class JournaledStateContextTests : JournalingTestBase
             Func<TState, TResult> operation,
             Action<TState, TResult>? apply)
         {
+            LastTarget = access.Target;
             if (Recorded.TryDequeue(out var outcome))
             {
                 return outcome is Exception exception ? throw exception : (TResult)outcome!;
@@ -339,6 +516,7 @@ public sealed class JournaledStateContextTests : JournalingTestBase
             Depth++;
             try
             {
+                Arguments.Add((argument, access.Target.Stamp));
                 var result = operation(state);
                 if (Rejects?.Invoke(result) is { } rejection)
                 {

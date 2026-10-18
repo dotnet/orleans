@@ -108,7 +108,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
-        _items.Clear();
+        ApplyClear();
         _writer = writer;
         _hasStagedEntries = false;
         DurableStateObservation.PublishDurableResync<DurableQueue<T>, QueueChange<T>>(_manager, this);
@@ -277,10 +277,29 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
         }
     }
 
-    private void ApplyEnqueue(T item) => _items.Enqueue(item);
-    private T ApplyDequeue() => _items.Dequeue();
-    private bool ApplyTryDequeue([MaybeNullWhen(false)] out T value) => _items.TryDequeue(out value);
-    private void ApplyClear() => _items.Clear();
+    private void ApplyEnqueue(T item)
+    {
+        _accessTarget.OnChanged();
+        _items.Enqueue(item);
+    }
+
+    private T ApplyDequeue()
+    {
+        _accessTarget.OnChanged();
+        return _items.Dequeue();
+    }
+
+    private bool ApplyTryDequeue([MaybeNullWhen(false)] out T value)
+    {
+        _accessTarget.OnChanged();
+        return _items.TryDequeue(out value);
+    }
+
+    private void ApplyClear()
+    {
+        _accessTarget.OnChanged();
+        _items.Clear();
+    }
     void IDurableQueueCommandHandler<T>.ApplyEnqueue(T item) => ApplyEnqueue(item);
     void IDurableQueueCommandHandler<T>.ApplyDequeue() => _ = ApplyDequeue();
     void IDurableQueueCommandHandler<T>.ApplyClear() => ApplyClear();

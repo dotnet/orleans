@@ -103,7 +103,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IReportsS
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
-        _items.Clear();
+        ApplyClear();
         _writer = writer;
         _hasStagedEntries = false;
         DurableStateObservation.PublishDurableResync<DurableList<T>, ListChange<T>>(_manager, this);
@@ -270,11 +270,35 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IReportsS
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    private void ApplyAdd(T item) => _items.Add(item);
-    private void ApplySet(int index, T item) => _items[index] = item;
-    private void ApplyInsert(int index, T item) => _items.Insert(index, item);
-    private void ApplyRemoveAt(int index) => _items.RemoveAt(index);
-    private void ApplyClear() => _items.Clear();
+    private void ApplyAdd(T item)
+    {
+        _accessTarget.OnChanged();
+        _items.Add(item);
+    }
+
+    private void ApplySet(int index, T item)
+    {
+        _accessTarget.OnChanged();
+        _items[index] = item;
+    }
+
+    private void ApplyInsert(int index, T item)
+    {
+        _accessTarget.OnChanged();
+        _items.Insert(index, item);
+    }
+
+    private void ApplyRemoveAt(int index)
+    {
+        _accessTarget.OnChanged();
+        _items.RemoveAt(index);
+    }
+
+    private void ApplyClear()
+    {
+        _accessTarget.OnChanged();
+        _items.Clear();
+    }
     void IDurableListCommandHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
     void IDurableListCommandHandler<T>.ApplySet(int index, T item) => ApplySet(index, item);
     void IDurableListCommandHandler<T>.ApplyInsert(int index, T item) => ApplyInsert(index, item);

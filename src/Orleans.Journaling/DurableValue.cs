@@ -72,6 +72,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
 
     private void SetValue(T? value)
     {
+        _accessTarget.OnChanged();
         _value = value;
         OnModified();
         if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
@@ -98,8 +99,11 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
     internal IAsyncEnumerable<ValueChange<T>> WatchAsync(DurableWatchMode mode, CancellationToken cancellationToken) =>
         DurableStateObservation.WatchValue(_manager, this, mode, cancellationToken);
 
-    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context)
+    {
+        _accessTarget.OnChanged();
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
+    }
 
     void IStateMachine.OnRecoveryCompleted()
     {
@@ -118,6 +122,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
+        _accessTarget.OnChanged();
         _writer = writer;
         _value = default;
         _isDirty = false;
