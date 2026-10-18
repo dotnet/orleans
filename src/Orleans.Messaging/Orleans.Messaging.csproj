@@ -16,6 +16,9 @@
     <!-- Validate framework assets while the first release establishes a package baseline. -->
     <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
     <EnablePackageValidation>true</EnablePackageValidation>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
   </PropertyGroup>
 
   <ItemGroup>
