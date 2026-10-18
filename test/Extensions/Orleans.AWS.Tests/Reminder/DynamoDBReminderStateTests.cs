@@ -89,14 +89,14 @@ public sealed class DynamoDBReminderStateTests
             var forwarded = await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.Equal(cancellation.Token, forwarded);
             await cancellation.CancelAsync();
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => startup.WaitAsync(TimeSpan.FromSeconds(10)));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => startup.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
             Assert.Equal(blockedRead, client.ReadCount);
         }
         finally
         {
             await cancellation.CancelAsync();
             release.TrySetResult();
-            await table.StopAsync();
+            await table.StopAsync(TestContext.Current.CancellationToken);
         }
     }
 
