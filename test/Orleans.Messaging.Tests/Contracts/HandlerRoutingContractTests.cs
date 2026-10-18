@@ -100,7 +100,7 @@ public sealed class HandlerRoutingContractTests : IDisposable
 
     private sealed class ProbeHandler(string name, bool canHandle, List<string> order) : IInboxHandler
     {
-        public bool CanHandle(IInboxHandlerContext context)
+        public bool CanHandle(InboxMessage message)
         {
             order.Add($"{name}?");
             return canHandle;

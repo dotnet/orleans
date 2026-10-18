@@ -25,7 +25,7 @@ internal readonly struct InboxDispatcher
         cancellationToken.ThrowIfCancellationRequested();
         foreach (var handler in _handlers)
         {
-            if (handler.CanHandle(context))
+            if (handler.CanHandle(context.Message))
             {
                 return handler.HandleAsync(context, cancellationToken);
             }
