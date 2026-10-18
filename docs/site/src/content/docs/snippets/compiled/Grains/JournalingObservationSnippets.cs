@@ -182,7 +182,7 @@ public static class ConversationGrainTests
     // <journaling_test_cluster>
     public static async Task AskCommitsTheResponseAndSurvivesReactivation()
     {
-        var builder = new InProcessTestClusterBuilder();
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
         builder.ConfigureSilo((options, siloBuilder) =>
         {
             // Real journaled state managers, with journals held in silo memory. Reflection-based JSON metadata
