@@ -650,6 +650,51 @@ public sealed class TicketGrain : DurableGrain, ITicketGrain
 }
 // </durable_tasks_replay_regions>
 
+// <durable_tasks_effect_and_step>
+public interface IHoldGrain : IGrainWithStringKey
+{
+    DurableTask<Guid> HoldAsync(int quantity);
+
+    DurableTask<Guid> ConfirmAsync(Guid holdId);
+}
+
+public sealed class HoldGrain : DurableGrain, IHoldGrain
+{
+    private readonly IDurableValue<int> _held;
+    private readonly IDurableValue<Guid> _holdId;
+
+    public HoldGrain()
+    {
+        _held = StateManager.GetOrAddValue<int>("held");
+        _holdId = StateManager.GetOrAddValue<Guid>("hold-id");
+    }
+
+    public async DurableTask<Guid> HoldAsync(int quantity)
+    {
+        // Each effect runs in this work item before it returns, and records under {taskId}/hold-id and {taskId}/hold.
+        // Their records and their state changes commit in the same journal write, and no other turn runs between them.
+        var holdId = DurableTask.Once("hold-id", Guid.NewGuid);
+        DurableTask.Once("hold", () =>
+        {
+            _held.Value += quantity;
+            _holdId.Value = holdId;
+        });
+
+        await DurableTask.Delay(TimeSpan.FromMinutes(15)).WithId("expiry");
+        return holdId;
+    }
+
+    public async DurableTask<Guid> ConfirmAsync(Guid holdId)
+    {
+        // The step runs when it's awaited, as a child execution with its own context, and records under
+        // {taskId}/confirmation-id, the identifier which DurableTask.Once("confirmation-id", ...) would use.
+        return await DurableTask.Run(async () => await RequestConfirmationAsync(holdId)).WithId("confirmation-id");
+    }
+
+    private static Task<Guid> RequestConfirmationAsync(Guid holdId) => Task.FromResult(holdId);
+}
+// </durable_tasks_effect_and_step>
+
 // <durable_tasks_progress>
 [GenerateSerializer, Immutable]
 public sealed record ExportProgress(int Completed, int Total);

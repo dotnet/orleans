@@ -37,6 +37,15 @@ The analyzers divide each durable task body into regions:
   receive and the bodies of local steps, run once per recorded result. A step's body is
   itself a durable task body, with its own regions.
 
+A `DurableTask.Once` effect runs immediately, in the current work item, before it
+returns; a `DurableTask.Run` step runs when it's awaited, scheduled, or posted, possibly
+in a later turn, as a child execution. Consecutive effects in one synchronous block
+therefore commit in the same journal write with the state which they change, and no
+other turn of the grain runs between them, while each step has its own
+`DurableTask.Current`, cancellation scope, and journal write. An effect and a step with
+the same name share an identifier, so changing one into the other is a divergence for
+executions which recorded it; branch the change on `DurableTask.GetVersion`.
+
 The following grain shows each region:
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_replay_regions" language="csharp":::
@@ -52,7 +61,7 @@ awaiting, or helpers in other assemblies.
 | Rule | Failure which it prevents | Diagnostic |
 | --- | --- | --- |
 | Read and change grain state in recorded effects, steps, or the tail. | A replay applies a change again, or decides from state which later operations wrote. | [ORLEANS0100](../diagnostics/orleans0100.md) |
-| Produce clock, random, and environment values in recorded effects, and read time from `DurableTask.Current.UtcNow`. | A replay computes other arguments, IDs, keys, or deadlines, and diverges or repeats an external effect. | [ORLEANS0101](../diagnostics/orleans0101.md) |
+| Produce clock, random, and environment values in recorded effects, steps, or the tail, and read time from `DurableTask.Current.UtcNow`. Produce a value which the tail sends to an external service, such as an idempotency key, in a recorded effect or a step, because a tail whose result didn't commit runs again. | A replay computes other arguments, IDs, keys, or deadlines, and diverges or repeats an external effect. | [ORLEANS0101](../diagnostics/orleans0101.md) |
 | Await external operations in steps or the tail. | A replay repeats the operation, observes another result, or fails while the service is unavailable. | [ORLEANS0102](../diagnostics/orleans0102.md) |
 | Change state after the last external await of a step or the tail. | The change commits without the result, and the next run applies it again. | [ORLEANS0103](../diagnostics/orleans0103.md) |
 | Return the outputs of a `DurableTask.Once` effect. | A replay skips the effect, and the body's variables keep their initial values. | [ORLEANS0104](../diagnostics/orleans0104.md) |

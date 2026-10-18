@@ -21,7 +21,7 @@ A constant name which `WithId` or `DurableTask.Once` receives inside a durable t
 
 ## Rule description
 
-The runtime generates identifiers which contain `$`: unnamed children and effects, such as `$child-1`; effect records, such as `$once:key`; repeated names, such as `charge$2`; and runtime records, such as `$signal:approved`. A name with `$` could equal one of them, so `WithId` and `DurableTask.Once` reject it inside a durable execution with `ArgumentException`, and the task fails when it reaches the operation.
+The runtime generates identifiers which contain `$`: unnamed children and effects, such as `$child-1`; repeated names, such as `charge$2`; and runtime records, such as `$signal:approved`. A name with `$` could equal one of them, so `WithId` and `DurableTask.Once` reject it inside a durable execution with `ArgumentException`, and the task fails when it reaches the operation.
 
 ## How to fix violations
 

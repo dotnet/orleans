@@ -449,18 +449,20 @@ synchronously on the activation which makes them, when the runtime stages them: 
   changed, whichever operation requests the write. A replay which returns the
   recorded result therefore finds those changes applied once.
 - A `DurableTask.Once` effect runs on the activation, and its outcome is recorded
-  as a terminal entry of the execution's tree, `{taskId}/$once:{name}`, staged in
+  as a terminal entry of the execution's tree, `{taskId}/{name}`, staged in
   the same work item as the journaled state the effect changed. Both commit in the
   next journal write, and a replay returns the recorded outcome without running
   the effect. The record is deleted with the tree, and an activation which ends
   before that write loses both, so the next attempt runs the effect again. A result
   which doesn't serialize is recorded as that failure. Code which continues off the
-  activation, for example after `ConfigureAwait(false)`, can't record effects. An
-  effect and a child which use the same occurrence of a name, `$once:x$2` and
-  `x$2`, fail as a divergence in either direction. An unnamed effect,
+  activation, for example after `ConfigureAwait(false)`, can't record effects.
+  Effects and children share identifiers: `DurableTask.Once("x", f)` records under
+  `x`, as `WithId("x")` names a child, and an unnamed effect,
   `DurableTask.Once(effect)`, takes the execution's next generated child
-  identifier, such as `$child-3`, so an effect and a child which a replay finds
-  under the same generated identifier fail as a divergence too.
+  identifier, such as `$child-3`. A replay which finds a child where an effect
+  runs, or an effect where a child starts, fails as a divergence which names both
+  kinds; so does a named combinator's input beneath an effect's identifier, or an
+  effect where a named combinator recorded its inputs.
 - `DurableTask.GetVersion(name, minSupported, maxSupported)` records the version of a
   change which an execution follows as a terminal entry of its tree,
   `{taskId}/$version:{name}`, at the execution's first check of the name, staged like

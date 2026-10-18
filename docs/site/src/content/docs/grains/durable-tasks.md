@@ -107,15 +107,15 @@ lists every kind of ID and its stability. The order workflow above produces this
 
 ```text
 place-order-{orderId}
-place-order-{orderId}/$once:submit
+place-order-{orderId}/submit
 place-order-{orderId}/grace-period
-place-order-{orderId}/$once:validate
+place-order-{orderId}/validate
 place-order-{orderId}/reserve/0
 place-order-{orderId}/reserve/1
 place-order-{orderId}/authorize-payment
-place-order-{orderId}/$once:pay
+place-order-{orderId}/pay
 place-order-{orderId}/$signal:shipped
-place-order-{orderId}/$once:ship
+place-order-{orderId}/ship
 ```
 
 - <xref:Orleans.DurableTasks.DurableTaskExtensions.WithId*> names a child with a stable
@@ -145,11 +145,11 @@ task's own grain is rejected.
 
 A *recorded effect*,
 <xref:Orleans.DurableTasks.DurableTask.Once*?displayProperty=nameWithType>, runs
-synchronous code once for the running task and records its result, or the exception it
-threw, in the task's tree under `$once:{name}`. The record commits with the task's next
-durable write together with the journaled state which the effect changed, without a
-write of its own, and a replay returns the recorded result without running the effect
-again. The order workflow changes its status this way:
+synchronous code in the caller's current work item before it returns, with no
+suspension and no child execution, and records its result, or the exception it threw,
+in the task's tree under its name. The record commits in the same journal write as the
+journaled state which the effect changed, and a replay returns the recorded result
+without running the effect again. The order workflow changes its status this way:
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_once" language="csharp":::
 
@@ -162,20 +162,22 @@ again. The order workflow changes its status this way:
   before the throw commit with the recorded exception. A result which doesn't serialize
   is recorded as that failure. A run which ends before a journal write commits the
   record also loses the effect's state changes, so the next run runs the effect again.
-- A name which one run repeats identifies later occurrences by their order, such as
-  `pay$2`. Effects and children named with `WithId` share the count, so a deployment
-  which turns a recorded step into an effect, or an effect into a step, fails with the
-  divergence error instead of running the work again.
+- Consecutive effects in one synchronous block, and the journaled state which they
+  change, commit in the same journal write, and no other turn of the grain runs between
+  them. Returning from an effect doesn't mean that its record has committed: it commits
+  with the task's next journal write. The effect runs after task cancellation too, so
+  compensation records its effects.
+- A name identifies an effect as `WithId` identifies a step: `pay`, then `pay$2` for a
+  later occurrence in the same run.
 - `DurableTask.Once(effect)` omits the name, such as
   `var reference = DurableTask.Once(Guid.NewGuid);`. The effect takes the execution's
   next generated child ID, such as `$child-3`, which unnamed effects share with unnamed
   children, so it finds its record when every run creates its unnamed operations in the
-  same order. A replay which finds a child where an effect now runs, or the reverse,
-  fails with the divergence error. Name effects whose position can change between runs
-  or deployments.
-- Effects are synchronous: asynchronous and durable effects don't compile, and run as
-  awaited children instead. An effect runs on the activation's scheduler, so `Once`
-  after `ConfigureAwait(false)` throws `InvalidOperationException` without running it.
+  same order. Name effects whose position can change between runs or deployments.
+- Effects are synchronous: asynchronous and durable effects don't compile, and the
+  error shows the replacement, `await DurableTask.Run(async () => ...)`. An effect runs
+  on the activation's scheduler, so `Once` after `ConfigureAwait(false)` throws
+  `InvalidOperationException` without running it.
 - The record applies only within a durable task. Outside one, such as in a helper which
   an ordinary grain method shares, the effect runs every time.
 
@@ -194,11 +196,36 @@ which records it in the caller's task state. Messages use identities derived fro
 sender, receiver, task, and subject, so redeliveries and replayed sends are
 deduplicated.
 
-<xref:Orleans.DurableTasks.DurableTask.Run*?displayProperty=nameWithType> runs a
-delegate as a child task, for work which isn't a grain call, such as a call to an
-external service. A replay returns the delegate's recorded result, and runs a delegate
-whose result wasn't recorded again, so the delegate's external effect needs its own
-idempotency.
+<xref:Orleans.DurableTasks.DurableTask.Run*?displayProperty=nameWithType> creates an
+unstarted step, for work which isn't a grain call, such as a call to an external
+service. The step runs its delegate when it's awaited, scheduled, or posted, possibly in
+a later turn, as a child execution with its own `DurableTask.Current` and cancellation
+scope. Creating it starts nothing, and nothing runs on the thread pool. A replay returns
+the delegate's recorded result, and runs a delegate whose result wasn't recorded again,
+so the delegate's external effect needs its own idempotency.
+
+### Effects and steps
+
+`DurableTask.Once("hold-id", Guid.NewGuid)` and
+`await DurableTask.Run(async () => ...).WithId("hold-id")` use the same identifier,
+`{taskId}/hold-id`, and both record their outcome once. They differ in when the code
+runs, and the other differences follow from that:
+
+- An effect runs immediately, in the current work item, before `Once` returns. So
+  consecutive effects commit together with the state they change, the effect observes
+  the caller's `DurableTask.Current`, and it runs after task cancellation.
+- A step runs when it's awaited, scheduled, or posted, possibly in a later turn, as a
+  child execution. So it has its own `DurableTask.Current`, a step which isn't shielded
+  completes as canceled when its parent's cancellation was requested before it starts,
+  and its record commits in a journal write of its own.
+
+:::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_effect_and_step" language="csharp":::
+
+A replay which finds one kind recorded where the body now runs the other fails with a
+divergence error which names both, instead of running the work again. A deployment
+which changes an effect into a step, or a step into an effect, branches on
+[`DurableTask.GetVersion`](durable-tasks-versioning.md) so that executions which
+recorded the old kind keep it.
 
 ## Publish progress and stream drafts
 

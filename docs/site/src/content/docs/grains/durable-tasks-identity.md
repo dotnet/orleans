@@ -60,21 +60,22 @@ Each operation which a body runs is recorded beneath the execution's ID:
 
 | Operation | Segment | Example |
 | --- | --- | --- |
-| A child, delay, combinator, or subscription named with `WithId(name)` | `name`; later occurrences of the same name in one run, `name$2`, `name$3`, and so on | `publish-q3/check$2` |
+| A child, delay, combinator, or subscription named with `WithId(name)`, or a recorded effect, `DurableTask.Once(name, effect)` | `name`; later occurrences of the same name in one run, `name$2`, `name$3`, and so on | `publish-q3/check$2` |
 | An unnamed child, delay, `DurableTask.Run` step, subscription, or `DurableTask.Once(effect)` | `$child-{n}`, numbered in the order in which the run creates them | `publish-q3/$child-1` |
 | An unnamed combinator or timeout | `${kind}-{n}`, where `{kind}` is `when-all`, `when-any`, `race`, `schedule-all`, `when-all-completed`, `when-each`, or `timeout` | `publish-q3/$race-1` |
 | A combinator's input | `{combinator}/{index}`, in input order | `publish-q3/render/0` |
 | A timeout's work and delay, `WaitAsync` and `WaitUntilAsync` | `{timeout}/0` and `{timeout}/1` | `quote/0`, `quote/1` |
 | A selection which a durable completion order can't decide | `{combinator}/$winner` for `WhenAny`, `Race`, and timeouts, or `{combinator}/$next-{n}` for `WhenEach` | `first-quote/$winner` |
-| A named recorded effect, `DurableTask.Once(name, effect)` | `$once:name`; later occurrences, `$once:name$2` | `publish-q3/$once:version` |
 | A version decision, `DurableTask.GetVersion(name, ...)` | `$version:name`, once per execution | `publish-q3/$version:carrier-booking` |
 | A detached start | `$detach:{targetGrainId}:{rootId}` | `publish-q3/$detach:archive\/archive:archive-q3` |
 | A signal send from a durable task | `$send:{targetGrainId}:{taskId}:{name}`; repeated sends, `$2`, `$3` | `place-order-42/$send:order\/42:place-order-42:shipped` |
 | A signal's recorded value, beneath the invoked task | `$signal:{name}`; `DurableSignal<T>.For(suffix)` names `{name}/{suffix}` | `publish-q3/$signal:approved`, `publish-q3/$signal:approved\/round-2` |
 
-- Named children, named combinators, and named effects share one occurrence count per
-  name: `x$2` and `$once:x$2` are the same occurrence, so a replay which finds the other
-  kind recorded fails as a divergence instead of running the work again.
+- Named children, named combinators, and named effects share one identifier per
+  occurrence of a name: `DurableTask.Once("x", f)` and `await DurableTask.Run(g).WithId("x")`
+  both record under `x`. A replay which finds the other kind recorded under an
+  identifier fails as a divergence which names both kinds, instead of running the work
+  again.
 - Unnamed children, unnamed effects, unnamed subscriptions, and the segment of an
   unnamed detached root share the `$child-{n}` count. Unnamed combinators and timeouts
   share the `${kind}-{n}` count.
