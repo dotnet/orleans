@@ -27,7 +27,13 @@ public class TaggedUnionSerializationTests : IDisposable
 
     public TaggedUnionSerializationTests()
     {
-        _services = new ServiceCollection().AddSingleton<PetCallbacks>().AddSingleton<NumberCallbacks>().AddSerializer().BuildServiceProvider();
+        _services = new ServiceCollection()
+            .AddSingleton<PetCallbacks>()
+            .AddSingleton<NumberCallbacks>()
+            .AddSingleton<CaseOrderCallbacks>()
+            .AddSingleton<CaseCallbacks>()
+            .AddSerializer()
+            .BuildServiceProvider();
         _serializer = _services.GetRequiredService<Serializer>();
         _copier = _services.GetRequiredService<DeepCopier>();
     }
@@ -354,7 +360,7 @@ public class TaggedUnionSerializationTests : IDisposable
         var callbacks = _services.GetRequiredService<PetCallbacks>();
         var bytes = _serializer.SerializeToArray(value);
 
-        Assert.Equal(new[] { ("serializing", value.Value), ("serialized", value.Value) }, callbacks.Events);
+        Assert.Equal(new (string, object?)[] { ("serializing", value.Value), ("serialized", value.Value) }, callbacks.Events);
         callbacks.Events.Clear();
 
         var result = _serializer.Deserialize<CallbackPet>(bytes);
@@ -406,6 +412,44 @@ public class TaggedUnionSerializationTests : IDisposable
         var result = Copy(value);
 
         Assert.Equal(43, result.Value);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnionDeserializationCallbacksSurroundCaseCallbacks(bool legacy)
+    {
+        var value = new CallbackCase("ordered");
+        var bytes = legacy
+            ? _serializer.SerializeToArray<object>(value)
+            : _serializer.SerializeToArray<CallbackEnvelope>(value);
+        var callbacks = _services.GetRequiredService<CaseOrderCallbacks>();
+
+        var result = _serializer.Deserialize<CallbackEnvelope>(bytes);
+
+        Assert.Equal(value, result.Value);
+        Assert.Equal(new[] { "union:before", "case:before", "case:after", "union:after" }, callbacks.Events);
+    }
+
+    [Fact]
+    public void ImmutableUnionPreservesCaseWithoutRegisteredCopier()
+    {
+        var value = new OpaqueCase("shared");
+
+        var result = Copy<ImmutablePet>(value);
+
+        Assert.Same(value, result.Value);
+    }
+
+    [Fact]
+    public void GenericImmutableUnionPreservesCaseReference()
+    {
+        var value = new Value<List<int>>([1, 2]);
+
+        var result = Copy<ImmutableValue<List<int>>>(value);
+
+        Assert.Same(value, result.Value);
+        Assert.Same(value.Item, ((Value<List<int>>)result.Value!).Item);
     }
 }
 
@@ -512,13 +556,41 @@ public sealed class PetCallbacks
     public void OnCopied(ref CallbackPet original, CallbackPet result) => Events.Add(("copied", result.Value));
 }
 
-[GenerateSerializer, SerializationCallbacks(typeof(NumberCallbacks))]
+[Immutable, GenerateSerializer, SerializationCallbacks(typeof(NumberCallbacks))]
 public union CallbackNumber(int, string);
 
 public sealed class NumberCallbacks
 {
     public void OnCopied(CallbackNumber original, ref CallbackNumber result) => result = 43;
 }
+
+[GenerateSerializer, SerializationCallbacks(typeof(CaseOrderCallbacks))]
+public union CallbackEnvelope(CallbackCase);
+
+[GenerateSerializer, SerializationCallbacks(typeof(CaseCallbacks))]
+public sealed record CallbackCase([property: Id(0)] string Name);
+
+public sealed class CaseOrderCallbacks
+{
+    public List<string> Events { get; } = [];
+
+    public void OnDeserializing(ref CallbackEnvelope value) => Events.Add("union:before");
+    public void OnDeserialized(CallbackEnvelope value) => Events.Add("union:after");
+}
+
+public sealed class CaseCallbacks(CaseOrderCallbacks callbacks)
+{
+    public void OnDeserializing(CallbackCase value) => callbacks.Events.Add("case:before");
+    public void OnDeserialized(CallbackCase value) => callbacks.Events.Add("case:after");
+}
+
+public sealed record OpaqueCase(string Name);
+
+[Immutable, GenerateSerializer]
+public union ImmutablePet(OpaqueCase);
+
+[Immutable, GenerateSerializer]
+public union ImmutableValue<T>(Value<T>);
 
 [GenerateSerializer]
 public union PetV1(Cat);
