@@ -91,7 +91,11 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                 if (pending is not null) _pump.Signal();
 
                 Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "duplicate");
-                return DeliveryResult.Duplicate();
+
+                // A sender whose answer was lost delivers again, so it receives the rejection which a sink first answered.
+                return pending is null && _rejections.TryGetValue(key, out var rejection)
+                    ? DeliveryResult.DeadLettered(rejection.Reason)
+                    : DeliveryResult.Duplicate();
             }
 
             // Sink-owned messages never occupy inbox capacity and need no handler. A sink's duplicate can still be staged,
@@ -176,7 +180,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                 else
                 {
                     LogSinkDeadLettered(Logger, error, key, GrainContext.GrainId, reason);
-                    StageDeadLetter(message, reason, attemptCount: 1);
+                    StageDeadLetter(message, reason, attemptCount: 1, new() { Reason = reason });
                 }
             }
             catch (Exception exception)
@@ -356,16 +360,17 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     private bool IsCurrent(InboxEntry entry) =>
         _messages.TryGetValue(entry.Message.Envelope.MessageId, out var current) && ReferenceEquals(current, entry);
 
-    private void StageCompletion(MessageId messageId, InboxDeadLetter? deadLetter) =>
+    private void StageCompletion(MessageId messageId, InboxDeadLetter? deadLetter, InboxRejection? rejection = null) =>
         Emit(new()
         {
             Kind = InboxCommandKind.Complete,
             MessageId = messageId,
             ProcessedAt = TimeProvider.GetUtcNow(),
-            DeadLetter = deadLetter
+            DeadLetter = deadLetter,
+            Rejection = rejection
         });
 
-    private void StageDeadLetter(InboxMessage message, string reason, int attemptCount)
+    private void StageDeadLetter(InboxMessage message, string reason, int attemptCount, InboxRejection? rejection = null)
     {
         var now = TimeProvider.GetUtcNow();
         var key = message.Envelope.MessageId;
@@ -376,7 +381,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             DeadLetteredAt = now,
             Reason = reason,
             AttemptCount = attemptCount
-        });
+        }, rejection);
     }
 
     private bool CompactDeadLetters(DateTimeOffset now, int reservedCapacity = 0)
