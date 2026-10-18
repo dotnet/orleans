@@ -31,8 +31,10 @@ shipping result:
 
 :::code source="../snippets/compiled/Grains/DurableTaskTestingSnippets.cs" id="durable_tasks_testing_workflow" language="csharp":::
 
-Configure the recording cluster with `ConfigureCaptureSilo`, then await that progress
-before capturing its journal:
+Create one `FulfillmentProgress` for the recording cluster and pass that same instance
+to `ConfigureCaptureSilo` for every silo. The shared barrier observes the workflow
+wherever Orleans places it. Await that progress before capturing the grain's journal
+from the cluster's shared journal storage:
 
 :::code source="../snippets/compiled/Grains/DurableTaskTestingSnippets.cs" id="durable_tasks_testing_capture" language="csharp":::
 
