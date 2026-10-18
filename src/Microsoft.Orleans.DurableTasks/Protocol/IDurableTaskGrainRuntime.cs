@@ -270,14 +270,14 @@ internal interface IDurableTaskGrainRuntime
         throw new NotSupportedException("The durable task runtime does not support versions.");
 
     /// <summary>
-    /// Throws when <paramref name="operationId"/> isn't recorded and an earlier run recorded <paramref name="otherKindId"/>,
-    /// the identifier which the other kind of named operation receives for the same occurrence of the same name.
+    /// Throws when an earlier run recorded a <c>DurableTask.Once</c> effect under <paramref name="effectId"/>, which holds
+    /// <paramref name="operationId"/>, such as a named combinator's input whose combinator has the effect's name.
     /// </summary>
     /// <param name="operationId">The operation which this run requests.</param>
-    /// <param name="otherKindId">The identifier of the other kind of operation for the same name and occurrence.</param>
+    /// <param name="effectId">The operation's ancestor beneath its execution, which an effect would have recorded.</param>
     /// <param name="requested">A description of the requested operation, for the error.</param>
-    /// <exception cref="InvalidOperationException">The earlier run recorded the other kind of operation.</exception>
-    void ThrowIfRecordedAsOtherKind(TaskId operationId, TaskId otherKindId, string requested)
+    /// <exception cref="InvalidOperationException">The earlier run recorded an effect under <paramref name="effectId"/>.</exception>
+    void ThrowIfRecordedAsEffect(TaskId operationId, TaskId effectId, string requested)
     {
     }
 

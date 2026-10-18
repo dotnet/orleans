@@ -24,8 +24,6 @@ namespace Orleans.DurableTasks.Runtime;
 /// </remarks>
 internal sealed class GrainDurableTaskContext : DurableTaskContext
 {
-    // The segment prefix of DurableTask.Once records, which share each occurrence of a name with children.
-    private const string EffectSegmentPrefix = "$once:";
     private readonly IDurableTaskGrainRuntime _runtime;
     private readonly TaskScheduler _scheduler;
     private long _utcNowTicks;
@@ -514,18 +512,26 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     /// <summary>
     /// Throws unless <paramref name="taskId"/> can be a child of this execution which runs <paramref name="task"/>: the
-    /// execution isn't deleted, and an earlier run recorded no other kind of operation for the child's name.
+    /// execution isn't deleted, and no effect which an earlier run recorded holds the operation beneath which the child
+    /// runs, such as a named combinator whose input the child is.
     /// </summary>
+    /// <remarks>The runtime checks the record which a direct child finds under its own identifier when it starts.</remarks>
     private void ValidateChild(TaskId taskId, DurableTask task)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         ThrowIfNotChildTaskId(taskId);
         ThrowIfAttemptCanceled();
-        if (TryGetOtherKindId(taskId, out var effectId))
+        var operationId = taskId;
+        for (var parent = operationId.Parent(); parent != Id; parent = parent.Parent())
         {
-            _runtime.ThrowIfRecordedAsOtherKind(
+            operationId = parent;
+        }
+
+        if (operationId != taskId)
+        {
+            _runtime.ThrowIfRecordedAsEffect(
                 taskId,
-                effectId,
+                operationId,
                 task switch
                 {
                     IDurableTaskRequest { Context.TargetId: var target } => $"a call to grain '{target}'",
@@ -592,13 +598,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     /// <remarks>
     /// The effect runs, and its record is staged, in the work item which calls this on the activation, so the record
-    /// commits in the same journal write as the journaled state which the effect changed. An effect which an earlier
-    /// run recorded as a child, or a child which an earlier run recorded as an effect, under the same name and
-    /// occurrence, or under the same generated identifier, fails as a divergence instead of running again.
+    /// commits in the same journal write as the journaled state which the effect changed. Effects and children share
+    /// identifiers, so an effect where an earlier run recorded a child, or a child where an earlier run recorded an
+    /// effect, fails as a divergence which names both kinds instead of running again.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// The caller isn't running on the activation's scheduler, or an earlier run recorded another kind of operation under
-    /// the effect's name and occurrence.
+    /// the effect's identifier.
     /// </exception>
     protected override DurableTaskResponse RunEffect<TState>(
         TaskId effectId,
@@ -614,11 +620,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         ThrowIfNotChildTaskId(effectId);
         ThrowIfAttemptCanceled();
         ObserveOperation(effectId, recordsOperation: true);
-        if (TryGetOtherKindId(effectId, out var stepId))
-        {
-            _runtime.ThrowIfRecordedAsOtherKind(effectId, stepId, "a DurableTask.Once effect");
-        }
-
         return _runtime.RunEffect(effectId, state, effect);
     }
 
@@ -676,38 +677,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
 
         return version;
-    }
-
-    /// <summary>
-    /// Gets the identifier which the other kind of named operation receives for the occurrence of a name which
-    /// <paramref name="operationId"/> uses beneath this execution: a <c>DurableTask.Once</c> effect, <c>$once:x$2</c>,
-    /// and a child or combinator, <c>x$2</c>, share each occurrence of a name.
-    /// </summary>
-    /// <returns><see langword="false"/> when the operation's segment beneath this execution is generated.</returns>
-    private bool TryGetOtherKindId(TaskId operationId, out TaskId otherId)
-    {
-        var named = operationId;
-        for (var parent = named.Parent(); parent != Id; parent = parent.Parent())
-        {
-            named = parent;
-        }
-
-        var executionPath = Id.ToString();
-        var segment = named.ToString().AsSpan(executionPath.Length + 1);
-        if (segment.StartsWith(EffectSegmentPrefix, StringComparison.Ordinal))
-        {
-            otherId = TaskId.Parse($"{executionPath}/{segment[EffectSegmentPrefix.Length..]}");
-            return true;
-        }
-
-        if (segment[0] != '$')
-        {
-            otherId = TaskId.Parse($"{executionPath}/{EffectSegmentPrefix}{segment}");
-            return true;
-        }
-
-        otherId = default;
-        return false;
     }
 
     /// <summary>
