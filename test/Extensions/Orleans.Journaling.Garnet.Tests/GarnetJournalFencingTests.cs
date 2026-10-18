@@ -362,22 +362,28 @@ public sealed class GarnetJournalFencingTests : IAsyncDisposable
         return new(payload);
     }
 
-    /// <summary>Reads the first sector of segment 0 through a device, returning the callback's error code and the first byte.</summary>
+    /// <summary>Reads the first sector of segment 0 through a device, returning the callback's error code and, on success, the first byte.</summary>
     private static async Task<(uint ErrorCode, byte First)> ReadFirstByteAsync(GarnetPartitionBlobDevice device)
     {
         const int Length = 512;
+        var completion = new TaskCompletionSource<(uint ErrorCode, byte First)>(TaskCreationOptions.RunContinuationsAsynchronously);
         var buffer = System.Runtime.InteropServices.Marshal.AllocHGlobal(Length);
-        try
+        // The callback owns the buffer through I/O completion, including when the wait times out or is cancelled.
+        device.ReadAsync(0, 0, buffer, Length, (errorCode, _, _, _) =>
         {
-            var completion = new TaskCompletionSource<uint>(TaskCreationOptions.RunContinuationsAsynchronously);
-            device.ReadAsync(0, 0, buffer, Length, (errorCode, _, _, _) => completion.TrySetResult(errorCode), context: completion);
-            var errorCode = await completion.Task.WaitAsync(TimeSpan.FromSeconds(30), CancellationToken);
-            return (errorCode, System.Runtime.InteropServices.Marshal.ReadByte(buffer));
-        }
-        finally
-        {
-            System.Runtime.InteropServices.Marshal.FreeHGlobal(buffer);
-        }
+            byte first;
+            try
+            {
+                first = errorCode == 0 ? System.Runtime.InteropServices.Marshal.ReadByte(buffer) : (byte)0;
+            }
+            finally
+            {
+                System.Runtime.InteropServices.Marshal.FreeHGlobal(buffer);
+            }
+
+            completion.TrySetResult((errorCode, first));
+        }, context: completion);
+        return await completion.Task.WaitAsync(TimeSpan.FromSeconds(30), CancellationToken);
     }
 
     private static async Task SaveAsync(GarnetJournalPartitionHost host)
