@@ -115,7 +115,9 @@ construction or activation setup, before journal recovery.
   - `Backpressured`: the sink is at capacity, so the sender retries. A self-sent
     message fails its `Send` instead.
   - `DeadLettered`: the inbox dead-letters the message with the sink's reason. A
-    sink that throws or reports another status is treated the same way.
+    sink that throws or reports another status is treated the same way. The processed
+    record keeps the reason, so a duplicate within `DeduplicationWindow`, such as a
+    retry whose first answer was lost, receives the same rejection.
 
   Sink-owned messages never occupy capacity and have no inbox retry lifecycle; the
   sink honors their `DeliverAt`. Declined messages follow the handler path once
@@ -137,6 +139,8 @@ receiver returns a `DeliveryResult`:
 - `Accepted`: the message is durable in the inbox, or, for a message an inbox sink
   accepted, in the sink's state together with its processed record.
 - `Duplicate`: the message ID is pending or completed within `DeduplicationWindow`.
+  A completed message which an inbox sink rejected is answered with its original
+  `DeadLettered` result instead.
 - `Backpressured`: the inbox holds `MaxCapacity` pending messages without `DeliverAt`.
   The inbox admits scheduled messages regardless of `MaxCapacity`.
 - `HandlerNotFound`: the receiver has no registered handlers.

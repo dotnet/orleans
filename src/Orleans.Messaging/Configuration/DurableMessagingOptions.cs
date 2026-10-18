@@ -55,7 +55,8 @@ public class DurableMessagingOptions
 
     /// <summary>
     /// Gets or sets the time window for tracking processed messages to prevent duplicates.
-    /// Messages that were processed within this window will be rejected with <c>DeliveryResult.Duplicate()</c>.
+    /// A message processed within this window is answered with <c>DeliveryResult.Duplicate()</c>, or, when an inbox
+    /// sink rejected it on delivery, with the same <c>DeliveryResult.DeadLettered</c> reason and code.
     /// </summary>
     /// <remarks>
     /// <para>

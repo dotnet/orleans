@@ -57,7 +57,8 @@ public interface IInboxMessageSink
     /// </description></item>
     /// <item><description>
     /// <see cref="DeliveryStatus.DeadLettered"/>: the sink rejects the message and stages nothing. The inbox
-    /// dead-letters it with its payload and the result's reason, and records it as processed.
+    /// dead-letters it with its payload and the result's reason, and records it as processed. The processed record keeps
+    /// the reason, so a duplicate of the message, such as a retry whose first answer was lost, receives the same rejection.
     /// </description></item>
     /// </list>
     /// <para>
