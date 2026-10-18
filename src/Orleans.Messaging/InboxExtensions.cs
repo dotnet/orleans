@@ -76,8 +76,8 @@ public static class InboxExtensions
 
     private abstract class Handler<T>(MessageType<T> messageType) : IInboxHandler
     {
-        public bool CanHandle(IInboxHandlerContext context) =>
-            string.Equals(context.Message.Envelope.Subject, messageType.Subject, StringComparison.Ordinal);
+        public bool CanHandle(InboxMessage message) =>
+            string.Equals(message.Envelope.Subject, messageType.Subject, StringComparison.Ordinal);
 
         public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
