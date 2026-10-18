@@ -194,9 +194,9 @@ internal sealed class DurableTaskSymbols
         return awaited is IInvocationOperation invocation && IsDurableTasksType(invocation.TargetMethod.ContainingType);
     }
 
-    /// <summary>Returns whether an invocation records an effect: <c>DurableTask.Once</c>, named or unnamed.</summary>
-    public bool IsOnce(IInvocationOperation invocation) =>
-        invocation.TargetMethod.Name == "Once"
+    /// <summary>Returns whether an invocation records an effect: <c>DurableTask.RunInline</c>, named or unnamed.</summary>
+    public bool IsRunInline(IInvocationOperation invocation) =>
+        invocation.TargetMethod.Name == "RunInline"
         && SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.ContainingType, DurableTask);
 
     /// <summary>Returns whether an invocation creates a delegate definition: <c>DurableTask.Run</c>.</summary>
@@ -362,7 +362,7 @@ internal sealed class DurableTaskSymbols
     public static readonly ImmutableHashSet<string> DurableOperationNames = ImmutableHashSet.Create(
         StringComparer.Ordinal,
         "WithId",
-        "Once",
+        "RunInline",
         "Post",
         "ScheduleAsync",
         "SignalDurableTaskAsync",

@@ -3804,7 +3804,7 @@ internal sealed class TestHost(DateTimeOffset utcNow)
 
     public bool Contains(TaskId id) => _entries.ContainsKey(id);
 
-    /// <summary>Gets the outcomes which <c>DurableTask.Once</c> recorded, by effect identifier.</summary>
+    /// <summary>Gets the outcomes which <c>DurableTask.RunInline</c> recorded, by effect identifier.</summary>
     public ConcurrentDictionary<TaskId, DurableTaskResponse> Effects { get; } = new();
 
     public bool IsCancellationRequested(TaskId id) => _entries.TryGetValue(id, out var entry) && entry.CancellationRequested;

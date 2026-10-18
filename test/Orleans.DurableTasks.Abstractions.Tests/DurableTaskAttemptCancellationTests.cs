@@ -24,7 +24,7 @@ public class DurableTaskAttemptCancellationTests
         var data = new TheoryData<string, bool>();
         foreach (var operation in new[]
         {
-            "Once", "OnceAction", "AwaitChild", "AwaitNamedChild", "ScheduleChild", "PostChild", "ShieldedChild",
+            "RunInline", "RunInlineAction", "AwaitChild", "AwaitNamedChild", "ScheduleChild", "PostChild", "ShieldedChild",
             "DetachedChild", "SignalWait", "SignalTryWait", "Delay", "DelayUntil", "WhenAll", "WhenAny", "WhenEach",
             "WhenAllCompleted", "ScheduleAll", "Race", "WaitAsyncTimeout", "WaitUntilAsync", "ConfiguredCancel",
             "ConfiguredPoll",
@@ -150,7 +150,7 @@ public class DurableTaskAttemptCancellationTests
             {
                 Assert.True(cancellationToken.IsCancellationRequested);
                 Assert.False(DurableTask.Current.AttemptCancellationToken.IsCancellationRequested);
-                var refunded = DurableTask.Once("refund", static () => 42);
+                var refunded = DurableTask.RunInline("refund", static () => 42);
                 await DurableTask.Delay(TimeSpan.FromMinutes(1));
                 return refunded + await DurableTask.Run(static _ => 1).WithId("child");
             }),
@@ -344,14 +344,14 @@ public class DurableTaskAttemptCancellationTests
     }
 
     [Fact]
-    public async Task OnceEffectWhichThrowsTheAttemptsCancellationIsNotRecorded()
+    public async Task RunInlineEffectWhichThrowsTheAttemptsCancellationIsNotRecorded()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var context = host.CreateContext(RootId);
         DurableTaskAttemptCanceledException? thrown = null;
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.Run(_ => DurableTask.Once("effect", new Func<int>(() =>
+            DurableTask.Run(_ => DurableTask.RunInline("effect", new Func<int>(() =>
             {
                 // The host stops the attempt while the effect runs, and the effect's work observes it.
                 DurableTaskRuntimeHelper.CancelAttempt(context, DurableTaskAttemptCancellationReason.ActivationStopping);
@@ -367,22 +367,22 @@ public class DurableTaskAttemptCancellationTests
 
         // A replay runs the effect again, because the canceled attempt recorded nothing.
         var replay = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.Run(_ => DurableTask.Once("effect", static () => 2)),
+            DurableTask.Run(_ => DurableTask.RunInline("effect", static () => 2)),
             host.CreateContext(RootId));
         Assert.Equal(2, replay.GetResult<int>());
     }
 
     [Fact]
-    public async Task OnceEffectWhichThrowsAnOrdinaryCancellationRecordsIt()
+    public async Task RunInlineEffectWhichThrowsAnOrdinaryCancellationRecordsIt()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var expected = new OperationCanceledException("effect canceled");
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.Run(_ => DurableTask.Once("effect", new Func<int>(() => throw expected))),
+            DurableTask.Run(_ => DurableTask.RunInline("effect", new Func<int>(() => throw expected))),
             host.CreateContext(RootId));
         var replay = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.Run(_ => DurableTask.Once("effect", static () => 2)),
+            DurableTask.Run(_ => DurableTask.RunInline("effect", static () => 2)),
             host.CreateContext(RootId));
 
         Assert.Same(expected, response.Exception);
@@ -517,15 +517,15 @@ public class DurableTaskAttemptCancellationTests
         DurableTask<int>[] Inputs() => [DurableTask.Run(static _ => 1), DurableTask.Run(static _ => 2)];
         switch (operation)
         {
-            case "Once":
-                DurableTask.Once("effect", () =>
+            case "RunInline":
+                DurableTask.RunInline("effect", () =>
                 {
                     effect();
                     return 1;
                 });
                 break;
-            case "OnceAction":
-                DurableTask.Once(effect);
+            case "RunInlineAction":
+                DurableTask.RunInline(effect);
                 break;
             case "AwaitChild":
                 await DurableTask.Run(static _ => 1);

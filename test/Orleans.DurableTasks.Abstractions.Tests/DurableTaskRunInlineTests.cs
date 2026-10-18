@@ -3,23 +3,23 @@ using Xunit;
 
 namespace Orleans.DurableTasks.Abstractions.Tests;
 
-/// <summary>Tests the replay contract of <see cref="DurableTask.Once{TResult}(string, Func{TResult})"/>.</summary>
+/// <summary>Tests the replay contract of <see cref="DurableTask.RunInline{TResult}(string, Func{TResult})"/>.</summary>
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("DurableTasks")]
 [TestCategory("BVT")]
-public class DurableTaskOnceTests
+public class DurableTaskRunInlineTests
 {
     private static readonly DateTimeOffset Now = new(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
 
     [Fact]
-    public async Task OnceRunsItsEffectOnceAndEveryRunReturnsItsRecordedResult()
+    public async Task RunInlineRunsItsEffectOnceAndEveryRunReturnsItsRecordedResult()
     {
         var host = new TestHost(Now);
         var taskId = TaskId.CreateRoot("root");
         var runs = 0;
 
-        Guid Body() => DurableTask.Once("id", () =>
+        Guid Body() => DurableTask.RunInline("id", () =>
         {
             runs++;
             return Guid.NewGuid();
@@ -46,7 +46,7 @@ public class DurableTaskOnceTests
             for (var i = 0; i < values.Length; i++)
             {
                 var value = i * 10;
-                values[i] = DurableTask.Once("line", () =>
+                values[i] = DurableTask.RunInline("line", () =>
                 {
                     runs++;
                     return value;
@@ -68,7 +68,7 @@ public class DurableTaskOnceTests
     }
 
     [Fact]
-    public async Task OnceRecordsTheExceptionItsEffectThrows()
+    public async Task RunInlineRecordsTheExceptionItsEffectThrows()
     {
         var host = new TestHost(Now);
         var taskId = TaskId.CreateRoot("root");
@@ -84,7 +84,7 @@ public class DurableTaskOnceTests
         {
             try
             {
-                DurableTask.Once("fail", Fail);
+                DurableTask.RunInline("fail", Fail);
                 return "completed";
             }
             catch (InvalidOperationException exception)
@@ -107,7 +107,7 @@ public class DurableTaskOnceTests
 
         bool Body()
         {
-            DurableTask.Once("mark", () => runs++);
+            DurableTask.RunInline("mark", () => runs++);
             return true;
         }
 
@@ -122,11 +122,11 @@ public class DurableTaskOnceTests
     {
         var runs = 0;
 
-        Assert.Equal(1, DurableTask.Once("count", () => ++runs));
-        Assert.Equal(2, DurableTask.Once("count", () => ++runs));
-        DurableTask.Once("count", () => { runs++; });
+        Assert.Equal(1, DurableTask.RunInline("count", () => ++runs));
+        Assert.Equal(2, DurableTask.RunInline("count", () => ++runs));
+        DurableTask.RunInline("count", () => { runs++; });
         Assert.Equal(3, runs);
-        Assert.Throws<InvalidOperationException>(() => DurableTask.Once("fail", Fail));
+        Assert.Throws<InvalidOperationException>(() => DurableTask.RunInline("fail", Fail));
 
         static int Fail() => throw new InvalidOperationException();
     }
@@ -137,7 +137,7 @@ public class DurableTaskOnceTests
     [InlineData("line$2")]
     public void NamesAreNonEmptyAndExcludeTheGeneratedIdentifierMarker(string name)
     {
-        Assert.Throws<ArgumentException>(() => DurableTask.Once(name, () => 1));
+        Assert.Throws<ArgumentException>(() => DurableTask.RunInline(name, () => 1));
     }
 
     [Fact]
@@ -147,12 +147,12 @@ public class DurableTaskOnceTests
         var runs = 0;
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.Run(_ => DurableTask.Once(null!, () => ++runs)),
+            DurableTask.Run(_ => DurableTask.RunInline(null!, () => ++runs)),
             host.CreateContext(TaskId.CreateRoot("root")));
 
         Assert.IsType<ArgumentNullException>(response.Exception);
-        Assert.Throws<ArgumentNullException>(() => DurableTask.Once("step", (Func<int>)null!));
-        Assert.Throws<ArgumentNullException>(() => DurableTask.Once("step", (Action)null!));
+        Assert.Throws<ArgumentNullException>(() => DurableTask.RunInline("step", (Func<int>)null!));
+        Assert.Throws<ArgumentNullException>(() => DurableTask.RunInline("step", (Action)null!));
         Assert.Equal(0, runs);
         Assert.Empty(host.Effects);
     }
@@ -166,17 +166,17 @@ public class DurableTaskOnceTests
         // Asynchronous delegates don't compile; a delegate whose result type is asynchronous through generic code is
         // rejected when it runs, inside and outside a durable task.
         var response = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.Run(_ => Once<ValueTask<int>>(() => ValueTask.FromResult(++runs))),
+            DurableTask.Run(_ => RunInline<ValueTask<int>>(() => ValueTask.FromResult(++runs))),
             host.CreateContext(TaskId.CreateRoot("root")));
 
         Assert.IsType<NotSupportedException>(response.Exception);
-        Assert.Throws<NotSupportedException>(() => Once<ValueTask>(() => new ValueTask(Task.FromResult(++runs))));
-        Assert.Throws<NotSupportedException>(() => { _ = Once<Task<int>>(() => Task.FromResult(++runs)); });
-        Assert.Throws<NotSupportedException>(() => Once<DurableTask<int>>(() => DurableTask.FromResult(++runs)));
+        Assert.Throws<NotSupportedException>(() => RunInline<ValueTask>(() => new ValueTask(Task.FromResult(++runs))));
+        Assert.Throws<NotSupportedException>(() => { _ = RunInline<Task<int>>(() => Task.FromResult(++runs)); });
+        Assert.Throws<NotSupportedException>(() => RunInline<DurableTask<int>>(() => DurableTask.FromResult(++runs)));
         Assert.Equal(0, runs);
         Assert.Empty(host.Effects);
 
-        static T Once<T>(Func<T> effect) => DurableTask.Once("generic", effect);
+        static T RunInline<T>(Func<T> effect) => DurableTask.RunInline("generic", effect);
     }
 
     [Fact]
@@ -192,7 +192,7 @@ public class DurableTaskOnceTests
 
         async DurableTask Body()
         {
-            DurableTask.Once("step", () => log.Add("effect"));
+            DurableTask.RunInline("step", () => log.Add("effect"));
             log.Add("after");
             await Task.CompletedTask;
         }
@@ -216,21 +216,21 @@ public class DurableTaskOnceTests
 
         static async DurableTask Body()
         {
-            DurableTask.Once("step", () => 1);
+            DurableTask.RunInline("step", () => 1);
             await DurableTask.Run(static _ => { }).WithId("step");
             await DurableTask.WhenAll([DurableTask.Run(static _ => { })]).WithId("step");
-            DurableTask.Once("step", () => 2);
+            DurableTask.RunInline("step", () => 2);
         }
     }
 
     [Fact]
-    public async Task OnceAndAStepWithTheSameNameUseOneIdentifier()
+    public async Task RunInlineAndAStepWithTheSameNameUseOneIdentifier()
     {
         var onceHost = new TestHost(Now);
         var stepHost = new TestHost(Now);
 
         var once = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.Run(_ => DurableTask.Once("get-id", Guid.NewGuid)),
+            DurableTask.Run(_ => DurableTask.RunInline("get-id", Guid.NewGuid)),
             onceHost.CreateContext(TaskId.CreateRoot("root")));
         var step = await DurableTaskRuntimeHelper.RunAsync(StepBody(), stepHost.CreateContext(TaskId.CreateRoot("root")));
 
@@ -243,25 +243,25 @@ public class DurableTaskOnceTests
     }
 
     [Fact]
-    public async Task HostWithoutRecordedEffectsRejectsOnce()
+    public async Task HostWithoutRecordedEffectsRejectsRunInline()
     {
         var context = new EffectContext(TaskId.CreateRoot("root"), log: null);
         var runs = 0;
 
-        var response = await DurableTaskRuntimeHelper.RunAsync(DurableTask.Run(_ => DurableTask.Once("id", () => ++runs)), context);
+        var response = await DurableTaskRuntimeHelper.RunAsync(DurableTask.Run(_ => DurableTask.RunInline("id", () => ++runs)), context);
 
         Assert.IsType<NotSupportedException>(response.Exception);
         Assert.Equal(0, runs);
     }
 
     [Fact]
-    public async Task UnnamedOnceRunsItsEffectOnceUnderAGeneratedIdentifier()
+    public async Task UnnamedRunInlineRunsItsEffectOnceUnderAGeneratedIdentifier()
     {
         var host = new TestHost(Now);
         var taskId = TaskId.CreateRoot("root");
         var runs = 0;
 
-        Guid Body() => DurableTask.Once(() =>
+        Guid Body() => DurableTask.RunInline(() =>
         {
             runs++;
             return Guid.NewGuid();
@@ -298,10 +298,10 @@ public class DurableTaskOnceTests
 
         async DurableTask<int[]> Body()
         {
-            var a = DurableTask.Once(() => ++effectRuns);
-            DurableTask.Once("named", () => 0);
+            var a = DurableTask.RunInline(() => ++effectRuns);
+            DurableTask.RunInline("named", () => 0);
             var b = await DurableTask.Run(_ => 1 + ++childRuns);
-            var c = DurableTask.Once(() => 1 + ++effectRuns);
+            var c = DurableTask.RunInline(() => 1 + ++effectRuns);
             return [a, b, c];
         }
     }
@@ -315,10 +315,10 @@ public class DurableTaskOnceTests
 
         string Body()
         {
-            DurableTask.Once(() => { runs++; });
+            DurableTask.RunInline(() => { runs++; });
             try
             {
-                DurableTask.Once(Fail);
+                DurableTask.RunInline(Fail);
                 return "completed";
             }
             catch (InvalidOperationException exception)
@@ -346,11 +346,11 @@ public class DurableTaskOnceTests
     {
         var runs = 0;
 
-        Assert.Equal(1, DurableTask.Once(() => ++runs));
-        Assert.Equal(2, DurableTask.Once(() => ++runs));
-        DurableTask.Once(() => { runs++; });
+        Assert.Equal(1, DurableTask.RunInline(() => ++runs));
+        Assert.Equal(2, DurableTask.RunInline(() => ++runs));
+        DurableTask.RunInline(() => { runs++; });
         Assert.Equal(3, runs);
-        Assert.Throws<InvalidOperationException>(() => DurableTask.Once(Fail));
+        Assert.Throws<InvalidOperationException>(() => DurableTask.RunInline(Fail));
 
         static int Fail() => throw new InvalidOperationException();
     }
@@ -362,28 +362,28 @@ public class DurableTaskOnceTests
         var runs = 0;
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.Run(_ => Once<ValueTask<int>>(() => ValueTask.FromResult(++runs))),
+            DurableTask.Run(_ => RunInline<ValueTask<int>>(() => ValueTask.FromResult(++runs))),
             host.CreateContext(TaskId.CreateRoot("root")));
 
         Assert.IsType<NotSupportedException>(response.Exception);
-        Assert.Throws<ArgumentNullException>(() => DurableTask.Once((Func<int>)null!));
-        Assert.Throws<ArgumentNullException>(() => DurableTask.Once((Action)null!));
-        Assert.Throws<NotSupportedException>(() => Once<ValueTask>(() => new ValueTask(Task.FromResult(++runs))));
-        Assert.Throws<NotSupportedException>(() => { _ = Once<Task<int>>(() => Task.FromResult(++runs)); });
-        Assert.Throws<NotSupportedException>(() => Once<DurableTask<int>>(() => DurableTask.FromResult(++runs)));
+        Assert.Throws<ArgumentNullException>(() => DurableTask.RunInline((Func<int>)null!));
+        Assert.Throws<ArgumentNullException>(() => DurableTask.RunInline((Action)null!));
+        Assert.Throws<NotSupportedException>(() => RunInline<ValueTask>(() => new ValueTask(Task.FromResult(++runs))));
+        Assert.Throws<NotSupportedException>(() => { _ = RunInline<Task<int>>(() => Task.FromResult(++runs)); });
+        Assert.Throws<NotSupportedException>(() => RunInline<DurableTask<int>>(() => DurableTask.FromResult(++runs)));
         Assert.Equal(0, runs);
         Assert.Empty(host.Effects);
 
-        static T Once<T>(Func<T> effect) => DurableTask.Once(effect);
+        static T RunInline<T>(Func<T> effect) => DurableTask.RunInline(effect);
     }
 
     [Fact]
-    public async Task HostWithoutRecordedEffectsRejectsUnnamedOnce()
+    public async Task HostWithoutRecordedEffectsRejectsUnnamedRunInline()
     {
         var context = new EffectContext(TaskId.CreateRoot("root"), log: null);
         var runs = 0;
 
-        var response = await DurableTaskRuntimeHelper.RunAsync(DurableTask.Run(_ => DurableTask.Once(() => ++runs)), context);
+        var response = await DurableTaskRuntimeHelper.RunAsync(DurableTask.Run(_ => DurableTask.RunInline(() => ++runs)), context);
 
         Assert.IsType<NotSupportedException>(response.Exception);
         Assert.Equal(0, runs);

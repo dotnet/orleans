@@ -26,7 +26,7 @@ namespace Orleans.DurableTasks.Analyzers;
 /// </para>
 /// <para>
 /// A durable operation is an await of a durable task, a configuration, or an abstractions API; an await of a helper in
-/// the same compilation whose source performs durable operations; or a <c>DurableTask.Once</c> effect. The analysis is
+/// the same compilation whose source performs durable operations; or a <c>DurableTask.RunInline</c> effect. The analysis is
 /// intraprocedural: helpers which the body calls without awaiting, and helpers in other assemblies, aren't inspected.
 /// </para>
 /// </remarks>
@@ -39,7 +39,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
         DurableTaskDiagnostics.NonDeterministicValueInReplayedCode,
         DurableTaskDiagnostics.ExternalAwaitInReplayedCode,
         DurableTaskDiagnostics.StateChangeBeforeExternalAwait,
-        DurableTaskDiagnostics.OnceAssignsCapturedVariable,
+        DurableTaskDiagnostics.RunInlineAssignsCapturedVariable,
         DurableTaskDiagnostics.ReservedCharacterInName,
         DurableTaskDiagnostics.DuplicateName,
         DurableTaskDiagnostics.SchedulerEscape,
@@ -85,7 +85,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
         /// <summary>A durable task body, which the replay rules analyze.</summary>
         Body,
 
-        /// <summary>A <c>DurableTask.Once</c> effect, which runs once.</summary>
+        /// <summary>A <c>DurableTask.RunInline</c> effect, which runs once.</summary>
         Effect,
 
         /// <summary>A lambda which runs as part of the statement of the enclosing body which creates it.</summary>
@@ -117,7 +117,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                     switch (operation)
                     {
                         case IAwaitOperation await when IsDefinitionAwait(symbols, await):
-                        case IInvocationOperation invocation when symbols.IsOnce(invocation):
+                        case IInvocationOperation invocation when symbols.IsRunInline(invocation):
                             return true;
                     }
                 }
@@ -305,7 +305,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
         {
             if (GetReceivingInvocation(function) is { } invocation)
             {
-                if (symbols.IsOnce(invocation))
+                if (symbols.IsRunInline(invocation))
                 {
                     return FunctionKind.Effect;
                 }
@@ -366,7 +366,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             }
         }
 
-        /// <summary>Reports assignments to the body's variables and scheduler escapes in a <c>DurableTask.Once</c> effect.</summary>
+        /// <summary>Reports assignments to the body's variables and scheduler escapes in a <c>DurableTask.RunInline</c> effect.</summary>
         private void AnalyzeEffect(ControlFlowGraph graph)
         {
             var effect = graph.OriginalOperation switch
@@ -401,7 +401,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                             && !SymbolEqualityComparer.Default.Equals(variable.ContainingSymbol, effect)
                             && !IsDeclaredIn(variable, effect))
                         {
-                            Report(DurableTaskDiagnostics.OnceAssignsCapturedVariable, operation.Syntax.GetLocation(), variable.Name);
+                            Report(DurableTaskDiagnostics.RunInlineAssignsCapturedVariable, operation.Syntax.GetLocation(), variable.Name);
                         }
                     }
                 }
@@ -505,7 +505,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
         private bool IsDurableOperation(IOperation operation) => operation switch
         {
             IAwaitOperation await => IsDurableAwait(await),
-            IInvocationOperation invocation => symbols.IsOnce(invocation) || DurableTaskSymbols.IsPost(invocation),
+            IInvocationOperation invocation => symbols.IsRunInline(invocation) || DurableTaskSymbols.IsPost(invocation),
             _ => false,
         };
 
@@ -733,7 +733,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                     _analysis.Report(DurableTaskDiagnostics.RepeatedSignalWait, invocation.Syntax.GetLocation(), signal.Syntax.ToString());
                 }
 
-                if ((Symbols.IsOnce(invocation) || DurableTaskSymbols.IsWithId(invocation)) && GetName(invocation) is { } name)
+                if ((Symbols.IsRunInline(invocation) || DurableTaskSymbols.IsWithId(invocation)) && GetName(invocation) is { } name)
                 {
                     if (name.Value.IndexOf('$') >= 0)
                     {
@@ -764,8 +764,8 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             }
 
             /// <summary>
-            /// Returns the constant name which a <c>WithId</c> or <c>DurableTask.Once</c> invocation passes, or null. An
-            /// unnamed <c>DurableTask.Once</c> takes the execution's next generated identifier and has no name.
+            /// Returns the constant name which a <c>WithId</c> or <c>DurableTask.RunInline</c> invocation passes, or null. An
+            /// unnamed <c>DurableTask.RunInline</c> takes the execution's next generated identifier and has no name.
             /// </summary>
             private static (string Value, Location Location)? GetName(IInvocationOperation invocation)
             {
@@ -937,7 +937,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             private bool ContainsDurableOperationShallow(IOperation operation) => operation switch
             {
                 IAwaitOperation await => _analysis.IsDurableAwait(await),
-                IInvocationOperation invocation => Symbols.IsOnce(invocation) || DurableTaskSymbols.IsPost(invocation),
+                IInvocationOperation invocation => Symbols.IsRunInline(invocation) || DurableTaskSymbols.IsPost(invocation),
                 _ => false,
             };
 

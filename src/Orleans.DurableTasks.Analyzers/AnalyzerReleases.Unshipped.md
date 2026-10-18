@@ -9,7 +9,7 @@ ORLEANS0100 | Usage | Warning | DurableTaskReplayAnalyzer, grain state accessed 
 ORLEANS0101 | Usage | Warning | DurableTaskReplayAnalyzer, non-deterministic value produced in code which a replay re-runs
 ORLEANS0102 | Usage | Warning | DurableTaskReplayAnalyzer, external await in code which a replay re-runs
 ORLEANS0103 | Usage | Warning | DurableTaskReplayAnalyzer, grain state changed before an external await
-ORLEANS0104 | Usage | Warning | DurableTaskReplayAnalyzer, DurableTask.Once effect assigns a captured variable
+ORLEANS0104 | Usage | Warning | DurableTaskReplayAnalyzer, DurableTask.RunInline effect assigns a captured variable
 ORLEANS0105 | Usage | Warning | DurableTaskDefinitionAnalyzer, durable task definition never awaited, scheduled, or posted
 ORLEANS0106 | Usage | Warning | DurableTaskDefinitionAnalyzer, single-use durable task definition run more than once
 ORLEANS0107 | Usage | Error | DurableTaskReplayAnalyzer, durable operation name contains '$'

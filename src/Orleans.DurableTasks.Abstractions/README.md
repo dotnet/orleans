@@ -40,7 +40,7 @@ on this abstractions assembly.
   `IsTaskCancellationRequested` becomes true, the request reaches the task's attached children, and
   the task's body decides its outcome. When the cancellation escapes the body, for example from
   awaiting a canceled child, the task is canceled; otherwise it completes with the body's result or
-  failure. The body's compensation, such as `DurableTask.Once` effects, shielded children, and
+  failure. The body's compensation, such as `DurableTask.RunInline` effects, shielded children, and
   journaled state changes, commits.
 - `CancelAsync(reason)` attaches a reason to the request, which the task's code reads from
   `DurableTask.Current.TaskCancellationReason`, for example in the `catch` block which decides its
@@ -52,7 +52,7 @@ on this abstractions assembly.
   `DurableTaskRuntimeHelper.CancelAttempt` when the attempt's work can't be recorded any more: its
   grain activation is stopping, or the task was aborted or deleted. From then on, every durable
   operation of the attempt throws `DurableTaskAttemptCanceledException`, which derives from
-  `OperationCanceledException` and carries the `DurableTaskAttemptCancellationReason`: `Once`, starting
+  `OperationCanceledException` and carries the `DurableTaskAttemptCancellationReason`: `RunInline`, starting
   or awaiting children, including shielded and detached ones, `Post`, `ScheduleAsync`, signals,
   delays, handle operations, and combinators. A wait which the attempt's cancellation ends throws it
   too. The host discards the attempt's response and records nothing which the attempt does; a
@@ -249,7 +249,7 @@ continues:
   example because the ID already identifies another definition, fails.
 - `Post()` is synchronous: it stages the start, and the start commits with the caller's next durable
   write, together with the state changes which the calling code made, and is then delivered once.
-  Within a durable execution, the start is recorded like a `DurableTask.Once` effect, so a replay
+  Within a durable execution, the start is recorded like a `DurableTask.RunInline` effect, so a replay
   returns the same handle without starting the task again, and awaiting the handle later observes
   the result. Code without a durable outbox, such as a client, can't post.
 - Outside a durable execution, every task is a root task, so `.Detached()` changes nothing. `WithId`
@@ -369,7 +369,7 @@ including changes which later operations made. A durable body therefore has thre
 
 - **Recorded operations** run once per execution, and a replay returns their recorded outcomes:
   children such as durable grain calls, `async DurableTask` methods, `DurableTask.Run` delegates,
-  and delays, as well as signal waits, detached and posted starts, and `DurableTask.Once` effects.
+  and delays, as well as signal waits, detached and posted starts, and `DurableTask.RunInline` effects.
 - **Re-executed code** precedes the body's last recorded operation and runs again in every replay.
   It computes values from the method's arguments, recorded results, `DurableTask.Current.UtcNow`,
   the cancellation state, and configuration which stays the same while executions are pending.
@@ -382,36 +382,36 @@ Follow these rules in re-executed code:
 
 - Put each side effect in a recorded operation, or in the synchronous tail. Change grain state, read
   grain state whose value decides later operations, and produce random values, identifiers, and
-  wall-clock times in `DurableTask.Once` or in a child, so a replay observes the values the first
+  wall-clock times in `DurableTask.RunInline` or in a child, so a replay observes the values the first
   run recorded. Read logical time from `DurableTask.Current.UtcNow`. Call external services in
   children, whose external effects need their own idempotency.
 - Give stable identifiers with `WithId` to children which are scheduled conditionally, in loops,
   or concurrently outside a combinator, and to combinators. Generated identifiers are stable only when unnamed
-  children, unnamed `DurableTask.Once` effects, unnamed detached tasks, and combinators are created in the same order.
+  children, unnamed `DurableTask.RunInline` effects, unnamed detached tasks, and combinators are created in the same order.
 - Scheduling an existing identifier with different arguments fails, so a replay which diverges
   from the recorded execution surfaces as an error.
   When a deployment changes a workflow while executions are pending, keep the existing steps
   and identifiers, and give new steps new identifiers, or branch the change on
-  `DurableTask.GetVersion`; see [Versioned changes](#versioned-changes). A changed `Once` delegate
+  `DurableTask.GetVersion`; see [Versioned changes](#versioned-changes). A changed `RunInline` delegate
   doesn't affect executions which recorded it.
 - An `async DurableTask` method which completes without awaiting is a normal step whose result the
   parent records. The package's analyzers suppress CS1998 for such methods
   ([ORLEANS0028](https://aka.ms/orleans/diagnostics#orleans0028)). A synchronous state transition
-  runs as a `DurableTask.Once` effect, which commits with the next durable write without a write of
+  runs as a `DurableTask.RunInline` effect, which commits with the next durable write without a write of
   its own.
 - Logs in re-executed code repeat on replay. `logger.ReplaySafe()` writes each event once; see
   [Replay diagnostics and logging](#replay-diagnostics-and-logging).
 
 ## Recorded effects
 
-`DurableTask.Once(name, effect)` runs a synchronous effect in the caller's current work item before
+`DurableTask.RunInline(name, effect)` runs a synchronous effect in the caller's current work item before
 it returns, with no suspension and no child execution, and records its outcome. Every later run of
 the body, including a replay, returns the recorded result, or throws the recorded exception, without
 running the effect:
 
 ```csharp
-var summary = DurableTask.Once("pay", () => SetStatus(OrderStatus.Paid));
-var paymentId = DurableTask.Once("payment-id", Guid.NewGuid);
+var summary = DurableTask.RunInline("pay", () => SetStatus(OrderStatus.Paid));
+var paymentId = DurableTask.RunInline("payment-id", Guid.NewGuid);
 ```
 
 - The record commits with the task's next durable write, together with the state changes which the
@@ -423,19 +423,19 @@ var paymentId = DurableTask.Once("payment-id", Guid.NewGuid);
 - A failure is recorded too, because journaled state has no rollback: changes made before the throw
   commit with the recorded exception. A result which the host can't store, for example because it
   doesn't serialize, is recorded as that failure.
-- Consecutive `DurableTask.Once` calls in one synchronous block, and the journaled state which they
+- Consecutive `DurableTask.RunInline` calls in one synchronous block, and the journaled state which they
   change, commit in the same journal write, and no other turn of the grain runs between them. The
   effect runs after task cancellation too, and returning doesn't mean that its record has committed.
 - A name identifies the effect as `WithId` identifies a step: `pay`, then `pay$2` for a later
-  occurrence in the same run. Names don't contain `$`. `DurableTask.Once("get-id", Guid.NewGuid)`
+  occurrence in the same run. Names don't contain `$`. `DurableTask.RunInline("get-id", Guid.NewGuid)`
   and `await DurableTask.Run(async () => Guid.NewGuid()).WithId("get-id")` use the same identifier,
   `get-id`, but run differently: the step runs when it is awaited, possibly in a later turn, as a
   child execution with its own `DurableTask.Current` and cancellation scope, and commits in a
   journal write of its own. A replay which finds one kind recorded where the body now runs the
   other fails with a divergence error instead of running the work again, so a deployment which
   changes one into the other branches on `DurableTask.GetVersion`.
-- `DurableTask.Once(effect)` omits the name for terseness, such as
-  `var paymentId = DurableTask.Once(Guid.NewGuid);`. The effect takes the execution's next generated
+- `DurableTask.RunInline(effect)` omits the name for terseness, such as
+  `var paymentId = DurableTask.RunInline(Guid.NewGuid);`. The effect takes the execution's next generated
   identifier, `$child-1`, `$child-2`, and so on, which unnamed effects share with unnamed children,
   so it's replay-stable when the body creates its unnamed operations in the same order. Name effects
   whose position can change between runs or deployments.
@@ -477,7 +477,7 @@ var trackingId = shipping >= 1
 
 `DurableTask.Current.IsReplaying` reports whether a run of the body is re-running operations which an
 earlier run recorded. It is `true` from the start of a run which finds operations that earlier runs
-recorded in the task's tree, such as children, records of detached tasks, and `Once` records,
+recorded in the task's tree, such as children, records of detached tasks, and `RunInline` records,
 until the run has reached each of them or starts an operation which no earlier run recorded. It then
 stays `false`. A first run reports `false` throughout. Signal values which callers sent to the task
 don't count as recorded operations.
@@ -485,7 +485,7 @@ don't count as recorded operations.
 Use it for logging and diagnostics only. A run which ended before a journal write committed its work
 is replayed, so code which runs only while `IsReplaying` is `false` can run twice or never, and code
 which branches on it schedules different operations in different runs. Work which runs once belongs
-in `DurableTask.Once`, a step, or the body's synchronous tail.
+in `DurableTask.RunInline`, a step, or the body's synchronous tail.
 
 `logger.ReplaySafe()` returns a logger which skips events while the task replays, so each event is
 logged once:
@@ -501,7 +501,7 @@ public async DurableTask<OrderResult> PlaceOrderAsync(SubmitOrder request)
 ```
 
 The logger reads the running task when it logs, so one instance serves durable task bodies and
-ordinary grain methods. Logs inside a `DurableTask.Once` effect, or inside a step which completed,
+ordinary grain methods. Logs inside a `DurableTask.RunInline` effect, or inside a step which completed,
 don't repeat without it, because a replay returns their recorded results without running them.
 
 The package carries analyzers which report code that a replay would run differently, as

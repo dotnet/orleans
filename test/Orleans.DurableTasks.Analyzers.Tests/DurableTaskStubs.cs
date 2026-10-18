@@ -2,7 +2,7 @@ namespace Orleans.DurableTasks.Analyzers.Tests;
 
 /// <summary>
 /// Declares the durable task programming model, grain state, and signals by the metadata names which the analyzers match:
-/// <c>DurableTask.Current</c> returning <c>DurableTaskContext</c> with its cancellation members, <c>DurableTask.Once</c>,
+/// <c>DurableTask.Current</c> returning <c>DurableTaskContext</c> with its cancellation members, <c>DurableTask.RunInline</c>,
 /// <c>IsReplaying</c>, <c>ReplaySafe()</c>, the journaled state types, and grains.
 /// </summary>
 internal static class DurableTaskStubs
@@ -31,10 +31,10 @@ internal static class DurableTaskStubs
                 public static DurableTask<T> Run<T>(Func<CancellationToken, Task<T>> function) => null!;
                 public static DurableTask Run(Func<Task> function) => null!;
                 public static DurableTask<T> Run<T>(Func<Task<T>> function) => null!;
-                public static T Once<T>(string name, Func<T> effect) => effect();
-                public static void Once(string name, Action effect) => effect();
-                public static T Once<T>(Func<T> effect) => effect();
-                public static void Once(Action effect) => effect();
+                public static T RunInline<T>(string name, Func<T> effect) => effect();
+                public static void RunInline(string name, Action effect) => effect();
+                public static T RunInline<T>(Func<T> effect) => effect();
+                public static void RunInline(Action effect) => effect();
                 public static int GetVersion(string name, int minSupported, int maxSupported) => maxSupported;
                 public static DurableTask<T[]> WhenAll<T>(IEnumerable<DurableTask<T>> inputs) => null!;
                 public static DurableTask WhenAll(IEnumerable<DurableTask> inputs) => null!;

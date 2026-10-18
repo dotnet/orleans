@@ -6,11 +6,11 @@ namespace Orleans.DurableTasks;
 
 public abstract partial class DurableTask
 {
-    private const string OnceMustBeSynchronous =
-        "DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).";
+    private const string RunInlineMustBeSynchronous =
+        "DurableTask.RunInline stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).";
 
-    private const string OnceAwaitsDurableTasks =
-        "DurableTask.Once stores a synchronous result, and a durable task runs as a step. Await the durable task directly.";
+    private const string RunInlineAwaitsDurableTasks =
+        "DurableTask.RunInline stores a synchronous result, and a durable task runs as a step. Await the durable task directly.";
 
     /// <summary>
     /// Runs <paramref name="effect"/> in the caller's current work item before returning, with no suspension and no child
@@ -65,8 +65,8 @@ public abstract partial class DurableTask
     /// </remarks>
     /// <example>
     /// <code>
-    /// var summary = DurableTask.Once("pay", () =&gt; SetStatus(OrderStatus.Paid));
-    /// var paymentId = DurableTask.Once("payment-id", Guid.NewGuid);
+    /// var summary = DurableTask.RunInline("pay", () =&gt; SetStatus(OrderStatus.Paid));
+    /// var paymentId = DurableTask.RunInline("payment-id", Guid.NewGuid);
     /// </code>
     /// </example>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="effect"/> is <see langword="null"/>.</exception>
@@ -79,12 +79,12 @@ public abstract partial class DurableTask
     /// <typeparamref name="TResult"/> is an asynchronous operation, such as a <see cref="Task"/>, a
     /// <see cref="ValueTask"/>, or a <see cref="DurableTask"/>, or the host doesn't support recorded effects.
     /// </exception>
-    public static TResult Once<TResult>(string name, Func<TResult> effect)
+    public static TResult RunInline<TResult>(string name, Func<TResult> effect)
     {
         ArgumentNullException.ThrowIfNull(effect);
         if (AsynchronousResult<TResult>.Value)
         {
-            throw new NotSupportedException(OnceMustBeSynchronous);
+            throw new NotSupportedException(RunInlineMustBeSynchronous);
         }
 
         return GetEffectContext(name) is { } context
@@ -102,7 +102,7 @@ public abstract partial class DurableTask
     /// </param>
     /// <param name="effect">The synchronous effect.</param>
     /// <remarks>
-    /// The effect runs and records its outcome as <see cref="Once{TResult}(string, Func{TResult})"/> describes. A replay
+    /// The effect runs and records its outcome as <see cref="RunInline{TResult}(string, Func{TResult})"/> describes. A replay
     /// returns, or throws the exception which the effect threw, without running it. Outside a durable task, the effect
     /// runs every time.
     /// </remarks>
@@ -113,7 +113,7 @@ public abstract partial class DurableTask
     /// earlier run recorded another kind of operation, such as a step, under the effect's identifier.
     /// </exception>
     /// <exception cref="NotSupportedException">The host doesn't support recorded effects.</exception>
-    public static void Once(string name, Action effect)
+    public static void RunInline(string name, Action effect)
     {
         ArgumentNullException.ThrowIfNull(effect);
         if (GetEffectContext(name) is not { } context)
@@ -133,39 +133,39 @@ public abstract partial class DurableTask
             }).EnsureSuccessfulCompletion();
     }
 
-    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.Once</c> can't record.</summary>
+    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.RunInline</c> can't record.</summary>
     /// <remarks>An asynchronous lambda also converts to a durable task, and this overload takes precedence.</remarks>
-    [Obsolete(OnceMustBeSynchronous, error: true)]
+    [Obsolete(RunInlineMustBeSynchronous, error: true)]
     [OverloadResolutionPriority(1)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void Once(string name, Func<Task> effect) => throw new NotSupportedException(OnceMustBeSynchronous);
+    public static void RunInline(string name, Func<Task> effect) => throw new NotSupportedException(RunInlineMustBeSynchronous);
 
-    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.Once</c> can't record.</summary>
+    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.RunInline</c> can't record.</summary>
     /// <remarks>An asynchronous lambda also converts to a durable task, and this overload takes precedence.</remarks>
-    [Obsolete(OnceMustBeSynchronous, error: true)]
+    [Obsolete(RunInlineMustBeSynchronous, error: true)]
     [OverloadResolutionPriority(1)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static TResult Once<TResult>(string name, Func<Task<TResult>> effect) => throw new NotSupportedException(OnceMustBeSynchronous);
+    public static TResult RunInline<TResult>(string name, Func<Task<TResult>> effect) => throw new NotSupportedException(RunInlineMustBeSynchronous);
 
     /// <summary>Rejects a durable task effect, which runs as a durable child when it is awaited.</summary>
-    [Obsolete(OnceAwaitsDurableTasks, error: true)]
+    [Obsolete(RunInlineAwaitsDurableTasks, error: true)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void Once(string name, Func<DurableTask> effect) => throw new NotSupportedException(OnceAwaitsDurableTasks);
+    public static void RunInline(string name, Func<DurableTask> effect) => throw new NotSupportedException(RunInlineAwaitsDurableTasks);
 
     /// <summary>Rejects a durable task effect, which runs as a durable child when it is awaited.</summary>
-    [Obsolete(OnceAwaitsDurableTasks, error: true)]
+    [Obsolete(RunInlineAwaitsDurableTasks, error: true)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static TResult Once<TResult>(string name, Func<DurableTask<TResult>> effect) => throw new NotSupportedException(OnceAwaitsDurableTasks);
+    public static TResult RunInline<TResult>(string name, Func<DurableTask<TResult>> effect) => throw new NotSupportedException(RunInlineAwaitsDurableTasks);
 
-    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.Once</c> can't record.</summary>
-    [Obsolete(OnceMustBeSynchronous, error: true)]
+    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.RunInline</c> can't record.</summary>
+    [Obsolete(RunInlineMustBeSynchronous, error: true)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void Once(string name, Func<ValueTask> effect) => throw new NotSupportedException(OnceMustBeSynchronous);
+    public static void RunInline(string name, Func<ValueTask> effect) => throw new NotSupportedException(RunInlineMustBeSynchronous);
 
-    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.Once</c> can't record.</summary>
-    [Obsolete(OnceMustBeSynchronous, error: true)]
+    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.RunInline</c> can't record.</summary>
+    [Obsolete(RunInlineMustBeSynchronous, error: true)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static TResult Once<TResult>(string name, Func<ValueTask<TResult>> effect) => throw new NotSupportedException(OnceMustBeSynchronous);
+    public static TResult RunInline<TResult>(string name, Func<ValueTask<TResult>> effect) => throw new NotSupportedException(RunInlineMustBeSynchronous);
 
     /// <summary>
     /// Runs <paramref name="effect"/> in the caller's current work item before returning, and records its outcome, which
@@ -176,7 +176,7 @@ public abstract partial class DurableTask
     /// <returns>The result which the effect returned when it ran.</returns>
     /// <remarks>
     /// <para>
-    /// The effect runs and records its outcome as <see cref="Once{TResult}(string, Func{TResult})"/> describes, under the
+    /// The effect runs and records its outcome as <see cref="RunInline{TResult}(string, Func{TResult})"/> describes, under the
     /// execution's next generated child identifier, such as <c>$child-3</c>, instead of a name.
     /// </para>
     /// <para>
@@ -188,7 +188,7 @@ public abstract partial class DurableTask
     /// </remarks>
     /// <example>
     /// <code>
-    /// var paymentId = DurableTask.Once(Guid.NewGuid);
+    /// var paymentId = DurableTask.RunInline(Guid.NewGuid);
     /// </code>
     /// </example>
     /// <exception cref="ArgumentNullException"><paramref name="effect"/> is <see langword="null"/>.</exception>
@@ -200,12 +200,12 @@ public abstract partial class DurableTask
     /// <typeparamref name="TResult"/> is an asynchronous operation, such as a <see cref="Task"/>, a
     /// <see cref="ValueTask"/>, or a <see cref="DurableTask"/>, or the host doesn't support recorded effects.
     /// </exception>
-    public static TResult Once<TResult>(Func<TResult> effect)
+    public static TResult RunInline<TResult>(Func<TResult> effect)
     {
         ArgumentNullException.ThrowIfNull(effect);
         if (AsynchronousResult<TResult>.Value)
         {
-            throw new NotSupportedException(OnceMustBeSynchronous);
+            throw new NotSupportedException(RunInlineMustBeSynchronous);
         }
 
         return DurableTaskContext.Ambient is { } context
@@ -219,8 +219,8 @@ public abstract partial class DurableTask
     /// </summary>
     /// <param name="effect">The synchronous effect.</param>
     /// <remarks>
-    /// The effect runs and records its outcome as <see cref="Once{TResult}(string, Func{TResult})"/> describes, under the
-    /// execution's next generated child identifier, which <see cref="Once{TResult}(Func{TResult})"/> describes. A replay
+    /// The effect runs and records its outcome as <see cref="RunInline{TResult}(string, Func{TResult})"/> describes, under the
+    /// execution's next generated child identifier, which <see cref="RunInline{TResult}(Func{TResult})"/> describes. A replay
     /// returns, or throws the exception which the effect threw, without running it. Outside a durable task, the effect
     /// runs every time.
     /// </remarks>
@@ -230,7 +230,7 @@ public abstract partial class DurableTask
     /// earlier run recorded another kind of operation, such as a step, under the effect's generated identifier.
     /// </exception>
     /// <exception cref="NotSupportedException">The host doesn't support recorded effects.</exception>
-    public static void Once(Action effect)
+    public static void RunInline(Action effect)
     {
         ArgumentNullException.ThrowIfNull(effect);
         if (DurableTaskContext.Ambient is not { } context)
@@ -250,39 +250,39 @@ public abstract partial class DurableTask
             }).EnsureSuccessfulCompletion();
     }
 
-    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.Once</c> can't record.</summary>
+    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.RunInline</c> can't record.</summary>
     /// <remarks>An asynchronous lambda also converts to a durable task, and this overload takes precedence.</remarks>
-    [Obsolete(OnceMustBeSynchronous, error: true)]
+    [Obsolete(RunInlineMustBeSynchronous, error: true)]
     [OverloadResolutionPriority(1)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void Once(Func<Task> effect) => throw new NotSupportedException(OnceMustBeSynchronous);
+    public static void RunInline(Func<Task> effect) => throw new NotSupportedException(RunInlineMustBeSynchronous);
 
-    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.Once</c> can't record.</summary>
+    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.RunInline</c> can't record.</summary>
     /// <remarks>An asynchronous lambda also converts to a durable task, and this overload takes precedence.</remarks>
-    [Obsolete(OnceMustBeSynchronous, error: true)]
+    [Obsolete(RunInlineMustBeSynchronous, error: true)]
     [OverloadResolutionPriority(1)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static TResult Once<TResult>(Func<Task<TResult>> effect) => throw new NotSupportedException(OnceMustBeSynchronous);
+    public static TResult RunInline<TResult>(Func<Task<TResult>> effect) => throw new NotSupportedException(RunInlineMustBeSynchronous);
 
     /// <summary>Rejects a durable task effect, which runs as a durable child when it is awaited.</summary>
-    [Obsolete(OnceAwaitsDurableTasks, error: true)]
+    [Obsolete(RunInlineAwaitsDurableTasks, error: true)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void Once(Func<DurableTask> effect) => throw new NotSupportedException(OnceAwaitsDurableTasks);
+    public static void RunInline(Func<DurableTask> effect) => throw new NotSupportedException(RunInlineAwaitsDurableTasks);
 
     /// <summary>Rejects a durable task effect, which runs as a durable child when it is awaited.</summary>
-    [Obsolete(OnceAwaitsDurableTasks, error: true)]
+    [Obsolete(RunInlineAwaitsDurableTasks, error: true)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static TResult Once<TResult>(Func<DurableTask<TResult>> effect) => throw new NotSupportedException(OnceAwaitsDurableTasks);
+    public static TResult RunInline<TResult>(Func<DurableTask<TResult>> effect) => throw new NotSupportedException(RunInlineAwaitsDurableTasks);
 
-    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.Once</c> can't record.</summary>
-    [Obsolete(OnceMustBeSynchronous, error: true)]
+    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.RunInline</c> can't record.</summary>
+    [Obsolete(RunInlineMustBeSynchronous, error: true)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void Once(Func<ValueTask> effect) => throw new NotSupportedException(OnceMustBeSynchronous);
+    public static void RunInline(Func<ValueTask> effect) => throw new NotSupportedException(RunInlineMustBeSynchronous);
 
-    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.Once</c> can't record.</summary>
-    [Obsolete(OnceMustBeSynchronous, error: true)]
+    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.RunInline</c> can't record.</summary>
+    [Obsolete(RunInlineMustBeSynchronous, error: true)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static TResult Once<TResult>(Func<ValueTask<TResult>> effect) => throw new NotSupportedException(OnceMustBeSynchronous);
+    public static TResult RunInline<TResult>(Func<ValueTask<TResult>> effect) => throw new NotSupportedException(RunInlineMustBeSynchronous);
 
     /// <summary>Validates <paramref name="name"/> and returns the running task's context, or <see langword="null"/>.</summary>
     private static DurableTaskContext? GetEffectContext(string name)
