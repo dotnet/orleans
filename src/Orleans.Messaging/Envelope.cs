@@ -27,7 +27,7 @@ public readonly struct Envelope
     public string? Subject { get; init; }
 
     /// <summary>Gets optional application-defined named byte-array headers.</summary>
-    /// <remarks>Use an ordinal dictionary for case-sensitive header names. Keys are nonempty and arrays are non-null.</remarks>
+    /// <remarks>Use an ordinal dictionary for case-sensitive header names. Keys are nonempty, well-formed UTF-16 strings, and arrays are non-null.</remarks>
     [Id(3)]
     public Dictionary<string, byte[]>? Headers { get; init; }
 

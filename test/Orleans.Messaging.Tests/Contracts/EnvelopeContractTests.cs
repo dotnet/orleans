@@ -317,17 +317,50 @@ public sealed class EnvelopeContractTests
     [InlineData("invalid-subject")]
     [InlineData("empty-header-key")]
     [InlineData("null-header-value")]
+    [InlineData("lone-high-surrogate-header-key")]
+    [InlineData("lone-low-surrogate-header-key")]
+    [InlineData("reversed-surrogate-header-key")]
     public void InvalidMetadataIsRejectedBeforeAdmission(string invalid)
     {
         var envelope = Create([1]) with
         {
             Subject = invalid == "empty-subject" ? "" : invalid == "invalid-subject" ? "\ud800" : null,
-            Headers = invalid == "empty-header-key" ? new() { [""] = "value"u8.ToArray() } : invalid == "null-header-value" ? new() { ["key"] = null! } : null
+            Headers = invalid switch
+            {
+                "empty-header-key" => new() { [""] = "value"u8.ToArray() },
+                "null-header-value" => new() { ["key"] = null! },
+                "lone-high-surrogate-header-key" => new() { ["trace-\ud83d"] = "value"u8.ToArray() },
+                "lone-low-surrogate-header-key" => new() { ["\ude00-trace"] = "value"u8.ToArray() },
+                "reversed-surrogate-header-key" => new() { ["trace-\ude00\ud83d"] = "value"u8.ToArray() },
+                _ => null
+            }
         };
         Assert.ThrowsAny<ArgumentException>(() => Validate(envelope));
         Assert.ThrowsAny<ArgumentException>(() => Validate(new InboxMessage { Envelope = envelope }));
         Assert.ThrowsAny<ArgumentException>(() => Validate(new OutboxMessage { Envelope = envelope, ReceiverId = Receiver }));
         Assert.Equal(new byte[] { 1 }, envelope.Payload);
+    }
+
+    [Fact]
+    public void SurrogatePairHeaderKeysRoundTripThroughOrleansSerialization()
+    {
+        using var sending = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var receiving = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var envelope = Create([1]) with
+        {
+            MessageId = MessageId.Create("order-\U0001F600"),
+            Headers = new(StringComparer.Ordinal) { ["trace-\U0001F600"] = "first"u8.ToArray(), ["trace-\U0001F601"] = "second"u8.ToArray() }
+        };
+        Validate(envelope);
+
+        var decoded = receiving.GetRequiredService<Serializer<Envelope>>().Deserialize(sending.GetRequiredService<Serializer<Envelope>>().SerializeToArray(envelope));
+
+        Validate(decoded);
+        Assert.Equal(envelope.MessageId, decoded.MessageId);
+        Assert.NotNull(decoded.Headers);
+        Assert.Equal(["trace-\U0001F600", "trace-\U0001F601"], decoded.Headers.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal("first"u8.ToArray(), decoded.Headers["trace-\U0001F600"]);
+        Assert.Equal("second"u8.ToArray(), decoded.Headers["trace-\U0001F601"]);
     }
 
     private static Envelope Create(byte[] payload) => new() { MessageId = Id, Payload = payload };
