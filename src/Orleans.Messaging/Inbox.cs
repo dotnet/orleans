@@ -52,6 +52,9 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     public IInbox Register(IInboxHandler handler)
     {
         _handlers.Add(handler);
+
+        // Pending messages wait for a handler without holding a wake-up, so a late registration resumes them.
+        if (_messages.Count > 0) _pump.RequestWakeup();
         return this;
     }
 
@@ -407,13 +410,14 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
     /// <summary>
     /// Returns the delay until the next message or work source is due, or <see langword="null"/> when neither the inbox
-    /// nor any work source holds work.
+    /// nor any work source holds work which this activation can perform. Messages wait without a wake-up until a handler
+    /// is registered.
     /// </summary>
     /// <param name="jobNow">The current Durable Jobs time, which the caller uses to schedule the wake-up.</param>
     internal TimeSpan? GetNextWakeupDelay(DateTimeOffset jobNow)
     {
         var next = GetWorkSourceDelay();
-        if (_messages.Count == 0 || next <= TimeSpan.Zero) return next;
+        if (_messages.Count == 0 || _handlers.IsEmpty || next <= TimeSpan.Zero) return next;
         var now = TimeProvider.GetUtcNow();
         foreach (var entry in _messages.Values)
         {
