@@ -169,15 +169,13 @@ public sealed class SelfAddressedMessageTests() : MessagingBehaviorTestBase(new 
         // Unscheduled self-sent messages occupy capacity for deliveries from other grains.
         var external = CreateEnvelope(grain, NewMessage(20, "external"));
         Assert.Equal(DeliveryStatus.Backpressured, (await DeliverAsync(grain, external)).Status);
-        Assert.NotEqual(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(grain)).Status);
+        Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(grain)).Status);
         var waiting = await grain.GetSnapshotAsync();
         Assert.Equal(3, waiting.InboxCount);
         Assert.Empty(waiting.Effects);
         Assert.Empty(waiting.InboxDeadLetters);
 
         await grain.ConfigureHandlerAsync(true);
-        await ReactivateAsync(grain);
-        _ = await Fixture.RunPumpAsync(grain);
         var completed = await Fixture.WaitForEffectCountAsync(grain, 3);
         Assert.Equal(0, completed.InboxCount);
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(grain, external)).Status);
