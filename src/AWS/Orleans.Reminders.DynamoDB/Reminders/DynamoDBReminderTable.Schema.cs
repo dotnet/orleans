@@ -173,7 +173,18 @@ internal sealed partial class DynamoDBReminderTable
             v2TableName,
             values,
             $"{V2PartitionKeyName} = :partition AND {V2SortKeyName} BETWEEN :lower AND :upper",
-            Resolve);
+            ResolveV2RangeRow);
+    }
+
+    private ReminderEntry ResolveV2RangeRow(Dictionary<string, AttributeValue> item)
+    {
+        if (item[SERVICE_ID_PROPERTY_NAME].S != serviceId)
+        {
+            throw new InvalidOperationException(
+                $"DynamoDB reminder range for service '{serviceId}' in '{v2TableName}' contains a conflicting stored service identity.");
+        }
+
+        return Resolve(item);
     }
 
     private async Task<string?> UpsertDualRow(ReminderEntry entry)

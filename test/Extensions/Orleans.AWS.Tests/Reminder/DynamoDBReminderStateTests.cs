@@ -210,6 +210,59 @@ public sealed class DynamoDBReminderStateTests
     }
 
     [Theory]
+    [InlineData(1u, 10u)]
+    [InlineData(10u, 1u)]
+    [InlineData(0u, 0u)]
+    public async Task V2RangeReadRejectsConflictingServiceAcrossPages(uint begin, uint end)
+    {
+        var entry = Entry();
+        var item = RowItem(entry);
+        var pages = 0;
+        using var client = new RequestClient
+        {
+            Read = (_, _) => Task.FromResult(new GetItemResponse { Item = StateItem("Cutover") }),
+            Query = request =>
+            {
+                Assert.True(request.ConsistentRead);
+                if (request.ExpressionAttributeValues[":partition"].S != DynamoDBReminderTable.GetV2PartitionKey("service", 0)
+                    || request.ExpressionAttributeValues[":lower"].S != DynamoDBReminderTable.GetV2RangeBounds(begin + 1, uint.MaxValue).Lower)
+                {
+                    return new() { Items = [] };
+                }
+
+                if (++pages == 1)
+                {
+                    Assert.True(request.ExclusiveStartKey is null or { Count: 0 });
+                    return new()
+                    {
+                        Items = [],
+                        LastEvaluatedKey = new() { ["SortKey"] = new("next-page") },
+                    };
+                }
+
+                Assert.Equal("next-page", request.ExclusiveStartKey["SortKey"].S);
+                return new() { Items = [item] };
+            },
+        };
+        var table = CreateTable(client, DynamoDBReminderTableMode.V2);
+        AttachStorage(table, client);
+
+        var result = Assert.Single((await table.ReadRows(begin, end)).Reminders);
+        Assert.Equal(entry.GrainId, result.GrainId);
+        Assert.Equal(entry.ReminderName, result.ReminderName);
+        Assert.Equal(2, pages);
+
+        pages = 0;
+        item["ServiceId"] = new("another-service");
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => table.ReadRows(begin, end));
+
+        Assert.Contains("conflicting stored service identity", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("'service'", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(2, pages);
+        Assert.Equal(0, client.WriteCount);
+    }
+
+    [Theory]
     [InlineData(DynamoDBReminderTableMode.Migrate, null)]
     [InlineData(DynamoDBReminderTableMode.V2, null)]
     [InlineData(DynamoDBReminderTableMode.V2Only, null)]
