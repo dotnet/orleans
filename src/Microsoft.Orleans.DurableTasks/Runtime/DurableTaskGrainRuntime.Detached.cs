@@ -134,7 +134,7 @@ internal sealed partial class DurableTaskGrainRuntime
         var handle = StageSubscriptionRecord(recordId, fingerprint, shielded, response);
 
         // A canceled starter still starts the task, which its cancellation doesn't reach, and ends only its subscription.
-        if (response is null && IsAncestorCancellationRequested(recordId, state: null, shielded))
+        if (response is null && IsStartRefusedByAncestorCancellation(recordId, state: null, shielded))
         {
             _pendingHandleResponses[recordId] = StageResponse(recordId, DurableTaskResponse.Canceled);
         }

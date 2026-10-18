@@ -52,7 +52,7 @@ internal sealed partial class DurableTaskGrainRuntime
         }
 
         // A subscription of a canceled ancestor is not created, unless the parent started it shielded.
-        if (IsAncestorCancellationRequested(taskId, state: null, shielded))
+        if (IsStartRefusedByAncestorCancellation(taskId, state: null, shielded))
         {
             return new(new CompletedTaskHandle(taskId, DurableTaskResponse.Canceled), RequiresWrite: false);
         }
