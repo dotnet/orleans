@@ -53,6 +53,10 @@ internal static class DurableTaskEventBarriers
         && CallerScope.TryParseWireId(CallerScope.GetCallerTaskId(callerId, taskId), out _, out var callerNodeId)
         && callerNodeId == nodeId;
 
+    /// <summary>Waits until an attempt of <paramref name="taskId"/> ended on <paramref name="grainId"/>'s activation.</summary>
+    public static Task WaitForExecutionStoppedAsync(this DiagnosticEventCollector events, GrainId grainId, TaskId taskId) =>
+        Wait<DurableTaskEvents.ExecutionStopped>(events, grainId, taskId);
+
     private static Task<DiagnosticEvent> Wait<TEvent>(DiagnosticEventCollector events, GrainId grainId, TaskId taskId)
         where TEvent : DurableTaskEvents.DurableTaskEvent =>
         events.WaitForEventAsync(
