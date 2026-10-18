@@ -428,12 +428,16 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         return next;
     }
 
+    // Work sources may report any non-positive delay to request a prompt wake-up; it is normalized to zero so that due
+    // times derived from it stay representable.
     private TimeSpan? GetWorkSourceDelay()
     {
         TimeSpan? next = null;
         foreach (var source in _workSources)
         {
-            if (source.GetWakeupDelay() is { } delay && (next is null || delay < next)) next = delay;
+            if (source.GetWakeupDelay() is not { } delay) continue;
+            if (delay <= TimeSpan.Zero) return TimeSpan.Zero;
+            if (next is null || delay < next) next = delay;
         }
 
         return next;
