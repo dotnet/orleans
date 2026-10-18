@@ -26,6 +26,10 @@ the serializer stable when accessing existing data.
 Missing reads and successful clears recreate the state through the registered
 Orleans activator and reset the ETag and existence metadata.
 
+Legacy documents use a null ETag and `RecordExists` to authorize updates and clears
+after a successful read. Clearing a record observed as absent reports a concurrency
+conflict if a document now exists. A wildcard ETag (`*`) authorizes unconditional clears.
+
 The JSON serializer supports scalar and array roots. It preserves the legacy
 `$`-to-`__` field-name encoding and reserves JSON property names beginning with
 `__`; such names fail explicitly before persistence. Cancellation-token storage

@@ -102,6 +102,73 @@ public sealed class MongoLegacyStateConcurrencyTests
         Assert.Equal("recreated", (await collection.Find(new BsonDocument("_id", id.ToString())).SingleAsync(token))["_doc"]["Name"].AsString);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task AbsentRead_ConcurrentRawInsertRejectsClearWithoutChangingState(string? etag)
+    {
+        await using var database = await MongoDatabase.CreateAsync();
+        using var host = CreateHost(database);
+        var storage = host.Services.GetRequiredKeyedService<IGrainStorage>("store");
+        var token = TestContext.Current.CancellationToken;
+        var id = GrainId.Create("account", "inserted-after-absent-read");
+        var state = new GrainState<MongoTestState> { State = new MongoTestState() };
+        await storage.ReadStateAsync("Account", id, state, token);
+        Assert.False(state.RecordExists);
+        Assert.Null(state.ETag);
+        var original = state.State;
+        original.Name = "absent-reader";
+        original.Count = 999;
+        state.ETag = etag;
+        var collection = database.Database.GetCollection<BsonDocument>("Legacy_Account");
+        var raw = new BsonDocument { { "_id", id.ToString() }, { "Name", "concurrent-writer" }, { "Count", 42 } };
+        await collection.InsertOneAsync(raw, cancellationToken: token);
+
+        var error = await Assert.ThrowsAsync<InconsistentStateException>(() => storage.ClearStateAsync("Account", id, state, token));
+        Assert.Null(error.StoredEtag);
+        Assert.Equal(etag, error.CurrentEtag);
+        Assert.Same(original, state.State);
+        Assert.Equal("absent-reader", state.State.Name);
+        Assert.Equal(999, state.State.Count);
+        Assert.Equal(etag, state.ETag);
+        Assert.False(state.RecordExists);
+        Assert.Equal(raw, await collection.Find(new BsonDocument("_id", id.ToString())).SingleAsync(token));
+
+        await storage.ReadStateAsync("Account", id, state, token);
+        Assert.True(state.RecordExists);
+        Assert.Null(state.ETag);
+        Assert.Equal("concurrent-writer", state.State.Name);
+        Assert.Equal(42, state.State.Count);
+        var observed = state.State;
+        state.ETag = etag;
+        await storage.ClearStateAsync("Account", id, state, token);
+        Assert.NotSame(observed, state.State);
+        Assert.Null(state.ETag);
+        Assert.False(state.RecordExists);
+        Assert.Equal(0, await collection.CountDocumentsAsync(FilterDefinition<BsonDocument>.Empty, cancellationToken: token));
+    }
+
+    [Fact]
+    public async Task UnreadRawDocument_WildcardClearRemovesStoredState()
+    {
+        await using var database = await MongoDatabase.CreateAsync();
+        using var host = CreateHost(database);
+        var storage = host.Services.GetRequiredKeyedService<IGrainStorage>("store");
+        var token = TestContext.Current.CancellationToken;
+        var id = GrainId.Create("account", "wildcard-clear-legacy");
+        var collection = database.Database.GetCollection<BsonDocument>("Legacy_Account");
+        await collection.InsertOneAsync(
+            new BsonDocument { { "_id", id.ToString() }, { "Name", "unread" }, { "Count", 42 } }, cancellationToken: token);
+        var original = new MongoTestState { Name = "new-activation", Count = 999 };
+        var state = new GrainState<MongoTestState> { State = original, ETag = "*", RecordExists = false };
+
+        await storage.ClearStateAsync("Account", id, state, token);
+        Assert.NotSame(original, state.State);
+        Assert.Null(state.ETag);
+        Assert.False(state.RecordExists);
+        Assert.Equal(0, await collection.CountDocumentsAsync(FilterDefinition<BsonDocument>.Empty, cancellationToken: token));
+    }
+
     private static Microsoft.Extensions.Hosting.IHost CreateHost(MongoDatabase database)
         => MongoTestHost.Create(silo =>
         {
