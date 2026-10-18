@@ -53,6 +53,38 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
+    [Fact]
+    public async Task EarlierScheduledMessage_SchedulesAnEarlierWakeupWhichSupersedesTheLaterOne()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+        var grainId = receiver.GetGrainId();
+        var later = JobClock.GetUtcNow() + Delay;
+        var earlier = JobClock.GetUtcNow() + TimeSpan.FromMinutes(1);
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(20, "later")), later))).Status);
+        var laterJob = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grainId));
+        Assert.Equal(later, laterJob.DueTime);
+
+        // The later wake-up does not cover a message due first, so its acceptance schedules an earlier one.
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(21, "earlier")), earlier))).Status);
+        var jobs = Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grainId);
+        Assert.Equal(2, jobs.Count);
+        Assert.Equal(earlier, jobs[1].DueTime);
+
+        // Work due later than the earliest wake-up schedules nothing further.
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(22, "last")), later + Delay))).Status);
+        Assert.Equal(2, Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grainId).Count);
+
+        // Any other wake-up completes in favour of the earliest one, whose run reschedules for the remaining work.
+        Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunDuplicatePumpAsync(receiver)).Status);
+        await AssertWakeupAtAsync(receiver, earlier);
+        JobClock.Advance(earlier - JobClock.GetUtcNow());
+        await AssertWakeupAtAsync(receiver, later);
+        Assert.Equal("earlier", Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Value);
+        Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunDuplicatePumpAsync(receiver)).Status);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
