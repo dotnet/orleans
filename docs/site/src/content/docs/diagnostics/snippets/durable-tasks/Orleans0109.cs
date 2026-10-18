@@ -15,7 +15,7 @@ public sealed class DocumentGrain : DurableGrain
     // <orleans0109_violation>
     public async DurableTask<string> SealAsync(byte[] document)
     {
-        // The hash runs on the thread pool, and the code after this await continues there, off the activation.
+        // The hash delegate runs on the thread pool; the await resumes on the activation's scheduler.
         var hash = await Task.Run(() => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(document)));
         await Archive(hash).WithId("archive");
         return hash;
