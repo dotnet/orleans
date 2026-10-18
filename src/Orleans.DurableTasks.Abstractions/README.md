@@ -50,13 +50,16 @@ on this abstractions assembly.
   reason. A host supplies the reason through `DurableTaskRuntimeHelper.RequestTaskCancellation`.
 - A host cancels an *attempt*, one in-memory run of a task's body, with
   `DurableTaskRuntimeHelper.CancelAttempt` when the attempt's work can't be recorded any more: its
-  grain activation is stopping, or the task was aborted or deleted. From then on, every durable
+  grain activation is stopping, the task was aborted or deleted, or the running code can't replay the
+  task's recorded execution (`UnsupportedVersion` or `Diverged`). From then on, every durable
   operation of the attempt throws `DurableTaskAttemptCanceledException`, which derives from
   `OperationCanceledException` and carries the `DurableTaskAttemptCancellationReason`: `RunInline`, starting
   or awaiting children, including shielded and detached ones, `Post`, `ScheduleAsync`, signals,
   delays, handle operations, and combinators. A wait which the attempt's cancellation ends throws it
-  too. The host discards the attempt's response and records nothing which the attempt does; a
-  stopping activation's task replays in a new attempt.
+  too. The host discards the attempt's response; a stopping activation's task replays in a new
+  attempt, and a task whose attempt can't replay its record stays pending until code which can
+  replay it runs. Changes which the attempt's code makes to journaled grain state, such as cleanup,
+  commit with the grain's next journal write.
 - `DurableTask.Current.CancellationToken` is canceled by task cancellation and by attempt
   cancellation, so the calls which ordinary task code makes end promptly in both cases.
   `DurableTask.Current.AttemptCancellationToken` is canceled only by attempt cancellation. Code which
@@ -388,8 +391,10 @@ Follow these rules in re-executed code:
 - Give stable identifiers with `WithId` to children which are scheduled conditionally, in loops,
   or concurrently outside a combinator, and to combinators. Generated identifiers are stable only when unnamed
   children, unnamed `DurableTask.RunInline` effects, unnamed detached tasks, and combinators are created in the same order.
-- Scheduling an existing identifier with different arguments fails, so a replay which diverges
-  from the recorded execution surfaces as an error.
+- A replay which schedules another operation, or other arguments, under an identifier which an
+  earlier run recorded diverges from the recorded execution. The host cancels the attempt with
+  `DurableTaskAttemptCancellationReason.Diverged` and keeps the task pending until code which
+  matches the record replays it.
   When a deployment changes a workflow while executions are pending, keep the existing steps
   and identifiers, and give new steps new identifiers, or branch the change on
   `DurableTask.GetVersion`; see [Versioned changes](#versioned-changes). A changed `RunInline` delegate
@@ -432,8 +437,8 @@ var paymentId = DurableTask.RunInline("payment-id", Guid.NewGuid);
   `get-id`, but run differently: the step runs when it is awaited, possibly in a later turn, as a
   child execution with its own `DurableTask.Current` and cancellation scope, and commits in a
   journal write of its own. A replay which finds one kind recorded where the body now runs the
-  other fails with a divergence error instead of running the work again, so a deployment which
-  changes one into the other branches on `DurableTask.GetVersion`.
+  other diverges instead of running the work again, so a deployment which changes one into the
+  other branches on `DurableTask.GetVersion`.
 - `DurableTask.RunInline(effect)` omits the name for terseness, such as
   `var paymentId = DurableTask.RunInline(Guid.NewGuid);`. The effect takes the execution's next generated
   identifier, `$child-1`, `$child-2`, and so on, which unnamed effects share with unnamed children,

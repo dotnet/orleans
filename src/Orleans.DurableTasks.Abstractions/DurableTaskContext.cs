@@ -607,9 +607,11 @@ public abstract class DurableTaskContext
     /// A host which can't store the outcome, for example because its result doesn't serialize, records and returns that
     /// failure instead, so every run observes the same failure. A host throws <see cref="InvalidOperationException"/>
     /// without running the effect when it can't stage the record with the effect's state changes, for example when it is
-    /// called off the host's scheduler, or when an earlier run recorded another kind of operation, such as a step, under
-    /// the effect's identifier, which is how a replay which diverges from its recorded execution surfaces. Hosts which
-    /// don't support recorded effects keep this default implementation, which throws <see cref="NotSupportedException"/>.
+    /// called off the host's scheduler. When an earlier run recorded another kind of operation, such as a step, under the
+    /// effect's identifier, the replay diverges from its recorded execution: a host cancels the attempt with
+    /// <see cref="DurableTaskAttemptCancellationReason.Diverged"/> without running the effect, and keeps the task pending.
+    /// Hosts which don't support recorded effects keep this default implementation, which throws
+    /// <see cref="NotSupportedException"/>.
     /// </para>
     /// </remarks>
     protected internal virtual DurableTaskResponse RunEffect<TState>(
