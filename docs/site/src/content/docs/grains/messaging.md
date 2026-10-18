@@ -274,7 +274,8 @@ leaves the deduplication window, so sinks must be idempotent.
   returns <xref:Orleans.Messaging.DeliveryStatus.Duplicate> when its subject,
   payload, and `DeliverAt` time match, and fails when they differ. A repeat of a
   completed message returns `Duplicate` while the completion record is within
-  <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>. After the
+  <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>, or the
+  original `DeadLettered` reason and code when an inbox sink rejected it. After the
   window ends, the same ID is accepted and processed again.
 - A message with <xref:Orleans.Messaging.Envelope.DeliverAt> is delivered and
   accepted immediately, then processed once its acceptance is durable and the

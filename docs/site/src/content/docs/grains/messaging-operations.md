@@ -78,7 +78,7 @@ inbox depth counter includes them.
 | Delivery status | Meaning and response |
 | --- | --- |
 | `Accepted` | The receiver journaled the message. Await the durable reply or query business state by the same command ID. |
-| `Duplicate` | The receiver has this message ID pending or completed within retention. The outbox removes the message; business results come from a reply or query. |
+| `Duplicate` | The receiver has this message ID pending or completed within retention. The outbox removes the message; business results come from a reply or query. A repeat of a message which an inbox sink rejected receives the original `DeadLettered` result instead. |
 | `Backpressured` | The receiver is at capacity. The outbox retries. Examine receiver depth, oldest message age, and handler latency. |
 | `HandlerNotFound` | The receiver has no registered handlers. The outbox retries. Check handler registration during activation and deployment skew. |
 | `DeadLettered` | The outbox removes the message as a terminal receiver outcome. |
