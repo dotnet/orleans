@@ -23,6 +23,12 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+  </PropertyGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks.Tests" />
     <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks.IntegrationTests" />
