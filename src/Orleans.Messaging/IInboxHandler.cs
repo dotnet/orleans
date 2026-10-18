@@ -22,3 +22,4 @@ public interface IInboxHandler
     /// <returns>A task which completes when handling returns.</returns>
     ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
 }
+
