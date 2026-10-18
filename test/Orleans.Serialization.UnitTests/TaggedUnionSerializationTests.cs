@@ -32,6 +32,7 @@ public class TaggedUnionSerializationTests : IDisposable
             .AddSingleton<NumberCallbacks>()
             .AddSingleton<CaseOrderCallbacks>()
             .AddSingleton<CaseCallbacks>()
+            .AddSingleton<ImmutablePetCallbacks>()
             .AddSerializer()
             .BuildServiceProvider();
         _serializer = _services.GetRequiredService<Serializer>();
@@ -451,6 +452,22 @@ public class TaggedUnionSerializationTests : IDisposable
         Assert.Same(value, result.Value);
         Assert.Same(value.Item, ((Value<List<int>>)result.Value!).Item);
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ImmutableUnionRunsCopyCallbacksAndPreservesCaseReference(bool opaque)
+    {
+        ImmutableCallbackPet value = opaque
+            ? new OpaqueCase("shared")
+            : new Value<List<int>>([1, 2]);
+        var callbacks = _services.GetRequiredService<ImmutablePetCallbacks>();
+
+        var result = Copy(value);
+
+        Assert.Same(value.Value, result.Value);
+        Assert.Equal(new[] { "copying", "copied" }, callbacks.Events);
+    }
 }
 
 [GenerateSerializer]
@@ -591,6 +608,17 @@ public union ImmutablePet(OpaqueCase);
 
 [Immutable, GenerateSerializer]
 public union ImmutableValue<T>(Value<T>);
+
+[Immutable, GenerateSerializer, SerializationCallbacks(typeof(ImmutablePetCallbacks))]
+public union ImmutableCallbackPet(OpaqueCase, Value<List<int>>);
+
+public sealed class ImmutablePetCallbacks
+{
+    public List<string> Events { get; } = [];
+
+    public void OnCopying(ImmutableCallbackPet original, ref ImmutableCallbackPet result) => Events.Add("copying");
+    public void OnCopied(ImmutableCallbackPet original, ref ImmutableCallbackPet result) => Events.Add("copied");
+}
 
 [GenerateSerializer]
 public union PetV1(Cat);
