@@ -1974,7 +1974,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         // A child of a canceled ancestor is not created, unless the parent started it shielded. A child which existed when
         // the cancellation was requested records the request itself.
-        if (state is not { CancellationRequestedAt: not null } && IsAncestorCancellationRequested(taskId, state, shielded))
+        if (state is not { CancellationRequestedAt: not null } && IsStartRefusedByAncestorCancellation(taskId, state, shielded))
         {
             return new(new CompletedTaskHandle(taskId, DurableTaskResponse.Canceled), RequiresWrite: false);
         }
@@ -2056,6 +2056,55 @@ internal sealed partial class DurableTaskGrainRuntime(
         return false;
     }
 
+    /// <summary>
+    /// Returns whether the durable cancellation of one of a task's ancestors refuses the task's start, after each running
+    /// ancestor which the cancellation reaches observes it.
+    /// </summary>
+    /// <param name="taskId">The task to start.</param>
+    /// <param name="state">The task's state, if it exists.</param>
+    /// <param name="shielded">Whether the task's parent starts it shielded.</param>
+    /// <remarks>
+    /// A cancellation is staged when it arrives and reaches the running executions once the write which commits it
+    /// completes. A body which starts work in between has that work refused, so it observes its own cancellation first:
+    /// the refused start throws while <see cref="DurableTaskContext.IsTaskCancellationRequested"/> reports the
+    /// cancellation, and the body runs its cancellation handling, such as shielded compensation. The propagation which
+    /// follows the write finds the cancellation already requested.
+    /// </remarks>
+    private bool IsStartRefusedByAncestorCancellation(TaskId taskId, IDurableTaskState? state, bool shielded)
+    {
+        if (!IsAncestorCancellationRequested(taskId, state, shielded))
+        {
+            return false;
+        }
+
+        for (var ancestorId = taskId.Parent(); !ancestorId.IsDefault; ancestorId = ancestorId.Parent())
+        {
+            if (!_storage.TryGetTask(ancestorId, out var ancestorState))
+            {
+                continue;
+            }
+
+            if (ancestorState.CancellationRequestedAt.HasValue && TryGetExecutionContext(ancestorId, out var context))
+            {
+                try
+                {
+                    DurableTaskRuntimeHelper.RequestTaskCancellation(context, ancestorState.CancellationReason);
+                }
+                catch (AggregateException exception)
+                {
+                    _shared.Logger.LogWarning(exception, "{Id} error canceling durable task '{TaskId}'.", GrainId, ancestorId);
+                }
+            }
+
+            if (ancestorState.Shielded)
+            {
+                break;
+            }
+        }
+
+        return true;
+    }
+
     /// <summary>Records that a child which its parent started shielded is unreachable by its ancestors' cancellation.</summary>
     private void MarkShielded(TaskId taskId, IDurableTaskState state, bool shielded)
     {
@@ -2108,7 +2157,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 await CommitResponseAsync(taskId, DurableTaskResponse.Canceled, CancellationToken.None));
         }
 
-        if (IsAncestorCancellationRequested(taskId, state, shielded))
+        if (IsStartRefusedByAncestorCancellation(taskId, state, shielded))
         {
             if (state is null)
             {

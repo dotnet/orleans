@@ -346,6 +346,48 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task BodyWhoseStartAStagedCancellationRefusesObservesTheCancellation() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var caller = GrainId.Create("caller", "one");
+        var rootId = TaskId.Parse("root");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            started.TrySetResult();
+            await release.Task;
+            try
+            {
+                await DurableTask.Run(static _ => 2).WithId("step");
+                return "completed";
+            }
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
+            {
+                var compensation = await DurableTask.Run(static _ => "compensated").WithId("compensate").Shielded();
+                return $"{compensation}: {DurableTask.Current.TaskCancellationReason}";
+            }
+        }));
+        runtime.ScheduleFromInbox(rootId, request);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // The caller's cancellation is staged, and its propagation to the body waits for the write which commits it. The
+        // body starts its step before that write, so the staged cancellation refuses the step.
+        Accept(CreateHandler(runtime), CancellationMessage(caller, runtime.GrainId, rootId, "caller stopped"));
+        release.SetResult();
+
+        // The body observes the cancellation which refused its step, and compensates.
+        var response = await runtime.GetScheduledTaskHandle(rootId)
+            .WaitAsync(TestContext.Current.CancellationToken)
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.Equal("compensated: caller stopped", response.GetResult<string>());
+        Assert.False(storage.Contains(TaskId.Parse("root/step")));
+    });
+
+    [Fact]
     public Task InboxBatchStagesCancellationsAndCompletionsWithoutWaitingForBatchWrite() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
@@ -4372,13 +4414,13 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             new DurableTaskCompletionMessage { TaskId = storedId, SubscriberId = taskId, Response = response, Sender = sender });
     }
 
-    private static InboxMessage CancellationMessage(GrainId sender, GrainId receiver, TaskId taskId) =>
+    private static InboxMessage CancellationMessage(GrainId sender, GrainId receiver, TaskId taskId, string? reason = null) =>
         MessagingTestHelpers.CreateMessage(
             MessagingTestHelpers.MessageTypes.Cancellation,
             sender,
             receiver,
             taskId,
-            new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender });
+            new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender, CancellationReason = reason });
     private static ValueTask<TaskId> InvokeSelectCompletionCoreAsync(
         GrainDurableTaskContext context,
         TaskId decisionId,

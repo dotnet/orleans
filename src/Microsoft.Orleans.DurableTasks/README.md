@@ -385,7 +385,9 @@ synchronously on the activation which makes them, when the runtime stages them: 
   task, and terminalizes delays and tasks whose bodies haven't started as canceled. A started body
   decides its task's outcome: the task is canceled when the cancellation escapes it, and otherwise
   completes with the body's result or failure. Attached children which aren't shielded and which the
-  body starts after the request are canceled without running. Recovery replays a canceled body with its cancellation
+  body starts after the request are canceled without running, and from such a start on, the body
+  observes the request through `IsTaskCancellationRequested`, even before the request's write
+  completes. Recovery replays a canceled body with its cancellation
   requested, so completed children return their recorded results. The first durable terminal result
   wins a race.
 - A body starts compensation with `.Shielded()`. A shielded child, such as a local step, a delay, or a
