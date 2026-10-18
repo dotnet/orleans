@@ -441,7 +441,8 @@ accepts no `WithId`, so the named form schedules the inputs with
 <xref:Orleans.DurableTasks.DurableTask.DelayUntil*?displayProperty=nameWithType> are
 durable timers measured in logical time. The runtime records the delay's due time and
 sends the grain a scheduled resume message, which its inbox holds until the Durable Jobs
-clock reaches the due time. A recorded due time is a commitment: a replay which requests
+clock reaches the due time. Logical time reads the Durable Jobs clock, so due times and
+the inbox share one time domain. A recorded due time is a commitment: a replay which requests
 another due time, for example after a configured duration changed, keeps the recorded
 one and logs a warning. Timeouts use these delays, so a timeout counts from the run which
 first awaited it.

@@ -34,6 +34,9 @@ internal sealed class DurableTaskJournalHarness : IAsyncDisposable
         silo.Services.AddLogging();
         silo.Services.AddSingleton(timeProvider ?? TimeProvider.System);
         silo.Services.AddKeyedSingleton(JournalingTimeProviderNames.Journaling, TimeProvider.System);
+
+        // Like a silo, the other areas' keyed clocks, including the Durable Jobs clock, default to the unkeyed one.
+        silo.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
         silo.AddJournaling();
         silo.AddDurableTasks();
 

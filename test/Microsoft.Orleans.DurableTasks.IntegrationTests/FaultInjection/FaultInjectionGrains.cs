@@ -192,7 +192,7 @@ public sealed class FaultWorkflowGrain(
         var effect = DurableTask.RunInline("workflow", () => Increment("workflow"));
         var processed = await partner.ProcessAsync(step, this.GetPrimaryKey(), rootId).WithId("process");
         var ready = await Ready.WaitAsync();
-        await DurableTask.Delay(TimeSpan.FromMinutes(1)).WithId("pause");
+        await DurableTask.Delay(DurableTaskFaultHarness.WorkflowDelay).WithId("pause");
         var echoed = await partner.EchoAsync(processed).Detached().WithId($"{rootId}-echo");
         return $"step={step};effect={effect};processed={processed};ready={ready};echoed={echoed}";
     }
@@ -204,7 +204,7 @@ public sealed class FaultWorkflowGrain(
         string deadline;
         try
         {
-            deadline = await Never.WaitAsync().WaitAsync(TimeSpan.FromMinutes(5)).WithId("deadline");
+            deadline = await Never.WaitAsync().WaitAsync(DurableTaskFaultHarness.WorkflowDelay).WithId("deadline");
         }
         catch (TimeoutException)
         {
@@ -306,7 +306,7 @@ public sealed class FaultWorkflowGrain(
     private static async DurableTask<string> GateAsync()
     {
         var held = await Held.WaitAsync();
-        await DurableTask.Delay(TimeSpan.FromMinutes(10));
+        await DurableTask.Delay(DurableTaskFaultHarness.WorkflowDelay);
         return $"gate after {held}";
     }
 

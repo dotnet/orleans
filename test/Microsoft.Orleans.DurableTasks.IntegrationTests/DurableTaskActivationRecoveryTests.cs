@@ -98,7 +98,7 @@ public abstract class DurableTaskActivationRecoveryTests(string journalFormatKey
     }
 
     [Fact]
-    public async Task DelayedTaskResumesWhenDue()
+    public async Task DelayedTaskResumesWhenTheDurableJobsClockPassesItsDueTime()
     {
         const string rootId = "delay-resume";
         const int argument = 5;
@@ -106,10 +106,15 @@ public abstract class DurableTaskActivationRecoveryTests(string journalFormatKey
         var grain = _fixture.Client.GetGrain<IDurableTaskRecoveryTestGrain>(Guid.NewGuid());
         var grainId = grain.GetGrainId();
 
-        // The Durable Jobs clock runs ahead of the grain's clock by more than the delay, so the delay's resume is due when
-        // the grain schedules it.
+        // Only the Durable Jobs clock advances. The task's logical time, and so its delay's due time, follow that clock.
         _fixture.JobClock.Advance(TimeSpan.FromHours(2));
+        var before = _fixture.JobClock.GetUtcNow();
         var scheduled = await grain.DelayThenComputeAsync(argument).WithId(rootId).ScheduleAsync(cancellationToken);
+        await _fixture.Probe.WaitForLogicalTimeCountAsync(grainId, 1, cancellationToken);
+        Assert.InRange(Assert.Single(_fixture.Probe.GetLogicalTimes(grainId)), before, _fixture.JobClock.GetUtcNow());
+        Assert.False(await scheduled.IsCompletedAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, cancellationToken));
+
+        _fixture.JobClock.Advance(TimeSpan.FromHours(2));
         var response = await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
 
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);

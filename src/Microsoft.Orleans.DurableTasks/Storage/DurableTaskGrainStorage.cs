@@ -4,6 +4,7 @@ using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
 using Orleans.DurableTasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -47,7 +48,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         [FromKeyedServices("$task-requests")] IDurableDictionary<TaskId, byte[]> requests,
         [FromKeyedServices("$task-results")] IDurableDictionary<TaskId, byte[]> results,
         IJournaledStateManager stateManager,
-        TimeProvider timeProvider,
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider,
         Serializer serializer)
     {
         ArgumentNullException.ThrowIfNull(items);

@@ -911,7 +911,9 @@ public sealed class DurableRpcProtocolTests
 
     private sealed class TestSiloBuilder : ISiloBuilder
     {
-        public IServiceCollection Services { get; } = new ServiceCollection();
+        // Like a silo, each area's keyed clock defaults to the unkeyed one.
+        public IServiceCollection Services { get; } = new ServiceCollection()
+            .AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
         public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
 }
