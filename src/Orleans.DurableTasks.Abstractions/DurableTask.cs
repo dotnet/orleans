@@ -76,7 +76,7 @@ public abstract partial class DurableTask
     /// <remarks>
     /// <para>
     /// The child records the result of the function's task, or the exception which it threw, and a replay returns the
-    /// recorded outcome without running the function. <see cref="Once{TResult}(string, Func{TResult})"/> runs a
+    /// recorded outcome without running the function. <see cref="RunInline{TResult}(string, Func{TResult})"/> runs a
     /// synchronous effect in the caller's work item instead. Because the step runs later, as a child, a step which
     /// isn't shielded completes as canceled when the parent's cancellation was requested before it starts, and its
     /// record commits in a journal write of its own. A step and an effect with the same name share an identifier, and a
@@ -635,7 +635,7 @@ public readonly struct ConfiguredDurableTask
     /// <remarks>
     /// The start commits with the caller's next durable write, in the same write as the state changes which the calling
     /// code made, and is then delivered exactly once. Within a durable execution, the start is recorded like
-    /// <see cref="DurableTask.Once{TResult}(Func{TResult})"/>, so a replay returns the same handle without starting the
+    /// <see cref="DurableTask.RunInline{TResult}(Func{TResult})"/>, so a replay returns the same handle without starting the
     /// task again. In an ordinary method of a grain which has a durable outbox, the task is a root task.
     /// </remarks>
     /// <exception cref="InvalidOperationException">The caller has no durable outbox, for example because it's a client.</exception>

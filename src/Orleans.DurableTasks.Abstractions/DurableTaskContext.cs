@@ -85,7 +85,7 @@ public abstract class DurableTaskContext
     /// task replays. State changes and durable operations don't depend on the value: a run which ended before a durable
     /// write committed its work is replayed, so code which runs only while the value is <see langword="false"/> can run
     /// twice or never, and code which branches on it schedules different operations in different runs. A state change
-    /// which runs once belongs in <see cref="DurableTask.Once{TResult}(string, Func{TResult})"/>, in a step, or in the
+    /// which runs once belongs in <see cref="DurableTask.RunInline{TResult}(string, Func{TResult})"/>, in a step, or in the
     /// body's synchronous tail.
     /// </para>
     /// <para>Hosts which don't track replay keep this default implementation, which returns <see langword="false"/>.</para>
@@ -493,9 +493,9 @@ public abstract class DurableTaskContext
     /// <remarks>
     /// A name repeated in one run identifies its later occurrences by their order: the first is <paramref name="name"/>,
     /// and later ones append their ordinal, such as <c>reserve$2</c>, so children named in a loop keep their identifiers
-    /// on replay. Named children, named combinators, and <see cref="DurableTask.Once{TResult}(string, Func{TResult})"/>
+    /// on replay. Named children, named combinators, and <see cref="DurableTask.RunInline{TResult}(string, Func{TResult})"/>
     /// effects share one count per name. Names don't contain <c>$</c>, which generated identifiers use. Unnamed children
-    /// and unnamed <see cref="DurableTask.Once{TResult}(Func{TResult})"/> effects share one count of generated
+    /// and unnamed <see cref="DurableTask.RunInline{TResult}(Func{TResult})"/> effects share one count of generated
     /// identifiers, <c>$child-1</c>, <c>$child-2</c>, and so on. Generated identifiers are replay-stable when unnamed
     /// operations are created in the same deterministic order. A concurrent
     /// batch can use
@@ -598,7 +598,7 @@ public abstract class DurableTaskContext
     /// <returns>The effect's outcome, which the host recorded.</returns>
     /// <remarks>
     /// <para>
-    /// <see cref="DurableTask.Once{TResult}(string, Func{TResult})"/> calls this synchronously from the task's body. A host
+    /// <see cref="DurableTask.RunInline{TResult}(string, Func{TResult})"/> calls this synchronously from the task's body. A host
     /// runs the effect and stages its record in the same synchronous work, so the record commits with the next durable
     /// write together with the state changes which the effect made. Every later run of the body, including a replay,
     /// receives the recorded outcome without running the effect.
@@ -616,7 +616,7 @@ public abstract class DurableTaskContext
         TaskId effectId,
         TState state,
         Func<TState, DurableTaskResponse> effect)
-        => throw new NotSupportedException("The durable task host does not support DurableTask.Once.");
+        => throw new NotSupportedException("The durable task host does not support DurableTask.RunInline.");
 
     /// <summary>
     /// Returns the version of the change <paramref name="name"/> which this execution follows, deciding and recording it
