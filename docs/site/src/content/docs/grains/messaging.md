@@ -204,7 +204,8 @@ source or an inbox sink keeps that state as the only journaled copy:
   letter's reason, such as the rejection which the receiver reported. A `Rejected`
   retirement also carries the application-defined code which the receiver's sink
   reported, if any.
-  An outbox dead letter receives the materialized message first. After the send, a
+  An outbox dead letter receives its own copy of the materialized message first, so the
+  source can release its payload when the message retires. After the send, a
   source that throws or returns an invalid message, for example because its stored
   payload no longer decodes, dead-letters only that entry and retires it as
   `DeadLettered` in the same journal write; the grain keeps processing its other
