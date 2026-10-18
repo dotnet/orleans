@@ -119,9 +119,9 @@ public class DurableTaskReplayRegionTests
             {
                 var status = {|ORLEANS0100:_status|}.Value;
                 var id = DurableTask.RunInline(Guid.NewGuid);
-                var read = DurableTask.RunInline(() => _status.Value);
-                var now = DurableTask.RunInline(() => DateTime.UtcNow);
-                DurableTask.RunInline(() => SetStatus(status + read));
+                var read = DurableTask.{|ORLEANS0120:RunInline|}(() => _status.Value);
+                var now = DurableTask.{|ORLEANS0120:RunInline|}(() => DateTime.UtcNow);
+                DurableTask.{|ORLEANS0120:RunInline|}(() => SetStatus(status + read));
 
                 // The tail follows the last recorded effect.
                 return $"{id} {now} {_status.Value}";

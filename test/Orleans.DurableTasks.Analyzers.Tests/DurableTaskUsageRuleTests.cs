@@ -49,21 +49,21 @@ public class DurableTaskUsageRuleTests
             {
                 var captured = 0;
                 DurableTask.RunInline(() => { {|ORLEANS0104:captured = 1|}; });
-                DurableTask.RunInline(() => { {|ORLEANS0104:captured++|}; });
-                var returned = DurableTask.RunInline(() =>
+                DurableTask.{|ORLEANS0120:RunInline|}(() => { {|ORLEANS0104:captured++|}; });
+                var returned = DurableTask.{|ORLEANS0120:RunInline|}(() =>
                 {
                     var local = 2;
                     local++;
                     _status.Value = local;
                     return local;
                 });
-                DurableTask.RunInline(() => {|ORLEANS0109:Task.Run(() => 1)|}.Result);
+                DurableTask.{|ORLEANS0120:RunInline|}(() => {|ORLEANS0109:Task.Run(() => 1)|}.Result);
 
                 // Unnamed effects take generated identifiers, so neither a result which contains '$' nor a repeated call
                 // site is a name.
-                DurableTask.RunInline(() => "$value");
-                DurableTask.RunInline(() => 3);
-                DurableTask.RunInline(() => 3);
+                DurableTask.{|ORLEANS0120:RunInline|}(() => "$value");
+                DurableTask.{|ORLEANS0120:RunInline|}(() => 3);
+                DurableTask.{|ORLEANS0120:RunInline|}(() => 3);
                 await Step(captured + returned).WithId("step");
                 return returned;
             }
@@ -83,13 +83,89 @@ public class DurableTaskUsageRuleTests
                 {|ORLEANS0105:Step(3).Detached().Shielded();|}
                 await Step(4).WithId("awaited");
                 Step(5).Detached().Post();
-                _ = await Step(5).ScheduleAsync();
+                _ = await {|ORLEANS0119:Step(5).WithId("discarded").ScheduleAsync()|};
                 var definition = Step(6);
                 await definition.WithId("later");
             }
         }
         """);
 
+    [Fact]
+    public Task DefinitionsWhichLocalsHoldAreAwaitedScheduledOrPosted() => AnalyzerVerifier.VerifyAsync($$"""
+        public class C
+        {
+        {{Members}}
+            private static Task SaveAsync() => Task.CompletedTask;
+
+            private static void Consume(DurableTask task) { }
+
+            public async DurableTask RunAsync(bool condition)
+            {
+                var {|ORLEANS0105:write = DurableTask.Run(SaveAsync)|};
+                var {|ORLEANS0105:named = Step(1).WithId("named")|};
+                var {|ORLEANS0105:original = Step(2)|};
+                var alias = original;
+                var configured = alias.WithId("alias");
+
+                var awaited = Step(3);
+                await awaited.WithId("awaited");
+                var passed = Step(4);
+                Consume(passed);
+                var scheduled = Step(5);
+                await (await scheduled.WithId("scheduled").ScheduleAsync());
+                var posted = Step(6);
+                await posted.WithId("posted").Post();
+                var conditional = Step(7);
+                if (condition)
+                {
+                    await conditional.WithId("conditional");
+                }
+
+                var combined = Step(8);
+                await DurableTask.WhenAll(new[] { combined }).WithId("combined");
+                var captured = Step(9);
+                await DurableTask.Run(async () => await captured.WithId("captured")).WithId("capture");
+                var reassigned = Step(10);
+                reassigned = Step(11);
+                return;
+            }
+
+            public static DurableTask Create()
+            {
+                var returned = Step(12);
+                return returned;
+            }
+        }
+        """);
+
+    [Fact]
+    public Task HandlesOfScheduledChildrenAreObserved() => AnalyzerVerifier.VerifyAsync($$"""
+        public class C
+        {
+        {{Members}}
+            private static void Track(ScheduledTask task) { }
+
+            public async DurableTask RunAsync()
+            {
+                await {|ORLEANS0119:Step(1).WithId("discarded").ScheduleAsync()|};
+                var unobserved = await {|ORLEANS0119:Step(2).WithId("unobserved").ScheduleAsync()|};
+                var identified = await {|ORLEANS0119:Step(3).WithId("identified").ScheduleAsync()|};
+                _ = identified.Id;
+
+                var awaited = await Step(4).WithId("awaited").ScheduleAsync();
+                await awaited;
+                var combined = await Step(5).WithId("combined").ScheduleAsync();
+                await ScheduledTask.WhenAll(new[] { combined });
+                var passed = await Step(6).WithId("passed").ScheduleAsync();
+                Track(passed);
+                await Step(7).WithId("detached").Detached().ScheduleAsync();
+            }
+
+            public async DurableTask<ScheduledTask> ReturnAsync() => await Step(8).WithId("returned").ScheduleAsync();
+
+            public async Task ClientAsync() => await Step(9).WithId("client").ScheduleAsync();
+        }
+        """);
     [Fact]
     public Task SingleUseDefinitionsRunOnce() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
@@ -154,7 +230,6 @@ public class DurableTaskUsageRuleTests
             private static int Record() => DurableTask.RunInline({|ORLEANS0107:"record$1"|}, () => 1);
         }
         """);
-
     [Fact]
     public Task EachCallSiteWhichOneRunReachesHasItsOwnName() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
@@ -367,8 +442,8 @@ public class DurableTaskUsageRuleTests
             public async DurableTask RunAsync(int[] items)
             {
                 Step(2).Detached().Post();
-                await DurableTask.Run(_ => { Step(3).Post(); });
-                foreach (var item in items.Where(item => Step(item).Post() is not null))
+                await DurableTask.{|ORLEANS0121:Run|}(_ => { Step(3).WithId("in-step").Post(); }).WithId("step");
+                foreach (var item in items.Where(item => Step(item).WithId("filter").Post() is not null))
                 {
                 }
 
@@ -378,7 +453,7 @@ public class DurableTaskUsageRuleTests
                     await Step(4).WithId("after-post");
                 }
 
-                await LocalAsync();
+                await LocalAsync().WithId("local");
             }
 
             public static void Helper() => {|ORLEANS0116:Step(5).Post()|};

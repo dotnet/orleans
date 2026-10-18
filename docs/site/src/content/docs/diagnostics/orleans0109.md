@@ -31,7 +31,7 @@ ORLEANS0014 reports `ConfigureAwait(false)`, which also moves continuations off 
 
 ## How to fix violations
 
-**Run the work in a step.** A `DurableTask.Run` delegate runs on the activation's scheduler, and its result is recorded, so a replay returns it without computing it again:
+**Record the work in an effect.** A `DurableTask.RunInline` effect runs synchronous work on the activation's scheduler, and its result is recorded, so a replay returns it without computing it again:
 
 :::code source="snippets/durable-tasks/Orleans0109.cs" id="orleans0109_fix_inline" language="csharp":::
 

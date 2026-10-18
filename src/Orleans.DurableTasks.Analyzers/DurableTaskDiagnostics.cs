@@ -46,8 +46,8 @@ internal static class DurableTaskDiagnostics
         "ORLEANS0105",
         "Await, schedule, or post durable task definitions",
         "Await, schedule, or post the durable task which '{0}' defines: a durable task runs only when it is awaited, scheduled, or posted",
-        DiagnosticSeverity.Warning,
-        "Calling a method which returns DurableTask creates a definition, and WithId, Detached, and Shielded return a configuration of it. The task runs when the definition is awaited, scheduled with ScheduleAsync, or started with Post.");
+        DiagnosticSeverity.Error,
+        "Calling a method which returns DurableTask creates a definition, and WithId, Detached, and Shielded return a configuration of it. The task runs when the definition is awaited, scheduled with ScheduleAsync, or started with Post. A definition which a statement discards, or which a local holds without awaiting, scheduling, posting, returning, or passing it on, never runs.");
 
     public static readonly DiagnosticDescriptor ReusedDefinition = Create(
         "ORLEANS0106",
@@ -139,6 +139,41 @@ internal static class DurableTaskDiagnostics
         "Pass a constant '{0}' to '{1}': an execution records its version under the change's name, and each deployment states the versions which it supports",
         DiagnosticSeverity.Warning,
         "An execution records the version of each change which it checks under the change's name, and every replay of the execution reads it back under the same name. A name which depends on data can differ between replays and deployments, which records a second decision. A deployment states which versions its code supports, so the range is a constant of the code which branches on it.");
+
+    public static readonly DiagnosticDescriptor UnobservedHandle = Create(
+        "ORLEANS0119",
+        "Await, combine, or return the handles of scheduled children",
+        "Await the handle of '{0}', pass it to a combinator, or return it: the execution owns this child, nothing observes its outcome, and deleting the execution's tree cancels it",
+        DiagnosticSeverity.Info,
+        "In a durable task body, ScheduleAsync starts an attached child and returns its handle. The execution owns the child: the child's result and failure reach only code which observes the handle, and deleting the execution's tree, once the execution is terminal, cancels a child which is still running. Await the handle, pass it to a combinator such as ScheduledTask.WhenAll, or return it. Work which outlives the execution starts with Detached().");
+
+    public static readonly DiagnosticDescriptor UnnamedOperation = Create(
+        "ORLEANS0120",
+        "Name durable operations whose position can change",
+        "Name this operation, with WithId or a DurableTask.RunInline name: its generated identifier counts the unnamed operations before it, which loops, conditions, and deployments change",
+        DiagnosticSeverity.Info,
+        "An unnamed child, effect, detached start, or combinator takes the execution's next generated identifier, such as $child-3 or $when-all-2, which counts the unnamed operations of its kind which ran before it. An operation in a loop or a condition, or after another unnamed operation, can receive another identifier in a replay or after a deployment which adds or removes an operation before it, and then diverges from the recorded execution. A name which WithId or DurableTask.RunInline receives identifies the operation by its call site.");
+
+    public static readonly DiagnosticDescriptor SynchronousStep = Create(
+        "ORLEANS0121",
+        "Run synchronous work with DurableTask.RunInline",
+        "Run this delegate with DurableTask.RunInline: it neither awaits nor observes its CancellationToken, so a step adds a child execution and a journal write without running asynchronous work",
+        DiagnosticSeverity.Warning,
+        "DurableTask.Run runs its delegate as a child execution when the step is awaited, possibly in a later turn, and commits the result in a journal write of its own. DurableTask.RunInline runs synchronous work in the current work item and records its result with the execution's next journal write, together with the state changes which it makes, so consecutive effects commit together. An execution which recorded the step diverges when it replays an effect in its place, so a deployment with pending executions branches the change on DurableTask.GetVersion.");
+
+    public static readonly DiagnosticDescriptor AsyncVoidDelegate = Create(
+        "ORLEANS0122",
+        "Pass delegates which return a task for asynchronous work",
+        "Return a Task from '{0}': '{1}' records an async void delegate's completion at its first await, before its work completes",
+        DiagnosticSeverity.Error,
+        "An async void delegate returns to its caller at its first incomplete await. DurableTask.RunInline and DurableTask.Run record the delegate's completion when it returns, so the record precedes the work which follows the await, a replay doesn't run that work, and its failures escape the task. Run asynchronous work in DurableTask.Run with a delegate which returns a Task, or in an async DurableTask method.");
+
+    public static readonly DiagnosticDescriptor StateChangedInPlace = Create(
+        "ORLEANS0123",
+        "Assign new values to grain state instead of changing them in place",
+        "Assign a new value to '{0}' instead of changing the object which it holds: grain state records each change which passes through its API, and a change in place bypasses it",
+        DiagnosticSeverity.Warning,
+        "Journaled grain state records each change which passes through its API, such as an assignment to IDurableValue<T>.Value or IPersistentState<T>.State, or to an entry of a durable dictionary. A change made in place to an object which the state holds, such as an item added to a list in the value or a property set on an entry, bypasses the API: no record holds it until another change writes the whole value, so the state in memory differs from the state which the journal recovers. Store immutable values, such as records and immutable collections, and assign a new value to change one.");
 
     private static DiagnosticDescriptor Create(
         string id,
