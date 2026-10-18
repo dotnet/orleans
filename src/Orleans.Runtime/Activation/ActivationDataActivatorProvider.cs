@@ -90,7 +90,6 @@ internal partial class ActivationDataActivatorProvider(
                 configure.Configure(context);
             }
 
-            using var ecSuppressor = ExecutionContext.SuppressFlow();
             context.WorkItemGroup.Post(_startActivation, context);
             return context;
         }

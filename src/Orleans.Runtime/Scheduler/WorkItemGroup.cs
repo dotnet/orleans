@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -205,10 +204,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
 #if DEBUG
             if (Logger.IsEnabled(LogLevel.Trace))
             {
-                Logger.LogTrace(
-                    "Add to RunQueue #{SequenceNumber}, onto {GrainContext}",
-                    thisSequenceNumber,
-                    GrainContext);
+                LogTraceAddToRunQueue(Logger, thisSequenceNumber, GrainContext);
             }
 #endif
             ScheduleExecution(this);
@@ -228,10 +224,16 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     {
         lock (_lockObj)
         {
-            var tasks = _workItems
-                .Where(item => item.Type == WorkItem.WorkItemType.Task)
-                .Select(item => Unsafe.As<Task>(item.Callback));
-            return [.. tasks];
+            var tasks = new List<Task>();
+            foreach (var item in _workItems)
+            {
+                if (item.Type == WorkItem.WorkItemType.Task)
+                {
+                    tasks.Add(Unsafe.As<Task>(item.Callback));
+                }
+            }
+
+            return tasks;
         }
     }
 
@@ -423,7 +425,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
         EnqueueWorkItem(new WorkItem(Unsafe.As<Action<object?>>(action), state));
     }
 
-    internal void QueueNullableAction(Action<object?> action, object? state)
+    internal void QueueActionWithNullableState(Action<object?> action, object? state)
     {
         ArgumentNullException.ThrowIfNull(action);
         EnqueueWorkItem(new WorkItem(action, state));
@@ -482,9 +484,9 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
 
     [LoggerMessage(
         Level = LogLevel.Trace,
-        Message = "Add to RunQueue {Task}, #{SequenceNumber}, onto {GrainContext}"
+        Message = "Add to RunQueue #{SequenceNumber}, onto {GrainContext}"
     )]
-    private static partial void LogTraceAddToRunQueue(ILogger logger, Task task, long sequenceNumber, IGrainContext grainContext);
+    private static partial void LogTraceAddToRunQueue(ILogger logger, long sequenceNumber, IGrainContext grainContext);
 
     [LoggerMessage(
         EventId = (int)ErrorCode.SchedulerTooManyPendingItems,
@@ -515,6 +517,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
 
     /// <summary>
     /// Asynchronously posts a callback to be executed on this WorkItemGroup.
+    /// The callback runs in the scheduler thread's execution context.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override void Post(SendOrPostCallback d, object? state)

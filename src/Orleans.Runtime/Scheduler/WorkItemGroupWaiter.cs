@@ -13,7 +13,8 @@ namespace Orleans.Runtime.Scheduler;
 /// <summary>
 /// Represents a synchronization event that, when signaled, resets automatically after releasing a single waiter.
 /// This type supports concurrent signalers but only a single waiter.
-/// Continuations are always scheduled on the provided <see cref="WorkItemGroup"/>.
+/// Callbacks registered through <see cref="IValueTaskSource.OnCompleted"/> are queued on the provided <see cref="WorkItemGroup"/>.
+/// Callers which observe synchronous completion continue inline.
 /// </summary>
 internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueTaskSource
 {
@@ -86,7 +87,7 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
 
         // Operation already completed, so queue the supplied callback.
         Debug.Assert(ReferenceEquals(storedContinuation, CompletedSentinel));
-        _workItemGroup.QueueNullableAction(continuation, state);
+        _workItemGroup.QueueActionWithNullableState(continuation, state);
 
         [DoesNotReturn]
         static void ThrowArgumentNullException() => throw new ArgumentNullException(nameof(continuation));
@@ -184,7 +185,7 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
         if (continuation is not null)
         {
             // Always schedule on the WorkItemGroup
-            _workItemGroup.QueueNullableAction(continuation, continuationState);
+            _workItemGroup.QueueActionWithNullableState(continuation, continuationState);
         }
     }
 

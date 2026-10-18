@@ -414,17 +414,77 @@ public class WorkItemGroupWaiterTests
     }
 
     [Fact]
-    public void QueueNullableActionPreservesNullState()
+    public void QueueActionWithNullableStatePreservesNullState()
     {
         using var services = CreateServices();
         var workItemGroup = CreateWorkItemGroup(services);
         SetRunning(workItemGroup);
         object? observedState = new object();
 
-        workItemGroup.QueueNullableAction(state => observedState = state, null);
+        workItemGroup.QueueActionWithNullableState(state => observedState = state, null);
         workItemGroup.Execute();
 
         Assert.Null(observedState);
+    }
+
+    [Fact]
+    public void QueueActionWithNullableStateRejectsNullCallbackSynchronously()
+    {
+        using var services = CreateServices();
+        var workItemGroup = CreateWorkItemGroup(services);
+        SetRunning(workItemGroup);
+
+        Assert.Throws<ArgumentNullException>("action", () => workItemGroup.QueueActionWithNullableState(null!, null));
+        Assert.Equal(0, workItemGroup.ExternalWorkItemCount);
+    }
+
+    [Fact]
+    public void PostUsesSchedulerThreadExecutionContext()
+    {
+        using var services = CreateServices();
+        var workItemGroup = CreateWorkItemGroup(services);
+        SetRunning(workItemGroup);
+        var asyncLocal = new AsyncLocal<object?>();
+        object? observedValue = new object();
+
+        try
+        {
+            asyncLocal.Value = new object();
+            workItemGroup.Post(_ => observedValue = asyncLocal.Value, null);
+        }
+        finally
+        {
+            asyncLocal.Value = null;
+        }
+
+        workItemGroup.Execute();
+
+        Assert.Null(observedValue);
+    }
+
+    [Fact]
+    public void ScheduledTasksSnapshotContainsOnlyTasksAndPreservesQueueOrder()
+    {
+        using var services = CreateServices();
+        var workItemGroup = CreateWorkItemGroup(
+            services,
+            new SchedulingOptions { ActivationSchedulingQuantum = TimeSpan.Zero });
+        SetRunning(workItemGroup);
+        var firstTask = new Task(static () => { });
+        var secondTask = new Task(static () => { });
+
+        workItemGroup.QueueAction(static () => { });
+        firstTask.Start(workItemGroup.TaskScheduler);
+        workItemGroup.Post(static _ => { }, null);
+        secondTask.Start(workItemGroup.TaskScheduler);
+        var snapshot = workItemGroup.GetScheduledTasks();
+
+        workItemGroup.Execute();
+
+        Assert.Equal([firstTask, secondTask], snapshot);
+        Assert.Empty(workItemGroup.GetScheduledTasks());
+        Assert.Equal(TaskStatus.RanToCompletion, firstTask.Status);
+        Assert.Equal(TaskStatus.RanToCompletion, secondTask.Status);
     }
 
     [Fact]
