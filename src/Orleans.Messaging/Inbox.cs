@@ -82,9 +82,9 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         {
             if (IsDuplicate(message, out var pending))
             {
-                // The sender may retire its copy once this returns, so the acceptance must be durable. A sink acceptance
-                // journals only its processed record, which can still be in flight.
-                if (pending is null ? _sinks.Count > 0 : !IsDurable(pending)) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
+                // The sender may retire its copy once this returns, so the acceptance or the processed record must be
+                // durable. A completion staged by a handler or a sink can still be in flight.
+                if (pending is null ? !AreCompletionsDurable : !IsDurable(pending)) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
                 if (pending is not null) _pump.Signal();
 
                 Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "duplicate");
