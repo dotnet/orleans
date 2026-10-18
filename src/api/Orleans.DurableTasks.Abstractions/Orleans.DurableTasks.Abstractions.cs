@@ -103,62 +103,6 @@ namespace Orleans.DurableTasks
 
         public static int GetVersion(string name, int minSupported, int maxSupported) { throw null; }
 
-        public static void Once(System.Action effect) { }
-
-        [System.Obsolete("DurableTask.Once stores a synchronous result, and a durable task runs as a step. Await the durable task directly.", true)]
-        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-        public static void Once(System.Func<DurableTask> effect) { }
-
-        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
-        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-        public static void Once(System.Func<System.Threading.Tasks.Task> effect) { }
-
-        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
-        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-        public static void Once(System.Func<System.Threading.Tasks.ValueTask> effect) { }
-
-        public static void Once(string name, System.Action effect) { }
-
-        [System.Obsolete("DurableTask.Once stores a synchronous result, and a durable task runs as a step. Await the durable task directly.", true)]
-        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-        public static void Once(string name, System.Func<DurableTask> effect) { }
-
-        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
-        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-        public static void Once(string name, System.Func<System.Threading.Tasks.Task> effect) { }
-
-        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
-        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-        public static void Once(string name, System.Func<System.Threading.Tasks.ValueTask> effect) { }
-
-        public static TResult Once<TResult>(System.Func<TResult> effect) { throw null; }
-
-        [System.Obsolete("DurableTask.Once stores a synchronous result, and a durable task runs as a step. Await the durable task directly.", true)]
-        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-        public static TResult Once<TResult>(System.Func<DurableTask<TResult>> effect) { throw null; }
-
-        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
-        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-        public static TResult Once<TResult>(System.Func<System.Threading.Tasks.Task<TResult>> effect) { throw null; }
-
-        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
-        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-        public static TResult Once<TResult>(System.Func<System.Threading.Tasks.ValueTask<TResult>> effect) { throw null; }
-
-        public static TResult Once<TResult>(string name, System.Func<TResult> effect) { throw null; }
-
-        [System.Obsolete("DurableTask.Once stores a synchronous result, and a durable task runs as a step. Await the durable task directly.", true)]
-        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-        public static TResult Once<TResult>(string name, System.Func<DurableTask<TResult>> effect) { throw null; }
-
-        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
-        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-        public static TResult Once<TResult>(string name, System.Func<System.Threading.Tasks.Task<TResult>> effect) { throw null; }
-
-        [System.Obsolete("DurableTask.Once stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
-        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-        public static TResult Once<TResult>(string name, System.Func<System.Threading.Tasks.ValueTask<TResult>> effect) { throw null; }
-
         public static DurableTask<int> Race(System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
 
         public static DurableTask<int> Race(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
@@ -208,6 +152,62 @@ namespace Orleans.DurableTasks
         public static DurableTask<TResult> Run<TState, TResult>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> function, TState state) { throw null; }
 
         protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context);
+        public static void RunInline(System.Action effect) { }
+
+        [System.Obsolete("DurableTask.RunInline stores a synchronous result, and a durable task runs as a step. Await the durable task directly.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static void RunInline(System.Func<DurableTask> effect) { }
+
+        [System.Obsolete("DurableTask.RunInline stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static void RunInline(System.Func<System.Threading.Tasks.Task> effect) { }
+
+        [System.Obsolete("DurableTask.RunInline stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static void RunInline(System.Func<System.Threading.Tasks.ValueTask> effect) { }
+
+        public static void RunInline(string name, System.Action effect) { }
+
+        [System.Obsolete("DurableTask.RunInline stores a synchronous result, and a durable task runs as a step. Await the durable task directly.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static void RunInline(string name, System.Func<DurableTask> effect) { }
+
+        [System.Obsolete("DurableTask.RunInline stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static void RunInline(string name, System.Func<System.Threading.Tasks.Task> effect) { }
+
+        [System.Obsolete("DurableTask.RunInline stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static void RunInline(string name, System.Func<System.Threading.Tasks.ValueTask> effect) { }
+
+        public static TResult RunInline<TResult>(System.Func<TResult> effect) { throw null; }
+
+        [System.Obsolete("DurableTask.RunInline stores a synchronous result, and a durable task runs as a step. Await the durable task directly.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static TResult RunInline<TResult>(System.Func<DurableTask<TResult>> effect) { throw null; }
+
+        [System.Obsolete("DurableTask.RunInline stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static TResult RunInline<TResult>(System.Func<System.Threading.Tasks.Task<TResult>> effect) { throw null; }
+
+        [System.Obsolete("DurableTask.RunInline stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static TResult RunInline<TResult>(System.Func<System.Threading.Tasks.ValueTask<TResult>> effect) { throw null; }
+
+        public static TResult RunInline<TResult>(string name, System.Func<TResult> effect) { throw null; }
+
+        [System.Obsolete("DurableTask.RunInline stores a synchronous result, and a durable task runs as a step. Await the durable task directly.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static TResult RunInline<TResult>(string name, System.Func<DurableTask<TResult>> effect) { throw null; }
+
+        [System.Obsolete("DurableTask.RunInline stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static TResult RunInline<TResult>(string name, System.Func<System.Threading.Tasks.Task<TResult>> effect) { throw null; }
+
+        [System.Obsolete("DurableTask.RunInline stores a synchronous result. For asynchronous work, use await DurableTask.Run(async () => ...).", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static TResult RunInline<TResult>(string name, System.Func<System.Threading.Tasks.ValueTask<TResult>> effect) { throw null; }
+
         public static DurableTask<ScheduledTask[]> ScheduleAll(System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
 
         public static DurableTask<ScheduledTask[]> ScheduleAll(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
