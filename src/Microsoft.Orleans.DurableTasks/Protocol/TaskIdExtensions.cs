@@ -38,7 +38,7 @@ public static class TaskIdExtensions
     /// <param name="key">The <see cref="MessagingHierarchicalKey"/> to convert.</param>
     /// <returns>
     /// A <see cref="TaskId"/> equivalent to the specified <see cref="MessagingHierarchicalKey"/>,
-    /// or <see cref="TaskId.None"/> if the key is <c>null</c> or unset.
+    /// or <see cref="TaskId.None"/> if the key is unset.
     /// </returns>
     /// <example>
     /// <code>
@@ -48,6 +48,17 @@ public static class TaskIdExtensions
     /// // taskId.ToString() == "workflow/task-123"
     /// </code>
     /// </example>
+    public static TaskId ToTaskId(this MessagingHierarchicalKey key) =>
+        key.IsDefault ? TaskId.None : TaskId.Parse(key.ToString(), null);
+
+    /// <summary>
+    /// Converts a nullable <see cref="MessagingHierarchicalKey"/> to a <see cref="TaskId"/>.
+    /// </summary>
+    /// <param name="key">The <see cref="MessagingHierarchicalKey"/> to convert.</param>
+    /// <returns>
+    /// A <see cref="TaskId"/> equivalent to the specified <see cref="MessagingHierarchicalKey"/>,
+    /// or <see cref="TaskId.None"/> if the key is <c>null</c> or unset.
+    /// </returns>
     public static TaskId ToTaskId(this MessagingHierarchicalKey? key) =>
-        key is { IsDefault: false } value ? TaskId.Parse(value.ToString(), null) : TaskId.None;
+        key is { } value ? value.ToTaskId() : TaskId.None;
 }

@@ -118,6 +118,8 @@ public sealed class DurableRpcProtocolTests
         Assert.Null(TaskId.None.ToHierarchicalKey());
         Assert.Equal(TaskId.None, ((global::Orleans.Messaging.HierarchicalKey?)null).ToTaskId());
         Assert.Equal(TaskId.None, ((global::Orleans.Messaging.HierarchicalKey?)default(global::Orleans.Messaging.HierarchicalKey)).ToTaskId());
+        Assert.Equal(taskId, global::Orleans.Messaging.HierarchicalKey.Parse("workflow/child", null).ToTaskId());
+        Assert.Equal(TaskId.None, default(global::Orleans.Messaging.HierarchicalKey).ToTaskId());
     }
 
     [Fact]
