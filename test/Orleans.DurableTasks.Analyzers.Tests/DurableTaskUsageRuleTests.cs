@@ -18,16 +18,16 @@ public class DurableTaskUsageRuleTests
         """;
 
     [Fact]
-    public Task OnceEffectsReturnTheirOutputs() => AnalyzerVerifier.VerifyAsync($$"""
+    public Task RunInlineEffectsReturnTheirOutputs() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {
         {{Members}}
             public async DurableTask<int> RunAsync()
             {
                 var captured = 0;
-                DurableTask.Once("assign", () => { {|ORLEANS0104:captured = 1|}; });
-                DurableTask.Once("increment", () => { {|ORLEANS0104:captured++|}; });
-                var returned = DurableTask.Once("return", () =>
+                DurableTask.RunInline("assign", () => { {|ORLEANS0104:captured = 1|}; });
+                DurableTask.RunInline("increment", () => { {|ORLEANS0104:captured++|}; });
+                var returned = DurableTask.RunInline("return", () =>
                 {
                     var local = 2;
                     local++;
@@ -41,29 +41,29 @@ public class DurableTaskUsageRuleTests
         """);
 
     [Fact]
-    public Task UnnamedOnceEffectsReturnTheirOutputsAndHaveNoNames() => AnalyzerVerifier.VerifyAsync($$"""
+    public Task UnnamedRunInlineEffectsReturnTheirOutputsAndHaveNoNames() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {
         {{Members}}
             public async DurableTask<int> RunAsync()
             {
                 var captured = 0;
-                DurableTask.Once(() => { {|ORLEANS0104:captured = 1|}; });
-                DurableTask.Once(() => { {|ORLEANS0104:captured++|}; });
-                var returned = DurableTask.Once(() =>
+                DurableTask.RunInline(() => { {|ORLEANS0104:captured = 1|}; });
+                DurableTask.RunInline(() => { {|ORLEANS0104:captured++|}; });
+                var returned = DurableTask.RunInline(() =>
                 {
                     var local = 2;
                     local++;
                     _status.Value = local;
                     return local;
                 });
-                DurableTask.Once(() => {|ORLEANS0109:Task.Run(() => 1)|}.Result);
+                DurableTask.RunInline(() => {|ORLEANS0109:Task.Run(() => 1)|}.Result);
 
                 // Unnamed effects take generated identifiers, so neither a result which contains '$' nor a repeated call
                 // site is a name.
-                DurableTask.Once(() => "$value");
-                DurableTask.Once(() => 3);
-                DurableTask.Once(() => 3);
+                DurableTask.RunInline(() => "$value");
+                DurableTask.RunInline(() => 3);
+                DurableTask.RunInline(() => 3);
                 await Step(captured + returned).WithId("step");
                 return returned;
             }
@@ -132,7 +132,7 @@ public class DurableTaskUsageRuleTests
             public async DurableTask RunAsync()
             {
                 await Step(1).WithId({|ORLEANS0107:"line$2"|});
-                DurableTask.Once({|ORLEANS0107:"$effect"|}, () => 1);
+                DurableTask.RunInline({|ORLEANS0107:"$effect"|}, () => 1);
                 await Step(2).WithId("valid");
             }
         }
@@ -147,7 +147,7 @@ public class DurableTaskUsageRuleTests
             {
                 await Step(1).WithId("pay");
                 await Step(2).WithId({|ORLEANS0108:"pay"|});
-                DurableTask.Once({|ORLEANS0108:"pay"|}, () => 3);
+                DurableTask.RunInline({|ORLEANS0108:"pay"|}, () => 3);
 
                 if (condition)
                 {
@@ -176,7 +176,7 @@ public class DurableTaskUsageRuleTests
                 await Step(1).WithId("step");
                 await {|ORLEANS0109:Task.Run(() => { })|};
                 var thread = {|ORLEANS0109:new Thread(() => { })|};
-                DurableTask.Once("effect", () => {|ORLEANS0109:Task.Run(() => 1)|}.Result);
+                DurableTask.RunInline("effect", () => {|ORLEANS0109:Task.Run(() => 1)|}.Result);
             }
 
             public async Task OrdinaryAsync() => await Task.Run(() => { });
