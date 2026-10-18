@@ -96,7 +96,7 @@ internal sealed class GarnetJournalHostingCoordinator(IRangeMetaStore metaStore,
 
     /// <summary>
     /// Moves one partition from the host with the most partitions to the one with the fewest, if their counts differ by
-    /// two or more and every partition is served by one of <paramref name="hosts"/>.
+    /// two or more and every partition is served by one of <paramref name="servingHosts"/>.
     /// </summary>
     /// <remarks>
     /// A move is a planned failover: the new host takes the partition's storage over, which fences the previous host, so
@@ -105,9 +105,10 @@ internal sealed class GarnetJournalHostingCoordinator(IRangeMetaStore metaStore,
     /// in which every partition served, so any intervening write, including another coordinator's move, rejects it.
     /// </remarks>
     /// <returns>The partition moved, or <see langword="null"/>.</returns>
-    public async Task<PartitionId?> TryBalanceAsync(IReadOnlyCollection<string> hosts, CancellationToken cancellationToken)
+    public async Task<PartitionId?> TryBalanceAsync(IReadOnlyCollection<string> hosts, IReadOnlySet<string> servingHosts, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(hosts);
+        ArgumentNullException.ThrowIfNull(servingHosts);
         if (hosts.Count < 2)
         {
             return null;
@@ -116,7 +117,7 @@ internal sealed class GarnetJournalHostingCoordinator(IRangeMetaStore metaStore,
         var view = await ReadAsync(cancellationToken).ConfigureAwait(false);
         var partitions = view.Map.Partitions;
         var set = hosts.ToHashSet(StringComparer.Ordinal);
-        if (partitions.Values.Any(hosting => hosting.Endpoint is null || !set.Contains(hosting.Host)))
+        if (partitions.Values.Any(hosting => hosting.Endpoint is null || !servingHosts.Contains(hosting.Host)))
         {
             return null;
         }

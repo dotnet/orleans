@@ -95,7 +95,8 @@ internal sealed class GarnetJournalFailoverAgent(
         if (assigned == 0 && balancingInterval is { } balance && balance != Timeout.InfiniteTimeSpan && Environment.TickCount64 >= _nextBalance)
         {
             _nextBalance = Environment.TickCount64 + (long)balance.TotalMilliseconds;
-            await coordinator.TryBalanceAsync(active, cancellationToken).ConfigureAwait(false);
+            var serving = registered.Where(host => !SiloAddress.TryParse(host, out _)).Concat(active).ToHashSet(StringComparer.Ordinal);
+            await coordinator.TryBalanceAsync(active, serving, cancellationToken).ConfigureAwait(false);
         }
 
         return assigned;

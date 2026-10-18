@@ -200,22 +200,23 @@ public sealed class GarnetJournalBalancerTests
             Enumerable.Range(0, 4).Select(index => KeyValuePair.Create(GarnetTestPartitions.Id(index), new PartitionHosting("a", 1, $"p{index}", Endpoint: $"a:{index}"))));
         await store.TryWriteAsync(map, 0, CancellationToken);
         var coordinator = new GarnetJournalHostingCoordinator(store);
+        var serving = new HashSet<string>(StringComparer.Ordinal) { "a", "b" };
 
-        Assert.Null(await coordinator.TryBalanceAsync(["a"], CancellationToken));
-        var moved = await coordinator.TryBalanceAsync(["a", "b"], CancellationToken);
+        Assert.Null(await coordinator.TryBalanceAsync(["a"], serving, CancellationToken));
+        var moved = await coordinator.TryBalanceAsync(["a", "b"], serving, CancellationToken);
         Assert.NotNull(moved);
         var view = (await store.ReadAsync(CancellationToken))!;
         Assert.Equal(new PartitionHosting("b", 2, moved.Value.Value), view.Map.Partitions[moved.Value]);
 
         // Until the moved partition serves at its new host, no other moves.
-        Assert.Null(await coordinator.TryBalanceAsync(["a", "b"], CancellationToken));
+        Assert.Null(await coordinator.TryBalanceAsync(["a", "b"], serving, CancellationToken));
         await Publish(store, moved.Value);
-        Assert.NotNull(await coordinator.TryBalanceAsync(["a", "b"], CancellationToken));
+        Assert.NotNull(await coordinator.TryBalanceAsync(["a", "b"], serving, CancellationToken));
         view = (await store.ReadAsync(CancellationToken))!;
         await Publish(store, view.Map.Partitions.First(entry => entry.Value.Endpoint is null).Key);
 
         // Two partitions each: balanced.
-        Assert.Null(await coordinator.TryBalanceAsync(["a", "b"], CancellationToken));
+        Assert.Null(await coordinator.TryBalanceAsync(["a", "b"], serving, CancellationToken));
         view = (await store.ReadAsync(CancellationToken))!;
         Assert.Equal(2, view.Map.Partitions.Values.Count(hosting => hosting.Host == "b"));
 
@@ -249,10 +250,24 @@ public sealed class GarnetJournalBalancerTests
                 CancellationToken);
         };
 
-        Assert.Null(await new GarnetJournalHostingCoordinator(store).TryBalanceAsync(["a", "b"], CancellationToken));
+        Assert.Null(await new GarnetJournalHostingCoordinator(store).TryBalanceAsync(["a", "b"], new HashSet<string> { "a", "b", "c" }, CancellationToken));
         var after = (await store.ReadAsync(CancellationToken))!;
         Assert.Single(after.Map.Partitions.Values, hosting => hosting.Endpoint is null);
         Assert.DoesNotContain(after.Map.Partitions.Values, hosting => hosting.Host == "b");
+    }
+
+    [Fact]
+    public async Task Hosting_WaitsForPartitionsOnUnregisteredHosts()
+    {
+        var store = new InMemoryRangeMetaStore();
+        var hostings = Enumerable.Range(0, 4)
+            .Select(index => KeyValuePair.Create(GarnetTestPartitions.Id(index), new PartitionHosting("a", 1, $"p{index}", $"a:{index}")))
+            .Append(KeyValuePair.Create(GarnetTestPartitions.Id(4), new PartitionHosting("explicit", 1, "p4", "explicit:4")));
+        await store.TryWriteAsync(RangeMap.CreateUniform(16, hostings), 0, CancellationToken);
+        var before = (await store.ReadAsync(CancellationToken))!;
+
+        Assert.Null(await new GarnetJournalHostingCoordinator(store).TryBalanceAsync(["a", "b"], new HashSet<string> { "a", "b" }, CancellationToken));
+        Assert.Equal(before, await store.ReadAsync(CancellationToken));
     }
 
     [Fact]

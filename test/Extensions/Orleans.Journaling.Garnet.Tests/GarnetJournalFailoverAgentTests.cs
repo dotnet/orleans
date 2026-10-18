@@ -151,6 +151,42 @@ public sealed class GarnetJournalFailoverAgentTests
     }
 
     [Fact]
+    public async Task Agent_BalancesAutomaticHosts_WhileExplicitHostsServeTheirPartitions()
+    {
+        var store = new InMemoryRangeMetaStore();
+        var other = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11115), 1);
+        var explicitPartition = new PartitionId("explicit");
+        var explicitHosting = new PartitionHosting("explicit-host", 3, "explicit");
+        var hostings = Enumerable.Range(0, 4)
+            .Select(index => KeyValuePair.Create(new PartitionId($"p{index}"), new PartitionHosting(Active.ToParsableString(), 1, $"p{index}", $"endpoint:{index}")))
+            .Append(KeyValuePair.Create(explicitPartition, explicitHosting));
+        await store.TryWriteAsync(RangeMap.CreateUniform(16, hostings), 0, CancellationToken);
+        var membership = new FakeMembership(new(
+            Snapshot(1).Members.Add(other, new ClusterMember(other, SiloStatus.Active, "other")),
+            new MembershipVersion(1)));
+        var registry = new FakeRegistry(Active, other);
+        registry.Hosts.Add(explicitHosting.Host);
+        await using var agent = new GarnetJournalFailoverAgent(new GarnetJournalHostingCoordinator(store), membership, registry, TimeSpan.FromSeconds(1), logger: null, balancingInterval: TimeSpan.Zero);
+
+        Assert.Equal(0, await agent.AssignAsync(CancellationToken));
+        var view = (await store.ReadAsync(CancellationToken))!;
+        Assert.All(view.Map.Partitions, entry => Assert.Equal(entry.Key == explicitPartition ? explicitHosting.Host : Active.ToParsableString(), entry.Value.Host));
+
+        explicitHosting = explicitHosting with { Endpoint = "explicit:1" };
+        Assert.True((await store.TryWriteAsync(view.Map with { Partitions = view.Map.Partitions.SetItem(explicitPartition, explicitHosting) }, view.Version, CancellationToken)).Written);
+        Assert.Equal(0, await agent.AssignAsync(CancellationToken));
+        var after = (await store.ReadAsync(CancellationToken))!;
+        Assert.Equal(explicitHosting, after.Map.Partitions[explicitPartition]);
+        Assert.Equal(3, after.Map.Partitions.Values.Count(hosting => hosting.Host == Active.ToParsableString()));
+        var moved = Assert.Single(after.Map.Partitions.Values, hosting => hosting.Host == other.ToParsableString());
+        Assert.Equal(2, moved.Epoch);
+        Assert.Null(moved.Endpoint);
+
+        Assert.Equal(0, await agent.AssignAsync(CancellationToken));
+        Assert.Equal(after, await store.ReadAsync(CancellationToken));
+    }
+
+    [Fact]
     public async Task Agent_AssignsNothingWithoutActiveSilos()
     {
         var store = new InMemoryRangeMetaStore();
