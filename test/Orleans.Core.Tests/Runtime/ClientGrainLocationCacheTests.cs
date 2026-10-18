@@ -1,3 +1,6 @@
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
@@ -14,6 +17,7 @@ namespace UnitTests.Runtime
         private static readonly SiloAddress SiloA = SiloAddress.FromParsableString("127.0.0.1:100@1");
         private static readonly SiloAddress SiloB = SiloAddress.FromParsableString("127.0.0.1:101@1");
         private static readonly SiloAddress SiloC = SiloAddress.FromParsableString("127.0.0.1:102@1");
+        private static readonly SiloAddress SiloD = SiloAddress.FromParsableString("127.0.0.1:103@1");
 
         [Fact]
         public void CacheUpdate_CachesValidLocation()
@@ -49,6 +53,39 @@ namespace UnitTests.Runtime
 
             Assert.True(cache.TryGetLocation(Grain, out var location));
             Assert.Equal(SiloB, location);
+        }
+
+        [Fact]
+        public async Task ConcurrentCacheUpdates_PreserveNewerLocation()
+        {
+            var cache = new ClientGrainLocationCache();
+            var grains = Enumerable.Range(0, 1024).Select(i => GrainId.Create("test", i.ToString())).ToArray();
+            foreach (var grain in grains)
+            {
+                using var response = Response(Update(grain, SiloA, SiloC));
+                cache.OnResponse(response);
+            }
+
+            using var barrier = new Barrier(2);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await Task.WhenAll(ApplyUpdates(SiloA, SiloB), ApplyUpdates(SiloC, SiloD));
+
+            foreach (var grain in grains)
+            {
+                Assert.True(cache.TryGetLocation(grain, out var location));
+                // Either serial ordering of the delayed A->B and current C->D updates retains D.
+                Assert.Equal(SiloD, location);
+            }
+
+            Task ApplyUpdates(SiloAddress superseded, SiloAddress replacement) => Task.Run(() =>
+            {
+                foreach (var grain in grains)
+                {
+                    barrier.SignalAndWait(cancellationToken);
+                    using var response = Response(Update(grain, superseded, replacement));
+                    cache.OnResponse(response);
+                }
+            }, cancellationToken);
         }
 
         [Fact]
@@ -120,15 +157,18 @@ namespace UnitTests.Runtime
         };
 
         private static GrainAddressCacheUpdate Update(SiloAddress invalid, SiloAddress? valid)
+            => Update(Grain, invalid, valid);
+
+        private static GrainAddressCacheUpdate Update(GrainId grain, SiloAddress invalid, SiloAddress? valid)
             => new(
-                new GrainAddress { GrainId = Grain, SiloAddress = invalid },
-                valid is null ? null : new GrainAddress { GrainId = Grain, SiloAddress = valid });
+                new GrainAddress { GrainId = grain, SiloAddress = invalid },
+                valid is null ? null : new GrainAddress { GrainId = grain, SiloAddress = valid });
 
         private static Message Response(GrainAddressCacheUpdate update) => new()
         {
             Direction = Message.Directions.Response,
             Result = Message.ResponseTypes.Success,
-            SendingGrain = Grain,
+            SendingGrain = update.GrainId,
             CacheInvalidationHeader = [update],
         };
 

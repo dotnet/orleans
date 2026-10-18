@@ -10,7 +10,7 @@ namespace Orleans;
 /// <remarks>
 /// Locations are learned from the cache invalidation headers on responses and are removed when the cached silo rejects a request.
 /// Each update replaces a cached location only when the cache holds the location which the update supersedes, or holds none,
-/// so a delayed update does not overwrite a newer location.
+/// so newer locations survive delayed updates. Writers are serialized, while reads use the concurrent cache directly.
 /// </remarks>
 [SuppressMessage(
     "Design",
@@ -47,14 +47,18 @@ internal sealed class ClientGrainLocationCache
 
     private void Replace(GrainId grainId, SiloAddress? superseded, SiloAddress? replacement)
     {
-        if (superseded is not null)
+        // Serialize the conditional remove/add across responses from different gateways.
+        lock (_locations)
         {
-            _locations.TryRemove(grainId, static (cached, superseded) => cached.Equals(superseded), superseded);
-        }
+            if (superseded is not null)
+            {
+                _locations.TryRemove(grainId, static (cached, superseded) => cached.Equals(superseded), superseded);
+            }
 
-        if (replacement is not null)
-        {
-            _locations.TryAdd(grainId, replacement);
+            if (replacement is not null)
+            {
+                _locations.TryAdd(grainId, replacement);
+            }
         }
     }
 }
