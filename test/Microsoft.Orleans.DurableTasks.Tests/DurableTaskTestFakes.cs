@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 #nullable enable
 using System;
 using System.Reflection;
@@ -95,11 +96,24 @@ internal sealed class ScriptedDurableTaskServer(params object[] outcomes) : IDur
         };
     }
 
-    public ValueTask CancelAsync(TaskId taskId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    /// <summary>Gets the cancellation and abort requests which reached the server, in order.</summary>
+    public ConcurrentQueue<(string Operation, string? Reason)> Requests { get; } = new();
 
-    public ValueTask CancelAsync(TaskId taskId, string? reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public ValueTask CancelAsync(TaskId taskId, CancellationToken cancellationToken = default) => Request("cancel", reason: null);
 
-    public ValueTask AbortAsync(TaskId taskId, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public ValueTask CancelAsync(TaskId taskId, string? reason, CancellationToken cancellationToken = default) => Request("cancel", reason);
+
+    public ValueTask AbortAsync(TaskId taskId, string reason, CancellationToken cancellationToken = default) => Request("abort", reason);
+
+    /// <summary>Records a request, and fails it with the script's next outcome when that outcome is an exception.</summary>
+    private ValueTask Request(string operation, string? reason)
+    {
+        Requests.Enqueue((operation, reason));
+        OnPoll?.Invoke();
+        return outcomes[Math.Min(Requests.Count, outcomes.Length) - 1] is Exception exception
+            ? ValueTask.FromException(exception)
+            : ValueTask.CompletedTask;
+    }
 }
 
 internal sealed class NotFoundDurableTaskServer(
