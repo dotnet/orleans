@@ -579,6 +579,89 @@ public class DurableLogTests : JournalingTestBase
         Assert.False(await next);
     });
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task Draft_CleanupWhileCancellationPropagates_AbandonsTheDraft(bool dispose) => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+
+        await using var read = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await read.NextAsync());
+        var draft = log.BeginDraft();
+        draft.Write("partial");
+        Assert.Equal(DraftItem(draft.Id, 0, "partial"), await read.NextAsync());
+
+        // A using statement or finally block abandons the draft while the cancellation propagates unchanged.
+        var canceled = new OperationCanceledException("The operation was canceled.");
+        Assert.Same(canceled, Assert.Throws<OperationCanceledException>(CleanUp));
+
+        Assert.False(draft.IsOpen);
+        Assert.Equal(0, draft.Count);
+        draft.Abandon("already closed");
+        draft.Dispose();
+        var expected = dispose
+            ? Abandoned(draft.Id, LogDraftAbandonReason.Disposed)
+            : Abandoned(draft.Id, LogDraftAbandonReason.Abandoned, "canceled");
+        Assert.Equal(expected, await read.NextAsync());
+        Assert.Empty(log);
+        Assert.Equal(0, log.NextSequence);
+
+        void CleanUp()
+        {
+            using (draft)
+            {
+                try
+                {
+                    throw canceled;
+                }
+                finally
+                {
+                    if (!dispose)
+                    {
+                        draft.Abandon("canceled");
+                    }
+                }
+            }
+        }
+    });
+
+    [Fact]
+    public Task Draft_CommitDuringCleanup_CommitsAndTheNextDraftContinuesNumbering() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+
+        await using var read = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await read.NextAsync());
+        var draft = log.BeginDraft();
+        draft.Write("partial");
+        Assert.Equal(DraftItem(draft.Id, 0, "partial"), await read.NextAsync());
+
+        // Cleanup which runs after a cancellation commits the draft, and the next journal write records its entry.
+        Assert.Equal(0, draft.Commit("partial"));
+        Assert.False(draft.IsOpen);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.Equal((1L, 1L), (log.NextSequence, log.CommittedSequence));
+        Assert.Equal(["partial"], log);
+
+        // The activation's next draft follows the committed one.
+        using var following = log.BeginDraft();
+        Assert.Equal((draft.Id.ActivationId, draft.Id.Number + 1), (following.Id.ActivationId, following.Id.Number));
+        following.Write("next");
+        LogEvent<string> item;
+        do
+        {
+            item = await read.NextAsync();
+        }
+        while (item.Kind is not LogEventKind.DraftItem);
+
+        Assert.Equal(DraftItem(following.Id, 0, "next"), item);
+    });
+
     [Fact]
     public Task CommittedWithDraftsRead_DeliversDraftsAndOnlyDurableEntries() => RunOnActivationSchedulerAsync(async () =>
     {
