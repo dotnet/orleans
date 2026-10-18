@@ -1,8 +1,8 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Reflection;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
-using Amazon.Runtime;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -424,8 +424,10 @@ public sealed class DynamoDBReminderMigrationTests
         }
     }
 
-    [Fact]
-    public async Task Migration_VerificationFailureIsPersistedAndPreventsCutover()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Migration_VerificationFailureIsPersistedAndPreventsCutover(bool corruptServiceId)
     {
         EnsureDynamoDb();
         var tableName = NewTableName();
@@ -446,13 +448,28 @@ public sealed class DynamoDBReminderMigrationTests
                 {
                     BeforeVerification = async () =>
                     {
-                        await client.DeleteItemAsync(
-                            new()
-                            {
-                                TableName = $"{tableName}-v2",
-                                Key = V2Key(serviceId, entry),
-                            },
-                            TestContext.Current.CancellationToken);
+                        if (corruptServiceId)
+                        {
+                            await client.UpdateItemAsync(
+                                new()
+                                {
+                                    TableName = $"{tableName}-v2",
+                                    Key = V2Key(serviceId, entry),
+                                    UpdateExpression = "SET ServiceId = :service",
+                                    ExpressionAttributeValues = new() { [":service"] = new("conflicting-service") },
+                                },
+                                TestContext.Current.CancellationToken);
+                        }
+                        else
+                        {
+                            await client.DeleteItemAsync(
+                                new()
+                                {
+                                    TableName = $"{tableName}-v2",
+                                    Key = V2Key(serviceId, entry),
+                                },
+                                TestContext.Current.CancellationToken);
+                        }
                     },
                 });
 
@@ -462,7 +479,7 @@ public sealed class DynamoDBReminderMigrationTests
             var state = await ReadState(client, tableName, serviceId);
             Assert.Equal("VerificationFailed", state["MigrationStatus"].S);
             Assert.Equal("1", state["SourceCount"].N);
-            Assert.Equal("0", state["TargetCount"].N);
+            Assert.Equal(corruptServiceId ? "1" : "0", state["TargetCount"].N);
             Assert.NotNull(await legacy.ReadRow(entry.GrainId, entry.ReminderName));
         }
         finally
@@ -508,6 +525,128 @@ public sealed class DynamoDBReminderMigrationTests
         finally
         {
             await StopAndDelete(client, tableName, legacy, table);
+        }
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task Migration_LeaseGenerationsRejectExpiredRenewalsAndDelayedTransactions(int elapsedMinutes)
+    {
+        EnsureDynamoDb();
+        var tableName = NewTableName();
+        const string serviceId = "lease-generations";
+        using var client = CreateClient();
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 8, 28, 10, 0, 0, TimeSpan.Zero));
+        var table = CreateTable(tableName, serviceId, DynamoDBReminderTableMode.Migrate, timeProvider: clock);
+
+        Task InvokeLeaseOperation(string name)
+            => (Task)typeof(DynamoDBReminderTable).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(table, null)!;
+
+        ConditionCheck CaptureFence()
+            => (ConditionCheck)typeof(DynamoDBReminderTable).GetMethod(
+                "CreateMigrationLeaseFence", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(table, null)!;
+
+        async Task AssertStaleWriteRejected(ConditionCheck fence)
+        {
+            var staleKey = new Dictionary<string, AttributeValue>
+            {
+                ["PartitionKey"] = new("stale-work"),
+                ["SortKey"] = new("result"),
+            };
+            var exception = await Assert.ThrowsAsync<TransactionCanceledException>(() => client.TransactWriteItemsAsync(
+                new()
+                {
+                    TransactItems =
+                    [
+                        new() { ConditionCheck = fence },
+                        new() { Put = new() { TableName = $"{tableName}-v2", Item = staleKey } },
+                    ],
+                },
+                TestContext.Current.CancellationToken));
+            Assert.Equal("ConditionalCheckFailed", exception.CancellationReasons[0].Code);
+            var result = await client.GetItemAsync(
+                new() { TableName = $"{tableName}-v2", Key = staleKey, ConsistentRead = true },
+                TestContext.Current.CancellationToken);
+            Assert.False(result.IsItemSet);
+        }
+
+        try
+        {
+            await table.StartAsync(TestContext.Current.CancellationToken);
+            Assert.True(await (Task<bool>)InvokeLeaseOperation("TryAcquireMigrationLease"));
+            var firstFence = CaptureFence();
+            var firstToken = firstFence.ExpressionAttributeValues[":token"].S;
+            await InvokeLeaseOperation("RenewMigrationLease");
+            Assert.Equal(firstToken, CaptureFence().ExpressionAttributeValues[":token"].S);
+
+            clock.Advance(TimeSpan.FromMinutes(elapsedMinutes));
+            var renewalFailure = await Assert.ThrowsAsync<InvalidOperationException>(() => InvokeLeaseOperation("RenewMigrationLease"));
+            Assert.IsType<ConditionalCheckFailedException>(renewalFailure.InnerException);
+            Assert.True(await (Task<bool>)InvokeLeaseOperation("TryAcquireMigrationLease"));
+            var secondFence = CaptureFence();
+            Assert.NotEqual(firstToken, secondFence.ExpressionAttributeValues[":token"].S);
+            await AssertStaleWriteRejected(firstFence);
+
+            await InvokeLeaseOperation("ReleaseMigrationLease");
+            Assert.True(await (Task<bool>)InvokeLeaseOperation("TryAcquireMigrationLease"));
+            Assert.NotEqual(
+                secondFence.ExpressionAttributeValues[":token"].S,
+                CaptureFence().ExpressionAttributeValues[":token"].S);
+            await AssertStaleWriteRejected(secondFence);
+        }
+        finally
+        {
+            await InvokeLeaseOperation("ReleaseMigrationLease");
+            await StopAndDelete(client, tableName, table);
+        }
+    }
+
+    [Fact]
+    public async Task Rollback_MissingStatePreservesV2AndLeavesDeletedV1Absent()
+    {
+        EnsureDynamoDb();
+        var tableName = NewTableName();
+        const string serviceId = "rollback-missing-state";
+        using var client = CreateClient();
+        var prepare = CreateTable(tableName, serviceId, DynamoDBReminderTableMode.Migrate);
+        var rollback = CreateTable(tableName, serviceId, DynamoDBReminderTableMode.Rollback);
+        try
+        {
+            await prepare.StartAsync(TestContext.Current.CancellationToken);
+            var entry = Entry(1);
+            var etag = await prepare.UpsertRow(entry);
+            var state = await ReadState(client, tableName, serviceId);
+            await client.DeleteTableAsync(new DeleteTableRequest { TableName = tableName }, TestContext.Current.CancellationToken);
+            await client.DeleteItemAsync(
+                new()
+                {
+                    TableName = $"{tableName}-v2",
+                    Key = new() { ["PartitionKey"] = state["PartitionKey"], ["SortKey"] = state["SortKey"] },
+                },
+                TestContext.Current.CancellationToken);
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => rollback.StartAsync(TestContext.Current.CancellationToken));
+
+            Assert.Contains("requires existing migration metadata", exception.Message, StringComparison.Ordinal);
+            await Assert.ThrowsAsync<ResourceNotFoundException>(
+                () => client.DescribeTableAsync(tableName, TestContext.Current.CancellationToken));
+            var retained = Assert.Single(await ReadV2Items(client, tableName, serviceId));
+            Assert.Equal(etag, Scalar(retained["ETag"]));
+            Assert.Equal(entry.GrainId.ToString(), retained["GrainReference"].S);
+            var absentState = await client.GetItemAsync(
+                new()
+                {
+                    TableName = $"{tableName}-v2",
+                    Key = new() { ["PartitionKey"] = state["PartitionKey"], ["SortKey"] = state["SortKey"] },
+                    ConsistentRead = true,
+                },
+                TestContext.Current.CancellationToken);
+            Assert.False(absentState.IsItemSet);
+        }
+        finally
+        {
+            await StopAndDelete(client, tableName, prepare, rollback);
         }
     }
 
@@ -905,22 +1044,7 @@ public sealed class DynamoDBReminderMigrationTests
     }
 
     private static AmazonDynamoDBClient CreateClient()
-    {
-        var service = AWSTestConstants.DynamoDbService;
-        if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-            || service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-        {
-            return new(new BasicAWSCredentials("dummy", "dummyKey"), new AmazonDynamoDBConfig { ServiceURL = service });
-        }
-
-        var config = new AmazonDynamoDBConfig { RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(service) };
-        return string.IsNullOrEmpty(AWSTestConstants.DynamoDbAccessKey)
-            || string.IsNullOrEmpty(AWSTestConstants.DynamoDbSecretKey)
-                ? new(config)
-                : new(
-                    new BasicAWSCredentials(AWSTestConstants.DynamoDbAccessKey, AWSTestConstants.DynamoDbSecretKey),
-                    config);
-    }
+        => AWSTestConstants.CreateDynamoDbClient();
 
     private static async Task StopAndDelete(AmazonDynamoDBClient client, string tableName, params DynamoDBReminderTable?[] tables)
     {

@@ -75,7 +75,7 @@ internal sealed partial class DynamoDBReminderTable
 
         var state = await ReadMigrationState();
         if (state is null
-            && (options.TableMode is DynamoDBReminderTableMode.V2 or DynamoDBReminderTableMode.V2Only
+            && (options.TableMode is DynamoDBReminderTableMode.V2 or DynamoDBReminderTableMode.V2Only or DynamoDBReminderTableMode.Rollback
                 || useV2Reads || useV2OnlyWrites))
         {
             throw new InvalidOperationException(
@@ -135,9 +135,20 @@ internal sealed partial class DynamoDBReminderTable
         }
     }
 
+    private void ValidateRollbackState(MigrationState? state)
+    {
+        if (options.TableMode == DynamoDBReminderTableMode.Rollback && state is null)
+        {
+            throw new InvalidOperationException(
+                $"DynamoDB reminder rollback for service '{serviceId}' requires existing migration metadata in '{v2TableName}'. "
+                + "Restore the migration metadata before retrying rollback.");
+        }
+    }
+
     private async Task InitializeMigration(CancellationToken cancellationToken)
     {
         var state = await ReadMigrationState(cancellationToken);
+        ValidateRollbackState(state);
         if (state?.Status == MigrationStatus.Retired)
         {
             if (options.TableMode == DynamoDBReminderTableMode.Rollback)
@@ -177,22 +188,22 @@ internal sealed partial class DynamoDBReminderTable
             return;
         }
 
-        state = await ReadMigrationState(cancellationToken);
-        if (state?.Status == MigrationStatus.Retired)
-        {
-            throw new InvalidOperationException("The DynamoDB reminder V1 schema was retired while waiting for the migration lease.");
-        }
-
-        if (state?.Status == MigrationStatus.Cutover && options.TableMode == DynamoDBReminderTableMode.V2)
-        {
-            useV2Reads = true;
-            await ReleaseMigrationLease();
-            return;
-        }
-
         StartLeaseRenewal();
         try
         {
+            state = await ReadMigrationState(cancellationToken);
+            ValidateRollbackState(state);
+            if (state?.Status == MigrationStatus.Retired)
+            {
+                throw new InvalidOperationException("The DynamoDB reminder V1 schema was retired while waiting for the migration lease.");
+            }
+
+            if (state?.Status == MigrationStatus.Cutover && options.TableMode == DynamoDBReminderTableMode.V2)
+            {
+                useV2Reads = true;
+                return;
+            }
+
             if (options.TableMode == DynamoDBReminderTableMode.Rollback)
             {
                 await EnsureCompatibleCluster(cancellationToken);
@@ -565,7 +576,8 @@ internal sealed partial class DynamoDBReminderTable
     private static bool RecordsEqual(
         IReadOnlyDictionary<string, AttributeValue> legacy,
         IReadOnlyDictionary<string, AttributeValue> v2)
-        => GetAttributeString(legacy[GRAIN_HASH_PROPERTY_NAME]) == GetAttributeString(v2[GRAIN_HASH_PROPERTY_NAME])
+        => GetAttributeString(legacy[SERVICE_ID_PROPERTY_NAME]) == GetAttributeString(v2[SERVICE_ID_PROPERTY_NAME])
+            && GetAttributeString(legacy[GRAIN_HASH_PROPERTY_NAME]) == GetAttributeString(v2[GRAIN_HASH_PROPERTY_NAME])
             && GetAttributeString(legacy[GRAIN_REFERENCE_PROPERTY_NAME]) == GetAttributeString(v2[GRAIN_REFERENCE_PROPERTY_NAME])
             && GetAttributeString(legacy[REMINDER_NAME_PROPERTY_NAME]) == GetAttributeString(v2[REMINDER_NAME_PROPERTY_NAME])
             && GetAttributeString(legacy[START_TIME_PROPERTY_NAME]) == GetAttributeString(v2[START_TIME_PROPERTY_NAME])
@@ -594,23 +606,22 @@ internal sealed partial class DynamoDBReminderTable
     private async Task<bool> TryAcquireMigrationLease()
     {
         var now = timeProvider.GetUtcNow();
-        leaseToken ??= Guid.NewGuid().ToString("N");
+        var token = Guid.NewGuid().ToString("N");
         var item = MetadataItem(MigrationLeaseSortKey);
         item[OwnerAttribute] = new(migrationOwner);
-        item[LeaseTokenAttribute] = new(leaseToken);
+        item[LeaseTokenAttribute] = new(token);
         item[ExpiresAtAttribute] = new() { N = now.Add(MigrationLeaseDuration).ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture) };
         try
         {
             await storage.PutEntryAsync(
                 v2TableName,
                 item,
-                $"attribute_not_exists({OwnerAttribute}) OR {ExpiresAtAttribute} < :now OR ({OwnerAttribute} = :owner AND {LeaseTokenAttribute} = :token)",
+                $"attribute_not_exists({OwnerAttribute}) OR {ExpiresAtAttribute} <= :now",
                 new()
                 {
                     [":now"] = new() { N = now.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture) },
-                    [":owner"] = new(migrationOwner),
-                    [":token"] = new(leaseToken),
                 });
+            leaseToken = token;
             return true;
         }
         catch (ConditionalCheckFailedException)
@@ -621,11 +632,20 @@ internal sealed partial class DynamoDBReminderTable
 
     private async Task RenewMigrationLease()
     {
-        if (!await TryAcquireMigrationLease())
+        var now = timeProvider.GetUtcNow();
+        var fence = CreateMigrationLeaseFence();
+        var item = MetadataItem(MigrationLeaseSortKey);
+        item[OwnerAttribute] = new(migrationOwner);
+        item[LeaseTokenAttribute] = new(leaseToken);
+        item[ExpiresAtAttribute] = new() { N = now.Add(MigrationLeaseDuration).ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture) };
+        try
         {
-            throw new InvalidOperationException("The DynamoDB reminder migration lease was lost.");
+            await storage.PutEntryAsync(v2TableName, item, fence.ConditionExpression, fence.ExpressionAttributeValues);
         }
-
+        catch (ConditionalCheckFailedException exception)
+        {
+            throw new InvalidOperationException("The DynamoDB reminder migration lease was lost.", exception);
+        }
     }
 
     private void StartLeaseRenewal()
@@ -669,6 +689,12 @@ internal sealed partial class DynamoDBReminderTable
 
     private async Task ReleaseMigrationLease()
     {
+        var token = leaseToken;
+        if (token is null)
+        {
+            return;
+        }
+
         try
         {
             await storage.DeleteEntryAsync(
@@ -678,11 +704,18 @@ internal sealed partial class DynamoDBReminderTable
                 new()
                 {
                     [":owner"] = new(migrationOwner),
-                    [":token"] = new(leaseToken),
+                    [":token"] = new(token),
                 });
         }
         catch (ConditionalCheckFailedException)
         {
+        }
+        finally
+        {
+            if (leaseToken == token)
+            {
+                leaseToken = null;
+            }
         }
     }
 

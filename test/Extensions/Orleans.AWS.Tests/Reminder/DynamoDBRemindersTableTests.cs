@@ -571,29 +571,7 @@ namespace AWSUtils.Tests.RemindersTest
         }
 
         private static Amazon.DynamoDBv2.AmazonDynamoDBClient CreateDynamoDBClient()
-        {
-            var service = AWSTestConstants.DynamoDbService;
-            if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-                || service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                return new Amazon.DynamoDBv2.AmazonDynamoDBClient(
-                    new Amazon.Runtime.BasicAWSCredentials("dummy", "dummyKey"),
-                    new Amazon.DynamoDBv2.AmazonDynamoDBConfig { ServiceURL = service });
-            }
-
-            var config = new Amazon.DynamoDBv2.AmazonDynamoDBConfig
-            {
-                RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(service),
-            };
-            return string.IsNullOrEmpty(AWSTestConstants.DynamoDbAccessKey)
-                || string.IsNullOrEmpty(AWSTestConstants.DynamoDbSecretKey)
-                    ? new Amazon.DynamoDBv2.AmazonDynamoDBClient(config)
-                    : new Amazon.DynamoDBv2.AmazonDynamoDBClient(
-                        new Amazon.Runtime.BasicAWSCredentials(
-                            AWSTestConstants.DynamoDbAccessKey,
-                            AWSTestConstants.DynamoDbSecretKey),
-                        config);
-        }
+            => AWSTestConstants.CreateDynamoDbClient();
 
         private static async Task DeleteTableIfExistsAsync(
             Amazon.DynamoDBv2.AmazonDynamoDBClient client,

@@ -101,7 +101,24 @@ internal sealed partial class DynamoDBReminderTable
     }
 
     private async Task<ReminderEntry?> ReadV2Row(GrainId grainId, string reminderName)
-        => await storage.ReadSingleEntryAsync(v2TableName, GetV2Key(grainId, reminderName), Resolve);
+    {
+        var item = await storage.ReadSingleEntryAsync(v2TableName, GetV2Key(grainId, reminderName), static item => item);
+        if (item is null)
+        {
+            return null;
+        }
+
+        if (!HasV2GrainIdentity(item, grainId) || item[REMINDER_NAME_PROPERTY_NAME].S != reminderName)
+        {
+            throw new InvalidOperationException(
+                $"DynamoDB reminder '{reminderName}' for grain '{grainId}' in '{v2TableName}' has a conflicting stored identity.");
+        }
+
+        return Resolve(item);
+    }
+
+    private bool HasV2GrainIdentity(Dictionary<string, AttributeValue> item, GrainId grainId)
+        => item[SERVICE_ID_PROPERTY_NAME].S == serviceId && item[GRAIN_REFERENCE_PROPERTY_NAME].S == grainId.ToString();
 
     private async Task<ReminderTableData> ReadV2Rows(GrainId grainId)
     {
@@ -115,8 +132,8 @@ internal sealed partial class DynamoDBReminderTable
             v2TableName,
             values,
             $"{V2PartitionKeyName} = :partition AND begins_with({V2SortKeyName}, :prefix)",
-            Resolve);
-        return new(rows);
+            static item => item);
+        return new(rows.Where(item => HasV2GrainIdentity(item, grainId)).Select(Resolve));
     }
 
     private async Task<ReminderTableData> ReadV2Rows(uint begin, uint end)

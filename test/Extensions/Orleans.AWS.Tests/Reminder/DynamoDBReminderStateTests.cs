@@ -103,6 +103,7 @@ public sealed class DynamoDBReminderStateTests
     [Theory]
     [InlineData(DynamoDBReminderTableMode.V2)]
     [InlineData(DynamoDBReminderTableMode.V2Only)]
+    [InlineData(DynamoDBReminderTableMode.Rollback)]
     public async Task MissingStateRejectsReadsAndMutations(DynamoDBReminderTableMode mode)
     {
         using var client = new RequestClient { Read = (_, _) => Task.FromResult(new GetItemResponse()) };
@@ -115,6 +116,97 @@ public sealed class DynamoDBReminderStateTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => table.RemoveRow(entry.GrainId, entry.ReminderName, "1"));
 
         Assert.Equal(0, client.WriteCount);
+    }
+
+    [Fact]
+    public async Task RollbackRechecksMissingStateAfterAcquiringTheLease()
+    {
+        var reads = 0;
+        using var client = new RequestClient
+        {
+            Read = (_, _) => Task.FromResult(new GetItemResponse { Item = ++reads < 3 ? StateItem("Cutover") : null }),
+        };
+        var table = CreateTable(client, DynamoDBReminderTableMode.Rollback);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => table.StartAsync(TestContext.Current.CancellationToken));
+
+        Assert.Contains("requires existing migration metadata", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(3, client.ReadCount);
+        Assert.Equal(2, client.WriteCount);
+        Assert.Equal(1, client.DeleteCount);
+    }
+
+    [Theory]
+    [InlineData("ServiceId")]
+    [InlineData("GrainReference")]
+    [InlineData("ReminderName")]
+    public async Task V2PointReadRejectsConflictingStoredIdentity(string attribute)
+    {
+        var entry = Entry();
+        entry.GrainId = GrainId.Create("state-test", new string('g', 400));
+        Assert.Contains("#H", DynamoDBReminderTable.GetV2GrainPrefix(entry.GrainId.GetUniformHashCode(), entry.GrainId), StringComparison.Ordinal);
+        entry.ReminderName = new string('r', 700);
+        var item = RowItem(entry);
+        item[attribute] = new("conflicting-identity");
+        using var client = new RequestClient
+        {
+            Read = (request, _) => Task.FromResult(new GetItemResponse
+            {
+                Item = request.Key["SortKey"].S == "STATE" ? StateItem("Cutover") : item,
+            }),
+        };
+        var table = CreateTable(client, DynamoDBReminderTableMode.V2);
+        AttachStorage(table, client);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => table.ReadRow(entry.GrainId, entry.ReminderName));
+
+        Assert.Contains("conflicting stored identity", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(2, client.ReadCount);
+        Assert.Equal(0, client.WriteCount);
+    }
+
+    [Fact]
+    public async Task V2GrainReadFiltersConflictingPrefixIdentitiesAcrossPages()
+    {
+        var entry = Entry();
+        entry.GrainId = GrainId.Create("state-test", new string('g', 400));
+        var wrongGrain = RowItem(entry);
+        wrongGrain["GrainReference"] = new(GrainId.Create("state-test", new string('h', 400)).ToString());
+        var wrongService = RowItem(entry);
+        wrongService["ServiceId"] = new("another-service");
+        var pages = 0;
+        using var client = new RequestClient
+        {
+            Read = (_, _) => Task.FromResult(new GetItemResponse { Item = StateItem("Cutover") }),
+            Query = request =>
+            {
+                Assert.True(request.ConsistentRead);
+                Assert.Equal(
+                    DynamoDBReminderTable.GetV2GrainPrefix(entry.GrainId.GetUniformHashCode(), entry.GrainId),
+                    request.ExpressionAttributeValues[":prefix"].S);
+                if (++pages == 1)
+                {
+                    Assert.True(request.ExclusiveStartKey is null or { Count: 0 });
+                    return new()
+                    {
+                        Items = [wrongGrain, wrongService],
+                        LastEvaluatedKey = new() { ["SortKey"] = new("next-page") },
+                    };
+                }
+
+                Assert.Equal("next-page", request.ExclusiveStartKey["SortKey"].S);
+                return new() { Items = [RowItem(entry)] };
+            },
+        };
+        var table = CreateTable(client, DynamoDBReminderTableMode.V2);
+        AttachStorage(table, client);
+
+        var result = Assert.Single((await table.ReadRows(entry.GrainId)).Reminders);
+
+        Assert.Equal(entry.GrainId, result.GrainId);
+        Assert.Equal(entry.ReminderName, result.ReminderName);
+        Assert.Equal(entry.StartAt, result.StartAt);
+        Assert.Equal(2, pages);
     }
 
     [Theory]
@@ -198,6 +290,23 @@ public sealed class DynamoDBReminderStateTests
         Period = TimeSpan.FromMinutes(1),
     };
 
+    private static Dictionary<string, AttributeValue> RowItem(ReminderEntry entry) => new()
+    {
+        ["ServiceId"] = new("service"),
+        ["GrainReference"] = new(entry.GrainId.ToString()),
+        ["ReminderName"] = new(entry.ReminderName),
+        ["ETag"] = new() { N = "1" },
+        ["Period"] = new(entry.Period.ToString()),
+        ["StartTime"] = new(entry.StartAt.ToString("O", CultureInfo.InvariantCulture)),
+    };
+
+    private static Dictionary<string, AttributeValue> StateItem(string state) => new()
+    {
+        ["MigrationStatus"] = new(state),
+        ["SourceCount"] = new() { N = "0" },
+        ["TargetCount"] = new() { N = "0" },
+    };
+
     private static DynamoDBReminderTable CreateTable(RequestClient client, DynamoDBReminderTableMode mode, string tableName = "reminders")
         => new(
             NullLoggerFactory.Instance,
@@ -233,8 +342,12 @@ public sealed class DynamoDBReminderStateTests
         public Func<GetItemRequest, CancellationToken, Task<GetItemResponse>> Read { get; init; }
             = (_, _) => throw new InvalidOperationException("Unexpected read.");
 
+        public Func<QueryRequest, QueryResponse> Query { get; init; }
+            = _ => throw new InvalidOperationException("Unexpected query.");
+
         public int ReadCount { get; private set; }
         public int WriteCount { get; private set; }
+        public int DeleteCount { get; private set; }
 
         public override Task<GetItemResponse> GetItemAsync(GetItemRequest request, CancellationToken cancellationToken = default)
         {
@@ -247,6 +360,15 @@ public sealed class DynamoDBReminderStateTests
         {
             WriteCount++;
             return Task.FromResult(new PutItemResponse());
+        }
+
+        public override Task<QueryResponse> QueryAsync(QueryRequest request, CancellationToken cancellationToken = default)
+            => Task.FromResult(Query(request));
+
+        public override Task<DeleteItemResponse> DeleteItemAsync(DeleteItemRequest request, CancellationToken cancellationToken = default)
+        {
+            DeleteCount++;
+            return Task.FromResult(new DeleteItemResponse());
         }
 
         public override Task<TransactWriteItemsResponse> TransactWriteItemsAsync(TransactWriteItemsRequest request, CancellationToken cancellationToken = default)

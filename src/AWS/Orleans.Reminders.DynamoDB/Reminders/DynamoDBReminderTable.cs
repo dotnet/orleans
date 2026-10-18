@@ -113,7 +113,9 @@ namespace Orleans.Reminders.DynamoDB
             if (options.TableMode != DynamoDBReminderTableMode.Legacy)
             {
                 await InitializeV2Table(cancellationToken);
-                if ((await ReadMigrationState(cancellationToken))?.Status == MigrationStatus.Retired)
+                var migrationState = await ReadMigrationState(cancellationToken);
+                ValidateRollbackState(migrationState);
+                if (migrationState?.Status == MigrationStatus.Retired)
                 {
                     await StartCompatibilityHeartbeat(cancellationToken);
                     try
