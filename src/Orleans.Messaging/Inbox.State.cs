@@ -22,22 +22,35 @@ internal sealed partial class Inbox
     private long _lastSequence;
     private long _capturedSequence;
     private long _durableSequence;
-    private long _lastAcceptSequence;
     private long _lastCompletionSequence;
+
+    // The earliest due time, on the Durable Jobs clock, of accepted or retrying messages staged since the last capture.
+    private DateTimeOffset? _stagedWakeup;
 
     private bool IsDurable(InboxEntry entry) => entry.Sequence <= _durableSequence;
 
     // Whether every processed record which deduplication relies on is durable.
     private bool AreCompletionsDurable => _lastCompletionSequence <= _durableSequence;
 
-    // Every journal write prepares every state, so a write which makes a work source's work pending ensures the wake-up
-    // before it can become durable.
-    ValueTask IStateMachine.PrepareWriteAsync(CancellationToken cancellationToken) =>
-        _lastAcceptSequence > _capturedSequence || GetWorkSourceDelay() is not null
-            ? _pump.EnsureWakeupAsync(cancellationToken)
-            : ValueTask.CompletedTask;
+    // Every journal write prepares every state, so a write which makes a message or a work source's work pending ensures
+    // its wake-up before it can become durable.
+    ValueTask IStateMachine.PrepareWriteAsync(CancellationToken cancellationToken)
+    {
+        var dueTime = _stagedWakeup;
+        if (GetWorkSourceDelay() is { } delay)
+        {
+            var workDueTime = MessagingTime.AddClamped(Shared.JobTimeProvider.GetUtcNow(), delay);
+            if (dueTime is null || workDueTime < dueTime) dueTime = workDueTime;
+        }
 
-    private void OnWriteCaptured() => _capturedSequence = _lastSequence;
+        return dueTime is { } due ? _pump.EnsureWakeupAsync(due, cancellationToken) : ValueTask.CompletedTask;
+    }
+
+    private void OnWriteCaptured()
+    {
+        _capturedSequence = _lastSequence;
+        _stagedWakeup = null;
+    }
 
     void IStateMachine.OnWriteCompleted()
     {
@@ -49,6 +62,13 @@ internal sealed partial class Inbox
     {
         Shared.InboxCodec.WriteSet(command, _writer);
         Apply(command);
+        var dueTime = command switch
+        {
+            { Kind: InboxCommandKind.Accept, Message: { } message } => message.Envelope.DeliverAt ?? DateTimeOffset.MinValue,
+            { Kind: InboxCommandKind.Retry, State: { } state } => state.NextAttemptAt,
+            _ => (DateTimeOffset?)null
+        };
+        if (dueTime is { } due && (_stagedWakeup is null || due < _stagedWakeup)) _stagedWakeup = due;
     }
 
     void IStateMachine.Reset(JournalStreamWriter writer)
@@ -59,7 +79,8 @@ internal sealed partial class Inbox
         _processed.Clear();
         _deadLetters.Clear();
         _scheduledCount = 0;
-        _lastSequence = _capturedSequence = _durableSequence = _lastAcceptSequence = _lastCompletionSequence = 0;
+        _stagedWakeup = null;
+        _lastSequence = _capturedSequence = _durableSequence = _lastCompletionSequence = 0;
     }
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
@@ -120,7 +141,7 @@ internal sealed partial class Inbox
         {
             case InboxCommandKind.Accept:
                 var message = command.Message ?? throw new InvalidOperationException("An accept command requires its message.");
-                _messages.Add(message.Envelope.MessageId, new InboxEntry { Message = message, State = new(), Sequence = _lastAcceptSequence = ++_lastSequence });
+                _messages.Add(message.Envelope.MessageId, new InboxEntry { Message = message, State = new(), Sequence = ++_lastSequence });
                 _processed.Remove(message.Envelope.MessageId);
                 if (message.Envelope.DeliverAt is not null) _scheduledCount++;
                 ReportDepth(1);
