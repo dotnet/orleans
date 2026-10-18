@@ -278,7 +278,8 @@ namespace Orleans.DurableTasks
         ActivationStopping = 0,
         TaskAborted = 1,
         TaskDeleted = 2,
-        UnsupportedVersion = 3
+        UnsupportedVersion = 3,
+        Diverged = 4
     }
 
     public readonly partial struct DurableTaskAwaiter : System.Runtime.CompilerServices.ICriticalNotifyCompletion, System.Runtime.CompilerServices.INotifyCompletion
