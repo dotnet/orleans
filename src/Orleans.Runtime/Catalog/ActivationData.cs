@@ -2219,7 +2219,9 @@ internal sealed partial class ActivationData :
                 }
 
                 // When its silo retires, an activation which still has queued requests migrates, carrying the requests with it.
+                // Only an activation which completed activation migrates, since an interrupted activation may hold partially initialized state.
                 if (!encounteredError
+                    && deactivateCommand.PreviousState == ActivationState.Valid
                     && DehydrationContext is null
                     && WaitingCount > 0
                     && MigratesOnRetirement())

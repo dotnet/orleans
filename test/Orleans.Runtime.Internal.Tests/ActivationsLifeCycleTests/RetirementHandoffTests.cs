@@ -1385,6 +1385,51 @@ public sealed class RetirementHandoffTests
         };
     }
 
+    [Fact]
+    public async Task ActivationInterruptedByRetirement_DoesNotMigrate()
+    {
+        var migrationsReceived = 0;
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
+        {
+            if (context.Request.GetMethodName() is nameof(IMigratingRequestsSystemTarget.AcceptMigratingGrainsWithRequests) or nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
+            {
+                Interlocked.Increment(ref migrationsReceived);
+            }
+
+            await context.Invoke();
+        })));
+        var retiring = cluster.Silos[1];
+        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+
+        // The activation is held in OnActivateAsync, with a request queued behind it.
+        state.HoldActivationOn = retiring.SiloAddress;
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, retiring.SiloAddress);
+        Task call;
+        try
+        {
+            call = grain.Record("queued").AsTask();
+        }
+        finally
+        {
+            RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+        }
+
+        await state.ActivationHeld.Task.WaitAsync(Timeout, Cancellation);
+        var activation = Assert.IsType<ActivationData>(FindActivation(retiring, grain.GetGrainId()));
+        await WaitUntilAsync(() => activation.WaitingCount == 1);
+
+        // Retirement interrupts the activation. Its state may be partially initialized, so it does not migrate, and its queued request is forwarded or rejected as before.
+        var stopping = cluster.StopSiloAsync(retiring, Cancellation);
+        await WaitUntilAsync(() => activation.State is ActivationState.Deactivating or ActivationState.Invalid);
+        state.ReleaseActivation.TrySetResult();
+        await stopping.WaitAsync(Timeout, Cancellation);
+        await call.WaitAsync(Timeout, Cancellation).ContinueWith(static _ => { }, TaskScheduler.Default);
+        Assert.Equal(0, Volatile.Read(ref migrationsReceived));
+    }
+
     private sealed class UnserializableValue;
 
     [Fact]
