@@ -9,7 +9,7 @@ ms.topic: reference
 
 Orleans analyzers detect unsupported RPC contracts, serialization schema problems, unsafe grain execution patterns, replay hazards in durable tasks, and compatibility changes. Select a diagnostic ID for its cause, impact, remediation, code-fix behavior, and suppression guidance.
 
-Durable task diagnostics ORLEANS0200 to ORLEANS0218 enforce the [replay-safety rules](../grains/durable-tasks-replay-rules.md) for durable task bodies.
+Durable task diagnostics ORLEANS0200 to ORLEANS0223 enforce the [replay-safety rules](../grains/durable-tasks-replay-rules.md) for durable task bodies.
 
 Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic ID as a URL fragment. The single redirect can therefore remain stable while this index and the detailed pages evolve.
 
@@ -143,7 +143,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 
 ## ORLEANS0205
 
-[Await, schedule, or post durable task definitions](orleans0205.md) — Warning. Durable task code creates a durable task definition and never runs it.
+[Await, schedule, or post durable task definitions](orleans0205.md) — Error. Durable task code creates a durable task definition and never runs it.
 
 ## ORLEANS0206
 
@@ -196,3 +196,23 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 ## ORLEANS0218
 
 [Pass constant version names and ranges](orleans0218.md) — Warning. A `DurableTask.GetVersion` call passes a change name or supported range which isn't a constant.
+
+## ORLEANS0219
+
+[Await, combine, or return the handles of scheduled children](orleans0219.md) — Info. A durable task body schedules an attached child and never observes its handle.
+
+## ORLEANS0220
+
+[Name durable operations whose position can change](orleans0220.md) — Info. An unnamed durable operation in a loop, in a condition, or after another unnamed operation takes a generated identifier which can shift.
+
+## ORLEANS0221
+
+[Run synchronous work with DurableTask.RunInline](orleans0221.md) — Warning. A `DurableTask.Run` step neither awaits nor observes its `CancellationToken`.
+
+## ORLEANS0222
+
+[Pass delegates which return a task for asynchronous work](orleans0222.md) — Error. `DurableTask.Run` or `DurableTask.RunInline` receives an `async void` delegate, whose completion precedes its work.
+
+## ORLEANS0223
+
+[Assign new values to grain state instead of changing them in place](orleans0223.md) — Warning. Durable task code changes an object which journaled or persistent grain state holds instead of assigning a new value.

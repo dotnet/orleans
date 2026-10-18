@@ -9,7 +9,7 @@ ms.topic: reference
 
 | Property | Value |
 | --- | --- |
-| Severity | Warning |
+| Severity | Error |
 | Category | Usage |
 | Code fix | None |
 
@@ -19,7 +19,7 @@ Code calls a method which returns `DurableTask` or `DurableTask<TResult>`, or co
 
 :::code source="snippets/durable-tasks/Orleans0205.cs" id="orleans0205_violation" language="csharp":::
 
-The C# compiler also reports CS4014 for some of these statements in `async` methods. ORLEANS0205 also covers definitions which are assigned to a discard, `_ = SendReceipt(customer);`, and configurations, such as `SendReceipt(customer).WithId("receipt");`.
+The C# compiler also reports CS4014 for some of these statements in `async` methods. ORLEANS0205 also covers definitions which are assigned to a discard, `_ = SendReceipt(customer);`, configurations, such as `SendReceipt(customer).WithId("receipt");`, and locals which hold a definition that no code awaits, schedules, posts, returns, or passes on, such as `var receipt = SendReceipt(customer);` followed by `return;`. A local which another local only renames or configures, such as `var named = receipt.WithId("receipt");`, counts as unused too, and a local which code assigns again isn't reported.
 
 ## Rule description
 

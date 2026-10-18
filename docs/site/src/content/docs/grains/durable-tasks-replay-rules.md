@@ -1,6 +1,6 @@
 ---
 title: Replay-safety rules for durable tasks
-description: Reference for the rules which keep durable task bodies correct under replay, the failures each rule prevents, and the analyzer diagnostics ORLEANS0100 to ORLEANS0118 which enforce them.
+description: Reference for the rules which keep durable task bodies correct under replay, the failures each rule prevents, and the analyzer diagnostics ORLEANS0100 to ORLEANS0123 which enforce them.
 ms.date: 10/16/2026
 ms.topic: reference
 ---
@@ -11,7 +11,7 @@ A durable task resumes after a deactivation or a failure by running its body aga
 the start, while each recorded operation returns its recorded outcome. The rules on this
 page keep that replay equivalent to the run which recorded the operations. The
 `Microsoft.Orleans.DurableTasks.Abstractions` package carries analyzers which check them
-at build time and report diagnostics ORLEANS0100 to ORLEANS0118; each diagnostic's page
+at build time and report diagnostics ORLEANS0100 to ORLEANS0123; each diagnostic's page
 shows the code which triggers it and common fixes.
 
 For the model behind the rules, see
@@ -86,6 +86,11 @@ awaiting, or helpers in other assemblies.
 | Post from grains and durable task bodies, and schedule from clients. | `Post` throws, because a client has no durable outbox. | [ORLEANS0116](../diagnostics/orleans0116.md) |
 | Pass `AttemptCancellationToken` to the calls which task-cancellation cleanup makes. | The cleanup's calls end at once, because `CancellationToken` is already canceled. | [ORLEANS0117](../diagnostics/orleans0117.md) |
 | Pass constant names and ranges to version checks. | One change records several decisions, or a deployment records versions which no branch handles. | [ORLEANS0118](../diagnostics/orleans0118.md) |
+| Await, combine, or return the handle of each scheduled child. | The child's failure goes unobserved, and deleting the execution's tree cancels it. | [ORLEANS0119](../diagnostics/orleans0119.md) |
+| Name operations in loops and conditions, and after other unnamed operations. | A loop, a condition, or a deployment shifts generated identifiers, and a replay diverges. | [ORLEANS0120](../diagnostics/orleans0120.md) |
+| Run synchronous work with `DurableTask.RunInline`. | A step adds a child execution and a journal write without running asynchronous work. | [ORLEANS0121](../diagnostics/orleans0121.md) |
+| Pass delegates which return a task to `DurableTask.Run` and `DurableTask.RunInline`. | The task records an `async void` delegate as complete at its first `await`, before its work runs. | [ORLEANS0122](../diagnostics/orleans0122.md) |
+| Assign new immutable values to grain state. | A change in place bypasses the journal, so the recovered state differs from the state in memory. | [ORLEANS0123](../diagnostics/orleans0123.md) |
 
 The analyzers also suppress CS1998 for `async DurableTask` methods without an `await`,
 which are ordinary steps; see [ORLEANS0028](../diagnostics/orleans0028.md).

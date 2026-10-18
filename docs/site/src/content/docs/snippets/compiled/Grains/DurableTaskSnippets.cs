@@ -719,12 +719,13 @@ public sealed class ExportGrain : DurableGrain, IExportGrain
 
     public async DurableTask<int> ExportAsync(string[] partitions)
     {
-        // Each append runs once for its position in the task, so a replay doesn't publish older progress again.
+        // Each append runs once, and a replay returns its recorded sequence, so it doesn't publish older progress again.
+        // The loop's appends share a name, which identifies them as progress, progress$2, and so on.
         DurableTask.RunInline(() => _progress.Append(new ExportProgress(0, partitions.Length)));
         for (var i = 0; i < partitions.Length; i++)
         {
             await GrainFactory.GetGrain<IPartitionGrain>(partitions[i]).ExportAsync().WithId("partition");
-            DurableTask.RunInline(() => _progress.Append(new ExportProgress(i + 1, partitions.Length)));
+            DurableTask.RunInline("progress", () => _progress.Append(new ExportProgress(i + 1, partitions.Length)));
         }
 
         return partitions.Length;

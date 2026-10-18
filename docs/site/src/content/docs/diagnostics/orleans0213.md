@@ -15,7 +15,7 @@ ms.topic: reference
 
 ## Cause
 
-A durable task body declares an `async void` local function, or an `async` lambda which converts to a delegate that returns `void`, such as `Action`:
+A durable task body declares an `async void` local function, or an `async` lambda which converts to a delegate that returns `void`, such as `Action`. [ORLEANS0122](orleans0122.md) reports such a lambda which `DurableTask.Run` or `DurableTask.RunInline` receives:
 
 :::code source="snippets/durable-tasks/Orleans0213.cs" id="orleans0213_violation" language="csharp":::
 
