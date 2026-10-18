@@ -169,10 +169,10 @@ public sealed class TreeDeletionOwnerGrain(
     public async DurableTask<string> StartWorkAndReturnAsync(Guid workerKey)
     {
         // The task completes while its children run, so deleting its tree cancels them.
-#pragma warning disable ORLEANS0119
+#pragma warning disable ORLEANS0219
         _ = await DurableTask.Run(RunLocalWorkAsync).WithId(LocalId).ScheduleAsync();
         _ = await GrainFactory.GetGrain<ITreeDeletionWorkerGrain>(workerKey).HoldAsync().WithId(RemoteId).ScheduleAsync();
-#pragma warning restore ORLEANS0119
+#pragma warning restore ORLEANS0219
         return Returned;
     }
 

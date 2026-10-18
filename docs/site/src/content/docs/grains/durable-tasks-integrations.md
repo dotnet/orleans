@@ -73,7 +73,7 @@ Pitfalls:
 
 - Compute the key outside the step's retry loop, from values which are stable across
   replays. A key from `Guid.NewGuid()` in the body changes in every replay; see
-  [ORLEANS0101](../diagnostics/orleans0101.md).
+  [ORLEANS0201](../diagnostics/orleans0201.md).
 - Keep in-step retries short. The step holds an execution running while it retries, and a
   deactivation cancels the step's attempt, which the next run starts again from the first
   retry.

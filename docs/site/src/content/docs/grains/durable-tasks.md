@@ -536,7 +536,7 @@ when the caller continues:
   parties look up starts with `ScheduleAsync`. Inside a durable task, the start is recorded like a `DurableTask.RunInline` effect, so a
   replay returns the same handle, and awaiting the handle later observes the result. A
   client has no outbox, so `Post` throws `InvalidOperationException` there, and
-  [ORLEANS0116](../diagnostics/orleans0116.md) reports it.
+  [ORLEANS0216](../diagnostics/orleans0216.md) reports it.
 - Inside a durable task, the record of a detached task, `$detach:{target}:{rootId}`,
   commits with the start, so a replay which reaches the record starts nothing. The
   starter holds the invocation, which carries the request, until its target accepts it,

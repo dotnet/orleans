@@ -85,7 +85,7 @@ attempt of one operation and different for every other operation:
   stable across deployments, like a `WithId` name.
 - Compute the key in the body, from values which are the same in every replay, and pass
   it into the step. A key which `Guid.NewGuid` produces outside a recorded effect differs
-  in every replay; see [ORLEANS0101](../diagnostics/orleans0101.md).
+  in every replay; see [ORLEANS0201](../diagnostics/orleans0201.md).
 - Reuse the key for every attempt of the same request, including retries inside the step
   and retries in later steps, and use a new key for a different request, such as a
   different amount.

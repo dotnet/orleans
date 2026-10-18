@@ -28,7 +28,7 @@ and `TaskId.Child(segment)`, `Parent()`, and `IsAncestorOf(other)` navigate the 
   take one unescaped root segment.
 - Segments which the runtime generates begin with, or contain, `$`. Names which
   `WithId` and `DurableTask.RunInline` receive inside a durable task don't contain `$`, so a
-  name never equals a generated segment; see [ORLEANS0107](../diagnostics/orleans0107.md).
+  name never equals a generated segment; see [ORLEANS0207](../diagnostics/orleans0207.md).
 
 The following workflow creates most kinds of ID. Its comments name the ID which each
 operation records:
@@ -167,7 +167,7 @@ Changes between deployments affect pending executions as follows:
   other step's result.
 - **Adding a named operation** with a new name leaves every other ID unchanged.
 - **Adding or removing an occurrence of a repeated name** before existing ones renumbers
-  the later occurrences; see [ORLEANS0108](../diagnostics/orleans0108.md).
+  the later occurrences; see [ORLEANS0208](../diagnostics/orleans0208.md).
 
 Name every operation which a later change might move, give new operations new names, and
 follow [Version workflows safely](durable-tasks-operations.md#version-workflows-safely).
