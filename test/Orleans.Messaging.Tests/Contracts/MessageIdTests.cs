@@ -108,6 +108,38 @@ public class MessageIdTests
         Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<MessageId>(json));
 
     [Theory]
+    [InlineData("order-{high}")]
+    [InlineData("{low}-order")]
+    [InlineData("order-{low}{high}")]
+    public void UnpairedSurrogate_IsRejectedOnEveryConstructionPath(string template)
+    {
+        var text = HierarchicalKeyTests.WithUnpairedSurrogates(template);
+        Assert.Throws<ArgumentException>(() => MessageId.Create(text));
+        Assert.Throws<ArgumentException>(() => MessageId.Create("orders", text));
+        Assert.Throws<FormatException>(() => MessageId.Parse(text));
+        Assert.Throws<FormatException>(() => MessageId.Parse(text.AsSpan()));
+        Assert.False(MessageId.TryParse(text, null, out var result));
+        Assert.True(result.IsDefault);
+        Assert.False(MessageId.TryParse(text.AsSpan(), null, out result));
+        Assert.True(result.IsDefault);
+    }
+
+    [Fact]
+    public void SurrogatePairs_RoundTripThroughOrleansSerialization()
+    {
+        using var first = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var second = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var id = MessageId.Create("order-\U0001F600");
+
+        var decoded = second.GetRequiredService<Serializer<MessageId>>().Deserialize(first.GetRequiredService<Serializer<MessageId>>().SerializeToArray(id));
+
+        Assert.Equal(id, decoded);
+        Assert.Equal("order-\U0001F600", decoded.ToString());
+        Assert.Equal(id, MessageId.Parse("order-\U0001F600"));
+        Assert.NotEqual(decoded, MessageId.Create("order-\U0001F601"));
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void SerializationAndCopy_PreserveIdentity(bool unset)

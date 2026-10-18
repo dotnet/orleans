@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -12,6 +13,7 @@ namespace Orleans.Messaging;
 /// <remarks>
 /// Create constructs literal segments and escapes slash and backslash characters exactly once.
 /// Parse reads the canonical escaped path. The key wraps its canonical string; equality and hashing use that string. Applications preserve the identity across retries.
+/// Every key is well-formed UTF-16: surrogate characters appear only as high-low pairs, so distinct keys keep distinct serialized forms.
 /// </remarks>
 [Immutable, Alias("Orleans.Messaging.HierarchicalKey")]
 [JsonConverter(typeof(HierarchicalKeyJsonConverter))]
@@ -22,6 +24,9 @@ public readonly struct HierarchicalKey : ISpanFormattable, IEquatable<Hierarchic
 
     /// <summary>The separator between canonical segments.</summary>
     public const char SegmentSeparator = '/';
+
+    private const char HighSurrogateStart = '\uD800';
+    private const char LowSurrogateEnd = '\uDFFF';
 
     private readonly string? _value;
 
@@ -71,10 +76,10 @@ public readonly struct HierarchicalKey : ISpanFormattable, IEquatable<Hierarchic
     /// <param name="value">The nonempty literal segment.</param>
     /// <returns>The segment identity.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="value"/> is null.</exception>
-    /// <exception cref="ArgumentException"><paramref name="value"/> is empty.</exception>
+    /// <exception cref="ArgumentException"><paramref name="value"/> is empty or contains an unpaired surrogate.</exception>
     public static HierarchicalKey Create(string value)
     {
-        ArgumentException.ThrowIfNullOrEmpty(value);
+        ValidateSegment(value);
         return new(Escape(value));
     }
 
@@ -82,7 +87,7 @@ public readonly struct HierarchicalKey : ISpanFormattable, IEquatable<Hierarchic
     /// <param name="values">The nonempty literal segments.</param>
     /// <returns>A flat canonical identity which owns its immutable backing string.</returns>
     /// <exception cref="ArgumentNullException">A segment is null.</exception>
-    /// <exception cref="ArgumentException">The input or a segment is empty.</exception>
+    /// <exception cref="ArgumentException">The input or a segment is empty, or a segment contains an unpaired surrogate.</exception>
     public static HierarchicalKey Create(params ReadOnlySpan<string> values)
     {
         if (values.IsEmpty)
@@ -92,7 +97,7 @@ public readonly struct HierarchicalKey : ISpanFormattable, IEquatable<Hierarchic
         var builder = new StringBuilder();
         foreach (var value in values)
         {
-            ArgumentException.ThrowIfNullOrEmpty(value);
+            ValidateSegment(value);
             if (builder.Length > 0) builder.Append(SegmentSeparator);
             AppendEscaped(builder, value);
         }
@@ -104,11 +109,11 @@ public readonly struct HierarchicalKey : ISpanFormattable, IEquatable<Hierarchic
     /// <returns>The child identity.</returns>
     /// <exception cref="InvalidOperationException">This key is unset.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="value"/> is null.</exception>
-    /// <exception cref="ArgumentException"><paramref name="value"/> is empty.</exception>
+    /// <exception cref="ArgumentException"><paramref name="value"/> is empty or contains an unpaired surrogate.</exception>
     public HierarchicalKey CreateChildKey(string value)
     {
         EnsureSet();
-        ArgumentException.ThrowIfNullOrEmpty(value);
+        ValidateSegment(value);
         return new(string.Concat(_value, "/", Escape(value)));
     }
 
@@ -234,6 +239,31 @@ public readonly struct HierarchicalKey : ISpanFormattable, IEquatable<Hierarchic
         if (IsDefault) throw new InvalidOperationException("The key must not be unset.");
     }
 
+    private static void ValidateSegment(string value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(value, paramName);
+        if (!IsWellFormedUtf16(value)) throw new ArgumentException("The value must not contain unpaired surrogate characters.", paramName);
+    }
+
+    // Orleans string serialization replaces unpaired surrogates, so accepting them would let distinct keys collide on the wire.
+    internal static bool IsWellFormedUtf16(ReadOnlySpan<char> value)
+    {
+        var i = value.IndexOfAnyInRange(HighSurrogateStart, LowSurrogateEnd);
+        if (i < 0) return true;
+        for (; i < value.Length; i++)
+        {
+            if (char.IsHighSurrogate(value[i]))
+            {
+                if (++i == value.Length || !char.IsLowSurrogate(value[i])) return false;
+            }
+            else if (char.IsLowSurrogate(value[i]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static string Escape(string value)
     {
         if (value.AsSpan().IndexOfAny(EscapeCharacter, SegmentSeparator) < 0) return value;
@@ -276,6 +306,10 @@ public readonly struct HierarchicalKey : ISpanFormattable, IEquatable<Hierarchic
                 if (segmentLength == 0) return false;
                 segmentLength = 0;
                 continue;
+            }
+            else if (char.IsSurrogate(path[i]))
+            {
+                if (!char.IsHighSurrogate(path[i]) || ++i == path.Length || !char.IsLowSurrogate(path[i])) return false;
             }
             segmentLength++;
         }
