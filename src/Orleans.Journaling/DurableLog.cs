@@ -17,6 +17,8 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
     // The first sequence after the most recent clear. Readers positioned before it observed history which the clear replaced.
     private long _resetSequence;
+    private long _capturedResetSequence;
+    private long _committedResetSequence;
 
     // The next sequence when the most recent write was captured, and when the most recent acknowledged write was captured.
     private long _capturedSequence;
@@ -155,6 +157,8 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         _items.Clear();
         _firstSequence = 0;
         _resetSequence = 0;
+        _capturedResetSequence = 0;
+        _committedResetSequence = 0;
         _capturedSequence = 0;
         _committedSequence = 0;
         _capturedFirstSequence = 0;
@@ -181,6 +185,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     {
         _capturedSequence = _committedSequence = NextSequence;
         _capturedFirstSequence = _committedFirstSequence = _firstSequence;
+        _capturedResetSequence = _committedResetSequence = _resetSequence;
         _isSealCaptured = _isSealCommitted = _isSealed;
         SignalReaders(DurableWatchMode.Committed);
     }
@@ -199,6 +204,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     {
         _committedSequence = Math.Max(_committedSequence, _capturedSequence);
         _committedFirstSequence = Math.Max(_committedFirstSequence, _capturedFirstSequence);
+        _committedResetSequence = Math.Max(_committedResetSequence, _capturedResetSequence);
         _isSealCommitted |= _isSealCaptured;
     }
 
@@ -238,6 +244,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     {
         _capturedSequence = NextSequence;
         _capturedFirstSequence = _firstSequence;
+        _capturedResetSequence = _resetSequence;
         _isSealCaptured = _isSealed;
     }
 
@@ -398,6 +405,12 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     // mutations made while the reader was suspended.
     private bool TryGetNextEvent(Reader reader, out LogEvent<T> logEvent)
     {
+        if (reader.ResetCount != _resetCount)
+        {
+            reader.FollowedDrafts?.RemoveAll(static followedDraft =>
+                followedDraft.TryGetOutcome(out var outcome) && outcome.IsCommitted);
+        }
+
         if (reader.FollowedDrafts is { Count: > 0 } followed && TryGetDraftOutcomeEvent(reader, followed, out logEvent))
         {
             return true;
@@ -407,39 +420,26 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         {
             // The journal was deleted, which restarted the sequence. Commits recorded before then describe deleted entries.
             reader.ResetCount = _resetCount;
-            reader.FollowedDrafts?.RemoveAll(static followedDraft => followedDraft.TryGetOutcome(out _));
 
             // The entries which were committed when the read began no longer exist.
             reader.CatchUpSequence = 0;
-            logEvent = ResetReader(reader, GetVisibleFirstSequence(reader), DurableChangeStatus.Committed, unconfirmedSequence: -1);
+            logEvent = ResetReader(reader, _committedFirstSequence, DurableChangeStatus.Committed, unconfirmedSequence: -1);
             return true;
         }
 
         if (reader.Cursor > NextSequence)
         {
-            logEvent = ResetReader(reader, GetVisibleFirstSequence(reader), DurableChangeStatus.Committed, unconfirmedSequence: -1);
+            logEvent = ResetReader(reader, _committedFirstSequence, DurableChangeStatus.Committed, unconfirmedSequence: -1);
             return true;
         }
 
-        if (reader.Cursor < _resetSequence)
+        var resetSequence = reader.IncludesStaged ? _resetSequence : _committedResetSequence;
+        if (reader.Cursor < resetSequence)
         {
-            // The clear consumed sequence _resetSequence - 1, so a write which captured that sequence made the clear durable.
-            var isClearCommitted = _resetSequence <= _committedSequence;
-            if (reader.IncludesStaged)
-            {
-                logEvent = isClearCommitted
-                    ? ResetReader(reader, _firstSequence, DurableChangeStatus.Committed, unconfirmedSequence: -1)
-                    : ResetReader(reader, _firstSequence, DurableChangeStatus.Staged, unconfirmedSequence: _resetSequence - 1);
-                return true;
-            }
-
-            if (isClearCommitted)
-            {
-                logEvent = ResetReader(reader, _committedFirstSequence, DurableChangeStatus.Committed, unconfirmedSequence: -1);
-                return true;
-            }
-
-            // Otherwise, the reader awaits the clear's write. The clear discarded every committed entry.
+            logEvent = resetSequence <= _committedResetSequence
+                ? ResetReader(reader, _committedFirstSequence, DurableChangeStatus.Committed, unconfirmedSequence: -1)
+                : ResetReader(reader, _firstSequence, DurableChangeStatus.Staged, unconfirmedSequence: resetSequence - 1);
+            return true;
         }
 
         var firstSequence = GetVisibleFirstSequence(reader);
@@ -447,12 +447,26 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         {
             reader.KnownFirstSequence = firstSequence;
             reader.Cursor = Math.Max(reader.Cursor, firstSequence);
+            var status = firstSequence <= _committedFirstSequence ? DurableChangeStatus.Committed : DurableChangeStatus.Staged;
+            reader.UnconfirmedTrimSequence = status is DurableChangeStatus.Staged ? firstSequence : -1;
             logEvent = new()
             {
                 Kind = LogEventKind.Trimmed,
                 Sequence = firstSequence,
-                Status = firstSequence <= _committedFirstSequence ? DurableChangeStatus.Committed : DurableChangeStatus.Staged,
+                Status = status,
             };
+            return true;
+        }
+
+        if (reader.UnconfirmedTrimSequence >= 0 && reader.UnconfirmedTrimSequence <= _committedFirstSequence)
+        {
+            logEvent = new()
+            {
+                Kind = LogEventKind.Trimmed,
+                Sequence = reader.UnconfirmedTrimSequence,
+                Status = DurableChangeStatus.Committed,
+            };
+            reader.UnconfirmedTrimSequence = -1;
             return true;
         }
 
@@ -507,6 +521,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         reader.Cursor = firstSequence;
         reader.KnownFirstSequence = firstSequence;
         reader.UnconfirmedSequence = unconfirmedSequence;
+        reader.UnconfirmedTrimSequence = -1;
         return new() { Kind = LogEventKind.Reset, Sequence = firstSequence, Status = status };
     }
 
@@ -758,6 +773,9 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
         // The first sequence delivered as staged which no watermark has confirmed, or -1.
         public long UnconfirmedSequence { get; set; } = -1;
+
+        // The latest staged retention boundary which awaits a committed trim notification.
+        public long UnconfirmedTrimSequence { get; set; } = -1;
 
         // The log's reset count when the reader last observed a deletion.
         public int ResetCount { get; set; } = resetCount;

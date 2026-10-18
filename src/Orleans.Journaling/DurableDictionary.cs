@@ -99,6 +99,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     public void Clear()
     {
         _codec.WriteClear(GetWriter());
+        _hasStagedEntries = true;
         ApplyClear();
         if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
         {
@@ -124,6 +125,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     private void WriteRemove(TKey key)
     {
         _codec.WriteRemove(key, GetWriter());
+        _hasStagedEntries = true;
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
@@ -131,6 +133,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     private void WriteSet(TKey key, TValue value)
     {
         _codec.WriteSet(key, value, GetWriter());
+        _hasStagedEntries = true;
     }
 
     protected virtual void OnSet(TKey key, TValue value) { }
@@ -155,7 +158,6 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     protected virtual JournalStreamWriter GetWriter()
     {
         Debug.Assert(_writer.IsInitialized);
-        _hasStagedEntries = true;
         return _writer;
     }
 

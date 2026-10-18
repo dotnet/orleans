@@ -76,6 +76,7 @@ public interface IDurableLog<T> : IReadOnlyCollection<T>
     /// Trimming bounds retention and preserves <see cref="NextSequence"/>; the retained entries remain valid. Every active
     /// reader receives <see cref="LogEventKind.Trimmed"/> with the new <see cref="FirstSequence"/>, and a reader positioned
     /// before it continues from it. Readers without <see cref="DurableWatchMode.Staged"/> receive the event once the trim is durable.
+    /// Readers with <see cref="DurableWatchMode.Staged"/> receive a staged boundary followed by a committed boundary once it is durable.
     /// A sealed log can be trimmed.
     /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="sequence"/> is negative or greater than <see cref="NextSequence"/>.</exception>

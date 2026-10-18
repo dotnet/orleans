@@ -10,6 +10,8 @@ internal partial class JournaledStateManager
     // Writes are captured and acknowledged one at a time, so at most one captured version awaits acknowledgement.
     private long _capturedWriteVersion;
     private long _committedWriteVersion;
+    // A prefix flush defers state callbacks and the observation watermark until every state can be captured.
+    private bool _hasDeferredWriteAcknowledgement;
 
     /// <summary>
     /// Gets this manager's observer hub, or <see langword="null"/> when no state has been watched.
@@ -74,6 +76,7 @@ internal partial class JournaledStateManager
         Debug.Assert(_capturedWriteVersion == _committedWriteVersion, "Each captured write is acknowledged before the next capture.");
         if (!capturedAllStates)
         {
+            _hasDeferredWriteAcknowledgement = true;
             return 0;
         }
 
@@ -84,12 +87,8 @@ internal partial class JournaledStateManager
     // Called under the manager lock after every state has observed the write's acknowledgement.
     private void OnWriteAcknowledged(long writeVersion)
     {
-        if (writeVersion == 0)
-        {
-            return;
-        }
-
-        Debug.Assert(writeVersion == _capturedWriteVersion);
+        Debug.Assert(writeVersion > 0 && writeVersion == _capturedWriteVersion);
+        _hasDeferredWriteAcknowledgement = false;
         _committedWriteVersion = writeVersion;
         Volatile.Read(ref _observers)?.OnWriteCommitted(writeVersion);
     }

@@ -213,6 +213,93 @@ public class DurableLogTests : JournalingTestBase
 
         log.TrimBefore(1);
         Assert.Equal(Trimmed(1, DurableChangeStatus.Staged), await read.NextAsync());
+        var next = read.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(Trimmed(1), read.Current);
+    });
+
+    [Theory]
+    [InlineData("clear")]
+    [InlineData("delete")]
+    [InlineData("cursor")]
+    public Task CommittedReset_PrecedesStagedTrim(string cause) => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        log.Append("a");
+        log.Append("b");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        await using var read = log.ReadAsync(cause == "cursor" ? 100 : 0, DurableWatchMode.Staged, cancellationToken: CancellationToken)
+            .GetAsyncEnumerator(CancellationToken);
+        if (cause != "cursor")
+        {
+            Assert.Equal(Entry(0, "a"), await read.NextAsync());
+        }
+
+        long resetSequence;
+        long trimSequence;
+        if (cause == "clear")
+        {
+            log.Clear();
+            log.Append("summary");
+            log.Append("next");
+            sut.Storage.HoldNextWrite();
+            var write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
+            await sut.Storage.WriteStarted.Task;
+            log.TrimBefore(4);
+            sut.Storage.Release();
+            await write;
+            resetSequence = 3;
+            trimSequence = 4;
+        }
+        else
+        {
+            if (cause == "delete")
+            {
+                await sut.Manager.DeleteStateAsync(CancellationToken);
+                log.Append("replacement-a");
+                log.Append("replacement-b");
+            }
+
+            log.TrimBefore(1);
+            resetSequence = 0;
+            trimSequence = 1;
+        }
+
+        Assert.Equal(Reset(resetSequence), await read.NextAsync());
+        Assert.Equal(Trimmed(trimSequence, DurableChangeStatus.Staged), await read.NextAsync());
+    });
+
+    [Fact]
+    public Task CommittedClear_IsVisibleWhileLaterClearIsStaged() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        log.Append("a");
+        log.Append("b");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        await using var read = log.ReadAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(Entry(0, "a"), await read.NextAsync());
+        Assert.Equal(Entry(1, "b"), await read.NextAsync());
+        Assert.Equal(CaughtUp(2), await read.NextAsync());
+
+        log.Clear();
+        sut.Storage.HoldNextWrite();
+        var write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
+        await sut.Storage.WriteStarted.Task;
+        log.Clear();
+        sut.Storage.Release();
+        await write;
+        Assert.Equal(Reset(3), await read.NextAsync());
+        var next = read.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(Reset(4), read.Current);
     });
 
     [Fact]
@@ -800,6 +887,28 @@ public class DurableLogTests : JournalingTestBase
         Assert.False(draft.IsOpen);
         Assert.Equal(Abandoned(draft.Id, LogDraftAbandonReason.Reset), await read.NextAsync());
         Assert.Equal(Reset(0), await read.NextAsync());
+    });
+
+    [Theory]
+    [InlineData(DurableWatchMode.Drafts)]
+    [InlineData(DurableWatchMode.Staged | DurableWatchMode.Drafts)]
+    public Task DeletedLog_DiscardsFollowedDraftCommitBeforeReplacementHistory(DurableWatchMode mode) => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        await using var read = log.ReadAsync(mode: mode, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await read.NextAsync());
+        var draft = log.BeginDraft();
+        draft.Write("discarded draft");
+        Assert.Equal(DraftItem(draft.Id, 0, "discarded draft"), await read.NextAsync());
+        draft.Commit("discarded entry");
+
+        await sut.Manager.DeleteStateAsync(CancellationToken);
+        log.Append("replacement");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.Equal(Reset(0), await read.NextAsync());
+        Assert.Equal(Entry(0, "replacement"), await read.NextAsync());
     });
 
     [Fact]

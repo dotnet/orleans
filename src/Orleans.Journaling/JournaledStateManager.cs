@@ -419,6 +419,12 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                             {
                                                 bufferToConsume = default;
                                             }
+
+                                            // A completed prefix can already be durable when the last open entry is aborted.
+                                            if (capturedAllStates && _hasDeferredWriteAcknowledgement)
+                                            {
+                                                writeVersion = OnWriteCaptured(capturedAllStates: true);
+                                            }
                                         }
                                         else
                                         {
@@ -490,8 +496,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                             ArrayPool<byte>.Shared.Return(debugPoisonBuffer);
 #endif
                                         }
+                                    }
 
-                                        // Notify all states that the operation completed.
+                                    if (writeVersion != 0)
+                                    {
+                                        // Acknowledge only after every state's pending entries were captured.
                                         lock (_lock)
                                         {
                                             foreach (var state in _states.Values)
@@ -531,6 +540,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                             _journalStreamDirectory.Set(name, id);
                                         }
 
+                                        _hasDeferredWriteAcknowledgement = false;
                                         _deletionGeneration++;
                                     }
                                     break;

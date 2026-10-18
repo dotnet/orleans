@@ -215,6 +215,221 @@ public class DurableStateObservationTests : JournalingTestBase
     });
 
     [Fact]
+    public Task ValueWatch_SnapshotAcknowledgesCapturedValueAndPreservesLaterChanges() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var value = CreateValue(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        value.Value = "snapshot";
+        sut.Storage.IsCompactionRequested = true;
+        sut.Storage.HoldNextWrite();
+        var write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
+        await sut.Storage.WriteStarted.Task;
+
+        await using var during = value.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        var next = during.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+        sut.Storage.Release();
+        await write;
+        Assert.True(await next);
+        Assert.Equal(Committed("snapshot", version: 1), during.Current);
+
+        await using var after = value.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(Committed("snapshot", version: 1), await after.NextAsync());
+
+        value.Value = "captured";
+        sut.Storage.IsCompactionRequested = true;
+        sut.Storage.HoldNextWrite();
+        write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
+        await sut.Storage.WriteStarted.Task;
+        value.Value = "later";
+        sut.Storage.Release();
+        await write;
+        Assert.Equal(Committed("captured", version: 2), await during.NextAsync());
+        next = during.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(Committed("later", version: 3), during.Current);
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task PrefixFlush_AcknowledgesOnFullCaptureAfterEntryAbort(bool dirtyValue) => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var dictionary = CreateDictionary(sut.Manager);
+        var log = CreateLog(sut.Manager);
+        var value = CreateValue(sut.Manager);
+        var manual = new OpenEntryState();
+        sut.Manager.RegisterStateMachine("manual", manual);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        await using var watch = dictionary.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var read = log.ReadAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var valueWatch = value.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await watch.NextAsync();
+        await read.NextAsync();
+        await valueWatch.NextAsync();
+
+        dictionary["flushed"] = 1;
+        log.Append("flushed");
+        if (dirtyValue)
+        {
+            value.Value = "uncaptured";
+        }
+
+        var change = watch.MoveNextAsync();
+        var entry = read.MoveNextAsync();
+        var valueChange = valueWatch.MoveNextAsync().AsTask();
+        var opened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var abort = new ManualResetEventSlim();
+        var openEntry = Task.Run(() =>
+        {
+            using var scope = manual.Writer.BeginEntry();
+            opened.SetResult();
+            abort.Wait(CancellationToken);
+        }, CancellationToken);
+        try
+        {
+            await opened.Task;
+            await sut.Manager.WriteStateAsync(CancellationToken);
+            Assert.False(change.IsCompleted);
+            Assert.False(entry.IsCompleted);
+            Assert.False(valueChange.IsCompleted);
+            Assert.Equal(0, log.CommittedSequence);
+        }
+        finally
+        {
+            abort.Set();
+            await openEntry;
+        }
+
+        // With no dirty value this capture has no bytes, but the completed prefix is already durable.
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await change);
+        Assert.Equal(("flushed", DurableChangeStatus.Committed), (watch.Current.Key, watch.Current.Status));
+        Assert.True(await entry);
+        Assert.Equal((LogEventKind.Entry, "flushed", DurableChangeStatus.Committed), (read.Current.Kind, read.Current.Item, read.Current.Status));
+        Assert.Equal(1, log.CommittedSequence);
+        if (dirtyValue)
+        {
+            Assert.True(await valueChange);
+            Assert.Equal(Committed("uncaptured", version: 2), valueWatch.Current);
+        }
+        else
+        {
+            await sut.Manager.DisposeAsync();
+            Assert.False(await valueChange);
+        }
+    });
+
+    [Theory]
+    [InlineData("dictionary-set")]
+    [InlineData("dictionary-add")]
+    [InlineData("dictionary-remove")]
+    [InlineData("dictionary-clear")]
+    [InlineData("list-add")]
+    [InlineData("list-set")]
+    [InlineData("list-insert")]
+    [InlineData("list-remove")]
+    [InlineData("list-clear")]
+    [InlineData("queue-enqueue")]
+    [InlineData("queue-dequeue")]
+    [InlineData("queue-try-dequeue")]
+    [InlineData("queue-clear")]
+    [InlineData("set-add")]
+    [InlineData("set-remove")]
+    [InlineData("set-clear")]
+    [InlineData("set-intersect")]
+    [InlineData("set-symmetric")]
+    public Task CollectionWatch_EncodingFailurePreservesDurability(string operation) => RunOnActivationSchedulerAsync(async () =>
+    {
+        foreach (var staged in new[] { false, true })
+        {
+            var sut = CreateSystem();
+            var codec = new FailingCollectionCodec(
+                new OrleansBinaryDurableDictionaryCommandCodec<string, int>(CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool),
+                new OrleansBinaryDurableListCommandCodec<int>(CodecProvider.GetCodec<int>(), SessionPool),
+                new OrleansBinaryDurableQueueCommandCodec<int>(CodecProvider.GetCodec<int>(), SessionPool),
+                new OrleansBinaryDurableSetCommandCodec<int>(CodecProvider.GetCodec<int>(), SessionPool));
+            var dictionary = new DurableDictionary<string, int>("dictionary", sut.Manager, codec);
+            var list = new DurableList<int>("list", sut.Manager, codec);
+            var queue = new DurableQueue<int>("queue", sut.Manager, codec);
+            var set = new DurableSet<int>("set", sut.Manager, codec);
+            await sut.Lifecycle.OnStart(CancellationToken);
+            dictionary["a"] = 1;
+            list.Add(1);
+            queue.Enqueue(1);
+            set.Add(1);
+            await sut.Manager.WriteStateAsync(CancellationToken);
+            if (staged)
+            {
+                dictionary["b"] = 2;
+                list.Add(2);
+                queue.Enqueue(2);
+                set.Add(2);
+            }
+
+            codec.Fail = true;
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                switch (operation)
+                {
+                    case "dictionary-set": dictionary["a"] = 3; break;
+                    case "dictionary-add": dictionary.Add("c", 3); break;
+                    case "dictionary-remove": dictionary.Remove("a"); break;
+                    case "dictionary-clear": dictionary.Clear(); break;
+                    case "list-add": list.Add(3); break;
+                    case "list-set": list[0] = 3; break;
+                    case "list-insert": list.Insert(0, 3); break;
+                    case "list-remove": list.RemoveAt(0); break;
+                    case "list-clear": list.Clear(); break;
+                    case "queue-enqueue": queue.Enqueue(3); break;
+                    case "queue-dequeue": queue.Dequeue(); break;
+                    case "queue-try-dequeue": queue.TryDequeue(out _); break;
+                    case "queue-clear": queue.Clear(); break;
+                    case "set-add": set.Add(3); break;
+                    case "set-remove": set.Remove(1); break;
+                    case "set-clear": set.Clear(); break;
+                    case "set-intersect": set.IntersectWith([]); break;
+                    case "set-symmetric": set.SymmetricExceptWith([3]); break;
+                    default: throw new ArgumentOutOfRangeException(nameof(operation));
+                }
+            });
+            codec.Fail = false;
+
+            await using var dictionaryWatch = dictionary.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+            await using var listWatch = list.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+            await using var queueWatch = queue.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+            await using var setWatch = set.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+            var next = new[]
+            {
+                dictionaryWatch.MoveNextAsync().AsTask(), listWatch.MoveNextAsync().AsTask(),
+                queueWatch.MoveNextAsync().AsTask(), setWatch.MoveNextAsync().AsTask(),
+            };
+            if (staged)
+            {
+                Assert.All(next, static task => Assert.False(task.IsCompleted));
+            }
+            else
+            {
+                Assert.All(next, static task => Assert.True(task.IsCompletedSuccessfully));
+            }
+
+            await sut.Manager.WriteStateAsync(CancellationToken);
+            Assert.All(await Task.WhenAll(next), Assert.True);
+            Assert.Equal(DurableChangeStatus.Committed, dictionaryWatch.Current.Status);
+            Assert.Equal(dictionary.OrderBy(static pair => pair.Key), dictionaryWatch.Current.Snapshot!.OrderBy(static pair => pair.Key));
+            Assert.Equal(list, listWatch.Current.Snapshot!);
+            Assert.Equal(queue, queueWatch.Current.Snapshot!);
+            Assert.Equal(set.Order(), setWatch.Current.Snapshot!.Order());
+            await sut.Manager.DisposeAsync();
+        }
+    });
+
+    [Fact]
     public Task DictionaryWatch_StagedMode_DeliversWatermarkAfterWrite() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();
@@ -666,5 +881,58 @@ public class DurableStateObservationTests : JournalingTestBase
     private sealed class UnsupportedValue : IDurableValue<int>
     {
         public int Value { get; set; }
+    }
+
+    private sealed class OpenEntryState : IStateMachine
+    {
+        public JournalStreamWriter Writer { get; private set; }
+        public void Reset(JournalStreamWriter writer) => Writer = writer;
+        public void ReplayEntry(JournalEntry entry, JournalReplayContext context) { }
+        public void WritePendingEntries(JournalStreamWriter writer) { }
+        public void WriteSnapshot(JournalStreamWriter writer) { }
+    }
+
+    private sealed class FailingCollectionCodec(
+        IDurableDictionaryCommandCodec<string, int> dictionary,
+        IDurableListCommandCodec<int> list,
+        IDurableQueueCommandCodec<int> queue,
+        IDurableSetCommandCodec<int> set) :
+        IDurableDictionaryCommandCodec<string, int>, IDurableListCommandCodec<int>, IDurableQueueCommandCodec<int>, IDurableSetCommandCodec<int>
+    {
+        public bool Fail { get; set; }
+
+        private void BeforeWrite(JournalStreamWriter writer)
+        {
+            if (Fail)
+            {
+                using var entry = writer.BeginEntry();
+                entry.Writer.GetSpan(1)[0] = 1;
+                entry.Writer.Advance(1);
+                throw new InvalidOperationException("Expected encoding failure.");
+            }
+        }
+
+        public void WriteSet(string key, int value, JournalStreamWriter writer) { BeforeWrite(writer); dictionary.WriteSet(key, value, writer); }
+        public void WriteRemove(string key, JournalStreamWriter writer) { BeforeWrite(writer); dictionary.WriteRemove(key, writer); }
+        void IDurableDictionaryCommandCodec<string, int>.WriteClear(JournalStreamWriter writer) { BeforeWrite(writer); dictionary.WriteClear(writer); }
+        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<string, int>> items, JournalStreamWriter writer) { BeforeWrite(writer); dictionary.WriteSnapshot(items, writer); }
+        public void Apply(JournalBufferReader input, IDurableDictionaryCommandHandler<string, int> consumer) => dictionary.Apply(input, consumer);
+        void IDurableListCommandCodec<int>.WriteAdd(int item, JournalStreamWriter writer) { BeforeWrite(writer); list.WriteAdd(item, writer); }
+        public void WriteSet(int index, int item, JournalStreamWriter writer) { BeforeWrite(writer); list.WriteSet(index, item, writer); }
+        public void WriteInsert(int index, int item, JournalStreamWriter writer) { BeforeWrite(writer); list.WriteInsert(index, item, writer); }
+        public void WriteRemoveAt(int index, JournalStreamWriter writer) { BeforeWrite(writer); list.WriteRemoveAt(index, writer); }
+        void IDurableListCommandCodec<int>.WriteClear(JournalStreamWriter writer) { BeforeWrite(writer); list.WriteClear(writer); }
+        void IDurableListCommandCodec<int>.WriteSnapshot(IReadOnlyCollection<int> items, JournalStreamWriter writer) { BeforeWrite(writer); list.WriteSnapshot(items, writer); }
+        public void Apply(JournalBufferReader input, IDurableListCommandHandler<int> consumer) => list.Apply(input, consumer);
+        public void WriteEnqueue(int item, JournalStreamWriter writer) { BeforeWrite(writer); queue.WriteEnqueue(item, writer); }
+        public void WriteDequeue(JournalStreamWriter writer) { BeforeWrite(writer); queue.WriteDequeue(writer); }
+        void IDurableQueueCommandCodec<int>.WriteClear(JournalStreamWriter writer) { BeforeWrite(writer); queue.WriteClear(writer); }
+        void IDurableQueueCommandCodec<int>.WriteSnapshot(IReadOnlyCollection<int> items, JournalStreamWriter writer) { BeforeWrite(writer); queue.WriteSnapshot(items, writer); }
+        public void Apply(JournalBufferReader input, IDurableQueueCommandHandler<int> consumer) => queue.Apply(input, consumer);
+        void IDurableSetCommandCodec<int>.WriteAdd(int item, JournalStreamWriter writer) { BeforeWrite(writer); set.WriteAdd(item, writer); }
+        public void WriteRemove(int item, JournalStreamWriter writer) { BeforeWrite(writer); set.WriteRemove(item, writer); }
+        void IDurableSetCommandCodec<int>.WriteClear(JournalStreamWriter writer) { BeforeWrite(writer); set.WriteClear(writer); }
+        void IDurableSetCommandCodec<int>.WriteSnapshot(IReadOnlyCollection<int> items, JournalStreamWriter writer) { BeforeWrite(writer); set.WriteSnapshot(items, writer); }
+        public void Apply(JournalBufferReader input, IDurableSetCommandHandler<int> consumer) => set.Apply(input, consumer);
     }
 }

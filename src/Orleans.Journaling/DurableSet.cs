@@ -100,6 +100,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
     public void Clear()
     {
         _codec.WriteClear(GetWriter());
+        _hasStagedEntries = true;
         ApplyClear();
         Publish(SetChangeKind.Cleared, item: default);
     }
@@ -115,6 +116,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
         }
 
         _codec.WriteAdd(item, GetWriter());
+        _hasStagedEntries = true;
         _ = ApplyAdd(item);
         Publish(SetChangeKind.Added, item);
         return true;
@@ -128,6 +130,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
         }
 
         _codec.WriteRemove(item, GetWriter());
+        _hasStagedEntries = true;
         _ = ApplyRemove(item);
         Publish(SetChangeKind.Removed, item);
         return true;
@@ -136,6 +139,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
     private void WriteSnapshot(IReadOnlyCollection<T> items)
     {
         _codec.WriteSnapshot(items, GetWriter());
+        _hasStagedEntries = true;
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
@@ -155,7 +159,6 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
     private JournalStreamWriter GetWriter()
     {
         Debug.Assert(_writer.IsInitialized);
-        _hasStagedEntries = true;
         return _writer;
     }
 
