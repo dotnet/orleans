@@ -583,6 +583,23 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task CompletedHandlesHonorCanceledPollsAndWaits() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/completed");
+        var state = storage.GetOrCreate(taskId);
+        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
+        var handle = runtime.GetScheduledTaskHandle(taskId);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handle.PollAsync(default, canceled.Token).AsTask());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handle.WaitAsync(canceled.Token).AsTask());
+        Assert.Equal(42, (await handle.PollAsync(default, TestContext.Current.CancellationToken)).GetResult<int>());
+        Assert.Equal(42, (await handle.WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
+    });
+
+    [Fact]
     public Task CompletionHandleAdvancesOnlyAfterCommit() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, _) = CreateRuntime();
@@ -597,6 +614,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.False((await handle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, TestContext.Current.CancellationToken)).IsCompleted);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(42, (await handle.WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handle.PollAsync(default, canceled.Token).AsTask());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handle.WaitAsync(canceled.Token).AsTask());
     });
 
     [Fact]
