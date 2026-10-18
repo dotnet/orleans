@@ -80,7 +80,7 @@ public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IMessag
         inbox.Register(this);
     }
 
-    public bool CanHandle(IInboxHandlerContext context) => true;
+    public bool CanHandle(InboxMessage message) => true;
 
 
     public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)

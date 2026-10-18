@@ -159,7 +159,7 @@ public sealed class CustomHandlerGrain : Grain, ICustomHandlerGrain, IMessagingG
 
     private sealed class Handler(int id, bool canHandle, IGrainContext grain, JsonMessagingProbe probe) : IInboxHandler
     {
-        public bool CanHandle(IInboxHandlerContext context) => canHandle && context.Message.Envelope.Subject == "custom";
+        public bool CanHandle(InboxMessage message) => canHandle && message.Envelope.Subject == "custom";
 
         public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {

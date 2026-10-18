@@ -73,7 +73,7 @@ public sealed class RawPayloadTestGrain : DurableGrain, IRawPayloadTestGrain, II
         return result;
     }
 
-    public bool CanHandle(IInboxHandlerContext context) => true;
+    public bool CanHandle(InboxMessage message) => true;
 
     public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {

@@ -109,7 +109,7 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
         return Task.CompletedTask;
     }
 
-    public bool CanHandle(IInboxHandlerContext context) => true;
+    public bool CanHandle(InboxMessage message) => true;
 
 
     public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
