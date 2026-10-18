@@ -67,6 +67,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
             }
 
             _codec.WriteSet(index, value, GetWriter());
+            _hasStagedEntries = true;
             ApplySet(index, value);
             Publish(ListChangeKind.Set, index, value);
         }
@@ -105,6 +106,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     public void Add(T item)
     {
         _codec.WriteAdd(item, GetWriter());
+        _hasStagedEntries = true;
         ApplyAdd(item);
         Publish(ListChangeKind.Added, _items.Count - 1, item);
     }
@@ -112,6 +114,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     public void Clear()
     {
         _codec.WriteClear(GetWriter());
+        _hasStagedEntries = true;
         ApplyClear();
         Publish(ListChangeKind.Cleared, index: 0, item: default);
     }
@@ -128,6 +131,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
         }
 
         _codec.WriteInsert(index, item, GetWriter());
+        _hasStagedEntries = true;
         ApplyInsert(index, item);
         Publish(ListChangeKind.Inserted, index, item);
     }
@@ -152,6 +156,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
         }
 
         _codec.WriteRemoveAt(index, GetWriter());
+        _hasStagedEntries = true;
         ApplyRemoveAt(index);
         Publish(ListChangeKind.RemovedAt, index, item: default);
     }
@@ -203,7 +208,6 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     private JournalStreamWriter GetWriter()
     {
         Debug.Assert(_writer.IsInitialized);
-        _hasStagedEntries = true;
         return _writer;
     }
 

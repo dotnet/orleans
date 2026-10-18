@@ -83,7 +83,7 @@ A collection which nobody watches publishes nothing and allocates nothing for ob
 
 A stream which begins before the first retained entry starts with `Trimmed`. A stream which begins at or before a cleared sequence number starts with `Reset`, including after the grain reactivates, while a stream which begins after the clear doesn't. Streams without `Staged` receive `Trimmed`, `Reset`, and `Sealed` once the trim, clear, or seal is durable. A committed reader positioned in entries which an uncommitted trim has discarded waits for the trim's write.
 
-A stream with `Staged` receives staged entries immediately, followed by a `Watermark` whose `Sequence` is the end of the committed entries. Pass the latest watermark sequence when the reader reconnects. A stream without `Staged` resumes from the position after the latest entry it received.
+A stream with `Staged` receives staged entries immediately, followed by a `Watermark` whose `Sequence` is the end of the committed entries. It receives a staged `Trimmed` event when retention changes, followed by a committed `Trimmed` event once that boundary is durable. Pass the latest watermark sequence when the reader reconnects. A stream without `Staged` resumes from the position after the latest entry it received.
 
 `Sealed` distinguishes a log which ended from an activation which stopped. When the activation stops, streams end without it.
 
