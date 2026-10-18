@@ -266,8 +266,9 @@ internal sealed partial class DurableTaskGrainRuntime
     /// A sender can commit an invocation and a signal for it in one write, and the outbox delivers them independently.
     /// A delivered signal for a task which isn't stored, or which records only a cancellation that preceded its
     /// invocation, is therefore recorded ahead of the invocation, which finds the record in its tree. The record is
-    /// deleted once Messaging's <c>OutboxRetryTimeout</c> has elapsed without the invocation, after which the invocation
-    /// can no longer arrive.
+    /// deleted with that tree, or, when no invocation arrives, once
+    /// <see cref="DurableTaskGrainRuntimeShared.InvocationAdmissionWindow"/> has elapsed, after which the grain no longer
+    /// admits an invocation which its sender staged before the signal.
     /// </remarks>
     private DurableSignalResult StageSignal(
         TaskId taskId,
@@ -318,7 +319,7 @@ internal sealed partial class DurableTaskGrainRuntime
 
     /// <summary>Returns when a signal which arrived before its invocation is deleted unless the invocation arrives.</summary>
     private DateTimeOffset GetEarlySignalExpiry(IDurableTaskState record) =>
-        AddSaturating(record.CreatedAt, _shared.OutboxRetryTimeout);
+        AddSaturating(record.CreatedAt, _shared.InvocationAdmissionWindow);
 
     /// <summary>Creates the exception which reports a rejected signal, or returns <see langword="null"/> for a recorded one.</summary>
     private static Exception? CreateSignalRejection(TaskId taskId, string name, DurableSignalResult result) => result switch

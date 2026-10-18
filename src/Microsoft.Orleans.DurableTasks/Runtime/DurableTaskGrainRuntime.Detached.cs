@@ -28,8 +28,10 @@ namespace Orleans.DurableTasks.Runtime;
 /// which is the target's acceptance. A grain which can't store the task, because its identifier already identifies
 /// another request or caller, dead-letters the invocation with the <see cref="DurableTaskRejectionCodes.Conflict"/> code,
 /// and the outbox retires it as rejected, with the grain's reason, which fails the record with a
-/// <see cref="DurableTaskConflictException"/>. Another rejection, with another code or none, fails the record with a
-/// <see cref="DurableTaskRejectedException"/>, which reports the code. An invocation which the outbox can't deliver
+/// <see cref="DurableTaskConflictException"/>. A grain which receives an invocation after its admission window, Messaging's
+/// <c>DeduplicationWindow</c> since the invocation was first staged, dead-letters it with the
+/// <see cref="DurableTaskRejectionCodes.Expired"/> code. Another rejection, with another code or none, fails the record with
+/// a <see cref="DurableTaskRejectedException"/>, which reports the code. An invocation which the outbox can't deliver
 /// before Messaging's <c>OutboxRetryTimeout</c>, including one which the grain fails to accept, such as one which doesn't
 /// decode, retires as dead-lettered, which fails the record with a <see cref="DurableTaskDeliveryException"/>. Awaiting the task, or a start which awaits its acceptance, throws the
 /// failure, in every replay.
@@ -169,6 +171,28 @@ internal sealed partial class DurableTaskGrainRuntime
     private static string DescribeDetachedStart(GrainId target, TaskId rootId) =>
         $"a start of detached task '{rootId}' on grain '{target}'";
 
+    /// <summary>
+    /// Returns why the grain rejects an invocation of <paramref name="taskId"/> which its sender first staged at
+    /// <paramref name="sentAt"/>, or <see langword="null"/> when the grain admits it.
+    /// </summary>
+    /// <remarks>
+    /// The grain admits an invocation before <see cref="DurableTaskGrainRuntimeShared.InvocationAdmissionWindow"/> has
+    /// elapsed since <paramref name="sentAt"/>. A cancellation or signal which its sender staged with or after the
+    /// invocation arrives after <paramref name="sentAt"/>, and its record is kept for the same window, so an admitted
+    /// invocation finds it. Like Messaging's <c>DeliverAt</c>, the check compares the sender's clock with the grain's. A
+    /// redelivery of an invocation which the grain stores stages nothing new, so the grain admits it at any time.
+    /// </remarks>
+    internal string? GetInvocationAdmissionRejection(TaskId taskId, DateTimeOffset sentAt)
+    {
+        var deadline = AddSaturating(sentAt, _shared.InvocationAdmissionWindow);
+        if (UtcNow < deadline || (_storage.TryGetTask(taskId, out var state) && IsInvoked(state)))
+        {
+            return null;
+        }
+
+        return $"The invocation of durable task '{taskId}' arrived at or after its admission deadline, {deadline:O}.";
+    }
+
     /// <summary>Stages an invocation which the inbox delivered.</summary>
     /// <param name="taskId">The invoked task: the caller's child, or a detached root task.</param>
     /// <param name="request">The request which the task runs.</param>
@@ -230,7 +254,7 @@ internal sealed partial class DurableTaskGrainRuntime
             return;
         }
 
-        _invocations.Add(messageId, new(invocation.ReceiverId, invocation.Envelope.Payload, recordId));
+        _invocations.Add(messageId, new(invocation.ReceiverId, invocation.Envelope.Payload, recordId, UtcNow));
         MessageTransport.Send(messageId);
     }
 

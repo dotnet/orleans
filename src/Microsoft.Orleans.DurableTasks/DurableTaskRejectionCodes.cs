@@ -14,4 +14,10 @@ public static class DurableTaskRejectionCodes
 {
     /// <summary>The task identifier already identifies another request, or a task of another caller.</summary>
     public const string Conflict = "durable-rpc/conflict";
+
+    /// <summary>
+    /// The invocation arrived after the grain's admission window: Messaging's <c>DeduplicationWindow</c> since its sender
+    /// first staged it.
+    /// </summary>
+    public const string Expired = "durable-rpc/expired";
 }

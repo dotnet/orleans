@@ -34,12 +34,14 @@ Messaging settings in `DurableMessagingOptions` govern the transport; see
 [Capacity, retries, and retention](messaging-operations.md#capacity-retries-and-retention).
 
 - `OutboxRetryTimeout` bounds how long the outbox retries an invocation, completion,
-  cancellation, or signal before dead-lettering it. A cancellation or signal which arrives
-  before its invocation is retained for this period, so the invocation terminates as
-  canceled, or observes the signal, when it arrives. A signal whose invocation doesn't
-  arrive in this period is deleted, and the grain logs a warning.
+  cancellation, or signal after a failed delivery before dead-lettering it.
 - `DeduplicationWindow` deduplicates redelivered durable task messages, like other
-  messages.
+  messages. It is also the invocation admission window: a grain admits an invocation until
+  this period has elapsed since its sender first staged it, and dead-letters a later one,
+  which backpressure or a delivery pipeline held, with the `durable-rpc/expired` code. A
+  cancellation or signal which arrives before its invocation is retained for this period,
+  so an admitted invocation terminates as canceled, or observes the signal. A signal whose
+  invocation doesn't arrive in this period is deleted, and the grain logs a warning.
 - Invocations, completions, cancellations, and signals are accepted directly into task
   state, so they don't occupy inbox capacity. Delay resumes are scheduled messages which
   the grain sends itself, so they don't count toward `MaxCapacity`, like other scheduled
@@ -263,6 +265,7 @@ every replay:
 | Outcome | Rejection code | Failure |
 | --- | --- | --- |
 | The task ID already identifies another request or caller. The target rejects it at once. | `durable-rpc/conflict` | `DurableTaskConflictException` |
+| The invocation arrives after the target's admission window, `DeduplicationWindow` since the starter first staged it. | `durable-rpc/expired` | `DurableTaskRejectedException` |
 | The target rejects the invocation with another code, or with none. | The target's code | `DurableTaskRejectedException` |
 | The target doesn't accept the invocation before `OutboxRetryTimeout`, because of transient failures or a request which it can't decode, or the outbox can't reach it. | | `DurableTaskDeliveryException`, with the dead letter's reason |
 

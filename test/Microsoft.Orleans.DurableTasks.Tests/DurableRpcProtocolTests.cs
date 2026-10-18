@@ -314,8 +314,11 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(DurableTaskMessageTypes.InvocationSubject, messages[0].Envelope.Subject);
         Assert.Equal(target, messages[0].ReceiverId);
 
-        // The runtime rebuilds a pending invocation from its target and payload.
-        var rebuilt = transport.CreateInvocation(messages[0].Envelope.MessageId, target, messages[0].Envelope.Payload);
+        // The runtime rebuilds a pending invocation from its target, payload, and first send time, which the header carries.
+        var sentAt = new DateTimeOffset(2026, 10, 18, 12, 0, 0, TimeSpan.Zero);
+        var rebuilt = transport.CreateInvocation(messages[0].Envelope.MessageId, target, messages[0].Envelope.Payload, sentAt);
+        Assert.Equal(sentAt, DurableTaskMessageTypes.GetSentAt(rebuilt.Envelope));
+        Assert.Throws<InvalidOperationException>(() => DurableTaskMessageTypes.GetSentAt(messages[0].Envelope));
         Assert.Equal((target, messages[0].Envelope.MessageId), (rebuilt.ReceiverId, rebuilt.Envelope.MessageId));
         Assert.Equal((messages[0].Envelope.Subject, messages[0].Envelope.Payload), (rebuilt.Envelope.Subject, rebuilt.Envelope.Payload));
         var body = MessagingTestHelpers.MessageTypes.Invocation.Decode(rebuilt.Envelope);
@@ -364,7 +367,11 @@ public sealed class DurableRpcProtocolTests
             target,
             TaskId.CreateRoot("detached"),
             DurableTaskMessageTypes.InvocationSubject);
-        var recorded = new PendingInvocation(target, [1, 2, 3], TaskId.Parse("starter/$detach:a"));
+        var recorded = new PendingInvocation(
+            target,
+            [1, 2, 3],
+            TaskId.Parse("starter/$detach:a"),
+            new DateTimeOffset(2026, 10, 18, 12, 0, 0, TimeSpan.Zero));
         var posted = recorded with { RecordId = null };
         var typeInfo = DurableTaskJsonContext.Default.PendingInvocation;
 
@@ -375,7 +382,7 @@ public sealed class DurableRpcProtocolTests
             PendingInvocation[] copies = [json, binary!];
             Assert.All(copies, copy =>
             {
-                Assert.Equal((invocation.Target, invocation.RecordId), (copy.Target, copy.RecordId));
+                Assert.Equal((invocation.Target, invocation.RecordId, invocation.SentAt), (copy.Target, copy.RecordId, copy.SentAt));
                 Assert.Equal(invocation.Payload, copy.Payload);
             });
         }

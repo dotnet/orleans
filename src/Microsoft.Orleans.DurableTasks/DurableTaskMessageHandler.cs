@@ -15,7 +15,9 @@ namespace Orleans.DurableTasks.Runtime;
 /// task state, and the inbox journals only the message's processed record in the same write. Each message is decoded and
 /// validated before any change is staged. An invocation whose identifier already identifies another request or caller is
 /// final, so it is dead-lettered with the <see cref="DurableTaskRejectionCodes.Conflict"/> code and the conflict's
-/// message, which the sender's outbox reports when it retires the invocation as rejected. A rejected signal is
+/// message, which the sender's outbox reports when it retires the invocation as rejected. An invocation which arrives
+/// after the grain's admission window is dead-lettered with the <see cref="DurableTaskRejectionCodes.Expired"/> code, so a
+/// cancellation or signal which preceded it is never lost to an admitted invocation. A rejected signal is
 /// dead-lettered with its rejection as the reason. Another failure, such as a message which doesn't decode, throws, so
 /// the sender's outbox retries the delivery until Messaging's <c>OutboxRetryTimeout</c>: during a rolling deployment, a
 /// retry can reach an activation which decodes it.
@@ -54,12 +56,20 @@ internal sealed class DurableTaskMessageHandler(
                     return true;
                 }
 
+                // An attached invocation addresses the sender's child, which this grain stores under the sender's scope; a
+                // detached invocation addresses a root task.
+                var invokedId = CallerScope.Resolve(sender, invocation.TaskId);
+                if (runtime.GetInvocationAdmissionRejection(invokedId, DurableTaskMessageTypes.GetSentAt(message.Envelope)) is { } expired)
+                {
+                    // A late invocation stages nothing.
+                    result = DeliveryResult.DeadLettered(expired, DurableTaskRejectionCodes.Expired);
+                    return true;
+                }
+
                 try
                 {
-                    // An attached invocation addresses the sender's child, which this grain stores under the sender's
-                    // scope; a detached invocation addresses a root task.
                     runtime.InvokeFromInbox(
-                        CallerScope.Resolve(sender, invocation.TaskId),
+                        invokedId,
                         request,
                         sender,
                         invocation.Detached,

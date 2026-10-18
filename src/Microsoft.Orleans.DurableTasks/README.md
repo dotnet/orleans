@@ -193,6 +193,7 @@ var placement = await order.PlaceOrderAsync(request).WithId(PlaceOrderTaskId(ord
   | Outcome | Code | Failure |
   | --- | --- | --- |
   | The task ID already identifies another request or caller. | `durable-rpc/conflict` | `DurableTaskConflictException` |
+  | The invocation arrives after the target's admission window, Messaging's `DeduplicationWindow` since the starter first staged it. | `durable-rpc/expired` | `DurableTaskRejectedException` |
   | The target rejects the invocation with another code, or with none. | The target's code | `DurableTaskRejectedException` |
   | The invocation isn't accepted before `OutboxRetryTimeout`, such as one which never decodes. | | `DurableTaskDeliveryException`, with the dead letter's reason |
 
@@ -238,8 +239,10 @@ await tasks.SignalAsync(workflowId, Shipped, shipment);
 - A sender can commit an invocation and a signal for it in one write, and the outbox delivers
   them independently, so a signal message can arrive first. The inbox records a signal message
   for a task which the grain doesn't hold yet, and the invocation finds the value when it
-  arrives. When no invocation arrives within Messaging's `OutboxRetryTimeout`, after which it no
-  longer can, the grain deletes the value and logs a warning.
+  arrives. The grain admits an invocation until Messaging's `DeduplicationWindow` has elapsed
+  since its sender first staged it, and keeps the value for that window, so an admitted
+  invocation finds it. When no invocation arrives within the window, the grain deletes the value
+  and logs a warning.
 - In a durable task, the send and a marker in the execution's tree commit in one journal write,
   like a posted start, so a replay which reaches the marker doesn't send it again. The marker is
   `{taskId}/$send:{target}:{task}:{name}`, and repeated sends of one signal in an execution,
@@ -370,8 +373,10 @@ synchronously on the activation which makes them, when the runtime stages them: 
   deleted execution's further scheduling throws `OperationCanceledException`.
   Completions and delay resumes which arrive for deleted tasks are ignored. A
   cancellation which arrives before its invocation is recorded, so the invocation
-  terminalizes as canceled when it arrives; the record is deleted once Messaging's
-  `OutboxRetryTimeout` has elapsed, after which the invocation can no longer arrive.
+  terminalizes as canceled when it arrives, and the record is deleted with its tree. The
+  grain admits an invocation until Messaging's `DeduplicationWindow` has elapsed since its
+  sender first staged it, and dead-letters a later one with the `durable-rpc/expired` code,
+  so a record whose invocation doesn't arrive within that window is deleted.
 - A completion whose stored result no longer decodes, for example after a later
   deployment removes the result type, can't be materialized. The outbox
   dead-letters that completion, recording the decoding error as the reason, and the

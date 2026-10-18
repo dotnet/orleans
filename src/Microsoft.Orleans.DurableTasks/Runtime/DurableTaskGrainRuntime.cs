@@ -63,9 +63,11 @@ namespace Orleans.DurableTasks.Runtime;
 /// completion was dead-lettered. A task without a stored ancestor, such as a remote child scheduled outside a durable
 /// execution, is deleted on the same retention schedule. Deleting a tree cancels its non-terminal tasks: it stages a
 /// cancellation to each pending remote child and cancels each running attempt, whose result is then discarded.
-/// Completions and resumes which arrive for a deleted task are ignored. A cancellation which arrives before its
-/// invocation is recorded until <see cref="Orleans.Messaging.Configuration.DurableMessagingOptions.OutboxRetryTimeout"/>
-/// has elapsed, after which the invocation can no longer arrive, and so is a signal which arrives before its invocation.
+/// Completions and resumes which arrive for a deleted task are ignored. A cancellation or a signal which arrives before its
+/// invocation is recorded, and the invocation finds it in its tree. The grain admits an invocation until
+/// <see cref="Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow"/> has elapsed since its sender
+/// first staged it, and dead-letters a later one, so a record whose invocation doesn't arrive within that window is
+/// deleted.
 /// A subscription to a task which the grain doesn't retain as an invoked task completes as not found at once.
 /// </para>
 /// <para>
@@ -627,7 +629,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         if (_invocations.TryGetValue(messageId, out var invocation))
         {
-            message = MessageTransport.CreateInvocation(messageId, invocation.Target, invocation.Payload);
+            message = MessageTransport.CreateInvocation(messageId, invocation.Target, invocation.Payload, invocation.SentAt);
             return true;
         }
 
@@ -2657,13 +2659,13 @@ internal sealed partial class DurableTaskGrainRuntime(
             var expiry = state.CompletedAt.HasValue ? GetRetentionExpiry(state) : DateTimeOffset.MinValue;
             if (isCancellationRecord)
             {
-                // The invocation which the cancellation precedes is delivered within the sender's retry timeout, or never.
-                var recordExpiry = AddSaturating(state.CreatedAt, _shared.OutboxRetryTimeout);
+                // The invocation which the cancellation precedes is admitted within the admission window, or never.
+                var recordExpiry = AddSaturating(state.CreatedAt, _shared.InvocationAdmissionWindow);
                 expiry = recordExpiry > expiry ? recordExpiry : expiry;
             }
             else if (IsSignalRecord(state))
             {
-                // A signal record without its task preceded the invocation, which arrives within the sender's retry timeout,
+                // A signal record without its task preceded the invocation, which is admitted within the admission window,
                 // or never.
                 expiry = GetEarlySignalExpiry(state);
             }
@@ -2673,7 +2675,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 if (IsSignalRecord(state))
                 {
                     _shared.Logger.LogWarning(
-                        "{Id} discarding a signal for durable task '{TaskId}', whose invocation didn't arrive within the sender's retry timeout.",
+                        "{Id} discarding a signal for durable task '{TaskId}', whose invocation wasn't admitted within the invocation admission window.",
                         GrainId,
                         taskId.Parent());
                 }
@@ -3030,7 +3032,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             taskState = GetOrCreateTask(taskId, request: null);
             StageCaller(taskId, taskState, callerId);
             _storage.RequestCancellation(taskId, taskState, reason);
-            TrackExpiry(AddSaturating(taskState.CreatedAt, _shared.OutboxRetryTimeout));
+            TrackExpiry(AddSaturating(taskState.CreatedAt, _shared.InvocationAdmissionWindow));
             return (true, [], []);
         }
 
