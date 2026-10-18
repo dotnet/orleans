@@ -27,7 +27,7 @@ and `TaskId.Child(segment)`, `Parent()`, and `IsAncestorOf(other)` navigate the 
   `GetDurableTask<TResult>(rootId)` and `IDurableTaskManager.CancelAsync(rootId, reason)`,
   take one unescaped root segment.
 - Segments which the runtime generates begin with, or contain, `$`. Names which
-  `WithId` and `DurableTask.Once` receive inside a durable task don't contain `$`, so a
+  `WithId` and `DurableTask.RunInline` receive inside a durable task don't contain `$`, so a
   name never equals a generated segment; see [ORLEANS0107](../diagnostics/orleans0107.md).
 
 The following workflow creates most kinds of ID. Its comments name the ID which each
@@ -60,8 +60,8 @@ Each operation which a body runs is recorded beneath the execution's ID:
 
 | Operation | Segment | Example |
 | --- | --- | --- |
-| A child, delay, combinator, or subscription named with `WithId(name)`, or a recorded effect, `DurableTask.Once(name, effect)` | `name`; later occurrences of the same name in one run, `name$2`, `name$3`, and so on | `publish-q3/check$2` |
-| An unnamed child, delay, `DurableTask.Run` step, subscription, or `DurableTask.Once(effect)` | `$child-{n}`, numbered in the order in which the run creates them | `publish-q3/$child-1` |
+| A child, delay, combinator, or subscription named with `WithId(name)`, or a recorded effect, `DurableTask.RunInline(name, effect)` | `name`; later occurrences of the same name in one run, `name$2`, `name$3`, and so on | `publish-q3/check$2` |
+| An unnamed child, delay, `DurableTask.Run` step, subscription, or `DurableTask.RunInline(effect)` | `$child-{n}`, numbered in the order in which the run creates them | `publish-q3/$child-1` |
 | An unnamed combinator or timeout | `${kind}-{n}`, where `{kind}` is `when-all`, `when-any`, `race`, `schedule-all`, `when-all-completed`, `when-each`, or `timeout` | `publish-q3/$race-1` |
 | A combinator's input | `{combinator}/{index}`, in input order | `publish-q3/render/0` |
 | A timeout's work and delay, `WaitAsync` and `WaitUntilAsync` | `{timeout}/0` and `{timeout}/1` | `quote/0`, `quote/1` |
@@ -72,7 +72,7 @@ Each operation which a body runs is recorded beneath the execution's ID:
 | A signal's recorded value, beneath the invoked task | `$signal:{name}`; `DurableSignal<T>.For(suffix)` names `{name}/{suffix}` | `publish-q3/$signal:approved`, `publish-q3/$signal:approved\/round-2` |
 
 - Named children, named combinators, and named effects share one identifier per
-  occurrence of a name: `DurableTask.Once("x", f)` and `await DurableTask.Run(g).WithId("x")`
+  occurrence of a name: `DurableTask.RunInline("x", f)` and `await DurableTask.Run(g).WithId("x")`
   both record under `x`. A replay which finds the other kind recorded under an
   identifier fails as a divergence which names both kinds, instead of running the work
   again.
@@ -137,7 +137,7 @@ A client observes the IDs of its own start through the handle:
 The runtime also uses names which aren't IDs and aren't part of the programming model:
 the journaled state `orleans.durable-tasks.runtime` and the tables inside it, such as
 `$tasks`, `$task-requests`, and `$task-results`, and request fingerprints which begin with
-`$`, such as `$once`, `$version`, `$subscribe:`, `$signal-send:`, and `$completion-decision:`.
+`$`, such as `$effect`, `$version`, `$subscribe:`, `$signal-send:`, and `$completion-decision:`.
 Diagnostics show some of them; their format can change between releases.
 
 ## Stability across replays and deployments

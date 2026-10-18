@@ -31,7 +31,7 @@ public interface IFaultInjectedGrain : IGrainWithGuidKey
 public interface IFaultWorkflowGrain : IFaultInjectedGrain
 {
     /// <summary>
-    /// Runs a local step, a <see cref="DurableTask.Once(string, Action)"/> effect, a call to the partner which signals the
+    /// Runs a local step, a <see cref="DurableTask.RunInline(string, Action)"/> effect, a call to the partner which signals the
     /// workflow back, a signal wait, a delay, and a detached start on the partner which it awaits.
     /// </summary>
     DurableTask<string> PipelineAsync(Guid partnerKey, string rootId);
@@ -54,7 +54,7 @@ public interface IFaultWorkflowGrain : IFaultInjectedGrain
     /// <summary>Throws <see cref="FaultApplicationException"/> from a local step, and records what the body observed.</summary>
     DurableTask<string> CatchLocalStepFailureAsync(string message);
 
-    /// <summary>Throws <see cref="FaultApplicationException"/> from a <see cref="DurableTask.Once(string, Action)"/> effect.</summary>
+    /// <summary>Throws <see cref="FaultApplicationException"/> from a <see cref="DurableTask.RunInline(string, Action)"/> effect.</summary>
     DurableTask<string> CatchOnceFailureAsync(string message);
 
     /// <summary>Starts a detached task on the partner under a root ID, and records what the start observed.</summary>
@@ -163,7 +163,7 @@ public abstract class FaultInjectedGrain : DurableGrain, IFaultInjectedGrain
         return Task.CompletedTask;
     }
 
-    /// <summary>Increments a journaled effect counter; call it from a <see cref="DurableTask.Once(string, Func{int})"/> effect.</summary>
+    /// <summary>Increments a journaled effect counter; call it from a <see cref="DurableTask.RunInline(string, Func{int})"/> effect.</summary>
     protected int Increment(string effect)
     {
         var count = _effects.TryGetValue(effect, out var current) ? current + 1 : 1;
@@ -189,7 +189,7 @@ public sealed class FaultWorkflowGrain(
     {
         var partner = Partner(partnerKey);
         var step = await DurableTask.Run(static _ => 20).WithId("step");
-        var effect = DurableTask.Once("workflow", () => Increment("workflow"));
+        var effect = DurableTask.RunInline("workflow", () => Increment("workflow"));
         var processed = await partner.ProcessAsync(step, this.GetPrimaryKey(), rootId).WithId("process");
         var ready = await Ready.WaitAsync();
         await DurableTask.Delay(TimeSpan.FromMinutes(1)).WithId("pause");
@@ -211,7 +211,7 @@ public sealed class FaultWorkflowGrain(
             deadline = "timed-out";
         }
 
-        var effect = DurableTask.Once("race", () => Increment("race"));
+        var effect = DurableTask.RunInline("race", () => Increment("race"));
         return $"winner={winner};outcome={outcome};deadline={deadline};effect={effect}";
     }
 
@@ -233,7 +233,7 @@ public sealed class FaultWorkflowGrain(
 
     public async DurableTask<int> FailAsync(string message)
     {
-        DurableTask.Once("fail", () => Increment("fail"));
+        DurableTask.RunInline("fail", () => Increment("fail"));
         await DurableTask.Run(static _ => { }).WithId("before-failure");
         throw new FaultApplicationException(message);
     }
@@ -247,7 +247,7 @@ public sealed class FaultWorkflowGrain(
         }
         catch (Exception exception)
         {
-            DurableTask.Once("caught", () => Increment("caught"));
+            DurableTask.RunInline("caught", () => Increment("caught"));
             return $"{exception.GetType().Name}: {exception.Message}";
         }
     }
@@ -257,7 +257,7 @@ public sealed class FaultWorkflowGrain(
         string observed;
         try
         {
-            DurableTask.Once("throwing", int () =>
+            DurableTask.RunInline("throwing", int () =>
             {
                 Increment("throwing");
                 throw new FaultApplicationException(message);
@@ -329,19 +329,19 @@ public sealed class FaultPartnerGrain(
         {
             probe.RecordStarted(this.GetPrimaryKey());
             await gates.WaitAsync(this.GetPrimaryKey(), cancellationToken);
-            return value + DurableTask.Once("gated", () => Increment("gated"));
+            return value + DurableTask.RunInline("gated", () => Increment("gated"));
         }).WithId("gated");
 
 
     public async DurableTask<int> ProcessAsync(int value, Guid workflowKey, string rootId)
     {
-        var effect = DurableTask.Once("process", () => Increment("process"));
+        var effect = DurableTask.RunInline("process", () => Increment("process"));
         await Workflow(workflowKey).SignalDurableTaskAsync(TaskId.CreateRoot(rootId), FaultWorkflowGrain.Ready, value * 3);
         return (value * 2) + effect - 1;
     }
 
     public DurableTask<int> EchoAsync(int value) =>
-        DurableTask.Run(_ => value + DurableTask.Once("echo", () => Increment("echo")));
+        DurableTask.Run(_ => value + DurableTask.RunInline("echo", () => Increment("echo")));
 
     public async DurableTask<string> HoldAsync(Guid workflowKey, string rootId)
     {
@@ -355,7 +355,7 @@ public sealed class FaultPartnerGrain(
         }
         catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
         {
-            var compensation = await DurableTask.Run(_ => DurableTask.Once("compensate", () => Increment("compensate")))
+            var compensation = await DurableTask.Run(_ => DurableTask.RunInline("compensate", () => Increment("compensate")))
                 .WithId("compensate")
                 .Shielded();
             return $"compensated {compensation}";
@@ -364,7 +364,7 @@ public sealed class FaultPartnerGrain(
 
     public async DurableTask<int> FailAsync(string message)
     {
-        DurableTask.Once("fail", () => Increment("fail"));
+        DurableTask.RunInline("fail", () => Increment("fail"));
         await DurableTask.Run(static _ => { }).WithId("before-failure");
         throw new FaultApplicationException(message);
     }
@@ -386,7 +386,7 @@ public sealed class FaultFencedGrain(
     : FaultInjectedGrain(inbox, diagnostics, effects, injector, grainContext), IFaultFencedGrain
 {
     public DurableTask<int> EchoAsync(int value) =>
-        DurableTask.Run(_ => value + DurableTask.Once("echo", () => Increment("echo")));
+        DurableTask.Run(_ => value + DurableTask.RunInline("echo", () => Increment("echo")));
 
     public async DurableTask<int> CallEchoAsync(Guid partnerKey, int value) =>
         await GrainFactory.GetGrain<IFaultPartnerGrain>(partnerKey).EchoAsync(value).WithId("echo");

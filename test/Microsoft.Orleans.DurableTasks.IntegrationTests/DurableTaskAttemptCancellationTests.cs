@@ -322,7 +322,7 @@ public sealed class AttemptCancellationTestGrain(
     {
         var context = DurableTask.Current;
         var grainId = this.GetGrainId();
-        DurableTask.Once("started", () => probe.Increment(grainId, AttemptCancellationProbe.EffectRuns));
+        DurableTask.RunInline("started", () => probe.Increment(grainId, AttemptCancellationProbe.EffectRuns));
         status.Value = "running";
         await _semaphore.WaitAsync(context.CancellationToken);
         try
@@ -370,7 +370,7 @@ public sealed class AttemptCancellationTestGrain(
         }
         catch (OperationCanceledException) when (context.IsTaskCancellationRequested)
         {
-            DurableTask.Once("compensate", () => probe.Increment(grainId, AttemptCancellationProbe.Compensations));
+            DurableTask.RunInline("compensate", () => probe.Increment(grainId, AttemptCancellationProbe.Compensations));
             status.Value = "compensating";
             // Compensation's children are shielded, because children which a canceled task starts end canceled.
             await DurableTask.Run(static _ => { }).WithId("checkpoint").Shielded();
@@ -421,7 +421,7 @@ public sealed class AttemptCancellationTestGrain(
     {
         var other = GrainFactory.GetGrain<IAttemptCancellationTestGrain>(Guid.NewGuid());
         var deadline = DurableTask.Current.UtcNow.AddMinutes(1);
-        Try("once", () => DurableTask.Once("cleanup", static () => { }));
+        Try("once", () => DurableTask.RunInline("cleanup", static () => { }));
         await TryAsync("child", async () => await DurableTask.Run(static _ => { }).WithId("child"));
         await TryAsync("shielded-child", async () => await DurableTask.Run(static _ => { }).WithId("shielded-child").Shielded());
         await TryAsync("detached-call", async () => await other.ComputeAsync(1).Detached().ScheduleAsync());

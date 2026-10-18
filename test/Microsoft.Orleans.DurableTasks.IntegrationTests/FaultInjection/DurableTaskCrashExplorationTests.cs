@@ -13,7 +13,7 @@ namespace Microsoft.Orleans.DurableTasks.IntegrationTests.FaultInjection;
 /// Each run uses fresh grains and arms one fault on the K-th journal write of one grain, for every K below the longest run
 /// observed, including the extra writes of recovery. Each run settles once its grains hold no messaging work, so the
 /// writes which follow the result, such as completion retirements, are explored too. Every run must produce the fault-free
-/// result, apply each <see cref="DurableTask.Once(string, Func{int})"/> effect exactly once in the grain's journaled state,
+/// result, apply each <see cref="DurableTask.RunInline(string, Func{int})"/> effect exactly once in the grain's journaled state,
 /// and leave no dead letters.
 /// </para>
 /// <para>

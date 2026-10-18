@@ -21,7 +21,7 @@ replay finds the record and doesn't apply the effect again:
 
 | Work | Commits with |
 | --- | --- |
-| A `DurableTask.Once` effect's state changes | The effect's record, in the task's next durable write. |
+| A `DurableTask.RunInline` effect's state changes | The effect's record, in the task's next durable write. |
 | A local step's final synchronous code | The step's result. |
 | The body's synchronous tail | The task's result. |
 | A call to another grain, a delay, a signal send, a detached start, `Post` | The execution's record of the operation, in one journal write with the outgoing message. |

@@ -155,14 +155,14 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
 
     public async DurableTask<OrderResult> PlaceOrderAsync(SubmitOrder order)
     {
-        DurableTask.Once("submit", () => SetStatus(OrderStatus.Submitted));
+        DurableTask.RunInline("submit", () => SetStatus(OrderStatus.Submitted));
 
         // <durable_tasks_fan_out>
         bool[] reserved;
         try
         {
             await DurableTask.Delay(TimeSpan.FromMinutes(1)).WithId("grace-period");
-            DurableTask.Once("validate", () => SetStatus(OrderStatus.AwaitingValidation));
+            DurableTask.RunInline("validate", () => SetStatus(OrderStatus.AwaitingValidation));
 
             // Reserves every line concurrently, as the children reserve/0, reserve/1, and so on.
             reserved = await order.Lines.Select(line => Catalog(line.ProductId).ReserveAsync(OrderId, line.Units))
@@ -189,11 +189,11 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             return await CancelOrderAsync(order.Lines, payment.Reason);
         }
 
-        DurableTask.Once("pay", () => SetStatus(OrderStatus.Paid));
+        DurableTask.RunInline("pay", () => SetStatus(OrderStatus.Paid));
 
         // Returns at once when the shipment arrived before the wait.
         var shipment = await Shipped.WaitAsync();
-        DurableTask.Once("ship", () => SetStatus(OrderStatus.Shipped));
+        DurableTask.RunInline("ship", () => SetStatus(OrderStatus.Shipped));
         return new OrderResult(OrderStatus.Shipped, shipment.TrackingNumber);
     }
 
@@ -231,20 +231,20 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             .WhenAll()
             .WithId("release")
             .Shielded();
-        DurableTask.Once("cancel", () => SetStatus(OrderStatus.Cancelled));
+        DurableTask.RunInline("cancel", () => SetStatus(OrderStatus.Cancelled));
         return new OrderResult(OrderStatus.Cancelled, reason);
     }
     // </durable_tasks_compensation>
 
-    // <durable_tasks_once>
-    // The workflow runs each status change as a recorded effect, such as DurableTask.Once("pay", ...): the state change
+    // <durable_tasks_run_inline>
+    // The workflow runs each status change as a recorded effect, such as DurableTask.RunInline("pay", ...): the state change
     // commits with its recorded result, and a replay returns the result without changing the state again.
     private OrderStatus SetStatus(OrderStatus status)
     {
         _status.Value = status;
         return status;
     }
-    // </durable_tasks_once>
+    // </durable_tasks_run_inline>
 
     private ICatalogItemGrain Catalog(int productId) => GrainFactory.GetGrain<ICatalogItemGrain>(productId);
 }
@@ -635,7 +635,7 @@ public sealed class TicketGrain : DurableGrain, ITicketGrain
 
         // A recorded effect advances the counter, draws a reference, and reads the clock once. Its change to the counter
         // commits with its recorded ticket, and a replay returns that ticket without running the effect again.
-        var ticket = DurableTask.Once(
+        var ticket = DurableTask.RunInline(
             "allocate",
             () => new Ticket(++_lastNumber.Value, Guid.NewGuid(), DateTimeOffset.UtcNow));
 
@@ -673,8 +673,8 @@ public sealed class HoldGrain : DurableGrain, IHoldGrain
     {
         // Each effect runs in this work item before it returns, and records under {taskId}/hold-id and {taskId}/hold.
         // Their records and their state changes commit in the same journal write, and no other turn runs between them.
-        var holdId = DurableTask.Once("hold-id", Guid.NewGuid);
-        DurableTask.Once("hold", () =>
+        var holdId = DurableTask.RunInline("hold-id", Guid.NewGuid);
+        DurableTask.RunInline("hold", () =>
         {
             _held.Value += quantity;
             _holdId.Value = holdId;
@@ -687,7 +687,7 @@ public sealed class HoldGrain : DurableGrain, IHoldGrain
     public async DurableTask<Guid> ConfirmAsync(Guid holdId)
     {
         // The step runs when it's awaited, as a child execution with its own context, and records under
-        // {taskId}/confirmation-id, the identifier which DurableTask.Once("confirmation-id", ...) would use.
+        // {taskId}/confirmation-id, the identifier which DurableTask.RunInline("confirmation-id", ...) would use.
         return await DurableTask.Run(async () => await RequestConfirmationAsync(holdId)).WithId("confirmation-id");
     }
 
@@ -720,11 +720,11 @@ public sealed class ExportGrain : DurableGrain, IExportGrain
     public async DurableTask<int> ExportAsync(string[] partitions)
     {
         // Each append runs once for its position in the task, so a replay doesn't publish older progress again.
-        DurableTask.Once(() => _progress.Append(new ExportProgress(0, partitions.Length)));
+        DurableTask.RunInline(() => _progress.Append(new ExportProgress(0, partitions.Length)));
         for (var i = 0; i < partitions.Length; i++)
         {
             await GrainFactory.GetGrain<IPartitionGrain>(partitions[i]).ExportAsync().WithId("partition");
-            DurableTask.Once(() => _progress.Append(new ExportProgress(i + 1, partitions.Length)));
+            DurableTask.RunInline(() => _progress.Append(new ExportProgress(i + 1, partitions.Length)));
         }
 
         return partitions.Length;

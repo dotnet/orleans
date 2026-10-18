@@ -42,10 +42,10 @@ public sealed class ReportGrain(IDurableTaskManager tasks) : DurableGrain, IRepo
     public async DurableTask<PublishReceipt> PublishAsync(string[] sections)
     {
         // publish-{reportId}/version, a named recorded effect, as WithId("version") names a step.
-        var version = DurableTask.Once("version", () => DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        var version = DurableTask.RunInline("version", () => DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
         // publish-{reportId}/$child-1, the execution's first unnamed operation.
-        var draftId = DurableTask.Once(Guid.NewGuid);
+        var draftId = DurableTask.RunInline(Guid.NewGuid);
 
         // publish-{reportId}/render/0, render/1, and so on: a named combinator's inputs, in input order. Each renderer
         // stores its call under the caller's scope, $caller/{reportGrainId}/publish-{reportId}/render/{i}.
@@ -147,7 +147,7 @@ public sealed class PublisherGrain : DurableGrain, IPublisherGrain
     // A durable task subscribes to the stored task, and the subscription is recorded for replay.
     public async DurableTask<bool> AwaitArchiveAsync()
     {
-        var archive = DurableTask.Once("archive", () => _archive.Value);
+        var archive = DurableTask.RunInline("archive", () => _archive.Value);
         return archive is { } address && await GrainFactory.GetDurableTask<bool>(address).WithId("archived");
     }
 

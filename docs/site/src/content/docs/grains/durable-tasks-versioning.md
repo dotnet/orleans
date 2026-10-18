@@ -43,12 +43,12 @@ Place the check before the first operation which the change adds, removes, or al
 that every execution reaches it with the operations which its version expects.
 
 - A check inside a loop, or in several helpers, returns the first decision every time.
-- The record commits with the execution's next durable write, as a `DurableTask.Once`
+- The record commits with the execution's next durable write, as a `DurableTask.RunInline`
   effect's does, and a replay which ends before that write decides again from the same
   history.
 - Version decisions are scoped to an invoked task's execution tree: a call to another
   grain decides its own versions.
-- The check runs on the activation's scheduler, as `DurableTask.Once` does. Outside a
+- The check runs on the activation's scheduler, as `DurableTask.RunInline` does. Outside a
   durable task, it returns `maxSupported`.
 - Names follow the rules for operation names: they're non-empty and don't contain `$`.
   [ORLEANS0118](../diagnostics/orleans0118.md) reports names and ranges which aren't

@@ -78,7 +78,7 @@ public sealed class DurableTaskReplaySafetyTests
     }
 
     [Fact]
-    public Task OnceCommitsItsRecordWithItsStateChangesAndReplayReturnsTheRecordedValue() => ActivationScheduler.RunAsync(async () =>
+    public Task RunInlineCommitsItsRecordWithItsStateChangesAndReplayReturnsTheRecordedValue() => ActivationScheduler.RunAsync(async () =>
     {
         var effectId = WorkflowId.Child("increment");
         await using var harness = new DurableTaskReplayHarness(IncrementOnce);
@@ -113,7 +113,7 @@ public sealed class DurableTaskReplaySafetyTests
     });
 
     [Fact]
-    public Task OnceRunsAgainWhenTheActivationEndsBeforeAWriteCommitsIt() => ActivationScheduler.RunAsync(async () =>
+    public Task RunInlineRunsAgainWhenTheActivationEndsBeforeAWriteCommitsIt() => ActivationScheduler.RunAsync(async () =>
     {
         await using var harness = new DurableTaskReplayHarness(IncrementOnce);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
@@ -134,7 +134,7 @@ public sealed class DurableTaskReplaySafetyTests
     });
 
     [Fact]
-    public Task OnceRecordsAFailureWithItsStateChangesAndReplayRethrowsIt() => ActivationScheduler.RunAsync(async () =>
+    public Task RunInlineRecordsAFailureWithItsStateChangesAndReplayRethrowsIt() => ActivationScheduler.RunAsync(async () =>
     {
         await using var harness = new DurableTaskReplayHarness(Workflow);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
@@ -158,7 +158,7 @@ public sealed class DurableTaskReplaySafetyTests
             string outcome;
             try
             {
-                DurableTask.Once("charge", Charge);
+                DurableTask.RunInline("charge", Charge);
                 outcome = "charged";
             }
             catch (InvalidOperationException exception)
@@ -199,7 +199,7 @@ public sealed class DurableTaskReplaySafetyTests
         var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
         var exception = Assert.IsType<InvalidOperationException>(response.Exception);
         Assert.Contains("'workflow/increment'", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("It records a DurableTask.Once effect, and this attempt requested a local child task.", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a DurableTask.RunInline effect, and this attempt requested a local child task.", exception.Message, StringComparison.Ordinal);
 
         static async DurableTask<int> Changed(ReplayGrain grain) =>
             await DurableTask.Run(_ => grain.Counter.Value + 1).WithId("increment");
@@ -222,7 +222,7 @@ public sealed class DurableTaskReplaySafetyTests
 
         var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
         var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("It records a local child task, and this attempt requested a DurableTask.Once effect.", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a local child task, and this attempt requested a DurableTask.RunInline effect.", exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, harness.EffectRuns);
 
         static async DurableTask<int> Original(ReplayGrain grain)
@@ -254,7 +254,7 @@ public sealed class DurableTaskReplaySafetyTests
         var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
         var exception = Assert.IsType<InvalidOperationException>(response.Exception);
         Assert.Contains("'workflow/increment$2'", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("this attempt requested a DurableTask.Once effect.", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("this attempt requested a DurableTask.RunInline effect.", exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, harness.EffectRuns);
         Assert.Equal(2, replay.Grain.Counter.Value);
 
@@ -277,7 +277,7 @@ public sealed class DurableTaskReplaySafetyTests
         static async DurableTask<int> Changed(ReplayGrain grain)
         {
             await DurableTask.Run(_ => ++grain.Counter.Value).WithId("increment");
-            return DurableTask.Once("increment", () =>
+            return DurableTask.RunInline("increment", () =>
             {
                 grain.Harness.CountEffectRun();
                 return ++grain.Counter.Value;
@@ -304,7 +304,7 @@ public sealed class DurableTaskReplaySafetyTests
         var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
         var exception = Assert.IsType<InvalidOperationException>(response.Exception);
         Assert.Contains("'workflow/increment/0' runs beneath 'workflow/increment'", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("It records a DurableTask.Once effect, and this attempt requested a local child task.", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a DurableTask.RunInline effect, and this attempt requested a local child task.", exception.Message, StringComparison.Ordinal);
         Assert.Equal(1, replay.Grain.Counter.Value);
 
         static async DurableTask<int> Changed(ReplayGrain grain)
@@ -315,7 +315,7 @@ public sealed class DurableTaskReplaySafetyTests
     });
 
     [Fact]
-    public Task OnceRecordsAResultWhichDoesNotSerializeAsThatFailure() => ActivationScheduler.RunAsync(async () =>
+    public Task RunInlineRecordsAResultWhichDoesNotSerializeAsThatFailure() => ActivationScheduler.RunAsync(async () =>
     {
         string? firstOutcome = null;
         await using var harness = new DurableTaskReplayHarness(Workflow);
@@ -343,7 +343,7 @@ public sealed class DurableTaskReplaySafetyTests
             string result;
             try
             {
-                DurableTask.Once("value", () =>
+                DurableTask.RunInline("value", () =>
                 {
                     grain.Harness.CountEffectRun();
                     grain.Counter.Value++;
@@ -363,7 +363,7 @@ public sealed class DurableTaskReplaySafetyTests
     });
 
     [Fact]
-    public Task UnnamedOnceCommitsItsRecordUnderAGeneratedIdentifierAndReplayReturnsTheRecordedValue() => ActivationScheduler.RunAsync(async () =>
+    public Task UnnamedRunInlineCommitsItsRecordUnderAGeneratedIdentifierAndReplayReturnsTheRecordedValue() => ActivationScheduler.RunAsync(async () =>
     {
         var effectId = WorkflowId.Child("$child-2");
         await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
@@ -377,7 +377,7 @@ public sealed class DurableTaskReplaySafetyTests
             Assert.All(
                 activation.Writes.Where(static write => write.Counter == 2),
                 write => Assert.Contains(effectId, write.Completed));
-            Assert.Equal("$once", GetTask(activation, effectId).RequestFingerprint);
+            Assert.Equal("$effect", GetTask(activation, effectId).RequestFingerprint);
         }
 
         // The replay creates the unnamed child and the unnamed effect in the same order, so each finds its record.
@@ -393,7 +393,7 @@ public sealed class DurableTaskReplaySafetyTests
         static async DurableTask<int> Workflow(ReplayGrain grain)
         {
             var first = await DurableTask.Run(_ => ++grain.Counter.Value);
-            var second = DurableTask.Once(() =>
+            var second = DurableTask.RunInline(() =>
             {
                 grain.Harness.CountEffectRun();
                 return ++grain.Counter.Value;
@@ -420,7 +420,7 @@ public sealed class DurableTaskReplaySafetyTests
         var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
         var exception = Assert.IsType<InvalidOperationException>(response.Exception);
         Assert.Contains("'workflow/$child-1'", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("It records a local child task, and this attempt requested a DurableTask.Once effect.", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a local child task, and this attempt requested a DurableTask.RunInline effect.", exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, harness.EffectRuns);
         Assert.Equal(1, replay.Grain.Counter.Value);
 
@@ -433,7 +433,7 @@ public sealed class DurableTaskReplaySafetyTests
 
         static async DurableTask<int> Changed(ReplayGrain grain)
         {
-            var value = DurableTask.Once(() =>
+            var value = DurableTask.RunInline(() =>
             {
                 grain.Harness.CountEffectRun();
                 return ++grain.Counter.Value;
@@ -463,14 +463,14 @@ public sealed class DurableTaskReplaySafetyTests
         var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
         var exception = Assert.IsType<InvalidOperationException>(response.Exception);
         Assert.Contains("'workflow/$child-1'", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("It records a DurableTask.Once effect", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a DurableTask.RunInline effect", exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, childRuns);
         Assert.Equal(1, harness.EffectRuns);
         Assert.Equal(1, replay.Grain.Counter.Value);
 
         static async DurableTask<int> Original(ReplayGrain grain)
         {
-            var value = DurableTask.Once(() =>
+            var value = DurableTask.RunInline(() =>
             {
                 grain.Harness.CountEffectRun();
                 return ++grain.Counter.Value;
@@ -488,7 +488,7 @@ public sealed class DurableTaskReplaySafetyTests
     });
 
     [Fact]
-    public Task OnceAfterConfigureAwaitFalseFailsWithoutRunning() => ActivationScheduler.RunAsync(async () =>
+    public Task RunInlineAfterConfigureAwaitFalseFailsWithoutRunning() => ActivationScheduler.RunAsync(async () =>
     {
         await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
         await using var activation = await harness.ActivateAsync(TestCancellation);
@@ -502,7 +502,7 @@ public sealed class DurableTaskReplaySafetyTests
         static async DurableTask<int> Workflow(ReplayGrain grain)
         {
             await Task.Delay(1).ConfigureAwait(false);
-            return DurableTask.Once("increment", () =>
+            return DurableTask.RunInline("increment", () =>
             {
                 grain.Harness.CountEffectRun();
                 return ++grain.Counter.Value;
@@ -559,11 +559,11 @@ public sealed class DurableTaskReplaySafetyTests
     private static async DurableTask<int> Workflow(ReplayGrain grain, List<string> observed, bool insertOperation)
     {
         Observe("start");
-        var a = DurableTask.Once("a", static () => 1);
+        var a = DurableTask.RunInline("a", static () => 1);
         Observe("a");
         if (insertOperation)
         {
-            DurableTask.Once("inserted", static () => 0);
+            DurableTask.RunInline("inserted", static () => 0);
             Observe("inserted");
         }
 
@@ -581,7 +581,7 @@ public sealed class DurableTaskReplaySafetyTests
 
     private static async DurableTask<int> IncrementOnceAsync(ReplayGrain grain)
     {
-        var value = DurableTask.Once("increment", () =>
+        var value = DurableTask.RunInline("increment", () =>
         {
             grain.Harness.CountEffectRun();
             return ++grain.Counter.Value;

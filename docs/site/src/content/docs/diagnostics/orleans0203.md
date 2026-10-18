@@ -33,7 +33,7 @@ For the commit model, see [Replay-safety rules](../grains/durable-tasks-replay-r
 
 :::code source="snippets/durable-tasks/Orleans0203.cs" id="orleans0203_fix_reorder" language="csharp":::
 
-**Record each change separately.** Split the work into a step for the external call and `DurableTask.Once` effects for the state changes. Each effect commits its change with its own record:
+**Record each change separately.** Split the work into a step for the external call and `DurableTask.RunInline` effects for the state changes. Each effect commits its change with its own record:
 
 :::code source="snippets/durable-tasks/Orleans0203.cs" id="orleans0203_fix_split" language="csharp":::
 

@@ -270,7 +270,7 @@ internal interface IDurableTaskGrainRuntime
         throw new NotSupportedException("The durable task runtime does not support versions.");
 
     /// <summary>
-    /// Throws when an earlier run recorded a <c>DurableTask.Once</c> effect under <paramref name="effectId"/>, which holds
+    /// Throws when an earlier run recorded a <c>DurableTask.RunInline</c> effect under <paramref name="effectId"/>, which holds
     /// <paramref name="operationId"/>, such as a named combinator's input whose combinator has the effect's name.
     /// </summary>
     /// <param name="operationId">The operation which this run requests.</param>
