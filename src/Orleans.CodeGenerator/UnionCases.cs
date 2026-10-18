@@ -122,7 +122,7 @@ internal static class UnionCaseResolver
     /// </remarks>
     private static INamedTypeSymbol GetClosedCaseType(INamedTypeSymbol subtype, INamedTypeSymbol closedType, Compilation compilation)
     {
-        if (!closedType.IsGenericType)
+        if (!closedType.IsGenericType && !subtype.IsGenericType)
         {
             return subtype;
         }

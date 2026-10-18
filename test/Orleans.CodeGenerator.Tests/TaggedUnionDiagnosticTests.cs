@@ -1,7 +1,10 @@
 // net10.0 tests reference Roslyn 5.9, which parses closed types and unions; net8.0 tests reference the oldest supported Roslyn.
 #if NET10_0_OR_GREATER
+using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Orleans.CodeGenerator.Tests;
@@ -79,6 +82,21 @@ public sealed class TaggedUnionDiagnosticTests
         "Case identifier 1 is used by both 'First' and 'Second' in 'Base'")]
     [InlineData(
         """
+        [GenerateSerializer] public closed record Base;
+        [GenerateSerializer, Case(0)] public sealed record Box<T>([property: Id(0)] T Item) : Base;
+        """,
+        "Case 'Box<T>' must pass its own type parameters as the type arguments of 'Base'")]
+    [InlineData(
+        """
+        [GenerateSerializer] public closed record Base;
+        public static class Outer<T>
+        {
+            [GenerateSerializer, Case(0)] public sealed record Box([property: Id(0)] T Item) : Base;
+        }
+        """,
+        "Case 'Outer<T>.Box' must pass its own type parameters as the type arguments of 'Base'")]
+    [InlineData(
+        """
         [GenerateSerializer] public closed record Shape<T>;
         [GenerateSerializer, Case(0)] public sealed record IntSquare([property: Id(0)] int Side) : Shape<int>;
         """,
@@ -120,16 +138,89 @@ public sealed class TaggedUnionDiagnosticTests
         Assert.Contains(expectedMessage, diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AddingClosedCasesPreservesHotReloadFieldsAndConstructor()
+    {
+        const string before = """
+            [GenerateSerializer] public closed record Base;
+            [GenerateSerializer, Case(9)] public sealed record Existing([property: Id(0)] string Value) : Base;
+            """;
+        const string added = """
+            [GenerateSerializer, Case(1)] public sealed record Added([property: Id(0)] string Value) : Base;
+            """;
+        var (beforeOutput, beforeResult) = Generate(before, hotReload: true);
+        var (afterOutput, afterResult) = Generate(before + "\n" + added, hotReload: true);
+        AssertNoErrors(beforeOutput);
+        AssertNoErrors(afterOutput);
+        var beforeCodec = GetCodec(beforeResult, "Codec_Base");
+        var afterCodec = GetCodec(afterResult, "Codec_Base");
+
+        Assert.Equal(
+            Assert.Single(beforeCodec.Members.OfType<ConstructorDeclarationSyntax>()).ParameterList.ToString(),
+            Assert.Single(afterCodec.Members.OfType<ConstructorDeclarationSyntax>()).ParameterList.ToString());
+        var fields = afterCodec.Members.OfType<FieldDeclarationSyntax>().ToDictionary(static field => field.Declaration.Variables.Single().Identifier.Text);
+        Assert.Contains("_codecProvider", fields.Keys);
+        Assert.Equal(
+            beforeCodec.Members.OfType<FieldDeclarationSyntax>().Single(static field => field.Declaration.Variables.Single().Identifier.Text == "_caseCodec9").ToString(),
+            fields["_caseCodec9"].ToString());
+        Assert.DoesNotContain(fields["_caseCodec1"].Modifiers, static modifier => modifier.IsKind(SyntaxKind.ReadOnlyKeyword));
+        Assert.Contains("(_caseCodec1 ??= OrleansGeneratedCodeHelper.GetService<", afterCodec.NormalizeWhitespace().ToFullString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HotReloadClosedCaseFieldsResolveWhenConstructorInitializationWasSkipped()
+    {
+        var (output, _) = Generate("""
+            [GenerateSerializer] public closed record Base;
+            [GenerateSerializer, Case(9)] public sealed record Item([property: Id(0)] string Value) : Base;
+
+            public static class Probe
+            {
+                public static bool RoundTrip()
+                {
+                    using var services = Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(
+                        Orleans.Serialization.ServiceCollectionExtensions.AddSerializer(
+                            new Microsoft.Extensions.DependencyInjection.ServiceCollection(),
+                            builder => Orleans.Serialization.SerializerBuilderExtensions.AddAssembly(builder, typeof(Probe).Assembly)));
+                    var provider = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<
+                        Orleans.Serialization.Serializers.ICodecProvider>(services);
+                    var serializer = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<
+                        Orleans.Serialization.Serializer<Base>>(services);
+                    var codec = provider.GetCodec<Base>();
+                    var field = codec.GetType().GetField("_caseCodec9", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+                    field.SetValue(codec, null);
+                    var bytes = serializer.SerializeToArray(new Item("after update"));
+                    var initializedByWrite = field.GetValue(codec) is not null;
+                    field.SetValue(codec, null);
+                    var result = serializer.Deserialize(bytes);
+                    return initializedByWrite && field.GetValue(codec) is not null && result == new Item("after update");
+                }
+            }
+            """, hotReload: true);
+        AssertNoErrors(output);
+        using var image = new MemoryStream();
+        var emitted = output.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        image.Position = 0;
+        var probe = AssemblyLoadContext.Default.LoadFromStream(image).GetType("Probe", throwOnError: true)!;
+        Assert.True(probe.GetMethod("RoundTrip")!.CreateDelegate<Func<bool>>()());
+    }
+
+    private static ClassDeclarationSyntax GetCodec(GeneratorDriverRunResult result, string className)
+        => Assert.Single(result.Results.SelectMany(static generator => generator.GeneratedSources)
+            .SelectMany(source => source.SyntaxTree.GetRoot(TestContext.Current.CancellationToken).DescendantNodes().OfType<ClassDeclarationSyntax>()),
+            declaration => declaration.Identifier.Text == className);
+
     private static void AssertGeneratesTaggedUnionCodec(GeneratorDriverRunResult result)
         => Assert.Contains(result.Results.SelectMany(static generator => generator.GeneratedSources), static source => source.SourceText.ToString().Contains("WriteStartUnion", StringComparison.Ordinal));
 
     private static void AssertNoErrors(Compilation compilation)
         => Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
 
-    private static (Compilation Output, GeneratorDriverRunResult Result) Generate(string source)
+    private static (Compilation Output, GeneratorDriverRunResult Result) Generate(string source, bool hotReload = false)
     {
         source = $"#nullable enable\nusing Orleans;\n{source}";
-        var references = TestCompilationHelper.CreateCompilation(source, "TaggedUnionDiagnosticTests").GetAwaiter().GetResult().References;
+        var references = TestCompilationHelper.CreateCompilation(source, "TaggedUnionDiagnosticTests", MetadataReference.CreateFromFile(typeof(ServiceProvider).Assembly.Location)).GetAwaiter().GetResult().References;
         var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
         var compilation = CSharpCompilation.Create(
             "TaggedUnionDiagnosticTests",
@@ -137,7 +228,10 @@ public sealed class TaggedUnionDiagnosticTests
             references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
 
-        GeneratorDriver driver = CSharpGeneratorDriver.Create([new OrleansSerializationSourceGenerator().AsSourceGenerator()], parseOptions: parseOptions);
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new OrleansSerializationSourceGenerator().AsSourceGenerator()],
+            parseOptions: parseOptions,
+            optionsProvider: TestCompilationHelper.CreateOptionsProvider(new Dictionary<string, string> { ["build_property.orleanshotreload"] = hotReload.ToString() }));
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out _, TestContext.Current.CancellationToken);
         return (output, driver.GetRunResult());
     }
