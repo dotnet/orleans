@@ -1314,6 +1314,77 @@ public sealed class RetirementHandoffTests
         await migration.AsTask().WaitAsync(Timeout, Cancellation);
     }
 
+    [Fact]
+    public async Task DeclinedRequests_AreRetainedWithoutWaitingForAnotherGrainsRetargets()
+    {
+        // Hold callers' retargets, so that the accepted grain's migration cannot complete.
+        var retargetArrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRetarget = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
+        {
+            if (context.Request.GetMethodName() == nameof(IMigratingRequestsSystemTarget.RetargetMigratedRequests))
+            {
+                retargetArrived.TrySetResult();
+                await releaseRetarget.Task;
+            }
+
+            await context.Invoke();
+        })));
+        var caller = cluster.Silos[0];
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var migrationManager = source.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
+        var pool = source.ServiceProvider.GetRequiredService<SerializerSessionPool>();
+        var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
+        var acceptedKey = Guid.NewGuid();
+        var declinedKey = Guid.NewGuid();
+        RetirementHandoffState.Create(acceptedKey);
+        RetirementHandoffState.Create(declinedKey);
+        var acceptedGrain = grainFactory.GetGrain<IRetirementHandoffGrain>(acceptedKey, typeof(RetirementHandoffGrain).FullName).GetGrainId();
+        var declined = grainFactory.GetGrain<IRetirementHandoffGrain>(declinedKey, typeof(RetirementHandoffGrain).FullName);
+
+        // The declined grain is already active on the target, which therefore declines its requests.
+        await PlaceOnAsync(target, () => declined.GetLocation());
+
+        // Both migrations are queued on the migration manager's scheduler before its pump runs, so they travel in one batch.
+        ValueTask<MigrationResult> acceptedMigration = default;
+        ValueTask<MigrationResult> declinedMigration = default;
+        List<Message> declinedRequests = [CreateRequest(declined.GetGrainId(), 2)];
+        await migrationManager.RunOrQueueTask(() =>
+        {
+            acceptedMigration = migrationManager.MigrateAsync(target.SiloAddress, acceptedGrain, new MigrationContext(pool), [CreateRequest(acceptedGrain, 1)], out var acceptedCarries);
+            declinedMigration = migrationManager.MigrateAsync(target.SiloAddress, declined.GetGrainId(), new MigrationContext(pool), declinedRequests, out var declinedCarries);
+            Assert.True(acceptedCarries);
+            Assert.True(declinedCarries);
+            return Task.CompletedTask;
+        });
+
+        try
+        {
+            // While the accepted grain's caller has not acknowledged its retarget, the declined grain's requests are already retained, so its source can forward them.
+            await retargetArrived.Task.WaitAsync(Timeout, Cancellation);
+            var declinedResult = await declinedMigration.AsTask().WaitAsync(Timeout, Cancellation);
+            Assert.Equal(MigratedRequestsOutcome.Retained, declinedResult.Requests);
+            Assert.False(acceptedMigration.IsCompleted);
+        }
+        finally
+        {
+            releaseRetarget.TrySetResult();
+        }
+
+        Assert.Equal(MigratedRequestsOutcome.Accepted, (await acceptedMigration.AsTask().WaitAsync(Timeout, Cancellation)).Requests);
+
+        Message CreateRequest(GrainId grainId, long id) => new()
+        {
+            Direction = Message.Directions.Request,
+            Id = new CorrelationId(id),
+            SendingGrain = GrainId.Create("test", "caller"),
+            SendingSilo = caller.SiloAddress,
+            TargetGrain = grainId,
+            BodyObject = new List<string> { "value" },
+        };
+    }
+
     private sealed class UnserializableValue;
 
     [Fact]

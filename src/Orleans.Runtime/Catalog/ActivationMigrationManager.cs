@@ -803,41 +803,51 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     }
 
     /// <summary>
-    /// Retargets the callers of the requests which the target accepted, then completes the work items.
+    /// Completes the work items, after retargeting the callers of the requests which the target accepted.
     /// </summary>
     /// <remarks>
-    /// Each work item completes only after its callers acknowledge, so a retiring source departs only after its callers follow their requests.
+    /// A work item whose requests were accepted completes only after its callers acknowledge, so a retiring source departs only after its callers follow their requests.
+    /// Other work items complete immediately, so that declined requests are restored and forwarded without waiting for unrelated callers.
     /// The pump continues with the next batch meanwhile.
     /// </remarks>
     private void CompleteAfterRetargeting(List<MigrationWorkItem> items, bool[] requestsAccepted)
     {
         Dictionary<SiloAddress, List<MigratedRequestRoute>>? routesBySilo = null;
+        List<MigrationWorkItem>? awaitingRetarget = null;
         for (var i = 0; i < items.Count; i++)
         {
-            if (requestsAccepted[i] && items[i].Routes is { } routes)
+            var item = items[i];
+            if (item.Value.Requests is null || !requestsAccepted[i])
             {
-                foreach (var (callerSilo, route) in routes)
-                {
-                    routesBySilo ??= [];
-                    if (!routesBySilo.TryGetValue(callerSilo, out var siloRoutes))
-                    {
-                        routesBySilo[callerSilo] = siloRoutes = [];
-                    }
+                item.SetResult(new(Migrated: true, MigratedRequestsOutcome.Retained, Exception: null));
+                continue;
+            }
 
-                    siloRoutes.Add(route);
+            if (item.Routes is not { Count: > 0 } routes)
+            {
+                item.SetResult(new(Migrated: true, MigratedRequestsOutcome.Accepted, Exception: null));
+                continue;
+            }
+
+            (awaitingRetarget ??= []).Add(item);
+            foreach (var (callerSilo, route) in routes)
+            {
+                routesBySilo ??= [];
+                if (!routesBySilo.TryGetValue(callerSilo, out var siloRoutes))
+                {
+                    routesBySilo[callerSilo] = siloRoutes = [];
                 }
+
+                siloRoutes.Add(route);
             }
         }
 
-        if (routesBySilo is null)
+        if (awaitingRetarget is not null)
         {
-            Complete(items, requestsAccepted);
-            return;
+            RetargetThenCompleteAsync(awaitingRetarget, routesBySilo!).Ignore();
         }
 
-        RetargetThenCompleteAsync(items, requestsAccepted, routesBySilo).Ignore();
-
-        async Task RetargetThenCompleteAsync(List<MigrationWorkItem> items, bool[] requestsAccepted, Dictionary<SiloAddress, List<MigratedRequestRoute>> routesBySilo)
+        async Task RetargetThenCompleteAsync(List<MigrationWorkItem> items, Dictionary<SiloAddress, List<MigratedRequestRoute>> routesBySilo)
         {
             try
             {
@@ -864,16 +874,10 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             }
             finally
             {
-                Complete(items, requestsAccepted);
-            }
-        }
-
-        static void Complete(List<MigrationWorkItem> items, bool[] requestsAccepted)
-        {
-            for (var i = 0; i < items.Count; i++)
-            {
-                var requests = items[i].Value.Requests is null || !requestsAccepted[i] ? MigratedRequestsOutcome.Retained : MigratedRequestsOutcome.Accepted;
-                items[i].SetResult(new(Migrated: true, requests, Exception: null));
+                foreach (var item in items)
+                {
+                    item.SetResult(new(Migrated: true, MigratedRequestsOutcome.Accepted, Exception: null));
+                }
             }
         }
     }
