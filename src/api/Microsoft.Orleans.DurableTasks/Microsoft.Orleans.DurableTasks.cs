@@ -12,6 +12,8 @@ namespace Orleans
     {
         public static Messaging.HierarchicalKey? ToHierarchicalKey(this DurableTasks.TaskId taskId) { throw null; }
 
+        public static DurableTasks.TaskId ToTaskId(this Messaging.HierarchicalKey key) { throw null; }
+
         public static DurableTasks.TaskId ToTaskId(this Messaging.HierarchicalKey? key) { throw null; }
     }
 }
