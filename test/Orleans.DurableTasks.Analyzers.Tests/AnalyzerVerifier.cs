@@ -45,7 +45,15 @@ internal static partial class AnalyzerVerifier
     ];
 
     private static readonly ImmutableArray<DiagnosticAnalyzer> Analyzers =
-        [new DurableTaskReplayAnalyzer(), new DurableTaskDefinitionAnalyzer(), new DurableTaskCleanupAnalyzer(), new DurableTaskVersionAnalyzer()];
+    [
+        new DurableTaskReplayAnalyzer(),
+        new DurableTaskDefinitionAnalyzer(),
+        new DurableTaskCleanupAnalyzer(),
+        new DurableTaskVersionAnalyzer(),
+        new DurableTaskIdentityAnalyzer(),
+        new DurableTaskDelegateAnalyzer(),
+        new DurableTaskStateMutationAnalyzer(),
+    ];
 
     /// <summary>Verifies that the analyzers report exactly the marked diagnostics in <paramref name="source"/>.</summary>
     public static async Task VerifyAsync(string source)

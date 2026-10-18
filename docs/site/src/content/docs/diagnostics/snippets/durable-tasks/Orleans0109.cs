@@ -26,9 +26,8 @@ public sealed class DocumentGrain : DurableGrain
     // <orleans0109_fix_inline>
     public async DurableTask<string> SealInlineAsync(byte[] document)
     {
-        // A step records the hash, and runs on the activation's scheduler.
-        var hash = await DurableTask.Run(_ => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(document)))
-            .WithId("hash");
+        // The effect records the hash, and runs on the activation's scheduler.
+        var hash = DurableTask.RunInline("hash", () => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(document)));
         await Archive(hash).WithId("archive");
         return hash;
     }

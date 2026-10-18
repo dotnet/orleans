@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace Orleans.DurableTasks.Analyzers;
@@ -14,6 +15,8 @@ internal sealed class DurableTaskSymbols
     private const string DurableTasksNamespace = "Orleans.DurableTasks";
 
     private readonly ImmutableArray<INamedTypeSymbol> _grainStateTypes;
+    private readonly INamedTypeSymbol? _durableValue;
+    private readonly INamedTypeSymbol? _persistentState;
 
     private DurableTaskSymbols(Compilation compilation, INamedTypeSymbol durableTask)
     {
@@ -48,6 +51,8 @@ internal sealed class DurableTaskSymbols
             "Orleans.Journaling.IDurableLog`1",
             "Orleans.Runtime.IPersistentState`1");
         _grainStateTypes = stateTypes;
+        _durableValue = compilation.GetTypeByMetadataName("Orleans.Journaling.IDurableValue`1");
+        _persistentState = compilation.GetTypeByMetadataName("Orleans.Runtime.IPersistentState`1");
         NonDeterministicTypes = Resolve(
             compilation,
             "System.DateTime",
@@ -126,9 +131,11 @@ internal sealed class DurableTaskSymbols
         && (name == DurableTasksNamespace || name.StartsWith(DurableTasksNamespace + ".", StringComparison.Ordinal));
 
     /// <summary>Returns whether a method returns a durable task definition or a configuration of one.</summary>
-    public bool ReturnsDefinition(IMethodSymbol method) =>
-        IsDurableTask(method.ReturnType)
-        || (IsDurableTasksType(method.ReturnType) && method.ReturnType.Name == "ConfiguredDurableTask");
+    public bool ReturnsDefinition(IMethodSymbol method) => IsDefinitionType(method.ReturnType);
+
+    /// <summary>Returns whether a type is a durable task definition or a configuration of one.</summary>
+    public bool IsDefinitionType(ITypeSymbol? type) =>
+        IsDurableTask(type) || (IsDurableTasksType(type) && type!.Name == "ConfiguredDurableTask");
 
     /// <summary>Returns whether a type, or a type which contains it, is a grain: it implements <c>IGrainBase</c>.</summary>
     public bool IsGrain(INamedTypeSymbol? type)
@@ -154,6 +161,134 @@ internal sealed class DurableTaskSymbols
 
     /// <summary>Returns whether a method is a durable task body: an async method which returns <c>DurableTask</c>.</summary>
     public bool IsDurableBody(IMethodSymbol method) => method.IsAsync && IsDurableTask(method.ReturnType);
+
+    /// <summary>
+    /// Returns whether an operation runs in a durable task body: an <c>async DurableTask</c> method, or a delegate which a
+    /// durable task factory, such as <c>DurableTask.Run</c>, runs, including code which such a body contains.
+    /// </summary>
+    public bool IsInDurableBody(IOperation operation, ISymbol containingSymbol)
+    {
+        for (var current = operation.Parent; current is not null; current = current.Parent)
+        {
+            switch (current)
+            {
+                case IAnonymousFunctionOperation function
+                    when IsDurableBody(function.Symbol) || GetDelegateReceiver(function) is { } factory && IsDurableTasksType(factory.TargetMethod.ContainingType):
+                    return true;
+                case ILocalFunctionOperation local when IsDurableBody(local.Symbol):
+                    return true;
+            }
+        }
+
+        return containingSymbol is IMethodSymbol method && IsDurableBody(method);
+    }
+
+    /// <summary>Returns the invocation which receives a delegate as an argument, or null.</summary>
+    public static IInvocationOperation? GetDelegateReceiver(IOperation function)
+    {
+        for (var current = function.Parent; current is not null; current = current.Parent)
+        {
+            switch (current)
+            {
+                case IDelegateCreationOperation:
+                case IConversionOperation:
+                    continue;
+                case IArgumentOperation { Parent: IInvocationOperation invocation }:
+                    return invocation;
+                default:
+                    return null;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the operation which consumes a definition, through the configuration calls which wrap it, and whether one of
+    /// those calls is <paramref name="configuration"/>.
+    /// </summary>
+    public static IOperation? GetConsumer(IOperation definition, string configuration, out bool configured)
+    {
+        configured = false;
+        var current = definition;
+        while (current.Parent is { } parent)
+        {
+            if (parent is IConversionOperation)
+            {
+                current = parent;
+                continue;
+            }
+
+            var configurationCall = parent switch
+            {
+                IInvocationOperation invocation when invocation.Instance == current => invocation,
+                IArgumentOperation { Parent: IInvocationOperation invocation } argument
+                    when invocation.Instance is null && invocation.Arguments[0] == argument => invocation,
+                _ => null,
+            };
+            if (configurationCall is null || !IsConfiguration(configurationCall))
+            {
+                return parent;
+            }
+
+            configured |= configurationCall.TargetMethod.Name == configuration;
+            current = configurationCall;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the operation which creates a definition, through the configuration calls which wrap it, and whether one of
+    /// those calls is <paramref name="configuration"/>.
+    /// </summary>
+    public static IOperation GetDefinition(IOperation value, string configuration, out bool configured)
+    {
+        configured = false;
+        var current = Unwrap(value);
+        while (current is IInvocationOperation invocation && IsConfiguration(invocation) && GetExtensionReceiver(invocation) is { } receiver)
+        {
+            configured |= invocation.TargetMethod.Name == configuration;
+            current = Unwrap(receiver);
+        }
+
+        return current;
+    }
+
+    /// <summary>
+    /// Returns whether an invocation creates a combinator, which an awaiting execution runs as part of itself under a
+    /// generated operation identifier: <c>WhenAll</c>, <c>WhenAny</c>, <c>Race</c>, <c>ScheduleAll</c>,
+    /// <c>WhenAllCompleted</c>, a definition's <c>WaitAsync</c> or <c>WaitUntilAsync</c>, or a signal's <c>TryWaitAsync</c>.
+    /// </summary>
+    public bool IsCombinator(IInvocationOperation invocation) =>
+        IsDurableTask(invocation.TargetMethod.ReturnType)
+        && IsDurableTasksType(invocation.TargetMethod.ContainingType)
+        && invocation.TargetMethod.Name is "WhenAll" or "WhenAny" or "Race" or "ScheduleAll" or "WhenAllCompleted" or "WaitAsync"
+            or "WaitUntilAsync" or "TryWaitAsync"
+        && !(invocation.TargetMethod.Name == "WaitAsync" && IsSignalWait(invocation));
+
+    /// <summary>
+    /// Returns whether an operation reads a value which grain state holds: <c>IDurableValue&lt;T&gt;.Value</c>,
+    /// <c>IPersistentState&lt;T&gt;.State</c>, or an element of a journaled collection through its indexer.
+    /// </summary>
+    public bool IsStateValue(IOperation operation) =>
+        operation is IPropertyReferenceOperation { Instance.Type: { } stateType, Property: var property }
+        && (property.IsIndexer
+            ? IsGrainState(stateType)
+            : (property.Name == "Value" && Implements(stateType, _durableValue))
+                || (property.Name == "State" && Implements(stateType, _persistentState)));
+
+    /// <summary>
+    /// Returns whether a method changes the collection which receives it in place, as <c>List&lt;T&gt;.Add</c> does,
+    /// rather than returning a changed copy, as immutable collections do.
+    /// </summary>
+    public static bool IsCollectionMutation(IMethodSymbol method) =>
+        !method.IsStatic
+        && method.Name is "Add" or "AddRange" or "Remove" or "RemoveAt" or "RemoveAll" or "RemoveRange" or "RemoveWhere" or "Clear"
+            or "Insert" or "InsertRange" or "Enqueue" or "Dequeue" or "TryDequeue" or "Push" or "Pop" or "TryPop" or "TryAdd"
+            or "TryRemove" or "UnionWith" or "IntersectWith" or "ExceptWith" or "SymmetricExceptWith" or "Sort" or "Reverse"
+        && !SymbolEqualityComparer.Default.Equals(method.ReturnType.OriginalDefinition, method.ContainingType.OriginalDefinition)
+        && method.ContainingNamespace?.ToDisplayString() != "System.Collections.Immutable";
 
     /// <summary>Returns whether a type is journaled or persistent grain state, or implements one of those types.</summary>
     public bool IsGrainState(ITypeSymbol? type)
@@ -263,6 +398,26 @@ internal sealed class DurableTaskSymbols
     public static IOperation? GetExtensionReceiver(IInvocationOperation invocation) =>
         invocation.Instance ?? (invocation.Arguments.Length > 0 ? invocation.Arguments[0].Value : null);
 
+    /// <summary>
+    /// Returns the value which a local's declaration assigns to it, when no code in the declaring block assigns the local
+    /// again, or null.
+    /// </summary>
+    public static IOperation? GetOnlyValue(ILocalSymbol local, SemanticModel semanticModel)
+    {
+        if (local.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() is not VariableDeclaratorSyntax { Initializer: not null } declarator
+            || semanticModel.GetOperation(declarator) is not IVariableDeclaratorOperation { Initializer.Value: { } value }
+            || (declarator.FirstAncestorOrSelf<BlockSyntax>() is { } block
+                && block.DescendantNodes().OfType<AssignmentExpressionSyntax>().Any(assignment =>
+                    assignment.Left is IdentifierNameSyntax { Identifier.ValueText: var name }
+                    && name == local.Name
+                    && SymbolEqualityComparer.Default.Equals(semanticModel.GetSymbolInfo(assignment.Left).Symbol, local))))
+        {
+            return null;
+        }
+
+        return value;
+    }
+
     /// <summary>Strips conversions and parentheses from an operation.</summary>
     public static IOperation Unwrap(IOperation operation)
     {
@@ -287,6 +442,29 @@ internal sealed class DurableTaskSymbols
         foreach (var stateType in _grainStateTypes)
         {
             if (SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, stateType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool Implements(ITypeSymbol type, INamedTypeSymbol? definition)
+    {
+        if (definition is null)
+        {
+            return false;
+        }
+
+        if (SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, definition))
+        {
+            return true;
+        }
+
+        foreach (var @interface in type.AllInterfaces)
+        {
+            if (SymbolEqualityComparer.Default.Equals(@interface.OriginalDefinition, definition))
             {
                 return true;
             }
