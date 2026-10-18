@@ -17,6 +17,12 @@
     <GenAPITargetPath>$(GenAPITargetDirectory)$(AssemblyName).cs</GenAPITargetPath>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
