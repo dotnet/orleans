@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.ExceptionServices;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
@@ -17,7 +18,8 @@ namespace Orleans.DurableTasks.Runtime;
 /// The log holds one record per access, in the order in which the body made them: whether it read or wrote, the
 /// operation, a stable hash of the state's name, and the access's outcome, which is a read's value, a write's result, or
 /// the exception which either threw. Outcomes are encoded with the Orleans serializer when the access runs, so later
-/// in-place changes to a mutable value don't change its record. A write without a result records no value.
+/// in-place changes to a mutable value don't change its record. An exception whose encoding fails is normalized to a
+/// description which both the recording attempt and replay throw. A write without a result records no value.
 /// </para>
 /// <para>
 /// A write's record is staged with the write, in the same work item, so whichever journal write commits the change also
@@ -133,7 +135,7 @@ internal sealed class DurableTaskAccessLog(
             }
             catch (Exception exception)
             {
-                RecordException(access, exception);
+                RecordAndThrowException(access, exception);
                 throw;
             }
 
@@ -241,7 +243,7 @@ internal sealed class DurableTaskAccessLog(
         catch (Exception exception)
         {
             // A value which doesn't serialize is recorded as that failure, so every attempt observes the same failure.
-            RecordException(access, exception);
+            RecordAndThrowException(access, exception);
             throw;
         }
 
@@ -249,7 +251,8 @@ internal sealed class DurableTaskAccessLog(
     }
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "An exception which doesn't serialize is recorded as a description of it.")]
-    private void RecordException(in JournaledStateAccess access, Exception exception)
+    [DoesNotReturn]
+    private void RecordAndThrowException(in JournaledStateAccess access, Exception exception)
     {
         byte[] value;
         try
@@ -258,11 +261,13 @@ internal sealed class DurableTaskAccessLog(
         }
         catch (Exception serializationException)
         {
-            value = _serializer.SerializeToArray<Exception>(new InvalidOperationException(
-                $"The access to journaled state '{access.Target.Name}' threw {exception.GetType()}: {exception.Message}, which couldn't be recorded: {serializationException.Message}"));
+            exception = new InvalidOperationException(
+                $"The access to journaled state '{access.Target.Name}' threw {exception.GetType()}: {exception.Message}, which couldn't be recorded: {serializationException.Message}");
+            value = _serializer.SerializeToArray(exception);
         }
 
         AddRecord(access, HasValue | IsException, value);
+        ExceptionDispatchInfo.Throw(exception);
     }
 
     private void AddRecord(in JournaledStateAccess access, byte flags, byte[]? value)

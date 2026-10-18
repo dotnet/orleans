@@ -61,8 +61,9 @@ internal sealed class DurableTaskReplayHarness(
             var counter = services.GetRequiredKeyedService<IDurableValue<int>>("counter");
             var log = services.GetRequiredKeyedService<IDurableLog<int>>("log");
             var stock = services.GetRequiredKeyedService<IDurableDictionary<string, int>>("stock");
+            var list = services.GetRequiredKeyedService<IDurableList<int>>("list");
             var manager = services.GetRequiredService<IJournaledStateManager>();
-            var grain = new ReplayGrain(this, counter, log, stock, manager);
+            var grain = new ReplayGrain(this, counter, log, stock, list, manager);
             var grainContext = Substitute.For<IGrainContext>();
             grainContext.GrainId.Returns(GrainId);
             grainContext.GetTarget().Returns(grain);
@@ -151,6 +152,7 @@ internal sealed class ReplayGrain(
     IDurableValue<int> counter,
     IDurableLog<int> log,
     IDurableDictionary<string, int> stock,
+    IDurableList<int> list,
     IJournaledStateManager manager)
 {
     private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -167,6 +169,9 @@ internal sealed class ReplayGrain(
 
     /// <summary>Gets the grain's journaled stock levels, by item.</summary>
     public IDurableDictionary<string, int> Stock { get; } = stock;
+
+    /// <summary>Gets the grain's journaled list.</summary>
+    public IDurableList<int> List { get; } = list;
 
     /// <summary>Completes once the workflow waits at the gate.</summary>
     public Task AtGate => _atGate.Task;

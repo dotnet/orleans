@@ -127,6 +127,129 @@ public sealed class DurableTaskJournaledStateAccessTests
     });
 
     [Fact]
+    public Task ReplayRethrowsTheNormalizedExceptionWhenEncodingTheOriginalFails() => ActivationScheduler.RunAsync(async () =>
+    {
+        string? firstOutcome = null;
+        await using var harness = new DurableTaskReplayHarness(Workflow);
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await CommitAtGateAsync(activation);
+            Assert.StartsWith("The access to journaled state 'list' threw System.Collections.Generic.KeyNotFoundException: source failed", firstOutcome, StringComparison.Ordinal);
+            Assert.Equal(2, activation.Grain.Counter.Value);
+            Assert.Equal([7], activation.Grain.List);
+        }
+
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        replay.Grain.OpenGate();
+
+        Assert.Equal(firstOutcome, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<string>());
+        Assert.Equal(2, replay.Grain.Counter.Value);
+        Assert.Equal([7], replay.Grain.List);
+        Assert.Equal(1, harness.EffectRuns);
+
+        async DurableTask<string> Workflow(ReplayGrain grain)
+        {
+            string outcome;
+            try
+            {
+                grain.List.AddRange(ItemsThenFailure());
+                outcome = "succeeded";
+            }
+            catch (KeyNotFoundException)
+            {
+                grain.Counter.Value = 1;
+                outcome = "original exception";
+            }
+            catch (InvalidOperationException exception)
+            {
+                grain.Counter.Value = 2;
+                outcome = exception.Message;
+            }
+
+            firstOutcome ??= outcome;
+            await DurableTask.Run(_ => grain.Harness.CountEffectRun()).WithId("after-failure");
+            await grain.WaitAtGateAsync();
+            return outcome;
+        }
+
+        static IEnumerable<int> ItemsThenFailure()
+        {
+            yield return 7;
+            var exception = new KeyNotFoundException("source failed");
+            exception.Data["unserializable"] = new UnserializableValue();
+            throw exception;
+        }
+    });
+
+    [Theory]
+    [InlineData("seal")]
+    [InlineData("abandon")]
+    [InlineData("dispose")]
+    [InlineData("commit")]
+    public Task ReplayRecordsAClosedDraftCommitBeforeTheNextStateAccess(string closure) => ActivationScheduler.RunAsync(async () =>
+    {
+        string? firstOutcome = null;
+        await using var harness = new DurableTaskReplayHarness(Workflow);
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await CommitAtGateAsync(activation);
+            Assert.Equal(1, activation.Grain.Counter.Value);
+            Assert.Contains("closed", firstOutcome, StringComparison.Ordinal);
+        }
+
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        replay.Grain.OpenGate();
+
+        Assert.Equal(firstOutcome, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<string>());
+        Assert.Equal(1, replay.Grain.Counter.Value);
+        Assert.Equal(closure == "commit" ? [7] : Array.Empty<int>(), replay.Grain.Log);
+        Assert.Equal(closure == "seal", replay.Grain.Log.IsSealed);
+        Assert.Equal(1, harness.EffectRuns);
+
+        async DurableTask<string> Workflow(ReplayGrain grain)
+        {
+            using var draft = grain.Log.BeginDraft();
+            switch (closure)
+            {
+                case "seal":
+                    grain.Log.Seal();
+                    break;
+                case "abandon":
+                    draft.Abandon();
+                    break;
+                case "dispose":
+                    draft.Dispose();
+                    break;
+                case "commit":
+                    Assert.Equal(0, draft.Commit(7));
+                    Assert.False(draft.IsOpen);
+                    break;
+            }
+
+            string outcome;
+            try
+            {
+                draft.Commit(8);
+                outcome = "succeeded";
+            }
+            catch (InvalidOperationException exception)
+            {
+                outcome = exception.Message;
+                grain.Counter.Value++;
+            }
+
+            firstOutcome ??= outcome;
+            await DurableTask.Run(_ => grain.Harness.CountEffectRun()).WithId("after-commit");
+            await grain.WaitAtGateAsync();
+            return outcome;
+        }
+    });
+
+    [Fact]
     public Task ReadsStageOnlyWithALaterWriteOrOperation() => ActivationScheduler.RunAsync(async () =>
     {
         await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
@@ -533,4 +656,6 @@ public sealed class DurableTaskJournaledStateAccessTests
         grain.RequestUnrelatedWrite();
         await grain.UnrelatedWrites;
     }
+
+    private sealed class UnserializableValue;
 }

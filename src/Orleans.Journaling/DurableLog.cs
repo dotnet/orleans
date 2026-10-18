@@ -248,11 +248,6 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    // A draft's commit runs through the context, so a replay returns the recorded sequence without appending again.
-    private long CommitDraftEntries(LogDraftId draftId, ReadOnlySpan<T> entries) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Write(_accessTarget, JournaledStateOperation.LogCommitDraft, (Self: this, DraftId: draftId, Entries: entries.ToArray()), static state => state.Self.CommitDraft(state.DraftId, state.Entries).Sequence)
-        : CommitDraft(draftId, entries).Sequence;
-
     // A replayed commit returns its recorded sequence without committing again, so its outcome is the retained commit record
     // of its draft. A trimmed record precedes every retained one, so the latest record's durability implies its durability.
     private DraftOutcome GetCommittedOutcome(LogDraftId draftId, long sequence, int count)
@@ -921,10 +916,18 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
 
         public long Commit(params ReadOnlySpan<T> entries)
         {
-            ThrowIfClosed();
-            var sequence = log.CommitDraftEntries(Id, entries);
+            // Validation and append share one recorded outcome; each attempt closes its own successful draft.
+            var sequence = JournaledStateContext.TryGetCurrent(log._accessTarget, out var context)
+                ? context.Write(log._accessTarget, JournaledStateOperation.LogCommitDraft, (Self: this, Entries: entries.ToArray()), static state => state.Self.CommitCore(state.Entries))
+                : CommitCore(entries);
             log.CloseDraft(this, log.GetCommittedOutcome(Id, sequence, entries.Length));
             return sequence;
+        }
+
+        private long CommitCore(ReadOnlySpan<T> entries)
+        {
+            ThrowIfClosed();
+            return log.CommitDraft(Id, entries).Sequence;
         }
 
         public void Abandon(string? message = null)
