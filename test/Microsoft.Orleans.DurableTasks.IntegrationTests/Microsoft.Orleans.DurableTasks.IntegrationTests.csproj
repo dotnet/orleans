@@ -10,6 +10,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\docs\site\src\content\docs\diagnostics\snippets\durable-tasks\GlobalUsings.cs" Link="Documentation\GlobalUsings.cs" />
+    <Compile Include="..\..\docs\site\src\content\docs\diagnostics\snippets\durable-tasks\Orleans0219.cs" Link="Documentation\Orleans0219.cs" />
+    <Compile Include="..\..\docs\site\src\content\docs\diagnostics\snippets\durable-tasks\Shared.cs" Link="Documentation\Shared.cs" />
     <Compile Include="..\..\playground\DurableOrderProcessing\CatalogData.cs" Link="OrderProcessing\CatalogData.cs" />
     <Compile Include="..\..\playground\DurableOrderProcessing\Contracts.cs" Link="OrderProcessing\Contracts.cs" />
     <Compile Include="..\..\playground\DurableOrderProcessing\Grains\CatalogItemGrain.cs" Link="OrderProcessing\CatalogItemGrain.cs" />
