@@ -1,3 +1,4 @@
+using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -8,6 +9,8 @@ namespace Orleans.Reminders.DynamoDB;
 
 internal sealed class DynamoDBReminderMigrationTestHooks
 {
+    public Action<DynamoDBStorage>? ConfigureStorage { get; init; }
+
     public Func<Task>? AfterLegacyPageRead { get; init; }
 
     public Func<Task>? BeforeVerification { get; init; }
@@ -47,6 +50,11 @@ internal sealed partial class DynamoDBReminderTable
             throw new ArgumentException("The legacy reminder table name must not be empty.", nameof(options.TableName));
         }
 
+        if (options.TableMode == DynamoDBReminderTableMode.Legacy)
+        {
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(v2TableName) || v2TableName.Length > 255)
         {
             throw new ArgumentException("The V2 reminder table name must contain between 1 and 255 characters.", nameof(options.V2TableName));
@@ -66,20 +74,57 @@ internal sealed partial class DynamoDBReminderTable
         }
 
         var state = await ReadMigrationState();
+        if (state is null
+            && (options.TableMode is DynamoDBReminderTableMode.V2 or DynamoDBReminderTableMode.V2Only
+                || useV2Reads || useV2OnlyWrites))
+        {
+            throw new InvalidOperationException(
+                $"DynamoDB reminder migration state for service '{serviceId}' is missing from '{v2TableName}'. "
+                + "Restore the migration metadata before serving reminders.");
+        }
+
+        if ((options.TableMode == DynamoDBReminderTableMode.V2Only || useV2OnlyWrites)
+            && state?.Status != MigrationStatus.Retired)
+        {
+            throw new InvalidOperationException(
+                $"DynamoDB reminder service '{serviceId}' requires Retired migration state for V2-only operation.");
+        }
+
+        if ((options.TableMode == DynamoDBReminderTableMode.V2 || useV2Reads)
+            && state?.Status is not (MigrationStatus.Cutover or MigrationStatus.Retired or MigrationStatus.RolledBack))
+        {
+            throw new InvalidOperationException(
+                $"DynamoDB reminder service '{serviceId}' requires a completed schema transition before serving reminders.");
+        }
+
         useV2Reads = state?.Status is MigrationStatus.Cutover or MigrationStatus.Retired;
         useV2OnlyWrites = state?.Status == MigrationStatus.Retired;
     }
 
-    private async Task ValidateLegacyModeMigrationState()
+    private async Task ValidateLegacyModeMigrationState(CancellationToken cancellationToken)
     {
+        // A derived name beyond DynamoDB's limit cannot identify an existing migration table.
+        if (options.V2TableName is null && v2TableName.Length > 255)
+        {
+            return;
+        }
+
         MigrationState? state;
         try
         {
-            state = await ReadMigrationState();
+            state = await ReadMigrationState(cancellationToken);
         }
         catch (ResourceNotFoundException)
         {
             return;
+        }
+        catch (AmazonDynamoDBException exception) when (exception.ErrorCode == "AccessDeniedException")
+        {
+            throw new OrleansConfigurationException(
+                $"DynamoDB Legacy reminder startup requires dynamodb:GetItem permission on '{v2TableName}' "
+                + $"to check migration state for service '{serviceId}'. Grant that permission before upgrading "
+                + "and retain it while Legacy mode is available.",
+                exception);
         }
 
         if (state?.Status is MigrationStatus.Cutover or MigrationStatus.Retired)
@@ -92,7 +137,7 @@ internal sealed partial class DynamoDBReminderTable
 
     private async Task InitializeMigration(CancellationToken cancellationToken)
     {
-        var state = await ReadMigrationState();
+        var state = await ReadMigrationState(cancellationToken);
         if (state?.Status == MigrationStatus.Retired)
         {
             if (options.TableMode == DynamoDBReminderTableMode.Rollback)
@@ -132,7 +177,7 @@ internal sealed partial class DynamoDBReminderTable
             return;
         }
 
-        state = await ReadMigrationState();
+        state = await ReadMigrationState(cancellationToken);
         if (state?.Status == MigrationStatus.Retired)
         {
             throw new InvalidOperationException("The DynamoDB reminder V1 schema was retired while waiting for the migration lease.");
@@ -202,7 +247,7 @@ internal sealed partial class DynamoDBReminderTable
         StartLeaseRenewal();
         try
         {
-            var state = await ReadMigrationState();
+            var state = await ReadMigrationState(cancellationToken);
             if (state?.Status == MigrationStatus.Retired)
             {
                 useV2Reads = true;
@@ -238,7 +283,7 @@ internal sealed partial class DynamoDBReminderTable
 
     private async Task BackfillAndVerify(CancellationToken cancellationToken)
     {
-        var state = await ReadMigrationState() ?? new(MigrationStatus.Backfilling);
+        var state = await ReadMigrationState(cancellationToken) ?? new(MigrationStatus.Backfilling);
         state.Status = MigrationStatus.Backfilling;
         await WriteMigrationState(state);
         LogMigrationState(logger, serviceId, state.Status.ToString());
@@ -641,9 +686,9 @@ internal sealed partial class DynamoDBReminderTable
         }
     }
 
-    private async Task StartCompatibilityHeartbeat()
+    private async Task StartCompatibilityHeartbeat(CancellationToken cancellationToken)
     {
-        await WriteCompatibilityMarker();
+        await WriteCompatibilityMarker(cancellationToken);
         heartbeatCancellation = new();
         heartbeatTask = RunCompatibilityHeartbeat(heartbeatCancellation.Token);
     }
@@ -655,7 +700,7 @@ internal sealed partial class DynamoDBReminderTable
             using var timer = new PeriodicTimer(CompatibilityHeartbeatPeriod, timeProvider);
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                await WriteCompatibilityMarker();
+                await WriteCompatibilityMarker(cancellationToken);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -663,7 +708,7 @@ internal sealed partial class DynamoDBReminderTable
         }
     }
 
-    private Task WriteCompatibilityMarker()
+    private Task WriteCompatibilityMarker(CancellationToken cancellationToken)
     {
         var item = MetadataItem($"{NodeSortKeyPrefix}{Encode(migrationOwner)}");
         item[OwnerAttribute] = new(migrationOwner);
@@ -671,7 +716,7 @@ internal sealed partial class DynamoDBReminderTable
         {
             N = timeProvider.GetUtcNow().Add(CompatibilityMarkerLifetime).ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture),
         };
-        return storage.PutEntryAsync(v2TableName, item);
+        return storage.PutEntryAsync(v2TableName, item, cancellationToken);
     }
 
     private async Task<MembershipVersion> EnsureCompatibleCluster(CancellationToken cancellationToken)
@@ -692,7 +737,8 @@ internal sealed partial class DynamoDBReminderTable
                 [":prefix"] = new(NodeSortKeyPrefix),
             },
             $"{V2PartitionKeyName} = :partition AND begins_with({V2SortKeyName}, :prefix)",
-            static item => item);
+            static item => item,
+            cancellationToken);
         var now = timeProvider.GetUtcNow().ToUnixTimeMilliseconds();
         var compatible = markers
             .Where(item => long.Parse(item[ExpiresAtAttribute].N, CultureInfo.InvariantCulture) >= now)
@@ -713,8 +759,8 @@ internal sealed partial class DynamoDBReminderTable
         return snapshot.Version;
     }
 
-    private async Task<MigrationState?> ReadMigrationState()
-        => await storage.ReadSingleEntryAsync(v2TableName, MetadataKey(MigrationStateSortKey), MigrationState.FromItem);
+    private async Task<MigrationState?> ReadMigrationState(CancellationToken cancellationToken = default)
+        => await storage.ReadSingleEntryAsync(v2TableName, MetadataKey(MigrationStateSortKey), MigrationState.FromItem, cancellationToken);
 
     private async Task WriteMigrationState(MigrationState state)
     {

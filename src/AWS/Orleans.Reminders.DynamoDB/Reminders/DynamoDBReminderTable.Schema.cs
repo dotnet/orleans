@@ -256,6 +256,14 @@ internal sealed partial class DynamoDBReminderTable
                     {
                         TableName = v2TableName,
                         Key = GetV2Key(grainId, reminderName),
+                        ConditionExpression = $"attribute_not_exists({V2PartitionKeyName}) OR ({SERVICE_ID_PROPERTY_NAME} = :service AND {GRAIN_REFERENCE_PROPERTY_NAME} = :grain AND {REMINDER_NAME_PROPERTY_NAME} = :reminder AND {ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS})",
+                        ExpressionAttributeValues = new()
+                        {
+                            [":service"] = new(serviceId),
+                            [":grain"] = new(grainId.ToString()),
+                            [":reminder"] = new(reminderName),
+                            [CURRENT_ETAG_ALIAS] = new() { N = etag },
+                        },
                     },
                 },
             ]);
@@ -299,9 +307,12 @@ internal sealed partial class DynamoDBReminderTable
                     {
                         TableName = v2TableName,
                         Key = GetV2Key(grainId, reminderName),
-                        ConditionExpression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}",
+                        ConditionExpression = $"{SERVICE_ID_PROPERTY_NAME} = :service AND {GRAIN_REFERENCE_PROPERTY_NAME} = :grain AND {REMINDER_NAME_PROPERTY_NAME} = :reminder AND {ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}",
                         ExpressionAttributeValues = new()
                         {
+                            [":service"] = new(serviceId),
+                            [":grain"] = new(grainId.ToString()),
+                            [":reminder"] = new(reminderName),
                             [CURRENT_ETAG_ALIAS] = new() { N = etag },
                         },
                     },

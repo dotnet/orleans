@@ -931,6 +931,7 @@ namespace Orleans.Runtime.ReminderService
                 var owner = _ringProvider.GetPrimaryTargetSilo(grainId.GetUniformHashCode());
                 if (owner is null)
                 {
+                    LogWarningOwnerNotificationIncomplete(grainId, reminderName);
                     return;
                 }
 
@@ -953,6 +954,7 @@ namespace Orleans.Runtime.ReminderService
                 owner = _ringProvider.GetPrimaryTargetSilo(grainId.GetUniformHashCode());
                 if (owner is null)
                 {
+                    LogWarningOwnerNotificationIncomplete(grainId, reminderName);
                     return;
                 }
 

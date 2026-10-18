@@ -6,6 +6,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -105,15 +106,16 @@ namespace Orleans.Reminders.DynamoDB
                 this.options.UseProvisionedThroughput,
                 this.options.CreateIfNotExists,
                 this.options.UpdateIfExists);
+            testHooks?.ConfigureStorage?.Invoke(storage);
 
             LogInformationInitializingDynamoDBRemindersTable(logger);
 
             if (options.TableMode != DynamoDBReminderTableMode.Legacy)
             {
                 await InitializeV2Table(cancellationToken);
-                if ((await ReadMigrationState())?.Status == MigrationStatus.Retired)
+                if ((await ReadMigrationState(cancellationToken))?.Status == MigrationStatus.Retired)
                 {
-                    await StartCompatibilityHeartbeat();
+                    await StartCompatibilityHeartbeat(cancellationToken);
                     try
                     {
                         await InitializeMigration(cancellationToken);
@@ -167,11 +169,11 @@ namespace Orleans.Reminders.DynamoDB
 
             if (options.TableMode == DynamoDBReminderTableMode.Legacy)
             {
-                await ValidateLegacyModeMigrationState();
+                await ValidateLegacyModeMigrationState(cancellationToken);
                 return;
             }
 
-            await StartCompatibilityHeartbeat();
+            await StartCompatibilityHeartbeat(cancellationToken);
 
             try
             {
@@ -322,7 +324,9 @@ namespace Orleans.Reminders.DynamoDB
                 GrainId = GrainId.Parse(item[GRAIN_REFERENCE_PROPERTY_NAME].S),
                 Period = TimeSpan.Parse(item[PERIOD_PROPERTY_NAME].S),
                 ReminderName = item[REMINDER_NAME_PROPERTY_NAME].S,
-                StartAt = DateTime.Parse(item[START_TIME_PROPERTY_NAME].S)
+                StartAt = DateTime.TryParseExact(item[START_TIME_PROPERTY_NAME].S, "O", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var startAt)
+                    ? startAt
+                    : DateTime.Parse(item[START_TIME_PROPERTY_NAME].S, CultureInfo.CurrentCulture)
             };
         }
 

@@ -357,6 +357,73 @@ public sealed class DynamoDBReminderMigrationTests
         }
     }
 
+    [Theory]
+    [InlineData("ServiceId")]
+    [InlineData("GrainReference")]
+    [InlineData("ReminderName")]
+    [InlineData("ETag")]
+    [InlineData(null)]
+    public async Task DualDeleteValidatesExistingV2IdentityAndEtagAndAcceptsMissingRows(string? changedAttribute)
+    {
+        EnsureDynamoDb();
+        var tableName = NewTableName();
+        const string serviceId = "delete-identity";
+        using var client = CreateClient();
+        var table = CreateTable(tableName, serviceId, DynamoDBReminderTableMode.Migrate);
+        try
+        {
+            await table.StartAsync(TestContext.Current.CancellationToken);
+            var entry = Entry(1);
+            var etag = await table.UpsertRow(entry);
+            var key = V2Key(serviceId, entry);
+            if (changedAttribute is null)
+            {
+                await client.DeleteItemAsync(
+                    new() { TableName = $"{tableName}-v2", Key = key },
+                    TestContext.Current.CancellationToken);
+            }
+            else
+            {
+                await client.UpdateItemAsync(
+                    new()
+                    {
+                        TableName = $"{tableName}-v2",
+                        Key = key,
+                        UpdateExpression = "SET #attribute = :value",
+                        ExpressionAttributeNames = new() { ["#attribute"] = changedAttribute },
+                        ExpressionAttributeValues = new()
+                        {
+                            [":value"] = changedAttribute == "ETag"
+                                ? new() { N = (long.Parse(etag!, CultureInfo.InvariantCulture) - 1).ToString(CultureInfo.InvariantCulture) }
+                                : new("different-identity"),
+                        },
+                    },
+                    TestContext.Current.CancellationToken);
+            }
+
+            var removed = await table.RemoveRow(entry.GrainId, entry.ReminderName, etag!);
+            var source = await client.GetItemAsync(
+                new()
+                {
+                    TableName = tableName,
+                    Key = new()
+                    {
+                        ["ReminderId"] = new($"{serviceId}_{entry.GrainId}_{entry.ReminderName}"),
+                        ["GrainHash"] = new() { N = entry.GrainId.GetUniformHashCode().ToString(CultureInfo.InvariantCulture) },
+                    },
+                    ConsistentRead = true,
+                },
+                TestContext.Current.CancellationToken);
+            Assert.Equal(changedAttribute is null, removed);
+            Assert.Equal(changedAttribute is not null, source.IsItemSet);
+            Assert.Equal(changedAttribute is null ? 0 : 1, (await ReadV2Items(client, tableName, serviceId)).Count);
+        }
+        finally
+        {
+            await StopAndDelete(client, tableName, table);
+        }
+    }
+
     [Fact]
     public async Task Migration_VerificationFailureIsPersistedAndPreventsCutover()
     {
