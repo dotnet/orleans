@@ -356,6 +356,8 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private readonly GrainInterfaceType _migratingRequestsInterfaceType;
     private readonly Serializer _serializer;
     private readonly int _maxMessageBodySize;
+    private readonly int _maxEnqueuedRequestsHardLimit;
+    private readonly ActivationDirectory _activations;
 #if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
@@ -382,6 +384,8 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         _migratingRequestsInterfaceType = interfaceTypeResolver.GetGrainInterfaceType(typeof(IMigratingRequestsSystemTarget));
         _serializer = serializer;
         _maxMessageBodySize = messagingOptions.Value.MaxMessageBodySize;
+        _maxEnqueuedRequestsHardLimit = messagingOptions.Value.MaxEnqueuedRequestsHardLimit;
+        _activations = shared.ActivationDirectory;
         _grainFactory = grainFactory;
         _logger = loggerFactory.CreateLogger<ActivationMigrationManager>();
         _catalog = catalog;
@@ -426,7 +430,10 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         {
             cancellationToken.ThrowIfCancellationRequested();
             var package = migratingGrains[i];
-            var requests = package.Requests is { Length: > 0 } migratedRequests ? ToMessages(package.GrainId, migratedRequests) : null;
+            // A grain which is already active here cannot take the requests, so they are not decoded.
+            var requests = package.Requests is { Length: > 0 } migratedRequests && _activations.FindTarget(package.GrainId) is null
+                ? ToMessages(package.GrainId, migratedRequests)
+                : null;
 
             // The new activation reads its previous address when it rehydrates, which happens after it queues the requests, so it is read here.
             GrainAddress? previousAddress = null;
@@ -468,6 +475,13 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         try
         {
             requests = _serializer.Deserialize<List<MigratedRequest>>(serializedRequests)!;
+
+            // A new activation would decline requests beyond its hard limit, so they are not decoded.
+            if (_maxEnqueuedRequestsHardLimit > 0 && requests.Count - 1 > _maxEnqueuedRequestsHardLimit)
+            {
+                LogDebugMigratedRequestsOverLimit(requests.Count, grainId);
+                return null;
+            }
 
             // Placement does not consider request versions, so this silo may run an earlier version of the grain than a request targets.
             // Decoding such a request could drop fields, which forwarding it to a compatible silo would then lose, so the requests stay with the source.
@@ -1127,6 +1141,12 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         Message = "{Count} queued requests for migrating grain {GrainId} cannot be serialized together, so they are forwarded instead of migrating with it."
     )]
     private partial void LogDebugMigratedRequestsNotSerializable(Exception exception, int count, GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Declined {Count} migrated requests for grain {GrainId} because they exceed the activation's request limit. The source forwards them instead."
+    )]
+    private partial void LogDebugMigratedRequestsOverLimit(int count, GrainId grainId);
 
     [LoggerMessage(
         Level = LogLevel.Warning,

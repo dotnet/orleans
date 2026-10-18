@@ -283,6 +283,112 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
+    public async Task RequestMigratedTwice_UpdatesTheCallersCacheToItsLatestActivation()
+    {
+        await using var cluster = await DeployAsync();
+        var caller = cluster.Silos[0];
+        var first = cluster.Silos[1];
+        var second = cluster.Silos[2];
+        var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
+        var locator = caller.ServiceProvider.GetRequiredService<Orleans.Runtime.GrainDirectory.GrainLocator>();
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+        await PlaceOnAsync(first, () => grain.GetLocation());
+
+        // Two requests queue behind a running request on the first activation.
+        var running = grain.Block().AsTask();
+        await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
+        var hold = grain.HoldThenGetLocation().AsTask();
+        await WaitUntilAsync(() => GetWaitingCount(first, grain.GetGrainId()) == 1);
+        var queued = grain.Record("queued").AsTask();
+        await WaitUntilAsync(() => GetWaitingCount(first, grain.GetGrainId()) == 2);
+
+        // Both migrate to the second silo, where the first runs while the other waits.
+        await grain.MigrateOnIdleTo(second.SiloAddress);
+        state.ReleaseBlock.TrySetResult();
+        await running.WaitAsync(Timeout, Cancellation);
+        Assert.Equal(second.SiloAddress, await state.HoldEntered.Task.WaitAsync(Timeout, Cancellation));
+        await WaitUntilAsync(() => GetWaitingCount(second, grain.GetGrainId()) == 1);
+
+        // The waiting request migrates again, back to the first silo, where the third activation is held while activating,
+        // so that its response follows the response from the second activation.
+        state.HoldActivationOn = first.SiloAddress;
+        await grain.MigrateOnIdleTo(first.SiloAddress);
+        state.ReleaseHold.TrySetResult();
+        Assert.Equal(second.SiloAddress, await hold.WaitAsync(Timeout, Cancellation));
+        Assert.True(locator.TryLookupInCache(grain.GetGrainId(), out var cached));
+        Assert.Equal(second.SiloAddress, cached.SiloAddress);
+
+        try
+        {
+            await state.ActivationHeld.Task.WaitAsync(Timeout, Cancellation);
+        }
+        finally
+        {
+            state.ReleaseActivation.TrySetResult();
+        }
+
+        // The request's cache update is composed across both migrations, so its response replaces the caller's cached address with the latest activation's.
+        await queued.WaitAsync(Timeout, Cancellation);
+        Assert.True(locator.TryLookupInCache(grain.GetGrainId(), out cached));
+        Assert.Equal(first.SiloAddress, cached.SiloAddress);
+    }
+
+    [Fact]
+    public async Task MigrationWhoseAcknowledgementIsLost_RunsItsRequestsOnceWithoutRetargetingOrForwardingThem()
+    {
+        // The target accepts the migration and its requests, but the source does not receive the acknowledgement.
+        var retargets = 0;
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
+        {
+            switch (context.Request.GetMethodName())
+            {
+                case nameof(IMigratingRequestsSystemTarget.AcceptMigratingGrainsWithRequests):
+                    await context.Invoke();
+                    throw new InvalidOperationException("The acknowledgement is lost.");
+                case nameof(IMigratingRequestsSystemTarget.RetargetMigratedRequests):
+                    Interlocked.Increment(ref retargets);
+                    break;
+            }
+
+            await context.Invoke();
+        })));
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+        await PlaceOnAsync(source, () => grain.GetLocation());
+        var activation = Assert.IsType<ActivationData>(FindActivation(source, grain.GetGrainId()));
+
+        var running = grain.Block().AsTask();
+        await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
+        var queued = grain.HoldThenGetLocation().AsTask();
+        await WaitUntilAsync(() => GetWaitingCount(source, grain.GetGrainId()) == 1);
+
+        await grain.MigrateOnIdleTo(target.SiloAddress);
+        state.ReleaseBlock.TrySetResult();
+        await running.WaitAsync(Timeout, Cancellation);
+
+        // The target may own the requests, so the source neither keeps nor forwards them, and finishes deactivating.
+        await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+        Assert.Equal(0, activation.GetRequestCount());
+
+        // The request runs once, on the target, and its caller, which was not retargeted, receives the response.
+        Assert.Equal(target.SiloAddress, await state.HoldEntered.Task.WaitAsync(Timeout, Cancellation));
+        state.ReleaseHold.TrySetResult();
+        Assert.Equal(target.SiloAddress, await queued.WaitAsync(Timeout, Cancellation));
+
+        // A request which the source forwarded would travel to the target ahead of a later call from the source, and would run first.
+        var fromSource = source.ServiceProvider.GetRequiredService<IGrainFactory>().GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+        Assert.Equal(target.SiloAddress, await fromSource.GetLocation().AsTask().WaitAsync(Timeout, Cancellation));
+        Assert.Equal(1, state.HoldCount);
+        Assert.Equal(0, Volatile.Read(ref retargets));
+    }
+
+    [Fact]
     public async Task MigratedRequests_AreDeclinedWhenTheGrainIsAlreadyActive()
     {
         await using var cluster = await DeployAsync();
