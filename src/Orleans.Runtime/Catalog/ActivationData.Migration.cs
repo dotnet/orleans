@@ -153,6 +153,7 @@ internal sealed partial class ActivationData
     /// </returns>
     /// <remarks>
     /// The catalog calls this before the activation begins activating, so no request runs before these.
+    /// Callers of accepted one-way requests receive a cache-invalidation-only response with this activation's address.
     /// </remarks>
     internal bool TryEnqueueMigratedRequests(List<Message> messages, GrainAddress? previousAddress)
     {
@@ -185,7 +186,24 @@ internal sealed partial class ActivationData
             }
 
             _waitingRequests.InsertRange(0, migrated);
-            return true;
         }
+
+        if (previousAddress is not null)
+        {
+            var messageCenter = _shared.InternalRuntime.RuntimeClient.MessageCenter;
+            foreach (var message in messages)
+            {
+                if (message.Direction is Message.Directions.OneWay)
+                {
+                    messageCenter.SendRejectionResponse(
+                        message,
+                        Message.RejectionTypes.CacheInvalidation,
+                        "One-way request migrated to a new activation",
+                        exception: null);
+                }
+            }
+        }
+
+        return true;
     }
 }

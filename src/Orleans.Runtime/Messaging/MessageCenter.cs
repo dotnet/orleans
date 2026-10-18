@@ -291,7 +291,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private void SendRejectionResponse(Message message, Message.RejectionTypes rejectionType, string reason, Exception? exception)
+        internal void SendRejectionResponse(Message message, Message.RejectionTypes rejectionType, string reason, Exception? exception)
         {
             var rejection = messageFactory.CreateRejectionResponse(message, rejectionType, reason, exception);
             SendMessage(rejection);

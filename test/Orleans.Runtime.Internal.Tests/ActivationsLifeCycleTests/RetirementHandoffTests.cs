@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Placement;
+using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
@@ -993,40 +994,90 @@ public sealed class RetirementHandoffTests
         }
     }
 
-    [Fact]
-    public async Task QueuedOneWayRequest_MigratesWithoutRetargetingItsCaller()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task QueuedOneWayRequest_MigratesWithoutRetargetingItsCaller(bool retireSource)
     {
         var retargets = 0;
-        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
         {
-            if (context.Request.GetMethodName() == nameof(IMigratingRequestsSystemTarget.RetargetMigratedRequests))
+            silo.Services.AddSingleton<OneWayCacheUpdateObserver>();
+            silo.Services.AddSingleton<IMessageStatisticsSink>(services => services.GetRequiredService<OneWayCacheUpdateObserver>());
+            silo.AddIncomingGrainCallFilter(async context =>
             {
-                Interlocked.Increment(ref retargets);
-            }
+                if (context.Request.GetMethodName() == nameof(IMigratingRequestsSystemTarget.RetargetMigratedRequests))
+                {
+                    Interlocked.Increment(ref retargets);
+                }
 
-            await context.Invoke();
-        })));
-        var retiring = cluster.Silos[1];
-        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+                await context.Invoke();
+            });
+        }));
+        var caller = cluster.Silos[0];
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
+        var locator = caller.ServiceProvider.GetRequiredService<Orleans.Runtime.GrainDirectory.GrainLocator>();
+        var cacheUpdates = caller.ServiceProvider.GetRequiredService<OneWayCacheUpdateObserver>();
         var key = Guid.NewGuid();
         var state = RetirementHandoffState.Create(key);
         var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
-        await PlaceOnAsync(retiring, () => grain.GetLocation());
+        await PlaceOnAsync(source, () => grain.GetLocation());
+        Assert.True(locator.TryLookupInCache(grain.GetGrainId(), out var cached));
+        Assert.Equal(source.SiloAddress, cached.SiloAddress);
+        cacheUpdates.GrainId = grain.GetGrainId();
 
         var running = grain.Block().AsTask();
         await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
         await grain.RecordOneWay();
-        await WaitUntilAsync(() => GetWaitingCount(retiring, grain.GetGrainId()) == 1);
+        await WaitUntilAsync(() => GetWaitingCount(source, grain.GetGrainId()) == 1);
 
-        var stopping = cluster.StopSiloAsync(retiring, Cancellation);
-        await WaitUntilAsync(() => FindActivation(retiring, grain.GetGrainId()) is ActivationData { State: ActivationState.Deactivating });
+        var stopping = Task.CompletedTask;
+        if (retireSource)
+        {
+            stopping = cluster.StopSiloAsync(source, Cancellation);
+            await WaitUntilAsync(() => FindActivation(source, grain.GetGrainId()) is ActivationData { State: ActivationState.Deactivating });
+        }
+        else
+        {
+            await grain.MigrateOnIdleTo(target.SiloAddress);
+        }
+
         state.ReleaseBlock.TrySetResult();
         await running.WaitAsync(Timeout, Cancellation);
 
         // The one-way request runs on the new silo, and its caller has no pending call to retarget.
-        Assert.NotEqual(retiring.SiloAddress, await state.OneWayReceived.Task.WaitAsync(Timeout, Cancellation));
+        var destination = await state.OneWayReceived.Task.WaitAsync(Timeout, Cancellation);
+        Assert.NotEqual(source.SiloAddress, destination);
+        if (!retireSource)
+        {
+            // Keep the source alive so that only the migrated request's cache update corrects the caller's route.
+            await cacheUpdates.Received.Task.WaitAsync(Timeout, Cancellation);
+            Assert.Equal(target.SiloAddress, destination);
+            Assert.True(locator.TryLookupInCache(grain.GetGrainId(), out cached));
+            Assert.Equal(destination, cached.SiloAddress);
+        }
+
         await stopping.WaitAsync(Timeout, Cancellation);
         Assert.Equal(0, Volatile.Read(ref retargets));
+    }
+
+    private sealed class OneWayCacheUpdateObserver : IMessageStatisticsSink
+    {
+        public GrainId GrainId { get; set; }
+        public TaskCompletionSource Received { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Action<Message> GetMessageObserver() => message =>
+        {
+            if (message.Direction is Message.Directions.Response
+                && message.Result is Message.ResponseTypes.Rejection
+                && message.SendingGrain == GrainId
+                && message.HasCacheInvalidationHeader)
+            {
+                Received.TrySetResult();
+            }
+        };
     }
 
     [Fact]
