@@ -83,7 +83,7 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
     }
 
 
-    public bool CanHandle(IInboxHandlerContext context) => true;
+    public bool CanHandle(InboxMessage message) => true;
 
 
 

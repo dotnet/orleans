@@ -403,7 +403,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
 
     private sealed class Handler(SourceSinkProbe.Counters probe) : IInboxHandler
     {
-        public bool CanHandle(IInboxHandlerContext context) => context.Message.Envelope.Subject == Subject;
+        public bool CanHandle(InboxMessage message) => message.Envelope.Subject == Subject;
 
         public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
