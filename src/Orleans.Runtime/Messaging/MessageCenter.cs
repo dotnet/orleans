@@ -224,7 +224,11 @@ namespace Orleans.Runtime.Messaging
                     }
                     else if (this.siloStatusOracle.IsDeadSilo(targetSilo))
                     {
-                        // Do not try to establish
+                        if (TryRerouteMessageToDeadSilo(msg))
+                        {
+                            return;
+                        }
+
                         if (msg.Direction is Message.Directions.Request or Message.Directions.OneWay)
                         {
                             this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);

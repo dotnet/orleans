@@ -76,6 +76,35 @@ public class MessageCenterTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task SendMessage_TargetDiesBeforeConnectionAcquisition_ReaddressesUnsentMessage(bool oneWay)
+    {
+        await using var fixture = await RoutingFixture.CreateAsync();
+        fixture.MarkOldSiloDeadAfterFirstCheck();
+        using var message = fixture.CreateMessage(oneWay ? Message.Directions.OneWay : Message.Directions.Request);
+
+        fixture.Target.SendMessage(message);
+
+        Assert.Same(message, await fixture.ReplacementConnection.NextMessage());
+        Assert.Equal(fixture.ReplacementSilo, message.TargetSilo);
+        Assert.Equal(1, message.ForwardCount);
+        Assert.Equal(0, message.RetryCount);
+        Assert.Same(fixture.Body, message.BodyObject);
+        Assert.False(fixture.OldConnection.HasMessages);
+        Assert.False(fixture.Factory.HasAttempts);
+        fixture.Directory.Received(1).InvalidateCacheEntry(
+            Arg.Is<GrainAddress>(address => address.GrainId == message.TargetGrain && address.SiloAddress == fixture.OldSilo));
+        Assert.False(fixture.Completion.Task.IsCompleted);
+
+        if (!oneWay)
+        {
+            fixture.CompleteRequest(message);
+            Assert.Null((await fixture.Completion.Task.WaitAsync(TestContext.Current.CancellationToken)).Exception);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task SendMessage_TargetDiesDuringConnectionAcquisition_ReaddressesUnsentRequest(bool connectionSucceeds)
     {
         await using var fixture = await RoutingFixture.CreateAsync();
@@ -272,6 +301,8 @@ public class MessageCenterTests
 
         public void MarkOldSiloDead() => _oracle.IsDeadSilo(OldSilo).Returns(true);
 
+        public void MarkOldSiloDeadAfterFirstCheck() => _oracle.IsDeadSilo(OldSilo).Returns(false, true);
+
         public Message CreateMessage(Message.Directions direction)
         {
             var message = new Message
@@ -315,7 +346,11 @@ public class MessageCenterTests
             OldConnection.OnReadCompleted(new ConnectionClosedException());
             ReplacementConnection.OnReadCompleted(new ConnectionClosedException());
             await OldConnection.CloseAsync(null);
-            await Manager.Close(CancellationToken.None);
+            Manager.OnConnectionTerminated(OldSilo, OldConnection, exception: null);
+            await ReplacementConnection.CloseAsync(null);
+            Manager.OnConnectionTerminated(ReplacementSilo, ReplacementConnection, exception: null);
+            await Manager.Close(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(0, Manager.ConnectionCount);
             await Target.DisposeAsync();
             await _routingServices.DisposeAsync();
             await _cluster.DisposeAsync();
