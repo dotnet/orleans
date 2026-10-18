@@ -27,7 +27,7 @@ public class TaggedUnionSerializationTests : IDisposable
 
     public TaggedUnionSerializationTests()
     {
-        _services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        _services = new ServiceCollection().AddSingleton<PetCallbacks>().AddSingleton<NumberCallbacks>().AddSerializer().BuildServiceProvider();
         _serializer = _services.GetRequiredService<Serializer>();
         _copier = _services.GetRequiredService<DeepCopier>();
     }
@@ -344,6 +344,69 @@ public class TaggedUnionSerializationTests : IDisposable
         Assert.Equal(new object?[] { new Cat("A"), null, new Dog("B") }, result.Pets!.ConvertAll(static pet => pet.Value));
         Assert.Equal("after", result.Trailing);
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnionSerializationCallbacksSurroundCaseOperations(bool empty)
+    {
+        CallbackPet value = empty ? default(CallbackPet) : new Cat("hooks");
+        var callbacks = _services.GetRequiredService<PetCallbacks>();
+        var bytes = _serializer.SerializeToArray(value);
+
+        Assert.Equal(new[] { ("serializing", value.Value), ("serialized", value.Value) }, callbacks.Events);
+        callbacks.Events.Clear();
+
+        var result = _serializer.Deserialize<CallbackPet>(bytes);
+
+        Assert.Equal(value.Value, result.Value);
+        Assert.Equal(new[] { ("deserializing", (object?)null), ("deserialized", result.Value) }, callbacks.Events);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnionCopyCallbacksSurroundCaseOperations(bool empty)
+    {
+        CallbackPet value = empty ? default(CallbackPet) : new Cat("hooks");
+        var callbacks = _services.GetRequiredService<PetCallbacks>();
+
+        var result = Copy(value);
+
+        Assert.Equal(value.Value, result.Value);
+        Assert.Equal(new[] { ("copying", (object?)null), ("copied", result.Value) }, callbacks.Events);
+        if (!empty)
+        {
+            Assert.NotSame(value.Value, result.Value);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnionDeserializationCallbacksSurroundLegacyCaseValues(bool empty)
+    {
+        object? value = empty ? null : new Cat("legacy");
+        var bytes = _serializer.SerializeToArray(value);
+        var callbacks = _services.GetRequiredService<PetCallbacks>();
+
+        var result = _serializer.Deserialize<CallbackPet>(bytes);
+
+        Assert.Equal(value, result.Value);
+        Assert.Equal(new[] { ("deserializing", (object?)null), ("deserialized", result.Value) }, callbacks.Events);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnionWithShallowCasesRunsCopyCallbacks(bool empty)
+    {
+        CallbackNumber value = empty ? default(CallbackNumber) : 42;
+
+        var result = Copy(value);
+
+        Assert.Equal(43, result.Value);
+    }
 }
 
 [GenerateSerializer]
@@ -433,6 +496,29 @@ public sealed record Dog([property: Id(0)] string Name);
 
 [GenerateSerializer]
 public union Pet(Cat, Dog);
+
+[GenerateSerializer, SerializationCallbacks(typeof(PetCallbacks))]
+public union CallbackPet(Cat, Dog);
+
+public sealed class PetCallbacks
+{
+    public List<(string Event, object? Value)> Events { get; } = [];
+
+    public void OnSerializing(ref CallbackPet value) => Events.Add(("serializing", value.Value));
+    public void OnSerialized(CallbackPet value) => Events.Add(("serialized", value.Value));
+    public void OnDeserializing(ref CallbackPet value) => Events.Add(("deserializing", value.Value));
+    public void OnDeserialized(CallbackPet value) => Events.Add(("deserialized", value.Value));
+    public void OnCopying(CallbackPet original, ref CallbackPet result) => Events.Add(("copying", result.Value));
+    public void OnCopied(ref CallbackPet original, CallbackPet result) => Events.Add(("copied", result.Value));
+}
+
+[GenerateSerializer, SerializationCallbacks(typeof(NumberCallbacks))]
+public union CallbackNumber(int, string);
+
+public sealed class NumberCallbacks
+{
+    public void OnCopied(CallbackNumber original, ref CallbackNumber result) => result = 43;
+}
 
 [GenerateSerializer]
 public union PetV1(Cat);
