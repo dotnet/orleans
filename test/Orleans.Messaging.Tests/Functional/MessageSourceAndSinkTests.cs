@@ -58,11 +58,16 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         var payload = NewPayload();
         var message = NewInboxMessage("rejected", payload);
         var extension = receiver.AsReference<IMessagingExtension>();
+        await receiver.WriteAsync();
+        using var metrics = new MessageMetricListener(await OnGrainAsync(receiver, context => context.ActivationServices.GetRequiredService<OrleansInstruments>().Meter));
 
         var result = await extension.DeliverAsync(message, Token);
 
         Assert.Equal(DeliveryStatus.DeadLettered, result.Status);
         Assert.Equal(reason, result.Message);
+        var grainType = receiver.GetGrainId().Type.ToString();
+        Assert.Single(metrics.Read("inbox-messages-received")).AssertCounter(grainType, "dead_lettered");
+        Assert.Single(metrics.Read("inbox-messages-processed")).AssertCounter(grainType, "dead_lettered");
         var (state, count, letters) = await OnGrainAsync(receiver, context => (
             Grain(context).GetState(),
             Inbox(context).Count,
