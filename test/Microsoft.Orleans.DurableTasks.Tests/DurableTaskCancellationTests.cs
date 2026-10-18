@@ -2,6 +2,7 @@ using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Journaling;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -42,6 +43,88 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.NotNull(storage.Get(rootId).CancellationRequestedAt);
         Assert.Equal(DurableTaskStatus.Canceled, storage.Get(TaskId.Parse("root/work")).Result!.Status);
     });
+
+    [Fact]
+    public Task ChildWhichEndsCanceledInTheCancellationsWriteWakesTheBodyWithItsCancellationRequested() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        manager.ResumesWritersAsynchronously = true;
+        var rootId = TaskId.Parse("root");
+        var waitId = TaskId.Parse("root/wait");
+        DurableTaskContext? rootContext = null;
+        var request = CreateRequest(1, () => DurableTask.Run(async cancellationToken =>
+        {
+            rootContext = DurableTask.Current;
+            try
+            {
+                var wait = await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("wait").ScheduleAsync(cancellationToken);
+                await wait;
+                return "completed";
+            }
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
+            {
+                return $"compensated: {DurableTask.Current.TaskCancellationReason}";
+            }
+        }));
+
+        // The child's attempt waits for the write which records its delay.
+        var delayWriteStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseDelayWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.AfterWriteStarted = async () =>
+        {
+            if (storage.Contains(waitId) && storage.Get(waitId).DueTime is not null && delayWriteStarted.TrySetResult())
+            {
+                await releaseDelayWrite.Task;
+            }
+        };
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await delayWriteStarted.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+
+        // Code which awaits the child observes its outcome no earlier than this continuation does.
+        var observed = runtime.GetScheduledTaskHandle(waitId).WaitAsync(TestContext.Current.CancellationToken).AsTask().ContinueWith(
+            _ => rootContext!.IsTaskCancellationRequested,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        // The cancellation's write waits to capture until the child's attempt, which observes the staged request, ends
+        // canceled, so one write commits both the request and the child's result.
+        var gate = new PrepareGate();
+        manager.RegisterStateMachine("prepare-gate", gate);
+        var cancellation = ((IDurableTaskServer)runtime).CancelAsync(rootId, "buyer", TestContext.Current.CancellationToken).AsTask();
+        releaseDelayWrite.SetResult();
+        await WaitUntilAsync(() => storage.Get(waitId).Result is { Status: DurableTaskStatus.Canceled });
+        gate.Open();
+        await cancellation.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+
+        // The owner's attempt observes its task's cancellation before the outcome which that cancellation caused.
+        Assert.True(await observed.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken));
+        Assert.Equal("compensated: buyer", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
+    });
+
+    /// <summary>Holds the preparation of writes, before they capture staged changes, until it opens.</summary>
+    private sealed class PrepareGate : IStateMachine
+    {
+        private readonly TaskCompletionSource _open = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void Open() => _open.SetResult();
+
+        ValueTask IStateMachine.PrepareWriteAsync(CancellationToken cancellationToken) => new(_open.Task);
+
+        void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) => throw new NotSupportedException();
+
+        void IStateMachine.Reset(JournalStreamWriter writer)
+        {
+        }
+
+        void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
+        {
+        }
+
+        void IStateMachine.WriteSnapshot(JournalStreamWriter writer)
+        {
+        }
+    }
 
     [Fact]
     public Task CancellationWhichEscapesTheBodyCancelsTheTask() => ActivationScheduler.RunAsync(async () =>
