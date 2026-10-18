@@ -82,8 +82,17 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
         /// <summary>Code which isn't part of a durable task body.</summary>
         None,
 
-        /// <summary>A durable task body, which the replay rules analyze.</summary>
+        /// <summary>
+        /// A durable task body, which the replay rules analyze: an <c>async DurableTask</c> method, local function, or lambda,
+        /// or a delegate which <c>DurableTask.Run</c> receives.
+        /// </summary>
         Body,
+
+        /// <summary>
+        /// Code which awaits durable tasks directly or records effects, which the replay rules analyze as a body. It can run
+        /// in a durable task, or outside one, where <c>WithId</c> names a root task.
+        /// </summary>
+        Helper,
 
         /// <summary>A <c>DurableTask.RunInline</c> effect, which runs once.</summary>
         Effect,
@@ -99,7 +108,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             return FunctionKind.Body;
         }
 
-        return PerformsDirectDurableOperations(symbols, graph) ? FunctionKind.Body : FunctionKind.None;
+        return PerformsDirectDurableOperations(symbols, graph) ? FunctionKind.Helper : FunctionKind.None;
     }
 
     /// <summary>
@@ -268,8 +277,8 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
         {
             switch (kind)
             {
-                case FunctionKind.Body:
-                    new Region(this, graph).Analyze();
+                case FunctionKind.Body or FunctionKind.Helper:
+                    new Region(this, graph, kind).Analyze();
                     AnalyzeCancellationHandlers(graph.OriginalOperation);
                     break;
                 case FunctionKind.Effect:
@@ -277,10 +286,11 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                     break;
             }
 
+            var analyzed = kind is FunctionKind.Body or FunctionKind.Helper;
             foreach (var localFunction in graph.LocalFunctions)
             {
                 var localGraph = graph.GetLocalFunctionControlFlowGraph(localFunction, context.CancellationToken);
-                if (kind == FunctionKind.Body && localFunction.IsAsync && localFunction.ReturnsVoid)
+                if (analyzed && localFunction.IsAsync && localFunction.ReturnsVoid)
                 {
                     Report(DurableTaskDiagnostics.AsyncVoidInBody, localFunction.Locations[0], localFunction.Name);
                 }
@@ -292,7 +302,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             {
                 var functionGraph = graph.GetAnonymousFunctionControlFlowGraph(function, context.CancellationToken);
                 var functionKind = ClassifyAnonymousFunction(function, functionGraph, kind);
-                if (kind == FunctionKind.Body && function.Symbol.IsAsync && function.Symbol.ReturnsVoid)
+                if (analyzed && function.Symbol.IsAsync && function.Symbol.ReturnsVoid)
                 {
                     Report(DurableTaskDiagnostics.AsyncVoidInBody, function.Syntax.GetLocation(), "async lambda");
                 }
@@ -300,6 +310,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                 AnalyzeGraph(functionGraph, functionKind);
             }
         }
+
 
         private FunctionKind ClassifyAnonymousFunction(IFlowAnonymousFunctionOperation function, ControlFlowGraph graph, FunctionKind enclosing)
         {
@@ -321,12 +332,12 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                 return FunctionKind.Body;
             }
 
-            if (enclosing is FunctionKind.Body or FunctionKind.Inline)
+            if (enclosing is FunctionKind.Body or FunctionKind.Helper or FunctionKind.Inline)
             {
                 return FunctionKind.Inline;
             }
 
-            return PerformsDirectDurableOperations(symbols, graph) ? FunctionKind.Body : FunctionKind.None;
+            return PerformsDirectDurableOperations(symbols, graph) ? FunctionKind.Helper : FunctionKind.None;
         }
 
         /// <summary>Returns the invocation which receives a lambda as an argument, if any.</summary>
@@ -602,15 +613,17 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
         {
             private readonly BodyAnalysis _analysis;
             private readonly ControlFlowGraph _graph;
+            private readonly FunctionKind _kind;
             private readonly List<BasicBlock>[] _successors;
             private readonly bool[] _reachesDurable;
             private readonly bool[] _reachesExternal;
             private readonly List<(string Name, int Block, int Index, Location Location)> _names = [];
 
-            public Region(BodyAnalysis analysis, ControlFlowGraph graph)
+            public Region(BodyAnalysis analysis, ControlFlowGraph graph, FunctionKind kind)
             {
                 _analysis = analysis;
                 _graph = graph;
+                _kind = kind;
                 _successors = ComputeSuccessors(graph);
                 _reachesDurable = ComputeReach(ContainsDurableOperation);
                 _reachesExternal = ComputeReach(ContainsExternalAwait);
@@ -733,7 +746,11 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                     _analysis.Report(DurableTaskDiagnostics.RepeatedSignalWait, invocation.Syntax.GetLocation(), signal.Syntax.ToString());
                 }
 
-                if ((Symbols.IsRunInline(invocation) || DurableTaskSymbols.IsWithId(invocation)) && GetName(invocation) is { } name)
+                // A WithId name identifies a child only in a durable task body; elsewhere, such as in a client, it names a
+                // root task. A DurableTask.RunInline name identifies an effect only in a durable task, so a helper which
+                // records one runs in a body.
+                if ((Symbols.IsRunInline(invocation) || (_kind == FunctionKind.Body && DurableTaskSymbols.IsWithId(invocation)))
+                    && GetName(invocation) is { } name)
                 {
                     if (name.Value.IndexOf('$') >= 0)
                     {
