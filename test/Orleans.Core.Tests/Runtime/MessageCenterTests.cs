@@ -105,6 +105,35 @@ public class MessageCenterTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task SendMessage_TargetDiesAfterSynchronousConnectionAcquisition_ReaddressesUnsentMessage(bool oneWay)
+    {
+        await using var fixture = await RoutingFixture.CreateAsync();
+        fixture.PublishOldConnectionBeforeAcquisitionThenMarkSiloDead();
+        using var message = fixture.CreateMessage(oneWay ? Message.Directions.OneWay : Message.Directions.Request);
+
+        fixture.Target.SendMessage(message);
+
+        Assert.Same(message, await fixture.ReplacementConnection.NextMessage());
+        Assert.Equal(fixture.ReplacementSilo, message.TargetSilo);
+        Assert.Equal(1, message.ForwardCount);
+        Assert.Equal(0, message.RetryCount);
+        Assert.Same(fixture.Body, message.BodyObject);
+        Assert.False(fixture.OldConnection.HasMessages);
+        Assert.False(fixture.Factory.HasAttempts);
+        fixture.Directory.Received(1).InvalidateCacheEntry(
+            Arg.Is<GrainAddress>(address => address.GrainId == message.TargetGrain && address.SiloAddress == fixture.OldSilo));
+        Assert.False(fixture.Completion.Task.IsCompleted);
+
+        if (!oneWay)
+        {
+            fixture.CompleteRequest(message);
+            Assert.Null((await fixture.Completion.Task.WaitAsync(TestContext.Current.CancellationToken)).Exception);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task SendMessage_TargetDiesDuringConnectionAcquisition_ReaddressesUnsentRequest(bool connectionSucceeds)
     {
         await using var fixture = await RoutingFixture.CreateAsync();
@@ -303,6 +332,17 @@ public class MessageCenterTests
 
         public void MarkOldSiloDeadAfterFirstCheck() => _oracle.IsDeadSilo(OldSilo).Returns(false, true);
 
+        public void PublishOldConnectionBeforeAcquisitionThenMarkSiloDead() =>
+            _oracle.IsDeadSilo(OldSilo).Returns(
+                _ => false,
+                _ =>
+                {
+                    // Publish after TryGetConnection so GetConnection completes synchronously.
+                    Manager.OnConnected(OldSilo, OldConnection);
+                    return false;
+                },
+                _ => true);
+
         public Message CreateMessage(Message.Directions direction)
         {
             var message = new Message
@@ -324,7 +364,7 @@ public class MessageCenterTests
                 Assert.True(_callbacks.TryAdd(
                     (message.SendingGrain, message.Id),
                     new CallbackData(shared, new CompletionSource(Completion), message,
-                        _cluster.Silos[0].ServiceProvider.GetRequiredService<ApplicationRequestInstruments>())));
+                        new ApplicationRequestInstruments(_cluster.Silos[0].ServiceProvider.GetRequiredService<OrleansInstruments>()))));
             }
 
             return message;

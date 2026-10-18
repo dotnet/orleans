@@ -244,31 +244,23 @@ namespace Orleans.Runtime.Messaging
                     else
                     {
                         var connectionTask = this.connectionManager.GetConnection(targetSilo);
-                        if (connectionTask.IsCompletedSuccessfully)
-                        {
-                            var sender = connectionTask.Result;
-                            sender.Send(msg);
-                        }
-                        else
-                        {
-                            _ = SendAsync(this, connectionTask, msg);
+                        _ = SendAsync(this, connectionTask, msg);
 
-                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg)
+                        static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg)
+                        {
+                            try
                             {
-                                try
+                                var sender = await connectionTask;
+                                if (!messageCenter.TryRerouteMessageToDeadSilo(msg))
                                 {
-                                    var sender = await connectionTask;
-                                    if (!messageCenter.TryRerouteMessageToDeadSilo(msg))
-                                    {
-                                        sender.Send(msg);
-                                    }
+                                    sender.Send(msg);
                                 }
-                                catch (Exception exception)
+                            }
+                            catch (Exception exception)
+                            {
+                                if (!messageCenter.TryRerouteMessageToDeadSilo(msg))
                                 {
-                                    if (!messageCenter.TryRerouteMessageToDeadSilo(msg))
-                                    {
-                                        messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
-                                    }
+                                    messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
                                 }
                             }
                         }
