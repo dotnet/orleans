@@ -83,4 +83,15 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// concurrent writers and should not be used for correctness decisions.
     /// </remarks>
     long PendingWriteByteCount => -1;
+
+    /// <summary>
+    /// Gets the registered state machines with their stable names.
+    /// </summary>
+    /// <remarks>
+    /// Diagnostic tools use this snapshot to discover registered state, such as the built-in durable collections,
+    /// and watch the instances which support observation. The snapshot excludes placeholders for retired state.
+    /// Implementations which do not track registrations return an empty collection.
+    /// </remarks>
+    /// <returns>A snapshot of the registered state machines in no particular order.</returns>
+    IReadOnlyList<KeyValuePair<string, IStateMachine>> GetStateMachines() => [];
 }
