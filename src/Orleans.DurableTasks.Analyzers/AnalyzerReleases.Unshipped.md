@@ -10,7 +10,7 @@ ORLEANS0101 | Usage | Warning | DurableTaskReplayAnalyzer, non-deterministic val
 ORLEANS0102 | Usage | Warning | DurableTaskReplayAnalyzer, external await in code which a replay re-runs
 ORLEANS0103 | Usage | Warning | DurableTaskReplayAnalyzer, grain state changed before an external await
 ORLEANS0104 | Usage | Warning | DurableTaskReplayAnalyzer, DurableTask.RunInline effect assigns a captured variable
-ORLEANS0105 | Usage | Warning | DurableTaskDefinitionAnalyzer, durable task definition never awaited, scheduled, or posted
+ORLEANS0105 | Usage | Error | DurableTaskDefinitionAnalyzer, durable task definition never awaited, scheduled, or posted
 ORLEANS0106 | Usage | Warning | DurableTaskDefinitionAnalyzer, single-use durable task definition run more than once
 ORLEANS0107 | Usage | Error | DurableTaskReplayAnalyzer, durable operation name contains '$'
 ORLEANS0108 | Usage | Warning | DurableTaskReplayAnalyzer, durable operation name repeated at another call site
@@ -24,3 +24,8 @@ ORLEANS0115 | Usage | Info | DurableTaskReplayAnalyzer, log in code which a repl
 ORLEANS0116 | Usage | Warning | DurableTaskDefinitionAnalyzer, durable task posted outside grains and durable task bodies
 ORLEANS0117 | Usage | Warning | DurableTaskCleanupAnalyzer, task-cancellation cleanup passes the already-canceled CancellationToken
 ORLEANS0118 | Usage | Warning | DurableTaskVersionAnalyzer, version check with a non-constant name or range
+ORLEANS0119 | Usage | Info | DurableTaskDefinitionAnalyzer, handle of a scheduled child which nothing observes
+ORLEANS0120 | Usage | Info | DurableTaskIdentityAnalyzer, unnamed durable operation whose generated identifier can shift
+ORLEANS0121 | Usage | Warning | DurableTaskDelegateAnalyzer, DurableTask.Run step which runs synchronous work
+ORLEANS0122 | Usage | Error | DurableTaskDelegateAnalyzer, async void delegate passed to DurableTask.Run or DurableTask.RunInline
+ORLEANS0123 | Usage | Warning | DurableTaskStateMutationAnalyzer, grain state value changed in place
