@@ -20,6 +20,132 @@ public sealed class SerializerConstructionReviewTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void ClosedFactoriesResolveInterfaceDependenciesThroughConstructionServices(bool failFirst)
+    {
+        var calls = 0;
+        InterfaceDependencies? failed = null;
+        var failure = new InvalidOperationException("Injected closed dependency failure");
+        var registrations = new ServiceCollection().AddSerializer();
+        registrations.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddSerializer(typeof(ConstrainedValueSerializer<>));
+            options.AddSerializer(typeof(PendingBaseCodec<>));
+            options.AddCopier(typeof(ConstrainedBaseCopier<>));
+            options.AddActivator(typeof(ConstrainedActivator<>));
+            options.AddSerializerService<InterfaceDependencies>(provider =>
+            {
+                var result = new InterfaceDependencies(
+                    OrleansGeneratedCodeHelper.GetService<IFieldCodec<int>>(null!, provider),
+                    OrleansGeneratedCodeHelper.GetService<IDeepCopier<int>>(null!, provider),
+                    OrleansGeneratedCodeHelper.GetService<IBaseCodec<ReferenceModel<string>>>(null!, provider),
+                    OrleansGeneratedCodeHelper.GetService<IValueSerializer<ValueModel<string>>>(null!, provider),
+                    OrleansGeneratedCodeHelper.GetService<IBaseCopier<ReferenceModel<string>>>(null!, provider),
+                    OrleansGeneratedCodeHelper.GetService<IActivator<ReferenceModel<string>>>(null!, provider),
+                    OrleansGeneratedCodeHelper.GetService<IFieldCodecProvider>(null!, provider));
+                if (++calls == 1 && failFirst)
+                {
+                    failed = result;
+                    throw failure;
+                }
+
+                return result;
+            });
+        });
+        using var services = registrations.BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        if (failFirst)
+        {
+            Assert.Same(failure, Assert.Throws<InvalidOperationException>(() =>
+                OrleansGeneratedCodeHelper.GetService<InterfaceDependencies>(null!, provider)));
+        }
+
+        var dependencies = OrleansGeneratedCodeHelper.GetService<InterfaceDependencies>(null!, provider);
+        Assert.Same(dependencies, OrleansGeneratedCodeHelper.GetService<InterfaceDependencies>(null!, provider));
+        Assert.Same(provider.GetCodec<int>(), dependencies.Codec);
+        Assert.Same(provider.GetDeepCopier<int>(), dependencies.Copier);
+        Assert.Same(provider.GetBaseCodec<ReferenceModel<string>>(), dependencies.BaseCodec);
+        Assert.Same(provider.GetValueSerializer<ValueModel<string>>(), dependencies.ValueSerializer);
+        Assert.Same(provider.GetBaseCopier<ReferenceModel<string>>(), dependencies.BaseCopier);
+        Assert.Same(provider.GetActivator<ReferenceModel<string>>(), dependencies.Activator);
+        Assert.Same(provider, dependencies.Provider);
+        Assert.Equal(42, dependencies.Copier.DeepCopy(42, null!));
+        Assert.IsType<ReferenceModel<string>>(dependencies.Activator.Create());
+        Assert.Equal(failFirst ? 2 : 1, calls);
+        if (failFirst)
+        {
+            Assert.NotSame(failed!.BaseCodec, dependencies.BaseCodec);
+            Assert.NotSame(failed.ValueSerializer, dependencies.ValueSerializer);
+            Assert.NotSame(failed.BaseCopier, dependencies.BaseCopier);
+            Assert.NotSame(failed.Activator, dependencies.Activator);
+        }
+    }
+
+    private sealed record InterfaceDependencies(
+        IFieldCodec<int> Codec,
+        IDeepCopier<int> Copier,
+        IBaseCodec<ReferenceModel<string>> BaseCodec,
+        IValueSerializer<ValueModel<string>> ValueSerializer,
+        IBaseCopier<ReferenceModel<string>> BaseCopier,
+        IActivator<ReferenceModel<string>> Activator,
+        IFieldCodecProvider Provider);
+
+    public sealed class PendingBaseCodec<T> : IBaseCodec<ReferenceModel<T>>
+    {
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, ReferenceModel<T> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> => throw new NotSupportedException();
+
+        public void Deserialize<TInput>(ref Reader<TInput> reader, ReferenceModel<T> value) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public void ClosedFactoryHelperRejectsExternalDiWithoutPublishingDependencies()
+    {
+        var externalCalls = 0;
+        var calls = 0;
+        var leaves = 0;
+        Leaf? failedLeaf = null;
+        InvalidOperationException? caught = null;
+        var registrations = new ServiceCollection().AddSerializer();
+        registrations.AddTransient<ExternalDependency>(_ =>
+        {
+            externalCalls++;
+            return new();
+        });
+        registrations.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddSerializerService<Leaf>(_ => new Leaf(++leaves));
+            options.AddSerializerService<Root>(provider =>
+            {
+                var leaf = OrleansGeneratedCodeHelper.GetService<Leaf>(null!, provider);
+                if (++calls == 1)
+                {
+                    failedLeaf = leaf;
+                    caught = Assert.Throws<InvalidOperationException>(() =>
+                        OrleansGeneratedCodeHelper.GetService<ExternalDependency>(null!, provider));
+                }
+
+                return new Root(leaf);
+            });
+        });
+        using var services = registrations.BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var failure = Assert.Throws<InvalidOperationException>(() =>
+            OrleansGeneratedCodeHelper.GetService<Root>(null!, provider));
+        Assert.Same(caught, failure);
+        Assert.Contains("while a serialization graph is unpublished", failure.Message);
+        var root = OrleansGeneratedCodeHelper.GetService<Root>(null!, provider);
+        Assert.NotSame(failedLeaf, root.Leaf);
+        Assert.Equal(2, root.Leaf.Generation);
+        Assert.Equal(2, calls);
+        Assert.Equal(2, leaves);
+        Assert.Equal(0, externalCalls);
+        Assert.Same(root, OrleansGeneratedCodeHelper.GetService<Root>(null!, provider));
+        Assert.Same(root.Leaf, OrleansGeneratedCodeHelper.GetService<Leaf>(null!, provider));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void DiFirstRecursiveListServicesReuseCanonicalSingletons(bool copierFirst)
     {
         var node = new DiFirstNode { Value = 42 };

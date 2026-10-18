@@ -208,6 +208,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="input">The input.</param>
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
+        /// <remarks>The input must remain valid and its referenced bytes unchanged for the lifetime of the reader.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Reader<ArcBufferReaderInput> Create(ArcBuffer input, SerializerSession session) => new(new ArcBufferReaderInput(in input), session, 0);
 
@@ -614,7 +615,7 @@ namespace Orleans.Serialization.Buffers
             else if (IsArcBufferInput)
             {
                 ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
-                var newInput = input.ForkFrom(checked((int)position));
+                var newInput = input.ForkFrom(checked((int)(position - _sequenceOffset)));
                 forked = new Reader<TInput>(Unsafe.As<ArcBufferReaderInput, TInput>(ref newInput), Session, position);
 
                 if (forked.Position != position)

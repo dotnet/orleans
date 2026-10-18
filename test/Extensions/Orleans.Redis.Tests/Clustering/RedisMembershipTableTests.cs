@@ -380,17 +380,17 @@ namespace Tester.Redis.Clustering
             var cleanupDatabase = Substitute.For<IDatabase>();
             var cleanupConnection = Substitute.For<IConnectionMultiplexer>();
             cleanupConnection.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(cleanupDatabase);
-            cleanupDatabase.HashGetAllAsync(key).Returns(async _ =>
+            cleanupDatabase.HashGetAllAsync(key, CommandFlags.DemandMaster).Returns(async call =>
             {
-                var snapshot = await database.HashGetAllAsync(key);
+                var snapshot = await database.HashGetAllAsync(key, call.ArgAt<CommandFlags>(1));
                 var owner = refreshCandidate ? entries[0] : entries[2];
                 owner.IAmAliveTime = cutoff;
                 await table.UpdateIAmAliveAsync(owner, token);
                 return snapshot;
             });
-            cleanupDatabase.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>(), CommandFlags.NoScriptCache)
+            cleanupDatabase.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>(), CommandFlags.DemandMaster | CommandFlags.NoScriptCache)
                 .Returns(call => database.ScriptEvaluateAsync(
-                    call.ArgAt<string>(0), call.ArgAt<RedisKey[]>(1), call.ArgAt<RedisValue[]>(2), CommandFlags.NoScriptCache));
+                    call.ArgAt<string>(0), call.ArgAt<RedisKey[]>(1), call.ArgAt<RedisValue[]>(2), call.ArgAt<CommandFlags>(3)));
             using var cleanupTable = new RedisMembershipTable(
                 Options.Create(new RedisClusteringOptions { CreateMultiplexer = _ => Task.FromResult((cleanupConnection, true)) }),
                 _clusterOptions);

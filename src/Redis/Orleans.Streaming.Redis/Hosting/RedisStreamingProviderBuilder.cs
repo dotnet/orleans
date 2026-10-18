@@ -50,7 +50,7 @@ internal sealed class RedisStreamingProviderBuilder : IProviderBuilder<ISiloBuil
                     }
                 });
 
-            if (int.TryParse(configurationSection["PartitionCount"], out var partitionCount))
+            if (configurationSection.GetValue<int?>("PartitionCount") is { } partitionCount)
             {
                 streamsBuilder.ConfigurePartitioning(partitionCount);
             }
@@ -91,7 +91,7 @@ internal sealed class RedisStreamingProviderBuilder : IProviderBuilder<ISiloBuil
                 }
             });
 
-            if (int.TryParse(configurationSection["PartitionCount"], out var partitionCount))
+            if (configurationSection.GetValue<int?>("PartitionCount") is { } partitionCount)
             {
                 streamsBuilder.ConfigurePartitioning(partitionCount);
             }

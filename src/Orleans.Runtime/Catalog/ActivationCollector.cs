@@ -824,33 +824,63 @@ namespace Orleans.Runtime
             LogDeactivateActivationsFromCollector(list.Count);
             _catalogInstruments.ActivationShutdownViaCollection();
 
-            var options = new ParallelOptions
+            // Snapshot tasks and diagnostic identities so completed activation contexts can be reclaimed independently.
+            var completions = new Task[list.Count];
+            var collectedActivations = ActivationCollectionEvents.IsCollectionCompletedEnabled
+                ? new ActivationCollectionEvents.CollectedActivation[list.Count]
+                : null;
+            for (var i = 0; i < list.Count; i++)
             {
-                // Continue observing completion when the caller cancels its WaitAsync below.
-                CancellationToken = CancellationToken.None,
-                MaxDegreeOfParallelism = Environment.ProcessorCount * 512
-            };
+                var activation = list[i];
+                completions[i] = activation.Deactivated;
+                if (collectedActivations is not null)
+                {
+                    collectedActivations[i] = new(activation.GrainId, activation.ActivationId);
+                }
+            }
 
-            var deactivationTask = Parallel.ForEachAsync(list, options, async (activationData, token) =>
-            {
-                await activationData.Deactivated.ConfigureAwait(false);
-            });
+            var deactivationTask = ObserveDeactivationCompletion(completions, collectedActivations, collectionSource, ageLimit, deactivationReason);
 
             try
             {
-                await deactivationTask.WaitAsync(cancellationToken);
+                // User callbacks retain their activation until completion. Bound only this batch's wait so later collection passes can proceed.
+                await deactivationTask.WaitAsync(_grainCollectionOptions.DeactivationTimeout, _timeProvider, cancellationToken);
+            }
+            catch (TimeoutException)
+            {
+                LogCollectionWaitTimedOut(list.Count, _grainCollectionOptions.DeactivationTimeout);
+                ObserveFailure();
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                _ = deactivationTask.ContinueWith(
-                    static task => _ = task.Exception,
-                    CancellationToken.None,
-                    TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
-                    TaskScheduler.Default);
+                ObserveFailure();
                 throw;
             }
 
-            ActivationCollectionEvents.EmitCollectionCompleted(collectionSource, ageLimit, deactivationReason, list);
+            static async Task ObserveDeactivationCompletion(
+                Task[] completions,
+                ActivationCollectionEvents.CollectedActivation[]? collectedActivations,
+                ActivationCollectionEvents.CollectionSource collectionSource,
+                TimeSpan ageLimit,
+                DeactivationReason deactivationReason)
+            {
+                await Task.WhenAll(completions);
+
+                if (collectedActivations is not null)
+                {
+                    ActivationCollectionEvents.EmitCollectionCompleted(collectionSource, ageLimit, deactivationReason, collectedActivations);
+                }
+            }
+
+            void ObserveFailure()
+            {
+                _ = deactivationTask.ContinueWith(
+                    static (task, state) => ((ActivationCollector)state!).LogErrorWhileCollectingActivations(task.Exception!),
+                    this,
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
+                    TaskScheduler.Default);
+            }
         }
 
         public void Dispose()
@@ -1220,5 +1250,11 @@ namespace Orleans.Runtime
             Message = "Deactivating '{Count}' idle activations."
         )]
         private partial void LogDeactivateActivationsFromCollector(int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Collection batch of {Count} activations is still deactivating after {Timeout}. Collection will continue while these activations complete deactivation."
+        )]
+        private partial void LogCollectionWaitTimedOut(int count, TimeSpan timeout);
     }
 }

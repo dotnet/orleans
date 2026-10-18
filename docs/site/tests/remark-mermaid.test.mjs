@@ -21,6 +21,16 @@ describe('Mermaid Markdown', () => {
     expect(tree.children[0].value).not.toContain('language-mermaid');
   });
 
+  test('renders the script-free fallback outside the code block pipeline', async () => {
+    const processor = unified().use(remarkParse).use(remarkMermaid);
+    const tree = await processor.run(processor.parse('```mermaid\nflowchart LR\n  A --> B\n```'));
+
+    // Expressive Code processes <pre><code> and loads its stylesheet with the page's first code block, so a
+    // <noscript> fallback in that form would leave the page's other code blocks unstyled.
+    expect(tree.children[0].value).toContain('<noscript><pre class="mermaid-source">flowchart LR');
+    expect(tree.children[0].value).not.toContain('<code>');
+  });
+
   test('leaves other code fences unchanged', async () => {
     const processor = unified().use(remarkParse).use(remarkMermaid);
     const tree = await processor.run(

@@ -70,6 +70,27 @@ namespace Orleans.Runtime
         void ReceiveMessage(object message);
 
         /// <summary>
+        /// Queues <paramref name="request"/> as a one-way request on this instance.
+        /// </summary>
+        /// <param name="request">
+        /// The request to invoke. Its <see cref="IInvokable.GetInterfaceType"/> method must return an interface type.
+        /// </param>
+        /// <param name="options">The options for the request.</param>
+        /// <remarks>
+        /// <para>
+        /// The request is scheduled with the instance's other requests and passes through grain call filters, which observe
+        /// <paramref name="request"/>. It starts a new call chain and never leaves this instance.
+        /// </para>
+        /// <para>
+        /// The instance passes the request's outcome to <see cref="ILocalRequest.Complete"/> after the request and its call filters complete,
+        /// or when it rejects the request.
+        /// </para>
+        /// </remarks>
+        /// <exception cref="NotSupportedException">This instance does not support local requests.</exception>
+        void ReceiveLocalRequest(ILocalRequest request, LocalRequestOptions options)
+            => throw new NotSupportedException($"{GetType()} does not support local requests.");
+
+        /// <summary>
         /// Start activating this instance.
         /// </summary>
         /// <param name="requestContext">The request context of the request which is causing this instance to be activated, if any.</param>

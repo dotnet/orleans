@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans grain persistence provider which holds state only in memory.</Title>
     <Description>In-memory storage for Microsoft Orleans</Description>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
     <AssemblyName>Orleans.Persistence.Memory</AssemblyName>
     <RootNamespace>Orleans.Persistence.Memory</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>

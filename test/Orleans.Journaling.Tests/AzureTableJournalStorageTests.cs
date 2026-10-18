@@ -766,6 +766,24 @@ public sealed class AzureTableJournalStorageTests
     }
 
     [Fact]
+    public async Task CreateIfNotExistsAsync_StoresCallerMetadataAsJsonObject()
+    {
+        var store = new FakeTableStore();
+        var storage = CreateStorage(store);
+
+        Assert.True(await storage.CreateIfNotExistsAsync(
+            new Dictionary<string, string> { ["owner"] = "alice", ["note"] = "<é>" },
+            TestContext.Current.CancellationToken));
+
+        Assert.Equal(
+            """{"owner":"alice","note":"\u003C\u00E9\u003E"}""",
+            store.GetProperty(TestPartitionKey, AzureTableJournalStorage.HeaderRowKey, AzureTableJournalStorage.MetadataPropertyName));
+        var metadata = await CreateStorage(store).GetMetadataAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(metadata);
+        Assert.Equal(new Dictionary<string, string> { ["owner"] = "alice", ["note"] = "<é>" }, metadata.Properties);
+    }
+
+    [Fact]
     public async Task UpdateMetadataAsync_WhenExpectedETagDoesNotMatch_ReturnsNull()
     {
         var store = new FakeTableStore();

@@ -61,7 +61,13 @@ For end-to-end interop examples, see the [Orleans F# sample](https://learn.micro
 
 ## Inspect diagnostics and output
 
-Treat Orleans analyzer and generator diagnostics as contract errors, not warnings to suppress. Generated files can be inspected through normal compiler-generated-file tooling when debugging, but application code should depend on the public interfaces rather than generated implementation names.
+Treat Orleans analyzer and generator diagnostics as contract errors. Orleans marks generated implementation types with `EditorBrowsable(Never)` for editors which honor this metadata. Generated files retain their source locations for diagnostics and debugging, and remain available through compiler-generated-file tooling and direct definition navigation to generated symbols.
+
+Roslyn honors type-level `EditorBrowsable` for type completion from referenced assemblies. Member completion, same-assembly type completion, and implementation searches include generated symbols while their implementation trees participate in the compilation.
+
+The generator registers serializers, copiers, activators, proxies, invocation helpers, runtime metadata, and serializer-context registration bodies with Roslyn's `RegisterImplementationSourceOutput`. Minimal serializer-context declarations use regular source output to complete authored partial types for editor type checking, including consumers of projects whose implementation outputs are omitted. Hosts choose whether to include implementation outputs in their compilations; ordinary builds include the complete generated implementation. Context-shape and supported-contract diagnostics use regular output. Diagnostics which require a producer's generated codec or copier metadata accompany implementation output.
+
+XML documentation contains authored API comments. The documentation site's API reference filters generated implementation types and members using their generated-code attributes, preserving authored partial types such as serializer contexts.
 
 The optional [Orleans contract compatibility analyzer](grain-versioning/contract-compatibility-analyzer.md) records grain RPC identities and signatures in `OrleansContracts.txt` so contract drift can be reviewed before a rolling upgrade.
 

@@ -26,6 +26,188 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 {
     private const string CustomFormatKey = "custom-test-format";
 
+    [Fact]
+    public async Task VolatileProviders_UseIndependentNamedSnapshotThresholds()
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddVolatileJournalStorage(options =>
+        {
+            options.MaxAppendsBeforeSnapshot = 2;
+            options.MaxBytesBeforeSnapshot = 100;
+        });
+        builder.AddVolatileJournalStorage("small-bytes", options =>
+        {
+            options.MaxAppendsBeforeSnapshot = 100;
+            options.MaxBytesBeforeSnapshot = 3;
+        });
+        builder.AddVolatileJournalStorage("large", options =>
+        {
+            options.MaxAppendsBeforeSnapshot = int.MaxValue;
+            options.MaxBytesBeforeSnapshot = long.MaxValue;
+        });
+        await using var services = builder.Services.BuildServiceProvider();
+        var defaults = services.GetRequiredService<IJournalStorageProvider>().CreateStorage(new("threshold"));
+        var named = services.GetRequiredKeyedService<IJournalStorageProvider>("small-bytes").CreateStorage(new("threshold"));
+        var large = services.GetRequiredKeyedService<IJournalStorageProvider>("large").CreateStorage(new("threshold"));
+        var token = TestContext.Current.CancellationToken;
+        await defaults.AppendAsync(new ReadOnlySequence<byte>([1]), token);
+        await named.AppendAsync(new ReadOnlySequence<byte>([1, 2]), token);
+        await large.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), token);
+        Assert.False(defaults.IsCompactionRequested);
+        Assert.False(named.IsCompactionRequested);
+        Assert.False(large.IsCompactionRequested);
+        await defaults.AppendAsync(new ReadOnlySequence<byte>([2]), token);
+        Assert.True(defaults.IsCompactionRequested);
+        Assert.False(named.IsCompactionRequested);
+        await named.AppendAsync(new ReadOnlySequence<byte>([3]), token);
+        Assert.True(named.IsCompactionRequested);
+        await defaults.ReplaceAsync(new ReadOnlySequence<byte>([4]), token);
+        Assert.False(defaults.IsCompactionRequested);
+        Assert.True(named.IsCompactionRequested);
+        Assert.False(large.IsCompactionRequested);
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(-1, 1)]
+    [InlineData(1, 0)]
+    [InlineData(1, -1)]
+    public void VolatileProviders_InvalidSnapshotThresholdsFailDefaultAndNamedResolution(int appends, long bytes)
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddVolatileJournalStorage(Configure);
+        builder.AddVolatileJournalStorage("invalid", Configure);
+        using var services = builder.Services.BuildServiceProvider();
+        foreach (var name in new[] { ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, "invalid" })
+        {
+            var exception = Assert.Throws<OptionsValidationException>(() =>
+                services.GetRequiredKeyedService<IJournalStorageProvider>(name));
+            Assert.Equal(typeof(VolatileJournalStorageOptions), exception.OptionsType);
+            Assert.Equal(name == ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME ? Options.DefaultName : name, exception.OptionsName);
+            Assert.Equal([appends <= 0 ? "MaxAppendsBeforeSnapshot must be positive." : "MaxBytesBeforeSnapshot must be positive."],
+                exception.Failures);
+        }
+
+        void Configure(VolatileJournalStorageOptions options)
+        {
+            options.MaxAppendsBeforeSnapshot = appends;
+            options.MaxBytesBeforeSnapshot = bytes;
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)]
+    [InlineData("configured")]
+    public async Task VolatileProviders_SeparateOptionsPipelineAppliesOnceAndIsCapturedAtConstruction(string name)
+    {
+        var builder = CreateNamedProviderBuilder();
+        var optionsName = name == ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME ? Options.DefaultName : name;
+        builder.Services.Configure<VolatileJournalStorageOptions>(optionsName, options =>
+        {
+            options.MaxAppendsBeforeSnapshot = 2;
+            options.MaxBytesBeforeSnapshot = long.MaxValue;
+        });
+        builder.AddVolatileJournalStorage(name, configureOptions: null);
+        builder.Services.ConfigureAll<VolatileJournalStorageOptions>(options => options.MaxAppendsBeforeSnapshot++);
+        builder.Services.PostConfigure<VolatileJournalStorageOptions>(optionsName, options => options.MaxAppendsBeforeSnapshot++);
+        await using var services = builder.Services.BuildServiceProvider();
+        var configured = name == ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME
+            ? services.GetRequiredService<IOptions<VolatileJournalStorageOptions>>().Value
+            : services.GetRequiredService<IOptionsMonitor<VolatileJournalStorageOptions>>().Get(optionsName);
+        Assert.Equal(4, configured.MaxAppendsBeforeSnapshot);
+        Assert.Equal(long.MaxValue, configured.MaxBytesBeforeSnapshot);
+        var provider = services.GetRequiredKeyedService<IJournalStorageProvider>(name);
+        var storage = provider.CreateStorage(new("options-pipeline"));
+        if (name == ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
+        {
+            Assert.Same(provider, services.GetRequiredService<IJournalStorageProvider>());
+        }
+
+        configured.MaxAppendsBeforeSnapshot = 1;
+        var token = TestContext.Current.CancellationToken;
+        for (var index = 0; index < 3; index++)
+        {
+            await storage.AppendAsync(new ReadOnlySequence<byte>([1]), token);
+            Assert.False(storage.IsCompactionRequested);
+        }
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([2]), token);
+        Assert.True(storage.IsCompactionRequested);
+        var second = provider.CreateStorage(new("options-pipeline"));
+        Assert.True(second.IsCompactionRequested);
+        await second.ReplaceAsync(new ReadOnlySequence<byte>([3]), token);
+        Assert.False(storage.IsCompactionRequested);
+        await second.AppendAsync(new ReadOnlySequence<byte>([4]), token);
+        Assert.False(storage.IsCompactionRequested);
+    }
+
+    [Theory]
+    [InlineData(OrleansBinaryJournalFormat.JournalFormatKey)]
+    [InlineData(JsonLinesJournalFormat.JournalFormatKey)]
+    public async Task VolatileProviders_ThresholdSnapshotIsAcknowledgedAndReplaysCurrentFormats(string formatKey)
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddVolatileJournalStorage(options =>
+        {
+            options.MaxAppendsBeforeSnapshot = 2;
+            options.MaxBytesBeforeSnapshot = long.MaxValue;
+        });
+        builder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = formatKey);
+        await using var services = builder.Services.BuildServiceProvider();
+        var journalId = JournalId.FromGrainId(GrainId.Create("test-grain", "snapshot-recovery"));
+        var storage = Assert.IsType<VolatileJournalStorage>(
+            services.GetRequiredService<IJournalStorageProvider>().CreateStorage(journalId));
+        var factory = services.GetRequiredService<IJournaledStateManagerFactory>();
+        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(formatKey);
+        var token = TestContext.Current.CancellationToken;
+        await using (var manager = factory.CreateStandalone(journalId))
+        {
+            var value = new DurableValue<int>("value", manager, codec);
+            await manager.InitializeAsync(token);
+            value.Value = 1;
+            await manager.WriteStateAsync(token);
+            Assert.False(storage.IsCompactionRequested);
+            Assert.Single(storage.Segments);
+            value.Value = 2;
+            await manager.WriteStateAsync(token);
+            Assert.True(storage.IsCompactionRequested);
+            Assert.Equal(2, storage.Segments.Count);
+
+            value.Value = 3;
+            await manager.WriteStateAsync(token);
+            Assert.False(storage.IsCompactionRequested);
+            Assert.Single(storage.Segments);
+            Assert.Equal(formatKey, (await storage.GetMetadataAsync(token))!.FormatKey);
+            value.Value = 4;
+            await manager.WriteStateAsync(token);
+            Assert.False(storage.IsCompactionRequested);
+            Assert.Equal(2, storage.Segments.Count);
+            value.Value = 5;
+            await manager.WriteStateAsync(token);
+            Assert.True(storage.IsCompactionRequested);
+            Assert.Equal(3, storage.Segments.Count);
+        }
+
+        await using (var manager = factory.CreateStandalone(journalId))
+        {
+            var value = new DurableValue<int>("value", manager, codec);
+            await manager.InitializeAsync(token);
+            Assert.Equal(5, value.Value);
+            Assert.True(storage.IsCompactionRequested);
+            value.Value = 6;
+            await manager.WriteStateAsync(token);
+            Assert.False(storage.IsCompactionRequested);
+            Assert.Single(storage.Segments);
+        }
+
+        await using (var manager = factory.CreateStandalone(journalId))
+        {
+            var value = new DurableValue<int>("value", manager, codec);
+            await manager.InitializeAsync(token);
+            Assert.Equal(6, value.Value);
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

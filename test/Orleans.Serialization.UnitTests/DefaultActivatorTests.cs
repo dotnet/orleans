@@ -159,6 +159,16 @@ public sealed class DefaultActivatorTests
         Assert.Equal(0, provider.GetActivator<ImplicitValueConstructor>().Create().Value);
     }
 
+    [Fact]
+    public void CodecProvider_NullableActivator_CreatesNull()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+
+        Assert.Null(provider.GetActivator<int?>().Create());
+        Assert.Null(provider.GetActivator<ExplicitValueConstructor?>().Create());
+    }
+
     private sealed class PublicConstructor
     {
         public PublicConstructor()

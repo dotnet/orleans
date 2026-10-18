@@ -29,6 +29,7 @@ internal readonly struct GeneratedSourceEntry(string hintName, string source) : 
     }
 }
 
+// Source can accompany a diagnostic so invalid implementations retain their editor type-checking declarations.
 internal readonly struct SourceOutputResult(GeneratedSourceEntry? sourceEntry, Diagnostic? diagnostic) : IEquatable<SourceOutputResult>
 {
     public GeneratedSourceEntry? SourceEntry { get; } = sourceEntry;
@@ -53,6 +54,9 @@ internal readonly struct SourceOutputResult(GeneratedSourceEntry? sourceEntry, D
         }
     }
 }
+
+// The declaration completes the authored partial type; the implementation provides its runtime registrations.
+internal readonly record struct SerializerContextOutput(SourceOutputResult Declaration, SourceOutputResult Implementation);
 
 internal readonly struct ReferenceAssemblyDataResult(ReferenceAssemblyModel model, ImmutableArray<Diagnostic> diagnostics) : IEquatable<ReferenceAssemblyDataResult>
 {

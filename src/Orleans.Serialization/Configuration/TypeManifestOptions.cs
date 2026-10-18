@@ -59,6 +59,12 @@ namespace Orleans.Serialization.Configuration
         /// <typeparam name="T">The serialized type.</typeparam>
         /// <param name="codecFactory">The factory for the field codec.</param>
         /// <param name="copierFactory">The factory for the deep copier.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches the completed codec and copier instances for its lifetime
+        /// by their closed service types. Factory results and their dependencies therefore have provider lifetime,
+        /// including instances obtained from transient or scoped dependency-injection registrations.
+        /// Implementations must support reuse across concurrent serialization and copying operations.
+        /// </remarks>
         public void AddSerializer<T>(
             Func<ICodecProvider, IFieldCodec<T>> codecFactory,
             Func<ICodecProvider, IDeepCopier<T>> copierFactory)
@@ -83,6 +89,9 @@ namespace Orleans.Serialization.Configuration
         /// The codec provider constructs and caches one instance per service type. Recursive generated
         /// constructors retain references to in-progress dependencies through the generated-code helper.
         /// The first registration for a service type is used.
+        /// Cached instances and their dependencies have the <see cref="CodecProvider"/> lifetime, including
+        /// instances obtained from transient or scoped dependency-injection registrations. Services must
+        /// support concurrent use by serialization implementations.
         /// During graph construction, dependencies resolve through provider-owned services and these closed
         /// factories. Supply external dependencies through explicit constructor arguments or factories which
         /// return captured instances. Ordinary dependency injection resumes after the graph is published.
@@ -341,6 +350,11 @@ namespace Orleans.Serialization.Configuration
         /// Adds a serializer implementation type and preserves the members used to inspect and activate it.
         /// </summary>
         /// <param name="type">The serializer implementation type.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// </remarks>
         public void AddSerializer(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
@@ -351,6 +365,11 @@ namespace Orleans.Serialization.Configuration
         /// Adds a field codec implementation type and preserves the members used to inspect and activate it.
         /// </summary>
         /// <param name="type">The field codec implementation type.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// </remarks>
         public void AddFieldCodec(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
@@ -361,6 +380,11 @@ namespace Orleans.Serialization.Configuration
         /// Adds a copier implementation type and preserves the members used to inspect and activate it.
         /// </summary>
         /// <param name="type">The copier implementation type.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// </remarks>
         public void AddCopier(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
@@ -371,6 +395,11 @@ namespace Orleans.Serialization.Configuration
         /// Adds a converter implementation type and preserves the members used to inspect and activate it.
         /// </summary>
         /// <param name="type">The converter implementation type.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// </remarks>
         public void AddConverter(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
@@ -381,6 +410,11 @@ namespace Orleans.Serialization.Configuration
         /// Adds an activator implementation type and preserves the members used to inspect and activate it.
         /// </summary>
         /// <param name="type">The activator implementation type.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// </remarks>
         public void AddActivator(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
@@ -404,6 +438,11 @@ namespace Orleans.Serialization.Configuration
         /// </summary>
         /// <param name="type">The codec implementation type.</param>
         /// <param name="targetType">The serialized type, or its generic definition for an open generic codec.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// </remarks>
         public void AddSerializer(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
@@ -419,6 +458,11 @@ namespace Orleans.Serialization.Configuration
         /// </summary>
         /// <param name="type">The codec implementation type.</param>
         /// <param name="targetType">The serialized type, or its generic definition for an open generic codec.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// </remarks>
         public void AddFieldCodec(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
@@ -434,6 +478,11 @@ namespace Orleans.Serialization.Configuration
         /// </summary>
         /// <param name="type">The base codec implementation type.</param>
         /// <param name="targetType">The serialized type, or its generic definition for an open generic codec.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// </remarks>
         public void AddBaseCodec(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
@@ -449,6 +498,11 @@ namespace Orleans.Serialization.Configuration
         /// </summary>
         /// <param name="type">The value serializer implementation type.</param>
         /// <param name="targetType">The serialized type, or its generic definition for an open generic serializer.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// </remarks>
         public void AddValueSerializer(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
@@ -464,6 +518,11 @@ namespace Orleans.Serialization.Configuration
         /// </summary>
         /// <param name="type">The copier implementation type.</param>
         /// <param name="targetType">The copied type, or its generic definition for an open generic copier.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// </remarks>
         public void AddCopier(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
@@ -479,6 +538,11 @@ namespace Orleans.Serialization.Configuration
         /// </summary>
         /// <param name="type">The base copier implementation type.</param>
         /// <param name="targetType">The copied type, or its generic definition for an open generic copier.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// </remarks>
         public void AddBaseCopier(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
@@ -494,6 +558,11 @@ namespace Orleans.Serialization.Configuration
         /// </summary>
         /// <param name="type">The activator implementation type.</param>
         /// <param name="targetType">The activated type, or its generic definition for an open generic activator.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// </remarks>
         public void AddActivator(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
@@ -510,6 +579,11 @@ namespace Orleans.Serialization.Configuration
         /// <param name="type">The converter implementation type.</param>
         /// <param name="targetType">The converted value type, or its generic definition for an open generic converter.</param>
         /// <param name="surrogateType">The surrogate type, or a generic definition using the converter's arguments in the same order.</param>
+        /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// </remarks>
         public void AddConverter(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
@@ -539,9 +613,14 @@ namespace Orleans.Serialization.Configuration
         /// <param name="targetType">The converted type or its generic definition.</param>
         /// <param name="surrogateType">The surrogate description, binding parameters to the converter implementation.</param>
         /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// <para>
         /// Array nodes used in an executable surrogate description must be source-known closed types
         /// supplied through <see cref="SerializationType.Create"/>. Use the concrete surrogate type
         /// overload to register a closed converter and its surrogate directly.
+        /// </para>
         /// </remarks>
         public void AddConverter(
 #if NET5_0_OR_GREATER
@@ -570,10 +649,15 @@ namespace Orleans.Serialization.Configuration
         /// <param name="targetType">The target type description.</param>
         /// <param name="surrogateType">The surrogate description for a converter contract.</param>
         /// <remarks>
+        /// Each <see cref="CodecProvider"/> caches completed instances by closed implementation type for its lifetime.
+        /// Implementations and their dependencies have provider lifetime, including instances resolved from
+        /// transient or scoped dependency-injection registrations, and must support concurrent use.
+        /// <para>
         /// Target descriptions support structural array matching. Executable surrogate descriptions
         /// require source-known closed array types supplied through <see cref="SerializationType.Create"/>.
         /// Registered converters handle matching array targets before the intrinsic array codec and
         /// copier fallbacks. Directly registered codecs and copiers retain priority over converters.
+        /// </para>
         /// </remarks>
         public void AddSerializationContract(
 #if NET5_0_OR_GREATER

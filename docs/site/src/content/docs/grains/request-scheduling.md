@@ -1,7 +1,7 @@
 ---
 title: Grain request scheduling
 description: Understand Orleans turn-based execution, interleaving, and reentrancy.
-ms.date: 08/02/2026
+ms.date: 10/15/2026
 ms.topic: concept-article
 ---
 
@@ -42,7 +42,7 @@ Code in different requests doesn't run simultaneously, but multiple incomplete c
 ### Method-level interleaving
 
 :::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="interleaving_method_attributes":::
-`ReadOnly` is a scheduling promise. Don't mutate grain state from a read-only method.
+`ReadOnly` is a scheduling promise. Active read-only requests can interleave with one another and collectively exclude writable requests until every read-only request completes, unless another interleaving policy permits overlap. Keep grain state unchanged from a read-only method.
 
 ### Predicate-based interleaving
 
@@ -62,4 +62,34 @@ The scope permits callbacks associated with that call chain until it is disposed
 
 Grain timer callbacks participate in scheduling. Callbacks don't interleave by default; configure `GrainTimerCreationOptions.Interleave` when intentional.
 
+To run work from another thread under the activation's scheduling, see [Run background work as a grain request](#run-background-work-as-a-grain-request).
+
 Use <xref:System.Threading.Tasks.Task.Run*> only to isolate unavoidable synchronous blocking or CPU work from the Orleans scheduler. Don't access grain state from the thread-pool delegate. Await it and update grain state after execution resumes on the activation scheduler. See [External tasks and grains](external-tasks-and-grains.md).
+
+## Run background work as a grain request
+
+<xref:Orleans.GrainBaseExtensions.RunRequestAsync*> runs a callback as a request on the activation. Call it from any thread, such as a stream, messaging, or library callback, to apply results to grain state under the same scheduling as grain calls:
+
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_from_callback":::
+With the default <xref:Orleans.Runtime.LocalRequestOptions>, the request:
+
+- Follows the grain's reentrancy rules and queues behind the current request on a non-reentrant grain.
+- Passes through incoming grain call filters, which observe it as `IGrainRequestInvoker.RunRequestAsync` with no arguments.
+- Starts a new call chain. <xref:Orleans.Runtime.RequestContext> values from the calling thread don't flow into the callback.
+- Restarts the activation's idle collection period.
+- Bypasses <xref:Orleans.Configuration.SiloMessagingOptions.MaxEnqueuedRequestsHardLimit>.
+
+The callback can be synchronous, as in this example, or return a `Task` or `Task<TResult>`. The returned task completes with the callback's result or exception. The callback receives the cancellation token passed to `RunRequestAsync`, and cancelling it while the request is queued cancels the request. If the activation deactivates before the request runs, the task faults with <xref:Orleans.Runtime.OrleansMessageRejectionException>.
+
+Pass the grain and other values through the `state` argument and use a `static` lambda, so the call doesn't allocate a closure. On a non-reentrant grain, awaiting the returned task from another request on the same activation deadlocks, because the queued request waits for the current one to complete.
+
+### Configure the request
+
+Pass <xref:Orleans.Runtime.LocalRequestOptions> to change how the request is scheduled. Set <xref:Orleans.Runtime.LocalRequestOptions.KeepAlive> to `false` for frequent background work that shouldn't keep an otherwise idle activation in memory. Set <xref:Orleans.Runtime.LocalRequestOptions.Interleave> to `true` to run the request between the turns of other requests, as with an `[AlwaysInterleave]` method:
+
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_options":::
+### Deliver a custom request
+
+<xref:Orleans.Runtime.IGrainContext.ReceiveLocalRequest*> delivers an <xref:Orleans.Runtime.ILocalRequest> to the activation with the same scheduling as `RunRequestAsync`. Call filters, logs, and traces observe the request's own interface name, method name, and arguments, so a custom request can describe the work to them. The activation passes the request's response to <xref:Orleans.Runtime.ILocalRequest.Complete*>, or an exception if the activation rejects the request. The request reports that outcome, including any failure, to its observers:
+
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="receive_local_request":::

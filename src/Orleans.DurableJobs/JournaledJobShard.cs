@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Orleans.Diagnostics;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.DurableJobs;
 
@@ -86,6 +87,8 @@ internal sealed class JournaledJobShard : IJobShard
             _state.MarkAsComplete();
         }
 
+        // The processor outlives its creator, so it runs without the creator's execution context and async locals.
+        using var suppressExecutionContext = new ExecutionContextSuppressor();
         _operationProcessor = Task.Run(ProcessOperationsAsync);
     }
 

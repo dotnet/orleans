@@ -30,6 +30,10 @@ export default defineConfig({
       },
       favicon: '/favicon.svg',
       customCss: ['./src/styles/custom.css'],
+      // The Visual Studio Code themes give types, members, locals and keywords distinct colors in C#.
+      expressiveCode: {
+        themes: ['dark-plus', 'light-plus'],
+      },
       components: {
         MarkdownContent: './src/components/MarkdownContent.astro',
       },

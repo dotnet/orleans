@@ -178,4 +178,25 @@ The default minimum is seven days. Removal is persisted by a compaction after th
 
 <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournaling*> registers the core services, formats, durable-state factories, and lifecycle integration. Register storage through a provider-specific method or the generic <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournalStorage*> method. Runtime tests and disposable development hosts can use <xref:Orleans.Journaling.JournalingHostingExtensions.AddVolatileJournalStorage*> with a provider name. Its contents live in process memory, so use persistent emulator storage to validate restart recovery and provider migration.
 
+<xref:Orleans.Journaling.VolatileJournalStorageOptions> controls the retained append
+history. The defaults request a snapshot after **100 successful appends or 1 MiB
+(1,048,576 bytes)** of appended data, whichever limit is reached first:
+
+:::code language="csharp" source="./snippets/journaling/JournalingConfiguration.cs" id="volatile_journal_thresholds":::
+
+The state manager observes that request before its next write. That write replaces
+the history with a snapshot of current state; successful replacement resets both
+counters. Snapshot bytes are excluded from the appended-byte count. Deletion and
+recreation begin with empty history. Each limit must be positive; a single append
+can exceed the byte threshold.
+
+Use the overload accepting a provider name and options delegate to configure
+independent named thresholds. Providers capture the configured limits when
+constructed. Counters belong to each journal and are shared by
+handles for the same journal within one provider. Larger limits amortize
+full-state snapshot copies over more updates; smaller limits reduce retained
+append history and replay work. Size both limits alongside the current snapshot.
+Retained memory includes the latest snapshot, appended encoded bytes up to and
+including the crossing append, and the storage provider's bookkeeping.
+
 Use the same durable provider category in staging that production uses so recovery, compaction, concurrency, and backup procedures receive realistic validation.

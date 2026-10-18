@@ -134,6 +134,12 @@ namespace Orleans.Runtime
             systemSharedCallbackData.CancellationManager = _cancellationManager;
         }
 
+        /// <summary>
+        /// Creates the message which queues <paramref name="request"/> on <paramref name="target"/> as a local request.
+        /// </summary>
+        public Message CreateLocalRequest(IGrainContext target, ILocalRequest request, LocalRequestOptions options)
+            => messageFactory.CreateLocalRequest(target, request, options);
+
         public void SendRequest(
             GrainReference target,
             IInvokable request,
@@ -289,6 +295,8 @@ namespace Orleans.Runtime
 
         public async Task Invoke(IGrainContext target, Message message)
         {
+            // Local requests are one-way: they complete themselves on the target instead of sending a response.
+            Debug.Assert(!message.IsLocalOnly || message.Direction == Message.Directions.OneWay);
             try
             {
                 // Don't process messages that have already timed out
@@ -322,11 +330,21 @@ namespace Orleans.Runtime
                                 else
                                 {
                                     response = await invokable.Invoke();
-                                    // The copier preserves the null state of its input.
-                                    response = this.responseCopier.Copy(response)!;
+
+                                    // A local request is passed by reference, and so is its response.
+                                    if (!message.IsLocalOnly)
+                                    {
+                                        // The copier preserves the null state of its input.
+                                        response = this.responseCopier.Copy(response)!;
+                                    }
                                 }
 
-                                invokable.Dispose();
+                                // A local request is disposed once it is completed.
+                                if (!message.IsLocalOnly)
+                                {
+                                    invokable.Dispose();
+                                }
+
                                 break;
                             }
                         default:
@@ -340,7 +358,8 @@ namespace Orleans.Runtime
 
                 if (response.Exception is { } invocationException)
                 {
-                    LogGrainInvokeException(this.invokeExceptionLogger, message.Direction != Message.Directions.OneWay ? LogLevel.Debug : LogLevel.Warning, invocationException, message);
+                    var logLevel = message.Direction != Message.Directions.OneWay || message.IsLocalOnly ? LogLevel.Debug : LogLevel.Warning;
+                    LogGrainInvokeException(this.invokeExceptionLogger, logLevel, invocationException, message);
 
                     // If a grain allowed an inconsistent state exception to escape and the exception originated from
                     // this activation, then deactivate it.
@@ -362,6 +381,13 @@ namespace Orleans.Runtime
                     }
                 }
 
+                // A local request owns its outcome, including reporting its failure, in place of a response.
+                // Completing it is the last step, so a failure before it completes the request exactly once.
+                if (message.IsLocalOnly)
+                {
+                    LocalRequests.Complete(message, response, this.logger);
+                }
+
                 if (message.Direction != Message.Directions.OneWay)
                 {
                     SafeSendResponse(message, response);
@@ -372,6 +398,10 @@ namespace Orleans.Runtime
             catch (Exception exc2)
             {
                 LogWarningInvokeException(this.logger, exc2, message);
+                if (message.IsLocalOnly)
+                {
+                    LocalRequests.Reject(message, exc2, this.logger);
+                }
 
                 if (message.Direction != Message.Directions.OneWay)
                 {

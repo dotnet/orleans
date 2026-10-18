@@ -51,4 +51,12 @@ namespace Orleans.Serialization.Activators
     T> : DefaultActivator<T> where T : struct
     {
     }
+
+    /// <summary>
+    /// Creates <see langword="null"/> for <see cref="Nullable{T}"/>, matching <see cref="System.Activator.CreateInstance{T}"/>.
+    /// </summary>
+    internal sealed class DefaultNullableActivator<T> : IActivator<T?> where T : struct
+    {
+        public T? Create() => null;
+    }
 }
