@@ -28,10 +28,15 @@ internal sealed class DurableTaskGrainRuntimeShared(
     public DurableTaskOptions Options { get; } = options.Value;
 
     /// <summary>
-    /// Gets how long an outbox retries a message before dead-lettering it, which bounds how late an invocation can
-    /// arrive after a cancellation for it.
+    /// Gets how long after its sender first staged it an invocation is admitted: Messaging's <c>DeduplicationWindow</c>.
+    /// A cancellation or signal which arrives before its invocation is recorded for this long, so an admitted invocation
+    /// finds it.
     /// </summary>
-    public TimeSpan OutboxRetryTimeout { get; } = messagingOptions.Value.OutboxRetryTimeout;
+    /// <remarks>
+    /// Messaging requires <c>OutboxRetryTimeout</c> to be shorter, so a delivery which its retries complete is admitted.
+    /// An invocation which backpressure or a delivery pipeline holds past the window is dead-lettered.
+    /// </remarks>
+    public TimeSpan InvocationAdmissionWindow { get; } = messagingOptions.Value.DeduplicationWindow;
 
     public Serializer Serializer { get; } = serializer;
 }

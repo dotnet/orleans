@@ -198,6 +198,7 @@ namespace Orleans.DurableTasks
     public static partial class DurableTaskRejectionCodes
     {
         public const string Conflict = "durable-rpc/conflict";
+        public const string Expired = "durable-rpc/expired";
     }
 
     public partial interface IDurableTaskManager

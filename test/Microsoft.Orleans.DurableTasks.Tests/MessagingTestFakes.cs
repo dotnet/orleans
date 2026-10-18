@@ -59,6 +59,25 @@ internal static class MessagingTestHelpers
             receiver,
             body).ToInboxMessage();
 
+    /// <summary>Creates an invocation which its sender first staged at <paramref name="sentAt"/>.</summary>
+    public static InboxMessage CreateInvocationMessage(
+        GrainId sender,
+        GrainId receiver,
+        TaskId taskId,
+        DurableTaskInvocationMessage body,
+        DateTimeOffset sentAt)
+    {
+        var message = MessageTypes.Invocation.Create(
+            DurableTaskMessageTransport.CreateMessageId(sender, receiver, taskId, DurableTaskMessageTypes.InvocationSubject),
+            receiver,
+            body);
+        return new OutboxMessage
+        {
+            Envelope = message.Envelope with { Headers = DurableTaskMessageTypes.CreateSentAtHeaders(sentAt) },
+            ReceiverId = receiver,
+        }.ToInboxMessage();
+    }
+
     public static InboxMessage CreateResumeMessage(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime) =>
         MessageTypes.Resume.Create(
             DurableTaskMessageTransport.CreateResumeMessageId(grainId, taskId, generation, dueTime),

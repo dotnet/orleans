@@ -21,8 +21,11 @@ internal interface IDurableTaskMessageTransport
         IDurableTaskRequest request,
         TaskId? subscriberId);
 
-    /// <summary>Rebuilds the invocation <paramref name="messageId"/> to <paramref name="target"/> from its encoded payload.</summary>
-    OutboxMessage CreateInvocation(MessageId messageId, GrainId target, byte[] payload);
+    /// <summary>
+    /// Rebuilds the invocation <paramref name="messageId"/> to <paramref name="target"/> from its encoded payload, with the
+    /// time <paramref name="sentAt"/> at which the sender first staged it.
+    /// </summary>
+    OutboxMessage CreateInvocation(MessageId messageId, GrainId target, byte[] payload, DateTimeOffset sentAt);
 
     /// <summary>Stages a message which the runtime provides: a completion or an invocation.</summary>
     void Send(MessageId messageId);

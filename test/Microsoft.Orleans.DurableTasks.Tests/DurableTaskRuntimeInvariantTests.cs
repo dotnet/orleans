@@ -3007,14 +3007,14 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
-    public Task LateCancellationRecordIsDeletedOnceTheOutboxRetryTimeoutEnds() => ActivationScheduler.RunAsync(async () =>
+    public Task EarlyCancellationRecordIsDeletedOnceTheInvocationAdmissionWindowEnds() => ActivationScheduler.RunAsync(async () =>
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var retryAge = TimeSpan.FromHours(2);
         var (runtime, storage, manager, _) = CreateRuntime(
             TimeSpan.FromHours(1),
             timeProvider: clock,
-            outboxRetryTimeout: retryAge);
+            deduplicationWindow: retryAge);
         var taskId = TaskId.Parse("root");
         var caller = GrainId.Create("caller", "one");
 
@@ -3932,12 +3932,12 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Accept(
             CreateHandler(runtime),
-            MessagingTestHelpers.CreateMessage(
-                MessagingTestHelpers.MessageTypes.Invocation,
+            MessagingTestHelpers.CreateInvocationMessage(
                 sender,
                 runtime.GrainId,
                 rootId,
-                new DurableTaskInvocationMessage { TaskId = rootId, Request = request, Sender = sender, Detached = true, SubscriberId = recordId }));
+                new DurableTaskInvocationMessage { TaskId = rootId, Request = request, Sender = sender, Detached = true, SubscriberId = recordId },
+                runtime.UtcNow));
 
         // The task and its subscriber are staged together.
         var state = storage.Get(rootId);
@@ -3979,12 +3979,12 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         // The attached invocation's identifier already identifies another request, so the inbox dead-letters it with the
         // conflict's code and message, which the sender's outbox reports as the rejection.
         Assert.True(CreateHandler(runtime).TryAccept(
-            MessagingTestHelpers.CreateMessage(
-                MessagingTestHelpers.MessageTypes.Invocation,
+            MessagingTestHelpers.CreateInvocationMessage(
                 sender,
                 runtime.GrainId,
                 taskId,
-                new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender }),
+                new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender },
+                runtime.UtcNow),
             out var result));
 
         Assert.Equal(DurableTaskRejectionCodes.Conflict, Assert.IsType<DeliveryResult.DeadLettered>(result.Value).Code);
@@ -3995,17 +3995,61 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task InvocationAdmittedWithinItsWindowFindsTheCancellationWhichPrecededIt() => ActivationScheduler.RunAsync(async () =>
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var window = TimeSpan.FromHours(2);
+        var (runtime, storage, manager, _) = CreateRuntime(timeProvider: clock, deduplicationWindow: window);
+        var handler = CreateHandler(runtime);
+        var sender = GrainId.Create("caller", "one");
+        var taskId = TaskId.Parse("starter/call");
+        var storedId = CallerScope.Resolve(sender, taskId);
+        var lateId = TaskId.Parse("starter/late");
+        var request = CreateSerializableRequest(runtime.GrainId);
+        var sentAt = clock.GetUtcNow();
+
+        // The caller staged the invocations, then a cancellation of the first. The cancellation arrives first, and
+        // backpressure holds the invocations until the end of the admission window.
+        Accept(handler, CancellationMessage(sender, runtime.GrainId, taskId));
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        clock.Advance(window - TimeSpan.FromTicks(1));
+        Assert.False(InvokeDeleteExpiredTasks(runtime));
+
+        Accept(handler, Invocation(taskId));
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => storage.Get(storedId).Result is { IsCompleted: true });
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(storedId).Result!.Status);
+
+        // Once the window ends, the grain dead-letters an invocation which it doesn't store, and admits a redelivery of one
+        // which it stores.
+        clock.Advance(TimeSpan.FromTicks(1));
+        Assert.True(handler.TryAccept(Invocation(lateId), out var late));
+        Assert.Equal(DurableTaskRejectionCodes.Expired, Assert.IsType<DeliveryResult.DeadLettered>(late.Value).Code);
+        Assert.False(storage.Contains(CallerScope.Resolve(sender, lateId)));
+        Assert.True(handler.TryAccept(Invocation(taskId), out var redelivered));
+        Assert.IsType<DeliveryResult.Accepted>(redelivered.Value);
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        InboxMessage Invocation(TaskId id) => MessagingTestHelpers.CreateInvocationMessage(
+            sender,
+            runtime.GrainId,
+            id,
+            new DurableTaskInvocationMessage { TaskId = id, Request = request, Sender = sender },
+            sentAt);
+    });
+
+    [Fact]
     public Task UndecodableInvocationThrowsSoItsDeliveryIsRetriedAndChangesNothing() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var sender = GrainId.Create("caller", "one");
         var taskId = TaskId.Parse("starter/call");
-        var invocation = MessagingTestHelpers.CreateMessage(
-            MessagingTestHelpers.MessageTypes.Invocation,
+        var invocation = MessagingTestHelpers.CreateInvocationMessage(
             sender,
             runtime.GrainId,
             taskId,
-            new DurableTaskInvocationMessage { TaskId = taskId, Request = CreateSerializableRequest(runtime.GrainId), Sender = sender });
+            new DurableTaskInvocationMessage { TaskId = taskId, Request = CreateSerializableRequest(runtime.GrainId), Sender = sender },
+            runtime.UtcNow);
         var envelope = invocation.Envelope;
         var truncated = new OutboxMessage
         {
@@ -4287,12 +4331,12 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Accept(
             CreateHandler(runtime),
-            MessagingTestHelpers.CreateMessage(
-                MessagingTestHelpers.MessageTypes.Invocation,
+            MessagingTestHelpers.CreateInvocationMessage(
                 sender,
                 runtime.GrainId,
                 rootId,
-                new DurableTaskInvocationMessage { TaskId = rootId, Request = request, Sender = sender, Detached = true }));
+                new DurableTaskInvocationMessage { TaskId = rootId, Request = request, Sender = sender, Detached = true },
+                runtime.UtcNow));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await WaitUntilAsync(() => storage.Get(rootId).Result is { IsCompleted: true });
         await WaitUntilIdleAsync(runtime);
@@ -4408,12 +4452,12 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         TaskId taskId,
         IDurableTaskRequest request,
         GrainId? messageIdSender = null) =>
-        MessagingTestHelpers.CreateMessage(
-            MessagingTestHelpers.MessageTypes.Invocation,
+        MessagingTestHelpers.CreateInvocationMessage(
             messageIdSender ?? sender,
             receiver,
             taskId,
-            new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender });
+            new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender },
+            DateTimeOffset.UtcNow);
 
     /// <summary>
     /// Creates the completion which <paramref name="sender"/> sends for the remote child <paramref name="taskId"/> of
@@ -4471,7 +4515,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             TimeSpan? resultRetentionPeriod = null,
             bool initialize = true,
             TimeProvider? timeProvider = null,
-            TimeSpan? outboxRetryTimeout = null)
+            TimeSpan? deduplicationWindow = null)
     {
         var manager = new TestStateManager();
         var storage = new TestStorage(manager, timeProvider);
@@ -4481,7 +4525,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             resultRetentionPeriod,
             initialize,
             timeProvider,
-            outboxRetryTimeout);
+            deduplicationWindow);
     }
 
     /// <summary>
@@ -4498,7 +4542,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             TimeSpan? resultRetentionPeriod = null,
             bool initialize = true,
             TimeProvider? timeProvider = null,
-            TimeSpan? outboxRetryTimeout = null)
+            TimeSpan? deduplicationWindow = null)
     {
         var context = Substitute.For<IGrainContext>();
         context.GrainId.Returns(GrainId.Create("test", "one"));
@@ -4514,7 +4558,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             }),
             Options.Create(new DurableMessagingOptions
             {
-                OutboxRetryTimeout = outboxRetryTimeout ?? TimeSpan.FromDays(1),
+                DeduplicationWindow = deduplicationWindow ?? TimeSpan.FromDays(1),
             }),
             CreateSerializer());
         var transport = new RecordingDurableTaskMessageTransport();
