@@ -15,8 +15,8 @@ namespace Documentation.Grains.DurableTasks.Testing;
 public static class DurableTaskTestingSnippets
 {
     // <durable_tasks_testing_capture>
-    public static void ConfigureCaptureSilo(ISiloBuilder silo) =>
-        silo.Services.AddSingleton(new FulfillmentCode { UseCarrier = false }).AddSingleton<FulfillmentProgress>();
+    public static void ConfigureCaptureSilo(ISiloBuilder silo, FulfillmentProgress progress) =>
+        silo.Services.AddSingleton(new FulfillmentCode { UseCarrier = false }).AddSingleton(progress);
 
     public static async Task CaptureAsync(InProcessTestCluster cluster, string orderId, string path)
     {

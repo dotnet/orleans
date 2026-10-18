@@ -200,12 +200,15 @@ public sealed class DurableTaskReplayerTests(DurableTaskReplayFixture fixture) :
     public async Task DocumentationCaptureReplaysVersionZeroAtTheApprovalWait()
     {
         var path = Path.GetTempFileName();
+        var progress = new FulfillmentProgress();
         var cluster = new DurableTaskRecoveryFixture(
             DurableTaskRecoveryFixture.Json,
-            DurableTaskTestingSnippets.ConfigureCaptureSilo);
+            silo => DurableTaskTestingSnippets.ConfigureCaptureSilo(silo, progress));
         try
         {
             await cluster.InitializeAsync();
+            Assert.Equal(2, cluster.Cluster.Silos.Count);
+            Assert.All(cluster.Cluster.Silos, silo => Assert.Same(progress, silo.ServiceProvider.GetRequiredService<FulfillmentProgress>()));
             const string orderId = "documentation";
             await DurableTaskTestingSnippets.CaptureAsync(cluster.Cluster, orderId, path);
             await using var replayer = await DurableTaskReplayer.StartAsync(
