@@ -15,6 +15,9 @@ typed message bindings, delivery results, and options.
 - `Subject`: an optional ordinal name, at most 256 UTF-8 bytes, that selects a typed
   handler.
 - `Headers`: optional named byte arrays with nonempty keys and non-null values.
+- `DeliverAt`: an optional time on the Durable Jobs clock. The receiver accepts the
+  message immediately and processes it once that clock reaches `DeliverAt`. A message
+  with `DeliverAt` does not count toward `MaxCapacity`, including after it becomes due.
 
 `OutboxMessage` pairs an envelope with its receiver. `InboxMessage` carries the same
 envelope at the receiver. Keep published payload and header arrays unchanged.
