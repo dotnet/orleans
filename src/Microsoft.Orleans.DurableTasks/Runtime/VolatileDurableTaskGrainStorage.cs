@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.DurableJobs;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks;
 using System.Linq;
@@ -16,7 +18,7 @@ namespace Orleans.DurableTasks.Runtime;
 public class VolatileDurableTaskGrainStorage(
     DeepCopier<Dictionary<TaskId, DurableTaskState>> storageCopier,
     DeepCopier<DurableTaskState> stateCopier,
-    TimeProvider timeProvider,
+    [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider,
     Serializer serializer) : IDurableTaskGrainStorage
 {
     private readonly DeepCopier<Dictionary<TaskId, DurableTaskState>> _storageCopier = storageCopier;

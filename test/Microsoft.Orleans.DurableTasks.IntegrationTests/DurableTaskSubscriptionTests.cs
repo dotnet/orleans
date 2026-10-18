@@ -90,7 +90,9 @@ public abstract class DurableTaskSubscriptionTests(string journalFormatKey) : IA
         var relay = await subscriber.SubscribeWithDeadlineAsync(operationKey, "op").WithId("relay").ScheduleAsync(cancellationToken);
         await subscribing.WaitAsync(Timeout, cancellationToken);
 
-        // The deadline's delay is due once the Durable Jobs clock passes it.
+        // The deadline's delay is due once the Durable Jobs clock, which logical time follows, passes it, so the clock
+        // advances once the subscriber holds the delay.
+        await WaitForDelayAsync(subscriber, cancellationToken);
         _fixture.JobClock.Advance(TimeSpan.FromHours(2));
 
         Assert.Equal("timed out", await GetResultAsync(relay, cancellationToken));
@@ -147,6 +149,16 @@ public abstract class DurableTaskSubscriptionTests(string journalFormatKey) : IA
 
     private static async Task<T> GetResultAsync<T>(DurableTaskReference<T> task, CancellationToken cancellationToken) =>
         (await task.GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken)).GetResult<T>();
+
+    private static async Task WaitForDelayAsync(IAddressable grain, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(Timeout);
+        while (!(await GetTasksAsync(grain, timeout.Token)).Values.Any(static state => state.DueTime is not null))
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(10), timeout.Token);
+        }
+    }
 
     private static async Task<Dictionary<TaskId, DurableTaskDiagnosticState>> GetTasksAsync(IAddressable grain, CancellationToken cancellationToken)
     {

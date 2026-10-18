@@ -426,7 +426,9 @@ synchronously on the activation which makes them, when the runtime stages them: 
   the due time. The grain's own inbox accepts the message in the delay's journal
   write, without an outbox round trip, so the delay and its resume commit together
   in one write, and the inbox processes the resume once the Durable Jobs clock
-  reaches the due time. Resumes are generation-fenced: a resume for a canceled delay
+  reaches the due time. Logical time, due times, and task timestamps read that clock,
+  the `TimeProvider` keyed `DurableJobTimeProviderNames.DurableJobs`, so they share
+  one time domain with Messaging's scheduling. Resumes are generation-fenced: a resume for a canceled delay
   terminalizes it as canceled, and duplicate and stale resumes are harmless.
   Like every scheduled message, a resume doesn't count toward Messaging's
   `MaxCapacity`: its sender bounds it, and the grain holds one resume for each

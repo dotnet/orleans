@@ -16,9 +16,10 @@ namespace Microsoft.Orleans.DurableTasks.IntegrationTests.FaultInjection;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The Durable Jobs clock leads the grains' clock by <see cref="JobClockLead"/>, so the workflows' delays, which are
-/// shorter, and Durable Jobs retries, which follow the grains' clock, are due as soon as they are scheduled. Outbox
-/// retries follow <see cref="RetryInterval"/>. The harness doesn't advance the clock while it waits.
+/// The Durable Jobs clock leads the grains' clock by <see cref="JobClockLead"/>, so Durable Jobs retries, which follow
+/// the grains' clock, are due as soon as they are scheduled. The workflows' delays and timeouts last
+/// <see cref="WorkflowDelay"/>, so they are due once real time passes it. Outbox retries follow
+/// <see cref="RetryInterval"/>. The harness doesn't advance the clock while it waits.
 /// </para>
 /// <para>
 /// The harness synchronizes on events only: a task's completion through the client's wait for its response, and
@@ -31,6 +32,7 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
     public static readonly TimeSpan RunTimeout = TimeSpan.FromSeconds(30);
     public static readonly TimeSpan JobClockLead = TimeSpan.FromHours(1);
     public static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(100);
+    public static readonly TimeSpan WorkflowDelay = TimeSpan.FromMilliseconds(10);
     private const int MaxClientAttempts = 20;
     private readonly MessagingWakeupTracker _wakeups = new();
 
