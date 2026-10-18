@@ -121,6 +121,19 @@ public sealed class PublicMessagingRegistrationTests
         Assert.Contains("MaxCapacity must be greater than zero.", failure.Message, StringComparison.Ordinal);
     }
     [Fact]
+    public void AddMessaging_NullDeliveryResiliencePipelineFailsThroughOptionsContract()
+    {
+        var services = new ServiceCollection();
+        services.AddMessaging(options => options.DeliveryResiliencePipeline = null!);
+        using var provider = services.BuildServiceProvider();
+
+        var exception = Assert.Throws<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<DurableMessagingOptions>>().Value);
+
+        Assert.Contains(nameof(DurableMessagingOptions.DeliveryResiliencePipeline), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AddMessaging_BindsInboxContractToDeliveredInboxOverEarlierRegistration()
     {
         var services = new ServiceCollection();
