@@ -97,6 +97,7 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
     private readonly Guid _activationId = Guid.NewGuid();
     private int _activeHandlers;
     private int _maxConcurrentHandlers;
+    private bool _handlerRegistered;
     // Spans activations so a replayed message does not fail again after recovery.
     private static readonly ConcurrentDictionary<MessageId, byte> FailedOnce = new();
     private static readonly ConcurrentDictionary<MessageId, int> FailedAttempts = new();
@@ -140,7 +141,7 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
     {
         if (_handlerConfiguration.IsEnabled(this.GetGrainId()))
         {
-            _inbox.Register(new ApplicationDispatcher(this));
+            RegisterHandler();
         }
         await base.OnActivateAsync(cancellationToken);
         _snapshotProbe.Publish(this.GetGrainId(), CreateSnapshot());
@@ -203,7 +204,14 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
     public Task ConfigureHandlerAsync(bool enabled)
     {
         _handlerConfiguration.Set(this.GetGrainId(), enabled);
+        if (enabled && !_handlerRegistered) RegisterHandler();
         return Task.CompletedTask;
+    }
+
+    private void RegisterHandler()
+    {
+        _inbox.Register(new ApplicationDispatcher(this));
+        _handlerRegistered = true;
     }
 
     public async Task<bool> RemoveInboxDeadLetterAsync(MessageId messageId)
