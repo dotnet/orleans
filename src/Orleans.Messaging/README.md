@@ -164,4 +164,6 @@ durably at the grain's next journal write.
 
 The `Microsoft.Orleans` meter publishes counters for received and processed messages
 tagged by grain type and status, a histogram for processing duration, and the
-`orleans-messaging-inbox-depth` up-down counter for pending work.
+`orleans-messaging-inbox-depth` up-down counter for pending work. A message an inbox
+sink accepts counts as received `accepted` and processed `success`; one which the
+sink dead-letters counts as received and processed `dead_lettered`.
