@@ -27,7 +27,7 @@ public sealed class PaymentGrain(IPaymentGateway payments) : DurableGrain
     public async DurableTask<Charge?> PayOnceAsync(decimal amount)
     {
         // The effect draws the key once, and every replay returns the recorded key.
-        var idempotencyKey = DurableTask.Once("idempotency-key", () => Guid.NewGuid().ToString("N"));
+        var idempotencyKey = DurableTask.RunInline("idempotency-key", () => Guid.NewGuid().ToString("N"));
 
         // Logical time: the runtime records it, so a replay computes the same deadline.
         var deadline = DurableTask.Current.UtcNow.AddDays(3);
