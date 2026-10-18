@@ -124,6 +124,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     public void Clear()
     {
         _codec.WriteClear(GetWriter());
+        _hasStagedEntries = true;
         ApplyClear();
         Publish(QueueChangeKind.Cleared, item: default);
     }
@@ -136,6 +137,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     public void Enqueue(T item)
     {
         _codec.WriteEnqueue(item, GetWriter());
+        _hasStagedEntries = true;
         ApplyEnqueue(item);
         Publish(QueueChangeKind.Enqueued, item);
     }
@@ -144,6 +146,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     {
         var result = _items.Peek();
         _codec.WriteDequeue(GetWriter());
+        _hasStagedEntries = true;
         _ = ApplyDequeue();
         Publish(QueueChangeKind.Dequeued, result);
         return result;
@@ -157,6 +160,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
         }
 
         _codec.WriteDequeue(GetWriter());
+        _hasStagedEntries = true;
         _ = ApplyTryDequeue(out _);
         Publish(QueueChangeKind.Dequeued, item);
         return true;
@@ -203,7 +207,6 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     private JournalStreamWriter GetWriter()
     {
         Debug.Assert(_writer.IsInitialized);
-        _hasStagedEntries = true;
         return _writer;
     }
 
