@@ -146,8 +146,10 @@ jobs:
 
         bash .github/scripts/docker-pull-with-retry.sh "$MONGODB_IMAGE"
 
+        # Keep mongosh's transient files outside the entrypoint's data-directory ownership scan.
         docker run -d --pull=never --name mongodb \
           -p 127.0.0.1:27017:27017 \
+          -e HOME=/tmp \
           --health-cmd 'mongosh --quiet --eval "if (!db.hello().isWritablePrimary) { quit(1); }"' \
           --health-interval 2s \
           --health-timeout 5s \
