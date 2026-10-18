@@ -408,7 +408,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private async Task ProcessMembershipUpdates()
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
-        var current = new HashSet<SiloAddress>();
+        ClusterMembershipSnapshot? previous = null;
 
         try
         {
@@ -416,17 +416,12 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             {
                 try
                 {
-                    // Get active members
-                    var update = new HashSet<SiloAddress>(membershipSnapshot.Members.Values
-                        .Where(member => member.Status == SiloStatus.Active)
-                        .Select(member => member.SiloAddress));
-
-                    // If active list has changed, trigger immediate shard check
-                    if (!current.SetEquals(update))
+                    if (previous is null || ShouldCheckShards(previous, membershipSnapshot))
                     {
-                        current = update;
                         _shardCheckSignal.Release();
                     }
+
+                    previous = membershipSnapshot;
                 }
                 catch (Exception exception)
                 {
@@ -441,6 +436,29 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                 throw;
             }
         }
+    }
+
+    /// <summary>
+    /// Returns <see langword="true"/> when a silo joins or leaves the active set, or is declared dead.
+    /// </summary>
+    /// <remarks>
+    /// Discovery claims a shard once its owner is dead. A stopping or shutting-down owner leaves the active set
+    /// before it is declared dead, so the dead declaration triggers its own sweep.
+    /// </remarks>
+    internal static bool ShouldCheckShards(ClusterMembershipSnapshot previous, ClusterMembershipSnapshot current)
+    {
+        foreach (var member in current.CreateUpdate(previous).Changes)
+        {
+            var previousStatus = previous.Members.TryGetValue(member.SiloAddress, out var previousMember) ? previousMember.Status : SiloStatus.None;
+            if (member.Status == SiloStatus.Dead
+                ? previousStatus != SiloStatus.Dead
+                : member.Status == SiloStatus.Active || previousStatus == SiloStatus.Active)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private async Task PeriodicShardCheck()

@@ -202,7 +202,9 @@ Each silo discovers shards whose start time is within `DurableJobsOptions.ShardL
 of its current Durable Jobs time-provider clock. The default lookahead is ten minutes.
 A discovered shard starts processing once its start time enters `ShardActivationBufferPeriod`.
 `DurableJobsOptions.ShardCheckInterval` controls periodic discovery and writable-shard cleanup
-checks, with a default of five minutes. Membership changes also trigger checks.
+checks, with a default of five minutes. A silo joining or leaving the active set also triggers
+a check, as does a silo being declared dead, so the dead silo's shards are adopted as soon as
+membership declares it dead.
 The lookahead accepts non-negative durations; zero selects shards whose start time is at or
 before the current time. The discovery horizon is capped at `DateTimeOffset.MaxValue`.
 The check interval accepts durations from 1 to 4294967294 milliseconds.
