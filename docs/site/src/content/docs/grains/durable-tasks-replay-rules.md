@@ -160,7 +160,8 @@ These rules depend on data or deployment history which the analyzers can't obser
   recorded accesses replays it.
 - **Bound the history.** Every recorded operation stays in the task's tree until the
   tree is deleted, and the access log keeps a record for each access in re-executed code
-  until the execution completes. A workflow which loops indefinitely ends each generation
+  until the execution completes; consecutive reads which repeat a read's outcome share one
+  record. A workflow which loops indefinitely ends each generation
   and starts its successor as a detached task, such as `subscription-{id}-{generation}`.
 
 ## Configure the analyzers

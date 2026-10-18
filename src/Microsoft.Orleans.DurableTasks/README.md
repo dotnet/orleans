@@ -583,7 +583,10 @@ synchronously on the activation which makes them, when the runtime stages them: 
   position, or a recorded outcome which no longer decodes, stalls the attempt for
   `Diverged`, as an unsupported version does. Values and exceptions are recorded with the Orleans
   serializer in every journal format, and each journal write journals one entry per
-  execution whose log grew. Live observations, `IDurableTaskCompletionSource<T>.Task`,
+  execution whose log grew. A read which returns the same outcome as the attempt's
+  latest recorded read of the same state and operation records a reference to that
+  read, and consecutive references with the same arguments share one record. Live
+  observations, `IDurableTaskCompletionSource<T>.Task`,
   `IDurableLog<T>.ReadAsync`, and `WatchAsync`, run unrecorded. The runtime's own state
   and its durable messages run as the host's work, so a body's log holds only the body's
   accesses. Aborting or deleting the task, or completing its body, closes the access
