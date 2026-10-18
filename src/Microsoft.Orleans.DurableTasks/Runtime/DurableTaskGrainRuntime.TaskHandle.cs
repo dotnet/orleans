@@ -78,6 +78,7 @@ internal sealed partial class DurableTaskGrainRuntime
 
         public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return await ResponseTask.WaitAsync(cancellationToken);
         }
 
