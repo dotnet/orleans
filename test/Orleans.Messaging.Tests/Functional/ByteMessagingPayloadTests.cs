@@ -81,7 +81,7 @@ public sealed class ByteMessagingPayloadTests : MessagingBehaviorTestBase
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Completed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public bool CanHandle(IInboxHandlerContext context) => true;
+        public bool CanHandle(InboxMessage message) => true;
 
 
         public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
