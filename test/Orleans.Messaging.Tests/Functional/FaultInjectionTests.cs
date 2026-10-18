@@ -116,6 +116,56 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         Assert.Equal(1, probe.SinkAcceptances);
     }
 
+    [Theory]
+    [InlineData(ReceiverRecovery.None)]
+    [InlineData(ReceiverRecovery.Journal)]
+    [InlineData(ReceiverRecovery.Snapshot)]
+    public async Task LostResponse_AfterTheSinkRejected_RetiresTheSourceMessageAsRejected(ReceiverRecovery recovery)
+    {
+        var sender = NewSinkGrain();
+        var receiver = NewSinkGrain();
+        var probe = _cluster.SourceSinkProbe.For(receiver);
+        probe.Mode = SinkMode.DeadLetter;
+
+        // The rejection's write is the receiver's first, so a requested snapshot holds its processed record.
+        if (recovery == ReceiverRecovery.Snapshot) Fixture.Storage.RequestSnapshot(JournalId.FromGrainId(receiver.GetGrainId()));
+        var lost = DeliveryFault.LoseResponse();
+        Deliveries.Enqueue(lost);
+        var id = NewSourceMessageId("lost-rejection");
+
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), id, RandomNumberGenerator.GetBytes(32), write: true);
+
+        var rejection = await lost.ReceiverAnswer;
+        Assert.Equal(DeliveryStatus.DeadLettered, rejection.Status);
+        await WaitForFailedAttemptAsync(sender, id, 1);
+        if (recovery != ReceiverRecovery.None)
+        {
+            var previous = Fixture.GetGrainContext(receiver);
+            await receiver.DeactivateAsync();
+            await previous.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        }
+
+        // The receiver answers the retry from its processed record, without offering the message to the sink again.
+        probe.Mode = SinkMode.Accept;
+        await _cluster.AdvanceAndRunPumpAsync(sender, RetryInterval);
+
+        await Fixture.WaitUntilAsync(sender, () => Sink(sender).GetState().Retired.Count == 1);
+        var (retired, reasons, codes) = await OnSinkAsync(sender, static grain => (grain.GetState().Retired, grain.GetRetirementReasons(), grain.GetRetirementCodes()));
+        Assert.Equal(nameof(OutboxMessageRetirementStatus.Rejected), retired[id.ToString()]);
+        Assert.Equal(SourceSinkGrain.Rejection, reasons[id.ToString()]);
+        Assert.Equal(SourceSinkGrain.RejectionCode, codes[id.ToString()]);
+        Assert.Equal([DeliveryStatus.DeadLettered, DeliveryStatus.DeadLettered], Deliveries.Answers);
+        Assert.Equal(1, probe.SinkOffers);
+        Assert.Equal(0, probe.SinkAcceptances);
+    }
+
+    public enum ReceiverRecovery
+    {
+        None,
+        Journal,
+        Snapshot
+    }
+
     [Fact]
     public async Task TimedOutDelivery_WhoseCallIsStillCommitting_IsDeduplicatedAgainstTheRetry()
     {
