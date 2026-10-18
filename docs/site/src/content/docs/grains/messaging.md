@@ -40,7 +40,7 @@ Sending and delivery validate each message before any durable change:
 - The message ID is set and is at most 1,024 UTF-8 bytes in its canonical form.
 - The payload is non-null.
 - A supplied subject is nonempty and at most 256 UTF-8 bytes.
-- Header keys are nonempty and header values are non-null.
+- Header keys are nonempty, well-formed UTF-16 strings, and header values are non-null.
 - An outgoing message has a destination.
 
 Retries and reconstructed submissions reuse the same ID, subject, destination, body,
