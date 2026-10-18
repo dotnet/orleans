@@ -103,7 +103,11 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
         }
     }
 
-    void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter)
+    {
+        WriteState(snapshotWriter);
+        _isDirty = false;
+    }
 
 
     private void WriteState(JournalStreamWriter writer)
