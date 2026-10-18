@@ -15,7 +15,10 @@ namespace Orleans.Messaging;
 /// A single loop runs on the activation scheduler and services the inbox whenever it is signaled.
 /// One durable job keeps waking the grain while the inbox or a registered <see cref="IInboxWorkSource"/> holds work
 /// which the activation can perform; inbox messages wait for a handler without a wake-up.
+/// Work staged with an earlier due time than the current wake-up schedules an earlier one, and the job which a newer,
+/// earlier wake-up supersedes completes when it runs.
 /// Wake-ups may be early, late, or duplicated: every pass derives the work to perform from current state.
+/// Wake-up bookkeeping runs on the activation scheduler: journal writes prepare on it and serialize with job runs.
 /// The loop keeps the activation alive while a pass runs over queued work.
 /// Work which only becomes due later relies on the durable job, so the activation can be collected while it waits.
 /// </remarks>
@@ -29,11 +32,15 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     private Task? _loop;
     private TaskCompletionSource? _nextPass;
     private Task<DurableJob>? _scheduling;
-    private bool _wakeupScheduled;
+    private DateTimeOffset _schedulingDueTime;
     private bool _keepingAlive;
 
-    // Advances whenever a job run stops guaranteeing a future wake-up. A schedule requested in an earlier epoch may
-    // belong to a job which has already run and completed, so it no longer guarantees a wake-up.
+    // The job which wakes the grain next, if any, and its due time. A job run which completes clears it.
+    private string? _wakeupJobId;
+    private DateTimeOffset _wakeupDueTime;
+
+    // Advances whenever a job run completes. A schedule requested in an earlier epoch may belong to a job which has
+    // already run and completed, so it no longer guarantees a wake-up.
     private int _wakeupEpoch;
     private int _schedulingEpoch;
 
@@ -92,18 +99,24 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         }
     }
 
-    /// <summary>Ensures a durable job will wake this grain while messaging work remains.</summary>
-    public async ValueTask EnsureWakeupAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Ensures a durable job will wake this grain no later than <paramref name="dueTime"/>, on the Durable Jobs clock.
+    /// </summary>
+    public async ValueTask EnsureWakeupAsync(DateTimeOffset dueTime, CancellationToken cancellationToken)
     {
-        if (_wakeupScheduled) return;
-        if (_scheduling is null || _schedulingEpoch != _wakeupEpoch)
+        // Work which is already due needs a wake-up due now, which any tracked or scheduling wake-up due by now satisfies.
+        var now = Shared.JobTimeProvider.GetUtcNow();
+        if (dueTime < now) dueTime = now;
+        if (_wakeupJobId is not null && _wakeupDueTime <= dueTime) return;
+        if (_scheduling is null || _schedulingEpoch != _wakeupEpoch || _schedulingDueTime > dueTime)
         {
             _schedulingEpoch = _wakeupEpoch;
+            _schedulingDueTime = dueTime;
             _scheduling = Shared.JobManager.ScheduleJobAsync(new ScheduleJobRequest
             {
                 Target = GrainContext.GrainId,
                 JobName = JobName,
-                DueTime = Shared.JobTimeProvider.GetUtcNow()
+                DueTime = _schedulingDueTime
             }, _shutdown.Token);
         }
 
@@ -111,8 +124,12 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         var epoch = _schedulingEpoch;
         try
         {
-            await scheduling.WaitAsync(cancellationToken).ConfigureAwait(true);
-            if (epoch == _wakeupEpoch) _wakeupScheduled = true;
+            var job = await scheduling.WaitAsync(cancellationToken).ConfigureAwait(true);
+            if (epoch == _wakeupEpoch && (_wakeupJobId is null || job.DueTime < _wakeupDueTime))
+            {
+                _wakeupJobId = job.Id;
+                _wakeupDueTime = job.DueTime;
+            }
         }
         finally
         {
@@ -123,7 +140,12 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         // A running job keeps rescheduling itself until the inbox and every work source are empty.
-        _wakeupScheduled = true;
+        var jobId = context.Job.Id;
+        if (_wakeupJobId is null)
+        {
+            _wakeupJobId = jobId;
+            _wakeupDueTime = context.Job.DueTime;
+        }
         EnsureStarted();
         var pass = _nextPass ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
         _signal.Signal();
@@ -134,7 +156,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         catch
         {
             // This attempt no longer guarantees a future wake-up.
-            ClearWakeup();
+            CompleteWakeup(jobId);
             if (!_shutdown.IsCancellationRequested && Inbox.HasWork)
             {
                 RepairWakeupAsync().Ignore();
@@ -146,17 +168,26 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         var now = Shared.JobTimeProvider.GetUtcNow();
         if (Inbox.GetNextWakeupDelay(now) is not { } delay)
         {
-            ClearWakeup();
+            CompleteWakeup(jobId);
             return DurableJobRunResult.Completed;
         }
 
-        return DurableJobRunResult.RescheduleAt(
-            MessagingTime.AddClamped(now, delay > TimeSpan.Zero ? delay : RecheckDelay));
+        var next = MessagingTime.AddClamped(now, delay > TimeSpan.Zero ? delay : RecheckDelay);
+        if (_wakeupJobId is not null && _wakeupJobId != jobId && _wakeupDueTime <= next)
+        {
+            // Another job wakes the grain first, and its run reschedules for any remaining work.
+            CompleteWakeup(jobId);
+            return DurableJobRunResult.Completed;
+        }
+
+        _wakeupJobId = jobId;
+        _wakeupDueTime = next;
+        return DurableJobRunResult.RescheduleAt(next);
     }
 
-    private void ClearWakeup()
+    private void CompleteWakeup(string jobId)
     {
-        _wakeupScheduled = false;
+        if (_wakeupJobId == jobId) _wakeupJobId = null;
         _wakeupEpoch++;
     }
 
@@ -164,7 +195,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     {
         try
         {
-            await EnsureWakeupAsync(CancellationToken.None).ConfigureAwait(true);
+            await EnsureWakeupAsync(Shared.JobTimeProvider.GetUtcNow(), CancellationToken.None).ConfigureAwait(true);
         }
         catch (Exception exception) when (!_shutdown.IsCancellationRequested)
         {
@@ -231,7 +262,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         await Inbox.StartAsync(cancellationToken).ConfigureAwait(true);
         if (Inbox.HasWork)
         {
-            await EnsureWakeupAsync(cancellationToken).ConfigureAwait(true);
+            await EnsureWakeupAsync(Shared.JobTimeProvider.GetUtcNow(), cancellationToken).ConfigureAwait(true);
         }
     }
 

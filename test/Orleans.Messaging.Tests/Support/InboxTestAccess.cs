@@ -36,6 +36,9 @@ internal static class InboxTestAccess
     public static InboxMessageState GetMessageState(Inbox inbox, MessageId messageId) =>
         inbox.MessageState[messageId].State;
 
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_wakeupJobId")]
+    public static extern ref string? WakeupJobId(MessagingPump pump);
+
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_messages")]
     private static extern ref Dictionary<MessageId, InboxEntry> GetMessages(Inbox inbox);
 

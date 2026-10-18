@@ -175,7 +175,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         // The scheduled job runs and completes, with no work remaining, before the scheduling call returns.
         Fixture.JobManagerProbe.SkipNext(MessagingPump.JobName);
         using var schedule = Fixture.JobManagerProbe.BlockNext(MessagingPump.JobName);
-        var scheduling = await Fixture.OnGrainAsync(receiver, () => pump.EnsureWakeupAsync(TestContext.Current.CancellationToken).AsTask());
+        var scheduling = await Fixture.OnGrainAsync(receiver, () => pump.EnsureWakeupAsync(DateTimeOffset.MinValue, TestContext.Current.CancellationToken).AsTask());
         await schedule.WaitUntilEnteredAsync();
         Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(receiver)).Status);
         schedule.Continue();

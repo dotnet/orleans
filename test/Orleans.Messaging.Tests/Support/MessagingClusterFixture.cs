@@ -168,21 +168,32 @@ public class MessagingClusterFixture : IAsyncLifetime
             TestContext.Current.CancellationToken);
     }
 
-    /// <summary>Executes the pump's durable job callback directly, as a spurious or duplicate wake-up would.</summary>
-    internal async Task<DurableJobRunResult> RunPumpAsync(IAddressable grain)
+    /// <summary>
+    /// Executes the pump's durable job callback directly as its current wake-up job, as an early or spurious firing of that
+    /// job would.
+    /// </summary>
+    internal Task<DurableJobRunResult> RunPumpAsync(IAddressable grain) =>
+        RunPumpAsync(grain, TestContext.Current.CancellationToken, duplicate: false);
+
+    /// <summary>Executes the pump's durable job callback directly as a job other than its current wake-up job.</summary>
+    internal Task<DurableJobRunResult> RunDuplicatePumpAsync(IAddressable grain) =>
+        RunPumpAsync(grain, TestContext.Current.CancellationToken, duplicate: true);
+
+    private async Task<DurableJobRunResult> RunPumpAsync(IAddressable grain, CancellationToken runCancellation, bool duplicate)
     {
-        var job = new DurableJob
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            Name = MessagingPump.JobName,
-            ShardId = "test",
-            TargetGrainId = grain.GetGrainId(),
-            DueTime = DateTimeOffset.UtcNow
-        };
         var pump = GetPump(grain);
-        var run = await OnGrainAsync(grain, () => pump.ExecuteJobAsync(
-            new PumpRunContext(job),
-            TestContext.Current.CancellationToken).AsTask());
+        var run = await OnGrainAsync(grain, () =>
+        {
+            var job = new DurableJob
+            {
+                Id = (duplicate ? null : InboxTestAccess.WakeupJobId(pump)) ?? Guid.NewGuid().ToString("N"),
+                Name = MessagingPump.JobName,
+                ShardId = "test",
+                TargetGrainId = grain.GetGrainId(),
+                DueTime = DateTimeOffset.UtcNow
+            };
+            return pump.ExecuteJobAsync(new PumpRunContext(job), runCancellation).AsTask();
+        });
         return await run.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
     }
 
