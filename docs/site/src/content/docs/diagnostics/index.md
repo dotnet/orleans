@@ -137,7 +137,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 
 ## ORLEANS0104
 
-[Return the outputs of a DurableTask.Once effect](orleans0104.md) — Warning. A `DurableTask.Once` effect assigns a variable of the body, which a replay doesn't assign.
+[Return the outputs of a DurableTask.RunInline effect](orleans0104.md) — Warning. A `DurableTask.RunInline` effect assigns a variable of the body, which a replay doesn't assign.
 
 ## ORLEANS0105
 
@@ -149,7 +149,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 
 ## ORLEANS0107
 
-[Use durable operation names without '$'](orleans0107.md) — Error. A `WithId` or `DurableTask.Once` name contains `$`, which the runtime rejects.
+[Use durable operation names without '$'](orleans0107.md) — Error. A `WithId` or `DurableTask.RunInline` name contains `$`, which the runtime rejects.
 
 ## ORLEANS0108
 
@@ -169,7 +169,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 
 ## ORLEANS0112
 
-[Filter cancellation handlers by IsCancellationRequested](orleans0112.md) — Info. Durable task code catches cancellation without telling durable cancellation from a host stop.
+[Filter cancellation handlers by IsTaskCancellationRequested](orleans0112.md) — Info. Durable task code catches cancellation without telling task cancellation from attempt cancellation.
 
 ## ORLEANS0113
 

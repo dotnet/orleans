@@ -28,7 +28,7 @@ A replay runs the body from the start, and each recorded operation returns its r
 
 Three places access grain state once:
 
-- A `DurableTask.Once` effect runs once, and its state changes commit with its record.
+- A `DurableTask.RunInline` effect runs once, and its state changes commit with its record.
 - A local step, an `async DurableTask` method of the same grain, commits the state changes of its final code with its recorded result.
 - The body's synchronous tail, the code after its last durable operation, commits its state changes with the task's result.
 
@@ -36,7 +36,7 @@ For the replay model, see [Writing replay-safe workflows](https://github.com/dot
 
 ## How to fix violations
 
-**Record the access with `DurableTask.Once`.** The effect runs once and returns its outputs, and a replay returns the recorded values. Read state which decides later operations the same way, and append progress to an `IDurableLog<T>` with `DurableTask.Once(() => log.Append(entry))`, so each entry is appended once:
+**Record the access with `DurableTask.RunInline`.** The effect runs once and returns its outputs, and a replay returns the recorded values. Read state which decides later operations the same way, and append progress to an `IDurableLog<T>` with `DurableTask.RunInline(() => log.Append(entry))`, so each entry is appended once:
 
 :::code source="snippets/durable-tasks/Orleans0100.cs" id="orleans0100_fix_once" language="csharp":::
 
