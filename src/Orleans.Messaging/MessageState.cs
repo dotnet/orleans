@@ -8,13 +8,17 @@ internal sealed class InboxMessageState
     [Id(0)]
     public int AttemptCount { get; set; }
 
+    /// <summary>Gets or sets the time, on the Durable Jobs clock, from which the inbox attempts the message again.</summary>
     [Id(1)]
     public DateTimeOffset? NextAttemptAt { get; set; }
 
     [Id(2)]
     public string? LastError { get; set; }
 
-    /// <summary>Gets or sets when a failing message's retries end, <c>InboxRetryTimeout</c> after its first failure.</summary>
+    /// <summary>
+    /// Gets or sets when a failing message's retries end on the Durable Jobs clock, <c>InboxRetryTimeout</c> after its
+    /// first failure.
+    /// </summary>
     [Id(3)]
     public DateTimeOffset? ExpirationTime { get; set; }
 }
