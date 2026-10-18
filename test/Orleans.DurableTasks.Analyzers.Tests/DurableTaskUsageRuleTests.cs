@@ -139,6 +139,23 @@ public class DurableTaskUsageRuleTests
         """);
 
     [Fact]
+    public Task NamesOutsideDurableTaskBodiesNameRootTasks() => AnalyzerVerifier.VerifyAsync($$"""
+        public class Client
+        {
+        {{Members}}
+            public async Task StartAsync()
+            {
+                await Step(1).WithId("order$1");
+                await Step(2).WithId("order");
+                await Step(3).WithId("order");
+            }
+
+            // A DurableTask.RunInline name identifies an effect only in a durable task, which runs this helper.
+            private static int Record() => DurableTask.RunInline({|ORLEANS0107:"record$1"|}, () => 1);
+        }
+        """);
+
+    [Fact]
     public Task EachCallSiteWhichOneRunReachesHasItsOwnName() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {
