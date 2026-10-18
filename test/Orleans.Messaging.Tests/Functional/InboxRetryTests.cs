@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableJobs;
 using Orleans.Messaging.Configuration;
 using Orleans.Messaging.Tests.Support;
@@ -195,6 +196,12 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
             base.ConfigureOptions(options);
             options.InboxRetryTimeout = RetryTimeout;
             options.RetryInitialInterval = RetryDelay;
+        }
+
+        protected override void ConfigureServices(IServiceCollection services)
+        {
+            base.ConfigureServices(services);
+            UseTestClockForDurableJobs(services);
         }
     }
 }
