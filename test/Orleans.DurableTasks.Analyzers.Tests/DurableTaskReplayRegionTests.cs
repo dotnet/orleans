@@ -95,14 +95,14 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             public async DurableTask<int> RunAsync()
             {
-                var status = {|ORLEANS0100:_status|}.Value;
+                var status = {|ORLEANS0200:_status|}.Value;
                 await Step(status).WithId("first");
-                if ({|ORLEANS0100:_stock|}.ContainsKey(1))
+                if ({|ORLEANS0200:_stock|}.ContainsKey(1))
                 {
                     await Step(2).WithId("second");
                 }
 
-                {|ORLEANS0100:_status|}.Value = 2;
+                {|ORLEANS0200:_status|}.Value = 2;
                 var recorded = DurableTask.RunInline("read", () => _status.Value);
                 await Step(recorded).WithId("third");
                 return _status.Value;
@@ -117,11 +117,11 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             public async DurableTask<string> RunAsync()
             {
-                var status = {|ORLEANS0100:_status|}.Value;
+                var status = {|ORLEANS0200:_status|}.Value;
                 var id = DurableTask.RunInline(Guid.NewGuid);
-                var read = DurableTask.{|ORLEANS0120:RunInline|}(() => _status.Value);
-                var now = DurableTask.{|ORLEANS0120:RunInline|}(() => DateTime.UtcNow);
-                DurableTask.{|ORLEANS0120:RunInline|}(() => SetStatus(status + read));
+                var read = DurableTask.{|ORLEANS0220:RunInline|}(() => _status.Value);
+                var now = DurableTask.{|ORLEANS0220:RunInline|}(() => DateTime.UtcNow);
+                DurableTask.{|ORLEANS0220:RunInline|}(() => SetStatus(status + read));
 
                 // The tail follows the last recorded effect.
                 return $"{id} {now} {_status.Value}";
@@ -139,7 +139,7 @@ public class DurableTaskReplayRegionTests
                 for (var i = 0; i < 3; i++)
                 {
                     await Step(i).WithId($"step-{i}");
-                    {|ORLEANS0100:_stock|}[i] = true;
+                    {|ORLEANS0200:_stock|}[i] = true;
                 }
             }
         }
@@ -152,9 +152,9 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             public async DurableTask<string> RunAsync(ILogger logger)
             {
-                var id = {|ORLEANS0101:Guid.NewGuid()|};
-                var now = {|ORLEANS0101:DateTime.UtcNow|};
-                var random = {|ORLEANS0101:new Random()|};
+                var id = {|ORLEANS0201:Guid.NewGuid()|};
+                var now = {|ORLEANS0201:DateTime.UtcNow|};
+                var random = {|ORLEANS0201:new Random()|};
                 var recorded = DurableTask.RunInline("id", Guid.NewGuid);
                 var logical = DurableTask.Current.UtcNow;
                 await Step(random.Next()).WithId("first");
@@ -170,8 +170,8 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             public async DurableTask<int> RunAsync()
             {
-                var fetched = {|ORLEANS0102:await FetchAsync()|};
-                {|ORLEANS0111:await Task.Delay(1000)|};
+                var fetched = {|ORLEANS0202:await FetchAsync()|};
+                {|ORLEANS0211:await Task.Delay(1000)|};
                 await Task.Yield();
                 await ScheduleHelperAsync();
                 await Step(fetched).WithId("first");
@@ -198,12 +198,12 @@ public class DurableTaskReplayRegionTests
 
             public async DurableTask<int> RunAsync()
             {
-                {|ORLEANS0100:_list|}.Add(1);
-                {|ORLEANS0100:_queue|}.Enqueue(1);
-                {|ORLEANS0100:_set|}.Add(1);
-                {|ORLEANS0100:_completion|}.TrySetResult(1);
-                {|ORLEANS0100:_log|}.Append(1);
-                {|ORLEANS0100:_state|}.State = 1;
+                {|ORLEANS0200:_list|}.Add(1);
+                {|ORLEANS0200:_queue|}.Enqueue(1);
+                {|ORLEANS0200:_set|}.Add(1);
+                {|ORLEANS0200:_completion|}.TrySetResult(1);
+                {|ORLEANS0200:_log|}.Append(1);
+                {|ORLEANS0200:_state|}.State = 1;
 
                 // A recorded effect appends once, and the tail appends with the task's result.
                 var sequence = DurableTask.RunInline("progress", () => _log.Append(2));
@@ -224,11 +224,11 @@ public class DurableTaskReplayRegionTests
 
             public async DurableTask<int> StepAsync()
             {
-                {|ORLEANS0103:_list.AddRange(new[] { 1, 2 })|};
-                {|ORLEANS0103:_set.UnionWith(new[] { 1, 2 })|};
-                {|ORLEANS0103:_set.ExceptWith(new[] { 3 })|};
-                {|ORLEANS0103:_log.Append(1)|};
-                {|ORLEANS0103:_log.TrimBefore(1)|};
+                {|ORLEANS0203:_list.AddRange(new[] { 1, 2 })|};
+                {|ORLEANS0203:_set.UnionWith(new[] { 1, 2 })|};
+                {|ORLEANS0203:_set.ExceptWith(new[] { 3 })|};
+                {|ORLEANS0203:_log.Append(1)|};
+                {|ORLEANS0203:_log.TrimBefore(1)|};
                 await FetchAsync();
                 return (int)_log.Append(2);
             }
@@ -242,8 +242,8 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             public async DurableTask<int> StepAsync()
             {
-                {|ORLEANS0103:_status.Value = 1|};
-                {|ORLEANS0103:_status.Value++|};
+                {|ORLEANS0203:_status.Value = 1|};
+                {|ORLEANS0203:_status.Value++|};
                 await FetchAsync();
                 _status.Value = 2;
                 _status.Value--;
@@ -254,8 +254,8 @@ public class DurableTaskReplayRegionTests
             {
                 await Step(1).WithId("first");
                 var fetched = await FetchAsync();
-                {|ORLEANS0103:_status.Value = fetched|};
-                {|ORLEANS0103:_stock.Add(1, true)|};
+                {|ORLEANS0203:_status.Value = fetched|};
+                {|ORLEANS0203:_stock.Add(1, true)|};
                 await FetchAsync();
                 return fetched;
             }
@@ -271,14 +271,14 @@ public class DurableTaskReplayRegionTests
             {
                 var fetched = await DurableTask.Run(async _ =>
                 {
-                    var value = {|ORLEANS0102:await FetchAsync()|};
+                    var value = {|ORLEANS0202:await FetchAsync()|};
                     await Step(value).WithId("inner");
                     return value;
                 }).WithId("fetch");
 
                 var tokenless = await DurableTask.Run(async () =>
                 {
-                    var value = {|ORLEANS0102:await FetchAsync()|};
+                    var value = {|ORLEANS0202:await FetchAsync()|};
                     await Step(value).WithId("tokenless-inner");
                     return value + DateTime.UtcNow.Second;
                 }).WithId("tokenless");
@@ -287,7 +287,7 @@ public class DurableTaskReplayRegionTests
 
                 async DurableTask<int> Local()
                 {
-                    var status = {|ORLEANS0100:_status|}.Value;
+                    var status = {|ORLEANS0200:_status|}.Value;
                     await Step(status).WithId("local");
                     return status;
                 }
@@ -302,7 +302,7 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             public async DurableTask<int> RunAsync(int[] items)
             {
-                var status = {|ORLEANS0100:_status|}.Value;
+                var status = {|ORLEANS0200:_status|}.Value;
                 await foreach (var completed in DurableTask.WhenEach(items.Select(item => (DurableTask)Step(item))))
                 {
                 }
@@ -319,20 +319,20 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             public async DurableTask<int> RaceAsync()
             {
-                var status = {|ORLEANS0100:_status|}.Value;
+                var status = {|ORLEANS0200:_status|}.Value;
                 var (index, value) = await DurableTask.Race(new[] { Step(status), Step(2) }).WithId("race");
                 return index + value;
             }
 
             public async DurableTask<int> TimeoutAsync()
             {
-                var status = {|ORLEANS0100:_status|}.Value;
+                var status = {|ORLEANS0200:_status|}.Value;
                 return await Step(status).WaitAsync(TimeSpan.FromMinutes(1)).WithId("pay");
             }
 
             public async DurableTask<int> HandleTimeoutAsync(ScheduledTask<int> payment)
             {
-                var status = {|ORLEANS0100:_status|}.Value;
+                var status = {|ORLEANS0200:_status|}.Value;
                 return status + await payment.WaitUntilAsync(DurableTask.Current.UtcNow.AddMinutes(1));
             }
         }
