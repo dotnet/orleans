@@ -7,7 +7,7 @@ namespace Orleans.Messaging.Tests.Support;
 public sealed class MessagingMetricProbe : IDisposable
 {
     private readonly ConcurrentDictionary<(string Instrument, string TagValue), long> _measurements = [];
-    private readonly ConcurrentDictionary<string, long> _gauges = [];
+    private readonly ConcurrentDictionary<string, long> _depths = [];
     private readonly object _lock = new();
     private TaskCompletionSource _changed = CreateSignal();
     private readonly MeterListener _listener;
@@ -39,11 +39,7 @@ public sealed class MessagingMetricProbe : IDisposable
     public long GetCount(string instrument, string tagValue = "") =>
         _measurements.TryGetValue((instrument, tagValue), out var count) ? count : 0;
 
-    public long GetDepth(string instrument)
-    {
-        _listener.RecordObservableInstruments();
-        return _gauges.TryGetValue(instrument, out var value) ? value : 0;
-    }
+    public long GetDepth(string instrument) => _depths.TryGetValue(instrument, out var value) ? value : 0;
 
     public Task WaitForCountAsync(
         string instrument,
@@ -90,7 +86,8 @@ public sealed class MessagingMetricProbe : IDisposable
     {
         if (instrument.Name is "orleans-messaging-inbox-depth" or "orleans-messaging-outbox-depth")
         {
-            _gauges[instrument.Name] = measurement;
+            // The depth instruments are UpDownCounters, so each measurement is a delta.
+            _depths.AddOrUpdate(instrument.Name, measurement, (_, current) => current + measurement);
             return;
         }
 
