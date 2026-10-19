@@ -100,8 +100,10 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
             // Sink-owned messages never occupy inbox capacity and need no handler. A sink's duplicate can still be staged,
             // so every outcome except backpressure is reported once the write is durable.
+            var stagedBefore = _pump.StagedChangeCount;
             if (StageSinkAcceptance(message) is { } sinkResult)
             {
+                ExcludeFromHandlerAttempt(stagedBefore);
                 if (sinkResult.Status != DeliveryStatus.Backpressured) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
                 return sinkResult;
             }
@@ -121,6 +123,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             }
 
             Emit(new() { Kind = InboxCommandKind.Accept, Message = message });
+            ExcludeFromHandlerAttempt(stagedBefore);
             await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
             Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "accepted");
             LogMessageAccepted(Logger, key, GrainContext.GrainId);
@@ -132,6 +135,20 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             throw;
         }
     }
+
+    /// <summary>
+    /// Attributes changes which a delivery staged since <paramref name="stagedBefore"/> to the delivery, which interleaves
+    /// with a handler attempt waiting at an await, so the attempt's failure doesn't treat them as its own.
+    /// </summary>
+    private void ExcludeFromHandlerAttempt(long stagedBefore)
+    {
+        if (_execution is { } execution) execution.StagedChanges += _pump.StagedChangeCount - stagedBefore;
+    }
+
+    // Whether a state staged a change during the attempt which isn't a delivery's; a manager which doesn't track staged
+    // changes may have.
+    private bool StagedDuring(HandlerExecution execution) =>
+        _pump.StagedChangeCount is var count && (count < 0 || count != execution.StagedChanges);
 
     /// <summary>
     /// Offers a message to the registered sinks and stages the outcome which the first sink to take the message reports.
@@ -267,7 +284,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         }
 
         var start = Stopwatch.GetTimestamp();
-        var execution = new HandlerExecution(this, entry) { Active = true };
+        var execution = new HandlerExecution(this, entry) { Active = true, StagedChanges = _pump.StagedChangeCount };
+        _execution = execution;
         Exception? error = null;
         try
         {
@@ -275,8 +293,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             execution.ThrowIfRejected();
             if (!execution.Completed)
             {
-                execution.Reject(new InvalidOperationException(
-                    "Inbox handlers must call Complete or Fail before returning successfully."));
+                throw new InvalidOperationException("Inbox handlers must call Complete or Fail before returning successfully.");
             }
         }
         catch (Exception) when (execution.Rejection is { } rejection)
@@ -287,6 +304,19 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         catch (Exception exception) when (execution.Completed)
         {
             LogHandlerException(Logger, exception, entry.Message.Envelope.MessageId, GrainContext.GrainId);
+        }
+        catch (Exception exception) when (StagedDuring(execution))
+        {
+            // The attempt ended without an outcome after it staged changes. Pending changes share one journal buffer, so a
+            // retry record would commit them; failing the activation discards them, and the message runs again after
+            // recovery from the journal.
+            LogHandlerException(Logger, exception, entry.Message.Envelope.MessageId, GrainContext.GrainId);
+            var failure = new InvalidOperationException(
+                $"The inbox handler for message '{entry.Message.Envelope.MessageId}' failed after staging changes, so the activation discards them.",
+                exception);
+            _pump.Fail(failure, "An inbox handler failed after staging changes.");
+            if (exception is OperationCanceledException && cancellationToken.IsCancellationRequested) throw;
+            throw failure;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -300,6 +330,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         finally
         {
             execution.Active = false;
+            _execution = null;
         }
 
         string status;
@@ -506,6 +537,12 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     internal sealed class HandlerExecution(Inbox owner, InboxEntry entry)
     {
         public bool Active { get; set; }
+
+        /// <summary>
+        /// Gets or sets the journal's staged change count when the attempt started, advanced past changes which
+        /// interleaved deliveries staged.
+        /// </summary>
+        public long StagedChanges { get; set; }
 
         public bool Completed { get; private set; }
 

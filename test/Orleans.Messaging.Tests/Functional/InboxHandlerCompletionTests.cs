@@ -385,23 +385,75 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task SuccessfulReturnWithoutComplete_IsExplicitTerminalMisuse()
+    public async Task SuccessfulReturnWithoutCompleteOrStaging_FailsLikeAnException()
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         handler.Body = (_, _) => ValueTask.CompletedTask;
         var input = await DeliverAsync(rig);
+        var finished = FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await WaitAsync(finished);
+
+        // This fixture's InboxRetryTimeout is zero, so the first failure dead-letters the message.
+        var letter = Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters);
+        Assert.Equal(input.Envelope.MessageId, letter.MessageId);
+        Assert.Contains("must call Complete", letter.Reason, StringComparison.Ordinal);
+        Assert.Empty(rig.Inbox);
+        Assert.Empty(rig.Effects);
+        await AssertHealthyAsync(rig);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AttemptWithoutOutcomeAfterStaging_DiscardsItsChangesAndRunsAgainAfterRecovery(bool throws)
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        handler.Body = (self, _) =>
+        {
+            self.Mutate();
+            if (throws) throw new InvalidOperationException("A downstream call failed after staging.");
+            return ValueTask.CompletedTask;
+        };
+        var input = await DeliverAsync(rig);
         var writes = Writes(rig);
         handler.Release.TrySetResult();
+
         var error = Assert.IsType<InvalidOperationException>(await WaitAsync(rig.Grain.DeactivationFailure.Task));
-        Assert.Contains("must call Complete", error.Message, StringComparison.Ordinal);
+        Assert.Contains("after staging changes", error.Message, StringComparison.Ordinal);
+        await WaitAsync(rig.Context.Deactivated);
         Assert.Equal(writes, Writes(rig));
-        await rig.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.Equal(input.Envelope.MessageId, Assert.Single(rig.Inbox).Key);
-        Assert.Equal(input.Envelope.Payload.ToArray(), Assert.Single(rig.Inbox).Value.Message.Envelope.Payload.ToArray());
-        Assert.Empty(rig.Processed);
-        Assert.Empty(rig.Effects);
-        await AssertFailureReplayAsync(rig, input);
+
+        // The retried wake-up recovers the grain from the journal without the first attempt's effect, and the message
+        // runs again: this fixture's replay handler dead-letters it.
+        var recovered = await Fixture.WaitForDeadLetterCountAsync(rig.Receiver, 1);
+        Assert.NotEqual(rig.Grain.GetSnapshotForTest().ActivationId, recovered.ActivationId);
+        Assert.Empty(recovered.Effects);
+        Assert.Equal(0, recovered.InboxCount);
+        Assert.Equal(input.Envelope.MessageId, Assert.Single(recovered.InboxDeadLetters).MessageId);
+    }
+    [Fact]
+    public async Task AttemptFailure_WhileADeliveryInterleaves_DoesNotTreatTheAcceptanceAsItsOwn()
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        handler.Body = (_, _) => throw new InvalidOperationException("A downstream call failed.");
+        var input = await DeliverAsync(rig);
+        var finished = FinishedAsync(rig);
+
+        // A delivery interleaves while the attempt waits; the acceptance it stages is the delivery's change.
+        var interleaved = CreateEnvelope(rig.Receiver, NewMessage(502, "interleaved"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, interleaved)).Status);
+
+        // The attempt fails without staging anything itself, so it records its failure as usual: this fixture's zero
+        // InboxRetryTimeout dead-letters the message at once, and the activation stays.
+        handler.Release.TrySetResult();
+        await WaitAsync(finished);
+
+        Assert.Contains(input.Envelope.MessageId, rig.Grain.GetSnapshotForTest().InboxDeadLetters.Select(static letter => letter.MessageId));
+        await AssertHealthyAsync(rig);
     }
 
     [Fact]
