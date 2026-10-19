@@ -51,6 +51,38 @@ public sealed class OutboxDeliveryBehaviorTests : MessagingBehaviorTestBase
     }
 
     [Fact]
+    public async Task TransactionalSend_IsDeliveredOnlyAfterTheCommitsWrite()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+
+        await sender.SendInTransactionAsync(receiver.GetGrainId(), "messages/transactional", NewMessage(56, "transactional"), abort: false);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+        Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
+        Assert.Equal(1, (await sender.GetSnapshotAsync()).OutboxCount);
+
+        await sender.RetryWriteStateAsync();
+        var delivered = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal("transactional", Assert.Single(delivered.Effects).Value);
+    }
+
+    [Fact]
+    public async Task AbortedTransactionalSend_IsNeverDelivered()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+
+        await sender.SendInTransactionAsync(receiver.GetGrainId(), "messages/transactional", NewMessage(57, "aborted"), abort: true);
+        await sender.RetryWriteStateAsync();
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, (await sender.GetSnapshotAsync()).OutboxCount);
+        Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
+        await sender.RequestDeactivationAsync();
+        Assert.Equal(0, (await sender.GetSnapshotAsync()).OutboxCount);
+    }
+
+    [Fact]
     public async Task DuplicateOutboxEnqueue_UsesOneDurableWakeup()
     {
         var sender = NewGrain();

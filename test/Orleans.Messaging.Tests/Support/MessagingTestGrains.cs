@@ -17,6 +17,7 @@ public interface IMessagingTestGrain : IGrainWithGuidKey
     Task<MessageId> SendDuplicateAsync(GrainId target, string route, TestMessage message);
     Task<MessageId> SendAndDeactivateAsync(GrainId target, string route, TestMessage message);
     Task<MessageId> StageWithoutCommitAsync(GrainId target, string route, TestMessage message);
+    Task SendInTransactionAsync(GrainId target, string route, TestMessage message, bool abort);
     Task RetryWriteStateAsync();
     Task StageEffectAsync(MessageEffect effect);
     Task StageOutputAsync(OutboxMessage envelope);
@@ -181,6 +182,28 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
     }
 
     public async Task RetryWriteStateAsync() => await WriteStateAsync();
+
+    public async Task SendInTransactionAsync(GrainId target, string route, TestMessage message, bool abort)
+    {
+        var envelope = CreateEnvelope(target, route, message);
+        try
+        {
+            await ((JournaledStateManager)_journalOwner).RunTransactionAsync(async transactionCancellation =>
+            {
+                _outbox.Send(envelope);
+
+                // A write by another request while the transaction is open doesn't make the transaction's send durable.
+                await this.RunRequestAsync(cancellationToken => WriteStateAsync(cancellationToken).AsTask(), new LocalRequestOptions { Interleave = true }, transactionCancellation);
+                if (abort)
+                {
+                    throw new InvalidOperationException("abort");
+                }
+            });
+        }
+        catch (InvalidOperationException) when (abort)
+        {
+        }
+    }
 
     public async Task<DeliveryResult> AcceptAndDeactivateAsync(InboxMessage envelope)
     {
