@@ -91,6 +91,9 @@ internal sealed class DurableTaskAccessLog(
     // The longest header: kind and flags, operation, a five-byte varint index, a state's id, and an argument hash.
     private const int MaxHeaderLength = 2 + 5 + 4 + 4;
 
+    // The largest encoding buffer which a thread keeps for later outcomes.
+    private const int MaxRetainedEncodingBuffer = 64 * 1024;
+
     private readonly DurableTaskContext _attempt = attempt;
     private readonly TaskId _taskId = attempt.Id;
     private readonly IDurableTaskAccessLogStorage _storage = storage;
@@ -126,7 +129,8 @@ internal sealed class DurableTaskAccessLog(
     private ArrayBufferWriter<byte>? _pending;
     private bool _addedPending;
 
-    // Holds an outcome while it's encoded, before it's copied into its record.
+    // Holds an outcome while it's encoded, before it's copied into its record. A buffer which grew past
+    // MaxRetainedEncodingBuffer for a large outcome isn't kept for later ones.
     [ThreadStatic]
     private static ArrayBufferWriter<byte>? t_encoded;
 
@@ -333,6 +337,7 @@ internal sealed class DurableTaskAccessLog(
             else
             {
                 AddRecord(access, argumentHash, HasValue, copied ?? encoded.WrittenSpan);
+                ReleaseEncodingBuffer(encoded);
             }
         }
 
@@ -384,6 +389,7 @@ internal sealed class DurableTaskAccessLog(
         }
 
         AddRecord(access, argumentHash, HasValue, encoded!.WrittenSpan);
+        ReleaseEncodingBuffer(encoded);
         if (typed is null)
         {
             typed = new(target, access.Operation);
@@ -716,8 +722,7 @@ internal sealed class DurableTaskAccessLog(
             return null;
         }
 
-        var encoded = t_encoded ??= new();
-        encoded.ResetWrittenCount();
+        var encoded = GetEncodingBuffer();
         _serializer.Serialize(result, encoded);
         return encoded;
     }
@@ -726,8 +731,7 @@ internal sealed class DurableTaskAccessLog(
     [DoesNotReturn]
     private void RecordAndThrowException(in JournaledStateAccess access, int? argumentHash, Exception exception)
     {
-        var encoded = t_encoded ??= new();
-        encoded.ResetWrittenCount();
+        var encoded = GetEncodingBuffer();
         try
         {
             _serializer.Serialize(exception, encoded);
@@ -741,7 +745,24 @@ internal sealed class DurableTaskAccessLog(
         }
 
         AddRecord(access, argumentHash, HasValue | IsException, encoded.WrittenSpan);
+        ReleaseEncodingBuffer(encoded);
         ExceptionDispatchInfo.Throw(exception);
+    }
+
+    private static ArrayBufferWriter<byte> GetEncodingBuffer()
+    {
+        var encoded = t_encoded ??= new();
+        encoded.ResetWrittenCount();
+        return encoded;
+    }
+
+    // Drops a buffer which a large outcome grew, so the thread doesn't hold it for the life of the process.
+    private static void ReleaseEncodingBuffer(ArrayBufferWriter<byte> encoded)
+    {
+        if (encoded.Capacity > MaxRetainedEncodingBuffer)
+        {
+            t_encoded = null;
+        }
     }
 
     private void AddRecord(in JournaledStateAccess access, int? argumentHash, byte flags, ReadOnlySpan<byte> value = default)
