@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
@@ -67,4 +69,33 @@ internal sealed class AccessRecordingRuntime(Serializer serializer) : IDurableTa
     public IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId) => throw new NotSupportedException();
 
     public TaskId GetTargetTaskId(TaskId taskId, out GrainId addressedHost) => throw new NotSupportedException();
+
+    /// <summary>
+    /// Runs <paramref name="body"/> as an attempt of <paramref name="taskId"/> whose access log this runtime creates over
+    /// <paramref name="storage"/>, through <see cref="DurableTaskRuntimeHelper.RunAsync"/>, as the grain runtime runs a
+    /// durable task's body, and returns the attempt's log.
+    /// </summary>
+    public DurableTaskAccessLog RunAttempt(TaskId taskId, IDurableTaskAccessLogStorage storage, Action body)
+    {
+        Storage = storage;
+        var attempt = new GrainDurableTaskContext(taskId, this, grainContext: null!, TaskScheduler.Current);
+        Storage = null;
+        var run = DurableTaskRuntimeHelper.RunAsync(new ActionTask(body), attempt);
+        Debug.Assert(run.IsCompleted, "The attempt's body runs synchronously.");
+        if (run.Result.Exception is { } exception)
+        {
+            ExceptionDispatchInfo.Throw(exception);
+        }
+
+        return attempt.AccessLog!;
+    }
+
+    private sealed class ActionTask(Action body) : DurableTask
+    {
+        protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
+        {
+            body();
+            return new(DurableTaskResponse.Completed);
+        }
+    }
 }

@@ -364,6 +364,10 @@ internal class Program
         {
             AccessRecordingBytes.Run();
         },
+        ["Journaling.PositionResolution"] = _ =>
+        {
+            PositionResolutionCost.Run();
+        },
         ["Journaling.Azure"] = args =>
         {
             Environment.ExitCode = AzureJournalRunner.RunCommandAsync(args).GetAwaiter().GetResult();
