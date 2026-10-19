@@ -29,6 +29,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <!-- Supplies the [Alias] attributes which give persisted types stable wire names. -->
+    <ProjectReference Include="..\Orleans.Serialization.Abstractions\Orleans.Serialization.Abstractions.csproj" />
     <ProjectReference Include="..\Orleans.DurableTasks.Analyzers\Orleans.DurableTasks.Analyzers.csproj"
                       ReferenceOutputAssembly="false"
                       PrivateAssets="all" />

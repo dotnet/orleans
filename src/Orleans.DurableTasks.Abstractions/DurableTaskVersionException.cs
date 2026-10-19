@@ -12,6 +12,7 @@ namespace Orleans.DurableTasks;
 /// attempt's result and keeps the task pending. A later activation, typically on a deployment whose code supports the
 /// recorded version, replays the task. Abort the task to end it instead.
 /// </remarks>
+[Alias("Orleans.DurableTasks.DurableTaskVersionException")]
 public sealed class DurableTaskVersionException : Exception
 {
     /// <summary>Initializes an exception for the recorded version <paramref name="version"/> of <paramref name="name"/>.</summary>

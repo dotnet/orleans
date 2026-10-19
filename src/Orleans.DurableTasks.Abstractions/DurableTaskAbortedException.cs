@@ -5,6 +5,7 @@ namespace Orleans.DurableTasks;
 /// <see cref="ScheduledTask.AbortAsync"/> terminalizes a task as failed with this exception, whose message is the reason
 /// which the operator supplied. Awaiting the aborted task throws it.
 /// </remarks>
+[Alias("Orleans.DurableTasks.DurableTaskAbortedException")]
 public sealed class DurableTaskAbortedException : Exception
 {
     /// <summary>Initializes an exception for a task aborted without a stated reason.</summary>

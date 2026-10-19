@@ -4,6 +4,7 @@ using System.Runtime.ExceptionServices;
 namespace Orleans.DurableTasks;
 
 /// <summary>Identifies the execution status of a durable task.</summary>
+[Alias("Orleans.DurableTasks.DurableTaskStatus")]
 public enum DurableTaskStatus
 {
     /// <summary>No status is available.</summary>
@@ -19,6 +20,7 @@ public enum DurableTaskStatus
 }
 
 /// <summary>Identifies the kind of durable task observation.</summary>
+[Alias("Orleans.DurableTasks.DurableTaskResponseKind")]
 public enum DurableTaskResponseKind
 {
     /// <summary>No observation is available.</summary>
@@ -36,6 +38,7 @@ public enum DurableTaskResponseKind
 }
 
 /// <summary>Represents a durable task observation.</summary>
+[Alias("Orleans.DurableTasks.DurableTaskResponse")]
 public abstract class DurableTaskResponse
 {
     internal DurableTaskResponse() { }
@@ -131,6 +134,7 @@ public abstract class DurableTaskResponse
 }
 
 /// <summary>Represents a successful durable task without a result value.</summary>
+[Alias("Orleans.DurableTasks.SuccessDurableTaskResponse")]
 public sealed class SuccessDurableTaskResponse : DurableTaskResponse
 {
     /// <summary>Gets the shared successful response.</summary>
@@ -152,6 +156,7 @@ public sealed class SuccessDurableTaskResponse : DurableTaskResponse
 }
 
 /// <summary>Represents a successful durable task with a result value.</summary>
+[Alias("Orleans.DurableTasks.DurableTaskResponse`1")]
 public sealed class DurableTaskResponse<TResult>(TResult result) : DurableTaskResponse
 {
     /// <summary>Gets the typed result.</summary>
@@ -189,6 +194,7 @@ public sealed class DurableTaskResponse<TResult>(TResult result) : DurableTaskRe
 }
 
 /// <summary>Represents a failed durable task.</summary>
+[Alias("Orleans.DurableTasks.ExceptionDurableTaskResponse")]
 public sealed class ExceptionDurableTaskResponse : DurableTaskResponse
 {
     /// <summary>Initializes a response for <paramref name="exception"/>.</summary>
@@ -213,6 +219,7 @@ public sealed class ExceptionDurableTaskResponse : DurableTaskResponse
 }
 
 /// <summary>Represents a canceled durable task.</summary>
+[Alias("Orleans.DurableTasks.CanceledDurableTaskResponse")]
 public sealed class CanceledDurableTaskResponse : DurableTaskResponse
 {
     /// <summary>Initializes a response for <paramref name="exception"/>.</summary>
@@ -237,6 +244,7 @@ public sealed class CanceledDurableTaskResponse : DurableTaskResponse
 }
 
 /// <summary>Represents a pending durable task.</summary>
+[Alias("Orleans.DurableTasks.PendingDurableTaskResponse")]
 public sealed class PendingDurableTaskResponse : DurableTaskResponse
 {
     /// <summary>Gets the shared pending response.</summary>
@@ -258,6 +266,7 @@ public sealed class PendingDurableTaskResponse : DurableTaskResponse
 }
 
 /// <summary>Represents a subscription to a future durable task response.</summary>
+[Alias("Orleans.DurableTasks.SubscribedDurableTaskResponse")]
 public sealed class SubscribedDurableTaskResponse : DurableTaskResponse
 {
     /// <summary>Gets the shared subscribed response.</summary>
