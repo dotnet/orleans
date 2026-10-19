@@ -10,16 +10,17 @@ what must always be true, who guarantees it, and what happens when something fai
 
 ## Procedure
 
-1. For each affected boundary, identify the guarantees material to the change: what the component **provides** to consumers and what it **demands** of callers and lower layers.
+1. For each affected boundary, identify the guarantees material to the change, including implicit ones the code already relies on: what the component **provides** to consumers and what it **demands** of callers and lower layers.
 2. Classify each changed error path: expected operational failure, invalid external input, cancellation, or programming-invariant violation.
-3. Replace fallbacks for states that cannot occur with assertions; give each condition that can occur a designed path in the spec.
+3. Look for an invariant or redesign that eliminates each fallback; replace fallbacks for states that cannot occur with assertions; give each condition that can occur a designed path in the spec.
 4. When an invariant almost holds, or it is unclear whether it should hold, raise it as a question before code depends on it.
 5. Check failure semantics, idempotence, concurrency ownership, activation scheduling, cancellation flow, and trust boundaries.
 
 ## Checklist
 
 - **Invariants in both directions.** Each affected boundary states what it guarantees and requires, using types where practical, XML docs for non-obvious caller-visible guarantees, and assertions for programming invariants.
-- **Invariants, not fallbacks.** Fallback code handles realistic conditions with defined semantics (for example, refreshing a stale directory entry); a fallback for a state that cannot occur masks a broken invariant and becomes an assertion.
+- **Explicit guarantees.** Guarantees that code relies on are made explicit unless they are obviously maintained: in the type where the type system can express them, otherwise in a doc comment at the owning boundary and an assertion where they are relied on.
+- **Invariants, not fallbacks.** Code relies on established invariants instead of defending against the states they rule out; a fallback for a state that cannot occur masks a broken invariant and becomes an assertion. When a realistic condition seems to need a fallback, first look for an invariant or redesign that eliminates the condition; a fallback that remains is part of the spec with defined semantics (for example, refreshing a stale directory entry).
 - **Designed hints.** Caches and directory, routing, and placement entries are specified as possibly stale, define how staleness is detected (validity check, version, or rejection by the authority), and recover through the authoritative path.
 - **Illegal states unrepresentable.** External input is converted to validated types at the owning boundary and trusted inside, and revalidated when it crosses another trust boundary ([parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/)).
 - **Two kinds of error.** Expected failures (I/O, timeouts, silo failure, storage conflicts, invalid external input, cancellation) are handled explicitly; product programming errors are caught by side-effect-free `Debug.Assert` per `AGENTS.md`. Most catastrophic failures come from mishandled error paths ([Yuan et al.](https://www.usenix.org/system/files/conference/osdi14/osdi14-paper-yuan.pdf)).
