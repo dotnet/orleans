@@ -102,5 +102,11 @@ public interface IStateMachine
     /// <summary>
     /// Notifies the state that all prior journal entries and snapshots which it has written have been written to stable storage.
     /// </summary>
+    /// <remarks>
+    /// The manager captures every state for each write: it calls <see cref="WritePendingEntries"/> or
+    /// <see cref="WriteSnapshot"/> on every state, persists the result, and then calls this method on every state. Changes
+    /// made after that capture belong to the next write, so an implementation acknowledges only the changes it captured
+    /// for this write. A write which captures nothing persists nothing and makes no call.
+    /// </remarks>
     void OnWriteCompleted() { }
 }

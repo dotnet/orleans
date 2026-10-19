@@ -1,4 +1,6 @@
 using CsCheck;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 using Xunit;
 using static Orleans.Journaling.Tests.ObservationTestHelpers;
 
@@ -44,6 +46,25 @@ public class DurableStateObservationTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken);
 
         Assert.Null(sut.Manager.AsJournaledStateManager().Observers);
+    });
+
+    [Fact]
+    public Task Watch_BeforeRecovery_Throws() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var value = CreateValue(sut.Manager);
+        var log = CreateLog(sut.Manager);
+
+        // An unrecovered manager has no durable state to report.
+        await using var watch = value.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await watch.MoveNextAsync());
+        await using var read = log.ReadAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await read.MoveNextAsync());
+        Assert.Null(sut.Manager.AsJournaledStateManager().Observers);
+
+        await sut.Lifecycle.OnStart(CancellationToken);
+        await using var recovered = value.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(DurableChangeStatus.Committed, (await recovered.NextAsync()).Status);
     });
 
     [Fact]
@@ -256,7 +277,7 @@ public class DurableStateObservationTests : JournalingTestBase
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public Task PrefixFlush_AcknowledgesOnFullCaptureAfterEntryAbort(bool dirtyValue) => RunOnActivationSchedulerAsync(async () =>
+    public Task OpenEntry_DefersTheWriteUntilItCapturesEveryState(bool dirtyValue) => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();
         var dictionary = CreateDictionary(sut.Manager);
@@ -273,56 +294,117 @@ public class DurableStateObservationTests : JournalingTestBase
         await read.NextAsync();
         await valueWatch.NextAsync();
 
-        dictionary["flushed"] = 1;
-        log.Append("flushed");
+        dictionary["staged"] = 1;
+        log.Append("staged");
         if (dirtyValue)
         {
-            value.Value = "uncaptured";
+            value.Value = "staged";
         }
 
-        var change = watch.MoveNextAsync();
-        var entry = read.MoveNextAsync();
-        var valueChange = valueWatch.MoveNextAsync().AsTask();
         var opened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var abort = new ManualResetEventSlim();
+        using var close = new ManualResetEventSlim();
         var openEntry = Task.Run(() =>
         {
             using var scope = manual.Writer.BeginEntry();
             opened.SetResult();
-            abort.Wait(CancellationToken);
+            close.Wait(CancellationToken);
         }, CancellationToken);
-        try
-        {
-            await opened.Task;
-            await sut.Manager.WriteStateAsync(CancellationToken);
-            Assert.False(change.IsCompleted);
-            Assert.False(entry.IsCompleted);
-            Assert.False(valueChange.IsCompleted);
-            Assert.Equal(0, log.CommittedSequence);
-        }
-        finally
-        {
-            abort.Set();
-            await openEntry;
-        }
+        await opened.Task;
+        var segmentCount = sut.Storage.Inner.Segments.Count;
 
-        // With no dirty value this capture has no bytes, but the completed prefix is already durable.
-        await sut.Manager.WriteStateAsync(CancellationToken);
-        Assert.True(await change);
-        Assert.Equal(("flushed", DurableChangeStatus.Committed), (watch.Current.Key, watch.Current.Status));
-        Assert.True(await entry);
-        Assert.Equal((LogEventKind.Entry, "flushed", DurableChangeStatus.Committed), (read.Current.Kind, read.Current.Item, read.Current.Status));
+        // An entry which another thread holds open occupies the journal buffer, so the write waits for it rather than
+        // acknowledging changes which it has not captured.
+        var write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
+        await Task.Delay(TimeSpan.FromMilliseconds(100), CancellationToken);
+        Assert.False(write.IsCompleted);
+        Assert.Equal(segmentCount, sut.Storage.Inner.Segments.Count);
+        Assert.Equal(0, log.CommittedSequence);
+
+        close.Set();
+        await openEntry;
+        await write;
+        Assert.Equal(("staged", DurableChangeStatus.Committed), ((await watch.NextAsync()).Key, watch.Current.Status));
+        Assert.Equal((LogEventKind.Entry, "staged", DurableChangeStatus.Committed), ((await read.NextAsync()).Kind, read.Current.Item, read.Current.Status));
         Assert.Equal(1, log.CommittedSequence);
         if (dirtyValue)
         {
-            Assert.True(await valueChange);
-            Assert.Equal(Committed("uncaptured", version: 2), valueWatch.Current);
+            Assert.Equal(Committed("staged", version: 2), await valueWatch.NextAsync());
         }
-        else
-        {
-            await sut.Manager.DisposeAsync();
-            Assert.False(await valueChange);
-        }
+
+        var recovered = CreateSystem(sut.Storage);
+        var recoveredValue = CreateValue(recovered.Manager);
+        var recoveredLog = CreateLog(recovered.Manager);
+        recovered.Manager.RegisterStateMachine("manual", new OpenEntryState());
+        await recovered.Lifecycle.OnStart(CancellationToken);
+        Assert.Equal(["staged"], recoveredLog);
+        Assert.Equal(dirtyValue ? "staged" : null, recoveredValue.Value);
+    });
+
+    [Fact]
+    public Task DurableValue_OnPersisted_AcknowledgesOnlyTheCapturedValue() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var value = CreateValue(sut.Manager);
+        var other = CreateDictionary(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        var persisted = 0;
+        value.OnPersisted = () => persisted++;
+
+        // A write which does not capture the value does not acknowledge it.
+        other["a"] = 1;
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.Equal(0, persisted);
+
+        value.Value = "captured";
+        sut.Storage.HoldNextWrite();
+        var write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
+        await sut.Storage.WriteStarted.Task;
+        value.Value = "later";
+        sut.Storage.Release();
+        await write;
+        Assert.Equal(1, persisted);
+
+        // The value set during the write is acknowledged by the write which captures it.
+        other["b"] = 2;
+        sut.Storage.HoldNextWrite();
+        write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
+        await sut.Storage.WriteStarted.Task;
+        Assert.Equal(1, persisted);
+        sut.Storage.Release();
+        await write;
+        Assert.Equal(2, persisted);
+    });
+
+    [Fact]
+    public Task DurableTaskCompletionSource_CompletesAfterTheWriteWhichCapturesIt() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var tcs = new DurableTaskCompletionSource<int>(
+            "tcs",
+            sut.Manager,
+            new OrleansBinaryDurableTaskCompletionSourceCommandCodec<int>(CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<Exception>(), SessionPool),
+            ServiceProvider.GetRequiredService<DeepCopier<int>>(),
+            ServiceProvider.GetRequiredService<DeepCopier<Exception>>());
+        var other = CreateDictionary(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+
+        // The write in flight captured the pending state, so its acknowledgement does not complete the task.
+        other["a"] = 1;
+        sut.Storage.HoldNextWrite();
+        var write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
+        await sut.Storage.WriteStarted.Task;
+        Assert.True(tcs.TrySetResult(42));
+        sut.Storage.Release();
+        await write;
+        Assert.False(tcs.Task.IsCompleted);
+
+        sut.Storage.HoldNextWrite();
+        write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
+        await sut.Storage.WriteStarted.Task;
+        Assert.False(tcs.Task.IsCompleted);
+        sut.Storage.Release();
+        await write;
+        Assert.Equal(42, await tcs.Task);
     });
 
     [Theory]
@@ -471,16 +553,22 @@ public class DurableStateObservationTests : JournalingTestBase
 
         await sut.Manager.WriteStateAsync(CancellationToken);
 
-        // The buffer overflowed at the fifth and ninth changes. The latest snapshot includes nine entries.
+        // The buffer overflowed at the fifth change, which folded every later change into one resync. The write which
+        // captured the changes built its snapshot, which includes all ten entries.
         var resync = await watch.NextAsync();
         Assert.Equal(DictionaryChangeKind.Resync, resync.Kind);
         Assert.Equal(DurableChangeStatus.Committed, resync.Status);
-        Assert.Equal(9, resync.Snapshot!.Count);
+        Assert.Equal(10, resync.Snapshot!.Count);
         Apply(view, resync);
-        var last = await watch.NextAsync();
-        Assert.Equal(new DictionaryChange<string, int> { Kind = DictionaryChangeKind.Set, Key = "key9", Value = 9, Status = DurableChangeStatus.Committed, Version = 1 }, last);
-        Apply(view, last);
         Assert.Equal(dictionary.OrderBy(static pair => pair.Key), view.OrderBy(static pair => pair.Key));
+        var next = watch.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+
+        // Changes made after the capture follow the snapshot.
+        dictionary["after"] = 10;
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(new DictionaryChange<string, int> { Kind = DictionaryChangeKind.Set, Key = "after", Value = 10, Status = DurableChangeStatus.Committed, Version = 2 }, watch.Current);
     });
 
     [Fact]
@@ -584,46 +672,6 @@ public class DurableStateObservationTests : JournalingTestBase
         Assert.Equal((DictionaryChangeKind.Set, 1L), (dictionaryWatch.Current.Kind, dictionaryWatch.Current.Version));
         Assert.Equal((ListChangeKind.Added, 1L), (listWatch.Current.Kind, listWatch.Current.Version));
         Assert.Equal((LogEventKind.Entry, 0L, "e", DurableChangeStatus.Committed), (logRead.Current.Kind, logRead.Current.Sequence, logRead.Current.Item, logRead.Current.Status));
-    });
-
-    [Fact]
-    public Task GetStateMachines_EnumeratesRegisteredNamesAndInstances() => RunOnActivationSchedulerAsync(async () =>
-    {
-        var sut = CreateSystem();
-        var value = CreateValue(sut.Manager, "status");
-        var dictionary = CreateDictionary(sut.Manager, "history");
-        await sut.Lifecycle.OnStart(CancellationToken);
-
-        var stateMachines = sut.Manager.GetStateMachines().OrderBy(static pair => pair.Key, StringComparer.Ordinal).ToArray();
-        Assert.Equal(["history", "status"], stateMachines.Select(static pair => pair.Key));
-        Assert.Same(dictionary, stateMachines[0].Value);
-        Assert.Same(value, stateMachines[1].Value);
-    });
-
-    [Fact]
-    public Task GetStateMachines_ExcludesRetiredState() => RunOnActivationSchedulerAsync(async () =>
-    {
-        var storage = new GatedJournalStorage();
-        var first = CreateSystem(storage);
-        var retired = CreateValue(first.Manager, "retired");
-        var firstStatus = CreateValue(first.Manager, "status");
-        await first.Lifecycle.OnStart(CancellationToken);
-        retired.Value = "old";
-        firstStatus.Value = "current";
-        await first.Manager.WriteStateAsync(CancellationToken);
-
-        var second = CreateSystem(storage);
-        CreateValue(second.Manager, "status");
-        await second.Lifecycle.OnStart(CancellationToken);
-        Assert.Equal(["status"], second.Manager.GetStateMachines().Select(static pair => pair.Key));
-
-        // Registering the state again restores it.
-        var third = CreateSystem(storage);
-        var restored = CreateValue(third.Manager, "retired");
-        CreateValue(third.Manager, "status");
-        await third.Lifecycle.OnStart(CancellationToken);
-        Assert.Equal(["retired", "status"], third.Manager.GetStateMachines().Select(static pair => pair.Key).Order(StringComparer.Ordinal));
-        Assert.Equal("old", restored.Value);
     });
 
     [Fact]

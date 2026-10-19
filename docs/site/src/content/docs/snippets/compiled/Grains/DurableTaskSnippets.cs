@@ -759,7 +759,7 @@ public interface IConversationGrain : IGrainWithStringKey
 {
     DurableTask<long> AskAsync(string prompt);
 
-    IAsyncEnumerable<LogEvent<string>> WatchAsync(long fromSequence, CancellationToken cancellationToken);
+    IAsyncEnumerable<LogEvent<string>> WatchAsync(long fromSequence, long epoch, CancellationToken cancellationToken);
 }
 
 public sealed class ConversationGrain : DurableGrain, IConversationGrain
@@ -790,8 +790,8 @@ public sealed class ConversationGrain : DurableGrain, IConversationGrain
     }).WithId("respond");
 
     // Watchers receive the draft's chunks live, then the committed entry which replaces them.
-    public IAsyncEnumerable<LogEvent<string>> WatchAsync(long fromSequence, CancellationToken cancellationToken) =>
-        _transcript.ReadAsync(fromSequence, DurableWatchMode.Drafts, cancellationToken: cancellationToken);
+    public IAsyncEnumerable<LogEvent<string>> WatchAsync(long fromSequence, long epoch, CancellationToken cancellationToken) =>
+        _transcript.ReadAsync(fromSequence, epoch, DurableWatchMode.Drafts, cancellationToken: cancellationToken);
 }
 // </durable_tasks_stream_draft>
 

@@ -195,8 +195,8 @@ public sealed class ConversationGrain(IDurableStateManager stateManager) : Grain
     private readonly IDurableLog<string> _messages = stateManager.GetOrAddLog<string>("messages");
     private readonly IDurableValue<string> _status = stateManager.GetOrAddValue<string>("status");
 
-    public IAsyncEnumerable<LogEvent<string>> WatchAsync(long after, CancellationToken cancellationToken = default) =>
-        _messages.ReadAsync(after + 1, cancellationToken: cancellationToken);
+    public IAsyncEnumerable<LogEvent<string>> WatchAsync(long epoch, long nextSequence, CancellationToken cancellationToken = default) =>
+        _messages.ReadAsync(nextSequence, epoch, cancellationToken: cancellationToken);
 
     public IAsyncEnumerable<ValueChange<string>> WatchStatusAsync(CancellationToken cancellationToken = default) =>
         _status.WatchAsync(cancellationToken: cancellationToken);
@@ -210,19 +210,32 @@ acknowledged, so readers observe only durable state. `DurableWatchMode.Staged` d
 changes immediately and reports their durability with watermarks. Each acknowledged write publishes one
 watermark shared by every watcher of the manager.
 
+Each write captures every state, persists what it captured, and then acknowledges it. A change made while a
+write is in flight belongs to the next write, so `IStateMachine.OnWriteCompleted` implementations and
+`IDurableTaskCompletionSource<T>.Task` report only what the completed write captured. When
+another thread holds a journal entry open, as a standalone manager's owner can, the write waits for the entry
+to close and then captures it with every other change, so `WriteStateAsync` acknowledges every change staged
+before it was called.
+
 Value watches deliver the latest value and retain no backlog. Collection watches begin with a `Resync`
 snapshot and buffer a bounded number of changes for each reader; a reader which falls behind receives a
-new `Resync` snapshot. A manager creates its observer state when the first watch begins, and unwatched
-state publishes nothing.
+`Resync` snapshot. The snapshot is built once, when the write which captures its changes begins, or when a
+reader with `Staged` reads it. A manager creates its observer state when the first watch begins, and
+unwatched state publishes nothing. Watching requires a recovered manager. In committed mode, a watch which
+begins while changes are staged delivers its first snapshot after the next write.
 
 `IDurableLog<T>` is an append-only log with durable, monotonically increasing `long` sequence numbers.
 `Append` returns an entry's sequence and `CommittedSequence` marks the end of the durable entries.
-`TrimBefore` bounds retention, `Clear` replaces the history and consumes one sequence number, so sequence
-numbers are never reused, and `Seal` durably ends the log. `ReadAsync(fromSequence, mode, resumeDraftId)`
-re-reads retained entries from a position and waits for new entries. Every active reader receives `Trimmed`
-when entries are trimmed and `Reset` when the history is replaced, including a reader which resumes at or
-before a cleared sequence number. The stream delivers `CaughtUp` once after the entries which were committed
-when the read began, and ends with `Sealed` once a seal is durable.
+`TrimBefore` bounds retention, `Clear` replaces the entries and consumes one sequence number, so sequence
+numbers are never reused within a history, and `Seal` durably ends the log. `Epoch` identifies the history:
+the first change after the log is created or its journal is deleted begins a history with a new random epoch,
+which is journaled with it. A reader position is an epoch and a sequence number, and every `LogEvent<T>`
+carries its `Epoch`. `ReadAsync(fromSequence, epoch, mode, resumeDraftId)` re-reads retained entries from a
+position and waits for new entries. Every active reader receives `Trimmed` when entries are trimmed and
+`Reset` when the entries it observed are replaced: by a clear, by deleting the journal, or because it resumes
+with another history's epoch or at or before a cleared sequence number, in any activation. The stream delivers
+`CaughtUp` once after the entries which were committed when the read began, and ends with `Sealed` once a seal
+is durable.
 
 `DurableWatchMode` is a set of flags: `Staged` adds staged changes and watermarks, and `Drafts` adds draft
 content. `Committed | Drafts` streams live drafts with only durable entries, so every entry is a valid resume
@@ -234,14 +247,13 @@ entries closes the draft cleanly. `Abandon` or disposal reports `DraftAbandoned`
 `LogDraftAbandonReason`. A closed draft releases its items, so a reader which has not read every item
 receives the outcome next and never receives the rest; the committed entries carry the final content. The
 log closes open drafts when its journal is deleted or it is sealed, so check `IsOpen` before committing a
-draft which the log can close. A reader which resumes a draft that closed in the current activation receives
-its outcome; the log records the outcomes of its 16 most recently closed drafts. Draft identifiers include
-the activation which opened them, so a reader reconnecting to a new activation receives `DraftAbandoned` with
-`PreviousActivation` and resumes from its position.
+draft which the log can close. The log journals a draft's identifier with its committed entries, so a reader
+which resumes a committed draft receives `DraftCommitted`, in any activation, while the log retains the first
+committed entry. A reader which resumes a draft that the current activation abandoned receives its reason; the
+log records the reasons for its 16 most recently abandoned drafts. A reader resuming a draft which another
+activation opened and never committed receives `DraftAbandoned` with `PreviousActivation`.
 
 A failed journal write faults watch streams; a stopped manager completes them without `Sealed`.
-`GetStateMachines()` on a grain's `StateManager` enumerates registered state names and instances for
-diagnostic tools.
 
 To test code which uses durable state, host it in a grain on an `InProcessTestCluster` whose silos call `AddJournaling()`,
 apply the application's journal format configuration, and call `AddVolatileJournalStorage()`. The silos run
