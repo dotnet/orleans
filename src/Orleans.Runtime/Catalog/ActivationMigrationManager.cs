@@ -135,8 +135,9 @@ internal interface IActivationMigrationManager
 /// </summary>
 /// <remarks>
 /// <para>
-/// The activation transfers its queued requests when it starts the migration, and the requests which reach it afterwards when it stops receiving requests,
-/// through <see cref="SourceDeactivated"/>. The activation does not access the requests afterwards.
+/// The activation transfers its queued requests when it starts the migration, and any requests which it would otherwise forward afterwards, through
+/// <see cref="TryAddLaterRequests"/>, including requests which reach it after it leaves the catalog. <see cref="SourceDeactivated"/> signals that it has left the catalog.
+/// The activation does not access the requests afterwards.
 /// </para>
 /// <para>
 /// Once the outcome is known and the activation has stopped receiving requests, the migration forwards the requests which the target did not take,
@@ -213,14 +214,36 @@ internal sealed class ActivationMigration(
     }
 
     /// <summary>
-    /// Takes ownership of the requests which reached the activation after the migration started, once the activation has stopped receiving requests.
+    /// Takes ownership of requests which reached the activation after the migration started, unless the migration has already delivered its requests.
     /// </summary>
-    /// <param name="laterRequests">The requests, if any.</param>
-    public void SourceDeactivated(List<Message>? laterRequests)
+    /// <param name="laterRequests">The requests.</param>
+    /// <returns><see langword="true"/> if the migration took ownership of the requests, and forwards them after its own; otherwise, <see langword="false"/>.</returns>
+    public bool TryAddLaterRequests(List<Message> laterRequests)
     {
-        _laterRequests = laterRequests;
-        Signal();
+        lock (_lock)
+        {
+            if (_delivering)
+            {
+                return false;
+            }
+
+            if (_laterRequests is null)
+            {
+                _laterRequests = laterRequests;
+            }
+            else
+            {
+                _laterRequests.AddRange(laterRequests);
+            }
+
+            return true;
+        }
     }
+
+    /// <summary>
+    /// Signals that the activation has left the catalog, so that requests which the migration forwards do not return to it.
+    /// </summary>
+    public void SourceDeactivated() => Signal();
 
     /// <summary>
     /// Records the migration's outcome, delivering its requests if the activation has stopped receiving requests.
@@ -263,15 +286,17 @@ internal sealed class ActivationMigration(
         if (pending == 0)
         {
             List<(GrainId SendingGrain, CorrelationId MessageId)>? cancellations;
+            List<Message>? laterRequests;
             lock (_lock)
             {
                 _delivering = true;
                 cancellations = _cancellations;
+                laterRequests = _laterRequests;
+                _laterRequests = null;
             }
 
             var requests = _requests;
-            var laterRequests = _laterRequests;
-            _requests = _laterRequests = null;
+            _requests = null;
             manager.DeliverRequests(this, target, Package.Requests, _requestsRetained is true, requests, laterRequests, cancellations);
         }
     }

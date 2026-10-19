@@ -254,6 +254,22 @@ internal sealed partial class ActivationData :
     }
 
     /// <summary>
+    /// Gets the migration of this activation, which owns its requests until it delivers them.
+    /// </summary>
+    private ActivationMigration? Migration
+    {
+        get => _extras?.Migration;
+        set
+        {
+            lock (_lock)
+            {
+                _extras ??= new();
+                _extras.Migration = value;
+            }
+        }
+    }
+
+    /// <summary>
     /// Gets the previous directory registration for this grain, if known.
     /// This is used to update the grain directory to point to the new registration during activation.
     /// </summary>
@@ -1775,13 +1791,6 @@ internal sealed partial class ActivationData :
     }
 
     /// <summary>
-    /// Rejects or forwards requests which this activation dequeued once it could no longer process them.
-    /// </summary>
-    /// <remarks>
-    /// Requests are forwarded if this was a duplicate activation or it was at some point successfully activated, and rejected otherwise.
-    /// Local requests never leave the activation, so they are rejected.
-    /// </remarks>
-    /// <summary>
     /// Removes all queued requests. The caller holds <see cref="_lock"/>.
     /// </summary>
     /// <returns>The requests, or <see langword="null"/> if there are none.</returns>
@@ -1802,31 +1811,34 @@ internal sealed partial class ActivationData :
         return requests;
     }
 
-    private void RejectOrForwardRequests(List<Message>? requests, ActivationMigration? migration = null)
+    /// <summary>
+    /// Rejects or forwards requests which this activation dequeued once it could no longer process them.
+    /// </summary>
+    /// <remarks>
+    /// Requests are forwarded if this was a duplicate activation or it was at some point successfully activated, and rejected otherwise.
+    /// Local requests never leave the activation, so they are rejected.
+    /// </remarks>
+    private void RejectOrForwardRequests(List<Message> requests)
     {
-        if (requests is not null)
+        foreach (var message in requests)
         {
-            foreach (var message in requests)
+            if (message.IsLocalOnly)
             {
-                if (message.IsLocalOnly)
-                {
-                    RejectRequest(message, new OrleansMessageRejectionException($"Activation {this} is no longer valid."));
-                }
+                RejectRequest(message, new OrleansMessageRejectionException($"Activation {this} is no longer valid."));
             }
-
-            requests.RemoveAll(static message => message.IsLocalOnly);
         }
 
-        if (migration is not null)
+        requests.RemoveAll(static message => message.IsLocalOnly);
+        if (requests.Count == 0)
         {
-            // The migration owns the requests which were queued when it started, and forwards these after them, once its outcome is known.
-            _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
-            migration.SourceDeactivated(requests);
             return;
         }
 
-        if (requests is not { Count: > 0 })
+        // Until this activation's migration has delivered the requests which it owns, it forwards these after them, once its outcome is known.
+        // This includes requests which reach this activation after it leaves the catalog.
+        if (Migration is { } migration && migration.TryAddLaterRequests(requests))
         {
+            _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
             return;
         }
 
@@ -2177,7 +2189,6 @@ internal sealed partial class ActivationData :
 
         var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start(_shared.CatalogInstruments, _shared.GrainTypeMetricName);
         var migrating = false;
-        ActivationMigration? migration = null;
         var encounteredError = false;
         try
         {
@@ -2339,10 +2350,12 @@ internal sealed partial class ActivationData :
                     queued = TakeWaitingRequests();
                 }
 
-                if (queued is not null || migration is not null)
+                if (queued is not null)
                 {
-                    RejectOrForwardRequests(queued, migration);
+                    RejectOrForwardRequests(queued);
                 }
+
+                Migration?.SourceDeactivated();
             }
             finally
             {
@@ -2381,7 +2394,8 @@ internal sealed partial class ActivationData :
 
                 // Send the dehydration context to the target host. The migration takes ownership of the queued requests, which the new activation runs before any other request,
                 // and of any which arrive later. It delivers the requests which the new activation does not take.
-                migration = migrationManager.StartMigration(ForwardingAddress, Address, context.MigrationContext, TakeRequestsForMigration(), cancellationToken);
+                var migration = migrationManager.StartMigration(ForwardingAddress, Address, context.MigrationContext, TakeRequestsForMigration(), cancellationToken);
+                Migration = migration;
                 await migration.Completion.WaitAsync(cancellationToken);
                 _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, ForwardingAddress);
                 return true;
@@ -2539,6 +2553,8 @@ internal sealed partial class ActivationData :
         /// If State == Invalid, this may contain a forwarding address for incoming messages
         /// </summary>
         public SiloAddress? ForwardingAddress { get => GetValueOrDefault<SiloAddress>(nameof(ForwardingAddress)); set => SetOrRemoveValue(nameof(ForwardingAddress), value); }
+
+        public ActivationMigration? Migration { get => GetValueOrDefault<ActivationMigration>(nameof(Migration)); set => SetOrRemoveValue(nameof(Migration), value); }
 
         /// <summary>
         /// A <see cref="TaskCompletionSource{TResult}"/> which completes when a grain has deactivated.
