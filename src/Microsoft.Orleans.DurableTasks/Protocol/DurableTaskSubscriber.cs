@@ -11,6 +11,6 @@ namespace Orleans.DurableTasks.Protocol;
 /// <param name="TaskId">The receiving grain's task which the result completes.</param>
 [GenerateSerializer, Immutable]
 [Alias("Orleans.DurableTasks.Protocol.DurableTaskSubscriber")]
-public readonly record struct DurableTaskSubscriber(
+internal readonly record struct DurableTaskSubscriber(
     [property: Id(0)] GrainId GrainId,
     [property: Id(1)] TaskId TaskId);

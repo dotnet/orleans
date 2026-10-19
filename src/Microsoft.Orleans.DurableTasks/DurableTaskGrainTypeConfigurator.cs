@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.DurableTasks.Protocol;
+using Orleans.DurableTasks.Storage;
 using Orleans.Journaling;
 using Orleans.Messaging;
 using Orleans.Metadata;
@@ -24,6 +26,11 @@ namespace Orleans.DurableTasks.Runtime;
 /// the grain's <c>OnActivateAsync</c> has completed, and running executions are signaled to abort before its
 /// <c>OnDeactivateAsync</c> runs; see <see cref="DurableTaskActivationObserver"/>.
 /// </para>
+/// <para>
+/// Task state lives in the grain's journal, which is the source of truth for the grain's executions, so activation
+/// setup requires the grain's journaled state manager and the journal-backed task storage, and fails the activation
+/// when either is missing.
+/// </para>
 /// </remarks>
 internal sealed class DurableTaskGrainTypeConfigurator(GrainClassMap grainClasses) : IConfigureGrainTypeComponents
 {
@@ -38,6 +45,7 @@ internal sealed class DurableTaskGrainTypeConfigurator(GrainClassMap grainClasse
         shared.AddActivationSetup(static context =>
         {
             var services = context.ActivationServices;
+            ValidateJournaledStorage(services, context.GrainId);
             var runtime = services.GetRequiredService<DurableTaskGrainRuntime>();
             services.GetRequiredService<IJournaledStateManager>()
                 .RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, runtime);
@@ -54,5 +62,26 @@ internal sealed class DurableTaskGrainTypeConfigurator(GrainClassMap grainClasse
                 runtime.StopAsync);
             runtime.InitializeForActivation(context);
         });
+    }
+
+    /// <summary>
+    /// Ensures that the activation whose services are <paramref name="services"/> stores its task state in its journal.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The activation has no journaled state manager, or its task storage isn't the journal-backed storage.
+    /// </exception>
+    internal static void ValidateJournaledStorage(IServiceProvider services, GrainId grainId)
+    {
+        if (services.GetService<IJournaledStateManager>() is null)
+        {
+            throw new InvalidOperationException(
+                $"Durable Tasks stores task state in the grain's journal, and grain '{grainId}' has no journaled state manager. Configure journaling and journal storage on the silo builder.");
+        }
+
+        if (services.GetService<IDurableTaskGrainStorage>() is not DurableTaskGrainStorage)
+        {
+            throw new InvalidOperationException(
+                $"Durable Tasks stores task state in the grain's journal, and grain '{grainId}' has no journal-backed task storage. Call AddDurableTasks on the silo builder.");
+        }
     }
 }

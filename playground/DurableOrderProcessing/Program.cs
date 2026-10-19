@@ -2,7 +2,6 @@ using System.Runtime.CompilerServices;
 using Orleans.Core.Internal;
 using Orleans.Dashboard;
 using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using DurableOrderProcessing;
@@ -85,16 +84,6 @@ api.MapGet("/orders/{orderId:guid}/workflow", async (Guid orderId, IGrainFactory
     }
 });
 
-// Lists the durable tasks which a grain retains, for diagnostics.
-api.MapGet("/orders/{orderId:guid}/tasks", (Guid orderId, IGrainFactory grains) =>
-    ListTasksAsync(grains.GetGrain<IOrderGrain>(orderId)));
-
-api.MapGet("/buyers/{buyerId}/tasks", (string buyerId, IGrainFactory grains) =>
-    ListTasksAsync(grains.GetGrain<IBuyerGrain>(buyerId)));
-
-api.MapGet("/catalog/{productId:int}/tasks", (int productId, IGrainFactory grains) =>
-    ListTasksAsync(grains.GetGrain<ICatalogItemGrain>(productId)));
-
 // Deactivates an order, for observing recovery: the next activation replays its pending tasks.
 api.MapPost("/orders/{orderId:guid}/deactivate", async (Guid orderId, IGrainFactory grains) =>
     await grains.GetGrain<IOrderGrain>(orderId).AsReference<IGrainManagementExtension>().DeactivateOnIdle());
@@ -106,17 +95,6 @@ api.MapPost("/orders/{orderId:guid}/ship", async (Guid orderId, IGrainFactory gr
     await grains.GetGrain<IOrderGrain>(orderId).ShipAsync() ? Results.Ok() : Results.Conflict());
 
 app.Run();
-
-static async Task<object[]> ListTasksAsync(IAddressable grain)
-{
-    var tasks = new List<object>();
-    await foreach (var (taskId, state) in grain.AsReference<IDurableTaskGrainExtension>().GetTasksAsync())
-    {
-        tasks.Add(new { taskId = taskId.ToString(), state.Status, state.CreatedAt, state.CompletedAt, state.DueTime });
-    }
-
-    return [.. tasks];
-}
 
 // Watches an order across its activations. A deactivation aborts the order's enumeration; the next activation streams
 // the history from the start again, so the watch skips the snapshots which it has already delivered.

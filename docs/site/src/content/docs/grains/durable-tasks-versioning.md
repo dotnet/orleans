@@ -91,9 +91,8 @@ execution follows `version` or a newer one.
 Retire a version once no pending execution follows it:
 
 1. Find the executions which follow it. Each execution holds its decision as the
-   `$version:{name}` record, whose response is the version, in
-   `IDurableTaskGrainExtension.GetTasksAsync`, and the `VersionRecorded` event reports
-   each decision as it's recorded; see [Monitor versions](#monitor-versions).
+   `$version:{name}` record, whose response is the version, and the `VersionRecorded`
+   event reports each decision as it's recorded; see [Monitor versions](#monitor-versions).
 2. Raise `minSupported` above the version, and remove its branch:
 
    :::code source="../snippets/compiled/Grains/DurableTaskVersioningSnippets.cs" id="durable_tasks_versioning_retired" language="csharp":::

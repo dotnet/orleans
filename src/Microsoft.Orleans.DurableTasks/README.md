@@ -30,12 +30,14 @@ in any journal format, including the
 default JSON format and the Orleans binary format. Requests and responses are
 stored as Orleans-serialized payloads, so their types need Orleans serializers
 but no JSON metadata; `AddDurableTasks` registers the JSON metadata for the
-remaining task state. Tests can register volatile task storage through
-`AddVolatileDurableTaskStorage`.
+remaining task state. Task state lives in the grain's journal, which is the
+source of truth for the grain's executions; tests keep it in memory with volatile
+journal storage, such as `AddVolatileJournalStorage`.
 
 Durable grains derive from `DurableGrain` or implement `IMessagingGrain`. During
 activation setup, before journal recovery, the adapter binds its runtime to the
-grain's journal and inbox.
+grain's journal and inbox; an activation without a journaled state manager fails
+during this setup.
 
 `GetDurableTask<T>(rootId)`, or its `TaskId` overload, returns a `DurableTaskReference<T>` to an
 existing task without scheduling a new execution. Clients and ordinary grain methods await it, poll
@@ -131,8 +133,9 @@ public sealed class OrderGrain(IDurableTaskManager tasks) : DurableGrain, IOrder
 
 A cancellation request can carry a reason, which the canceled workflow reads from
 `DurableTask.Current.TaskCancellationReason`, for example to record why it stopped. The first
-request determines the reason; `ScheduledTask.CancelAsync(reason)` and
-`IDurableTaskGrainExtension.CancelAsync(taskId, reason)` carry one from clients and tooling.
+request determines the reason; `ScheduledTask.CancelAsync(reason)`,
+`DurableTaskReference<T>.CancelAsync(reason)`, and `IDurableTaskManager.CancelAsync(taskId, reason)`
+carry one from clients, tooling, and the task's grain.
 
 Configuration on a durable grain call sets what the task is, and the call which starts it sets when
 the caller continues:
@@ -278,7 +281,7 @@ framework assets; its first published version establishes the compatibility base
 
 ## Diagnostics
 
-`IDurableTaskGrainExtension.GetTasksAsync` lists a grain's tasks with their status, request, and result.
+`DurableTaskReference<T>.GetStatusAsync` and `GetResponseAsync` report a task's status and result.
 `DurableTaskEvents`, the `Orleans.DurableTasks` diagnostic listener, reports the runtime's transitions
 synchronously on the activation which makes them, when the runtime stages them: `TaskCreated`,
 `TaskCompleted`, `TaskDeleted`, `ExecutionStarted`, `ExecutionStopped`, `ReplayEnded`,
@@ -415,17 +418,16 @@ synchronously on the activation which makes them, when the runtime stages them: 
   outlive the task itself.
 - A cancellation request's reason commits with the request on each task it reaches, travels with the
   cancellation to each pending call to another grain, and is what a replay of a canceled body reads
-  from `DurableTask.Current.TaskCancellationReason`. Diagnostics report it as the `Response` of a
-  `Canceling` or `Canceled` task.
-- An administrative abort, through `IDurableTaskManager.AbortAsync`, `IDurableTaskGrainExtension.AbortAsync`,
+  from `DurableTask.Current.TaskCancellationReason`.
+- An administrative abort, through `IDurableTaskManager.AbortAsync`, `DurableTaskReference<T>.AbortAsync`,
   or `ScheduledTask.AbortAsync`, commits the task and its execution tree as failed with
   `DurableTaskAbortedException` in one journal write, which also stages an abort to each pending call to
   another grain; that callee aborts its task's tree in turn. Each running attempt in the tree is canceled
   with the reason `TaskAborted` and its result discarded, so its later durable operations throw, and
   abort runs no compensation. The tree's delays terminalize with it, so their
   resumes are stale. The stored exception's message is the abort reason, and the task's completion time
-  records when it was aborted; diagnostics report the task as `Faulted` with
-  `DurableTaskAbortedException: <reason>`. Aborting a terminal task changes
+  records when it was aborted; polling the task reports it as `Failed` with
+  `DurableTaskAbortedException` carrying the reason. Aborting a terminal task changes
   nothing, and an abort which arrives before its invocation is recorded as a cancellation.
 - A detached task is a root on its target with no caller. Durable cancellation and abort of its
   starter don't reach it, and deleting the starter's execution tree deletes only the record which

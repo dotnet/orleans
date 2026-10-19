@@ -10,6 +10,7 @@ using Orleans.DurableTasks.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using NSubstitute;
 using Orleans.Concurrency;
 using Orleans.Configuration;
@@ -751,27 +752,77 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public void VolatileTaskStorageIsSharedWithinAnActivationScope()
+    public void SiloRegistrationStoresTaskStateInTheGrainJournal()
     {
         var silo = new TestSiloBuilder();
 
-        // A silo registers the serializer, whose copier the volatile storage uses to snapshot its tasks.
-        silo.Services.AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskState).Assembly));
         silo.AddDurableTasks();
-        silo.Services.RemoveAll<DurableTaskGrainStorage>();
-        silo.Services.RemoveAll<IDurableTaskGrainStorage>();
-        silo.AddVolatileDurableTaskStorage();
-        using var provider = silo.Services.BuildServiceProvider();
 
-        using var firstScope = provider.CreateScope();
-        var concrete = firstScope.ServiceProvider.GetRequiredService<VolatileDurableTaskGrainStorage>();
-        var abstraction = firstScope.ServiceProvider.GetRequiredService<IDurableTaskGrainStorage>();
-        Assert.Same(concrete, abstraction);
+        Assert.Contains(
+            silo.Services,
+            descriptor => descriptor.ServiceType == typeof(DurableTaskGrainStorage) && descriptor.Lifetime == ServiceLifetime.Scoped);
+        var storage = Assert.Single(silo.Services, descriptor => descriptor.ServiceType == typeof(IDurableTaskGrainStorage));
+        Assert.Equal(ServiceLifetime.Scoped, storage.Lifetime);
+    }
 
-        using var secondScope = provider.CreateScope();
-        Assert.NotSame(
-            concrete,
-            secondScope.ServiceProvider.GetRequiredService<VolatileDurableTaskGrainStorage>());
+    [Fact]
+    public void ActivationSetupFailsWithoutAJournaledStateManager()
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => DurableTaskGrainTypeConfigurator.ValidateJournaledStorage(services, GrainId.Create("durable", "one")));
+
+        Assert.Contains("has no journaled state manager", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ActivationSetupFailsWithoutJournalBackedTaskStorage()
+    {
+        await using var services = new ServiceCollection()
+            .AddScoped(_ => Substitute.For<IJournaledStateManager>())
+            .AddScoped(_ => Substitute.For<IDurableTaskGrainStorage>())
+            .BuildServiceProvider();
+        await using var scope = services.CreateAsyncScope();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => DurableTaskGrainTypeConfigurator.ValidateJournaledStorage(scope.ServiceProvider, GrainId.Create("durable", "one")));
+
+        Assert.Contains("has no journal-backed task storage", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ActivationSetupAcceptsTheSiloJournalBackedTaskStorage()
+    {
+        await using var harness = new DurableTaskJournalHarness(DurableTaskJournalHarness.Json);
+        await using var scope = harness.CreateScope();
+
+        DurableTaskGrainTypeConfigurator.ValidateJournaledStorage(scope.ServiceProvider, GrainId.Create("durable", "one"));
+    }
+
+    [Fact]
+    public void TryGetTargetReturnsTheTargetOfAnUnscheduledGrainCall()
+    {
+        using var host = new HostBuilder()
+            .UseOrleansClient(client => client.UseLocalhostClustering().AddDurableTasks())
+            .Build();
+        var grain = host.Services.GetRequiredService<IGrainFactory>()
+            .GetGrain<IDurableRpcCodegenGrain>(GrainId.Create("durable-rpc-codegen", "target"));
+
+        Assert.True(grain.GetValueAsync().TryGetTarget(out var typedTarget));
+        Assert.Equal(grain.GetGrainId(), typedTarget);
+        Assert.True(grain.ExecuteAsync(1).TryGetTarget(out var untypedTarget));
+        Assert.Equal(grain.GetGrainId(), untypedTarget);
+    }
+
+    [Fact]
+    public void TryGetTargetReturnsFalseForTasksWhichAreNotGrainCalls()
+    {
+        Assert.False(DurableTask.FromResult(1).TryGetTarget(out var target));
+        Assert.Equal(default, target);
+        Assert.False(DurableTask.Run(static _ => Task.CompletedTask).TryGetTarget(out target));
+        Assert.Equal(default, target);
+        Assert.Throws<ArgumentNullException>(() => ((DurableTask)null!).TryGetTarget(out _));
     }
 
     [Fact]

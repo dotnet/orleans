@@ -19,8 +19,9 @@ stores task state in each grain's journal as the journaled state
 `orleans.durable-tasks.runtime`. Give application states other names. Task state uses
 the grain's journal format, JSON or Orleans binary; `AddDurableTasks` registers the JSON
 metadata for task state, and requests, results, and signal values are stored as
-Orleans-serialized payloads. `AddVolatileDurableTaskStorage` replaces journal-backed task
-state with in-memory state for tests.
+Orleans-serialized payloads. The grain's journal is the source of truth for task state;
+tests keep it in memory with volatile journal storage, such as `AddVolatileJournalStorage`.
+Activation setup fails for a durable grain without a journaled state manager.
 
 `DurableTaskOptions` configures retention and stalled executions through the
 `AddDurableTasks` callback, and is validated at startup.
@@ -87,36 +88,27 @@ or retry schedules, and account for the retained task state in each grain's jour
 the number of retained client-scheduled tasks is their completion rate multiplied by the
 period.
 
-## List a grain's tasks
+## Observe a task
 
-Every durable grain serves `IDurableTaskGrainExtension`, which lists the tasks the grain
-retains. `GetTasksAsync` returns each task's ID and a `DurableTaskDiagnosticState`, and
-`GetRunningTasksAsync` returns the IDs of the executions running in the activation:
+Grain references expose task control: the `GetDurableTask<TResult>(rootId)` extension
+returns a `DurableTaskReference<TResult>` which polls, waits for, cancels, or aborts an
+existing task, and which a durable task awaits to subscribe to its result, and the
+`SignalDurableTaskAsync` and `TrySignalDurableTaskAsync` extensions deliver signals.
+`GetStatusAsync` reports the task's `DurableTaskStatus`, and `GetResponseAsync` returns its
+response, which holds the result or the exception. A poll of a task which the grain doesn't
+retain throws `DurableTaskNotFoundException`:
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_diagnostics" language="csharp":::
 
-| Status | Meaning | `Response` |
-| --- | --- | --- |
-| `Pending` | The task hasn't recorded a result. | None |
-| `Delayed` | A delay is waiting for its due time, reported in `DueTime`. | None |
-| `Canceling` | Cancellation was requested and the task hasn't recorded a result. | The cancellation reason |
-| `Completed` | The task completed successfully. | The result's `ToString()` |
-| `Canceled` | The task was canceled. | The cancellation reason |
-| `Faulted` | The task failed or was aborted. | The exception type and message, such as `DurableTaskAbortedException: <reason>` |
-| `Unreadable` | The stored result no longer decodes. | The decoding error |
+| Status | Meaning |
+| --- | --- |
+| `Pending` | The task hasn't recorded a result, including while a cancellation request or a delay is pending. |
+| `CompletedSuccessfully` | The task completed successfully. |
+| `Canceled` | The task was canceled. |
+| `Failed` | The task failed or was aborted; an abort's exception is `DurableTaskAbortedException`, whose message is the abort reason. |
 
-`Request` describes an invoked task's method call, `RemoteTarget` names the grain which
-runs a call to another grain, `CreatedAt` and `CompletedAt` record timestamps, and
-`Waiters` lists the grains whose completion is pending in the outbox. Diagnostics decode
-stored payloads and report decoding failures instead of throwing.
-
-Grain references also expose task control: the `GetDurableTask<TResult>(rootId)`
-extension returns a reference which polls, waits for, cancels, or aborts an existing
-task, and which a durable task awaits to subscribe to its result, and the
-`SignalDurableTaskAsync` and `TrySignalDurableTaskAsync` extensions deliver signals.
-Diagnostics describe a subscription child's `Request` as
-`a subscription to task '{taskId}' on grain '{grain}'`, and `Waiters` lists a
-subscriber other than the invoker as its grain followed by its task ID.
+A grain observes, cancels, aborts, and signals its own tasks without a grain call through
+`IDurableTaskManager`, which it resolves from its activation services.
 
 ## Observe runtime transitions
 

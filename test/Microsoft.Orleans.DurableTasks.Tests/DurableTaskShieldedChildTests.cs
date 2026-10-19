@@ -287,29 +287,27 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.True(storage.Get(childId).Shielded);
     });
 
-    [Fact]
-    public async Task VolatileStorageRecoversTheFirstCancellationReasonAndTheShield()
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public async Task JournalRecoversTheFirstCancellationReasonAndTheShield(string journalFormatKey)
     {
-        using var services = new ServiceCollection()
-            .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskMessageTransport).Assembly))
-            .BuildServiceProvider();
-        var storage = new VolatileDurableTaskGrainStorage(
-            services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
-            services.GetRequiredService<DeepCopier<DurableTaskState>>(),
-            TimeProvider.System,
-            services.GetRequiredService<Serializer>());
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var harness = new DurableTaskJournalHarness(journalFormatKey);
         var taskId = TaskId.Parse("root/cleanup");
-        var state = storage.GetOrCreateTask(taskId, request: null);
+        await using (var activation = await harness.ActivateAsync(cancellationToken))
+        {
+            var storage = activation.Storage;
+            var state = storage.GetOrCreateTask(taskId, request: null);
 
-        storage.Shield(taskId, state);
-        storage.RequestCancellation(taskId, state, "buyer");
-        Assert.True(storage.TryGetTask(taskId, out var canceled));
-        storage.RequestCancellation(taskId, canceled, "later");
-        await storage.WriteAsync(TestContext.Current.CancellationToken);
-        storage.Clear();
-        await storage.ReadAsync(TestContext.Current.CancellationToken);
+            storage.Shield(taskId, state);
+            storage.RequestCancellation(taskId, state, "buyer");
+            Assert.True(storage.TryGetTask(taskId, out var canceled));
+            storage.RequestCancellation(taskId, canceled, "later");
+            await storage.WriteAsync(cancellationToken);
+        }
 
-        Assert.True(storage.TryGetTask(taskId, out var recovered));
+        await using var recovery = await harness.ActivateAsync(cancellationToken);
+        Assert.True(recovery.Storage.TryGetTask(taskId, out var recovered));
         Assert.Equal(("buyer", true), (recovered.CancellationReason, recovered.Shielded));
         Assert.NotNull(recovered.CancellationRequestedAt);
     }
