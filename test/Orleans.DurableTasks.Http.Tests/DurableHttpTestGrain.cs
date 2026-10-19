@@ -14,6 +14,8 @@ public interface IDurableHttpTestGrain : IGrainWithStringKey
 
     DurableTask<string> WaitForShipmentAsync(string item);
 
+    DurableTask<string> WaitForConfirmationAsync(string item);
+
     DurableTask<string[]> SendIdempotencyKeyAsync();
 
     DurableTask<string> EchoLaterAsync(string value);
@@ -29,6 +31,8 @@ public interface IDurableHttpTestGrain : IGrainWithStringKey
     DurableTask<string> CancelRemoteOperationAsync(string orderId, string reason);
 
     DurableTask<string[]> SendRemoteRequestsAsync();
+
+    DurableTask<string> ApplyEffectAsync(string id);
 }
 
 /// <summary>Runs the durable tasks which the HTTP endpoints under test start.</summary>
@@ -39,6 +43,7 @@ public sealed class DurableHttpTestGrain(
 {
     public static readonly DurableSignal<string> Approved = new("approved");
     public static readonly DurableSignal<string> Shipped = new("shipped");
+    public static readonly DurableSignal<bool> Confirmed = new("confirmed");
 
     public DurableTask<string> EchoAsync(string value) => DurableTask.FromResult(value);
 
@@ -65,6 +70,9 @@ public sealed class DurableHttpTestGrain(
         var carrier = await Shipped.WaitAsync();
         return $"{item} approved by {approver}, shipped by {carrier}";
     }
+
+    /// <summary>Waits for a confirmation, whose value is a <see cref="bool"/>.</summary>
+    public async DurableTask<string> WaitForConfirmationAsync(string item) => $"{item} confirmed: {await Confirmed.WaitAsync()}";
 
     /// <summary>Returns <paramref name="value"/> after a durable delay, so an HTTP client observes a running operation.</summary>
     public async DurableTask<string> EchoLaterAsync(string value)
@@ -130,6 +138,17 @@ public sealed class DurableHttpTestGrain(
         var post = await api.SendAsync(() => new HttpRequestMessage(HttpMethod.Post, "/echo-idempotency-key")).WithId("post");
         var get = await api.SendAsync(() => new HttpRequestMessage(HttpMethod.Get, "/echo-idempotency-key")).WithId("get");
         return [post.EnsureSuccessStatusCode().ReadAsString(), get.EnsureSuccessStatusCode().ReadAsString()];
+    }
+
+    /// <summary>
+    /// Applies the effect <paramref name="id"/> at the server with <see cref="IDurableHttpClient.SendAsync"/>, then waits for
+    /// an approver, and returns how many requests the server had applied and the approver.
+    /// </summary>
+    public async DurableTask<string> ApplyEffectAsync(string id)
+    {
+        var applied = await api.SendAsync(() => new HttpRequestMessage(HttpMethod.Post, $"/effects/{id}")).WithId("apply");
+        var approver = await Approved.WaitAsync();
+        return $"{applied.EnsureSuccessStatusCode().ReadAsString()} {approver}";
     }
 
     private DurableTask<DurableHttpOperation> StartApprovalAsync(string orderId) =>

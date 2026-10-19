@@ -61,7 +61,7 @@ public sealed class DurableOperationEndpointTests(DurableHttpFixture fixture)
     }
 
     [Fact]
-    public async Task MappedOperationIdentifiersScopeOperations()
+    public async Task CallerScopesIsolateOperations()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var path = $"/orders/{Guid.NewGuid():N}/echo";
@@ -71,8 +71,8 @@ public sealed class DurableOperationEndpointTests(DurableHttpFixture fixture)
         Assert.Equal("ada's", await ada.Content.ReadFromJsonAsync<string>(cancellationToken));
         var location = GetOperationLocation(ada);
 
-        // The fixture maps an authenticated user's identifiers into the user's scope, so an equal key of another user, or
-        // of an anonymous request, starts its own operation, and each reads its own operation at the same URL.
+        // An authenticated user's operations belong to the user's scope, so an equal key of another user, or of an anonymous
+        // request, starts its own operation, and each reads its own operation at the same URL.
         using var grace = await StartAsync(path, new EchoRequest("grace's"), key, wait: 30, cancellationToken, user: "grace");
         Assert.Equal(HttpStatusCode.OK, grace.StatusCode);
         Assert.Equal("grace's", await grace.Content.ReadFromJsonAsync<string>(cancellationToken));
@@ -86,6 +86,43 @@ public sealed class DurableOperationEndpointTests(DurableHttpFixture fixture)
 
         using var conflict = await StartAsync(path, new EchoRequest("grace's"), key, wait: 30, cancellationToken, user: "ada");
         Assert.Equal(HttpStatusCode.UnprocessableEntity, conflict.StatusCode);
+    }
+
+    [Fact]
+    public async Task OperationKeysAreNotCapabilitiesOfOtherCallers()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var path = $"/orders/{Guid.NewGuid():N}/approval";
+        var key = Guid.NewGuid().ToString();
+        using var started = await StartAsync(path, new ApprovalRequest("widget"), key, wait: null, cancellationToken, user: "ada");
+        var location = GetOperationLocation(started);
+
+        // Another user, an anonymous caller, and an anonymous caller whose key embeds ada's name, as a mapping such as
+        // "{user}:{key}" would, reach none of ada's operation.
+        foreach (var (user, operation) in new[] { ("grace", location), (null, location), (null, new Uri(location.AbsoluteUri.Replace($"/operations/{key}", $"/operations/ada:{key}", StringComparison.Ordinal))) })
+        {
+            foreach (var request in new[]
+            {
+                new HttpRequestMessage(HttpMethod.Get, operation),
+                new HttpRequestMessage(HttpMethod.Post, $"{operation}:cancel"),
+                new HttpRequestMessage(HttpMethod.Post, $"{operation}/signals/approved") { Content = JsonContent.Create("mallory") },
+            })
+            {
+                using (request)
+                {
+                    if (user is not null)
+                    {
+                        request.Headers.Add(DurableHttpFixture.TestUserHeader, user);
+                    }
+
+                    using var response = await Http.SendAsync(request, cancellationToken);
+                    Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+                }
+            }
+        }
+
+        Assert.Equal(HttpStatusCode.NoContent, await SignalAsync(location, "ada", cancellationToken, user: "ada"));
+        Assert.Equal("widget approved by ada", (await GetOperationAsync(location, wait: 30, cancellationToken, user: "ada")).Result?.GetString());
     }
 
     [Fact]
@@ -140,7 +177,7 @@ public sealed class DurableOperationEndpointTests(DurableHttpFixture fixture)
     }
 
     [Fact]
-    public async Task CancellingASubscribingOperationCancelsTheTaskWhichItSubscribesTo()
+    public async Task CancellingASubscribingOperationEndsOnlyItsSubscription()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var orderId = Guid.NewGuid().ToString("N");
@@ -155,9 +192,13 @@ public sealed class DurableOperationEndpointTests(DurableHttpFixture fixture)
         }
 
         var canceled = await GetOperationAsync(location, wait: 30, cancellationToken);
-        Assert.Equal(new DurableOperationError("Canceled", "widget was canceled: the buyer withdrew"), canceled.Error);
-        var approval = await grain.GetDurableTask<string>(DurableHttpFixture.ApprovalRootId).GetResponseAsync(cancellationToken);
-        Assert.Equal(DurableTaskStatus.Canceled, approval.Status);
+        Assert.Equal(DurableOperationStatus.Canceled, canceled.Status);
+
+        // The approval, which other parties own, continues, and completes with its own signal.
+        var approval = grain.GetDurableTask<string>(DurableHttpFixture.ApprovalRootId);
+        Assert.Equal(DurableTaskStatus.Pending, await approval.GetStatusAsync(cancellationToken: cancellationToken));
+        await grain.SignalDurableTaskAsync(DurableHttpFixture.ApprovalRootId, DurableHttpTestGrain.Approved, "ada", cancellationToken);
+        Assert.Equal("widget approved by ada", (await approval.GetResponseAsync(cancellationToken)).GetResult<string>());
     }
 
     [Fact]
@@ -244,6 +285,29 @@ public sealed class DurableOperationEndpointTests(DurableHttpFixture fixture)
             using var response = await Http.PostAsync(signalUri, content, cancellationToken);
             return response.StatusCode;
         }
+    }
+
+    [Fact]
+    public async Task SignalWithoutABodyDoesNotDeliverTheDefaultValue()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var started = await StartAsync($"/orders/{Guid.NewGuid():N}/confirmation", new ApprovalRequest("widget"), Guid.NewGuid().ToString(), wait: null, cancellationToken);
+        var location = GetOperationLocation(started);
+        var signalUri = new Uri($"{location}/signals/confirmed");
+
+        using (var bodyless = await Http.PostAsync(signalUri, content: null, cancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, bodyless.StatusCode);
+        }
+
+        // The operation holds no value, so the value which the client then sends completes it.
+        Assert.Equal(DurableOperationStatus.Running, (await GetOperationAsync(location, wait: 0, cancellationToken)).Status);
+        using (var confirmed = await Http.PostAsJsonAsync(signalUri, true, cancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, confirmed.StatusCode);
+        }
+
+        Assert.Equal("widget confirmed: True", (await GetOperationAsync(location, wait: 30, cancellationToken)).Result?.GetString());
     }
 
     [Fact]
@@ -427,17 +491,34 @@ public sealed class DurableOperationEndpointTests(DurableHttpFixture fixture)
         Assert.Equal("hello", operation.Result?.GetString());
     }
 
-    [Theory]
-    [InlineData("rejected")]
-    [InlineData("undelivered")]
-    public async Task StartWhichTheOperationHostDoesNotAcceptIsABadGateway(string failure)
+    [Fact]
+    public async Task StartWhoseWorkItsGrainRejectsReportsThatTheWorkNeverRan()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var orderId = Guid.NewGuid().ToString("N");
+        var key = Guid.NewGuid().ToString();
+
+        // The order's grain already holds other work under the root which the operation's work would use, so it rejects
+        // the operation's work.
+        var workRootId = TaskId.CreateRoot("orders").Child(orderId).Child("@").Child(key).ToString();
+        await fixture.Client.GetGrain<IDurableHttpTestGrain>(orderId).EchoAsync("other").WithId(workRootId).ScheduleAsync(cancellationToken);
+
+        using var response = await StartAsync($"/orders/{orderId}/echo", new EchoRequest("hello"), key, wait: 30, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.FailedDependency, response.StatusCode);
+        var operation = (await response.Content.ReadFromJsonAsync<DurableOperation>(cancellationToken))!;
+        Assert.Equal(DurableOperationStatus.Failed, operation.Status);
+        Assert.Equal(DurableOperationError.NotStartedCode, operation.Error?.Code);
+    }
+
+    [Fact]
+    public async Task StartWithoutAnIdempotencyKeyIsRejected()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        using var response = await StartAsync($"/orders/{Guid.NewGuid():N}/echo", new EchoRequest("hello"), $"{failure}-{Guid.NewGuid():N}", wait: null, cancellationToken);
+        using var response = await Http.PostAsJsonAsync($"/orders/{Guid.NewGuid():N}/echo", new EchoRequest("hello"), cancellationToken);
 
-        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
-        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.False(response.Headers.Contains(DurableHttpHeaders.OperationLocation));
     }
 
@@ -446,7 +527,7 @@ public sealed class DurableOperationEndpointTests(DurableHttpFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var path = $"/orders/{Guid.NewGuid():N}/echo";
-        string[][] invalidKeys = [[new string('k', 256)], ["\"unterminated\\\""], ["first", "second"], ["a/b"]];
+        string[][] invalidKeys = [[new string('k', 256)], ["\"unterminated\\\""], ["first", "second"], ["a/b"], ["."], [".."]];
         foreach (var keys in invalidKeys)
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(new EchoRequest("hello")) };
@@ -487,9 +568,15 @@ public sealed class DurableOperationEndpointTests(DurableHttpFixture fixture)
         return (await response.Content.ReadFromJsonAsync<DurableOperation>(cancellationToken))!;
     }
 
-    private async Task<HttpStatusCode> SignalAsync(Uri location, string value, CancellationToken cancellationToken, string signal = "approved")
+    private async Task<HttpStatusCode> SignalAsync(Uri location, string value, CancellationToken cancellationToken, string signal = "approved", string? user = null)
     {
-        using var response = await Http.PostAsJsonAsync(new Uri($"{location}/signals/{signal}"), value, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"{location}/signals/{signal}")) { Content = JsonContent.Create(value) };
+        if (user is not null)
+        {
+            request.Headers.Add(DurableHttpFixture.TestUserHeader, user);
+        }
+
+        using var response = await Http.SendAsync(request, cancellationToken);
         return response.StatusCode;
     }
 

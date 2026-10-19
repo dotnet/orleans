@@ -19,8 +19,8 @@ namespace Microsoft.AspNetCore.Builder;
 /// <para>
 /// Nexus operations are durable operations like those which
 /// <see cref="DurableHttpEndpointRouteBuilderExtensions.WithDurableOperations"/> configures: the caller's
-/// <c>Nexus-Request-Id</c> names the operation, which <see cref="DurableHttpOptions.MapOperationId"/> maps within the
-/// service's scope. A group of the same scope, without route parameters, addresses the same operations, so it can stream
+/// <c>Nexus-Request-Id</c> names the operation within the service's scope and the caller's, which
+/// <see cref="DurableHttpOptions.GetCallerScope"/> returns. A group of the same scope, without route parameters, addresses the same operations, so it can stream
 /// their status or deliver their signals. Authentication and authorization belong to the application, which configures
 /// them on the service's endpoints.
 /// </para>
@@ -44,7 +44,7 @@ public static class NexusEndpointRouteBuilderExtensions
     public static RouteGroupBuilder MapNexusService(this IEndpointRouteBuilder endpoints, string service, string? scope = null)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
-        ThrowIfInvalidName(service);
+        DurableTaskEndpointConventions.ThrowIfInvalidName(service, nameof(service));
         return endpoints.MapGroup($"/{service}").WithMetadata(new NexusServiceMetadata(scope ?? $"nexus/{service}"));
     }
 
@@ -74,12 +74,14 @@ public static class NexusEndpointRouteBuilderExtensions
     /// <item><description><c>201 Created</c> with an <c>OperationInfo</c>, whose token addresses the operation, while it runs.</description></item>
     /// <item><description>
     /// <c>424 Failed Dependency</c> with an <c>OperationError</c> failure, whose message
-    /// <see cref="DurableHttpOptions.CreateError"/> describes, when the operation failed or was canceled.
+    /// <see cref="DurableHttpOptions.CreateError"/> describes, when the operation failed or was canceled. An operation whose
+    /// work never ran, because its grain didn't accept it, fails with the <see cref="DurableOperationError.NotStartedCode"/>
+    /// code.
     /// </description></item>
     /// <item><description>
     /// A handler error: <c>400</c> <c>BAD_REQUEST</c> for an invalid request identifier, <c>409</c> <c>CONFLICT</c> for a
     /// request identifier which another request used to start other work, and <c>503</c> <c>UNAVAILABLE</c> when the
-    /// operation's host doesn't accept it, which a caller retries.
+    /// request didn't reach the operation, which it left unchanged, so the caller retries it.
     /// </description></item>
     /// </list>
     /// <para>
@@ -99,7 +101,7 @@ public static class NexusEndpointRouteBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(service);
         ArgumentNullException.ThrowIfNull(handler);
-        ThrowIfInvalidName(operation);
+        DurableTaskEndpointConventions.ThrowIfInvalidName(operation, nameof(operation));
         var resultType = DurableTaskEndpointConventions.GetResultType(handler.Method)
             ?? throw new ArgumentException(
                 $"A Nexus operation's handler returns DurableTask or DurableTask<TResult>, not '{handler.Method.ReturnType}'.",
@@ -142,17 +144,5 @@ public static class NexusEndpointRouteBuilderExtensions
                 context,
                 context.RequestServices.GetRequiredService<DurableNexusOperations>().CancelAsync(context)));
         return group;
-    }
-
-    private static void ThrowIfInvalidName(string name, [System.Runtime.CompilerServices.CallerArgumentExpression(nameof(name))] string? parameter = null)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(name, parameter);
-        foreach (var character in name)
-        {
-            if (!char.IsAsciiLetterOrDigit(character) && character is not ('-' or '.' or '_' or '~'))
-            {
-                throw new ArgumentException($"A Nexus name has URL-unreserved characters, but '{name}' has '{character}'.", parameter);
-            }
-        }
     }
 }
