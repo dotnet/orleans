@@ -322,6 +322,58 @@ public class DurableTaskStartTests
     }
 
     [Fact]
+    public async Task DetachedStartsRequireADefinitionWhichAHostStartsAsARootTask()
+    {
+        var context = new StartRecordingContext(TaskId.CreateRoot("starter"));
+        var failures = new List<InvalidOperationException>();
+
+        var response = await RunAsync(context, async () =>
+        {
+            failures.Add(await Assert.ThrowsAsync<InvalidOperationException>(async () => await DurableTask.Run(static _ => 1).Detached()));
+            failures.Add(Assert.Throws<InvalidOperationException>(() => DurableTask.Run(static _ => 1).Detached("survey").Post()));
+            failures.Add(await Assert.ThrowsAsync<InvalidOperationException>(() => LocalStep().WithId("survey").Detached().ScheduleAsync(TestCancellation)));
+            await new RootDefinition().Detached();
+        });
+
+        // The rejected starts took no identifiers, so the detached root task which follows derives the first.
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.All(failures, static failure => Assert.Contains("ORLEANS0228", failure.Message, StringComparison.Ordinal));
+        Assert.Equal([TaskId.CreateRoot("starter/$child-1")], context.Starts.Select(static start => start.TaskId));
+
+        static async DurableTask<int> LocalStep() => 1;
+    }
+
+    [Fact]
+    public async Task DurableOperationsOffTheExecutionsSchedulerThrow()
+    {
+        var context = new StartRecordingContext(TaskId.CreateRoot("starter"));
+        var scheduler = new ConcurrentExclusiveSchedulerPair().ExclusiveScheduler;
+        var failures = new List<Exception>();
+
+        var response = await RunAsync(context, async () =>
+        {
+            // Code which continues on another scheduler, as after ConfigureAwait(false), can't order or record operations.
+            await Task.Factory.StartNew(
+                () =>
+                {
+                    failures.Add(Assert.Throws<InvalidOperationException>(() => DurableTask.RunInline("effect", static () => 1)));
+                    failures.Add(Assert.Throws<InvalidOperationException>(() => new RootDefinition().WithId("child").Post()));
+                    failures.Add(Assert.Throws<InvalidOperationException>(() => new RootDefinition().Post()));
+                },
+                TestCancellation,
+                TaskCreationOptions.None,
+                scheduler);
+            await new RootDefinition().WithId("child");
+        });
+
+        // The rejected operations took no identifiers or occurrences.
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.Equal(3, failures.Count);
+        Assert.All(failures, static failure => Assert.Contains("ConfigureAwait(false)", failure.Message, StringComparison.Ordinal));
+        Assert.Equal([TaskId.Parse("starter/child")], context.Starts.Select(static start => start.TaskId));
+    }
+
+    [Fact]
     public async Task PollsWithinAnExecutionThrow()
     {
         var context = new StartRecordingContext(TaskId.CreateRoot("starter"));
