@@ -1,11 +1,14 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Reminders.DynamoDB;
 using Orleans.Runtime;
 using Xunit;
@@ -18,6 +21,94 @@ namespace AWSUtils.Tests.RemindersTest;
 [TestCategory("AWS"), TestCategory("DynamoDB"), TestCategory("BVT")]
 public sealed class DynamoDBReminderStateTests
 {
+    [Theory]
+    [InlineData(DynamoDBReminderTableMode.V2)]
+    [InlineData(DynamoDBReminderTableMode.V2Only)]
+    [InlineData(DynamoDBReminderTableMode.Rollback)]
+    public async Task MissingStateStartupDoesNotInitializeLegacyOrMutate(DynamoDBReminderTableMode mode)
+    {
+        var described = new List<string>();
+        using var client = new RequestClient
+        {
+            Read = (_, _) => Task.FromResult(new GetItemResponse()),
+            Describe = tableName =>
+            {
+                described.Add(tableName);
+                return new() { Table = new() { TableName = tableName, TableStatus = TableStatus.ACTIVE } };
+            },
+        };
+        var table = CreateTable(client, mode, createIfNotExists: true);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => table.StartAsync(TestContext.Current.CancellationToken));
+
+        Assert.Contains("requires existing migration metadata", error.Message, StringComparison.Ordinal);
+        Assert.Equal(["reminders-v2"], described);
+        Assert.Equal(1, client.ReadCount);
+        Assert.Equal(0, client.CreateCount);
+        Assert.Equal(0, client.WriteCount);
+        Assert.Equal(0, client.DeleteCount);
+    }
+
+    [Fact]
+    public async Task ProductionRegistrationBindsMembershipSiloAndClockThroughStartup()
+    {
+        var address = SiloAddress.FromParsableString("127.0.0.1:21111@100");
+        var local = new RegistrationLocalSiloDetails(address);
+        var membership = new RegistrationMembershipService(address);
+        var clock = new RegistrationTimeProvider();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<ILocalSiloDetails>(local);
+        services.AddSingleton<IClusterMembershipService>(membership);
+        services.AddSingleton<TimeProvider>(clock);
+        services.Configure<ClusterOptions>(options => { options.ClusterId = "cluster"; options.ServiceId = "service"; });
+        services.UseDynamoDBReminderService(options =>
+        {
+            options.Service = "http://localhost";
+            options.TableName = "reminders";
+            options.TableMode = DynamoDBReminderTableMode.V2;
+            options.CreateIfNotExists = false;
+            options.UpdateIfExists = false;
+        });
+        using var provider = services.BuildServiceProvider();
+        var table = Assert.IsType<DynamoDBReminderTable>(provider.GetRequiredService<IReminderTable>());
+        using var client = new RequestClient
+        {
+            Read = (_, _) => Task.FromResult(new GetItemResponse { Item = StateItem("Retired") }),
+            Query = _ => new()
+            {
+                Items =
+                [
+                    new()
+                    {
+                        ["ServiceId"] = new("service"),
+                        ["LeaseOwner"] = new(address.ToParsableString()),
+                        ["ExpiresAt"] = new() { N = clock.GetUtcNow().AddMinutes(5).ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture) },
+                    },
+                ],
+            },
+        };
+        Assert.Same(local, typeof(DynamoDBReminderTable).GetField("localSiloDetails", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(table));
+        Assert.Same(membership, typeof(DynamoDBReminderTable).GetField("membershipService", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(table));
+        Assert.Same(clock, typeof(DynamoDBReminderTable).GetField("timeProvider", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(table));
+        // Replace only the backend client after production DI construction.
+        typeof(DynamoDBReminderTable).GetField("testHooks", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(
+            table, new DynamoDBReminderMigrationTestHooks { ConfigureStorage = storage => AttachClient(storage, client) });
+        try
+        {
+            await table.StartAsync(TestContext.Current.CancellationToken);
+
+            Assert.Equal(1, membership.RefreshCount);
+            Assert.Equal(1, client.WriteCount);
+            Assert.Equal(address.ToParsableString(), typeof(DynamoDBReminderTable).GetField("migrationOwner", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(table));
+            Assert.Same(table, provider.GetRequiredService<IReminderTable>());
+        }
+        finally
+        {
+            await table.StopAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
     [Fact]
     public async Task LegacyStartupAcceptsMaximumLengthTableNameWithoutProbingAnInvalidDerivedName()
     {
@@ -460,6 +551,42 @@ public sealed class DynamoDBReminderStateTests
         var field = typeof(DynamoDBStorage).GetField("_ddbClient", BindingFlags.Instance | BindingFlags.NonPublic)!;
         Assert.IsAssignableFrom<IDisposable>(field.GetValue(storage)).Dispose();
         field.SetValue(storage, client);
+    }
+
+    private sealed class RegistrationTimeProvider : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(2026, 10, 18, 12, 0, 0, TimeSpan.Zero);
+    }
+
+    private sealed class RegistrationLocalSiloDetails(SiloAddress address) : ILocalSiloDetails
+    {
+        public string Name => "registration-test";
+        public string ClusterId => "cluster";
+        public string DnsHostName => "localhost";
+        public SiloAddress SiloAddress => address;
+        public SiloAddress GatewayAddress => address;
+    }
+
+    private sealed class RegistrationMembershipService(SiloAddress address) : IClusterMembershipService
+    {
+        public int RefreshCount { get; private set; }
+        public ClusterMembershipSnapshot CurrentSnapshot { get; } = new(
+            ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(address, new(address, SiloStatus.Active, "local")),
+            new(1));
+        public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => Empty();
+        public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            RefreshCount++;
+            return ValueTask.CompletedTask;
+        }
+
+        public Task<bool> TryKill(SiloAddress siloAddress) => Task.FromResult(false);
+        private static async IAsyncEnumerable<ClusterMembershipSnapshot> Empty()
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
     }
 
     private sealed class RequestClient() : AmazonDynamoDBClient(

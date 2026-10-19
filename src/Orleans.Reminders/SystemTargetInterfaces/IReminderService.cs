@@ -89,8 +89,8 @@ namespace Orleans
         /// <param name="grainId">The grain identity.</param>
         /// <param name="reminderName">The reminder name.</param>
         /// <param name="remainingHops">The remaining topology redirects.</param>
-        /// <returns><see langword="true"/> when an owner reconciled the mutation; otherwise <see langword="false"/>.</returns>
-        Task<bool> ReconcileReminder(GrainId grainId, string reminderName, int remainingHops);
+        /// <returns><see langword="true"/> when an owner reconciled the mutation; otherwise <see langword="false"/>. The default implementation reports incomplete reconciliation.</returns>
+        Task<bool> ReconcileReminder(GrainId grainId, string reminderName, int remainingHops) => Task.FromResult(false);
 
         /// <summary>
         /// Gets the reminder registered to the specified grain with the provided name.

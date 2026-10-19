@@ -137,20 +137,20 @@ internal sealed partial class DynamoDBReminderTable
         return state is not null;
     }
 
-    private void ValidateRollbackState(MigrationState? state)
+    private void ValidateMigrationStateForStartup(MigrationState? state)
     {
-        if (options.TableMode == DynamoDBReminderTableMode.Rollback && state is null)
+        if (options.TableMode != DynamoDBReminderTableMode.Migrate && state is null)
         {
             throw new InvalidOperationException(
-                $"DynamoDB reminder rollback for service '{serviceId}' requires existing migration metadata in '{v2TableName}'. "
-                + "Restore the migration metadata before retrying rollback.");
+                $"DynamoDB reminder {options.TableMode} startup for service '{serviceId}' requires existing migration metadata in '{v2TableName}'. "
+                + "Restore the migration metadata before retrying startup.");
         }
     }
 
     private async Task InitializeMigration(CancellationToken cancellationToken)
     {
         var state = await ReadMigrationState(cancellationToken);
-        ValidateRollbackState(state);
+        ValidateMigrationStateForStartup(state);
         if (state?.Status == MigrationStatus.Retired)
         {
             if (options.TableMode == DynamoDBReminderTableMode.Rollback)
@@ -194,7 +194,7 @@ internal sealed partial class DynamoDBReminderTable
         try
         {
             state = await ReadMigrationState(cancellationToken);
-            ValidateRollbackState(state);
+            ValidateMigrationStateForStartup(state);
             if (state?.Status == MigrationStatus.Retired)
             {
                 throw new InvalidOperationException("The DynamoDB reminder V1 schema was retired while waiting for the migration lease.");

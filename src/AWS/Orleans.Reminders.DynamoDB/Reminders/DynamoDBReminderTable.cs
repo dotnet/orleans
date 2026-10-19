@@ -116,7 +116,7 @@ namespace Orleans.Reminders.DynamoDB
                 await InitializeV2Table(cancellationToken);
                 var migrationState = await ReadMigrationState(cancellationToken);
                 requireExistingLegacyTable = migrationState is not null;
-                ValidateRollbackState(migrationState);
+                ValidateMigrationStateForStartup(migrationState);
                 if (migrationState?.Status == MigrationStatus.Retired)
                 {
                     await StartCompatibilityHeartbeat(cancellationToken);

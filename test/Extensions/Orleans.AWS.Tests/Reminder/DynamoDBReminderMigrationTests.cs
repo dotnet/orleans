@@ -498,6 +498,7 @@ public sealed class DynamoDBReminderMigrationTests
         var clock = new ManualTimeProvider(new DateTimeOffset(2026, 8, 28, 10, 0, 0, TimeSpan.Zero));
         var cluster = CompatibleCluster();
         var legacy = CreateTable(tableName, serviceId, DynamoDBReminderTableMode.Legacy);
+        var prepare = CreateTable(tableName, serviceId, DynamoDBReminderTableMode.Migrate);
         var table = CreateTable(
             tableName,
             serviceId,
@@ -517,6 +518,7 @@ public sealed class DynamoDBReminderMigrationTests
         {
             await legacy.StartAsync(TestContext.Current.CancellationToken);
             await legacy.UpsertRow(Entry(1));
+            await prepare.StartAsync(TestContext.Current.CancellationToken);
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => table.StartAsync(TestContext.Current.CancellationToken));
             Assert.Contains("lost while copying", exception.Message, StringComparison.Ordinal);
@@ -524,7 +526,7 @@ public sealed class DynamoDBReminderMigrationTests
         }
         finally
         {
-            await StopAndDelete(client, tableName, legacy, table);
+            await StopAndDelete(client, tableName, legacy, prepare, table);
         }
     }
 
@@ -602,15 +604,18 @@ public sealed class DynamoDBReminderMigrationTests
         }
     }
 
-    [Fact]
-    public async Task Rollback_MissingStatePreservesV2AndLeavesDeletedV1Absent()
+    [Theory]
+    [InlineData(DynamoDBReminderTableMode.V2)]
+    [InlineData(DynamoDBReminderTableMode.V2Only)]
+    [InlineData(DynamoDBReminderTableMode.Rollback)]
+    public async Task AuthoritativeStartup_MissingStatePreservesV2AndLeavesDeletedV1Absent(DynamoDBReminderTableMode mode)
     {
         EnsureDynamoDb();
         var tableName = NewTableName();
         const string serviceId = "rollback-missing-state";
         using var client = CreateClient();
         var prepare = CreateTable(tableName, serviceId, DynamoDBReminderTableMode.Migrate);
-        var rollback = CreateTable(tableName, serviceId, DynamoDBReminderTableMode.Rollback);
+        var rollback = CreateTable(tableName, serviceId, mode);
         try
         {
             await prepare.StartAsync(TestContext.Current.CancellationToken);
@@ -947,6 +952,7 @@ public sealed class DynamoDBReminderMigrationTests
         var tableName = NewTableName();
         using var client = CreateClient();
         var cluster = CompatibleCluster(incompatibleStatus);
+        var prepare = CreateTable(tableName, "mixed", DynamoDBReminderTableMode.Migrate);
         var table = CreateTable(
             tableName,
             "mixed",
@@ -955,13 +961,14 @@ public sealed class DynamoDBReminderMigrationTests
             local: cluster.Local);
         try
         {
+            await prepare.StartAsync(TestContext.Current.CancellationToken);
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => table.StartAsync(TestContext.Current.CancellationToken));
             Assert.Contains("did not publish V2 compatibility markers", exception.Message, StringComparison.Ordinal);
         }
         finally
         {
-            await StopAndDelete(client, tableName, table);
+            await StopAndDelete(client, tableName, prepare, table);
         }
     }
 
