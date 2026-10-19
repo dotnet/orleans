@@ -291,6 +291,25 @@ internal interface IDurableTaskGrainRuntime
         throw new NotSupportedException("The durable task runtime does not support recorded effects.");
 
     /// <summary>
+    /// Runs <paramref name="body"/> as a transaction over the grain's journaled state whose commit stages a record of its
+    /// result under <paramref name="effectId"/>, without writing.
+    /// </summary>
+    Task<T> RunTransactionAsync<T>(TaskId effectId, Func<CancellationToken, Task<T>> body, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("The durable task runtime does not support transactions.");
+
+    /// <summary>Stages a record of an effect's outcome under <paramref name="effectId"/>, without writing.</summary>
+    void RecordEffect(TaskId effectId, DurableTaskResponse response) =>
+        throw new NotSupportedException("The durable task runtime does not support recorded effects.");
+
+    /// <summary>
+    /// Returns the outcome which an effect recorded under <paramref name="effectId"/>, or <see langword="null"/> when none
+    /// is recorded.
+    /// </summary>
+    /// <exception cref="DurableTaskDivergenceException">Another kind of operation is recorded under the identifier.</exception>
+    DurableTaskResponse? TryGetEffectOutcome(TaskId effectId, string requested) =>
+        throw new NotSupportedException("The durable task runtime does not support recorded effects.");
+
+    /// <summary>
     /// Returns the version of <paramref name="name"/> which <paramref name="executionId"/> or its nearest enclosing
     /// execution within the same invoked task recorded, or stages a record of <paramref name="version"/> beneath
     /// <paramref name="executionId"/>, without writing, and returns it.
