@@ -74,6 +74,23 @@ public sealed class DurableTaskStorageTests
     }
 
     [Fact]
+    public void MutationRejectsStateOwnedByAnotherStorage()
+    {
+        var first = CreateStorage();
+        var second = CreateStorage();
+        var taskId = TaskId.Parse("root/owned");
+        var firstState = first.GetOrCreateTask(taskId, request: null);
+        var secondState = second.GetOrCreateTask(taskId, request: null);
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => second.SetResponse(taskId, firstState, DurableTaskResponse.Completed));
+
+        Assert.Equal("state", exception.ParamName);
+        Assert.Null(secondState.Result);
+        Assert.Null(firstState.Result);
+    }
+
+    [Fact]
     public void SetRequestRejectsMissingContext()
     {
         var storage = CreateStorage();

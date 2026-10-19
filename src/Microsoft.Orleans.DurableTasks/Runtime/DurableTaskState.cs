@@ -32,7 +32,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// </remarks>
 [GenerateSerializer, SuppressReferenceTracking]
 [Alias("Orleans.DurableTasks.Runtime.DurableTaskState")]
-public class DurableTaskState : IDurableTaskState
+internal class DurableTaskState : IDurableTaskState
 {
     [NonSerialized]
     private Serializer? _serializer;

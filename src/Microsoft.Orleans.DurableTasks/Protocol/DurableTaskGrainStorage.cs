@@ -7,7 +7,7 @@ using Orleans.DurableTasks;
 
 namespace Orleans.DurableTasks.Protocol;
 
-public interface IDurableTaskGrainStorage
+internal interface IDurableTaskGrainStorage
 {
     /// <summary>Gets the stored tasks whose nearest stored ancestor is <paramref name="task"/>.</summary>
     /// <remarks>

@@ -12,6 +12,35 @@ namespace Orleans.DurableTasks;
 /// </summary>
 public static class DurableTaskGrainExtensions
 {
+    /// <summary>Gets the grain which a durable grain call targets, before the call is scheduled.</summary>
+    /// <param name="task">The durable task definition.</param>
+    /// <param name="target">
+    /// The grain which the call targets, when this method returns <see langword="true"/>; otherwise
+    /// <see langword="default"/>.
+    /// </param>
+    /// <returns>
+    /// <see langword="true"/> when <paramref name="task"/> is a call to a grain's <see cref="DurableTask"/>-returning
+    /// method, made through a grain reference and not yet scheduled; otherwise <see langword="false"/>, such as for a
+    /// local definition like <see cref="DurableTask.Run(Func{CancellationToken, Task})"/> or a reference to an existing
+    /// task.
+    /// </returns>
+    /// <remarks>
+    /// A call's target is set when the call is made through the grain reference, so it is available before the call is
+    /// scheduled, for example to choose the call's task identifier from the grain it targets.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="task"/> is <see langword="null"/>.</exception>
+    public static bool TryGetTarget(this DurableTask task, out GrainId target)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        if (task is IDurableTaskRequest { Context.TargetId: var requestTarget } && !requestTarget.IsDefault)
+        {
+            target = requestTarget;
+            return true;
+        }
+
+        target = default;
+        return false;
+    }
     /// <summary>
     /// Delivers <paramref name="signal"/> with <paramref name="value"/> to the invoked task <paramref name="taskId"/> on
     /// <paramref name="target"/>.

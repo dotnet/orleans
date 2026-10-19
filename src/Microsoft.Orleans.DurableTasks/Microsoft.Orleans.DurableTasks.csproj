@@ -32,6 +32,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks.Tests" />
     <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks.IntegrationTests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 
   <ItemGroup>

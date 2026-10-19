@@ -155,7 +155,7 @@
       watched?.close();
       const history = document.getElementById("history");
       document.getElementById("detail-title").innerHTML =
-        `Order <code>${orderId.slice(0, 8)}</code> <a href="/api/orders/${orderId}/tasks">tasks</a>`;
+        `Order <code>${orderId.slice(0, 8)}</code> <a href="/api/orders/${orderId}/workflow">workflow</a>`;
       history.innerHTML = "";
       watched = new EventSource(`/api/orders/${orderId}/events`);
       watched.onopen = () => { history.innerHTML = ""; };

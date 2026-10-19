@@ -4,7 +4,6 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Runtime;
@@ -809,12 +808,17 @@ internal static class InvoiceClient
 internal static class DurableTaskDiagnostics
 {
     // <durable_tasks_diagnostics>
-    public static async Task PrintTasksAsync(IGrainFactory grains, Guid orderId)
+    public static async Task PrintOrderTaskAsync(IGrainFactory grains, Guid orderId)
     {
-        var runtime = grains.GetGrain<IOrderGrain>(orderId).AsReference<IDurableTaskGrainExtension>();
-        await foreach (var (taskId, state) in runtime.GetTasksAsync())
+        var workflow = grains.GetGrain<IOrderGrain>(orderId).GetDurableTask<OrderResult>(OrderGrain.PlaceOrderTaskId(orderId));
+        try
         {
-            Console.WriteLine($"{taskId}: {state.Status} {state.Request} -> {state.Response}");
+            var response = await workflow.GetResponseAsync(new PollingOptions { PollTimeout = TimeSpan.Zero });
+            Console.WriteLine($"{workflow.Address}: {response.Status} {response.Exception?.Message}");
+        }
+        catch (DurableTaskNotFoundException)
+        {
+            Console.WriteLine($"{workflow.Address}: not retained");
         }
     }
     // </durable_tasks_diagnostics>

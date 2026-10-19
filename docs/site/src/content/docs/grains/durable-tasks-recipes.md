@@ -12,8 +12,9 @@ These compiled examples use grains which derive from
 [Durable tasks](durable-tasks.md#define-durable-task-methods). Configure Journaling,
 Durable Jobs, and the durable task runtime as shown in
 [Configure the silo and clients](durable-tasks.md#configure-the-silo-and-clients).
-Each recipe verifies its outcome with the task list which
-[diagnostics](durable-tasks-operations.md#list-a-grains-tasks) report for a grain.
+Each recipe's outcome is observable by [polling the task](durable-tasks-operations.md#observe-a-task)
+and through the [runtime transitions](durable-tasks-operations.md#observe-runtime-transitions)
+which `DurableTaskEvents` reports.
 
 ## Fan out to every line with a named WhenAll
 

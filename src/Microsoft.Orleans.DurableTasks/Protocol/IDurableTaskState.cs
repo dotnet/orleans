@@ -5,7 +5,7 @@ using Orleans.Runtime;
 
 namespace Orleans.DurableTasks.Protocol;
 
-public interface IDurableTaskState
+internal interface IDurableTaskState
 {
     /// <summary>
     /// The result of the task, which will be <see langword="null"/> if the task has not yet completed.

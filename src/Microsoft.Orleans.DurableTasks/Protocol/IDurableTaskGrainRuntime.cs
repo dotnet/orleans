@@ -9,20 +9,13 @@ using Orleans.Runtime;
 
 namespace Orleans.DurableTasks.Protocol;
 
-[Alias("IDurableTaskObserverGrainExtension")]
-public interface IDurableTaskObserver : IGrainExtension
-{
-    [Alias("OnResponse")]
-    ValueTask OnResponseAsync(TaskId taskId, DurableTaskResponse response, CancellationToken cancellationToken = default);
-}
-
 /// <remarks>
 /// The server's operations stage task state and commit it without running grain code, so they interleave with the grain's
 /// requests, including the segments of its durable executions: a cancellation reaches an execution whose segment awaits
 /// other work, and a schedule doesn't wait for the grain's running executions.
 /// </remarks>
 [Alias("IDurableTaskServerGrainExtension")]
-public interface IDurableTaskServer : IGrainExtension
+internal interface IDurableTaskServer : IGrainExtension
 {
     // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
     [Alias("ScheduleAsync"), AlwaysInterleave]
@@ -63,7 +56,7 @@ public interface IDurableTaskServer : IGrainExtension
 }
 
 [GenerateSerializer, Immutable, Alias(nameof(SubscribeOrPollOptions))]
-public readonly struct SubscribeOrPollOptions
+internal readonly struct SubscribeOrPollOptions
 {
     [Id(0)]
     public TimeSpan PollTimeout { get; init; }
@@ -71,7 +64,7 @@ public readonly struct SubscribeOrPollOptions
 }
 
 [Alias("IDurableTaskGrainExtension")]
-public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer
+internal interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer
 {
     [Alias("GetTasksAsync"), AlwaysInterleave]
     IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> GetTasksAsync(CancellationToken cancellationToken = default);
@@ -107,7 +100,7 @@ public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServe
 
 [GenerateSerializer]
 [Alias("DurableTaskDiagnosticState")]
-public struct DurableTaskDiagnosticState
+internal struct DurableTaskDiagnosticState
 {
     [Id(0)]
     public DateTimeOffset? CreatedAt { get; set; }

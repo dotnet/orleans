@@ -90,11 +90,9 @@ observes it, compensates, and appends the `Cancelled` snapshot. Ship sends the t
 
 - `GET /api/orders/{orderId}/events` streams the order's snapshots as server-sent events, as
   [Observe an order](#observe-an-order) describes.
-- `GET /api/orders/{orderId}/workflow` polls the order's PlaceOrder task. The task is pending until the order is
-  cancelled or ships, and the order then retains its result for `DurableTaskOptions.ResultRetentionPeriod`.
-- `GET /api/orders/{orderId}/tasks`, `/api/buyers/{buyerId}/tasks`, and `/api/catalog/{productId}/tasks` list the
-  tasks a grain retains, with their IDs, status, timestamps, and due time. The UI's order history links the selected
-  order to its task list.
+- `GET /api/orders/{orderId}/workflow` polls the order's PlaceOrder task through its `DurableTaskReference<T>`. The
+  task is pending until the order is cancelled or ships, and the order then retains its result for
+  `DurableTaskOptions.ResultRetentionPeriod`. The UI's order history links the selected order to its workflow.
 - `POST /api/orders/{orderId}/deactivate` deactivates an order, so its next activation replays the pending workflow.
 
 ## Compare with OrderProcessing

@@ -125,7 +125,6 @@ task's outcome.
 | `ScheduledTask.TargetTaskId` | The task on the grain which stores it, which other parties address: a detached task's root ID, a callee's `$caller/...` ID, or the task which a subscription observes. Outside a durable task, the root ID. |
 | `IDurableTaskReference.Id` | The referenced task, with `Target`, its grain. |
 | `DurableTaskAddress.Id` | A task which other parties address, with `Target`, its grain. |
-| `IDurableTaskGrainExtension.GetTasksAsync` | Every task which the grain retains, with its execution tree's records. |
 | `DurableTaskEvents` | The ID of each task, operation, signal wait, and selection which a transition concerns. |
 
 A client observes the IDs of its own start through the handle:
