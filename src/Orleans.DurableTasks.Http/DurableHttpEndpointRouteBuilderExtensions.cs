@@ -98,14 +98,14 @@ public static class DurableHttpEndpointRouteBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(group);
         ArgumentException.ThrowIfNullOrEmpty(scope);
-        var metadata = new DurableOperationsMetadata(scope, $"Orleans.DurableTasks.Http.Operation:{Guid.NewGuid():N}");
+        var metadata = new DurableOperationsMetadata(scope);
         group.WithMetadata(metadata);
         group.AddEndpointFilterFactory(static (context, next) =>
             DurableTaskEndpointConventions.GetResultType(context.MethodInfo) is null ? next : invocation => StartAsync(invocation, next));
         ((IEndpointConventionBuilder)group).Finally(static endpoint => DurableTaskEndpointConventions.DescribeStart(endpoint));
 
         group.MapGet("/operations/{operationId}", static context => ExecuteAsync(context, Operations(context).GetAsync(context)))
-            .WithName(metadata.OperationEndpointName)
+            .WithMetadata(new DurableOperationStatusEndpoint(metadata))
             .WithResponse(StatusCodes.Status200OK, typeof(DurableOperation))
             .WithProblem(StatusCodes.Status404NotFound)
             .WithProblem(StatusCodes.Status503ServiceUnavailable);

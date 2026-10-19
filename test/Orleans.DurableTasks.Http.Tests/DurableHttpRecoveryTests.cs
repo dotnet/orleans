@@ -29,9 +29,10 @@ public sealed class DurableHttpRecoveryTests(DurableHttpFixture fixture)
         var id = $"effect-{Guid.NewGuid():N}";
         var grain = fixture.Client.GetGrain<IDurableHttpTestGrain>(Guid.NewGuid().ToString("N"));
         await grain.ApplyEffectAsync(id).WithId("effect").ScheduleAsync(cancellationToken);
-        await WaitUntilAsync(() => Requests(id).Length == 1, cancellationToken);
 
-        // The next activation replays the task, whose step returns its recorded response.
+        // The next activation replays the task, whose step returns the response which it recorded.
+        var step = grain.GetDurableTask<DurableHttpResponse>(TaskId.CreateRoot("effect").Child("apply"));
+        await step.GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken);
         await DeactivateAsync(grain.GetGrainId(), cancellationToken);
         await grain.SignalDurableTaskAsync("effect", DurableHttpTestGrain.Approved, "ada", cancellationToken);
 
