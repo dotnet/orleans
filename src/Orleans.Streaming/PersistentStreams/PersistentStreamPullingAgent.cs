@@ -849,7 +849,7 @@ namespace Orleans.Streams
                         if (pubSubCache.Values.All(static stream =>
                             stream.AllConsumers().All(static consumer => consumer.State != StreamConsumerDataState.Active)))
                         {
-                            NotifyDeliveryProgress();
+                            NotifyDeliveryProgress(includeLatestStartPosition: true);
                         }
 
                         maxCacheAddCount = queueCache!.GetMaxAddCount();
@@ -1055,20 +1055,20 @@ namespace Orleans.Streams
         /// <summary>
         /// Publishes delivery progress for pressure recovery and the shutdown checkpoint.
         /// </summary>
-        private void NotifyDeliveryProgress()
+        private void NotifyDeliveryProgress(bool includeLatestStartPosition = false)
         {
             if (queueCache is null)
             {
                 return;
             }
 
-            if (TryGetDeliveryProgress(out var earliest))
+            if (TryGetDeliveryProgress(out var earliest, includeLatestStartPosition))
             {
                 queueCache.UpdateDeliveryProgress(earliest, _timeProvider.GetUtcNow().UtcDateTime);
             }
         }
 
-        private bool TryGetDeliveryProgress(out StreamSequenceToken? earliest)
+        private bool TryGetDeliveryProgress(out StreamSequenceToken? earliest, bool includeLatestStartPosition)
         {
             earliest = null;
 
@@ -1087,6 +1087,15 @@ namespace Orleans.Streams
                     }
 
                     var current = consumer.LastProcessedToken;
+                    if (includeLatestStartPosition
+                        && current is null
+                        && consumer.LastToken is StartPositionToken { StartPosition: StreamSubscriptionStartPosition.Latest }
+                        && consumer.PendingBatch is null
+                        && consumer.Cursor is IQueueCacheCursorStartPosition startPositionCursor)
+                    {
+                        current = startPositionCursor.LatestStartToken;
+                    }
+
                     if (current is null)
                     {
                         return false;

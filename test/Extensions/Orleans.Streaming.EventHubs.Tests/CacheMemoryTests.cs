@@ -189,6 +189,196 @@ public sealed class CacheMemoryTests : IDisposable
         Assert.Equal(0, controller.ActiveCacheMemory);
     }
 
+    [Fact, TestCategory("BVT")]
+    public void MemoryPressurePreservesSharedTailAtPartialDeliveryBoundary()
+    {
+        var controller = new EventHubCacheMemoryController(100 * 1024);
+        var pool = new EventHubCacheBufferPool(controller, 0, null, TimeSpan.FromMinutes(1));
+        var checkpointer = new TestCheckpointer();
+        using var cache = CreateCache("0", pool, controller, checkpointer: checkpointer);
+        var positions = cache.Add(
+            [MakeSerializedEventData(0, 80 * 1024, "first"), MakeSerializedEventData(1, 2 * 1024, "second")],
+            DateTime.UtcNow);
+        Assert.NotEqual(positions[0].StreamId, positions[1].StreamId);
+        cache.UpdatePurgeProtection(hasActiveSubscriptions: true);
+        var firstCursor = GetCursor(cache, positions[0].StreamId, positions[0].SequenceToken);
+        Assert.Equal(positions[0].SequenceToken, GetNextMessage(cache, firstCursor).SequenceToken);
+        AssertNoNextMessage(cache, firstCursor);
+        var tailCursor = GetCursor(cache, positions[1].StreamId, positions[1].SequenceToken);
+        Assert.Equal(128 * 1024, pool.ActiveMemory);
+
+        cache.UpdateDeliveryProgress(positions[0].SequenceToken, DateTime.UtcNow);
+
+        Assert.Equal("0", checkpointer.LastOffset);
+        Assert.Equal(0, cache.GetMaxAddCount());
+        Assert.Equal(128 * 1024, pool.ActiveMemory);
+        var tail = GetNextMessage(cache, tailCursor);
+        Assert.Equal(positions[1].SequenceToken, tail.SequenceToken);
+        Assert.All(Assert.Single(tail.GetEvents<byte[]>()).Item1, value => Assert.Equal((byte)1, value));
+        AssertNoNextMessage(cache, tailCursor);
+
+        cache.UpdateDeliveryProgress(positions[1].SequenceToken, DateTime.UtcNow);
+
+        Assert.Equal("1", checkpointer.LastOffset);
+        Assert.True(cache.GetMaxAddCount() > 0);
+        Assert.Equal(0, controller.ActiveCacheMemory);
+    }
+
+    [Theory]
+    [InlineData(StreamSubscriptionStartPosition.Latest, false)]
+    [InlineData(StreamSubscriptionStartPosition.EarliestAvailable, false)]
+    [InlineData(null, false)]
+    [InlineData(StreamSubscriptionStartPosition.Latest, true)]
+    [TestCategory("BVT")]
+    public async Task ExplicitStartPositionControlsPressureRecoveryBeforeFirstDelivery(
+        StreamSubscriptionStartPosition? startPosition,
+        bool shutdownBeforePump)
+    {
+        var controller = new EventHubCacheMemoryController(100 * 1024);
+        var pool = new EventHubCacheBufferPool(controller, 0, null, TimeSpan.FromMinutes(1));
+        var checkpointer = new TestCheckpointer();
+        using var cache = CreateCache("0", pool, controller, checkpointer: checkpointer);
+        var broker = Substitute.For<IEventHubReceiver>();
+        var pendingMessages = new Queue<List<EventData>>();
+        var readCount = 0;
+        broker.ReceiveAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                readCount++;
+                return Task.FromResult<IEnumerable<EventData>>(pendingMessages.TryDequeue(out var messages) ? messages : []);
+            });
+        var receiver = CreatePressureReceiver(cache, broker);
+        var queueId = QueueId.GetQueueId("pressure", 0, 0);
+        var agent = CreatePressureAgent(receiver, queueId);
+        var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+        await agent.RunOrQueueTask(() => agent.Initialize(TestContext.Current.CancellationToken));
+        var positions = cache.Add(
+            Enumerable.Range(0, 20).Select(i => MakeSerializedEventData(i, 8 * 1024)).ToList(),
+            DateTime.UtcNow);
+        var streamId = new QualifiedStreamId("provider", positions[0].StreamId);
+        await accessor.RegisterStream(streamId, positions[0].SequenceToken, DateTime.UtcNow);
+        var stream = Assert.Single(await accessor.GetPubSubCache()).Value;
+        var deliveries = new List<long>();
+        var errors = new List<Exception>();
+        var handshakeToken = startPosition is { } position
+            ? StreamHandshakeToken.CreateStartPositionToken(position)
+            : StreamHandshakeToken.CreateStartToken(positions[0].SequenceToken);
+        var consumer = new PressureConsumer(
+            batch =>
+            {
+                deliveries.Add(batch.SequenceToken.SequenceNumber);
+                return Task.FromResult<StreamHandshakeToken?>(null);
+            },
+            errors,
+            handshakeToken);
+        var data = stream.AddConsumer(
+            GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
+            streamId, consumer, null, DateTime.UtcNow);
+        Assert.True(await accessor.DoHandshakeWithConsumer(data, cacheToken: null));
+        data.IsRegistered = true;
+        Assert.Null(data.LastProcessedToken);
+        Assert.Equal(StreamConsumerDataState.Inactive, data.State);
+        Assert.True(controller.IsUnderPressure);
+
+        if (shutdownBeforePump)
+        {
+            await accessor.Shutdown();
+            Assert.Null(checkpointer.LastOffset);
+            Assert.Null(data.LastProcessedToken);
+            Assert.Empty(deliveries);
+            return;
+        }
+
+        await accessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
+        await accessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
+
+        Assert.Empty(deliveries);
+        Assert.Null(data.LastProcessedToken);
+        if (startPosition == StreamSubscriptionStartPosition.Latest)
+        {
+            Assert.Equal(1, readCount);
+            Assert.Equal("19", checkpointer.LastOffset);
+            Assert.False(controller.IsUnderPressure);
+        }
+        else
+        {
+            Assert.Equal(0, readCount);
+            Assert.Null(checkpointer.LastOffset);
+            Assert.True(controller.IsUnderPressure);
+            await accessor.RunConsumerCursor(data);
+            Assert.Equal(Enumerable.Range(0, 20).Select(i => (long)i), deliveries);
+        }
+
+        pendingMessages.Enqueue([MakeSerializedEventData(20, 2 * 1024)]);
+        await accessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
+        await accessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
+
+        Assert.Equal(startPosition == StreamSubscriptionStartPosition.Latest
+            ? [20L]
+            : Enumerable.Range(0, 21).Select(i => (long)i), deliveries);
+        Assert.NotNull(data.LastProcessedToken);
+        Assert.Equal(20, data.LastProcessedToken.SequenceNumber);
+        Assert.Empty(errors);
+        await accessor.Shutdown();
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task LatestPressureBoundaryPreservesPostRegistrationMessages()
+    {
+        var controller = new EventHubCacheMemoryController(100 * 1024);
+        var pool = new EventHubCacheBufferPool(controller, 0, null, TimeSpan.FromMinutes(1));
+        var checkpointer = new TestCheckpointer();
+        using var cache = CreateCache("0", pool, controller, checkpointer: checkpointer);
+        var broker = Substitute.For<IEventHubReceiver>();
+        broker.ReceiveAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IEnumerable<EventData>>([]));
+        var receiver = CreatePressureReceiver(cache, broker);
+        var queueId = QueueId.GetQueueId("pressure", 0, 0);
+        var agent = CreatePressureAgent(receiver, queueId);
+        var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+        await agent.RunOrQueueTask(() => agent.Initialize(TestContext.Current.CancellationToken));
+        var first = Assert.Single(cache.Add([MakeSerializedEventData(0, 80 * 1024)], DateTime.UtcNow));
+        var streamId = new QualifiedStreamId("provider", first.StreamId);
+        await accessor.RegisterStream(streamId, first.SequenceToken, DateTime.UtcNow);
+        var stream = Assert.Single(await accessor.GetPubSubCache()).Value;
+        var deliveries = new List<long>();
+        var errors = new List<Exception>();
+        var consumer = new PressureConsumer(
+            batch =>
+            {
+                deliveries.Add(batch.SequenceToken.SequenceNumber);
+                return Task.FromResult<StreamHandshakeToken?>(null);
+            },
+            errors,
+            StreamHandshakeToken.CreateStartPositionToken(StreamSubscriptionStartPosition.Latest));
+        var data = stream.AddConsumer(
+            GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
+            streamId, consumer, null, DateTime.UtcNow);
+        Assert.True(await accessor.DoHandshakeWithConsumer(data, cacheToken: null));
+        data.IsRegistered = true;
+        var next = Assert.Single(cache.Add([MakeSerializedEventData(1, 2 * 1024)], DateTime.UtcNow));
+        Assert.NotNull(data.Cursor);
+        data.Cursor.Refresh(next.SequenceToken);
+
+        await accessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
+
+        Assert.Equal("0", checkpointer.LastOffset);
+        Assert.Null(data.LastProcessedToken);
+        Assert.Empty(deliveries);
+        Assert.Equal(128 * 1024, pool.ActiveMemory);
+        await broker.DidNotReceive().ReceiveAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>());
+
+        await accessor.RunConsumerCursor(data);
+        await accessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
+
+        Assert.Equal([1L], deliveries);
+        Assert.Equal(next.SequenceToken, data.LastProcessedToken);
+        Assert.Equal("1", checkpointer.LastOffset);
+        Assert.False(controller.IsUnderPressure);
+        Assert.Empty(errors);
+        await accessor.Shutdown();
+    }
+
     [Theory, InlineData(false), InlineData(true), TestCategory("BVT")]
     public async Task RegisteredSubscriptionsResumeIngestionAfterMemoryPressure(bool holdSlowDelivery)
     {
@@ -206,20 +396,7 @@ public sealed class CacheMemoryTests : IDisposable
                 memoryAtReads.Add(controller.ActiveCacheMemory);
                 return Task.FromResult<IEnumerable<EventData>>(pendingMessages.TryDequeue(out var messages) ? messages : []);
             });
-        var receiver = new EventHubAdapterReceiver(
-            new EventHubPartitionSettings
-            {
-                Hub = new EventHubOptions(),
-                ReceiverOptions = new EventHubReceiverOptions(),
-                Partition = "0",
-            },
-            (_, _, _) => cache,
-            (_, _) => Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance),
-            NullLoggerFactory.Instance,
-            Substitute.For<IQueueAdapterReceiverMonitor>(),
-            new LoadSheddingOptions(),
-            Substitute.For<IEnvironmentStatisticsProvider>(),
-            (_, _, _) => broker);
+        var receiver = CreatePressureReceiver(cache, broker);
         var queueId = QueueId.GetQueueId("pressure", 0, 0);
         var agent = CreatePressureAgent(receiver, queueId);
         var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
@@ -526,6 +703,22 @@ public sealed class CacheMemoryTests : IDisposable
 
     public void Dispose() => serviceProvider.Dispose();
 
+    private static EventHubAdapterReceiver CreatePressureReceiver(EventHubQueueCache cache, IEventHubReceiver broker)
+        => new(
+            new EventHubPartitionSettings
+            {
+                Hub = new EventHubOptions(),
+                ReceiverOptions = new EventHubReceiverOptions(),
+                Partition = "0",
+            },
+            (_, _, _) => cache,
+            (_, _) => Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance),
+            NullLoggerFactory.Instance,
+            Substitute.For<IQueueAdapterReceiverMonitor>(),
+            new LoadSheddingOptions(),
+            Substitute.For<IEnvironmentStatisticsProvider>(),
+            (_, _, _) => broker);
+
     private PersistentStreamPullingAgent CreatePressureAgent(EventHubAdapterReceiver receiver, QueueId queueId)
     {
         var siloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1);
@@ -562,7 +755,7 @@ public sealed class CacheMemoryTests : IDisposable
             TimeProvider.System, shared);
     }
 
-    private EventData MakeSerializedEventData(int sequenceNumber, int payloadSize)
+    private EventData MakeSerializedEventData(int sequenceNumber, int payloadSize, string? streamKey = null)
     {
         var payload = new byte[payloadSize];
         Array.Fill(payload, (byte)sequenceNumber);
@@ -572,6 +765,7 @@ public sealed class CacheMemoryTests : IDisposable
             eventBody: encoded.EventBody,
             offsetString: sequenceNumber.ToString(CultureInfo.InvariantCulture),
             sequenceNumber: sequenceNumber,
+            partitionKey: streamKey,
             enqueuedTime: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
     }
 
@@ -643,7 +837,7 @@ public sealed class CacheMemoryTests : IDisposable
     {
         public override StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
-            var streamId = StreamId.Create("test", partition);
+            var streamId = StreamId.Create("test", queueMessage.PartitionKey ?? partition);
             var token = new EventHubSequenceTokenV2(queueMessage.OffsetString, queueMessage.SequenceNumber, 0);
             return new StreamPosition(streamId, token);
         }
@@ -776,7 +970,8 @@ public sealed class CacheMemoryTests : IDisposable
 
     private sealed class PressureConsumer(
         Func<IBatchContainer, Task<StreamHandshakeToken?>> onDelivery,
-        List<Exception> errors) : IStreamConsumerExtension
+        List<Exception> errors,
+        StreamHandshakeToken? initialToken = null) : IStreamConsumerExtension
     {
         public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
             => throw new NotSupportedException();
@@ -796,7 +991,7 @@ public sealed class CacheMemoryTests : IDisposable
         }
 
         public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
-            => Task.FromResult<StreamHandshakeToken?>(null);
+            => Task.FromResult(initialToken);
     }
 
     private sealed class CustomBufferPoolFactory : EventHubQueueCacheFactory

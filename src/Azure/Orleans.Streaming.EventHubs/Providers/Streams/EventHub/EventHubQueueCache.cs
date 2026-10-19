@@ -46,6 +46,11 @@ namespace Orleans.Streaming.EventHubs
 
         internal bool IsUnderMemoryPressure => memoryController?.IsUnderPressure == true;
 
+        internal StreamSequenceToken? GetNewestSequenceToken()
+        {
+            return cache.Newest is { } newest ? dataAdapter.GetSequenceToken(ref newest) : null;
+        }
+
         /// <summary>
         /// EventHub queue cache.
         /// </summary>
