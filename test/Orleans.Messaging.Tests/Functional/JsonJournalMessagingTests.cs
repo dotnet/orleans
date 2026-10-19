@@ -155,6 +155,7 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
                 silo.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "json");
                 silo.UseInMemoryDurableJobs();
                 silo.AddMessaging();
+                silo.Services.UseDocumentationPaymentGrain();
                 silo.Services.AddSingleton(Probe);
             });
             Cluster = builder.Build();
