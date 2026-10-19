@@ -10,6 +10,7 @@ namespace Orleans.DurableTasks;
 /// <see cref="TaskIdJsonConverter"/>.
 /// </remarks>
 [JsonConverter(typeof(TaskIdJsonConverter))]
+[Alias("Orleans.DurableTasks.TaskId")]
 public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanParsable<TaskId>, ISpanFormattable
 {
     private readonly HierarchicalKey? _key;
