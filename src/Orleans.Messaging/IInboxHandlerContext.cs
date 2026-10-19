@@ -18,8 +18,10 @@ public interface IInboxHandlerContext
     /// Synchronously stages inbox completion and transport deduplication for the active attempt.
     /// </summary>
     /// <remarks>
-    /// Apply safe-to-commit business mutations and stage outgoing messages before calling Complete
-    /// in the same synchronous final block. Return from the handler without further awaits.
+    /// Perform fallible and asynchronous work first, then apply business mutations and stage outgoing messages before
+    /// calling Complete in the same synchronous final block. Return from the handler without further awaits. An attempt
+    /// which stages changes and then ends without an outcome fails the activation, which discards those changes, and
+    /// the message runs again after recovery from the journal.
     /// The runtime owns the subsequent journal write and acknowledgement.
     /// Repeated completion within the same active attempt coalesces. Completion retains its
     /// logical outcome when cancellation arrives after the final block starts.

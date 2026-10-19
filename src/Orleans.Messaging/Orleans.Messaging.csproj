@@ -24,7 +24,8 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
+    <!-- Messaging uses Journaling internals, so it depends on Journaling's exact version. -->
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" PackExactVersion="true" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.DurableJobs\Orleans.DurableJobs.csproj" />
     <!-- Messaging uses Core internals, so it depends on Core's exact version. -->
     <ProjectReference Include="$(SourceRoot)src\Orleans.Core\Orleans.Core.csproj" PackExactVersion="true" />

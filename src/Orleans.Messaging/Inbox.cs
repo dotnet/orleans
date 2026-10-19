@@ -134,6 +134,19 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     }
 
     /// <summary>
+    /// Runs the handlers in a flow whose staged changes the attempt owns. Requests and other turns which interleave
+    /// while a handler awaits run in their own flows, so the attempt never treats their changes as its own.
+    /// </summary>
+    private async ValueTask HandleAsync(InboxEntry entry, HandlerExecution execution, CancellationToken cancellationToken)
+    {
+        execution.StagedChanges = _pump.BeginStagedChangeScope();
+        await _handlers.HandleAsync(new InboxHandlerContext(entry.Message, execution), cancellationToken).ConfigureAwait(true);
+    }
+
+    // Whether the attempt's own flow staged a change; a manager which can't record staged changes may have.
+    private static bool StagedDuring(HandlerExecution execution) => execution.StagedChanges?.HasStagedChanges ?? true;
+
+    /// <summary>
     /// Offers a message to the registered sinks and stages the outcome which the first sink to take the message reports.
     /// </summary>
     /// <returns>The delivery result, or <see langword="null"/> when every sink declines the message.</returns>
@@ -271,12 +284,11 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         Exception? error = null;
         try
         {
-            await _handlers.HandleAsync(new InboxHandlerContext(entry.Message, execution), cancellationToken).ConfigureAwait(true);
+            await HandleAsync(entry, execution, cancellationToken).ConfigureAwait(true);
             execution.ThrowIfRejected();
             if (!execution.Completed)
             {
-                execution.Reject(new InvalidOperationException(
-                    "Inbox handlers must call Complete or Fail before returning successfully."));
+                throw new InvalidOperationException("Inbox handlers must call Complete or Fail before returning successfully.");
             }
         }
         catch (Exception) when (execution.Rejection is { } rejection)
@@ -287,6 +299,19 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         catch (Exception exception) when (execution.Completed)
         {
             LogHandlerException(Logger, exception, entry.Message.Envelope.MessageId, GrainContext.GrainId);
+        }
+        catch (Exception exception) when (StagedDuring(execution))
+        {
+            // The attempt ended without an outcome after it staged changes. Pending changes share one journal buffer, so a
+            // retry record would commit them; failing the activation discards them, and the message runs again after
+            // recovery from the journal.
+            LogHandlerException(Logger, exception, entry.Message.Envelope.MessageId, GrainContext.GrainId);
+            var failure = new InvalidOperationException(
+                $"The inbox handler for message '{entry.Message.Envelope.MessageId}' failed after staging changes, so the activation discards them.",
+                exception);
+            _pump.Fail(failure, "An inbox handler failed after staging changes.");
+            if (exception is OperationCanceledException && cancellationToken.IsCancellationRequested) throw;
+            throw failure;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -506,6 +531,12 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     internal sealed class HandlerExecution(Inbox owner, InboxEntry entry)
     {
         public bool Active { get; set; }
+
+        /// <summary>
+        /// Gets or sets the scope which records whether the attempt's own flow staged a change, or <see langword="null"/>
+        /// when the state manager can't record it.
+        /// </summary>
+        public StagedChangeScope? StagedChanges { get; set; }
 
         public bool Completed { get; private set; }
 
