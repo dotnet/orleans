@@ -246,9 +246,6 @@ internal sealed class AttachedScheduledTask<TResult>(
     public override TFeature? GetFeature<TFeature>()
         where TFeature : class => _handle.GetFeature<TFeature>();
 
-    public override ValueTask CancelAsync(CancellationToken cancellationToken = default) =>
-        _handle.CancelAsync(cancellationToken);
-
     protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken) =>
         _handle.CancelAsync(reason, cancellationToken);
 

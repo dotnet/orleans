@@ -46,19 +46,18 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public void DurableTaskExtensionOperationsWhichChangeStateDoNotAlwaysInterleaveWithGrainTurns()
+    public void DurableTaskExtensionOperationsInterleaveWithGrainTurns()
     {
-        var poll = typeof(IDurableTaskServer).GetMethod(nameof(IDurableTaskServer.SubscribeOrPollAsync))!;
+        // The extension's operations only stage host-owned task state, or wait for it, and run no grain code; the task
+        // bodies which they start run in their own non-interleaving segments.
         var methods = typeof(IDurableTaskServer).GetMethods()
-            .Concat(typeof(IDurableTaskObserver).GetMethods())
-            .Where(method => method != poll);
+            .Concat(typeof(IDurableTaskGrainExtension).GetMethods())
+            .ToArray();
 
+        Assert.NotEmpty(methods);
         Assert.All(
             methods,
-            method => Assert.Null(method.GetCustomAttribute<AlwaysInterleaveAttribute>()));
-
-        // A poll changes no state and waits, so it interleaves with the turns which complete the task.
-        Assert.NotNull(poll.GetCustomAttribute<AlwaysInterleaveAttribute>());
+            method => Assert.NotNull(method.GetCustomAttribute<AlwaysInterleaveAttribute>()));
     }
 
     [Fact]
@@ -498,11 +497,11 @@ public sealed class DurableRpcProtocolTests
         var canceled = new ScriptedDurableTaskServer(new TimeoutException()) { OnPoll = cancellation.Cancel };
 
         await Assert.ThrowsAsync<DurableTaskNotFoundException>(
-            async () => await new GrainScheduledTaskHandle(taskId, target, null, notFound, null).CancelAsync(TestContext.Current.CancellationToken));
+            async () => await new GrainScheduledTaskHandle(taskId, target, null, notFound, null).CancelAsync(reason: null, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await new GrainScheduledTaskHandle(taskId, target, null, failure, null).AbortAsync("broken", TestContext.Current.CancellationToken));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            async () => await new GrainScheduledTaskHandle(taskId, target, null, canceled, null).CancelAsync(cancellation.Token));
+            async () => await new GrainScheduledTaskHandle(taskId, target, null, canceled, null).CancelAsync(reason: null, cancellation.Token));
 
         Assert.Equal([1, 1, 1], new[] { notFound.Requests.Count, failure.Requests.Count, canceled.Requests.Count });
     }
@@ -665,7 +664,7 @@ public sealed class DurableRpcProtocolTests
             lastResponse: null);
         using var cancellation = new CancellationTokenSource();
 
-        var cancel = handle.CancelAsync(cancellation.Token).AsTask();
+        var cancel = handle.CancelAsync(reason: null, cancellation.Token).AsTask();
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancel);
@@ -755,6 +754,9 @@ public sealed class DurableRpcProtocolTests
     public void VolatileTaskStorageIsSharedWithinAnActivationScope()
     {
         var silo = new TestSiloBuilder();
+
+        // A silo registers the serializer, whose copier the volatile storage uses to snapshot its tasks.
+        silo.Services.AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskState).Assembly));
         silo.AddDurableTasks();
         silo.Services.RemoveAll<DurableTaskGrainStorage>();
         silo.Services.RemoveAll<IDurableTaskGrainStorage>();

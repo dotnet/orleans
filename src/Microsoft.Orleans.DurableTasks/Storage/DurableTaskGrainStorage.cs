@@ -135,6 +135,14 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items[taskId] = typedState;
     }
 
+    public void SetIncarnation(TaskId taskId, IDurableTaskState state, Guid incarnation)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(incarnation, Guid.Empty);
+        var typedState = GetState(taskId, state);
+        typedState.Incarnation = incarnation;
+        _items[taskId] = typedState;
+    }
+
     public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
     {
         ArgumentNullException.ThrowIfNull(response);

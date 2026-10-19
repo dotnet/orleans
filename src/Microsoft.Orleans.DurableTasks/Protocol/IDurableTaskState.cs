@@ -91,6 +91,16 @@ public interface IDurableTaskState
     public GrainId CallerId { get; }
 
     /// <summary>
+    /// Gets the nonce which identifies this run of an invoked task, which the host minted when it first stored the task's
+    /// invocation, or <see cref="System.Guid.Empty"/> for a task which isn't invoked.
+    /// </summary>
+    /// <remarks>
+    /// Every execution in the task's tree reports it as <see cref="DurableTaskContext.Incarnation"/>. A later run of the
+    /// same identifier, after this one is deleted, has another.
+    /// </remarks>
+    public System.Guid Incarnation { get; }
+
+    /// <summary>
     /// Gets the grain-wide completion sequence which stamped the task's terminal result when it was staged, or zero when
     /// the task has no result or its storage doesn't order completions.
     /// </summary>

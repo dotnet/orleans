@@ -540,7 +540,8 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
             siloBuilder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
             siloBuilder.UseInMemoryDurableJobs();
             siloBuilder.Services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs, JobClock);
-            siloBuilder.AddDurableTasks();
+            // A crash or deactivation while an execution runs resumes it promptly, as recovery tests observe.
+            siloBuilder.AddDurableTasks(options => options.RunnableExecutionWakeupDelay = TimeSpan.FromSeconds(1));
             siloBuilder.Services.AddSingleton(Probe);
             siloBuilder.Services.AddSingleton(MessagingProbe);
             siloBuilder.Services.RemoveAll<IJournalStorageProvider>();

@@ -26,8 +26,6 @@ internal sealed partial class DurableTaskGrainRuntime
         // This will happen if the task is non-serializable, like a local method invocation.
         public bool IsRunning { get; set; }
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
-
         public async ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
         {
             ValueTask cancellation;

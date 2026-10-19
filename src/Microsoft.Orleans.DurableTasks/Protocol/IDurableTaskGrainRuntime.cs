@@ -231,6 +231,11 @@ internal interface IDurableTaskGrainRuntime
     /// </param>
     TaskId GetTargetTaskId(TaskId taskId, out GrainId addressedHost);
 
+    /// <summary>
+    /// Returns the incarnation of the invoked task whose execution tree contains <paramref name="executionId"/>.
+    /// </summary>
+    Guid GetIncarnation(TaskId executionId);
+
     /// <summary>Returns when a task's terminal result was recorded, or <see langword="null"/> when it has none.</summary>
     DateTimeOffset? GetCompletedAt(TaskId taskId);
 
