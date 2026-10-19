@@ -56,6 +56,13 @@ public sealed class DeliveryFaultInjector
     /// <summary>Lets tries call the receiver unchanged once the script is exhausted.</summary>
     public void StopRepeating() => _repeat = null;
 
+    /// <summary>Discards scripted faults which no try has taken, and stops repeating.</summary>
+    public void Clear()
+    {
+        _script.Clear();
+        _repeat = null;
+    }
+
     /// <summary>Waits until <paramref name="count"/> tries have reached the injector.</summary>
     public Task WaitForExecutionsAsync(int count) => _executions.WaitAsync(count);
 
