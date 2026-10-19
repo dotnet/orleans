@@ -28,9 +28,6 @@ internal sealed partial class ActivationData
     /// Removes the queued requests which can migrate with this activation.
     /// </summary>
     /// <returns>The requests, or <see langword="null"/> if there are none.</returns>
-    /// <remarks>
-    /// While the requests are in transit, a cancellation for one of them is sent to the grain as a request, which travels with this activation's other requests.
-    /// </remarks>
     private List<Message>? TakeRequestsForMigration()
     {
         var maxForwardCount = _shared.MessagingOptions.MaxForwardCount;

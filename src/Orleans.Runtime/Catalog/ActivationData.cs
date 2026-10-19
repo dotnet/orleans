@@ -254,22 +254,6 @@ internal sealed partial class ActivationData :
     }
 
     /// <summary>
-    /// Gets the migration of this activation, which owns its requests until it delivers them.
-    /// </summary>
-    private ActivationMigration? Migration
-    {
-        get => _extras?.Migration;
-        set
-        {
-            lock (_lock)
-            {
-                _extras ??= new();
-                _extras.Migration = value;
-            }
-        }
-    }
-
-    /// <summary>
     /// Gets the previous directory registration for this grain, if known.
     /// This is used to update the grain directory to point to the new registration during activation.
     /// </summary>
@@ -2190,6 +2174,7 @@ internal sealed partial class ActivationData :
 
         var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start(_shared.CatalogInstruments, _shared.GrainTypeMetricName);
         var migrating = false;
+        ActivationMigration? migration = null;
         var encounteredError = false;
         try
         {
@@ -2351,7 +2336,7 @@ internal sealed partial class ActivationData :
                     queued = TakeWaitingRequests();
                 }
 
-                if (Migration is { } migration)
+                if (migration is not null)
                 {
                     // The migration forwards the requests which the target did not take, followed by these.
                     if (queued is not null)
@@ -2403,10 +2388,9 @@ internal sealed partial class ActivationData :
                 OnDehydrate(context.MigrationContext);
 
                 // Send the dehydration context to the target host. The migration takes ownership of the queued requests, which the new activation runs before any other request.
-                // This activation remains in the catalog until the migration completes, so that the requests and cancellations which reach this silo for the grain reach it.
+                // This activation remains in the catalog until the migration completes, so that the requests which reach this silo for the grain reach it.
                 // Cancellation stops a migration which has not been sent. One which has been sent completes when the target responds.
-                var migration = migrationManager.StartMigration(ForwardingAddress, Address, context.MigrationContext, TakeRequestsForMigration(), cancellationToken);
-                Migration = migration;
+                migration = migrationManager.StartMigration(ForwardingAddress, Address, context.MigrationContext, TakeRequestsForMigration(), cancellationToken);
                 await migration.Completion;
                 _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, ForwardingAddress);
                 return true;
@@ -2536,6 +2520,108 @@ internal sealed partial class ActivationData :
         return tracker.IsReentrantSectionActive(reentrancyId);
     }
 
+    ValueTask IGrainCallCancellationExtension.CancelRequestAsync(
+        GrainId senderGrainId,
+        CorrelationId messageId,
+        CancellationToken cancellationToken)
+        => this.RunOrQueueTask(
+            static state => state.self.CancelRequestAsyncCore(state.senderGrainId, state.messageId, state.cancellationToken),
+            (self: this, senderGrainId, messageId, cancellationToken));
+
+    private ValueTask CancelRequestAsyncCore(
+        GrainId senderGrainId,
+        CorrelationId messageId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!TryCancelRequest())
+        {
+            // The message being canceled may not have arrived yet, so retry a few times.
+            return RetryCancellationAfterDelay();
+        }
+
+        return ValueTask.CompletedTask;
+
+        async ValueTask RetryCancellationAfterDelay()
+        {
+            var attemptsRemaining = 3;
+            do
+            {
+                await Task.Delay(1_000, cancellationToken);
+            } while (!TryCancelRequest() && --attemptsRemaining > 0);
+        }
+
+        bool TryCancelRequest()
+        {
+            Message? message = null;
+            var wasWaiting = false;
+            lock (_lock)
+            {
+                // Check the running requests.
+                foreach (var candidate in _runningRequests.Keys)
+                {
+                    if (candidate.Id == messageId && candidate.SendingGrain == senderGrainId)
+                    {
+                        message = candidate;
+                        break;
+                    }
+                }
+
+                if (message is null)
+                {
+                    // Check the waiting requests.
+                    for (var i = 0; i < _waitingRequests.Count; i++)
+                    {
+                        var candidate = _waitingRequests[i].Message;
+                        if (candidate.Id == messageId && candidate.SendingGrain == senderGrainId)
+                        {
+                            message = candidate;
+                            _waitingRequests.RemoveAt(i);
+                            wasWaiting = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            var didCancel = false;
+            if (message is not null && message.BodyObject is IInvokable request)
+            {
+                if (wasWaiting)
+                {
+                    // If the request was waiting, then we necessarily did manage to cancel it, so send the response now.
+                    _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+                    didCancel = true;
+                }
+                else
+                {
+                    didCancel = TryCancelInvokable(request) || !request.IsCancellable;
+                }
+            }
+
+            return didCancel;
+        }
+
+        bool TryCancelInvokable(IInvokable request)
+        {
+            try
+            {
+                return request.TryCancel();
+            }
+            catch (Exception exception)
+            {
+                LogErrorCancellationCallbackFailed(Shared.Logger, exception);
+                return true;
+            }
+        }
+    }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "One or more cancellation callbacks failed."
+    )]
+    private static partial void LogErrorCancellationCallbackFailed(ILogger logger, Exception exception);
+
     #endregion
 
     /// <summary>
@@ -2564,8 +2650,6 @@ internal sealed partial class ActivationData :
         /// If State == Invalid, this may contain a forwarding address for incoming messages
         /// </summary>
         public SiloAddress? ForwardingAddress { get => GetValueOrDefault<SiloAddress>(nameof(ForwardingAddress)); set => SetOrRemoveValue(nameof(ForwardingAddress), value); }
-
-        public ActivationMigration? Migration { get => GetValueOrDefault<ActivationMigration>(nameof(Migration)); set => SetOrRemoveValue(nameof(Migration), value); }
 
         /// <summary>
         /// A <see cref="TaskCompletionSource{TResult}"/> which completes when a grain has deactivated.

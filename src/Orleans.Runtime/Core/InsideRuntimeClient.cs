@@ -121,8 +121,6 @@ namespace Orleans.Runtime
 
         internal MessageCenter MessageCenter => this.messageCenter;
 
-        internal IGrainCallCancellationManager CancellationManager => _cancellationManager;
-
         public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime;
 
         internal void ConsumeServices()

@@ -125,16 +125,10 @@ internal interface IActivationMigrationManager
 /// The migration of an activation, which owns the requests which were queued for the activation.
 /// </summary>
 /// <remarks>
-/// <para>
 /// The activation transfers its queued requests when it starts the migration, and remains in the catalog until the migration completes,
-/// so that requests and cancellations which reach this silo for the grain reach it. It then leaves the catalog and transfers the requests which reached it meanwhile
+/// so that requests which reach this silo for the grain reach it. It then leaves the catalog and transfers the requests which reached it meanwhile
 /// through <see cref="Deliver"/>, which forwards the requests which the target did not take, followed by the later requests.
 /// The activation does not access the requests afterwards.
-/// </para>
-/// <para>
-/// The activation gives the migration cancellations of requests which it does not hold. Until the migration delivers its requests, it records them,
-/// and then cancels the requests which it would forward. Cancellations of requests which the target took are sent to the target.
-/// </para>
 /// </remarks>
 internal sealed class ActivationMigration(
     ActivationMigrationManager manager,
@@ -147,14 +141,7 @@ internal sealed class ActivationMigration(
     CancellationToken cancellationToken)
 {
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private List<(GrainId SendingGrain, CorrelationId MessageId)>? _cancellations;
-    private bool? _requestsRetained;
-    private bool _delivered;
-#if NET9_0_OR_GREATER
-    private readonly Lock _lock = new();
-#else
-    private readonly object _lock = new();
-#endif
+    private bool _requestsRetained;
 
     /// <summary>
     /// Completes when the target has acknowledged the migration, and the callers of the requests which it took have been retargeted.
@@ -177,42 +164,14 @@ internal sealed class ActivationMigration(
     internal CancellationToken CancellationToken { get; } = cancellationToken;
 
     /// <summary>
-    /// Records a cancellation of a request which this migration may own, unless the target took the migration's requests, or the migration has delivered them.
-    /// </summary>
-    /// <returns><see langword="true"/> if the cancellation was recorded; otherwise, <see langword="false"/>, and the cancellation follows the grain.</returns>
-    public bool TryCancel(GrainId sendingGrain, CorrelationId messageId)
-    {
-        lock (_lock)
-        {
-            if (_delivered || _requestsRetained is false)
-            {
-                return false;
-            }
-
-            (_cancellations ??= []).Add((sendingGrain, messageId));
-            return true;
-        }
-    }
-
-    /// <summary>
     /// Forwards the requests which the target did not take, followed by <paramref name="laterRequests"/>, once the activation has left the catalog.
     /// </summary>
     /// <param name="laterRequests">The requests which reached the activation after the migration started, if any.</param>
     /// <remarks>The activation calls this once, after <see cref="Completion"/> has completed.</remarks>
     public void Deliver(List<Message>? laterRequests)
     {
-        List<(GrainId SendingGrain, CorrelationId MessageId)>? cancellations;
-        bool requestsRetained;
-        lock (_lock)
-        {
-            Debug.Assert(!_delivered && _requestsRetained is not null, "The migration delivers its requests once, after its outcome is known.");
-            _delivered = true;
-            requestsRetained = _requestsRetained is true;
-            cancellations = _cancellations;
-            _cancellations = null;
-        }
-
-        manager.DeliverRequests(source, target, Package.Requests, requestsRetained, requests, laterRequests, cancellations);
+        Debug.Assert(Completion.IsCompleted, "The migration delivers its requests once its outcome is known.");
+        manager.DeliverRequests(source, target, Package.Requests, _requestsRetained, requests, laterRequests);
         requests = null;
     }
 
@@ -226,19 +185,7 @@ internal sealed class ActivationMigration(
     /// <param name="exception">The error which prevented the migration, if any.</param>
     internal void SetOutcome(bool requestsRetained, Exception? exception = null)
     {
-        List<(GrainId SendingGrain, CorrelationId MessageId)>? cancellations = null;
-        lock (_lock)
-        {
-            _requestsRetained = requestsRetained;
-            if (!requestsRetained)
-            {
-                // The target owns the requests which the migration carried, or may own them, so their cancellations are sent to it.
-                cancellations = _cancellations;
-                _cancellations = null;
-            }
-        }
-
-        manager.SignalCancellations(target, source.GrainId, cancellations);
+        _requestsRetained = requestsRetained;
         if (exception is null)
         {
             _completion.TrySetResult();
@@ -583,20 +530,6 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         }
     }
 
-    internal void SignalCancellations(SiloAddress target, GrainId grainId, List<(GrainId SendingGrain, CorrelationId MessageId)>? cancellations)
-    {
-        if (cancellations is not null)
-        {
-            foreach (var (sendingGrain, messageId) in cancellations)
-            {
-                SignalCancellation(target, grainId, sendingGrain, messageId);
-            }
-        }
-    }
-
-    private void SignalCancellation(SiloAddress target, GrainId grainId, GrainId sendingGrain, CorrelationId messageId)
-        => _runtimeClient.CancellationManager.SignalCancellation(target, grainId, sendingGrain, messageId);
-
     /// <summary>
     /// Disposes of a migration's requests once its outcome is known and its source activation has left the catalog.
     /// </summary>
@@ -606,15 +539,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     /// <param name="requestsRetained">Whether the migration did not deliver the requests which it carried, if any.</param>
     /// <param name="requests">The requests which were queued when the migration started.</param>
     /// <param name="laterRequests">The requests which reached the activation after the migration started.</param>
-    /// <param name="cancellations">The cancellations which reached the migration for requests which it owns.</param>
-    internal void DeliverRequests(
-        GrainAddress source,
-        SiloAddress target,
-        byte[]? frames,
-        bool requestsRetained,
-        List<Message>? requests,
-        List<Message>? laterRequests,
-        List<(GrainId SendingGrain, CorrelationId MessageId)>? cancellations)
+    internal void DeliverRequests(GrainAddress source, SiloAddress target, byte[]? frames, bool requestsRetained, List<Message>? requests, List<Message>? laterRequests)
     {
         if (requests is not null)
         {
@@ -647,26 +572,6 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             else
             {
                 requests.AddRange(laterRequests);
-            }
-        }
-
-        if (cancellations is not null)
-        {
-            // A request which was canceled while the migration owned it is canceled here rather than forwarded. Any other cancellation is sent to the target,
-            // which holds the requests which it took.
-            foreach (var (sendingGrain, messageId) in cancellations)
-            {
-                var index = requests?.FindIndex(request => request.Id == messageId && request.SendingGrain == sendingGrain) ?? -1;
-                if (index >= 0)
-                {
-                    var request = requests![index];
-                    requests.RemoveAt(index);
-                    FailRequest(request, new OperationCanceledException());
-                }
-                else
-                {
-                    SignalCancellation(target, source.GrainId, sendingGrain, messageId);
-                }
             }
         }
 
