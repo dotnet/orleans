@@ -205,13 +205,13 @@ internal sealed class JournaledStateAccessTarget
     private long _stamp;
 
     /// <exception cref="InvalidOperationException">Another state of <paramref name="manager"/> has the same identifier.</exception>
-    public JournaledStateAccessTarget(string name, IJournaledStateManager manager, IJournaledStateHistory? history = null)
+    public JournaledStateAccessTarget(string name, IJournaledStateManager manager, IReplicableState? replicableState = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         Name = name;
         Id = ComputeId(name);
         Manager = manager as JournaledStateManager;
-        History = history;
+        ReplicableState = replicableState;
         Manager?.RegisterAccessTarget(this);
     }
 
@@ -239,7 +239,7 @@ internal sealed class JournaledStateAccessTarget
     /// Gets the state's support for positional reads, which a context can record as positions of
     /// <see cref="Manager"/>'s journal instead of values, or <see langword="null"/> when its reads record values.
     /// </summary>
-    public IJournaledStateHistory? History { get; }
+    public IReplicableState? ReplicableState { get; }
 
     /// <summary>
     /// Gets the state's change stamp, which strictly increases with every change of the content which the state's reads
@@ -271,7 +271,7 @@ internal sealed class JournaledStateAccessTarget
     public void OnChanged() => _stamp++;
 
     // FNV-1a over the name's UTF-16 code units, which, unlike string.GetHashCode, is the same in every process.
-    private static int ComputeId(string name)
+    internal static int ComputeId(string name)
     {
         var hash = 2166136261u;
         foreach (var character in name)
