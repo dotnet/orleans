@@ -79,6 +79,22 @@ public abstract class DurableTaskContext
     /// <summary>Gets this execution's identifier.</summary>
     public TaskId Id { get; }
 
+    /// <summary>Gets the nonce which identifies the run of the root task which this execution belongs to.</summary>
+    /// <remarks>
+    /// <para>
+    /// The host mints the incarnation when it first stores an invoked root task, and journals it with that task. Every
+    /// execution in the task's tree, including steps and attached children, reports the same incarnation, and every
+    /// replay and attempt of the run reports it too. A later run of the same root identifier, for example after the
+    /// earlier run completed and its history was deleted, receives a new incarnation.
+    /// </para>
+    /// <para>
+    /// Identifiers which outlive one run, such as message identifiers, cancellation and signal records, and the
+    /// idempotency keys of calls to other services, include the incarnation, so a later run of the same root identifier
+    /// doesn't match the earlier run's records. Its string form is <c>ToString("N")</c>.
+    /// </para>
+    /// </remarks>
+    public abstract Guid Incarnation { get; }
+
     /// <summary>Gets the host-provided logical UTC time for this execution.</summary>
     public abstract DateTimeOffset UtcNow { get; }
 
