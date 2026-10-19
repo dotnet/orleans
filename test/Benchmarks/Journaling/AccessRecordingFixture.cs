@@ -236,10 +236,16 @@ internal static class AccessRecordingScenarios<TValue> where TValue : class
 /// context provider routes the accesses of, as a durable task grain does.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Each attempt is a <see cref="GrainDurableTaskContext"/> of <see cref="TaskId"/>, a task identifier of the depth and form
 /// which the runtime gives a step of a child of an invoked task, and runs its body through
 /// <see cref="DurableTaskRuntimeHelper.RunAsync"/>, which makes the attempt current, so
 /// <see cref="DurableTaskAccessContextProvider"/> finds the attempt's access log as it does in a grain.
+/// </para>
+/// <para>
+/// Pure reads record journal positions unless <c>BENCH_POSITIONS</c> is <c>off</c>, which records values as P2 does.
+/// Replays always consume value records: a recovery resolves positions into values before any attempt replays.
+/// </para>
 /// </remarks>
 internal abstract class AccessRecordingFixture : IDisposable
 {
@@ -249,6 +255,9 @@ internal abstract class AccessRecordingFixture : IDisposable
     public static TaskId TaskId { get; } = TaskId.CreateRoot("0f8fad5bd9cb469fa16570867728950e").Child("$child-1").Child("reserve-stock-1");
 
     public static IEnumerable<string> Formats => (Environment.GetEnvironmentVariable("BENCH_FORMATS") ?? "binary,json").Split(',');
+
+    /// <summary>Gets whether pure reads record journal positions.</summary>
+    public static bool Positions => Environment.GetEnvironmentVariable("BENCH_POSITIONS") is not "off";
 
     public static AccessRecordingFixture Create(string format, AccessRecordingValueKind valueKind) => valueKind switch
     {
@@ -278,6 +287,9 @@ internal abstract class AccessRecordingFixture : IDisposable
     /// </summary>
     public abstract (int Records, int Removal) MeasureBytes(AccessRecordingScenario scenario);
 
+    /// <summary>Returns the bytes which journaling a barrier's set and its release takes.</summary>
+    public abstract int MeasureBarrierBytes();
+
     public abstract void Dispose();
 }
 
@@ -292,6 +304,8 @@ internal sealed class AccessRecordingFixture<TValue> : AccessRecordingFixture wh
     private readonly Func<AccessRecordingFixture<TValue>, int>[] _bodies;
     private readonly AccessLogStorage[] _recorded;
     private readonly BodyTask _body;
+    private readonly IJournalFormat _journalFormat;
+    private readonly Func<IDurableDictionaryCommandCodec<string, string>> _barrierCodecFactory;
 
     public AccessRecordingFixture(string format, Func<AccessRecordingScenario, Func<AccessRecordingFixture<TValue>, int>> getBody, Func<int, TValue> createValue)
     {
@@ -305,9 +319,11 @@ internal sealed class AccessRecordingFixture<TValue> : AccessRecordingFixture wh
         services.Configure<JsonJournalOptions>(options => options.SerializerOptions = new JsonSerializerOptions { TypeInfoResolver = new DefaultJsonTypeInfoResolver() });
         services.AddJsonJournalFormat(tryAdd: false);
         var serviceProvider = services.BuildServiceProvider();
-        var journalFormat = serviceProvider.GetRequiredKeyedService<IJournalFormat>(formatKey);
+        var journalFormat = _journalFormat = serviceProvider.GetRequiredKeyedService<IJournalFormat>(formatKey);
+        _barrierCodecFactory = () => JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, string>>(serviceProvider, formatKey);
         var accessCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<TaskId, byte[]>>(serviceProvider, formatKey);
-        _runtime = new AccessRecordingRuntime(serviceProvider.GetRequiredService<Serializer>());
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        _runtime = new AccessRecordingRuntime(serializer);
 
         var shared = new JournaledStateManagerShared(
             NullLogger<JournaledStateManager>.Instance,
@@ -326,8 +342,9 @@ internal sealed class AccessRecordingFixture<TValue> : AccessRecordingFixture wh
             "value",
             manager,
             JournalFormatServices.GetRequiredCommandCodec<IDurableValueCommandCodec<TValue>>(serviceProvider, formatKey));
-        _logs = new DurableTaskAccessLogs(manager, accessCodec);
+        _logs = new DurableTaskAccessLogs(manager, accessCodec, Positions ? serializer : null);
         _storage = new(_logs);
+        manager.InitializeAsync().AsTask().GetAwaiter().GetResult();
         _body = new(this);
 
         // The states journal into buffers which each invocation resets, rather than through the manager's writes.
@@ -463,6 +480,18 @@ internal sealed class AccessRecordingFixture<TValue> : AccessRecordingFixture wh
     {
         _stateJournal.Dispose();
         _accessJournal.Dispose();
+    }
+
+    public override int MeasureBarrierBytes()
+    {
+        var positions = new JournalPositionState(() => _barrierCodecFactory());
+        using var journal = _journalFormat.CreateWriter();
+        var stream = journal.CreateJournalStreamWriter(new JournalStreamId(JournalPositionState.Id));
+        positions.Set(DurableTaskAccessLogs.StateMachineName, 12_345);
+        ((IStateMachine)positions).WritePendingEntries(stream);
+        positions.RemoveAll();
+        ((IStateMachine)positions).WritePendingEntries(stream);
+        return journal.CommittedLength;
     }
 
     private void ResetJournals()

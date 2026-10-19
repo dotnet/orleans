@@ -17,4 +17,6 @@ internal sealed class AccessLogStorage(DurableTaskAccessLogs logs) : IDurableTas
     public void AddPendingRecords(IDurableTaskPendingAccessRecords source)
     {
     }
+
+    public DurableTaskAccessLogs? PositionHolder => logs.Journal is null ? null : logs;
 }
