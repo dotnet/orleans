@@ -172,7 +172,9 @@ internal sealed partial class Inbox
 
                 _processed[command.MessageId] = command.ProcessedAt;
                 _lastCompletionSequence = ++_lastSequence;
+                // A completion replaces any earlier rejection of the ID, so a duplicate learns the latest outcome.
                 if (command.Rejection is { } rejection) _rejections[command.MessageId] = rejection;
+                else _rejections.Remove(command.MessageId);
                 if (command.DeadLetter is { } letter) _deadLetters[command.MessageId] = letter;
                 break;
             case InboxCommandKind.RemoveDeadLetters:
@@ -252,6 +254,7 @@ internal sealed class InboxProcessedEntry
 internal sealed class InboxRejection
 {
     [Id(0)] public required string Reason { get; init; }
+    [Id(1)] public string? Code { get; init; }
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxEntry")]
