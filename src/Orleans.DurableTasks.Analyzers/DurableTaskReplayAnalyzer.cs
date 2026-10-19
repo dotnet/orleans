@@ -936,11 +936,12 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                 return false;
             }
 
+            // Grain state changes through its collection API, and through the state-specific operations of logs, completion
+            // sources, and persistent state.
             private static bool IsMutating(IMethodSymbol method) =>
-                method.Name is "Add" or "AddRange" or "Remove" or "Clear" or "Insert" or "RemoveAt" or "Enqueue" or "Dequeue"
-                    or "TryDequeue" or "TryAdd" or "UnionWith" or "IntersectWith" or "ExceptWith" or "SymmetricExceptWith"
-                    or "Append" or "TrimBefore" or "TrySetResult" or "TrySetException" or "TrySetCanceled" or "WriteStateAsync"
-                    or "ClearStateAsync";
+                DurableTaskSymbols.IsCollectionMutation(method)
+                || method.Name is "Append" or "TrimBefore" or "TrySetResult" or "TrySetException" or "TrySetCanceled"
+                    or "WriteStateAsync" or "ClearStateAsync";
 
             private static string MemberName(IOperation operation) => operation switch
             {
