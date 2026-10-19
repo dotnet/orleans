@@ -90,13 +90,9 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         Record(order.Order);
 
         // Until the order is paid, cancelling its operation cancels this task. The next durable operation observes the
-        // cancellation and throws OperationCanceledException, and the workflow voids the payment authorization and
-        // releases the lines which validation may have reserved. A payment which times out or fails cancels the order
-        // the same way.
+        // cancellation and throws OperationCanceledException, and the workflow releases the lines which validation may
+        // have reserved.
         OrderLine[] reservable = [];
-        DurableHttpOperation? authorization = null;
-        PaymentResult? payment = null;
-        string? cancellation = null;
         try
         {
             await DurableTask.Delay(_options.GracePeriod).WithId("grace-period");
@@ -123,45 +119,52 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             {
                 throw new OperationCanceledException();
             }
+        }
+        catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
+        {
+            return await CancelOrderAsync(order, reservable, DurableTask.Current.TaskCancellationReason);
+        }
 
-            // Starts the authorization at the payment gateway. The request's Idempotency-Key derives from this step's
-            // task ID, so a retry of the request, or of the step after a failure, reaches the same authorization. The
-            // step is shielded, so a cancellation lets it finish and the workflow learns the authorization to void.
-            authorization = await _payments.StartOperationAsync(() => new HttpRequestMessage(HttpMethod.Post, "authorizations")
-            {
-                Content = JsonContent.Create(new PaymentAuthorizationRequest(OrderId, order.Order.Total, request.CardLast4)),
-            }).WithId("authorize-payment").Shielded();
-
-            // Polls the authorization, as await-payment/0, until it completes or its timeout, await-payment/1, elapses.
+        // Authorizes the payment at the gateway, and polls the authorization, as await-payment/0, until it completes or
+        // its timeout, await-payment/1, elapses. A cancellation, a timeout, or a failure of these steps abandons the
+        // payment, which the workflow voids, since the authorization request may have reached the gateway.
+        DurableHttpOperation? authorization = null;
+        PaymentResult? payment = null;
+        string? failure = null;
+        try
+        {
+            // The start is shielded, so a cancellation lets it finish and the workflow learns the authorization to void.
+            authorization = await _payments.StartOperationAsync(() => CreateAuthorizationRequest(order)).WithId("authorize-payment").Shielded();
             payment = await _payments.WaitForOperationAsync<PaymentResult>(authorization, new() { PollInterval = _options.PaymentPollInterval })
                 .WaitAsync(_options.PaymentTimeout)
                 .WithId("await-payment");
         }
         catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
         {
-            cancellation = DurableTask.Current.TaskCancellationReason;
+            failure = DurableTask.Current.TaskCancellationReason;
         }
         catch (TimeoutException)
         {
-            cancellation = "Payment authorization timed out.";
+            failure = "Payment authorization timed out.";
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            // Any other failure of the payment steps, such as an unreachable gateway, a resilience handler's timeout or
-            // open circuit, or a response which doesn't decode, fails the payment. A canceled attempt propagates, so the
-            // next attempt replays the workflow.
-            cancellation = "Payment authorization failed.";
+            // Any other failure, such as an unreachable gateway, a resilience handler's timeout or open circuit, or a
+            // response which doesn't decode, fails the payment. A canceled attempt propagates, so the next attempt replays
+            // the workflow.
+            failure = "Payment authorization failed.";
         }
 
-        if (payment is null)
+        if (payment is not { Succeeded: true })
         {
-            await VoidPaymentAsync(authorization, cancellation);
-            return await CancelOrderAsync(order, reservable, cancellation);
-        }
+            if (payment is { Succeeded: false })
+            {
+                return await CancelOrderAsync(order, lines, payment.Reason);
+            }
 
-        if (!payment.Succeeded)
-        {
-            return await CancelOrderAsync(order, lines, payment.Reason);
+            failure ??= "The payment gateway returned no result.";
+            await VoidPaymentAsync(order, authorization, failure);
+            return await CancelOrderAsync(order, lines, failure);
         }
 
         order = order.MarkPaid();
@@ -178,23 +181,37 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         return Result(order);
     }
 
-    // Cancels a started authorization at the gateway, which voids it, including one which completed after the order
-    // stopped waiting. The request is shielded, so it runs although the order is cancelled. A void which fails leaves the
-    // authorization to expire at the gateway, and the order is cancelled regardless.
-    private async Task VoidPaymentAsync(DurableHttpOperation? authorization, string? reason)
+    // Voids the order's authorization at the gateway, including one which completed after the order stopped waiting. An
+    // order which didn't learn its authorization's location, such as when the start's response was lost, sends the
+    // authorization request again with its key, which the gateway answers with the authorization which it recorded, or
+    // records one, and voids that. The requests are shielded, so they run although the order is cancelled. A void which
+    // fails leaves the authorization to expire at the gateway, and the order is cancelled regardless.
+    private async Task VoidPaymentAsync(OrderDetails order, DurableHttpOperation? authorization, string reason)
     {
-        if (authorization?.Location is not { } location)
-        {
-            return;
-        }
-
         try
         {
-            await _payments.CancelOperationAsync(location, reason).WithId("void-payment").Shielded();
+            authorization ??= await _payments.StartOperationAsync(() => CreateAuthorizationRequest(order)).WithId("recover-authorization").Shielded();
+            if (authorization.Location is { } location)
+            {
+                await _payments.CancelOperationAsync(location, reason).WithId("void-payment").Shielded();
+            }
         }
-        catch (HttpRequestException)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
         }
+    }
+
+    // Creates the order's authorization request. Its Idempotency-Key names the order, so every request for the order's
+    // authorization, including the one which voids an authorization whose location the order didn't learn, reaches the
+    // same authorization.
+    private HttpRequestMessage CreateAuthorizationRequest(OrderDetails order)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "authorizations")
+        {
+            Content = JsonContent.Create(new PaymentAuthorizationRequest(OrderId, order.Order.Total, order.Order.CardLast4)),
+        };
+        request.Headers.Add(PaymentGateway.IdempotencyKeyHeader, $"authorize-{OrderId}");
+        return request;
     }
 
     // Releases the lines' reservations concurrently, then records the cancellation. Releasing is idempotent and returns

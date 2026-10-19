@@ -24,7 +24,7 @@ sequenceDiagram
     participant Gateway as Payment gateway (/gateway, HTTP)
     participant Buyer as BuyerGrain
     Browser->>Api: POST /api/orders, Idempotency-Key: {orderId}
-    Api->>Order: PlaceOrderAsync, root task orders/{orderId}
+    Api->>Order: PlaceOrderAsync, root task orders/@/{orderId}
     Api-->>Browser: 202 Accepted, Operation-Location: /api/orders/operations/{orderId}
     Order->>Basket: CheckoutAsync (takes the basket's lines)
     Order--)Buyer: RecordOrderAsync (each status change, detached)
@@ -33,7 +33,7 @@ sequenceDiagram
         Order->>Catalog: ReserveAsync
     end
     alt all lines reserved
-        Order->>Gateway: POST /gateway/authorizations, Idempotency-Key derived from authorize-payment
+        Order->>Gateway: POST /gateway/authorizations, Idempotency-Key: authorize-{orderId}
         loop until decided, or the payment timeout
             Order->>Gateway: GET /gateway/authorizations/{id}
         end
@@ -67,7 +67,7 @@ operation reports the error `Rejected: The basket is empty.`
 
 Until the order is paid, cancelling its operation cancels the workflow. The next durable operation throws
 `OperationCanceledException`, so a cancellation which arrives during validation or payment is observed too. The workflow
-voids a started payment authorization at the gateway, releases each line concurrently in a shielded `WhenAll`, and then
+voids the payment authorization at the gateway once the workflow has requested one, releases each line concurrently in a shielded `WhenAll`, and then
 appends the `Cancelled` snapshot, which carries `DurableTask.Current.TaskCancellationReason`. Reservations which completed
 return normally after a cancellation, so the workflow records whether a cancellation arrived before it authorizes the
 payment, with `DurableTask.RunInline`, and a cancelled order doesn't reach the gateway. Rejected stock, declined payments,
@@ -86,9 +86,9 @@ Each layer names its requests, so retries at every layer reach the work which th
 | Layer | Identity | Retried by |
 | --- | --- | --- |
 | Browser to API | A checkout's `Idempotency-Key`, which the browser generates per checkout and persists until the server acknowledges it. The key is the order's ID. | The helper, after a network failure; the buyer, by clicking again; the page, after a refresh. |
-| API to the order | The operation key `orders/{orderId}`, which is the workflow's root task ID on the order grain. | Any request with the same key, which reaches the same workflow. A request which reuses the key with another body receives `422`. |
+| API to the order | The operation key `orders/@/{orderId}`: the scope, the anonymous caller's scope, and the order's ID. It is the workflow's root task ID on the order grain. | Any request with the same key, which reaches the same workflow. A request which reuses the key with another body receives `422`. |
 | Workflow to grains | Child task IDs, such as `checkout`, `reserve/0`, and `release/1`, beneath the root. | Replays after a deactivation or failure, which read recorded results. |
-| Workflow to gateway | An `Idempotency-Key` which `IDurableHttpClient` derives from the service, the order grain, and the step's task ID, such as `authorize-payment`. | The payment client's resilience handler, which follows the key handler, and the step itself after a failure. |
+| Workflow to gateway | The authorization's `Idempotency-Key`, `authorize-{orderId}`, which names the order, so a workflow which didn't learn its authorization's location, such as after a lost response, reaches it again to void it. Other unsafe requests, such as the void, carry a key which `IDurableHttpClient` derives from the service, the order grain, and the step's task ID. | The payment client's resilience handler, which follows the key handler, and the step itself after a failure. |
 | Signals | The shipment's ID, which the browser persists per ship intent. | A repeated signal with an equal value, which succeeds; another value returns `409`. |
 
 `POST /api/orders` requires its `Idempotency-Key` to be a lowercase UUID, which becomes the order's ID, so every request
@@ -152,8 +152,9 @@ running operations in `sessionStorage`, so they survive refreshes of the tab:
 `test/DurableOrderProcessing.Tests` asserts these outcomes against the playground's API: concurrent and retried
 checkouts with one key place one order and authorize one payment, a payment request whose response is lost authorizes
 once, the gateway deduplicates by key, cancellation during payment voids the authorization and releases the stock, a
-paid order ships after a cancellation request, a payment which the gateway fails cancels the order, and a Nexus request
-and a checkout with one ID reach one order.
+paid order ships after a cancellation request, a payment which the gateway fails cancels the order, an order which
+deactivates during its grace period and after payment appends each snapshot once and authorizes once, and a Nexus
+request and a checkout with one ID reach one order.
 
 ## Observe an order
 
@@ -194,11 +195,11 @@ curl -N http://localhost:5000/api/orders/{orderId}/events
 | Grace period | The order sends itself `GracePeriodElapsed` with `Envelope.DeliverAt`; the handler ignores it unless the order is still `Submitted`. | `await DurableTask.Delay(gracePeriod).WithId("grace-period")`. The runtime sends the same kind of scheduled self-message. |
 | Cancellation | `CancelAsync` cancels a `Submitted` or `AwaitingValidation` order; late stock confirmations release their reservations. | `POST /api/orders/operations/{orderId}:cancel` requests durable cancellation of the workflow with the buyer's reason until the order is paid. During validation, `WhenAll` waits for every reservation to settle, then throws `OperationCanceledException`, so the workflow compensates knowing that no reservation is still running. |
 | Reservation fan-out | One `ReserveStock` message per line; `StockResult` replies arrive in any order and the handler tracks each line. | `await lines.Select(...ReserveAsync...).WhenAll().WithId("reserve")` schedules one call per line concurrently, as children `reserve/0`, `reserve/1`, and so on, and returns each line's result in line order. |
-| Payment | `AuthorizePayment` and a `PaymentResult` reply, correlated by message ID. | The workflow starts an authorization at the gateway over HTTP with `IDurableHttpClient.StartOperationAsync`, keyed by its step, and polls it with `WaitForOperationAsync(...).WaitAsync(paymentTimeout).WithId("await-payment")`. A timeout or a cancellation voids the authorization. |
+| Payment | `AuthorizePayment` and a `PaymentResult` reply, correlated by message ID. | The workflow starts an authorization at the gateway over HTTP with `IDurableHttpClient.StartOperationAsync`, keyed by its order, and polls it with `WaitForOperationAsync(...).WaitAsync(paymentTimeout).WithId("await-payment")`. A timeout or a cancellation voids the authorization. |
 | Shipment | `ShipAsync` moves a `Paid` order to `Shipped`. | `POST /api/orders/operations/{orderId}/signals/shipped` delivers the `shipped` signal, which the paid workflow awaits with a shielded wait. The task records the first shipment, so a repeated one succeeds and another one returns `409`. |
 | Compensation | The transition which cancels the order stages `ReleaseStock` for each confirmed line. | Inline and shielded, so the compensation runs to completion after the cancellation which ended the workflow: the authorization is voided, then `lines.Select(...ReleaseAsync...).WhenAll().WithId("release").Shielded()` releases the lines concurrently. |
 | Projection | `StatusChanged` messages carry a version; the buyer keeps the highest. | The workflow posts one `RecordOrderAsync` call per version as a detached task, `.Detached().Post()`, whose root ID derives from the order grain and the workflow's ID. The update commits with the workflow's next journal write and runs independently of the workflow. The buyer keeps the highest version. |
-| Idempotency | Message IDs derived from the order ID, such as `orders/{orderId}/stock/{productId}`; each inbox processes a message ID once. | The checkout's `Idempotency-Key` names the order and its workflow, task IDs beneath it name each step, and the gateway's `Idempotency-Key` derives from the payment step, as [Idempotency end to end](#idempotency-end-to-end) describes. |
+| Idempotency | Message IDs derived from the order ID, such as `orders/{orderId}/stock/{productId}`; each inbox processes a message ID once. | The checkout's `Idempotency-Key` names the order and its workflow, task IDs beneath it name each step, and the gateway's `Idempotency-Key` names the order's authorization, as [Idempotency end to end](#idempotency-end-to-end) describes. |
 | Recovery | The inbox and outbox resume pending messages; each handler runs from the state it finds. | The next activation replays pending tasks from the start; completed children and recorded effects return their recorded results, so the workflow resumes where it stopped and the history holds each version once. Durable Jobs wakes the order when the delay is due or a completion arrives. |
 | Observability | Order state and the dashboard. | The order's operation, with long polling and server-sent events, its history as a server-sent event stream, the dashboard, and per-grain task lists. |
 | Non-blank lines of code | Grains 414, contracts 112, host 49. | Grains 315, contracts 133, host 229, including the HTTP API, the Nexus service, and the diagnostics endpoints; the simulated gateway adds 139. |
