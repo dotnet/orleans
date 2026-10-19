@@ -273,7 +273,7 @@ internal sealed class DurableTaskAccessLog(
 
         if (IsReplaying)
         {
-            return Replay<TResult>(access, ArgumentHash(argument));
+            return Replay<TArgument, TResult>(access, ArgumentHash(argument));
         }
 
         if (_state is AccessLogState.Closed)
@@ -432,7 +432,7 @@ internal sealed class DurableTaskAccessLog(
         return null;
     }
 
-    private TResult Replay<TResult>(in JournaledStateAccess access, int? argumentHash)
+    private TResult Replay<TArgument, TResult>(in JournaledStateAccess access, int? argumentHash)
     {
         var index = ++_consumed;
         if (_runRemaining > 0)
@@ -534,7 +534,8 @@ internal sealed class DurableTaskAccessLog(
                 fallback));
         }
 
-        if (exception is null && access.Kind is JournaledStateAccessKind.Read && returnsResult && _position < _recorded.Length)
+        // Only reads which a recording attempt could have referred to are kept for references.
+        if (exception is null && access.Kind is JournaledStateAccessKind.Read && LiveRead<TArgument, TResult>.CanRepeat(access.Operation) && _position < _recorded.Length)
         {
             RememberRead(stateIndex, access.Operation, value, recordedHash, result);
         }
