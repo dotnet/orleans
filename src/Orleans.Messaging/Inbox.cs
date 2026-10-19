@@ -323,8 +323,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             }
             else
             {
-                var retryAt = MessagingTime.AddClamped(now,
-                    TimeSpan.FromTicks(Options.RetryInitialInterval.Ticks * (1L << Math.Min(attempts - 1, DurableMessagingOptions.MaximumBackoffExponent))));
+                var retryAt = MessagingTime.AddClamped(now, MessagingTime.GetBackoff(Options.RetryInitialInterval, attempts));
+
                 Emit(new()
                 {
                     Kind = InboxCommandKind.Retry,
@@ -402,9 +402,6 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         Emit(new() { Kind = InboxCommandKind.RemoveDeadLetters, RemovedKeys = [messageId] });
         return true;
     }
-
-    /// <summary>Gets a value indicating whether the inbox or a registered work source holds pending work.</summary>
-    internal bool HasWork => _messages.Count > 0 || GetWorkSourceDelay() is not null;
 
     /// <summary>
     /// Returns the delay until the next message or work source is due, or <see langword="null"/> when neither the inbox
