@@ -350,6 +350,39 @@ public sealed class DurableTaskPositionalReadTests
     }
 
     [Fact]
+    public async Task AttemptRecordsValuesAfterAForcedResolution()
+    {
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
+        await using var activation = await harness.ActivateAsync();
+        activation.Dictionary["a"] = "x";
+        await activation.Manager.WriteStateAsync(Cancellation);
+        var log = activation.CreateLog();
+        activation.Run(log, static activation => _ = activation.Dictionary["a"]);
+        log.Flush();
+        harness.Storage.RequestCompaction = true;
+        harness.Storage.Replaces = 0;
+        for (var i = 0; i <= JournalPositionTracker.MaxDeferredSnapshots; i++)
+        {
+            await activation.Manager.WriteStateAsync(Cancellation);
+        }
+
+        harness.Storage.RequestCompaction = false;
+        Assert.Equal(1, harness.Storage.Replaces);
+
+        // The attempt which outlived the resolution records values, so it holds no barrier for the next compaction.
+        activation.Run(log, static activation => _ = activation.Dictionary.TryGetValue("a", out _));
+        Assert.Null(DurableTaskAccessLog.FindPositionalRecords(log.PendingRecords, log.PendingStates));
+        Assert.False(activation.Manager.Positions.HasBarriers);
+
+        // Another attempt records positions.
+        var other = activation.CreateLog(TaskId.CreateRoot("other"));
+        activation.Run(other, static activation => _ = activation.Dictionary.TryGetValue("a", out _));
+        Assert.NotNull(DurableTaskAccessLog.FindPositionalRecords(other.PendingRecords, other.PendingStates));
+        other.Close();
+        log.Close();
+    }
+
+    [Fact]
     public async Task ForcedResolutionFencesWhenAnotherWriterChangedTheJournal()
     {
         await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
