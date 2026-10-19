@@ -383,7 +383,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                         // which the snapshot replaces.
                                         lock (_lock)
                                         {
-                                            isSnapshot = _positions.SnapshotPassesBarriers(positionResolution, _migrationSnapshotRequired);
+                                            isSnapshot = _positions.SnapshotPassesBarriers(positionResolution);
                                         }
                                     }
 
@@ -1034,7 +1034,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
             plan = _positions.PlanSnapshot(_migrationSnapshotRequired);
         }
 
-        if (plan.Resolution is { Batches.Count: > 0 } resolution)
+        if (plan.Resolution is { } resolution)
         {
             await _positions.ReadHistoryAsync(resolution, cancellationToken).ConfigureAwait(true);
         }
