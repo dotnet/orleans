@@ -30,6 +30,9 @@ namespace Orleans.Messaging
         [Id(3)]
         public int AttemptCount { get { throw null; } init { } }
 
+        [Id(4)]
+        public string? Code { get { throw null; } init { } }
+
         [Id(1)]
         public System.DateTimeOffset DeadLetteredAt { get { throw null; } init { } }
 
@@ -215,10 +218,11 @@ namespace Orleans.Messaging
         bool RemoveInboxDeadLetter(MessageId messageId);
     }
 
-    [Alias("IMessagingExtension")]
+    [Alias("Orleans.Messaging.IMessagingExtension")]
     public partial interface IMessagingExtension : Runtime.IGrainExtension, Runtime.IAddressable
     {
         [Alias("DeliverAsync")]
+        [Concurrency.AlwaysInterleave]
         System.Threading.Tasks.ValueTask<DeliveryResult> DeliverAsync(InboxMessage message, System.Threading.CancellationToken cancellationToken = default);
     }
 
