@@ -119,6 +119,15 @@ internal interface IActivationMigrationManager
     /// </param>
     /// <returns>The migration.</returns>
     ActivationMigration StartMigration(SiloAddress target, GrainAddress source, MigrationContext migrationContext, List<Message>? requests, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Cancels a request for <paramref name="grainId"/> which a migration from this silo owns, if there is such a migration.
+    /// </summary>
+    /// <param name="grainId">The migrating grain.</param>
+    /// <param name="sendingGrain">The grain which sent the request.</param>
+    /// <param name="messageId">The request's identifier.</param>
+    /// <returns><see langword="true"/> if a migration of the grain owns its requests, and records the cancellation; otherwise, <see langword="false"/>.</returns>
+    bool TryCancelMigratingRequest(GrainId grainId, GrainId sendingGrain, CorrelationId messageId);
 }
 
 /// <summary>
@@ -134,6 +143,10 @@ internal interface IActivationMigrationManager
 /// followed by the later requests, so that each request precedes any cancellation of it which reached the activation later.
 /// Requests are not forwarded before then, so that a request does not create an activation on the target before the migration does, or return to the source activation.
 /// </para>
+/// <para>
+/// A cancellation for a request which the migration owns is recorded until the migration delivers its requests. It then cancels the request if the migration
+/// would forward it, and is otherwise sent to the target, which holds the requests which it took.
+/// </para>
 /// </remarks>
 internal sealed class ActivationMigration(
     ActivationMigrationManager manager,
@@ -148,7 +161,14 @@ internal sealed class ActivationMigration(
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private List<Message>? _requests = requests;
     private List<Message>? _laterRequests;
-    private bool _requestsRetained;
+    private List<(GrainId SendingGrain, CorrelationId MessageId)>? _cancellations;
+    private bool? _requestsRetained;
+    private bool _delivering;
+#if NET9_0_OR_GREATER
+    private readonly Lock _lock = new();
+#else
+    private readonly object _lock = new();
+#endif
 
     // The outcome and the source's deactivation each signal once. The second signal delivers the requests.
     private int _pendingSignals = 2;
@@ -173,6 +193,25 @@ internal sealed class ActivationMigration(
 
     internal CancellationToken CancellationToken { get; } = cancellationToken;
 
+    internal GrainAddress Source => source;
+
+    /// <summary>
+    /// Records a cancellation of a request which this migration owns, unless it has delivered its requests, or the target took them.
+    /// </summary>
+    internal bool TryCancel(GrainId sendingGrain, CorrelationId messageId)
+    {
+        lock (_lock)
+        {
+            if (_delivering || _requestsRetained is false)
+            {
+                return false;
+            }
+
+            (_cancellations ??= []).Add((sendingGrain, messageId));
+            return true;
+        }
+    }
+
     /// <summary>
     /// Takes ownership of the requests which reached the activation after the migration started, once the activation has stopped receiving requests.
     /// </summary>
@@ -193,7 +232,19 @@ internal sealed class ActivationMigration(
     /// <param name="exception">The error which prevented the migration, if any.</param>
     internal void SetOutcome(bool requestsRetained, Exception? exception = null)
     {
-        _requestsRetained = requestsRetained;
+        List<(GrainId SendingGrain, CorrelationId MessageId)>? cancellations = null;
+        lock (_lock)
+        {
+            _requestsRetained = requestsRetained;
+            if (!requestsRetained)
+            {
+                // The target owns the requests which the migration carried, or may own them, so their cancellations are sent to it now.
+                cancellations = _cancellations;
+                _cancellations = null;
+            }
+        }
+
+        manager.SignalCancellations(target, source.GrainId, cancellations);
         Signal();
         if (exception is null)
         {
@@ -211,10 +262,17 @@ internal sealed class ActivationMigration(
         Debug.Assert(pending >= 0);
         if (pending == 0)
         {
+            List<(GrainId SendingGrain, CorrelationId MessageId)>? cancellations;
+            lock (_lock)
+            {
+                _delivering = true;
+                cancellations = _cancellations;
+            }
+
             var requests = _requests;
             var laterRequests = _laterRequests;
             _requests = _laterRequests = null;
-            manager.DeliverRequests(source, target, Package.Requests, _requestsRetained, requests, laterRequests);
+            manager.DeliverRequests(this, target, Package.Requests, _requestsRetained is true, requests, laterRequests, cancellations);
         }
     }
 }
@@ -234,6 +292,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private const int PackageFramingAllowance = 64;
 
     private readonly ConcurrentDictionary<SiloAddress, (Task PumpTask, Channel<ActivationMigration> WorkItemChannel)> _workers = new();
+    private readonly ConcurrentDictionary<GrainId, ActivationMigration> _migrations = new();
     private readonly CancellationTokenSource _shuttingDownCts = new();
     private readonly ILogger<ActivationMigrationManager> _logger;
     private readonly IInternalGrainFactory _grainFactory;
@@ -400,6 +459,9 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         }
 
         var migration = new ActivationMigration(this, source, targetSilo, package, requests, routes, size, cancellationToken);
+
+        // The migration owns the grain's requests until it delivers them, so cancellations for them are directed to it.
+        _migrations[source.GrainId] = migration;
         if (!GetOrCreateWorker(targetSilo).TryWrite(migration))
         {
             migration.SetOutcome(requestsRetained: true, new SiloUnavailableException($"Silo {targetSilo} is no longer active"));
@@ -552,17 +614,44 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         }
     }
 
+    public bool TryCancelMigratingRequest(GrainId grainId, GrainId sendingGrain, CorrelationId messageId)
+        => _migrations.TryGetValue(grainId, out var migration) && migration.TryCancel(sendingGrain, messageId);
+
+    internal void SignalCancellations(SiloAddress target, GrainId grainId, List<(GrainId SendingGrain, CorrelationId MessageId)>? cancellations)
+    {
+        if (cancellations is not null)
+        {
+            foreach (var (sendingGrain, messageId) in cancellations)
+            {
+                SignalCancellation(target, grainId, sendingGrain, messageId);
+            }
+        }
+    }
+
+    private void SignalCancellation(SiloAddress target, GrainId grainId, GrainId sendingGrain, CorrelationId messageId)
+        => _runtimeClient.CancellationManager.SignalCancellation(target, grainId, sendingGrain, messageId);
+
     /// <summary>
     /// Disposes of a migration's requests once its outcome is known and its source activation has stopped receiving requests.
     /// </summary>
-    /// <param name="source">The migrating activation's address.</param>
+    /// <param name="migration">The migration.</param>
     /// <param name="target">The migration target.</param>
     /// <param name="frames">The serialized requests which the migration carried, if any.</param>
     /// <param name="requestsRetained">Whether the migration did not deliver the requests which it carried, if any.</param>
     /// <param name="requests">The requests which were queued when the migration started.</param>
     /// <param name="laterRequests">The requests which reached the activation after the migration started.</param>
-    internal void DeliverRequests(GrainAddress source, SiloAddress target, byte[]? frames, bool requestsRetained, List<Message>? requests, List<Message>? laterRequests)
+    /// <param name="cancellations">The cancellations which reached the migration for requests which it owns.</param>
+    internal void DeliverRequests(
+        ActivationMigration migration,
+        SiloAddress target,
+        byte[]? frames,
+        bool requestsRetained,
+        List<Message>? requests,
+        List<Message>? laterRequests,
+        List<(GrainId SendingGrain, CorrelationId MessageId)>? cancellations)
     {
+        var source = migration.Source;
+        _migrations.TryRemove(new(source.GrainId, migration));
         if (requests is not null)
         {
             if (requestsRetained)
@@ -594,6 +683,26 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             else
             {
                 requests.AddRange(laterRequests);
+            }
+        }
+
+        if (cancellations is not null)
+        {
+            // A request which was canceled while the migration owned it is canceled here rather than forwarded. Any other cancellation is sent to the target,
+            // which holds the requests which it took.
+            foreach (var (sendingGrain, messageId) in cancellations)
+            {
+                var index = requests?.FindIndex(request => request.Id == messageId && request.SendingGrain == sendingGrain) ?? -1;
+                if (index >= 0)
+                {
+                    var request = requests![index];
+                    requests.RemoveAt(index);
+                    FailRequest(request, new OperationCanceledException());
+                }
+                else
+                {
+                    SignalCancellation(target, source.GrainId, sendingGrain, messageId);
+                }
             }
         }
 

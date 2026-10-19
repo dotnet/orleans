@@ -60,6 +60,7 @@ internal partial class GrainCallCancellationManager : SystemTarget, IGrainCallCa
 #endif
     private readonly Task? _membershipUpdatesTask;
     private IInternalGrainFactory? _grainFactory;
+    private IActivationMigrationManager? _migrationManager;
 
     public GrainCallCancellationManager(
         ILocalSiloDetails localSiloDetails,
@@ -92,6 +93,9 @@ internal partial class GrainCallCancellationManager : SystemTarget, IGrainCallCa
 
     private IInternalGrainFactory GrainFactory => _grainFactory ??= _serviceProvider.GetRequiredService<IInternalGrainFactory>();
 
+    // Resolved on first use, since the migration manager depends on the runtime, which depends on this.
+    private IActivationMigrationManager? MigrationManager => _migrationManager ??= _serviceProvider.GetService<IActivationMigrationManager>();
+
     public ValueTask CancelCallsAsync(
         List<GrainCallCancellationRequest> cancellationRequests,
         CancellationToken cancellationToken = default)
@@ -103,6 +107,10 @@ internal partial class GrainCallCancellationManager : SystemTarget, IGrainCallCa
             if (_activationDirectory.FindTarget(request.TargetGrainId) is IGrainCallCancellationExtension extension)
             {
                 extension.CancelRequestAsync(request.SourceGrainId, request.MessageId, CancellationToken.None).Ignore();
+            }
+            else if (MigrationManager?.TryCancelMigratingRequest(request.TargetGrainId, request.SourceGrainId, request.MessageId) is true)
+            {
+                // The grain's activation migrated from this silo, and its migration still owns the request.
             }
             else
             {
