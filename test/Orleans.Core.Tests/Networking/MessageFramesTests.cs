@@ -141,6 +141,21 @@ public sealed class MessageFramesTests : IDisposable
         Assert.ThrowsAny<Exception>(() => _serializer.SerializeToArray(new List<Message> { CreateRequest(1, timeToLive: null), unserializable }));
     }
 
+    [Fact]
+    public void NullAndRepeatedMessages_RoundTripAsReferences()
+    {
+        var request = CreateRequest(1, timeToLive: null);
+        request.BodyObject = "value";
+
+        // A message which appears twice is serialized once, and both entries read back as the same message.
+        var messages = RoundTrip([request, null!, request]);
+        Assert.Equal(3, messages.Count);
+        Assert.Null(messages[1]);
+        Assert.Same(messages[0], messages[2]);
+        Assert.Equal(request.Id, messages[0].Id);
+        Assert.Equal("value", messages[0].BodyObject);
+    }
+
     private List<Message> RoundTrip(List<Message> messages) => _serializer.Deserialize<List<Message>>(_serializer.SerializeToArray(messages))!;
 
     private static Message CreateRequest(long id, TimeSpan? timeToLive) => new()

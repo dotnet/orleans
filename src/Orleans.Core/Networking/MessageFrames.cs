@@ -1,7 +1,6 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -118,8 +117,11 @@ internal sealed class MessageCodec(IServiceProvider serviceProvider) : IFieldCod
     public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type? expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Message value)
         where TBufferWriter : IBufferWriter<byte>
     {
-        Debug.Assert(value is not null);
-        ReferenceCodec.MarkValueField(writer.Session);
+        if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
+        {
+            return;
+        }
+
         writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(Message), WireType.LengthPrefixed);
 
         using var frame = new ArcBufferWriter();
@@ -141,14 +143,20 @@ internal sealed class MessageCodec(IServiceProvider serviceProvider) : IFieldCod
         }
     }
 
-    public Message ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+    public Message? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
-        ReferenceCodec.MarkValueField(reader.Session);
+        if (field.WireType == WireType.Reference)
+        {
+            return ReferenceCodec.ReadReference<Message, TInput>(ref reader, field);
+        }
+
         field.EnsureWireType(WireType.LengthPrefixed);
         var length = (int)reader.ReadVarUInt32();
         using var frame = new ArcBufferWriter();
         var output = frame;
         reader.ReadBytes(ref output, length);
-        return MessageFrames.Read(Shared, frame);
+        var message = MessageFrames.Read(Shared, frame);
+        ReferenceCodec.RecordObject(reader.Session, message);
+        return message;
     }
 }

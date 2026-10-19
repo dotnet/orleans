@@ -83,6 +83,7 @@
     <InternalsVisibleTo Include="Orleans.Runtime" />
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
     <InternalsVisibleTo Include="Orleans.Runtime.Tests" />
+    <InternalsVisibleTo Include="Orleans.Serialization.UnitTests" />
     <InternalsVisibleTo Include="Orleans.Streaming" />
     <InternalsVisibleTo Include="Orleans.Streaming.AdoNet" />
     <InternalsVisibleTo Include="Orleans.Streaming.EventHubs.Tests" />
