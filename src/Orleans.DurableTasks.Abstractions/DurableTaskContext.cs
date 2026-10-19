@@ -6,15 +6,31 @@ namespace Orleans.DurableTasks;
 
 /// <summary>Describes a running durable task and supplies its host's services.</summary>
 /// <remarks>
+/// <para>
 /// Task code reads the running task's context from <see cref="DurableTask.Current"/>. Hosts derive from this type to
 /// schedule and record the task's operations.
+/// </para>
+/// <para>
+/// An execution's code runs on one scheduler, the one which was current when the host created the context, such as its
+/// grain activation's scheduler, so the context's state needs no synchronization. The host creates the context, requests
+/// task cancellation, and cancels the attempt on that scheduler, and the execution's code allocates identifiers and runs
+/// effects there. Debug builds assert it. The cancellation tokens and the handles which the execution observes remain safe
+/// to use from any thread.
+/// </para>
 /// </remarks>
 public abstract class DurableTaskContext
 {
     private const char GeneratedSegmentPrefix = '$';
+    private const string OperationInEffectMessage =
+        "A DurableTask.RunInline effect runs once and records only its outcome, so it can't run durable operations: a replay "
+        + "returns the outcome without running them, which shifts the identifiers of the body's later operations. Run the "
+        + "operation in the body, before or after the effect.";
+
     private static readonly AsyncLocal<DurableTaskContext?> AmbientContext = new();
     private static readonly AsyncLocal<DurableTaskContext?> ShieldedContext = new();
-    private readonly object _lock = new();
+#if DEBUG
+    private readonly TaskScheduler _scheduler = TaskScheduler.Current;
+#endif
 
     // Canceled by task cancellation and by attempt cancellation: the source of CancellationToken.
     private readonly CancellationTokenSource _cancellationSource = new();
@@ -26,17 +42,16 @@ public abstract class DurableTaskContext
     private string? _taskCancellationReason;
     private DurableTaskAttemptCancellationReason? _attemptCancellationReason;
     private long _nextChildId;
-    private long _nextOperationId;
     private Dictionary<string, int>? _nameOccurrences;
+    private bool _runningEffect;
 
     /// <summary>Initializes an attempt of the durable task <paramref name="taskId"/>.</summary>
     /// <param name="taskId">The stable identifier of the task which this attempt runs.</param>
     /// <remarks>
-    /// The host requests the task's durable cancellation with
-    /// <see cref="DurableTaskRuntimeHelper.RequestTaskCancellation(DurableTaskContext, string?)"/>, and stops this attempt
-    /// with <see cref="DurableTaskRuntimeHelper.CancelAttempt(DurableTaskContext, DurableTaskAttemptCancellationReason)"/>.
-    /// A host drains a canceled attempt, discards its response, and runs the task again in a new context when the task
-    /// still needs an outcome.
+    /// The host creates the context on the scheduler which runs the execution's code. It requests the task's durable
+    /// cancellation with <see cref="RequestTaskCancellation(string?)"/>, and stops this attempt with
+    /// <see cref="CancelAttempt(DurableTaskAttemptCancellationReason)"/>. A host drains a canceled attempt, discards its
+    /// response, and runs the task again in a new context when the task still needs an outcome.
     /// </remarks>
     protected DurableTaskContext(TaskId taskId)
     {
@@ -99,16 +114,7 @@ public abstract class DurableTaskContext
     /// for example in <c>catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)</c>.
     /// The cancellation of an attempt leaves it <see langword="false"/>.
     /// </remarks>
-    public bool IsTaskCancellationRequested
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _taskCancellationRequested;
-            }
-        }
-    }
+    public bool IsTaskCancellationRequested => _taskCancellationRequested;
 
     /// <summary>
     /// Gets the reason which the durable cancellation request carries, or <see langword="null"/> when task cancellation
@@ -120,16 +126,7 @@ public abstract class DurableTaskContext
     /// <see cref="CancellationToken"/> is canceled, so code which observes the cancellation, such as a
     /// <see langword="catch"/> block, reads it.
     /// </remarks>
-    public string? TaskCancellationReason
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _taskCancellationReason;
-            }
-        }
-    }
+    public string? TaskCancellationReason => _taskCancellationReason;
 
     /// <summary>
     /// Gets whether the calling code runs within a <see cref="DurableTaskExtensions.Shielded(DurableTask)"/> start of this
@@ -202,8 +199,17 @@ public abstract class DurableTaskContext
     /// </remarks>
     public CancellationToken AttemptCancellationToken => _attemptCancellationSource.Token;
 
-    /// <summary>Gets a value indicating whether the host canceled this attempt.</summary>
-    internal bool IsAttemptCanceled => _attemptCancellationSource.IsCancellationRequested;
+    /// <summary>Gets a value indicating whether this attempt was canceled, by the host or by a divergence of its replay.</summary>
+    /// <remarks>
+    /// A host discards the response of a canceled attempt, and handles the task as
+    /// <see cref="AttemptCancellationReason"/> describes: it retries a task whose replay diverged or whose version is
+    /// unsupported, after a deployment changes the task's code, and it ends the attempt of a stopping activation, an
+    /// aborted task, or a deleted task.
+    /// </remarks>
+    protected internal bool IsAttemptCanceled => _attemptCancellationReason is not null;
+
+    /// <summary>Gets why this attempt was canceled, or <see langword="null"/> while it runs.</summary>
+    protected internal DurableTaskAttemptCancellationReason? AttemptCancellationReason => _attemptCancellationReason;
 
     /// <summary>
     /// Gets the token which ends an operation that runs as part of this execution, such as a signal wait: within a shield,
@@ -215,27 +221,52 @@ public abstract class DurableTaskContext
     /// </remarks>
     internal CancellationToken InlineOperationCancellationToken => SchedulesShieldedChildren ? AttemptCancellationToken : CancellationToken;
 
-    /// <summary>Throws <see cref="DurableTaskAttemptCanceledException"/> when the host canceled this attempt.</summary>
-    internal void ThrowIfAttemptCanceled()
+    /// <summary>
+    /// Throws when the calling code can't run a durable operation of this execution: <see cref="InvalidOperationException"/>
+    /// inside a <see cref="DurableTask.RunInline{TResult}(string, Func{TResult})"/> effect, and
+    /// <see cref="DurableTaskAttemptCanceledException"/> when the attempt was canceled.
+    /// </summary>
+    internal void ThrowIfCannotRunOperation()
     {
+        ThrowIfRunningEffect();
         if (IsAttemptCanceled)
         {
             throw CreateAttemptCanceledException(innerException: null);
         }
     }
 
+    /// <summary>Throws <see cref="InvalidOperationException"/> inside an effect, whose record holds only its outcome.</summary>
+    private void ThrowIfRunningEffect()
+    {
+        if (_runningEffect)
+        {
+            throw new InvalidOperationException(OperationInEffectMessage);
+        }
+    }
+
     /// <summary>Creates the exception which this canceled attempt's durable operations throw.</summary>
     /// <param name="innerException">The exception which the canceled operation threw, if any.</param>
-    internal DurableTaskAttemptCanceledException CreateAttemptCanceledException(Exception? innerException)
+    /// <exception cref="InvalidOperationException">The attempt hasn't been canceled.</exception>
+    protected internal DurableTaskAttemptCanceledException CreateAttemptCanceledException(Exception? innerException)
     {
-        DurableTaskAttemptCancellationReason? reason;
-        lock (_lock)
+        if (_attemptCancellationReason is not { } reason)
         {
-            reason = _attemptCancellationReason;
+            throw new InvalidOperationException("Only a canceled attempt throws the attempt's cancellation.");
         }
 
-        Debug.Assert(reason is not null, "Only a canceled attempt throws the attempt's cancellation, whose reason is recorded first.");
-        return new(reason.GetValueOrDefault(), AttemptCancellationToken, innerException);
+        return new(reason, AttemptCancellationToken, innerException);
+    }
+
+    /// <summary>
+    /// Cancels this attempt with <see cref="DurableTaskAttemptCancellationReason.Diverged"/>, because its replay departs
+    /// from the execution which earlier attempts recorded, and returns the exception which the diverging operation throws.
+    /// </summary>
+    /// <param name="cause">Describes the divergence, such as a recorded result whose type the code no longer expects.</param>
+    /// <remarks>The host retries the task once a deployment's code matches the record again.</remarks>
+    internal DurableTaskAttemptCanceledException Diverge(Exception cause)
+    {
+        CancelAttempt(DurableTaskAttemptCancellationReason.Diverged);
+        return CreateAttemptCanceledException(cause);
     }
 
     /// <summary>
@@ -250,7 +281,7 @@ public abstract class DurableTaskContext
         {
             try
             {
-                return await operation.ConfigureAwait(false);
+                return await operation;
             }
             catch (OperationCanceledException exception) when (exception is not DurableTaskAttemptCanceledException && IsAttemptCanceled)
             {
@@ -265,27 +296,43 @@ public abstract class DurableTaskContext
     /// </summary>
     internal ValueTask<DurableTaskResponse> ObserveAttempt(ValueTask<DurableTaskResponse> operation)
     {
-        return operation.IsCompletedSuccessfully && operation.Result is not CanceledDurableTaskResponse ? operation : ObserveAsync(operation);
+        // A ValueTask can be consumed once, so a completed operation's result is read once and returned in a new ValueTask.
+        if (operation.IsCompletedSuccessfully)
+        {
+            var response = operation.Result;
+            return IsAttemptCancellation(response, out var canceled)
+                ? ValueTask.FromException<DurableTaskResponse>(CreateAttemptCanceledException(canceled))
+                : new(response);
+        }
+
+        return ObserveAsync(operation);
 
         async ValueTask<DurableTaskResponse> ObserveAsync(ValueTask<DurableTaskResponse> operation)
         {
             DurableTaskResponse response;
             try
             {
-                response = await operation.ConfigureAwait(false);
+                response = await operation;
             }
             catch (OperationCanceledException exception) when (exception is not DurableTaskAttemptCanceledException && IsAttemptCanceled)
             {
                 throw CreateAttemptCanceledException(exception);
             }
 
-            if (response is CanceledDurableTaskResponse { Exception: not DurableTaskAttemptCanceledException } canceled && IsAttemptCanceled)
-            {
-                throw CreateAttemptCanceledException(canceled.Exception);
-            }
-
-            return response;
+            return IsAttemptCancellation(response, out var canceled) ? throw CreateAttemptCanceledException(canceled) : response;
         }
+    }
+
+    /// <summary>
+    /// Returns whether <paramref name="response"/> reports a cancellation which ended the operation because this attempt was
+    /// canceled, which the operation then throws as <see cref="DurableTaskAttemptCanceledException"/>.
+    /// </summary>
+    private bool IsAttemptCancellation(DurableTaskResponse response, [NotNullWhen(true)] out OperationCanceledException? canceled)
+    {
+        canceled = response is CanceledDurableTaskResponse { Exception: not DurableTaskAttemptCanceledException and var exception } && IsAttemptCanceled
+            ? exception
+            : null;
+        return canceled is not null;
     }
 
     /// <inheritdoc cref="ObserveAttempt{T}(ValueTask{T})"/>
@@ -297,7 +344,7 @@ public abstract class DurableTaskContext
         {
             try
             {
-                await operation.ConfigureAwait(false);
+                await operation;
             }
             catch (OperationCanceledException exception) when (exception is not DurableTaskAttemptCanceledException && IsAttemptCanceled)
             {
@@ -314,41 +361,50 @@ public abstract class DurableTaskContext
         => cancellationToken.IsCancellationRequested && exception is not DurableTaskAttemptCanceledException;
 
     /// <summary>
-    /// Records durable cancellation of the task carrying <paramref name="reason"/>, and cancels
-    /// <see cref="CancellationToken"/>. Later requests leave the first request's reason unchanged.
+    /// Requests durable cancellation of the task which this context runs, carrying <paramref name="reason"/>.
     /// </summary>
-    internal void RequestTaskCancellation(string? reason)
+    /// <param name="reason">
+    /// The reason which <see cref="TaskCancellationReason"/> reports, or <see langword="null"/> for none. The first request
+    /// determines the reason, so a host which replays a canceled task passes the reason it recorded with the task's
+    /// cancellation.
+    /// </param>
+    /// <remarks>
+    /// The host records the request durably before it calls this, so every later attempt of the task observes it, and
+    /// calls it on the execution's scheduler. The request sets <see cref="IsTaskCancellationRequested"/> and then cancels
+    /// <see cref="CancellationToken"/>, whose registrations run synchronously, as they do for any
+    /// <see cref="CancellationTokenSource"/>. Later requests change nothing.
+    /// </remarks>
+    protected internal void RequestTaskCancellation(string? reason)
     {
-        lock (_lock)
+        AssertOnScheduler();
+        if (_taskCancellationRequested)
         {
-            if (_taskCancellationRequested)
-            {
-                return;
-            }
-
-            _taskCancellationReason = reason;
-            _taskCancellationRequested = true;
+            return;
         }
 
+        _taskCancellationReason = reason;
+        _taskCancellationRequested = true;
         _cancellationSource.Cancel();
     }
 
-    /// <summary>
-    /// Cancels this attempt for <paramref name="reason"/>: cancels <see cref="AttemptCancellationToken"/>, then
-    /// <see cref="CancellationToken"/>. Later calls leave the first call's reason unchanged.
-    /// </summary>
-    internal void CancelAttempt(DurableTaskAttemptCancellationReason reason)
+    /// <summary>Cancels this attempt for <paramref name="reason"/>.</summary>
+    /// <param name="reason">Why the attempt is canceled.</param>
+    /// <remarks>
+    /// The host calls this on the execution's scheduler. The cancellation sets <see cref="AttemptCancellationReason"/>, then
+    /// cancels <see cref="AttemptCancellationToken"/> and then <see cref="CancellationToken"/>, whose registrations run
+    /// synchronously. From then on, the attempt's durable operations throw
+    /// <see cref="DurableTaskAttemptCanceledException"/> carrying the first call's reason, and later calls change nothing.
+    /// The host drains the attempt and discards its response.
+    /// </remarks>
+    protected internal void CancelAttempt(DurableTaskAttemptCancellationReason reason)
     {
-        lock (_lock)
+        AssertOnScheduler();
+        if (_attemptCancellationReason is not null)
         {
-            if (_attemptCancellationReason is not null)
-            {
-                return;
-            }
-
-            _attemptCancellationReason = reason;
+            return;
         }
 
+        _attemptCancellationReason = reason;
         try
         {
             _attemptCancellationSource.Cancel();
@@ -357,6 +413,17 @@ public abstract class DurableTaskContext
         {
             _cancellationSource.Cancel();
         }
+    }
+
+    /// <summary>Asserts that the calling code runs on the scheduler which runs this execution, and which owns its state.</summary>
+    [Conditional("DEBUG")]
+    private void AssertOnScheduler()
+    {
+#if DEBUG
+        Debug.Assert(
+            TaskScheduler.Current == _scheduler,
+            "A durable execution's state is confined to the scheduler which was current when its host created its context.");
+#endif
     }
 
     /// <summary>
@@ -424,9 +491,6 @@ public abstract class DurableTaskContext
         DateTimeOffset dueTime,
         CancellationToken cancellationToken);
 
-    /// <summary>Gets the host handle for an existing child identifier.</summary>
-    protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
-
     /// <summary>
     /// Receives this execution's terminal response when its body completes, synchronously with the body's final code.
     /// </summary>
@@ -488,7 +552,7 @@ public abstract class DurableTaskContext
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Creates a child identifier, using <paramref name="name"/> when supplied.
+    /// Creates the identifier of this execution's next operation, using <paramref name="name"/> when supplied.
     /// </summary>
     /// <remarks>
     /// A name repeated in one run identifies its later occurrences by their order: the first is <paramref name="name"/>,
@@ -497,15 +561,15 @@ public abstract class DurableTaskContext
     /// effects share one count per name. Names don't contain <c>$</c>, which generated identifiers use. Unnamed children
     /// and unnamed <see cref="DurableTask.RunInline{TResult}(Func{TResult})"/> effects share one count of generated
     /// identifiers, <c>$child-1</c>, <c>$child-2</c>, and so on. Generated identifiers are replay-stable when unnamed
-    /// operations are created in the same deterministic order. A concurrent
-    /// batch can use
+    /// operations are created in the same deterministic order. A concurrent batch can use
     /// <see cref="DurableTask.WhenAll(IReadOnlyList{DurableTask})"/> and
-    /// <see cref="DurableTask.WhenAny(IReadOnlyList{DurableTask})"/>, whose input indexes provide
-    /// stable logical slots. Concurrent independent scheduling operations, including concurrent
-    /// combinator invocations, must use explicit names or otherwise begin in deterministic order.
+    /// <see cref="DurableTask.WhenAny(IReadOnlyList{DurableTask})"/>, whose input indexes provide stable logical slots.
+    /// Concurrent independent scheduling operations, including concurrent combinator invocations, use explicit names or
+    /// otherwise begin in deterministic order.
     /// </remarks>
     /// <exception cref="ArgumentException"><paramref name="name"/> is empty or contains <c>$</c>.</exception>
-    protected internal virtual TaskId CreateChildTaskId(string? name)
+    /// <exception cref="InvalidOperationException">The calling code runs in an effect.</exception>
+    internal TaskId CreateChildTaskId(string? name)
     {
         if (name is not null)
         {
@@ -513,13 +577,14 @@ public abstract class DurableTaskContext
             return CreateNamedChildId(name);
         }
 
-        return Id.Child(
-            $"$child-{Interlocked.Increment(ref _nextChildId).ToString(CultureInfo.InvariantCulture)}");
+        ThrowIfRunningEffect();
+        AssertOnScheduler();
+        return Id.Child($"$child-{(++_nextChildId).ToString(CultureInfo.InvariantCulture)}");
     }
 
     /// <summary>
-    /// Gets the identity of the host which runs this execution, such as its grain, which qualifies the root identifiers of
-    /// the detached tasks which the execution starts without a name, or <see langword="null"/> for none.
+    /// Gets the identity of the host which runs this execution, such as its grain, which qualifies the root identifiers
+    /// which the execution derives for the detached tasks it starts, or <see langword="null"/> for none.
     /// </summary>
     /// <remarks>
     /// A task identifier is unique within its host, so executions on two hosts can share one. A host whose executions
@@ -529,23 +594,60 @@ public abstract class DurableTaskContext
     protected internal virtual string? HostId => null;
 
     /// <summary>
-    /// Creates the root identifier of a detached task which this execution starts without a name:
-    /// <c>{HostId}/{Id}:{segment}</c>, or <c>{Id}:{segment}</c> for a host without an identity, where <c>{segment}</c> is
-    /// the identifier which <see cref="CreateChildTaskId(string)"/> generates for the next unnamed operation.
+    /// Creates the root identifier of a detached task which this execution starts as its operation
+    /// <paramref name="operationId"/>.
     /// </summary>
     /// <remarks>
-    /// The segment comes from the count which unnamed children share, so a replay which starts unnamed operations in the
-    /// same order derives the same root identifier, and other parties derive it from the host's identity and this
-    /// execution's identifier. A named detached task's root identifier is its name.
+    /// The root identifier is a single segment which holds the escaped path of <see cref="HostId"/>, when the host has one,
+    /// followed by the segments of <paramref name="operationId"/>: <c>{HostId}/{Id}/{segment}</c>, in which each part
+    /// escapes its <c>/</c> and <c>\</c> as <see cref="TaskId"/> does. Distinct hosts, executions, and operations therefore
+    /// derive distinct roots, a replay which reaches the same operation derives the same root, and other parties derive it
+    /// from the host's identity, the execution's identifier, and the operation's segment.
     /// </remarks>
-    internal TaskId CreateDetachedRootId()
+    internal TaskId CreateDetachedRootId(TaskId operationId)
     {
-        var root = $"{Id}:{CreateChildTaskId(name: null).LastSegment}";
-        return TaskId.CreateRoot(HostId is { } hostId ? $"{hostId}/{root}" : root);
+        Debug.Assert(operationId.IsChildOf(Id), "A detached task's operation is a child of the starting execution.");
+        var path = operationId.ToString();
+        return TaskId.CreateRoot(HostId is { } hostId ? $"{TaskId.CreateRoot(hostId)}/{path}" : path);
     }
 
-    internal TaskId CreateOperationId(string kind)
-        => Id.Child($"${kind}-{Interlocked.Increment(ref _nextOperationId).ToString(CultureInfo.InvariantCulture)}");
+    /// <summary>Creates the identifier of an unnamed combinator or selection of the kind <paramref name="kind"/>.</summary>
+    /// <remarks>
+    /// Each kind counts its own operations, such as <c>$when-any-1</c> and <c>$when-any-2</c>, so a change in the number of
+    /// operations of one kind doesn't shift the identifiers of another kind.
+    /// </remarks>
+    internal TaskId CreateOperationId(string kind) => Id.Child($"${kind}-{NextOccurrence(GeneratedSegmentPrefix + kind).ToString(CultureInfo.InvariantCulture)}");
+
+    /// <summary>
+    /// Creates the identifier of an operation of the kind <paramref name="kind"/> which observes <paramref name="subject"/>,
+    /// such as a timeout of a child's wait: <c>{segment}${kind}-{n}</c>, where <c>{segment}</c> is the subject's segment
+    /// and <c>{n}</c> counts the operations of the kind on the subject.
+    /// </summary>
+    /// <remarks>
+    /// The identifier depends only on the subject and on the earlier operations of the kind on it, so operations on other
+    /// subjects don't shift it. A subject which isn't a child of this execution takes the kind's next identifier.
+    /// </remarks>
+    internal TaskId CreateOperationId(string kind, TaskId subject)
+    {
+        if (!subject.IsChildOf(Id))
+        {
+            return CreateOperationId(kind);
+        }
+
+        var name = $"{subject.LastSegment}{GeneratedSegmentPrefix}{kind}";
+        return Id.Child($"{name}-{NextOccurrence(name).ToString(CultureInfo.InvariantCulture)}");
+    }
+
+    /// <summary>Counts an occurrence of <paramref name="key"/> in this attempt, and returns its ordinal, from 1.</summary>
+    private int NextOccurrence(string key)
+    {
+        ThrowIfRunningEffect();
+        AssertOnScheduler();
+        _nameOccurrences ??= new(StringComparer.Ordinal);
+        _nameOccurrences.TryGetValue(key, out var occurrence);
+        _nameOccurrences[key] = ++occurrence;
+        return occurrence;
+    }
 
     /// <summary>Validates a caller-supplied name, which can't contain the <c>$</c> which generated identifiers use.</summary>
     internal static void ValidateName(string name, string paramName)
@@ -556,6 +658,29 @@ public abstract class DurableTaskContext
             throw new ArgumentException(
                 $"Names can't contain '{GeneratedSegmentPrefix}', which generated identifiers use.",
                 paramName);
+        }
+    }
+
+    /// <summary>Gets whether the calling code runs in a <see cref="DurableTask.RunInline{TResult}(Func{TResult})"/> effect.</summary>
+    internal bool IsRunningEffect => _runningEffect;
+
+    /// <summary>
+    /// Runs an effect's body with this execution's durable operations disabled: the effect's record holds only its outcome,
+    /// so an operation which the effect ran would be missing from a replay, and the identifiers of the body's later
+    /// operations would shift.
+    /// </summary>
+    internal TResult RunAsEffect<TState, TResult>(TState state, Func<TState, TResult> body)
+    {
+        Debug.Assert(!_runningEffect, "A nested effect runs as part of its enclosing effect.");
+        AssertOnScheduler();
+        _runningEffect = true;
+        try
+        {
+            return body(state);
+        }
+        finally
+        {
+            _runningEffect = false;
         }
     }
 
@@ -573,14 +698,7 @@ public abstract class DurableTaskContext
     /// </remarks>
     internal TaskId CreateNamedChildId(string name)
     {
-        int occurrence;
-        lock (_lock)
-        {
-            _nameOccurrences ??= new(StringComparer.Ordinal);
-            _nameOccurrences.TryGetValue(name, out occurrence);
-            _nameOccurrences[name] = ++occurrence;
-        }
-
+        var occurrence = NextOccurrence(name);
         return Id.Child(occurrence == 1
             ? name
             : $"{name}{GeneratedSegmentPrefix}{occurrence.ToString(CultureInfo.InvariantCulture)}");
@@ -645,6 +763,13 @@ public abstract class DurableTaskContext
     /// </remarks>
     protected internal virtual int GetVersion(string name, int minSupported, int maxSupported)
         => throw new NotSupportedException("The durable task host does not support DurableTask.GetVersion.");
+
+    /// <summary>Returns the version of the change <paramref name="name"/> which this running attempt follows.</summary>
+    internal int DecideVersion(string name, int minSupported, int maxSupported)
+    {
+        ThrowIfCannotRunOperation();
+        return GetVersion(name, minSupported, maxSupported);
+    }
 
     internal static ContextScope Enter(DurableTaskContext context)
     {

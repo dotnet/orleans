@@ -14,10 +14,11 @@ public static partial class DurableTaskExtensions
     /// <param name="name">The task's name.</param>
     /// <remarks>
     /// <para>
-    /// Within a durable execution, the name identifies an attached child among the execution's operations, and a replay
-    /// reaches the same child. A name repeated in one run identifies its later occurrences by their order, such as
-    /// <c>reserve$2</c>, and names don't contain <c>$</c>. A detached task uses the name verbatim as its root identifier,
-    /// so other parties can address it, for example with <c>GetDurableTask</c>.
+    /// Within a durable execution, the name identifies the execution's operation which starts the task, and a replay
+    /// reaches the same operation. A name repeated in one run identifies its later occurrences by their order, such as
+    /// <c>reserve$2</c>, and names don't contain <c>$</c>. The start allocates the occurrence, so the order of the
+    /// configuration calls doesn't change it. An attached task is the child which the name identifies, and a detached
+    /// task's root identifier derives from it, as <see cref="Detached(DurableTask)"/> describes.
     /// </para>
     /// <para>
     /// Outside a durable execution, every task is a root task, and the name is its root identifier. The name makes a start
@@ -41,10 +42,12 @@ public static partial class DurableTaskExtensions
     /// its result: the start names the execution as a subscriber, and canceling the wait ends only that subscription.
     /// </para>
     /// <para>
-    /// The task's root identifier is the name which <see cref="WithId(DurableTask, string)"/> assigns, verbatim, or
-    /// <c>{executionId}:{segment}</c>, where <c>{segment}</c> is the identifier which the execution generates for its next
-    /// unnamed operation, so a replay derives the same identifier. Starting a detached task again under the same root
-    /// identifier, including during a replay, reaches the same task.
+    /// The task's root identifier derives from the host's identity, the execution's identifier, and the identifier of the
+    /// operation which starts it: the name which <see cref="WithId(DurableTask, string)"/> assigns, or the execution's
+    /// next generated identifier. A replay therefore derives the same root identifier, and distinct executions and
+    /// operations derive distinct ones. Starting a detached task again under the same root identifier, including during a
+    /// replay, reaches the same task. <see cref="Detached(DurableTask, string)"/> supplies a root identifier which other
+    /// parties know in advance.
     /// </para>
     /// <para>Outside a durable execution, every task is already a root task, so the configuration is unchanged.</para>
     /// </remarks>
@@ -52,6 +55,25 @@ public static partial class DurableTaskExtensions
 
     /// <inheritdoc cref="Detached(DurableTask)"/>
     public static ConfiguredDurableTask<TResult> Detached<TResult>(this DurableTask<TResult> task) => new ConfiguredDurableTask<TResult>(task).Detached();
+
+    /// <summary>Returns a configuration which starts the task as the independent root task <paramref name="rootId"/>.</summary>
+    /// <param name="task">The definition to start, such as a durable grain call.</param>
+    /// <param name="rootId">The task's root identifier on its host, verbatim.</param>
+    /// <remarks>
+    /// <para>
+    /// The task relates to the starting execution as <see cref="Detached(DurableTask)"/> describes, under the root
+    /// identifier <paramref name="rootId"/>, which other parties address, for example with <c>GetDurableTask</c>. Every start
+    /// of <paramref name="rootId"/> on the task's host, from any execution or caller, including a replay, reaches the same
+    /// task, so the identifier names the task globally, such as <c>place-order-42</c>.
+    /// </para>
+    /// <para>Outside a durable execution, the task is the root task <paramref name="rootId"/>.</para>
+    /// </remarks>
+    /// <exception cref="ArgumentException"><paramref name="rootId"/> is <see langword="null"/> or empty.</exception>
+    public static ConfiguredDurableTask Detached(this DurableTask task, string rootId) => new ConfiguredDurableTask(task).Detached(rootId);
+
+    /// <inheritdoc cref="Detached(DurableTask, string)"/>
+    public static ConfiguredDurableTask<TResult> Detached<TResult>(this DurableTask<TResult> task, string rootId)
+        => new ConfiguredDurableTask<TResult>(task).Detached(rootId);
 
     /// <summary>
     /// Returns a configuration which starts the task as an attached child, or runs it as part of the execution, out of

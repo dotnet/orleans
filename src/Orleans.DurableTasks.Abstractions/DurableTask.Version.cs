@@ -85,7 +85,7 @@ public abstract partial class DurableTask
         ArgumentOutOfRangeException.ThrowIfNegative(minSupported);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxSupported, minSupported);
         return DurableTaskContext.Ambient is { } context
-            ? context.GetVersion(name, minSupported, maxSupported)
+            ? context.DecideVersion(name, minSupported, maxSupported)
             : maxSupported;
     }
 }
