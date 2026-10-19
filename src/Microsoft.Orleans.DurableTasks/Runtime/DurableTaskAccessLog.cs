@@ -16,18 +16,26 @@ namespace Orleans.DurableTasks.Runtime;
 /// <remarks>
 /// <para>
 /// The log holds one record per access, in the order in which the body made them: whether it read or wrote, the
-/// operation, a stable hash of the state's name, and the access's outcome, which is a read's value, a write's result, or
-/// the exception which either threw. Outcomes are encoded with the Orleans serializer when the access runs, so later
-/// in-place changes to a mutable value don't change its record. An exception whose encoding fails is normalized to a
-/// description which both the recording attempt and replay throw. A write without a result records no value.
+/// operation, a stable hash of the state's name, a stable hash of the access's arguments when it has any, such as a key,
+/// an index or a written value (<see cref="DurableTaskAccessArgumentHash"/>), and the access's outcome, which is a read's
+/// value, a write's result, or the exception which either threw. Outcomes are encoded with the Orleans serializer when the
+/// access runs, so later in-place changes to a mutable value don't change its record. An exception whose encoding fails
+/// is normalized to a description which both the recording attempt and replay throw. A write without a result records
+/// no value.
+/// </para>
+/// <para>
+/// A record is <c>[kind | flags:1][operation:1][state:4]</c>, then <c>[arguments:4]</c> when the flags have
+/// <c>0x10</c>, then <c>[length:4][outcome]</c> when they have <c>0x04</c>; <c>0x08</c> marks an outcome which is an
+/// exception, integers are little-endian, and a record which sets any other flag diverges.
 /// </para>
 /// <para>
 /// A write's record is staged with the write, in the same work item, so whichever journal write commits the change also
 /// commits its record. A read's record is staged with the attempt's next write or recorded operation, which are the only
 /// ways a decision based on the read becomes durable; reads which the body's tail makes, after its last durable operation,
-/// are never staged. A replay consumes the records in order, checking each access's kind, operation, and state, and runs
-/// live once it has consumed them all. An access which differs from its record, or whose recorded outcome no longer
-/// decodes, diverges: the runtime stalls the attempt.
+/// are never staged. A replay consumes the records in order, checking each access's kind, operation, state, and
+/// arguments, and runs live once it has consumed them all. An access which differs from its record, or whose recorded
+/// outcome no longer decodes or names an exception type which this version can't construct, diverges: the runtime stalls
+/// the attempt.
 /// </para>
 /// <para>
 /// Each access runs in a covered region of the attempt (<see cref="DurableTaskContext.IsInCoveredRegion"/>), as effects
@@ -50,14 +58,16 @@ internal sealed class DurableTaskAccessLog(
     TaskScheduler scheduler,
     Func<DurableTaskDivergenceException, Exception> diverge) : JournaledStateContext
 {
-    // Each record: [kind | flags][operation][state:4], then [length:4][outcome] when it has an outcome.
+    // Each record: [kind | flags][operation][state:4], then [hash:4] when it has an argument hash, then
+    // [length:4][outcome] when it has an outcome.
     private const byte KindMask = 0x03;
     private const byte HasValue = 0x04;
     private const byte IsException = 0x08;
+    private const byte HasArgumentHash = 0x10;
 
     // Bits which no record of this version sets: a record which sets one has a representation which this reader can't
     // decode, so it diverges rather than being read as an outcome.
-    private const byte ReservedFlags = unchecked((byte)~(KindMask | HasValue | IsException));
+    private const byte ReservedFlags = unchecked((byte)~(KindMask | HasValue | IsException | HasArgumentHash));
     private const int HeaderLength = 6;
 
     private readonly DurableTaskContext _attempt = attempt;
@@ -142,8 +152,9 @@ internal sealed class DurableTaskAccessLog(
         }
     }
 
-    protected override TResult Access<TState, TResult>(
+    protected override TResult Access<TArgument, TState, TResult>(
         in JournaledStateAccess access,
+        TArgument argument,
         TState state,
         Func<TState, TResult> operation,
         Action<TState, TResult>? apply)
@@ -157,7 +168,7 @@ internal sealed class DurableTaskAccessLog(
 
         if (IsReplaying)
         {
-            return Replay<TResult>(access);
+            return Replay<TResult>(access, ArgumentHash(argument));
         }
 
         if (_state is AccessLogState.Closed)
@@ -165,8 +176,11 @@ internal sealed class DurableTaskAccessLog(
             return RunLive(state, operation, apply);
         }
 
-        return Record(access, state, operation, apply);
+        return Record(access, ArgumentHash(argument), state, operation, apply);
     }
+
+    private static int? ArgumentHash<TArgument>(TArgument argument) =>
+        DurableTaskAccessArgumentHash.TryCompute(argument, out var hash) ? hash : null;
 
     private static TResult RunLive<TState, TResult>(TState state, Func<TState, TResult> operation, Action<TState, TResult>? apply)
     {
@@ -177,6 +191,7 @@ internal sealed class DurableTaskAccessLog(
 
     private TResult Record<TState, TResult>(
         in JournaledStateAccess access,
+        int? argumentHash,
         TState state,
         Func<TState, TResult> operation,
         Action<TState, TResult>? apply)
@@ -194,14 +209,14 @@ internal sealed class DurableTaskAccessLog(
         }
         catch (Exception exception) when (IsOpen && IsRecordable(exception))
         {
-            RecordAndThrowException(access, exception);
+            RecordAndThrowException(access, argumentHash, exception);
             throw;
         }
 
         // The runtime can end the attempt while the operation runs, such as from a callback which it calls.
         if (IsOpen)
         {
-            AddRecord(access, value is null ? (byte)0 : HasValue, value);
+            AddRecord(access, argumentHash, value is null ? (byte)0 : HasValue, value);
         }
 
         return result;
@@ -210,50 +225,85 @@ internal sealed class DurableTaskAccessLog(
     // The cancellation of the attempt ends it, so it's no outcome of the access which every later attempt observes.
     private static bool IsRecordable(Exception exception) => exception is not DurableTaskAttemptCanceledException;
 
-    private TResult Replay<TResult>(in JournaledStateAccess access)
+    private TResult Replay<TResult>(in JournaledStateAccess access, int? argumentHash)
     {
         var index = ++_consumed;
-        var header = _recorded.AsSpan(_position);
-        TResult result = default!;
-        Exception? exception = null;
+        var record = _recorded.AsSpan(_position);
         byte flags;
         byte operation;
         int target;
+        int? recordedHash = null;
+        ReadOnlyMemory<byte> value = default;
+        var length = HeaderLength;
         try
         {
-            flags = header[0];
+            flags = record[0];
             if ((flags & ReservedFlags) != 0)
             {
-                throw new NotSupportedException($"The recorded access {index} has a representation, 0x{flags:x2}, which this version doesn't read.");
+                throw Diverge(index, access, $"has a representation, 0x{flags:x2}, which this version doesn't read");
             }
 
-            operation = header[1];
-            target = BinaryPrimitives.ReadInt32LittleEndian(header[2..]);
-            _position += HeaderLength;
+            operation = record[1];
+            target = BinaryPrimitives.ReadInt32LittleEndian(record[2..]);
+            if ((flags & HasArgumentHash) != 0)
+            {
+                recordedHash = BinaryPrimitives.ReadInt32LittleEndian(record[length..]);
+                length += 4;
+            }
+
             if ((flags & HasValue) != 0)
             {
-                var length = BinaryPrimitives.ReadInt32LittleEndian(_recorded.AsSpan(_position));
-                var value = new ReadOnlyMemory<byte>(_recorded, _position + 4, length);
-                _position += 4 + length;
-                if (Matches(access, flags, operation, target))
-                {
-                    if ((flags & IsException) != 0)
-                    {
-                        exception = _serializer.Deserialize<Exception>(value)!;
-                    }
-                    else if (typeof(TResult) == typeof(JournaledStateAccessNoResult))
-                    {
-                        throw new InvalidOperationException($"The recorded access {index} has a result, which access '{access.Operation}' doesn't return.");
-                    }
-                    else
-                    {
-                        result = _serializer.Deserialize<TResult>(value)!;
-                    }
-                }
+                var valueLength = BinaryPrimitives.ReadInt32LittleEndian(record[length..]);
+                _ = record.Slice(length + 4, valueLength);
+                value = new(_recorded, _position + length + 4, valueLength);
+                length += 4 + valueLength;
             }
-            else if (typeof(TResult) != typeof(JournaledStateAccessNoResult) && Matches(access, flags, operation, target))
+        }
+        catch (Exception truncated) when (truncated is ArgumentOutOfRangeException or IndexOutOfRangeException)
+        {
+            throw _diverge(new DurableTaskDivergenceException(
+                $"Durable task '{_taskId}' diverged from its recorded execution: its recorded access {index} to journaled state is truncated.",
+                truncated));
+        }
+
+        if ((flags & KindMask) != (byte)access.Kind || operation != (byte)access.Operation || target != access.Target.Id)
+        {
+            throw Diverge(
+                index,
+                access,
+                $"was recorded as {(JournaledStateAccessKind)(flags & KindMask)} '{(JournaledStateOperation)operation}' of state #{target:x8}");
+        }
+
+        if (recordedHash != argumentHash)
+        {
+            throw Diverge(index, access, "was recorded with other arguments");
+        }
+
+        _position += length;
+        if (_position == _recorded.Length)
+        {
+            _recorded = [];
+            _position = 0;
+        }
+
+        var isException = (flags & IsException) != 0;
+        var returnsResult = typeof(TResult) != typeof(JournaledStateAccessNoResult);
+        if ((flags & HasValue) == 0 ? returnsResult || isException : !returnsResult && !isException)
+        {
+            throw Diverge(index, access, returnsResult ? "has no result, which the access returns" : "has a result, which the access doesn't return");
+        }
+
+        Exception? exception = null;
+        TResult result = default!;
+        try
+        {
+            if (isException)
             {
-                throw new InvalidOperationException($"The recorded access {index} has no result, which access '{access.Operation}' returns.");
+                exception = _serializer.Deserialize<Exception>(value)!;
+            }
+            else if (returnsResult)
+            {
+                result = _serializer.Deserialize<TResult>(value)!;
             }
         }
         catch (Exception decodeFailure)
@@ -263,31 +313,23 @@ internal sealed class DurableTaskAccessLog(
                 decodeFailure));
         }
 
-        if (!Matches(access, flags, operation, target))
+        // A recorded exception whose type this version can't resolve or construct would take other catch blocks than
+        // the recording attempt's, so it diverges, as an outcome which doesn't decode does.
+        if (exception is UnavailableExceptionFallbackException fallback)
         {
             throw _diverge(new DurableTaskDivergenceException(
-                $"Durable task '{_taskId}' diverged from its recorded execution. Its access {index} to journaled state was recorded as "
-                + $"{(JournaledStateAccessKind)(flags & KindMask)} '{(JournaledStateOperation)operation}' of state #{target:x8}, and this attempt performed "
-                + $"{access.Kind} '{access.Operation}' of state '{access.Target.Name}' (#{access.Target.Id:x8}). A replay accesses the same state in the same "
-                + "order; change a workflow's accesses only in new workflows, or after its executions complete."));
+                $"Durable task '{_taskId}' diverged from its recorded execution: the recorded exception of its access {index} to journaled state '{access.Target.Name}' has a type which this version can't construct.",
+                fallback));
         }
 
-        if (_position == _recorded.Length)
-        {
-            _recorded = [];
-            _position = 0;
-        }
-
-        if (exception is not null)
-        {
-            throw exception;
-        }
-
-        return result!;
+        return exception is null ? result : throw exception;
     }
 
-    private static bool Matches(in JournaledStateAccess access, byte flags, byte operation, int target) =>
-        (flags & KindMask) == (byte)access.Kind && operation == (byte)access.Operation && target == access.Target.Id;
+    private Exception Diverge(int index, in JournaledStateAccess access, string recorded) =>
+        _diverge(new DurableTaskDivergenceException(
+            $"Durable task '{_taskId}' diverged from its recorded execution. Its access {index} to journaled state {recorded}, and this attempt performed "
+            + $"{access.Kind} '{access.Operation}' of state '{access.Target.Name}' (#{access.Target.Id:x8}). A replay accesses the same state with the same "
+            + "arguments in the same order; change a workflow's accesses only in new workflows, or after its executions complete."));
 
     // A value which doesn't serialize throws, and the caller records that failure, so every attempt observes it.
     private byte[]? EncodeResult<TResult>(TResult result) =>
@@ -295,7 +337,7 @@ internal sealed class DurableTaskAccessLog(
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "An exception which doesn't serialize is recorded as a description of it.")]
     [DoesNotReturn]
-    private void RecordAndThrowException(in JournaledStateAccess access, Exception exception)
+    private void RecordAndThrowException(in JournaledStateAccess access, int? argumentHash, Exception exception)
     {
         byte[] value;
         try
@@ -309,22 +351,33 @@ internal sealed class DurableTaskAccessLog(
             value = _serializer.SerializeToArray(exception);
         }
 
-        AddRecord(access, HasValue | IsException, value);
+        AddRecord(access, argumentHash, HasValue | IsException, value);
         ExceptionDispatchInfo.Throw(exception);
     }
 
-    private void AddRecord(in JournaledStateAccess access, byte flags, byte[]? value)
+    private void AddRecord(in JournaledStateAccess access, int? argumentHash, byte flags, byte[]? value)
     {
         var pending = _pending ??= new();
-        var span = pending.GetSpan(HeaderLength + 4 + (value?.Length ?? 0));
+        var span = pending.GetSpan(HeaderLength + 8 + (value?.Length ?? 0));
+        if (argumentHash is not null)
+        {
+            flags |= HasArgumentHash;
+        }
+
         span[0] = (byte)((byte)access.Kind | flags);
         span[1] = (byte)access.Operation;
         BinaryPrimitives.WriteInt32LittleEndian(span[2..], access.Target.Id);
         var length = HeaderLength;
+        if (argumentHash is { } hash)
+        {
+            BinaryPrimitives.WriteInt32LittleEndian(span[length..], hash);
+            length += 4;
+        }
+
         if (value is not null)
         {
-            BinaryPrimitives.WriteInt32LittleEndian(span[HeaderLength..], value.Length);
-            value.CopyTo(span[(HeaderLength + 4)..]);
+            BinaryPrimitives.WriteInt32LittleEndian(span[length..], value.Length);
+            value.CopyTo(span[(length + 4)..]);
             length += 4 + value.Length;
         }
 

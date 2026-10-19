@@ -262,6 +262,78 @@ public sealed class DurableTaskAccessRecordingTests
     }
 
     [Fact]
+    public Task ReplayWhichPassesOtherArgumentsDiverges() => ActivationScheduler.RunAsync(async () =>
+    {
+        var key = "apple";
+        var stalled = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var subscription = global::Orleans.DurableTasks.Diagnostics.DurableTaskEvents.AllEvents.Subscribe(new EventObserver(evt =>
+        {
+            if (evt is global::Orleans.DurableTasks.Diagnostics.DurableTaskEvents.ExecutionStalled { Reason: DurableTaskAttemptCancellationReason.Diverged } stall && evt.TaskId == WorkflowId)
+            {
+                stalled.TrySetResult(stall.Exception);
+            }
+        }));
+
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, key));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await CommitAtGateAsync(activation);
+        }
+
+        // A later version reads another key with the same operation: its record holds the first key's arguments.
+        key = "pear";
+        await using (var diverged = await harness.ActivateAsync(TestCancellation))
+        {
+            var divergence = Assert.IsType<DurableTaskDivergenceException>(await stalled.Task.WaitAsync(Timeout, TestCancellation));
+            Assert.Contains("was recorded with other arguments", divergence.Message, StringComparison.Ordinal);
+            Assert.Contains("DictionaryTryGetValue", divergence.Message, StringComparison.Ordinal);
+        }
+
+        // Code which passes the recorded arguments replays the task.
+        key = "apple";
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        replay.Grain.OpenGate();
+        Assert.False((await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<bool>());
+
+        static async DurableTask<bool> Workflow(ReplayGrain grain, string key)
+        {
+            var found = grain.Stock.TryGetValue(key, out _);
+            await DurableTask.Run(static _ => { }).WithId("step");
+            await grain.WaitAtGateAsync();
+            return found;
+        }
+    });
+
+    [Fact]
+    public void ArgumentHashesAreStableAcrossProcessesAndDistinguishArguments()
+    {
+        // Every process and runtime version computes these values, so records which one process staged replay in another.
+        Assert.Equal(unchecked((int)0x485AC4B1u), Hash("apple"));
+        Assert.Equal(unchecked((int)0x20369D19u), Hash(42));
+        Assert.Equal(unchecked((int)0x92284EADu), Hash((7, "x")));
+        Assert.Equal(unchecked((int)0x49AFACA6u), Hash(new Guid("6f9619ff-8b86-d011-b42d-00cf4fc964ff")));
+        Assert.Equal(unchecked((int)0x2D934FBEu), Hash(new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc)));
+        Assert.Equal(unchecked((int)0x0044ADF2u), Hash(DayOfWeek.Friday));
+        Assert.Equal(unchecked((int)0x00CC8A3Cu), Hash(1.5));
+        Assert.Equal(unchecked((int)0x050C5D1Fu), Hash<string?>(null));
+
+        // Equal arguments hash alike, whatever their integer width; other arguments differ.
+        Assert.Equal(Hash(42), Hash(42L));
+        Assert.NotEqual(Hash("apple"), Hash("pear"));
+        Assert.NotEqual(Hash((1, 2)), Hash((2, 1)));
+        Assert.NotEqual(Hash(1), Hash("1"));
+        Assert.False(DurableTaskAccessArgumentHash.TryCompute(default(JournaledStateAccessNoArgument), out _));
+
+        static int Hash<T>(T value)
+        {
+            Assert.True(DurableTaskAccessArgumentHash.TryCompute(value, out var hash));
+            return hash;
+        }
+    }
+
+    [Fact]
     public void TransportSendsThroughTheOutboxAsTheJournaledStateHostsWork()
     {
         var host = new CountingHost();

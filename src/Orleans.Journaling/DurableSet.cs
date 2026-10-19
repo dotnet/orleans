@@ -126,7 +126,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsSta
     }
 
     public bool Contains(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.SetContains, (Self: this, Item: item), static state => state.Self._items.Contains(state.Item))
+        ? context.Read(_accessTarget, JournaledStateOperation.SetContains, item, (Self: this, Item: item), static state => state.Self._items.Contains(state.Item))
         : _items.Contains(item);
 
     public void CopyTo(T[] array, int arrayIndex)
@@ -145,7 +145,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsSta
         : _items.GetEnumerator();
 
     public bool Add(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Write(_accessTarget, JournaledStateOperation.SetAdd, (Self: this, Item: item), static state => state.Self.AddCore(state.Item))
+        ? context.Write(_accessTarget, JournaledStateOperation.SetAdd, item, (Self: this, Item: item), static state => state.Self.AddCore(state.Item))
         : AddCore(item);
 
     private bool AddCore(T item)
@@ -163,7 +163,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsSta
     }
 
     public bool Remove(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Write(_accessTarget, JournaledStateOperation.SetRemove, (Self: this, Item: item), static state => state.Self.RemoveCore(state.Item))
+        ? context.Write(_accessTarget, JournaledStateOperation.SetRemove, item, (Self: this, Item: item), static state => state.Self.RemoveCore(state.Item))
         : RemoveCore(item);
 
     private bool RemoveCore(T item)

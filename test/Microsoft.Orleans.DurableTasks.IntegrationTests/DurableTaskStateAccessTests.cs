@@ -70,7 +70,7 @@ public abstract class DurableTaskStateAccessTests : IAsyncLifetime
         await WaitAsync(() => probe.GetAttempts(grainId) > attempts, () => grain.GetStockAsync());
 
         // The replay observed the level which the first run read, so it neither decremented the restocked level nor sent
-        // another notification, although each run's send uses a new message identifier.
+        // another notification: the send's record holds the recorded message identifier, which the replay's effect returns.
         Assert.Equal(5, await grain.GetStockAsync());
         Assert.Equal([1], probe.GetNotifications(grainId));
         Assert.Equal([1, 1], probe.GetObservedLevels(grainId));
@@ -110,7 +110,7 @@ public sealed class DurableTaskStateAccessProbe
     private readonly ConcurrentDictionary<GrainId, List<int>> _observedLevels = [];
     private int _nextMessageId;
 
-    /// <summary>Issues a new message identifier on every call, as code which isn't replay-safe does.</summary>
+    /// <summary>Issues a new message identifier on every call, which a body records with <c>DurableTask.RunInline</c>.</summary>
     public MessageId NextMessageId() => MessageId.Create("reserved", Interlocked.Increment(ref _nextMessageId).ToString(System.Globalization.CultureInfo.InvariantCulture));
 
     public void RecordAttempt(GrainId grainId, int observedLevel) => Add(_observedLevels, grainId, observedLevel);
@@ -190,7 +190,9 @@ public sealed class DurableTaskStateAccessTestGrain : DurableGrain, IDurableTask
         if (level > 0)
         {
             _stock.Value = level - 1;
-            _outbox.Send(_reserved, _probe.NextMessageId(), this.GetGrainId(), level);
+            // A replay sends with the same arguments as the recording run, so the identifier comes from a recorded effect.
+            var messageId = DurableTask.RunInline("message-id", _probe.NextMessageId);
+            _outbox.Send(_reserved, messageId, this.GetGrainId(), level);
         }
 
         _probe.RecordAttempt(this.GetGrainId(), level);

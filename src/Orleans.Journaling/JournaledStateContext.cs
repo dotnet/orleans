@@ -35,13 +35,25 @@ internal abstract class JournaledStateContext
         return context is not null;
     }
 
-    /// <summary>Reads <paramref name="target"/> through this context.</summary>
+    /// <summary>Reads <paramref name="target"/> through this context, with a read whose result depends only on the state.</summary>
     public TResult Read<TState, TResult>(
         JournaledStateAccessTarget target,
         JournaledStateOperation operation,
         TState state,
         Func<TState, TResult> read)
-        => Access(new(target, JournaledStateAccessKind.Read, operation), state, read, apply: null);
+        => Access(new(target, JournaledStateAccessKind.Read, operation), default(JournaledStateAccessNoArgument), state, read, apply: null);
+
+    /// <summary>
+    /// Reads <paramref name="target"/> through this context, with a read whose result depends on the state and on
+    /// <paramref name="argument"/>, such as a key or an index.
+    /// </summary>
+    public TResult Read<TArgument, TState, TResult>(
+        JournaledStateAccessTarget target,
+        JournaledStateOperation operation,
+        TArgument argument,
+        TState state,
+        Func<TState, TResult> read)
+        => Access(new(target, JournaledStateAccessKind.Read, operation), argument, state, read, apply: null);
 
     /// <summary>Changes <paramref name="target"/> through this context and returns the change's result.</summary>
     public TResult Write<TState, TResult>(
@@ -49,7 +61,19 @@ internal abstract class JournaledStateContext
         JournaledStateOperation operation,
         TState state,
         Func<TState, TResult> write)
-        => Access(new(target, JournaledStateAccessKind.Write, operation), state, write, apply: null);
+        => Access(new(target, JournaledStateAccessKind.Write, operation), default(JournaledStateAccessNoArgument), state, write, apply: null);
+
+    /// <summary>
+    /// Changes <paramref name="target"/> through this context with a change which <paramref name="argument"/> describes,
+    /// such as a key and a value, and returns the change's result.
+    /// </summary>
+    public TResult Write<TArgument, TState, TResult>(
+        JournaledStateAccessTarget target,
+        JournaledStateOperation operation,
+        TArgument argument,
+        TState state,
+        Func<TState, TResult> write)
+        => Access(new(target, JournaledStateAccessKind.Write, operation), argument, state, write, apply: null);
 
     /// <summary>
     /// Changes <paramref name="target"/> through this context with a change whose result <paramref name="observe"/>
@@ -66,7 +90,7 @@ internal abstract class JournaledStateContext
         TState state,
         Func<TState, TResult> observe,
         Action<TState, TResult> apply)
-        => Access(new(target, JournaledStateAccessKind.Write, operation), state, observe, apply);
+        => Access(new(target, JournaledStateAccessKind.Write, operation), default(JournaledStateAccessNoArgument), state, observe, apply);
 
     /// <summary>Changes <paramref name="target"/> through this context.</summary>
     public void Write<TState>(
@@ -74,8 +98,18 @@ internal abstract class JournaledStateContext
         JournaledStateOperation operation,
         TState state,
         Action<TState> write)
+        => Write(target, operation, default(JournaledStateAccessNoArgument), state, write);
+
+    /// <summary>Changes <paramref name="target"/> through this context with a change which <paramref name="argument"/> describes.</summary>
+    public void Write<TArgument, TState>(
+        JournaledStateAccessTarget target,
+        JournaledStateOperation operation,
+        TArgument argument,
+        TState state,
+        Action<TState> write)
         => Access(
             new(target, JournaledStateAccessKind.Write, operation),
+            argument,
             (State: state, Write: write),
             static state =>
             {
@@ -89,6 +123,11 @@ internal abstract class JournaledStateContext
     /// outcome without running it: a result, or an exception which this throws.
     /// </summary>
     /// <param name="access">The access.</param>
+    /// <param name="argument">
+    /// The values besides the state which the access depends on: a read's key or index, or a write's key, index, and
+    /// written value. It's <see cref="JournaledStateAccessNoArgument"/> for an access which depends only on the state, or
+    /// whose arguments are sequences, which a context doesn't enumerate.
+    /// </param>
     /// <param name="state">The state which <paramref name="operation"/> and <paramref name="apply"/> take.</param>
     /// <param name="operation">
     /// Runs the access and returns its result; when <paramref name="apply"/> is supplied, determines the result of the
@@ -98,8 +137,9 @@ internal abstract class JournaledStateContext
     /// <remarks>
     /// <typeparamref name="TResult"/> is <see cref="JournaledStateAccessNoResult"/> for a write which returns nothing.
     /// </remarks>
-    protected abstract TResult Access<TState, TResult>(
+    protected abstract TResult Access<TArgument, TState, TResult>(
         in JournaledStateAccess access,
+        TArgument argument,
         TState state,
         Func<TState, TResult> operation,
         Action<TState, TResult>? apply);
@@ -200,6 +240,9 @@ internal readonly struct JournaledStateAccess(JournaledStateAccessTarget target,
 
 /// <summary>The result of a write which returns nothing.</summary>
 internal readonly struct JournaledStateAccessNoResult;
+
+/// <summary>The argument of an access which depends only on the state, or whose arguments a context doesn't examine.</summary>
+internal readonly struct JournaledStateAccessNoArgument;
 
 /// <summary>Whether an access reads or changes journaled state.</summary>
 /// <remarks>Records of accesses store these values.</remarks>

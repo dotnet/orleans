@@ -62,7 +62,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
         {
             if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
             {
-                context.Write(_accessTarget, JournaledStateOperation.ValueSet, (Self: this, Value: value), static state => state.Self.SetValue(state.Value));
+                context.Write(_accessTarget, JournaledStateOperation.ValueSet, value, (Self: this, Value: value), static state => state.Self.SetValue(state.Value));
                 return;
             }
 
