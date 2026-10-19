@@ -1,8 +1,12 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
+using Orleans.Messaging.Configuration;
+using Orleans.Messaging.Diagnostics;
 using Orleans.Messaging.Tests.Support;
 using Orleans.Runtime;
+using Orleans.TestingHost.Diagnostics;
 using Xunit;
 
 namespace Orleans.Messaging.Tests.Functional;
@@ -17,6 +21,140 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
     private static readonly TimeSpan Delay = TimeSpan.FromHours(1);
 
     private ManualJobClock JobClock => ((ScheduledDeliveryClusterFixture)Fixture).JobClock;
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OutboxRetries_UseJobTimeAndDeadLettersUseGrainTime(bool snapshot)
+    {
+        Fixture.Clock.Advance(TimeSpan.FromDays(2));
+        var sender = NewGrain();
+        var receiver = Fixture.Client.GetGrain<INoHandlerGrain>(Guid.NewGuid());
+        await receiver.PingAsync();
+        _ = await sender.GetSnapshotAsync();
+        var options = Fixture.GetGrainContext(sender).ActivationServices
+            .GetRequiredService<IOptions<DurableMessagingOptions>>().Value;
+        using var events = new DiagnosticEventCollector(MessagingEvents.ListenerName);
+        var firstRetry = WaitForRetryAsync(1);
+        var startedAt = JobClock.GetUtcNow();
+        var expiresAt = startedAt + options.OutboxRetryTimeout;
+
+        var messageId = await sender.SendAsync(receiver.GetGrainId(), "messages/unhandled", NewMessage(61, "dead-letter"));
+        await firstRetry;
+        await AssertWakeupAtAsync(sender, startedAt + options.RetryInitialInterval);
+        var state = await GetRetryStateAsync();
+        Assert.Equal(1, state.AttemptCount);
+        Assert.Equal(expiresAt, state.ExpirationTime);
+        Assert.Equal(startedAt + options.RetryInitialInterval, state.NextAttemptAt);
+
+        Fixture.Clock.Advance(TimeSpan.FromDays(1));
+        await AssertWakeupAtAsync(sender, Assert.IsType<DateTimeOffset>(state.NextAttemptAt));
+        Assert.Equal(1, (await GetRetryStateAsync()).AttemptCount);
+
+        var secondRetry = WaitForRetryAsync(2);
+        JobClock.Advance(options.RetryInitialInterval);
+        _ = await Fixture.RunPumpAsync(sender);
+        await secondRetry;
+        state = await GetRetryStateAsync();
+        Assert.Equal(expiresAt, state.ExpirationTime);
+        Assert.Equal(JobClock.GetUtcNow() + 2 * options.RetryInitialInterval, state.NextAttemptAt);
+        await AssertWakeupAtAsync(sender, Assert.IsType<DateTimeOffset>(state.NextAttemptAt));
+
+        if (snapshot)
+        {
+            Fixture.Storage.RequestSnapshot(JournalId.FromGrainId(sender.GetGrainId()));
+            await sender.RetryWriteStateAsync();
+        }
+        await ReactivateAsync(sender);
+        var recovered = await GetRetryStateAsync();
+        Assert.Equal(state.AttemptCount, recovered.AttemptCount);
+        Assert.Equal(state.ExpirationTime, recovered.ExpirationTime);
+        Assert.Equal(state.NextAttemptAt, recovered.NextAttemptAt);
+        await AssertWakeupAtAsync(sender, Assert.IsType<DateTimeOffset>(recovered.NextAttemptAt));
+
+        var thirdRetry = WaitForRetryAsync(3);
+        JobClock.Advance(expiresAt - JobClock.GetUtcNow() - TimeSpan.FromTicks(1));
+        _ = await Fixture.RunPumpAsync(sender);
+        await thirdRetry;
+        await AssertWakeupAtAsync(sender, expiresAt);
+        JobClock.Advance(TimeSpan.FromTicks(1));
+        _ = await Fixture.RunPumpAsync(sender);
+        var letter = Assert.Single((await Fixture.WaitForDeadLetterCountAsync(sender, 1)).OutboxDeadLetters);
+        Assert.Equal(messageId, letter.MessageId);
+        Assert.Equal(3, letter.AttemptCount);
+        Assert.Equal(Fixture.Clock.GetUtcNow(), letter.DeadLetteredAt);
+
+        if (snapshot)
+        {
+            Fixture.Storage.RequestSnapshot(JournalId.FromGrainId(sender.GetGrainId()));
+            await sender.RetryWriteStateAsync();
+        }
+        JobClock.Advance(options.DeadLetterRetentionPeriod);
+        await ReactivateAsync(sender);
+        Assert.Equal(letter, Assert.Single((await sender.GetSnapshotAsync()).OutboxDeadLetters));
+
+        Fixture.Clock.Advance(options.DeadLetterRetentionPeriod - TimeSpan.FromTicks(1));
+        await ReactivateAsync(sender);
+        Assert.Equal(letter, Assert.Single((await sender.GetSnapshotAsync()).OutboxDeadLetters));
+        Fixture.Clock.Advance(TimeSpan.FromTicks(1));
+        await ReactivateAsync(sender);
+        Assert.Empty((await sender.GetSnapshotAsync()).OutboxDeadLetters);
+        await ReactivateAsync(sender);
+        Assert.Empty((await sender.GetSnapshotAsync()).OutboxDeadLetters);
+
+        Task<DiagnosticEvent> WaitForRetryAsync(int attempt) => events.WaitForEventAsync(
+            nameof(MessagingEvents.OutboxRetryScheduled),
+            entry => entry.Payload is MessagingEvents.OutboxRetryScheduled scheduled
+                && scheduled.GrainContext.GrainId == sender.GetGrainId() && scheduled.AttemptCount == attempt,
+            TimeSpan.FromSeconds(30),
+            TestContext.Current.CancellationToken);
+
+        Task<OutboxMessageState> GetRetryStateAsync() => Fixture.OnGrainAsync(sender, () =>
+            Fixture.GetGrainContext(sender).ActivationServices.GetRequiredService<Outbox>().MessageState[messageId].State);
+    }
+
+    [Fact]
+    public async Task OutboxDeadLetterInsertion_CompactsOnGrainTime()
+    {
+        Fixture.Clock.Advance(TimeSpan.FromDays(2));
+        var sender = NewGrain();
+        var receiver = Fixture.Client.GetGrain<INoHandlerGrain>(Guid.NewGuid());
+        await receiver.PingAsync();
+        _ = await sender.GetSnapshotAsync();
+        var options = Fixture.GetGrainContext(sender).ActivationServices
+            .GetRequiredService<IOptions<DurableMessagingOptions>>().Value;
+
+        var first = Assert.Single((await DeadLetterAsync(62)).OutboxDeadLetters);
+        Assert.Equal(Fixture.Clock.GetUtcNow(), first.DeadLetteredAt);
+        JobClock.Advance(options.DeadLetterRetentionPeriod);
+        var retained = (await DeadLetterAsync(63)).OutboxDeadLetters;
+        Assert.Equal(2, retained.Count);
+        Assert.Contains(first, retained);
+        Assert.All(retained, letter => Assert.Equal(Fixture.Clock.GetUtcNow(), letter.DeadLetteredAt));
+
+        Fixture.Clock.Advance(options.DeadLetterRetentionPeriod);
+        var replacement = Assert.Single((await DeadLetterAsync(64)).OutboxDeadLetters);
+        Assert.Equal(Fixture.Clock.GetUtcNow(), replacement.DeadLetteredAt);
+        await ReactivateAsync(sender);
+        Assert.Equal(replacement, Assert.Single((await sender.GetSnapshotAsync()).OutboxDeadLetters));
+
+        async Task<EndpointSnapshot> DeadLetterAsync(int sequence)
+        {
+            using var events = new DiagnosticEventCollector(MessagingEvents.ListenerName);
+            var retry = events.WaitForEventAsync(
+                nameof(MessagingEvents.OutboxRetryScheduled),
+                entry => entry.Payload is MessagingEvents.OutboxRetryScheduled scheduled
+                    && scheduled.GrainContext.GrainId == sender.GetGrainId(),
+                TimeSpan.FromSeconds(30),
+                TestContext.Current.CancellationToken);
+            var messageId = await sender.SendAsync(receiver.GetGrainId(), "messages/unhandled", NewMessage(sequence, "dead-letter"));
+            await retry;
+            JobClock.Advance(options.OutboxRetryTimeout);
+            _ = await Fixture.RunPumpAsync(sender);
+            return await Fixture.SnapshotProbe.WaitAsync(sender.GetGrainId(),
+                state => state.OutboxCount == 0 && state.OutboxDeadLetters.Any(letter => letter.MessageId == messageId));
+        }
+    }
 
     [Fact]
     public async Task InboxWakeup_BareStagingWaitsForCommitAfterPriorWorkDrains()
@@ -363,6 +501,34 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
     }
 
     [Fact]
+    public async Task SelfSentScheduledMessage_IsAcceptedWithItsWriteAndProcessedWhenDue()
+    {
+        var grain = NewGrain();
+        _ = await grain.GetSnapshotAsync();
+        var deliverAt = JobClock.GetUtcNow() + Delay;
+        var message = NewMessage(40, "self");
+        var outgoing = TestApplicationProtocol.Create(Sessions, grain.GetGrainId(), grain.GetGrainId(), "messages/self", message);
+        outgoing = new OutboxMessage { ReceiverId = outgoing.ReceiverId, Envelope = outgoing.Envelope with { DeliverAt = deliverAt } };
+
+        await grain.StageOutputAsync(outgoing);
+        await grain.RetryWriteStateAsync();
+
+        // The grain's own inbox accepted the message in that write, without waiting for the due time.
+        var delivered = await Fixture.SnapshotProbe.WaitAsync(
+            grain.GetGrainId(), static snapshot => snapshot.InboxCount == 1 && snapshot.OutboxCount == 0);
+        Assert.Empty(delivered.Effects);
+        await AssertWakeupAtAsync(grain, deliverAt);
+        Assert.Empty((await grain.GetSnapshotAsync()).Effects);
+
+        JobClock.Advance(Delay);
+        Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(grain)).Status);
+        var completed = await Fixture.WaitForEffectCountAsync(grain, 1);
+        Assert.Equal("self", Assert.Single(completed.Effects).Value);
+        Assert.Equal(0, completed.InboxCount);
+        Assert.Equal(0, completed.OutboxCount);
+    }
+
+    [Fact]
     public async Task ScheduledMessage_LeavesActivationCollectableUntilDue()
     {
         var receiver = NewGrain();
@@ -404,7 +570,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         }
     }
 
-    private sealed class ScheduledDeliveryClusterFixture() : MessagingClusterFixture(1, receiverOnly: true)
+    private sealed class ScheduledDeliveryClusterFixture() : MessagingClusterFixture(1, receiverOnly: false)
     {
         public ManualJobClock JobClock { get; } = new(DateTimeOffset.UtcNow);
 
