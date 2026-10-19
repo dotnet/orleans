@@ -24,12 +24,12 @@ public interface IConversationGrain : IGrainWithStringKey
     // Ends the conversation. Every watch ends after the final entry.
     ValueTask End(CancellationToken cancellationToken);
 
-    // Committed history after the entry with sequence number 'after'.
-    IAsyncEnumerable<LogEvent<string>> WatchAsync(long after, CancellationToken cancellationToken = default);
+    // Committed history from a position. An epoch of zero reads the current history.
+    IAsyncEnumerable<LogEvent<string>> WatchAsync(long epoch, long nextSequence, CancellationToken cancellationToken = default);
 
     // Committed history and streaming drafts.
     IAsyncEnumerable<LogEvent<string>> WatchLiveAsync(
-        long nextSequence, LogDraftId? draftId, CancellationToken cancellationToken = default);
+        long epoch, long nextSequence, LogDraftId? draftId, CancellationToken cancellationToken = default);
 
     IAsyncEnumerable<ValueChange<string>> WatchStatusAsync(CancellationToken cancellationToken = default);
 }
@@ -82,12 +82,12 @@ public sealed class ConversationGrain(
         await stateManager.WriteStateAsync(cancellationToken);
     }
 
-    public IAsyncEnumerable<LogEvent<string>> WatchAsync(long after, CancellationToken cancellationToken = default) =>
-        _messages.ReadAsync(after + 1, cancellationToken: cancellationToken);
+    public IAsyncEnumerable<LogEvent<string>> WatchAsync(long epoch, long nextSequence, CancellationToken cancellationToken = default) =>
+        _messages.ReadAsync(nextSequence, epoch, cancellationToken: cancellationToken);
 
     public IAsyncEnumerable<LogEvent<string>> WatchLiveAsync(
-        long nextSequence, LogDraftId? draftId, CancellationToken cancellationToken = default) =>
-        _messages.ReadAsync(nextSequence, DurableWatchMode.Committed | DurableWatchMode.Drafts, draftId, cancellationToken);
+        long epoch, long nextSequence, LogDraftId? draftId, CancellationToken cancellationToken = default) =>
+        _messages.ReadAsync(nextSequence, epoch, DurableWatchMode.Committed | DurableWatchMode.Drafts, draftId, cancellationToken);
 
     public IAsyncEnumerable<ValueChange<string>> WatchStatusAsync(CancellationToken cancellationToken = default) =>
         _status.WatchAsync(cancellationToken: cancellationToken);
@@ -99,12 +99,14 @@ public static class ConversationClient
     // <conversation_client>
     public static async Task RenderAsync(IConversationGrain conversation, CancellationToken cancellationToken)
     {
-        // Every entry is durable, so the position after the latest entry is a valid resume point.
+        // Every entry is durable, so the epoch and the position after the latest entry are a valid resume point.
+        var epoch = 0L;
         var nextSequence = 0L;
         var history = new SortedList<long, string>();
         var drafts = new Dictionary<LogDraftId, StringBuilder>();
-        await foreach (var logEvent in conversation.WatchLiveAsync(nextSequence, draftId: null, cancellationToken))
+        await foreach (var logEvent in conversation.WatchLiveAsync(epoch, nextSequence, draftId: null, cancellationToken))
         {
+            epoch = logEvent.Epoch;
             switch (logEvent.Kind)
             {
                 case LogEventKind.Entry:
@@ -125,7 +127,7 @@ public static class ConversationClient
                     nextSequence = Math.Max(nextSequence, logEvent.Sequence);
                     break;
                 case LogEventKind.Reset:
-                    // The history was replaced, for example by a compacted summary.
+                    // The entries were replaced, for example by a compacted summary or by deleting the journal.
                     history.Clear();
                     nextSequence = logEvent.Sequence;
                     break;
@@ -150,19 +152,6 @@ public static class ConversationClient
         }
     }
     // </conversation_client>
-}
-
-public static class StateDiagnostics
-{
-    // <state_discovery>
-    public static IEnumerable<string> DescribeState(IJournaledStateManager manager)
-    {
-        foreach (var (name, stateMachine) in manager.GetStateMachines())
-        {
-            yield return $"{name}: {stateMachine.GetType().Name}";
-        }
-    }
-    // </state_discovery>
 }
 
 public sealed class FixedResponseGenerator(params string[] tokens) : IResponseGenerator
@@ -202,7 +191,7 @@ public static class ConversationGrainTests
         await cluster.DeactivateAsync(conversation);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var history = new List<string>();
-        await foreach (var logEvent in conversation.WatchAsync(after: -1, timeout.Token))
+        await foreach (var logEvent in conversation.WatchAsync(epoch: 0, nextSequence: 0, timeout.Token))
         {
             if (logEvent.Kind is LogEventKind.Entry)
             {
