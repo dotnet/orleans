@@ -9,12 +9,14 @@ internal static class InboxTestAccess
 
     public static int Count(this IOutbox outbox) => outbox switch
     {
+        Outbox value => value.Count,
         JournaledTestOutbox value => value.Count,
         _ => throw new NotSupportedException(outbox.GetType().FullName)
     };
 
     public static IEnumerable<OutboxMessage> Messages(this IOutbox outbox) => outbox switch
     {
+        Outbox value => value.MessageState.Values.Where(static entry => entry.Message is not null).Select(static entry => entry.Message!.Value),
         JournaledTestOutbox value => value.Messages,
         _ => throw new NotSupportedException(outbox.GetType().FullName)
     };
