@@ -48,6 +48,60 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         Assert.All(completed.Effects, effect => Assert.Equal(1, effect.Count));
     }
 
+    [Fact]
+    public async Task Wakeup_RetriesActivationFailuresBeyondTheDefaultLimitAndDeliversWithoutAClientCall()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+        var journal = JournalId.FromGrainId(receiver.GetGrainId());
+        var deliverAt = JobClock.GetUtcNow() + Delay;
+        Assert.Equal(DeliveryStatus.Accepted,
+            (await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(80, "outage")), deliverAt))).Status);
+        await Fixture.CollectAsync(Fixture.GetGrainContext(receiver));
+
+        // Durable Jobs gives up on other jobs after 5 failed runs; the pump job keeps retrying through a longer outage.
+        const int failures = 7;
+        Fixture.Storage.FailReads(journal, failures);
+        // Each retry becomes due on the Durable Jobs clock once Durable Jobs records the failed run.
+        var reads = Fixture.Storage.GetReadCount(journal);
+        await WaitUntilAsync(() =>
+        {
+            if (Fixture.Storage.GetReadCount(journal) > reads + failures) return true;
+            JobClock.Advance(Delay);
+            return false;
+        });
+
+        var recovered = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal("outage", Assert.Single(recovered.Effects).Value);
+        Assert.Equal(0, recovered.InboxCount);
+    }
+
+    [Fact]
+    public async Task Wakeup_ForDueWorkIsScheduledOncePerIdlePeriodWithinTheRecheckDelay()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+        var grainId = receiver.GetGrainId();
+        var scheduled = Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grainId).Count;
+        var now = JobClock.GetUtcNow();
+        using (var held = Fixture.HandlerProbe.Arm(grainId, HeldRoute))
+        {
+            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(81, "first"), HeldRoute))).Status);
+            await WaitForBarrierAsync(receiver, held);
+
+            // The live loop performs due work, so the wake-up is crash insurance due within RecheckDelay, and later
+            // writes reuse it.
+            var jobs = Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grainId);
+            Assert.Equal(scheduled + 1, jobs.Count);
+            Assert.Equal(now + MessagingPump.RecheckDelay, jobs[^1].DueTime);
+            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(82, "second")))).Status);
+            Assert.Equal(scheduled + 1, Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grainId).Count);
+        }
+
+        var completed = await Fixture.WaitForEffectCountAsync(receiver, 2);
+        Assert.Equal(new[] { "first", "second" }, completed.Effects.Select(static effect => effect.Value));
+    }
+
     [Theory]
     [InlineData(false, false, false)]
     [InlineData(false, false, true)]
@@ -325,6 +379,16 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
 
     private static InboxMessage Schedule(InboxMessage message, DateTimeOffset? deliverAt) =>
         new() { Envelope = message.Envelope with { DeliverAt = deliverAt } };
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (!condition())
+        {
+            if (DateTime.UtcNow > deadline) throw new TimeoutException("The condition was not met.");
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+        }
+    }
 
     private sealed class ScheduledDeliveryClusterFixture() : MessagingClusterFixture(1, receiverOnly: true)
     {
