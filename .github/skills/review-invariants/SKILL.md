@@ -13,7 +13,7 @@ what must always be true, who guarantees it, and what happens when something fai
 1. For each affected boundary, identify the guarantees material to the change, including implicit ones the code already relies on: what the component **provides** to consumers and what it **demands** of callers and lower layers.
 2. Classify each changed error path: expected operational failure, invalid external input, cancellation, or programming-invariant violation.
 3. Look for an invariant or redesign that eliminates each fallback; replace fallbacks for states that cannot occur with assertions; give each condition that can occur a designed path in the spec.
-4. When an invariant almost holds, or it is unclear whether it should hold, raise it as a question before code depends on it.
+4. When an invariant almost holds, or it is unclear whether it should hold, ask the maintainer (in reviews, raise it as a question) before code depends on it.
 5. Check failure semantics, idempotence, concurrency ownership, activation scheduling, cancellation flow, and trust boundaries.
 
 ## Checklist
