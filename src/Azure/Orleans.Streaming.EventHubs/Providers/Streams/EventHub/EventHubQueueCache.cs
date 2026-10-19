@@ -136,7 +136,7 @@ namespace Orleans.Streaming.EventHubs
             }
             else
             {
-                if (this.cachePressureMonitor.IsUnderPressure(nowUtc))
+                if (memoryController?.IsUnderPressure == true || this.cachePressureMonitor.IsUnderPressure(nowUtc))
                 {
                     return;
                 }
@@ -162,7 +162,7 @@ namespace Orleans.Streaming.EventHubs
 
         private void ResetBufferIfEmpty()
         {
-            if (cache.IsEmpty && this.evictionStrategy is ChronologicalEvictionStrategy)
+            if (cache.IsEmpty)
             {
                 currentBuffer = null;
                 preferredBufferSize = EventHubCacheBufferPool.MinBufferSize;

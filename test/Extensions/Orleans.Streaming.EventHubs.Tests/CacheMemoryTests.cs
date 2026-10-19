@@ -133,7 +133,9 @@ public sealed class CacheMemoryTests : IDisposable
         var controller = new EventHubCacheMemoryController(maxActiveMemory);
         var pool = new EventHubCacheBufferPool(controller, 64 * 1024, null, TimeSpan.FromMinutes(1));
         var checkpointer = new TestCheckpointer();
-        using var cache = CreateCache("0", pool, controller, checkpointer: checkpointer);
+        var evictionStrategy = new EventHubQueueCacheFactory.EventHubCacheEvictionStrategy(
+            NullLogger.Instance, new AlwaysPurgePredicate(), null, null);
+        using var cache = CreateCache("0", pool, controller, evictionStrategy, checkpointer);
         var positions = cache.Add(
             Enumerable.Range(0, 20).Select(i => MakeEventData(i, 8 * 1024)).ToList(),
             DateTime.UtcNow);
@@ -141,7 +143,10 @@ public sealed class CacheMemoryTests : IDisposable
 
         cache.UpdatePurgeProtection(hasActiveSubscriptions: true);
 
+        var retainedMemory = controller.ActiveCacheMemory;
         Assert.Equal(0, cache.GetMaxAddCount());
+        cache.SignalPurge();
+        Assert.Equal(retainedMemory, controller.ActiveCacheMemory);
         Assert.Null(checkpointer.LastOffset);
         var nextCursor = GetCursor(cache, positions[0].StreamId, positions[0].SequenceToken);
         for (var i = 0; i < positions.Count; i++)
@@ -163,6 +168,25 @@ public sealed class CacheMemoryTests : IDisposable
         }
 
         AssertNoNextMessage(cache, laggingCursor);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void TimeBasedPurgeContinuesWithRegisteredSubscriptionsBelowMemoryLimit()
+    {
+        var controller = new EventHubCacheMemoryController(1024 * 1024);
+        var pool = new EventHubCacheBufferPool(controller, 0, null, TimeSpan.FromMinutes(1));
+        var checkpointer = new TestCheckpointer();
+        var evictionStrategy = new EventHubQueueCacheFactory.EventHubCacheEvictionStrategy(
+            NullLogger.Instance, new AlwaysPurgePredicate(), null, null);
+        using var cache = CreateCache("0", pool, controller, evictionStrategy, checkpointer);
+        var position = Assert.Single(cache.Add([MakeEventData(0)], DateTime.UtcNow));
+        cache.UpdatePurgeProtection(hasActiveSubscriptions: true);
+        Assert.False(controller.IsUnderPressure);
+
+        cache.SignalPurge();
+
+        Assert.Equal(((IEventHubPartitionLocation)position.SequenceToken).EventHubOffset, checkpointer.LastOffset);
+        Assert.Equal(0, controller.ActiveCacheMemory);
     }
 
     [Theory, InlineData(false), InlineData(true), TestCategory("BVT")]
@@ -206,7 +230,6 @@ public sealed class CacheMemoryTests : IDisposable
         var streamId = new QualifiedStreamId("provider", positions[0].StreamId);
         await accessor.RegisterStream(streamId, positions[0].SequenceToken, DateTime.UtcNow);
         var stream = Assert.Single(await accessor.GetPubSubCache()).Value;
-        stream.LastReadToken = positions[^1].SequenceToken;
         var slowStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseSlow = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (!holdSlowDelivery)
@@ -257,7 +280,11 @@ public sealed class CacheMemoryTests : IDisposable
         }
 
         await slowDelivery.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        Assert.All(consumers, consumer => Assert.True(consumer.IsCaughtUp));
+        Assert.All(consumers, consumer =>
+        {
+            Assert.Equal(StreamConsumerDataState.Inactive, consumer.State);
+            Assert.Equal(positions[^1].SequenceToken, consumer.LastProcessedToken);
+        });
         pendingMessages.Enqueue([MakeSerializedEventData(messageCount, 2 * 1024)]);
         for (var attempt = 0; attempt < 3 && memoryAtReads.Count == 0; attempt++)
         {
@@ -360,6 +387,41 @@ public sealed class CacheMemoryTests : IDisposable
         cache.Dispose();
         cache.Dispose();
         Assert.Equal(2, pool.FreeCount);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void CustomEvictionStrategyTracksFreshBufferAfterEmptyPurge()
+    {
+        var pool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(64 * 1024));
+        var adapter = new TestEventHubDataAdapter(serializer);
+        var evictionStrategy = new CustomEvictionStrategy();
+        using var cache = new EventHubQueueCache(
+            "0",
+            EventHubAdapterReceiver.MaxMessagesPerRead,
+            pool,
+            adapter,
+            evictionStrategy,
+            NoOpCheckpointer.Instance,
+            NullLogger.Instance,
+            null,
+            null,
+            null);
+
+        cache.Add([MakeEventData(1)], DateTime.UtcNow);
+        cache.SignalPurge();
+        Assert.Equal(1, evictionStrategy.AllocatedBufferCount);
+
+        using var leasedBuffer = pool.Allocate();
+        var positions = cache.Add([MakeEventData(2)], DateTime.UtcNow);
+
+        Assert.Equal(2, evictionStrategy.AllocatedBufferCount);
+        Assert.NotSame(leasedBuffer.Id, evictionStrategy.LastAllocatedBuffer.Id);
+        var cursor = GetCursor(cache, positions[0].StreamId, positions[0].SequenceToken);
+        Assert.Equal(positions[0].SequenceToken, GetNextMessage(cache, cursor).SequenceToken);
+
+        cache.SignalPurge();
+        using var returnedBuffer = pool.Allocate();
+        Assert.Same(evictionStrategy.LastAllocatedBuffer, returnedBuffer);
     }
 
     [Fact, TestCategory("BVT")]
@@ -654,6 +716,38 @@ public sealed class CacheMemoryTests : IDisposable
         public void PerformPurge(DateTime utcNow)
         {
         }
+    }
+
+    private sealed class CustomEvictionStrategy : IEvictionStrategy, IDisposable
+    {
+        private readonly ChronologicalEvictionStrategy inner =
+            new(NullLogger.Instance, new AlwaysPurgePredicate(), null, null);
+
+        public IPurgeObservable PurgeObservable
+        {
+            set => inner.PurgeObservable = value;
+        }
+
+        public Action<CachedMessage?, CachedMessage?>? OnPurged
+        {
+            get => inner.OnPurged;
+            set => inner.OnPurged = value;
+        }
+
+        public int AllocatedBufferCount { get; private set; }
+
+        public FixedSizeBuffer LastAllocatedBuffer { get; private set; } = null!;
+
+        public void OnBlockAllocated(FixedSizeBuffer newBlock)
+        {
+            AllocatedBufferCount++;
+            LastAllocatedBuffer = newBlock;
+            inner.OnBlockAllocated(newBlock);
+        }
+
+        public void PerformPurge(DateTime utcNow) => inner.PerformPurge(utcNow);
+
+        public void Dispose() => inner.Dispose();
     }
 
     private sealed class TestCheckpointer : IStreamQueueCheckpointer<string>
