@@ -20,6 +20,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     private readonly Lock _lock = new();
     private readonly ArcBufferWriter _buffer = new();
     private int _committedLength;
+    private long _committedEntryCount;
     private bool _hasActiveEntry;
     private TaskCompletionSource? _activeEntryClosed;
     private bool _disposed;
@@ -56,6 +57,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             ThrowIfEntryActive();
             _buffer.Reset();
             _committedLength = 0;
+            _committedEntryCount = 0;
         }
     }
 
@@ -219,6 +221,13 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
         }
     }
 
+    /// <summary>
+    /// Gets the number of entries committed since this writer was created or last reset, including entries which
+    /// <see cref="Consume"/> released. Aborted entries don't count.
+    /// </summary>
+    /// <remarks>Read by the code which commits entries: the activation's scheduler, for a manager's writer.</remarks>
+    internal long CommittedEntryCount => _committedEntryCount;
+
     internal void Consume(ArcBuffer buffer)
     {
         lock (_lock)
@@ -271,6 +280,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             {
                 WritePreservedEntry(streamId, entry);
                 _committedLength = _buffer.Length;
+                _committedEntryCount++;
             }
             catch
             {
@@ -290,6 +300,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             {
                 FinishEntry(streamId);
                 _committedLength = _buffer.Length;
+                _committedEntryCount++;
             }
             catch
             {

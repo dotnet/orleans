@@ -1,12 +1,14 @@
+using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace Orleans.Durable.Journaling;
 
 [DebuggerDisplay("Count = {Count}, NextSequence = {NextSequence}")]
-internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLogCommandHandler<T>
+internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLogCommandHandler<T>, IJournaledStateHistory, IJournaledStateReplica
 {
     private readonly IDurableLogCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
@@ -45,7 +47,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableLogCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _manager = manager as JournaledStateManager;
-        _accessTarget = new(key, manager);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -54,10 +56,51 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
         _manager = manager as JournaledStateManager;
-        _accessTarget = new(key, manager);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
+    // A replica, which has no manager, so its reads run directly.
+    private DurableLog(IDurableLogCommandCodec<T> codec)
+    {
+        _codec = codec;
+        _accessTarget = new(nameof(DurableLog<T>));
+    }
+
+    // The collection journals each change as it makes it.
+    void IJournaledStateHistory.StagePendingChanges() { }
+
+    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableLog<T>(_codec);
+
+    void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
+    {
+        switch (operation)
+        {
+            case JournaledStateOperation.LogCount:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Count, result);
+                break;
+            case JournaledStateOperation.LogFirstSequence:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _firstSequence, result);
+                break;
+            case JournaledStateOperation.LogNextSequence:
+                JournaledStateReplicaEncoding.WriteResult(serializer, NextSequenceCore, result);
+                break;
+            case JournaledStateOperation.LogIsSealed:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _isSealed, result);
+                break;
+            case JournaledStateOperation.LogGet:
+                JournaledStateReplicaEncoding.WriteResult(serializer, GetCore(JournaledStateReplicaEncoding.ReadArgument<long>(serializer, argument)), result);
+                break;
+            case JournaledStateOperation.LogTryGet:
+                JournaledStateReplicaEncoding.WriteResult(serializer, TryGetIndex(JournaledStateReplicaEncoding.ReadArgument<long>(serializer, argument), out var index) ? (true, _items[index]) : (false, default(T)!), result);
+                break;
+            case JournaledStateOperation.LogSnapshot:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.ToArray(), result);
+                break;
+            default:
+                throw JournaledStateReplicaEncoding.NotPositional(operation, nameof(DurableLog<T>));
+        }
+    }
     public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
         ? context.Read(_accessTarget, JournaledStateOperation.LogCount, this, static self => self._items.Count)
         : _items.Count;
