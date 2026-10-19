@@ -27,7 +27,8 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
         DurableTaskDiagnostics.UnobservedDefinition,
         DurableTaskDiagnostics.ReusedDefinition,
         DurableTaskDiagnostics.PostWithoutOutbox,
-        DurableTaskDiagnostics.UnobservedHandle);
+        DurableTaskDiagnostics.UnobservedHandle,
+        DurableTaskDiagnostics.DetachedLocalTask);
 
     /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
@@ -43,6 +44,7 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
 
             start.RegisterOperationAction(operation => AnalyzeStatement(operation, symbols), OperationKind.ExpressionStatement);
             start.RegisterOperationAction(operation => AnalyzePost(operation, symbols), OperationKind.Invocation);
+            start.RegisterOperationAction(operation => AnalyzeDetached(operation, symbols), OperationKind.Invocation);
             start.RegisterOperationBlockAction(block => AnalyzeLocals(block, symbols));
         });
     }
@@ -84,6 +86,34 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
             invocation.Syntax.GetLocation(),
             DurableTaskSymbols.GetExtensionReceiver(invocation) is { } receiver ? GetDefinitionName(receiver) : invocation.TargetMethod.Name));
     }
+
+    /// <summary>
+    /// Reports <c>Detached</c> on a definition which runs as part of the execution which starts it: a <c>DurableTask</c>
+    /// factory such as <c>DurableTask.Run</c> or a combinator, or an <c>async DurableTask</c> method. Other definitions, such
+    /// as durable grain calls, start as root tasks.
+    /// </summary>
+    private static void AnalyzeDetached(OperationAnalysisContext context, DurableTaskSymbols symbols)
+    {
+        var invocation = (IInvocationOperation)context.Operation;
+        if (invocation.TargetMethod.Name != "Detached"
+            || !DurableTaskSymbols.IsDurableTasksType(invocation.TargetMethod.ContainingType)
+            || DurableTaskSymbols.GetExtensionReceiver(invocation) is not { } receiver
+            || DurableTaskSymbols.GetDefinition(receiver, "Detached", out _) is not IInvocationOperation definition
+            || !RunsInStartingExecution(definition.TargetMethod, symbols))
+        {
+            return;
+        }
+
+        var location = invocation.Syntax is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax access }
+            ? access.Name.GetLocation()
+            : invocation.Syntax.GetLocation();
+        context.ReportDiagnostic(Diagnostic.Create(DurableTaskDiagnostics.DetachedLocalTask, location, GetDefinitionName(definition)));
+    }
+
+    private static bool RunsInStartingExecution(IMethodSymbol method, DurableTaskSymbols symbols) =>
+        method.IsAsync
+        || SymbolEqualityComparer.Default.Equals(method.ContainingType, symbols.DurableTask)
+        || (DurableTaskSymbols.IsDurableTasksType(method.ContainingType) && method.ContainingType.Name is "DurableTaskExtensions" or "DurableSignal");
 
     /// <summary>Returns whether a value creates a definition or configures one.</summary>
     private static bool IsDefinition(IOperation value, DurableTaskSymbols symbols) =>

@@ -113,6 +113,7 @@ public sealed class DurableTaskIdentityAnalyzer : DiagnosticAnalyzer
 
         if (DurableTaskSymbols.GetDefinition(started, "WithId", out var named) is not IInvocationOperation definition
             || named
+            || DurableTaskSymbols.SuppliesRootId(started)
             || (awaited && symbols.IsSignalWait(definition)))
         {
             return null;

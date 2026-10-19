@@ -32,3 +32,4 @@ ORLEANS0223 | Usage | Warning | DurableTaskStateMutationAnalyzer, grain state va
 ORLEANS0225 | Usage | Error | DurableTaskReplayAnalyzer, durable task body polls a scheduled task
 ORLEANS0226 | Usage | Error | DurableTaskReplayAnalyzer, durable task body continues off its scheduler with ConfigureAwait
 ORLEANS0227 | Usage | Error | DurableTaskReplayAnalyzer, durable operation in a DurableTask.RunInline effect
+ORLEANS0228 | Usage | Error | DurableTaskDefinitionAnalyzer, detached start of a step, an async DurableTask method, or a combinator
