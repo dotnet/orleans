@@ -152,6 +152,8 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         try
         {
             await pass.Task.WaitAsync(cancellationToken).ConfigureAwait(true);
+            // A failed pass can leave only staged removals; its job must survive the activation's failure.
+            _shutdown.Token.ThrowIfCancellationRequested();
         }
         catch
         {

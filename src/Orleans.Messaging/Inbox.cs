@@ -425,6 +425,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         if (_messages.Count == 0 || _handlers.IsEmpty || next <= TimeSpan.Zero) return next;
         foreach (var entry in _messages.Values)
         {
+            // Capture follows synchronous preparation; its wake-up covers the write until acknowledgement.
+            if (entry.Sequence > _capturedSequence) continue;
             var delay = GetDelay(entry, jobNow);
             if (delay == TimeSpan.Zero) return delay;
             if (next is null || delay < next) next = delay;

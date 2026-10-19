@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Messaging.Tests.Support;
 using Xunit;
@@ -72,6 +73,40 @@ public sealed class InboxJournalRecoveryTests : MessagingBehaviorTestBase
 
         Assert.Equal(1, Assert.Single(cleaned.Effects).Count);
         Assert.Empty(cleaned.InboxDeadLetters);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CompletionWriteFailure_CancelsTheOwningJobPassBeforeRecovery(bool ambiguous)
+    {
+        var receiver = NewGrain();
+        var before = await receiver.GetSnapshotAsync();
+        var previous = Fixture.GetGrainContext(receiver);
+        const string route = "messages/failed-job-pass";
+        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
+        var envelope = CreateEnvelope(receiver, NewMessage(77, "failed-job-pass"), route);
+        Fixture.JobManagerProbe.SkipNext(MessagingPump.JobName);
+        await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.StageAcceptance(Fixture.GetInbox(receiver), envelope));
+        await receiver.RetryWriteStateAsync();
+
+        // This job owns the pass which enters the handler.
+        var running = Fixture.RunPumpAsync(receiver);
+        await handler.WaitUntilEnteredAsync();
+        var journal = JournalId.FromGrainId(receiver.GetGrainId());
+        if (ambiguous) Fixture.Storage.FailAfterWrite(journal);
+        else Fixture.Storage.FailWrite(journal);
+        handler.Release();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running);
+        await previous.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        _ = await receiver.GetSnapshotAsync();
+        var recovered = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.NotEqual(before.ActivationId, recovered.ActivationId);
+        Assert.Equal("failed-job-pass", Assert.Single(recovered.Effects).Value);
+        Assert.Equal(1, Assert.Single(recovered.Effects).Count);
+        Assert.Equal(0, recovered.InboxCount);
+        Assert.Empty(recovered.InboxDeadLetters);
     }
 
     [Fact]
