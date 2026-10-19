@@ -77,6 +77,67 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
+    public async Task MigratabilityChecker_ResolvesConstructedGenericGrainsByTheirClass()
+    {
+        await using var cluster = await DeployAsync();
+        var services = cluster.Silos[1].ServiceProvider;
+        var checker = services.GetRequiredService<GrainMigratabilityChecker>();
+        var grainFactory = services.GetRequiredService<IGrainFactory>();
+
+        // Constructed generic grains are described by their unconstructed class, which is migratable here.
+        Assert.True(checker.IsMigratable(grainFactory.GetGrain<IGenericRetirementHandoffGrain<int>>(Guid.NewGuid()).GetGrainId().Type, Orleans.Placement.ImmovableKind.Any));
+        Assert.True(checker.IsMigratable(grainFactory.GetGrain<IGenericRetirementHandoffGrain<string>>(Guid.NewGuid()).GetGrainId().Type, Orleans.Placement.ImmovableKind.Any));
+
+        // Immovable and stateless worker grains, and grain types which this silo does not know, remain unmigratable.
+        Assert.True(checker.IsMigratable(grainFactory.GetGrain<IRetirementHandoffGrain>(Guid.NewGuid(), typeof(RetirementHandoffGrain).FullName).GetGrainId().Type, Orleans.Placement.ImmovableKind.Any));
+        Assert.False(checker.IsMigratable(grainFactory.GetGrain<IImmovableRetirementHandoffGrain>(Guid.NewGuid()).GetGrainId().Type, Orleans.Placement.ImmovableKind.Any));
+        Assert.False(checker.IsMigratable(grainFactory.GetGrain<IStatelessRetirementHandoffGrain>(Guid.NewGuid()).GetGrainId().Type, Orleans.Placement.ImmovableKind.Any));
+        Assert.False(checker.IsMigratable(GrainType.Create("unknown-grain-type"), Orleans.Placement.ImmovableKind.Any));
+    }
+
+    [Fact]
+    public async Task QueuedRequestForGenericGrain_MigratesWithActivation_AndSurvivesRetiringSiloDeparture()
+    {
+        await using var cluster = await DeployAsync();
+        var retiring = cluster.Silos[1];
+        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grain = grainFactory.GetGrain<IGenericRetirementHandoffGrain<int>>(key);
+        await PlaceOnAsync(retiring, () => grain.GetLocation());
+
+        // A constructed generic grain is migratable unless its class is immovable.
+        Assert.True(retiring.ServiceProvider.GetRequiredService<GrainMigratabilityChecker>().IsMigratable(grain.GetGrainId().Type, Orleans.Placement.ImmovableKind.Any));
+
+        var running = grain.Block().AsTask();
+        await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
+        var queued = grain.HoldThenGetLocation().AsTask();
+        await WaitUntilAsync(() => GetWaitingCount(retiring, grain.GetGrainId()) == 1);
+
+        var stopping = cluster.StopSiloAsync(retiring, Cancellation);
+        await WaitUntilAsync(() => FindActivation(retiring, grain.GetGrainId()) is ActivationData { State: ActivationState.Deactivating });
+        state.ReleaseBlock.TrySetResult();
+        await running.WaitAsync(Timeout, Cancellation);
+
+        try
+        {
+            // The queued request migrates with the activation, and its caller keeps waiting after the retiring silo departs.
+            var destination = await state.HoldEntered.Task.WaitAsync(Timeout, Cancellation);
+            Assert.NotEqual(retiring.SiloAddress, destination);
+            await stopping.WaitAsync(Timeout, Cancellation);
+            await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(Timeout, Cancellation);
+            Assert.False(queued.IsCompleted, $"{queued.Status}: {queued.Exception?.InnerException}");
+
+            state.ReleaseHold.TrySetResult();
+            Assert.Equal(destination, await queued.WaitAsync(Timeout, Cancellation));
+        }
+        finally
+        {
+            state.ReleaseHold.TrySetResult();
+        }
+    }
+
+    [Fact]
     public async Task QueuedRequestFromCallerOnRetiringSilo_CompletesBeforeCallerDeactivates()
     {
         var builder = new InProcessTestClusterBuilder(3);
@@ -1892,6 +1953,48 @@ public interface IRetirementHandoffGrain : IGrainWithGuidKey
     ValueTask Record(string call);
 
     ValueTask<SiloAddress> GetLocationWithPayload(byte[] payload);
+}
+
+public interface IGenericRetirementHandoffGrain<T> : IGrainWithGuidKey
+{
+    ValueTask<SiloAddress> GetLocation();
+
+    ValueTask Block();
+
+    ValueTask<SiloAddress> HoldThenGetLocation();
+}
+
+[PreferLocalPlacement]
+public sealed class GenericRetirementHandoffGrain<T> : Grain, IGenericRetirementHandoffGrain<T>
+{
+    private RetirementHandoffState State => RetirementHandoffState.Get(this.GetPrimaryKey());
+
+    public ValueTask<SiloAddress> GetLocation() => new(GrainContext.Address.SiloAddress!);
+
+    public async ValueTask Block()
+    {
+        State.BlockEntered.TrySetResult();
+        await State.ReleaseBlock.Task;
+    }
+
+    public async ValueTask<SiloAddress> HoldThenGetLocation()
+    {
+        var location = GrainContext.Address.SiloAddress!;
+        State.HoldEntered.TrySetResult(location);
+        await State.ReleaseHold.Task;
+        return location;
+    }
+}
+
+public interface IStatelessRetirementHandoffGrain : IGrainWithGuidKey
+{
+    ValueTask Ping();
+}
+
+[StatelessWorker]
+public sealed class StatelessRetirementHandoffGrain : Grain, IStatelessRetirementHandoffGrain
+{
+    public ValueTask Ping() => default;
 }
 
 public interface IDisposalHeldGrain : IGrainWithGuidKey
