@@ -174,17 +174,8 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
         _accessTarget = new(nameof(DurableValue<T>));
     }
 
-    // A set journals the value at the next write; a positional read journals it now, so the journal holds what it read.
-    void IReplicableState.StagePendingChanges()
-    {
-        if (_isDirty)
-        {
-            Debug.Assert(_writer.IsInitialized);
-            WriteState(_writer);
-            _isDirty = false;
-            _isValueCaptured = true;
-        }
-    }
+    // A set journals the value at the next write, so until then the journal doesn't hold the value which reads observe.
+    bool IReplicableState.IsReproducibleFromJournal => !_isDirty;
 
     IJournaledStateReplica IReplicableState.CreateReplica() => new DurableValue<T>(_codec);
 

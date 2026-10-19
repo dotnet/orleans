@@ -279,20 +279,15 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _accessTarget = new(nameof(DurableTaskCompletionSource<T>));
     }
 
-    // Whether a terminal state waits for a write to capture it: no write captured it yet, and none acknowledged it, which
-    // completes the task.
-    private bool HasUncapturedCompletion => _status is not DurableTaskCompletionSourceStatus.Pending && !_isCompletionCaptured && !_completion.Task.IsCompleted;
-
-    // A completion journals its state at the next write; a positional read journals it now, so the journal holds what it read.
-    void IReplicableState.StagePendingChanges()
+    // A completion journals its state at the next write. Until a write captures it, or acknowledges it, which completes the
+    // task, the journal doesn't hold it. A fault's journaled exception doesn't reproduce the exception which reads observe
+    // (its type, stack trace and data can differ), so reads of a faulted source record values.
+    bool IReplicableState.IsReproducibleFromJournal => _status switch
     {
-        if (HasUncapturedCompletion)
-        {
-            Debug.Assert(_writer.IsInitialized);
-            WriteState(_writer);
-            _isCompletionCaptured = true;
-        }
-    }
+        DurableTaskCompletionSourceStatus.Pending => true,
+        DurableTaskCompletionSourceStatus.Faulted => false,
+        _ => _isCompletionCaptured || _completion.Task.IsCompleted,
+    };
 
     IJournaledStateReplica IReplicableState.CreateReplica() => new DurableTaskCompletionSource<T>(_codec, _copier, _exceptionCopier);
 
