@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Concurrency;
 using Orleans.DurableTasks;
 using Orleans.Journaling;
 using Orleans.Runtime;
@@ -42,7 +43,7 @@ public abstract class DurableTaskAttemptCancellationTests : IAsyncLifetime
     public ValueTask DisposeAsync() => _fixture.DisposeAsync();
 
     [Fact]
-    public async Task DeactivationCancelsTheAttemptWhoseCleanupCommits()
+    public async Task DeactivationDiscardsTheParkedAttemptWithoutRunningItsCleanup()
     {
         const string rootId = "deactivated";
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -52,22 +53,36 @@ public abstract class DurableTaskAttemptCancellationTests : IAsyncLifetime
         await Probe.WaitAsync(grainId, AttemptCancellationProbe.Waiting, cancellationToken);
         Assert.True(_fixture.Cluster.TryGetGrainContext(grainId, out var activation));
 
-        // The grain's OnDeactivateAsync commits a journal write while the canceled attempt is still unwinding.
+        // The attempt is parked on its signal, so deactivation discards it: it isn't resumed, so its cleanup, which isn't
+        // part of the execution's history, never runs.
         await grain.RequestDeactivationAsync();
         await activation.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        Assert.Equal(0, Probe.Get(grainId, AttemptCancellationProbe.Catches));
+        Assert.False(Probe.GetOutcomes(grainId).ContainsKey(AttemptCancellationProbe.Caught));
 
-        AssertCanceledAttemptUnwound(grainId, DurableTaskAttemptCancellationReason.ActivationStopping);
-        Assert.Equal(1, Probe.Get(grainId, AttemptCancellationProbe.ConcurrentWrites));
-
-        // The next activation recovers the committed journal, which holds the canceled attempt's cleanup, and replays the
-        // task, which assigns its status again and completes once it receives its signal without running its effect again.
-        var snapshot = await grain.GetSnapshotAsync();
-        Assert.Equal((1, AttemptCancellationTestGrain.CleanupChanges), (snapshot.Unrelated, snapshot.Changes));
+        // The next activation replays the task, which assigns its status again and completes once it receives its signal
+        // without running its effect again.
+        Assert.Equal(new AttemptCancellationSnapshot(Status: "running", Unrelated: 0), await grain.GetSnapshotAsync());
         await grain.SignalDurableTaskAsync(rootId, AttemptCancellationTestGrain.Approved, "approved", cancellationToken);
         Assert.Equal("approved", (await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken)).GetResult<string>());
-        Assert.Equal(new AttemptCancellationSnapshot(Status: "running", Unrelated: 1, AttemptCancellationTestGrain.CleanupChanges), await grain.GetSnapshotAsync());
+        Assert.Equal(new AttemptCancellationSnapshot(Status: "running", Unrelated: 0), await grain.GetSnapshotAsync());
         Assert.Equal(1, Probe.Get(grainId, AttemptCancellationProbe.EffectRuns));
-        Assert.Equal(1, Probe.Get(grainId, AttemptCancellationProbe.Catches));
+        Assert.Equal(0, Probe.Get(grainId, AttemptCancellationProbe.Catches));
+    }
+
+    [Fact]
+    public async Task CancellationReachesAStepWhoseSegmentHoldsTheGrain()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grain = _fixture.Client.GetGrain<IAttemptCancellationTestGrain>(Guid.NewGuid());
+        var scheduled = await grain.BlockedStepAsync().WithId("blocked").ScheduleAsync(cancellationToken);
+        await Probe.WaitAsync(grain.GetGrainId(), AttemptCancellationProbe.Waiting, cancellationToken);
+
+        // The step's segment holds the non-reentrant grain, and the cancellation, which only stages task state, interleaves
+        // with it, so the step's token observes it.
+        await scheduled.CancelAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        var response = await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        Assert.Equal("canceled", response.GetResult<string>());
     }
 
     [Fact]
@@ -193,10 +208,15 @@ public interface IAttemptCancellationTestGrain : IGrainWithGuidKey
     /// <summary>Increments the grain's unrelated counter.</summary>
     DurableTask<int> IncrementAsync();
 
+    /// <summary>Runs a step which waits on its token without a durable wait, so its segment holds the grain.</summary>
+    DurableTask<string> BlockedStepAsync();
+
     DurableTask<int> ComputeAsync(int value);
 
     Task<AttemptCancellationSnapshot> GetSnapshotAsync();
 
+    /// <summary>Deactivates the grain, interleaving with an execution whose segment runs.</summary>
+    [AlwaysInterleave]
     Task RequestDeactivationAsync();
 }
 
@@ -302,22 +322,6 @@ public sealed class AttemptCancellationTestGrain(
 
     private readonly SemaphoreSlim _semaphore = new(1, 1);
 
-    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
-    {
-        var grainId = this.GetGrainId();
-        if (probe.GetOutcomes(grainId).ContainsKey(AttemptCancellationProbe.Waiting) && !probe.IsUnwindingHeld(grainId))
-        {
-            // The runtime drains the canceled attempt while this method runs: this write commits while the attempt waits.
-            await probe.WaitAsync(grainId, AttemptCancellationProbe.Unwinding, cancellationToken);
-            unrelated.Value++;
-            await WriteStateAsync(cancellationToken);
-            probe.Increment(grainId, AttemptCancellationProbe.ConcurrentWrites);
-            probe.Signal(grainId, AttemptCancellationProbe.Release);
-        }
-
-        await base.OnDeactivateAsync(reason, cancellationToken);
-    }
-
     public async DurableTask<string> WaitForCancellationAsync()
     {
         var context = DurableTask.Current;
@@ -395,6 +399,24 @@ public sealed class AttemptCancellationTestGrain(
     }
 
     public DurableTask<int> IncrementAsync() => DurableTask.FromResult(++unrelated.Value);
+
+    public DurableTask<string> BlockedStepAsync()
+    {
+        var grainId = this.GetGrainId();
+        return DurableTask.Run(async cancellationToken =>
+        {
+            probe.Signal(grainId, AttemptCancellationProbe.Waiting);
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return "completed";
+            }
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
+            {
+                return "canceled";
+            }
+        });
+    }
 
     public DurableTask<int> ComputeAsync(int value) => DurableTask.FromResult(value);
 

@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks.Runtime;
 
@@ -20,8 +21,8 @@ namespace Orleans.DurableTasks.Runtime;
 /// The runtime cancels the attempt when the activation stops, or when the task is aborted or deleted with its execution
 /// tree, through <see cref="CancelAttempt"/>. From then on, the attempt's durable operations throw
 /// <see cref="DurableTaskAttemptCanceledException"/>, and the changes which its code makes to the grain's journaled state,
-/// such as cleanup, commit with the grain's next journal write. The runtime drains the canceled attempt and discards its
-/// response; after the activation stops, the next activation replays the task in a new context.
+/// such as cleanup, commit with the grain's next journal write. The runtime discards the canceled attempt's response;
+/// after the activation stops, the next activation replays the task in a new context.
 /// </para>
 /// <para>
 /// An attempt which the running code can't replay stalls: the runtime cancels it for
@@ -30,55 +31,76 @@ namespace Orleans.DurableTasks.Runtime;
 /// diverges from the execution's record, such as another operation under a recorded identifier or a recorded outcome
 /// which no longer decodes. The task stays pending until code which can replay it runs.
 /// </para>
+/// <para>
+/// The attempt runs in <em>segments</em>: the code between its durable waits. Each segment is a local request on the
+/// grain activation, which follows the grain's reentrancy rules, so on a non-reentrant grain a segment excludes the
+/// grain's other requests, as a grain method does. The first segment starts the body. A durable wait which is pending,
+/// such as the wait for a child's result, a signal, or the first of several completions, parks the attempt: the
+/// segment's request completes. Once the wait completes, a new request resumes the attempt, and the waiting code
+/// continues within it. Other awaits, such as journal writes or calls to other grains, stay within the segment.
+/// </para>
+/// <para>
+/// An attempt which is discarded, because the activation stops or the attempt stalls, is never resumed: its next
+/// activation replays the execution from its records. Its open segment, if any, observes the cancellation and ends.
+/// </para>
+/// <para>
+/// The attempt's state is confined to the activation's scheduler. Its entry points from the abstractions switch to the
+/// scheduler before they read or change that state, because a body can continue elsewhere, such as after
+/// <c>ConfigureAwait(false)</c>.
+/// </para>
 /// </remarks>
 internal sealed class GrainDurableTaskContext : DurableTaskContext
 {
+    private static readonly LocalRequestOptions SegmentOptions = new();
+
     private readonly IDurableTaskGrainRuntime _runtime;
+    private readonly IGrainContext _grainContext;
     private readonly TaskScheduler _scheduler;
     private long _utcNowTicks;
 
-    // Why the runtime canceled the attempt, or null. Set on the activation's scheduler. Guarded by _lock.
+    // Why the runtime canceled the attempt, or null.
     private DurableTaskAttemptCancellationReason? _attemptCancellationReason;
 
-    // The attempt's waits for events which messages deliver: those which are pending, and those which resumed but whose
-    // waiting code hasn't continued yet. The attempt is parked while a wait is pending and none has resumed. Guarded by
-    // _lock.
-    private int _pendingWaits;
-    private int _resumedWaits;
-    private bool _parked;
-    private bool _ended;
+    // The request of the segment which runs, or null while the attempt is parked or hasn't started; the segment requests
+    // which are queued; the attempt's durable waits which are parked, and the tasks and signal records which they await;
+    // and whether a parked wait was released and its resume isn't queued yet.
+    private TaskCompletionSource? _segment;
+    private int _queuedSegments;
+    private int _parkedWaits;
+    private HashSet<TaskId>? _awaited;
+    private bool _resumePending;
 
-    // The number of sends of each signal which this attempt has begun, by marker segment. Guarded by _lock.
+    // Completes once the attempt's code has ended or, for a discarded attempt, once no segment of it runs.
+    private readonly TaskCompletionSource _settled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    // The number of sends of each signal which this attempt has begun, by marker segment.
     private Dictionary<string, int>? _signalSends;
 
     // The operations which earlier attempts recorded and this attempt hasn't reached yet, released once the attempt has
     // reached each of them; and, while the attempt replays, those which it has reached, released when the replay ends.
     // The replay ends earlier than the unreached set empties when the attempt starts an operation which no earlier
-    // attempt recorded. Guarded by _lock; _unreached and _replaying are read without it.
+    // attempt recorded.
     private HashSet<TaskId>? _unreached;
     private HashSet<TaskId>? _reached;
-    private volatile bool _replaying;
+    private bool _replaying;
 
-    // The versions which this attempt decided, by change name. Guarded by _lock.
+    // The versions which this attempt decided, by change name.
     private Dictionary<string, int>? _versions;
 
     // Why the running code can't replay the execution, when the runtime stalled this attempt: a version which the code
-    // doesn't support, or a divergence from the execution's record. Guarded by _lock.
+    // doesn't support, or a divergence from the execution's record.
     private Exception? _stallException;
-#if NET9_0_OR_GREATER
-    private readonly Lock _lock = new();
-#else
-    private readonly object _lock = new();
-#endif
 
     public GrainDurableTaskContext(
         TaskId taskId,
         IDurableTaskGrainRuntime runtime,
+        IGrainContext grainContext,
         TaskScheduler scheduler,
         DateTimeOffset? utcNow = null)
         : base(taskId)
     {
         _runtime = runtime;
+        _grainContext = grainContext;
         _scheduler = scheduler;
         _utcNowTicks = (utcNow ?? runtime.UtcNow).UtcTicks;
         _unreached = runtime.GetRecordedOperations(taskId);
@@ -86,16 +108,170 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     }
 
     /// <summary>Gets whether the runtime canceled this attempt.</summary>
-    internal bool IsAttemptCanceled
+    internal bool IsAttemptCanceled => _attemptCancellationReason is not null;
+
+    /// <summary>
+    /// Gets whether the attempt ended without a record, so it is never resumed: the activation stops, or the running code
+    /// can't replay the execution.
+    /// </summary>
+    internal bool IsDiscarded => _attemptCancellationReason
+        is DurableTaskAttemptCancellationReason.ActivationStopping
+        or DurableTaskAttemptCancellationReason.Diverged
+        or DurableTaskAttemptCancellationReason.UnsupportedVersion;
+
+    /// <summary>Gets whether a segment of the attempt runs or is queued, so the attempt makes progress without a message.</summary>
+    /// <remarks>
+    /// A parked wait which the runtime released, by completing what it awaits or canceling its token, resumes in a later
+    /// work item. The attempt counts as runnable from the release, so a wake-up which the activation consults meanwhile
+    /// still resumes it after a crash.
+    /// </remarks>
+    internal bool IsRunnable => _segment is not null || _queuedSegments > 0 || _resumePending;
+
+    /// <summary>Notes that the runtime completed <paramref name="awaited"/>, a task or signal record, which can release a parked wait.</summary>
+    internal void OnAwaitedCompleted(TaskId awaited)
     {
-        get
+        AssertOnScheduler();
+        if (_awaited?.Contains(awaited) is true)
         {
-            lock (_lock)
-            {
-                return _attemptCancellationReason is not null;
-            }
+            _resumePending = true;
         }
     }
+
+    /// <summary>Requests the task cancellation of this attempt, which releases its parked waits.</summary>
+    /// <exception cref="AggregateException">A registration on a token threw.</exception>
+    internal void RequestTaskCancellation(string? reason)
+    {
+        AssertOnScheduler();
+        _resumePending |= _parkedWaits > 0;
+        DurableTaskRuntimeHelper.RequestTaskCancellation(this, reason);
+    }
+
+    /// <summary>
+    /// Gets a task which completes once the attempt's code has ended or, for a discarded attempt, once no segment of it
+    /// runs, so the attempt runs no more code on the activation.
+    /// </summary>
+    internal Task Settled => _settled.Task;
+
+    /// <summary>Queues the segment which runs the attempt's body, which <paramref name="start"/> releases.</summary>
+    internal void Start(TaskCompletionSource start) => QueueSegment(start);
+
+    /// <summary>Queues a segment request which releases <paramref name="gate"/> when the activation admits it.</summary>
+    private void QueueSegment(TaskCompletionSource gate)
+    {
+        AssertOnScheduler();
+        _queuedSegments++;
+        _resumePending = false;
+        _grainContext.ReceiveLocalRequest(new DurableTaskSegment(this, gate), SegmentOptions);
+    }
+
+    /// <summary>
+    /// Runs a segment which the activation admitted: releases <paramref name="gate"/>, whose waiting code continues
+    /// within the request, and completes once the attempt parks or ends.
+    /// </summary>
+    /// <remarks>
+    /// A discarded attempt isn't resumed. A segment which the activation admits while another one of the attempt runs,
+    /// as a reentrant grain can, continues within the running one.
+    /// </remarks>
+    internal ValueTask<Response> RunSegmentAsync(TaskCompletionSource gate)
+    {
+        AssertOnScheduler();
+        _queuedSegments--;
+        if (IsDiscarded)
+        {
+            return new(Response.Completed);
+        }
+
+        if (_segment is not null)
+        {
+            gate.SetResult();
+            return new(Response.Completed);
+        }
+
+        var segment = _segment = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        gate.SetResult();
+        return AwaitSegmentAsync(segment.Task);
+
+        static async ValueTask<Response> AwaitSegmentAsync(Task segment)
+        {
+            await segment;
+            return Response.Completed;
+        }
+    }
+
+    /// <summary>Ends the running segment, so the activation admits its other requests.</summary>
+    private void EndSegment()
+    {
+        if (_segment is { } segment)
+        {
+            _segment = null;
+            segment.SetResult();
+        }
+
+        if (IsDiscarded)
+        {
+            _settled.TrySetResult();
+        }
+    }
+
+    /// <summary>
+    /// Waits for <paramref name="wait"/>, a durable wait for an event which a message delivers, parking the attempt while
+    /// the wait is pending.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A pending wait ends the attempt's segment. Once the wait completes, a new segment request resumes the waiting code
+    /// within it, unless the attempt was discarded meanwhile.
+    /// </para>
+    /// <para>
+    /// The library's combinators can wait for several events of one attempt at once. When a resumed wait returns while
+    /// another one stays parked, its segment ends, so the other wait's resume can run, and code which continues between
+    /// the two runs outside a segment. Within one logical flow, which the replay model requires, at most one wait is
+    /// parked at a time.
+    /// </para>
+    /// </remarks>
+    internal async ValueTask<T> ParkAsync<T>(Task<T> wait, IReadOnlyCollection<TaskId> awaited)
+    {
+        await ParkAsync((Task)wait, awaited);
+        return await wait;
+    }
+
+    /// <inheritdoc cref="ParkAsync{T}(Task{T}, IReadOnlyCollection{TaskId})"/>
+    internal async ValueTask ParkAsync(Task wait, IReadOnlyCollection<TaskId> awaited)
+    {
+        AssertOnScheduler();
+        if (!wait.IsCompleted)
+        {
+            var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _parkedWaits++;
+            (_awaited ??= []).UnionWith(awaited);
+            _ = wait.ContinueWith(
+                static (_, state) =>
+                {
+                    var (attempt, gate) = ((GrainDurableTaskContext, TaskCompletionSource))state!;
+                    attempt.QueueSegment(gate);
+                },
+                (this, gate),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                _scheduler);
+            EndSegment();
+            await gate.Task;
+            if (--_parkedWaits > 0)
+            {
+                EndSegment();
+            }
+            else
+            {
+                _awaited = null;
+            }
+        }
+
+        await wait;
+    }
+
+    [Conditional("DEBUG")]
+    private void AssertOnScheduler() =>
+        Debug.Assert(TaskScheduler.Current == _scheduler, "The attempt's state is confined to the activation's scheduler.");
 
     /// <remarks>
     /// The runtime supplies the operations which earlier attempts recorded in this execution's tree when the attempt
@@ -115,7 +291,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// An execution's body runs its durable operations in one logical flow, and concurrent work runs in child executions,
     /// so a deterministic replay reaches the recorded operations in the order in which the earlier run created them.
     /// </remarks>
-    private bool HasUnreachedOperations => Volatile.Read(ref _unreached) is not null;
+    private bool HasUnreachedOperations => _unreached is not null;
 
     /// <summary>
     /// Gets the grain which runs this execution, which qualifies the root identifiers of the detached tasks which the
@@ -131,46 +307,38 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// </param>
     private void ObserveOperation(TaskId operationId, bool recordsOperation)
     {
-        if (Volatile.Read(ref _unreached) is null)
+        AssertOnScheduler();
+        if (_unreached is not { } unreached)
         {
             return;
         }
 
-        lock (_lock)
+        if (unreached.Remove(operationId))
         {
-            if (_unreached is not { } unreached)
+            if (unreached.Count > 0)
             {
-                return;
-            }
-
-            if (unreached.Remove(operationId))
-            {
-                if (unreached.Count > 0)
+                if (_replaying)
                 {
-                    if (_replaying)
-                    {
-                        (_reached ??= []).Add(operationId);
-                    }
-
-                    return;
+                    (_reached ??= []).Add(operationId);
                 }
 
-                Volatile.Write(ref _unreached, null);
-            }
-            else if (!_replaying || !recordsOperation || _reached?.Contains(operationId) is true)
-            {
                 return;
             }
 
-            _reached = null;
-            if (!_replaying)
-            {
-                return;
-            }
-
-            _replaying = false;
+            _unreached = null;
+        }
+        else if (!_replaying || !recordsOperation || _reached?.Contains(operationId) is true)
+        {
+            return;
         }
 
+        _reached = null;
+        if (!_replaying)
+        {
+            return;
+        }
+
+        _replaying = false;
         _runtime.OnReplayEnded(Id);
     }
 
@@ -182,7 +350,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// Child results keep their completion times, so a replay which observes the same children in the same order reads
     /// the same times. A delay therefore starts when the work before it completed.
     /// </remarks>
-    public override DateTimeOffset UtcNow => new(Volatile.Read(ref _utcNowTicks), TimeSpan.Zero);
+    public override DateTimeOffset UtcNow => new(_utcNowTicks, TimeSpan.Zero);
 
     private void ObserveCompletion(TaskId childId)
     {
@@ -194,22 +362,16 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     private void ObserveTime(DateTimeOffset time)
     {
-        var ticks = time.UtcTicks;
-        for (var current = Volatile.Read(ref _utcNowTicks); ticks > current;)
+        AssertOnScheduler();
+        if (time.UtcTicks > _utcNowTicks)
         {
-            var observed = Interlocked.CompareExchange(ref _utcNowTicks, ticks, current);
-            if (observed == current)
-            {
-                return;
-            }
-
-            current = observed;
+            _utcNowTicks = time.UtcTicks;
         }
     }
 
     /// <summary>
-    /// Cancels this attempt for <paramref name="reason"/>: from now on, its durable operations and the journaled state
-    /// changes which its code makes throw <see cref="DurableTaskAttemptCanceledException"/>.
+    /// Cancels this attempt for <paramref name="reason"/>: from now on, its durable operations throw
+    /// <see cref="DurableTaskAttemptCanceledException"/>. A discarded attempt is never resumed.
     /// </summary>
     /// <returns><see langword="true"/> when this call canceled the attempt, which the runtime then signals.</returns>
     /// <remarks>
@@ -219,15 +381,16 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// </remarks>
     internal bool CancelAttempt(DurableTaskAttemptCancellationReason reason)
     {
-        Debug.Assert(TaskScheduler.Current == _scheduler, "The runtime cancels attempts on the activation's scheduler.");
-        lock (_lock)
+        AssertOnScheduler();
+        if (_attemptCancellationReason is not null)
         {
-            if (_attemptCancellationReason is not null)
-            {
-                return false;
-            }
+            return false;
+        }
 
-            _attemptCancellationReason = reason;
+        _attemptCancellationReason = reason;
+        if (IsDiscarded && _segment is null)
+        {
+            _settled.TrySetResult();
         }
 
         return true;
@@ -240,126 +403,17 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// <exception cref="AggregateException">A registration on a token threw.</exception>
     internal void SignalAttemptCanceled()
     {
-        DurableTaskAttemptCancellationReason reason;
-        lock (_lock)
-        {
-            Debug.Assert(_attemptCancellationReason is not null, "Only a canceled attempt is signaled.");
-            reason = _attemptCancellationReason.GetValueOrDefault();
-        }
-
-        DurableTaskRuntimeHelper.CancelAttempt(this, reason);
+        AssertOnScheduler();
+        Debug.Assert(_attemptCancellationReason is not null, "Only a canceled attempt is signaled.");
+        _resumePending |= _parkedWaits > 0 && !IsDiscarded;
+        DurableTaskRuntimeHelper.CancelAttempt(this, _attemptCancellationReason.GetValueOrDefault());
     }
 
-    /// <summary>
-    /// Releases the attempt's parked state once the attempt has ended, which a wait that the attempt left pending would
-    /// otherwise keep.
-    /// </summary>
+    /// <summary>Ends the attempt's segment and settles the attempt once its code has ended.</summary>
     internal void OnAttemptCompleted()
     {
-        lock (_lock)
-        {
-            _ended = true;
-            if (_parked)
-            {
-                _parked = false;
-                _runtime.OnAttemptUnparked();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Runs a wait for an event which a message delivers, such as a child's result, a signal, or the first of several
-    /// completions, and reports the attempt parked while the wait is pending.
-    /// </summary>
-    /// <param name="wait">The wait.</param>
-    /// <param name="cancellationToken">The wait's token, whose cancellation resumes it.</param>
-    /// <param name="awaited">The tasks or signal records whose completion resumes the wait.</param>
-    /// <remarks>
-    /// The message which ends the wait reactivates the grain, so a parked attempt needs no wake-up of its own. The wait
-    /// resumes synchronously when the runtime completes what it awaits, or when its token is canceled, before the waiting
-    /// code continues in a later work item, so the attempt counts as runnable from that moment.
-    /// </remarks>
-    private async ValueTask<T> ParkAsync<T>(ValueTask<T> wait, CancellationToken cancellationToken, IReadOnlyList<TaskId> awaited)
-    {
-        if (wait.IsCompleted)
-        {
-            return await wait;
-        }
-
-        var parked = new ParkedWait(this);
-        lock (_lock)
-        {
-            _pendingWaits++;
-            UpdateParked();
-        }
-
-        foreach (var id in awaited)
-        {
-            _runtime.RegisterParkedWait(id, parked);
-        }
-
-        try
-        {
-            using var registration = cancellationToken.UnsafeRegister(static state => ((ParkedWait)state!).Resume(), parked);
-            return await wait;
-        }
-        finally
-        {
-            foreach (var id in awaited)
-            {
-                _runtime.UnregisterParkedWait(id, parked);
-            }
-
-            parked.End();
-        }
-    }
-
-    /// <summary>Notes that a pending wait resumed, so the attempt runs again once its code continues.</summary>
-    internal void OnWaitResumed()
-    {
-        lock (_lock)
-        {
-            _pendingWaits--;
-            _resumedWaits++;
-            UpdateParked();
-        }
-    }
-
-    /// <summary>Notes that a wait ended, after it resumed or without resuming.</summary>
-    internal void OnWaitEnded(bool resumed)
-    {
-        lock (_lock)
-        {
-            if (resumed)
-            {
-                _resumedWaits--;
-            }
-            else
-            {
-                _pendingWaits--;
-            }
-
-            UpdateParked();
-        }
-    }
-
-    private void UpdateParked()
-    {
-        var parked = !_ended && _pendingWaits > 0 && _resumedWaits == 0;
-        if (parked == _parked)
-        {
-            return;
-        }
-
-        _parked = parked;
-        if (parked)
-        {
-            _runtime.OnAttemptParked();
-        }
-        else
-        {
-            _runtime.OnAttemptUnparked();
-        }
+        EndSegment();
+        _settled.TrySetResult();
     }
 
     /// <summary>
@@ -369,11 +423,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// <returns>The exception which the stalled operation throws.</returns>
     private DurableTaskAttemptCanceledException Stall(DurableTaskAttemptCancellationReason reason, Exception cause)
     {
-        lock (_lock)
-        {
-            _stallException ??= cause;
-        }
-
+        _stallException ??= cause;
         _runtime.StallAttempt(this, reason, cause);
         return CreateAttemptCanceledException();
     }
@@ -393,15 +443,8 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     private DurableTaskAttemptCanceledException CreateAttemptCanceledException(Exception? innerException = null)
     {
-        DurableTaskAttemptCancellationReason? reason;
-        lock (_lock)
-        {
-            reason = _attemptCancellationReason;
-            innerException ??= _stallException;
-        }
-
-        Debug.Assert(reason is not null, "Only a canceled attempt throws its cancellation.");
-        return new(reason.GetValueOrDefault(), AttemptCancellationToken, innerException);
+        Debug.Assert(_attemptCancellationReason is not null, "Only a canceled attempt throws its cancellation.");
+        return new(_attemptCancellationReason.GetValueOrDefault(), AttemptCancellationToken, innerException ?? _stallException);
     }
 
     /// <summary>
@@ -467,13 +510,11 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         var waitForAcceptance = options.HasFlag(DurableTaskStartOptions.WaitForAcceptance);
         if (options.HasFlag(DurableTaskStartOptions.Detached))
         {
-            var (recordId, request) = GetDetachedRecord(taskId, task);
             return RunOnScheduler(
                 _scheduler,
-                () => StartDetachedCoreAsync(recordId, taskId, request, shielded, waitForAcceptance, cancellationToken));
+                () => StartDetachedCoreAsync(taskId, task, shielded, waitForAcceptance, cancellationToken));
         }
 
-        ObserveOperation(taskId, recordsOperation: true);
         return RunOnScheduler(
             _scheduler,
             () => ScheduleChildTaskCoreAsync(taskId, task, shielded, waitForAcceptance, cancellationToken));
@@ -486,6 +527,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         bool waitForAcceptance,
         CancellationToken cancellationToken)
     {
+        ObserveOperation(taskId, recordsOperation: true);
         try
         {
             ValidateChild(taskId, task);
@@ -501,13 +543,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     }
 
     private async ValueTask<IScheduledTaskHandle> StartDetachedCoreAsync(
-        TaskId recordId,
         TaskId rootId,
-        IDurableTaskRequest request,
+        DurableTask task,
         bool shielded,
         bool waitForAcceptance,
         CancellationToken cancellationToken)
     {
+        var (recordId, request) = GetDetachedRecord(rootId, task);
         ThrowIfAttemptCanceled();
         using var operationCts = CreateOperationCancellationSource(cancellationToken);
         var handle = await CompleteOperationAsync(_runtime.StartDetachedAsync(recordId, rootId, request, shielded, waitForAcceptance, operationCts.Token));
@@ -596,17 +638,10 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
         TaskId taskId,
         DateTimeOffset dueTime,
-        CancellationToken cancellationToken)
-    {
-        if (taskId != Id)
-        {
-            ObserveOperation(taskId, recordsOperation: true);
-        }
-
-        return RunOnScheduler(
+        CancellationToken cancellationToken) =>
+        RunOnScheduler(
             _scheduler,
             () => ScheduleDelayCoreAsync(taskId, dueTime, cancellationToken));
-    }
 
     private async ValueTask<DurableTaskResponse> ScheduleDelayCoreAsync(
         TaskId taskId,
@@ -615,6 +650,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         if (taskId != Id)
         {
+            ObserveOperation(taskId, recordsOperation: true);
             ThrowIfNotChildTaskId(taskId);
         }
 
@@ -624,12 +660,22 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         return await CompleteOperationAsync(_runtime.ScheduleDelayAsync(taskId, dueTime, operationCts.Token));
     }
 
+    /// <exception cref="InvalidOperationException">The caller isn't running on the activation's scheduler.</exception>
     protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)
     {
+        ThrowIfOffScheduler("look up a child's handle");
         ObserveOperation(taskId, recordsOperation: false);
-        return RunOnScheduler(
-            _scheduler,
-            () => GetChildTaskHandleCore(taskId));
+        return GetChildTaskHandleCore(taskId);
+    }
+
+    /// <summary>Throws unless the caller runs on the activation's scheduler, which the operation requires.</summary>
+    private void ThrowIfOffScheduler(string operation)
+    {
+        if (TaskScheduler.Current != _scheduler)
+        {
+            throw new InvalidOperationException(
+                $"Durable task '{Id}' can only {operation} on the scheduler of the grain activation which runs it. Code which continues elsewhere, for example after ConfigureAwait(false), can't.");
+        }
     }
 
     /// <remarks>
@@ -705,13 +751,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
 
         ThrowIfAttemptCanceled();
-        int version;
-        lock (_lock)
+        if (_versions is null || !_versions.TryGetValue(name, out var version))
         {
-            if (_versions is null || !_versions.TryGetValue(name, out version))
-            {
-                version = -1;
-            }
+            version = -1;
         }
 
         if (version < 0)
@@ -725,11 +767,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
                 throw Diverge(divergence);
             }
 
-            lock (_lock)
-            {
-                _versions ??= [];
-                _versions[name] = version;
-            }
+            (_versions ??= [])[name] = version;
         }
 
         if (version < minSupported || version > maxSupported)
@@ -787,11 +825,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         ThrowIfAttemptCanceled();
         using var operationCts = CreateOperationCancellationSource(cancellationToken);
-        var recordId = _runtime.GetSignalRecordId(Id, name);
-        var (value, recordedAt) = await CompleteOperationAsync(ParkAsync(
-            _runtime.WaitForSignalAsync(Id, name, operationCts.Token),
-            operationCts.Token,
-            recordId is { } id ? [id] : []));
+        var (value, recordedAt) = await CompleteOperationAsync(_runtime.WaitForSignalAsync(this, Id, name, operationCts.Token));
         ObserveTime(recordedAt);
         return value;
     }
@@ -815,26 +849,12 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         string name,
         DurableTaskResponse value,
         bool throwOnRejection,
-        CancellationToken cancellationToken)
-    {
-        var signal = CreateMarkerSegment("send", [target.ToString(), taskId.ToString(), name]);
-        int occurrence;
-        lock (_lock)
-        {
-            _signalSends ??= [];
-            _signalSends.TryGetValue(signal, out occurrence);
-            _signalSends[signal] = ++occurrence;
-        }
-
-        var markerId = Id.Child(occurrence == 1 ? signal : $"{signal}${occurrence.ToString(CultureInfo.InvariantCulture)}");
-        ObserveOperation(markerId, recordsOperation: true);
-        return RunOnScheduler(
+        CancellationToken cancellationToken) =>
+        RunOnScheduler(
             _scheduler,
-            () => SendSignalCoreAsync(markerId, target, taskId, name, value, throwOnRejection, cancellationToken));
-    }
+            () => SendSignalCoreAsync(target, taskId, name, value, throwOnRejection, cancellationToken));
 
     private async ValueTask<DurableSignalResult> SendSignalCoreAsync(
-        TaskId markerId,
         GrainId target,
         TaskId taskId,
         string name,
@@ -842,6 +862,12 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         bool throwOnRejection,
         CancellationToken cancellationToken)
     {
+        var signal = CreateMarkerSegment("send", [target.ToString(), taskId.ToString(), name]);
+        _signalSends ??= [];
+        _signalSends.TryGetValue(signal, out var occurrence);
+        _signalSends[signal] = ++occurrence;
+        var markerId = Id.Child(occurrence == 1 ? signal : $"{signal}${occurrence.ToString(CultureInfo.InvariantCulture)}");
+        ObserveOperation(markerId, recordsOperation: true);
         ThrowIfAttemptCanceled();
         using var operationCts = CreateOperationCancellationSource(cancellationToken);
         return await CompleteOperationAsync(_runtime.SendSignalAsync(markerId, target, taskId, name, value, throwOnRejection, operationCts.Token));
@@ -850,19 +876,17 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     protected override ValueTask<TaskId> SelectCompletionAsync(
         TaskId decisionId,
         IReadOnlyList<TaskId> candidates,
-        CancellationToken cancellationToken)
-    {
-        ObserveOperation(decisionId, recordsOperation: false);
-        return RunOnScheduler(
+        CancellationToken cancellationToken) =>
+        RunOnScheduler(
             _scheduler,
             () => SelectCompletionCoreAsync(decisionId, candidates, cancellationToken));
-    }
 
     private async ValueTask<TaskId> SelectCompletionCoreAsync(
         TaskId decisionId,
         IReadOnlyList<TaskId> candidates,
         CancellationToken cancellationToken)
     {
+        ObserveOperation(decisionId, recordsOperation: false);
         ThrowIfNotChildTaskId(decisionId);
         foreach (var candidate in candidates)
         {
@@ -872,7 +896,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         ThrowIfAttemptCanceled();
 
         using var operationCts = CreateOperationCancellationSource(cancellationToken);
-        return await CompleteOperationAsync(ParkAsync(_runtime.SelectCompletionAsync(decisionId, candidates, operationCts.Token), operationCts.Token, candidates));
+        return await CompleteOperationAsync(_runtime.SelectCompletionAsync(this, decisionId, candidates, operationCts.Token));
     }
 
     private void ThrowIfNotChildTaskId(TaskId taskId)
@@ -921,23 +945,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
                 CancellationToken.None,
                 TaskCreationOptions.DenyChildAttach,
                 scheduler).Unwrap());
-    }
-
-    private static TResult RunOnScheduler<TResult>(
-        TaskScheduler scheduler,
-        Func<TResult> callback)
-    {
-        if (TaskScheduler.Current == scheduler)
-        {
-            return callback();
-        }
-
-        return Task.Factory.StartNew(
-            static state => ((Func<TResult>)state!)(),
-            callback,
-            CancellationToken.None,
-            TaskCreationOptions.DenyChildAttach,
-            scheduler).GetAwaiter().GetResult();
     }
 
     /// <summary>Wraps a handle of this execution's operation, which the activation's scheduler runs.</summary>
@@ -1016,7 +1023,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         {
             owner.ThrowIfAttemptCanceled();
             using var operationCts = owner.CreateOperationCancellationSource(cancellationToken);
-            return Observe(await owner.CompleteOperationAsync(owner.ParkAsync(inner.WaitAsync(operationCts.Token), operationCts.Token, [inner.TaskId])));
+            return Observe(await owner.CompleteOperationAsync(owner.ParkAsync(inner.WaitAsync(operationCts.Token).AsTask(), [inner.TaskId])));
         }
 
         private DurableTaskResponse Observe(DurableTaskResponse response)

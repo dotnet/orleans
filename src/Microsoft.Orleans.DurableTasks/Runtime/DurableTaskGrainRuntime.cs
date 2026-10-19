@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -80,8 +79,14 @@ namespace Orleans.DurableTasks.Runtime;
 /// <para>
 /// Attempt cancellation stops an attempt: deactivation, an abort, and the deletion of a tree cancel attempts. A canceled
 /// attempt's durable operations throw <see cref="DurableTaskAttemptCanceledException"/>, its journaled state changes,
-/// such as cleanup, commit with the grain's next journal write, its tokens are canceled in a later work item, and
-/// deactivation drains it before the next activation replays its task.
+/// such as cleanup, commit with the grain's next journal write, and its tokens are canceled in a later work item. An
+/// aborted or deleted attempt drains: its parked waits resume with the cancellation. An attempt which deactivation or a
+/// stall discards is never resumed, and deactivation waits only for its running segment before the next activation
+/// replays its task.
+/// </para>
+/// <para>
+/// Each attempt runs in segments, local requests on the activation; see <see cref="GrainDurableTaskContext"/>. The
+/// runtime's state is confined to the activation's scheduler, as grain state is, so it uses no locks.
 /// </para>
 /// </remarks>
 internal sealed partial class DurableTaskGrainRuntime(
@@ -100,40 +105,25 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <summary>The journal state machine name of the runtime's commit hook.</summary>
     internal const string StateMachineName = "orleans.durable-tasks.runtime";
 
-    private readonly ConcurrentDictionary<TaskId, GrainDurableTaskContext> _executionContexts = [];
-    private readonly ConcurrentDictionary<TaskId, RunningRequest> _runningRequests = [];
-    private readonly ConcurrentDictionary<TaskId, IScheduledTaskHandle> _taskHandles = [];
-    private readonly ConcurrentDictionary<TaskId, byte> _pendingStarts = [];
-    private readonly ConcurrentDictionary<TaskId, DurableTaskResponse> _pendingHandleResponses = [];
-    private readonly ConcurrentDictionary<long, CancellationPropagation> _pendingCancellationPropagations = [];
-    private readonly ConcurrentDictionary<(TaskId TaskId, GrainId Target), byte> _preStagedCancellations = [];
-    private readonly ConcurrentDictionary<long, Task> _backgroundTasks = [];
-    private readonly SemaphoreSlim _resumePendingGate = new(1, 1);
-#if NET9_0_OR_GREATER
-    private readonly Lock _stopLock = new();
-#else
-    private readonly object _stopLock = new();
-#endif
+    // The runtime's state is confined to the activation's scheduler, as grain state is.
+    private readonly Dictionary<TaskId, GrainDurableTaskContext> _executionContexts = [];
+    private readonly Dictionary<TaskId, RunningRequest> _runningRequests = [];
+    private readonly Dictionary<TaskId, TaskHandle> _taskHandles = [];
+    private readonly HashSet<TaskId> _pendingStarts = [];
+    private readonly Dictionary<TaskId, DurableTaskResponse> _pendingHandleResponses = [];
+    private readonly Dictionary<long, CancellationPropagation> _pendingCancellationPropagations = [];
+    private readonly HashSet<(TaskId TaskId, GrainId Target)> _preStagedCancellations = [];
+    private readonly Dictionary<long, Task> _backgroundTasks = [];
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
     private readonly IDurableDictionary<TaskId, DateTimeOffset> _logicalTimes = logicalTimes;
     private readonly IDurableDictionary<MessageId, PendingInvocation> _invocations = invocations;
     private readonly IDurableTaskMessageTransport? _messageTransport = messageTransports.SingleOrDefault();
     private readonly CancellationTokenSource _deactivationCts = new();
-    // How soon a deactivated grain wakes to resume its runnable attempts, and how often the inbox's wake-up job recurs
-    // while they run; see GetWakeupDelay.
-    private static readonly TimeSpan RunnableWakeupDelay = TimeSpan.FromSeconds(1);
 
     // The executions whose attempts stalled because the running code can't replay them, and which stay pending. The grain
     // wakes every DurableTaskOptions.StalledExecutionRetryInterval while it holds one, so a later activation replays it.
-    private readonly ConcurrentDictionary<TaskId, byte> _stalledExecutions = [];
-
-    // The attempts which run, and those of them which are parked on a message-driven wait.
-    private int _runningAttempts;
-    private int _parkedAttempts;
-
-    // The parked waits of attempts, by the task or signal record whose completion resumes them.
-    private readonly Dictionary<TaskId, List<ParkedWait>> _parkedWaits = [];
+    private readonly HashSet<TaskId> _stalledExecutions = [];
     private TaskId[] _committingStarts = [];
     private KeyValuePair<TaskId, DurableTaskResponse>[] _committingHandleResponses = [];
     private long[] _committingCancellationPropagations = [];
@@ -144,11 +134,12 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     // The executions which recovery found and which start once the activation has completed.
     private List<TaskId>? _recoveredStarts;
+    private bool _recovered;
     private Task? _stopTask;
     private long _backgroundWriteId;
     private long _cancellationPropagationId;
-    private int _initialized;
-    private volatile bool _stopping;
+    private IGrainContext? _grainContext;
+    private bool _stopping;
 
     // The completions pending in the outbox, by message ID. The outbox resolves recovered completions before the runtime
     // observes recovery, so the index is built from task state on first use, then maintained as completions are sent and
@@ -162,30 +153,29 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     public GrainId GrainId => GrainContext.GrainId;
 
-    internal IGrainContext GrainContext => _shared.GrainContextAccessor.GrainContext;
+    /// <summary>Gets the activation which the runtime is bound to.</summary>
+    /// <remarks>
+    /// The binding is explicit, so code which runs off the activation's scheduler, where the ambient grain context is the
+    /// hosted client's, still reads this activation's identity.
+    /// </remarks>
+    internal IGrainContext GrainContext => _grainContext ?? throw CreateUnboundException();
 
     public DateTimeOffset UtcNow => _shared.TimeProvider.GetUtcNow();
 
     private IDurableTaskMessageTransport MessageTransport => _messageTransport ?? throw new InvalidOperationException(
         "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
 
-    internal void InitializeForActivation() => Volatile.Write(ref _initialized, 1);
+    /// <summary>Binds the runtime to <paramref name="grainContext"/>, the activation whose executions it runs.</summary>
+    internal void InitializeForActivation(IGrainContext grainContext) => _grainContext = grainContext;
 
     /// <summary>
     /// Recovers committed task state during the activation's lifecycle, deferring the recovered executions to
     /// <see cref="StartRecoveredExecutions"/>.
     /// </summary>
-    internal async Task RecoverAsync(CancellationToken cancellationToken)
+    internal Task RecoverAsync(CancellationToken cancellationToken)
     {
-        await _resumePendingGate.WaitAsync(cancellationToken);
-        try
-        {
-            await ResumePendingTasksCoreAsync(cancellationToken);
-        }
-        finally
-        {
-            _resumePendingGate.Release();
-        }
+        _recovered = true;
+        return ResumePendingTasksCoreAsync(cancellationToken);
     }
 
     /// <summary>Starts the executions which <see cref="RecoverAsync"/> recovered, once.</summary>
@@ -195,10 +185,12 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </remarks>
     internal void StartRecoveredExecutions()
     {
-        if (Interlocked.Exchange(ref _recoveredStarts, null) is not { } starts)
+        if (_recoveredStarts is not { } starts)
         {
             return;
         }
+
+        _recoveredStarts = null;
 
         foreach (var taskId in starts)
         {
@@ -226,6 +218,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </para>
     /// </remarks>
     public async ValueTask<TaskId> SelectCompletionAsync(
+        GrainDurableTaskContext attempt,
         TaskId decisionId,
         IReadOnlyList<TaskId> candidates,
         CancellationToken cancellationToken)
@@ -234,7 +227,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         cancellationToken.ThrowIfCancellationRequested();
         if (_storage.TryGetTask(decisionId, out var decision))
         {
-            return await SelectRecordedCompletionAsync(decisionId, decision, candidates, cancellationToken);
+            return await SelectRecordedCompletionAsync(attempt, decisionId, decision, candidates, cancellationToken);
         }
 
         for (var observedCompletion = false; ; observedCompletion = true)
@@ -248,11 +241,11 @@ internal sealed partial class DurableTaskGrainRuntime(
             // A handle which completed without a stored, sequenced result has no durable order.
             if (unordered || observedCompletion)
             {
-                return await SelectRecordedCompletionAsync(decisionId, decision: null, candidates, cancellationToken);
+                return await SelectRecordedCompletionAsync(attempt, decisionId, decision: null, candidates, cancellationToken);
             }
 
             DurableTaskEvents.EmitSelectionWaitStarted(GrainContext, decisionId);
-            await WaitForAnyAsync(candidates, cancellationToken);
+            await WaitForAnyAsync(attempt, candidates, cancellationToken);
             ThrowIfStopping();
         }
     }
@@ -293,6 +286,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// whose handle has completed.
     /// </summary>
     private async ValueTask<TaskId> SelectRecordedCompletionAsync(
+        GrainDurableTaskContext attempt,
         TaskId decisionId,
         IDurableTaskState? decision,
         IReadOnlyList<TaskId> candidates,
@@ -359,12 +353,15 @@ internal sealed partial class DurableTaskGrainRuntime(
                 return candidate;
             }
 
-            await WaitForAnyAsync(candidates, cancellationToken);
+            await WaitForAnyAsync(attempt, candidates, cancellationToken);
         }
     }
 
-    /// <summary>Waits until any candidate's handle completes, then cancels and drains the other waits.</summary>
-    private async Task WaitForAnyAsync(IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken)
+    /// <summary>
+    /// Waits until any candidate's handle completes, parking <paramref name="attempt"/> meanwhile, then cancels and drains
+    /// the other waits.
+    /// </summary>
+    private async Task WaitForAnyAsync(GrainDurableTaskContext attempt, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken)
     {
         using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var waits = new Task<DurableTaskResponse>[candidates.Count];
@@ -376,7 +373,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         try
         {
             // A failed wait propagates, as a failed poll does.
-            await await Task.WhenAny(waits);
+            await await attempt.ParkAsync(Task.WhenAny(waits), candidates);
         }
         finally
         {
@@ -494,15 +491,15 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         var utcNow = GetOrCreateLogicalTime(taskId);
 
-        var context = _executionContexts.GetOrAdd(taskId, static (id, state) => new(
-            id,
-            state.Runtime,
-            TaskScheduler.Current,
-            state.UtcNow), (Runtime: this, UtcNow: utcNow));
+        if (!_executionContexts.TryGetValue(taskId, out var context))
+        {
+            _executionContexts[taskId] = context = new(taskId, this, GrainContext, TaskScheduler.Current, utcNow);
+        }
+
         if (_storage.TryGetTask(taskId, out var taskState) && taskState.CancellationRequestedAt.HasValue)
         {
             // Nothing observes the token before the body starts.
-            DurableTaskRuntimeHelper.RequestTaskCancellation(context, taskState.CancellationReason);
+            context.RequestTaskCancellation(taskState.CancellationReason);
         }
 
         return context;
@@ -530,14 +527,19 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     private TaskHandle GetOrCreateRunningTaskHandle(TaskId taskId, GrainId remoteTarget = default)
     {
-        var handle = _taskHandles.GetOrAdd(taskId, id => new TaskHandle(id, this, remoteTarget));
-        if (handle is not TaskHandle taskHandle)
+        var handle = GetOrAddTaskHandle(taskId, remoteTarget);
+        handle.IsRunning = true;
+        return handle;
+    }
+
+    private TaskHandle GetOrAddTaskHandle(TaskId taskId, GrainId remoteTarget = default)
+    {
+        if (!_taskHandles.TryGetValue(taskId, out var handle))
         {
-            throw new InvalidOperationException($"Durable task '{taskId}' already has a completed handle.");
+            _taskHandles[taskId] = handle = new TaskHandle(taskId, this, remoteTarget);
         }
 
-        taskHandle.IsRunning = true;
-        return taskHandle;
+        return handle;
     }
 
     private bool TryRegisterCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination)
@@ -966,7 +968,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         // message carries the recorded reason, which the first request determines.
         var recordedReason = state.CancellationRequestedAt.HasValue ? state.CancellationReason : reason;
         _storage.RequestCancellation(taskId, state, reason);
-        if (!_preStagedCancellations.TryRemove((taskId, target), out _))
+        if (!_preStagedCancellations.Remove((taskId, target)))
         {
             StageCancellation(taskId, target, recordedReason);
         }
@@ -1192,7 +1194,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 && state.DueTime is null
                 && (!state.CancellationRequestedAt.HasValue || !IsCancellationLeaf(taskId, state)))
             {
-                _taskHandles.GetOrAdd(taskId, id => new TaskHandle(id, this));
+                GetOrAddTaskHandle(taskId);
             }
         }
 
@@ -1292,7 +1294,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (scheduled.Start)
         {
-            _pendingStarts[taskId] = 0;
+            _pendingStarts.Add(taskId);
         }
 
         return scheduled.Response;
@@ -1485,57 +1487,8 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         var executionContext = CreateExecutionContext(taskId);
         _ = GetOrCreateRunningTaskHandle(taskId);
-        committedRequest.SetTarget(_shared.GrainContextAccessor.GrainContext);
+        committedRequest.SetTarget(GrainContext);
         StartInvocation(taskId, static value => value.CreateTask(), committedRequest, executionContext);
-    }
-
-    void IDurableTaskGrainRuntime.OnAttemptParked() => Interlocked.Increment(ref _parkedAttempts);
-
-    void IDurableTaskGrainRuntime.OnAttemptUnparked() => Interlocked.Decrement(ref _parkedAttempts);
-
-    void IDurableTaskGrainRuntime.RegisterParkedWait(TaskId awaited, ParkedWait wait)
-    {
-        lock (_parkedWaits)
-        {
-            if (!_parkedWaits.TryGetValue(awaited, out var waits))
-            {
-                _parkedWaits[awaited] = waits = [];
-            }
-
-            waits.Add(wait);
-        }
-    }
-
-    void IDurableTaskGrainRuntime.UnregisterParkedWait(TaskId awaited, ParkedWait wait)
-    {
-        lock (_parkedWaits)
-        {
-            if (_parkedWaits.TryGetValue(awaited, out var waits) && waits.Remove(wait) && waits.Count == 0)
-            {
-                _parkedWaits.Remove(awaited);
-            }
-        }
-    }
-
-    TaskId? IDurableTaskGrainRuntime.GetSignalRecordId(TaskId executionId, string name) =>
-        GetSignalRecordId(GetSignalOwner(executionId), name);
-
-    /// <summary>Resumes the parked waits for <paramref name="awaited"/>, whose result or value the runtime completed.</summary>
-    private void ResumeParkedWaits(TaskId awaited)
-    {
-        List<ParkedWait>? waits;
-        lock (_parkedWaits)
-        {
-            if (_parkedWaits.Count == 0 || !_parkedWaits.Remove(awaited, out waits))
-            {
-                return;
-            }
-        }
-
-        foreach (var wait in waits)
-        {
-            wait.Resume();
-        }
     }
 
     /// <summary>
@@ -1544,22 +1497,23 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </summary>
     /// <remarks>
     /// <para>
-    /// An attempt is runnable unless it is parked on an event which a message delivers: a child's result, a signal, a
-    /// delay's resume, or the first of several completions. That message reactivates the grain. A journal write also
-    /// makes attempts runnable once it commits: it starts the requests it accepts, completes the handles of the results
-    /// and signals it stores, and propagates the cancellations it records. The inbox consults this source while it
-    /// prepares each write, before the runtime captures those effects, and ensures the wake-up before the write can
-    /// become durable.
+    /// An attempt is runnable while one of its segments runs or is queued. A parked attempt waits for an event which a
+    /// message delivers: a child's result, a signal, a delay's resume, or the first of several completions. That message
+    /// reactivates the grain. A journal write also makes attempts runnable once it commits: it starts the requests it
+    /// accepts, completes the handles of the results and signals it stores, and propagates the cancellations it records.
+    /// The inbox consults this source while it prepares each write, before the runtime captures those effects, and ensures
+    /// the wake-up before the write can become durable. Committed cancellations propagate in background work, which counts
+    /// as work until it ends.
     /// </para>
     /// <para>
-    /// A parked attempt counts as runnable from the moment the runtime completes what it awaits, before its code continues
-    /// in a later work item; see <see cref="GrainDurableTaskContext"/>. Committed cancellations propagate in background
-    /// work, which counts as work until it ends.
+    /// Messaging consults its work sources when the activation starts, before this runtime recovers its executions, so
+    /// until recovery has run, the pending executions which storage holds count as runnable. This re-arms the wake-up from
+    /// recovered state, so committed work is never stranded.
     /// </para>
     /// <para>
-    /// The delay is short, because a deactivated grain's runnable work makes no progress until the grain wakes, and while
-    /// the grain is active a wake-up only reschedules itself. Most attempts run only briefly between parked waits, so their
-    /// wake-up job finds no work on its first run and ends.
+    /// The delay, <see cref="Orleans.Configuration.DurableTaskOptions.RunnableExecutionWakeupDelay"/>, bounds how late a
+    /// grain which crashed resumes a runnable attempt. The wake-up only matters after a crash or a deactivation: while the
+    /// grain is active, a wake-up only reschedules itself, so a long delay keeps that cheap rather than polling.
     /// </para>
     /// <para>
     /// A stalled execution waits for code which can replay it, which only a later activation runs, so it keeps a slow
@@ -1568,29 +1522,48 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </para>
     /// </remarks>
     TimeSpan? IInboxWorkSource.GetWakeupDelay() =>
-        Volatile.Read(ref _runningAttempts) > Volatile.Read(ref _parkedAttempts)
-        || !_pendingStarts.IsEmpty
-        || !_pendingHandleResponses.IsEmpty
-        || !_pendingCancellationPropagations.IsEmpty
-        || !_backgroundTasks.IsEmpty
-        || Volatile.Read(ref _recoveredStarts) is not null
-            ? RunnableWakeupDelay
+        HasRunnableAttempts()
+        || _pendingStarts.Count > 0
+        || _pendingHandleResponses.Count > 0
+        || _pendingCancellationPropagations.Count > 0
+        || _backgroundTasks.Count > 0
+        || _recoveredStarts is not null
+        || (!_recovered && HasPendingExecutions())
+            ? _shared.Options.RunnableExecutionWakeupDelay
             : HasStalledExecutions() ? _shared.Options.StalledExecutionRetryInterval : null;
+
+    private bool HasRunnableAttempts()
+    {
+        foreach (var context in _executionContexts.Values)
+        {
+            if (context.IsRunnable)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Returns whether storage holds an execution which recovery would run.</summary>
+    private bool HasPendingExecutions()
+    {
+        foreach (var (_, state) in _storage.Tasks)
+        {
+            if (!HasStoredResult(state) && state.Request is not null && state.DueTime is null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>Returns whether a stalled execution is still pending, forgetting those which ended, such as by an abort.</summary>
     private bool HasStalledExecutions()
     {
-        foreach (var (taskId, _) in _stalledExecutions)
-        {
-            if (_storage.TryGetTask(taskId, out var state) && state.Result is not { IsCompleted: true })
-            {
-                return true;
-            }
-
-            _stalledExecutions.TryRemove(taskId, out _);
-        }
-
-        return false;
+        _stalledExecutions.RemoveWhere(taskId => !_storage.TryGetTask(taskId, out var state) || HasStoredResult(state));
+        return _stalledExecutions.Count > 0;
     }
 
     /// <summary>
@@ -1612,7 +1585,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             return;
         }
 
-        _stalledExecutions[context.Id] = 0;
+        _stalledExecutions.Add(context.Id);
         _shared.Logger.LogWarning(exception, "{Id} durable task '{TaskId}' stalled: {Reason}.", GrainId, context.Id, reason);
         DurableTaskEvents.EmitExecutionStalled(GrainContext, context.Id, reason, exception);
     }
@@ -1652,9 +1625,9 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         // Effects stay pending until a write which captured them completes, so a capture which writes no bytes
         // leaves them for the next write.
-        _committingStarts = _pendingStarts.IsEmpty ? [] : [.. _pendingStarts.Keys];
-        _committingHandleResponses = _pendingHandleResponses.IsEmpty ? [] : [.. _pendingHandleResponses];
-        _committingCancellationPropagations = _pendingCancellationPropagations.IsEmpty ? [] : [.. _pendingCancellationPropagations.Keys];
+        _committingStarts = (_pendingStarts.Count == 0) ? [] : [.. _pendingStarts];
+        _committingHandleResponses = (_pendingHandleResponses.Count == 0) ? [] : [.. _pendingHandleResponses];
+        _committingCancellationPropagations = (_pendingCancellationPropagations.Count == 0) ? [] : [.. _pendingCancellationPropagations.Keys];
     }
 
     private void RunCommittedEffects()
@@ -1668,21 +1641,25 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         foreach (var taskId in starts)
         {
-            if (_pendingStarts.TryRemove(taskId, out _))
+            if (_pendingStarts.Remove(taskId))
             {
                 StartRequest(taskId);
             }
         }
 
-        foreach (var entry in handleResponses)
+        foreach (var (taskId, response) in handleResponses)
         {
-            _pendingHandleResponses.TryRemove(entry);
+            // A later stage of the same task's response, which a later write commits, stays pending.
+            if (_pendingHandleResponses.TryGetValue(taskId, out var pending) && ReferenceEquals(pending, response))
+            {
+                _pendingHandleResponses.Remove(taskId);
+            }
         }
 
         List<CancellationPropagation>? committedPropagations = null;
         foreach (var id in propagations)
         {
-            if (_pendingCancellationPropagations.TryRemove(id, out var propagation))
+            if (_pendingCancellationPropagations.Remove(id, out var propagation))
             {
                 (committedPropagations ??= []).Add(propagation);
             }
@@ -1712,7 +1689,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (!_stopping)
         {
             // Checking for expired tasks is cheap until the earliest expiry passes.
-            if (!_pendingHandleResponses.IsEmpty || DeleteExpiredTasks())
+            if (!(_pendingHandleResponses.Count == 0) || DeleteExpiredTasks())
             {
                 QueueBackgroundWrite();
             }
@@ -1768,7 +1745,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             try
             {
-                DurableTaskRuntimeHelper.RequestTaskCancellation(context, propagation.CancellationReason);
+                context.RequestTaskCancellation(propagation.CancellationReason);
             }
             catch (AggregateException exception)
             {
@@ -2030,13 +2007,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             return new(new CompletedTaskHandle(taskId, response), RequiresWrite: false);
         }
 
-        var handle = _taskHandles.GetOrAdd(taskId, static (id, state) => new TaskHandle(id, state.Runtime, state.Target), (Runtime: this, Target: request.Context!.TargetId));
-        if (handle is TaskHandle taskHandle)
-        {
-            taskHandle.IsRunning = true;
-        }
-
-        return new(handle, RequiresWrite: true);
+        return new(GetOrCreateRunningTaskHandle(taskId, request.Context!.TargetId), RequiresWrite: true);
     }
 
     /// <summary>Returns whether the durable cancellation of one of a task's ancestors reaches the task.</summary>
@@ -2105,7 +2076,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 try
                 {
-                    DurableTaskRuntimeHelper.RequestTaskCancellation(context, ancestorState.CancellationReason);
+                    context.RequestTaskCancellation(ancestorState.CancellationReason);
                 }
                 catch (AggregateException exception)
                 {
@@ -2137,20 +2108,14 @@ internal sealed partial class DurableTaskGrainRuntime(
         TState state,
         GrainDurableTaskContext context)
     {
+        Debug.Assert(!_runningRequests.ContainsKey(taskId), "Callers start a task's attempt only while none runs.");
+
+        // The body starts in the attempt's first segment, a request which the activation admits as it admits grain calls.
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var invocation = Invoke(createTask, state, context, start.Task);
-
-        // Callers check for a running request before an await, so the registration decides which one executes.
-        if (!_runningRequests.TryAdd(taskId, new RunningRequest(invocation, context)))
-        {
-            start.SetCanceled();
-            return;
-        }
-
-        // The attempt is runnable from its registration, before its body's first work item runs.
-        Interlocked.Increment(ref _runningAttempts);
+        _runningRequests.Add(taskId, new RunningRequest(invocation, context));
         DurableTaskEvents.EmitExecutionStarted(GrainContext, taskId);
-        start.SetResult();
+        context.Start(start);
     }
 
     private async Task Invoke<TState>(
@@ -2167,7 +2132,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
         catch (Exception exception)
         {
-            if (exception is not OperationCanceledException && !IsDiscarded(context))
+            if (exception is not OperationCanceledException && !IsUnregistered(context))
             {
                 _shared.Logger.LogWarning(exception, "{Id} error invoking durable task '{DurableTask}'.", GrainId, createTask);
             }
@@ -2190,7 +2155,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             // A canceled attempt's response is discarded: its task continues in the next activation, or has its outcome.
             if (response.IsCompleted && !context.IsAttemptCanceled)
             {
-                Debug.Assert(!_stopping && !IsDiscarded(context), "The runtime cancels every attempt which it stops or discards.");
+                Debug.Assert(!_stopping && !IsUnregistered(context), "The runtime cancels every attempt which it stops or discards.");
                 await SetResponseAsync(context.Id, response, CancellationToken.None);
             }
         }
@@ -2206,15 +2171,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
         finally
         {
-            Interlocked.Decrement(ref _runningAttempts);
             context.OnAttemptCompleted();
             if (_runningRequests.TryGetValue(context.Id, out var running)
                 && ReferenceEquals(running.Context, context))
             {
-                ((ICollection<KeyValuePair<TaskId, RunningRequest>>)_runningRequests)
-                    .Remove(new(context.Id, running));
-                ((ICollection<KeyValuePair<TaskId, GrainDurableTaskContext>>)_executionContexts)
-                    .Remove(new(context.Id, context));
+                _runningRequests.Remove(context.Id);
+                _executionContexts.Remove(context.Id);
                 DurableTaskEvents.EmitExecutionStopped(GrainContext, context.Id);
             }
         }
@@ -2228,7 +2190,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// Returns whether an attempt's task was deleted with its execution tree, which unregisters the attempt's context,
     /// so the attempt's result is discarded.
     /// </summary>
-    private bool IsDiscarded(GrainDurableTaskContext context) =>
+    private bool IsUnregistered(GrainDurableTaskContext context) =>
         !_executionContexts.TryGetValue(context.Id, out var registered) || !ReferenceEquals(registered, context);
 
     /// <remarks>
@@ -2238,7 +2200,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </remarks>
     void IDurableTaskGrainRuntime.StageBodyResponse(GrainDurableTaskContext context, DurableTaskResponse response)
     {
-        Debug.Assert(!context.IsAttemptCanceled && !_stopping && !IsDiscarded(context), "Only a running attempt stages its response.");
+        Debug.Assert(!context.IsAttemptCanceled && !_stopping && !IsUnregistered(context), "Only a running attempt stages its response.");
         try
         {
             // The handle completes when a write commits the response, as it does for a response which the attempt commits.
@@ -2376,24 +2338,18 @@ internal sealed partial class DurableTaskGrainRuntime(
             "persisting deferred durable task cleanup");
     }
 
+    /// <summary>Tracks background work on the activation, which deactivation drains, and logs its failure.</summary>
     private void TrackBackgroundTask(Task task, string operation)
     {
-        var id = Interlocked.Increment(ref _backgroundWriteId);
-        var observedTask = ObserveBackgroundTaskAsync(task, operation);
-        _backgroundTasks[id] = observedTask;
-        _ = observedTask.ContinueWith(
-            static (_, state) =>
-            {
-                var (runtime, taskId) = ((DurableTaskGrainRuntime Runtime, long TaskId))state!;
-                runtime._backgroundTasks.TryRemove(taskId, out Task? _);
-            },
-            (this, id),
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
+        var id = ++_backgroundWriteId;
+        var observed = ObserveBackgroundTaskAsync(id, task, operation);
+        if (!observed.IsCompleted)
+        {
+            _backgroundTasks[id] = observed;
+        }
     }
 
-    private async Task ObserveBackgroundTaskAsync(Task task, string operation)
+    private async Task ObserveBackgroundTaskAsync(long id, Task task, string operation)
     {
         try
         {
@@ -2407,6 +2363,10 @@ internal sealed partial class DurableTaskGrainRuntime(
                 GrainId,
                 operation);
         }
+        finally
+        {
+            _backgroundTasks.Remove(id);
+        }
     }
 
     private async Task PersistBackgroundChangesAsync()
@@ -2416,8 +2376,18 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
 
+    /// <summary>Marks the attempts whose parked waits <paramref name="awaited"/> releases as runnable.</summary>
+    private void NotifyParkedAttempts(TaskId awaited)
+    {
+        foreach (var context in _executionContexts.Values)
+        {
+            context.OnAwaitedCompleted(awaited);
+        }
+    }
+
     private void CompleteTaskHandle(TaskId taskId, DurableTaskResponse response)
     {
+        NotifyParkedAttempts(taskId);
         if (_taskHandles.TryGetValue(taskId, out var handle) && handle is TaskHandle localHandle)
         {
             localHandle.TrySetResponse(response);
@@ -2594,35 +2564,36 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (!terminal && !state.RemoteTarget.IsDefault)
         {
             StageCancellation(taskId, state.RemoteTarget, state.CancellationReason);
-            _preStagedCancellations.TryRemove((taskId, state.RemoteTarget), out _);
+            _preStagedCancellations.Remove((taskId, state.RemoteTarget));
         }
         else if (!terminal && TryGetSubscription(state, out var target, out var subscribedTaskId))
         {
             Unsubscribe(target, subscribedTaskId, taskId);
         }
 
-        if (_executionContexts.TryRemove(taskId, out var context))
+        if (_executionContexts.Remove(taskId, out var context))
         {
             CancelAttempt(context, DurableTaskAttemptCancellationReason.TaskDeleted);
         }
 
-        if (_runningRequests.TryRemove(taskId, out var running))
+        if (_runningRequests.Remove(taskId, out var running))
         {
-            // Deactivation still drains the discarded attempt.
-            TrackBackgroundTask(running.Task, "running a deleted durable task");
+            // Deactivation waits for the canceled attempt, which drains.
+            TrackBackgroundTask(running.Context.Settled, "running a deleted durable task");
             DurableTaskEvents.EmitExecutionStopped(GrainContext, taskId);
         }
 
-        if (_taskHandles.TryRemove(taskId, out var handle))
+        if (_taskHandles.Remove(taskId, out var handle))
         {
             if (handle is TaskHandle { ResponseTask.IsCompleted: false } localHandle)
             {
                 localHandle.TrySetResponse(terminal ? state.Result! : DurableTaskResponse.Canceled);
+                NotifyParkedAttempts(taskId);
             }
         }
 
-        _pendingStarts.TryRemove(taskId, out _);
-        _pendingHandleResponses.TryRemove(taskId, out _);
+        _pendingStarts.Remove(taskId);
+        _pendingHandleResponses.Remove(taskId);
         _logicalTimes.Remove(taskId);
         RemoveTask(taskId);
         SignalAcceptance(taskId);
@@ -2761,7 +2732,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var propagation = StageCancellationTree(taskId, callerId, reason);
         if (propagation.Contexts.Count > 0 || propagation.Handles.Count > 0)
         {
-            _pendingCancellationPropagations[Interlocked.Increment(ref _cancellationPropagationId)] =
+            _pendingCancellationPropagations[++_cancellationPropagationId] =
                 new(propagation.Contexts, propagation.Handles, CancellationReason: reason);
         }
     }
@@ -2796,7 +2767,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        _pendingCancellationPropagations[Interlocked.Increment(ref _cancellationPropagationId)] =
+        _pendingCancellationPropagations[++_cancellationPropagationId] =
             new(contexts, handles, CancellationReason: reason, Completion: completion);
         return completion.Task;
     }
@@ -2870,7 +2841,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                     && requestContext.TargetId != GrainId)
                 {
                     StageCancellation(currentTaskId, requestContext.TargetId, reason);
-                    _preStagedCancellations.TryAdd((currentTaskId, requestContext.TargetId), 0);
+                    _preStagedCancellations.Add((currentTaskId, requestContext.TargetId));
                 }
 
                 contexts.Add(context);
@@ -2976,19 +2947,19 @@ internal sealed partial class DurableTaskGrainRuntime(
             MessageTransport.SendAbort(GrainId, state.RemoteTarget, taskId, reason);
         }
 
-        // Unregistering the attempt discards its result; deactivation still drains it.
-        if (_executionContexts.TryRemove(taskId, out var context))
+        // Unregistering the attempt discards its result; deactivation waits for it to drain.
+        if (_executionContexts.Remove(taskId, out var context))
         {
             CancelAttempt(context, DurableTaskAttemptCancellationReason.TaskAborted);
         }
 
-        if (_runningRequests.TryRemove(taskId, out var running))
+        if (_runningRequests.Remove(taskId, out var running))
         {
-            TrackBackgroundTask(running.Task, "running an aborted durable task");
+            TrackBackgroundTask(running.Context.Settled, "running an aborted durable task");
             DurableTaskEvents.EmitExecutionStopped(GrainContext, taskId);
         }
 
-        _pendingStarts.TryRemove(taskId, out _);
+        _pendingStarts.Remove(taskId);
         _pendingHandleResponses[taskId] = StageResponse(taskId, response);
     }
 
@@ -3007,37 +2978,28 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     private bool TryGetScheduledTaskHandle(TaskId taskId, [NotNullWhen(true)] out IScheduledTaskHandle? handle)
     {
-        if (_taskHandles.TryGetValue(taskId, out handle))
+        if (_taskHandles.TryGetValue(taskId, out var taskHandle))
         {
+            handle = taskHandle;
             return true;
         }
 
-        if (_storage.TryGetTask(taskId, out var taskState))
+        if (!_storage.TryGetTask(taskId, out var taskState))
         {
-            if (_pendingHandleResponses.ContainsKey(taskId))
-            {
-                handle = new TaskHandle(taskId, this, taskState.RemoteTarget);
-                handle = _taskHandles.GetOrAdd(taskId, handle);
-                return true;
-            }
-
-            // Rehydrate the task handle.
-            if (taskState.Result is { } response)
-            {
-                Debug.Assert(response.IsCompleted);
-                handle = new CompletedTaskHandle(taskId, response);
-                return true;
-            }
-            else
-            {
-                // Create a new handle for the task.
-                handle = new TaskHandle(taskId, this, taskState.RemoteTarget);
-                handle = _taskHandles.GetOrAdd(taskId, handle);
-                return true;
-            }
+            handle = null;
+            return false;
         }
 
-        return false;
+        // A committed result rehydrates as a completed handle; a staged one completes its handle once it commits.
+        if (!_pendingHandleResponses.ContainsKey(taskId) && taskState.Result is { } response)
+        {
+            Debug.Assert(response.IsCompleted);
+            handle = new CompletedTaskHandle(taskId, response);
+            return true;
+        }
+
+        handle = GetOrAddTaskHandle(taskId, taskState.RemoteTarget);
+        return true;
     }
 
     public IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId)
@@ -3101,13 +3063,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         return operations;
     }
 
-    internal Task StopAsync(CancellationToken _)
-    {
-        lock (_stopLock)
-        {
-            return _stopTask ??= StopCoreAsync();
-        }
-    }
+    internal Task StopAsync(CancellationToken _) => _stopTask ??= StopCoreAsync();
 
     private async Task StopCoreAsync()
     {
@@ -3125,38 +3081,39 @@ internal sealed partial class DurableTaskGrainRuntime(
         var stopping = new DurableTaskAttemptCanceledException(DurableTaskAttemptCancellationReason.ActivationStopping, _deactivationCts.Token);
         foreach (var handle in _taskHandles.Values)
         {
-            if (handle is TaskHandle localHandle)
-            {
-                localHandle.SetStopping(stopping);
-            }
+            handle.SetStopping(stopping);
         }
 
         while (true)
         {
-            if (_runningRequests.IsEmpty && _backgroundTasks.IsEmpty)
+            // A parked attempt is discarded and never resumes, so it settles at once; an attempt whose segment runs settles
+            // when the segment ends. Abandoning the drain would allow a replacement activation to overlap this one.
+            // Adapter-controlled waits observe the lifecycle token. Arbitrary user code can ignore it, so deactivation
+            // deliberately waits for every running segment before replacement replay can begin.
+            var running = _runningRequests.Values
+                .Select(static request => request.Context.Settled)
+                .Where(static settled => !settled.IsCompleted)
+                .Concat(_backgroundTasks.Values)
+                .ToArray();
+            if (running.Length == 0)
             {
                 return;
             }
 
-            var running = _runningRequests.Values
-                .Select(static request => request.Task)
-                .Concat(_backgroundTasks.Values)
-                .ToArray();
-            // Abandoning the drain would allow a replacement activation to overlap this one.
-            // Adapter-controlled waits observe the lifecycle token. Arbitrary user code can ignore it, so
-            // deactivation deliberately waits for every execution before replacement replay can begin.
             await Task.WhenAll(running).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
         }
     }
 
     private bool IsRequestRunning(TaskId taskId) => _runningRequests.ContainsKey(taskId);
 
+    private static InvalidOperationException CreateUnboundException() => new(
+        $"Durable Tasks requires grain activations to derive from Orleans.Journaling.DurableGrain or implement {typeof(Orleans.Messaging.IMessagingGrain).FullName} so the runtime binds to the activation's journal and inbox.");
+
     private void ThrowIfStopping()
     {
-        if (Volatile.Read(ref _initialized) == 0)
+        if (_grainContext is null)
         {
-            throw new InvalidOperationException(
-                $"Durable Tasks requires grain activations to derive from Orleans.Journaling.DurableGrain or implement {typeof(Orleans.Messaging.IMessagingGrain).FullName} so the runtime binds to the activation's journal and inbox.");
+            throw CreateUnboundException();
         }
 
         if (_stopping)

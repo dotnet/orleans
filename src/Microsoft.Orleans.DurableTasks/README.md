@@ -306,22 +306,30 @@ synchronously on the activation which makes them, when the runtime stages them: 
 - An activation recovers task state after its journal, inbox, and outbox have
   recovered, and starts the recovered executions once the grain's
   `OnActivateAsync` has completed.
+- An execution's attempt runs in segments: the code between its durable waits.
+  Each segment is a local request on the activation, which follows the grain's
+  reentrancy rules, so on a non-reentrant grain a segment excludes the grain's
+  other requests, as a grain method does. A durable wait which is pending, such
+  as the wait for a child's result, a signal, a delay, or the first of several
+  completions, parks the attempt and ends its segment; once the wait completes,
+  a new segment resumes the waiting code. Other awaits, such as journal writes
+  and calls to other grains, stay within the segment.
 - The runtime is an inbox work source: while the grain holds a runnable
-  execution, one which runs code rather than waiting for a child's result, a
-  signal, or a delay's resume, Messaging keeps the grain's Durable Jobs wake-up,
-  which a journal write ensures before it becomes durable. A grain which
-  deactivates or crashes while an execution is runnable is reactivated within
-  about a second, and recovery resumes the execution. A waiting execution
-  resumes when the message it waits for reactivates the grain.
+  execution, one whose segment runs or is about to run, Messaging keeps the
+  grain's Durable Jobs wake-up, which a journal write ensures before it becomes
+  durable. A grain which crashes while an execution is runnable is reactivated
+  within about 30 seconds, and recovery resumes the execution. When an
+  activation starts, its recovered pending executions re-arm the wake-up. A
+  parked execution resumes when the message it waits for reactivates the grain.
 - Activation shutdown begins when deactivation starts, before the grain's
   `OnDeactivateAsync` runs. It stops new execution and cancels every running
   attempt with the reason `ActivationStopping`: from then on, the attempt's
   durable operations throw `DurableTaskAttemptCanceledException`, and its `AttemptCancellationToken` and
-  `CancellationToken` are canceled. The runtime then drains the attempts, before
-  messaging and the journal stop, discards their results, and leaves committed
-  work available for replay in the next activation. Other grain work, such as
-  `OnDeactivateAsync` and the inbox, keeps committing while the attempts drain,
-  and the journaled state changes which a canceled attempt's cleanup makes commit
+  `CancellationToken` are canceled. A parked attempt is discarded and runs no
+  further code; a running segment finishes, and its result is discarded. The
+  next activation replays committed work. Other grain work, such as
+  `OnDeactivateAsync` and the inbox, keeps committing while segments finish,
+  and the journaled state changes which a canceled segment's cleanup makes commit
   with it. A poll or wait on
   the activation fails with `DurableTaskAttemptCanceledException`, as a call
   which arrives while the runtime stops does, and the task continues in the next

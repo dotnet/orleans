@@ -655,10 +655,12 @@ describes which tasks have addresses and how long they resolve.
 - Task state and outgoing messages share the grain's journal commit boundary with the
   grain's own journaled state. A failed journal write deactivates the grain, and the
   next activation recovers from committed state.
-- While an execution runs code, rather than waiting for a call's result, a signal, or a
-  delay, the grain keeps a Durable Jobs wake-up, so a grain which deactivates or crashes
-  is reactivated within about a second and resumes the execution. A waiting execution
-  resumes when the message it waits for reactivates its grain.
+- Each segment of an execution, the code between two durable waits, runs as a request
+  on the grain, so it follows the grain's reentrancy rules as a grain method does.
+- While an execution's segment runs or waits to run, the grain keeps a Durable Jobs
+  wake-up, so a grain which crashes is reactivated within about 30 seconds and resumes
+  the execution. An execution parked on a call's result, a signal, or a delay resumes
+  when the message it waits for reactivates its grain.
 - Posting a durable call from a durable grain, including from an ordinary method, stages
   the invocation in the outbox, so it commits atomically with the grain's state changes.
   Inside a durable task, awaiting and scheduling a call stage it the same way.

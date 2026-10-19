@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
@@ -45,7 +44,7 @@ internal sealed partial class DurableTaskGrainRuntime
 
     // The starts which await their target's acceptance, by the identifier of their record. Each is signaled when the record
     // records the acceptance or the failed start, or when the record is deleted.
-    private readonly ConcurrentDictionary<TaskId, TaskCompletionSource> _acceptanceWaiters = [];
+    private readonly Dictionary<TaskId, TaskCompletionSource> _acceptanceWaiters = [];
 
     /// <summary>
     /// Starts <paramref name="request"/> as the detached root task <paramref name="rootId"/>, recorded and subscribed under
@@ -350,9 +349,11 @@ internal sealed partial class DurableTaskGrainRuntime
                 return;
             }
 
-            var waiter = _acceptanceWaiters.GetOrAdd(
-                recordId,
-                static _ => new(TaskCreationOptions.RunContinuationsAsynchronously));
+            if (!_acceptanceWaiters.TryGetValue(recordId, out var waiter))
+            {
+                _acceptanceWaiters[recordId] = waiter = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
             await waiter.Task.WaitAsync(cancellationToken);
         }
     }
@@ -364,7 +365,7 @@ internal sealed partial class DurableTaskGrainRuntime
     /// <summary>Wakes the start which awaits the reply for <paramref name="recordId"/>, if any.</summary>
     private void SignalAcceptance(TaskId recordId)
     {
-        if (_acceptanceWaiters.TryRemove(recordId, out var waiter))
+        if (_acceptanceWaiters.Remove(recordId, out var waiter))
         {
             waiter.TrySetResult();
         }

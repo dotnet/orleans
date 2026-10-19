@@ -524,7 +524,8 @@ public sealed partial class DurableTaskSignalTests
                 Options.Create(new DurableMessagingOptions()),
                 MessagingTestHelpers.Serializer);
             Runtime = new DurableTaskGrainRuntime(Storage, Storage.LogicalTimes, Storage.Invocations, shared, [Transport]);
-            Runtime.InitializeForActivation();
+            TestLocalRequestQueue.Attach(context);
+            Runtime.InitializeForActivation(context);
             manager.RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, Runtime);
         }
 

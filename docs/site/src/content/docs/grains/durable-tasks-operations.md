@@ -298,9 +298,12 @@ caller's token or the wait's timeout ends it.
   don't rewrite it. A dead-lettered completion's result is also held by its dead letter
   while task state retains it for `ResultRetentionPeriod`. The completion sequence adds
   one integer to each task's state.
-- Executions run on the activation's scheduler and interleave with the grain's methods
-  at each `await`. A hot grain bounds the throughput of its workflows, so partition
-  workflows by business owner, such as one grain per order.
+- Each segment of an execution, the code between two durable waits, runs as a request
+  on the activation and follows the grain's reentrancy rules. On a non-reentrant grain,
+  a segment which awaits other work, such as a call to another grain, holds the grain
+  as a grain method does, and concurrent steps of one grain run one segment at a time.
+  A hot grain bounds the throughput of its workflows, so partition workflows by business
+  owner, such as one grain per order.
 - Polls interleave with the grain's other work, so a waiting client doesn't delay the
   work which completes the task.
 - Deleting an execution tree costs time proportional to its size, and retained trees
@@ -325,7 +328,8 @@ which include durable task messages; see
 - `ScheduleAll`, `WhenAllCompleted`, and `WhenEach` run only when awaited inside a
   durable execution; scheduling one as a task of its own throws
   `NotSupportedException`.
-- Activation shutdown stops new execution, drains running executions, discards their
-  results, and leaves committed work for replay in the next activation.
+- Activation shutdown stops new execution, discards parked attempts, lets running
+  segments finish, discards their results, and leaves committed work for replay in the
+  next activation.
 - The adapter and abstractions await their first NuGet publication, and their persisted
   formats can change while the integration is evaluated.

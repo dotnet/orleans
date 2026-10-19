@@ -204,7 +204,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     [Fact]
     public Task CancellationReachesTheInputsOfANamedCombinator() => ActivationScheduler.RunAsync(async () =>
     {
-        var (runtime, storage, _, transport) = CreateRuntime();
+        // The blocked input waits without a durable wait, so its segment runs until the cancellation reaches it.
+        var (runtime, storage, _, transport) = CreateRuntime(reentrant: true);
         var rootId = TaskId.Parse("root");
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var request = CreateRequest(1, () => DurableTask.Run(async _ =>
