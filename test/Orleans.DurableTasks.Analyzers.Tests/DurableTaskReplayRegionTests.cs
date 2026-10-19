@@ -266,6 +266,28 @@ public class DurableTaskReplayRegionTests
         """);
 
     [Fact]
+    public Task PersistentStateWritesBeforeAnExternalAwaitAreReported() => AnalyzerVerifier.VerifyAsync($$"""
+        public class C
+        {
+        {{Members}}
+            private readonly IOrderState<int> _order = null!;
+
+            public async DurableTask<int> StepAsync()
+            {
+                await {|ORLEANS0203:_status.WriteStateAsync()|};
+                await {|ORLEANS0203:_order.WriteStateAsync()|};
+                await FetchAsync();
+                await _status.WriteStateAsync();
+                return 1;
+            }
+        }
+
+        public interface IOrderState<T> : Orleans.Runtime.IPersistentState<T>
+        {
+        }
+        """);
+
+    [Fact]
     public Task RunDelegatesAndLocalFunctionsAreBodies() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {
