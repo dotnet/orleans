@@ -7,7 +7,7 @@ namespace Orleans.Messaging.Tests.Support;
 public sealed class MessagingMetricProbe : IDisposable
 {
     private readonly ConcurrentDictionary<(string Instrument, string TagValue), long> _measurements = [];
-    private readonly ConcurrentDictionary<string, long> _depths = [];
+    private readonly ConcurrentDictionary<(Meter Meter, string Instrument), long> _depths = [];
     private readonly object _lock = new();
     private TaskCompletionSource _changed = CreateSignal();
     private readonly MeterListener _listener;
@@ -39,7 +39,9 @@ public sealed class MessagingMetricProbe : IDisposable
     public long GetCount(string instrument, string tagValue = "") =>
         _measurements.TryGetValue((instrument, tagValue), out var count) ? count : 0;
 
-    public long GetDepth(string instrument) => _depths.TryGetValue(instrument, out var value) ? value : 0;
+    /// <summary>Gets the current value of a depth instrument created by <paramref name="meter"/>.</summary>
+    /// <remarks>Each silo creates its own meter, so a meter identifies one silo's depth.</remarks>
+    public long GetDepth(Meter meter, string instrument) => _depths.TryGetValue((meter, instrument), out var value) ? value : 0;
 
     public Task WaitForCountAsync(
         string instrument,
@@ -51,20 +53,24 @@ public sealed class MessagingMetricProbe : IDisposable
             tagValue,
             TestContext.Current.CancellationToken);
 
-    public async Task WaitForCountWithCancellationAsync(
+    public Task WaitForCountWithCancellationAsync(
         string instrument,
         long expected,
         string tagValue,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        WaitUntilAsync(() => GetCount(instrument, tagValue) >= expected, cancellationToken);
+
+    /// <summary>Waits until <paramref name="condition"/>, which reads this probe's measurements, holds.</summary>
+    public async Task WaitUntilAsync(Func<bool> condition, CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
-        while (GetCount(instrument, tagValue) < expected)
+        while (!condition())
         {
             Task changed;
             lock (_lock)
             {
-                if (GetCount(instrument, tagValue) >= expected)
+                if (condition())
                 {
                     return;
                 }
@@ -87,7 +93,8 @@ public sealed class MessagingMetricProbe : IDisposable
         if (instrument.Name is "orleans-messaging-inbox-depth" or "orleans-messaging-outbox-depth")
         {
             // The depth instruments are UpDownCounters, so each measurement is a delta.
-            _depths.AddOrUpdate(instrument.Name, measurement, (_, current) => current + measurement);
+            _depths.AddOrUpdate((instrument.Meter, instrument.Name), measurement, (_, current) => current + measurement);
+            SignalChanged();
             return;
         }
 
@@ -106,6 +113,11 @@ public sealed class MessagingMetricProbe : IDisposable
             (instrument.Name, tagValue),
             measurement,
             (_, current) => current + measurement);
+        SignalChanged();
+    }
+
+    private void SignalChanged()
+    {
         lock (_lock)
         {
             _changed.TrySetResult();
