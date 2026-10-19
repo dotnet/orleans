@@ -5,13 +5,13 @@ namespace Orleans.Journaling;
 /// </summary>
 public readonly struct JournalReplayContext
 {
-    internal JournalReplayContext(JournaledStateManager manager)
+    internal JournalReplayContext(IJournalReplayTarget manager)
     {
         ArgumentNullException.ThrowIfNull(manager);
         Manager = manager;
     }
 
-    private JournaledStateManager Manager =>
+    private IJournalReplayTarget Manager =>
         field ?? throw new InvalidOperationException("The journal replay context is not initialized.");
 
     /// <summary>
@@ -56,4 +56,21 @@ public readonly struct JournalReplayContext
 
         return JournalFormatServices.GetRequiredKeyedService<TCodec>(ServiceProvider, entryFormatKey);
     }
+}
+
+/// <summary>Receives the entries which a journal format replays.</summary>
+/// <remarks>
+/// A format resolves the state machine of each entry immediately before it replays that entry, in journal order, so a
+/// target observes every entry's position.
+/// </remarks>
+internal interface IJournalReplayTarget
+{
+    /// <summary>Gets the configured write journal format key.</summary>
+    string WriteJournalFormatKey { get; }
+
+    /// <summary>Gets the service provider used to resolve journal services.</summary>
+    IServiceProvider ServiceProvider { get; }
+
+    /// <summary>Resolves the state machine which replays the next entry, which belongs to <paramref name="streamId"/>.</summary>
+    IStateMachine ResolveStateMachine(JournalStreamId streamId);
 }

@@ -1,7 +1,9 @@
+using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace Orleans.Journaling;
 
@@ -20,7 +22,7 @@ public interface IDurableDictionary<TKey, TValue> : IDictionary<TKey, TValue> wh
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
 internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue>, IStateMachine, IReportsStagedChanges, IDurableDictionaryCommandHandler<TKey, TValue>,
-    IResyncSource<DictionaryChange<TKey, TValue>> where TKey : notnull
+    IResyncSource<DictionaryChange<TKey, TValue>>, IJournaledStateHistory, IJournaledStateReplica where TKey : notnull
 {
     private readonly IDurableDictionaryCommandCodec<TKey, TValue> _codec;
     private readonly Dictionary<TKey, TValue> _items = [];
@@ -54,7 +56,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _manager = manager as JournaledStateManager;
-        _accessTarget = routed ? new(key, manager) : null;
+        _accessTarget = routed ? new(key, manager, this) : null;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -346,6 +348,41 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
         ? ((IEnumerable<KeyValuePair<TKey, TValue>>)ReadSnapshot(context)).GetEnumerator()
         : ((IEnumerable<KeyValuePair<TKey, TValue>>)_items).GetEnumerator();
+
+    // The collection journals each change as it makes it.
+    void IJournaledStateHistory.StagePendingChanges() { }
+
+    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableDictionary<TKey, TValue>(_codec);
+
+    void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
+    {
+        switch (operation)
+        {
+            case JournaledStateOperation.DictionaryGet:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items[JournaledStateReplicaEncoding.ReadArgument<TKey>(serializer, argument)], result);
+                break;
+            case JournaledStateOperation.DictionaryTryGetValue:
+                JournaledStateReplicaEncoding.WriteResult(
+                    serializer,
+                    _items.TryGetValue(JournaledStateReplicaEncoding.ReadArgument<TKey>(serializer, argument), out var value) ? (true, value) : (false, default(TValue)!),
+                    result);
+                break;
+            case JournaledStateOperation.DictionaryContainsKey:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.ContainsKey(JournaledStateReplicaEncoding.ReadArgument<TKey>(serializer, argument)), result);
+                break;
+            case JournaledStateOperation.DictionaryContainsPair:
+                JournaledStateReplicaEncoding.WriteResult(
+                    serializer,
+                    ((ICollection<KeyValuePair<TKey, TValue>>)_items).Contains(JournaledStateReplicaEncoding.ReadArgument<KeyValuePair<TKey, TValue>>(serializer, argument)),
+                    result);
+                break;
+            case JournaledStateOperation.DictionaryCount:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Count, result);
+                break;
+            default:
+                throw JournaledStateReplicaEncoding.NotPositional(operation, nameof(DurableDictionary<TKey, TValue>));
+        }
+    }
 
     [DoesNotReturn]
     private static void ThrowDuplicateKey(TKey key) => throw new ArgumentException($"An item with the same key has already been added. Key: {key}", nameof(key));

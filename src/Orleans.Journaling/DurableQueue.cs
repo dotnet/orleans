@@ -1,7 +1,9 @@
+using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace Orleans.Journaling;
 
@@ -68,7 +70,7 @@ public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 
 [DebuggerTypeProxy(typeof(DurableQueueDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReportsStagedChanges, IDurableQueueCommandHandler<T>, IResyncSource<QueueChange<T>>
+internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReportsStagedChanges, IDurableQueueCommandHandler<T>, IResyncSource<QueueChange<T>>, IJournaledStateHistory, IJournaledStateReplica
 {
     private readonly IDurableQueueCommandCodec<T> _codec;
     private readonly Queue<T> _items = new();
@@ -86,7 +88,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableQueueCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _manager = manager as JournaledStateManager;
-        _accessTarget = new(key, manager);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -95,10 +97,45 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
         _manager = manager as JournaledStateManager;
-        _accessTarget = new(key, manager);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
+    // A replica, which has no manager, so its reads run directly.
+    private DurableQueue(IDurableQueueCommandCodec<T> codec)
+    {
+        _codec = codec;
+        _accessTarget = new(nameof(DurableQueue<T>));
+    }
+
+    // The collection journals each change as it makes it.
+    void IJournaledStateHistory.StagePendingChanges() { }
+
+    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableQueue<T>(_codec);
+
+    void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
+    {
+        switch (operation)
+        {
+            case JournaledStateOperation.QueueCount:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Count, result);
+                break;
+            case JournaledStateOperation.QueuePeek:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Peek(), result);
+                break;
+            case JournaledStateOperation.QueueTryPeek:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.TryPeek(out var item) ? (true, item) : (false, default(T)!), result);
+                break;
+            case JournaledStateOperation.QueueContains:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Contains(JournaledStateReplicaEncoding.ReadArgument<T>(serializer, argument)), result);
+                break;
+            case JournaledStateOperation.QueueSnapshot:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.ToArray(), result);
+                break;
+            default:
+                throw JournaledStateReplicaEncoding.NotPositional(operation, nameof(DurableQueue<T>));
+        }
+    }
     public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
         ? context.ReadWhole(_accessTarget, JournaledStateOperation.QueueCount, this, static self => self._items.Count)
         : _items.Count;

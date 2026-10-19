@@ -1,6 +1,8 @@
+using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace Orleans.Journaling;
 
@@ -43,7 +45,7 @@ public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsStagedChanges, IDurableSetCommandHandler<T>, IResyncSource<SetChange<T>>
+internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsStagedChanges, IDurableSetCommandHandler<T>, IResyncSource<SetChange<T>>, IJournaledStateHistory, IJournaledStateReplica
 {
     private readonly IDurableSetCommandCodec<T> _codec;
     private readonly HashSet<T> _items = [];
@@ -61,7 +63,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsSta
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableSetCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _manager = manager as JournaledStateManager;
-        _accessTarget = new(key, manager);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -70,10 +72,36 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsSta
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
         _manager = manager as JournaledStateManager;
-        _accessTarget = new(key, manager);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
+    // A replica, which has no manager, so its reads run directly.
+    private DurableSet(IDurableSetCommandCodec<T> codec)
+    {
+        _codec = codec;
+        _accessTarget = new(nameof(DurableSet<T>));
+    }
+
+    // The collection journals each change as it makes it.
+    void IJournaledStateHistory.StagePendingChanges() { }
+
+    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableSet<T>(_codec);
+
+    void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
+    {
+        switch (operation)
+        {
+            case JournaledStateOperation.SetCount:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Count, result);
+                break;
+            case JournaledStateOperation.SetContains:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Contains(JournaledStateReplicaEncoding.ReadArgument<T>(serializer, argument)), result);
+                break;
+            default:
+                throw JournaledStateReplicaEncoding.NotPositional(operation, nameof(DurableSet<T>));
+        }
+    }
     public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
         ? context.ReadWhole(_accessTarget, JournaledStateOperation.SetCount, this, static self => self._items.Count)
         : _items.Count;

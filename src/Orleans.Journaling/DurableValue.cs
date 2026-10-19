@@ -1,5 +1,7 @@
+using System.Buffers;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace Orleans.Journaling;
 
@@ -19,7 +21,7 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReportsStagedChanges, IDurableValueCommandHandler<T>
+internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReportsStagedChanges, IDurableValueCommandHandler<T>, IJournaledStateHistory, IJournaledStateReplica
 {
     private readonly IDurableValueCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
@@ -40,7 +42,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableValueCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _manager = manager as JournaledStateManager;
-        _accessTarget = new(key, manager);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -49,7 +51,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
         _manager = manager as JournaledStateManager;
-        _accessTarget = new(key, manager);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -163,5 +165,36 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
     {
         _accessTarget.OnChanged();
         _value = value;
+    }
+
+    // A replica, which has no manager, so its reads run directly.
+    private DurableValue(IDurableValueCommandCodec<T> codec)
+    {
+        _codec = codec;
+        _accessTarget = new(nameof(DurableValue<T>));
+    }
+
+    // A set journals the value at the next write; a positional read journals it now, so the journal holds what it read.
+    void IJournaledStateHistory.StagePendingChanges()
+    {
+        if (_isDirty)
+        {
+            Debug.Assert(_writer.IsInitialized);
+            WriteState(_writer);
+            _isDirty = false;
+            _isValueCaptured = true;
+        }
+    }
+
+    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableValue<T>(_codec);
+
+    void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
+    {
+        if (operation is not JournaledStateOperation.ValueGet)
+        {
+            throw JournaledStateReplicaEncoding.NotPositional(operation, nameof(DurableValue<T>));
+        }
+
+        JournaledStateReplicaEncoding.WriteResult(serializer, _value, result);
     }
 }

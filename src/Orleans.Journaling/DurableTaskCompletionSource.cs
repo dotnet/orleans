@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
@@ -42,7 +43,7 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IReportsStagedChanges, IDurableTaskCompletionSourceCommandHandler<T>
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IReportsStagedChanges, IDurableTaskCompletionSourceCommandHandler<T>, IJournaledStateHistory, IJournaledStateReplica
 {
     private readonly IDurableTaskCompletionSourceCommandCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
@@ -70,7 +71,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableTaskCompletionSourceCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _copier = copier;
         _exceptionCopier = exceptionCopier;
-        _accessTarget = new(key, manager);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -85,7 +86,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec = codec;
         _copier = copier;
         _exceptionCopier = exceptionCopier;
-        _accessTarget = new(key, manager);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -266,6 +267,44 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _status = DurableTaskCompletionSourceStatus.Canceled;
     }
 
+    // A replica, which has no manager, so its reads run directly.
+    private DurableTaskCompletionSource(
+        IDurableTaskCompletionSourceCommandCodec<T> codec,
+        DeepCopier<T> copier,
+        DeepCopier<Exception> exceptionCopier)
+    {
+        _codec = codec;
+        _copier = copier;
+        _exceptionCopier = exceptionCopier;
+        _accessTarget = new(nameof(DurableTaskCompletionSource<T>));
+    }
+
+    // Whether a terminal state waits for a write to capture it: no write captured it yet, and none acknowledged it, which
+    // completes the task.
+    private bool HasUncapturedCompletion => _status is not DurableTaskCompletionSourceStatus.Pending && !_isCompletionCaptured && !_completion.Task.IsCompleted;
+
+    // A completion journals its state at the next write; a positional read journals it now, so the journal holds what it read.
+    void IJournaledStateHistory.StagePendingChanges()
+    {
+        if (HasUncapturedCompletion)
+        {
+            Debug.Assert(_writer.IsInitialized);
+            WriteState(_writer);
+            _isCompletionCaptured = true;
+        }
+    }
+
+    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableTaskCompletionSource<T>(_codec, _copier, _exceptionCopier);
+
+    void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
+    {
+        if (operation is not JournaledStateOperation.CompletionSourceState)
+        {
+            throw JournaledStateReplicaEncoding.NotPositional(operation, nameof(DurableTaskCompletionSource<T>));
+        }
+
+        JournaledStateReplicaEncoding.WriteResult(serializer, StateCore, result);
+    }
 }
 
 /// <summary>
