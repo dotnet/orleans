@@ -17,7 +17,7 @@ namespace Orleans.Hosting;
 public static class MessagingExtensions
 {
     /// <summary>
-    /// Adds inbox messaging support to the silo.
+    /// Adds inbox and outbox messaging support to the silo.
     /// </summary>
     /// <remarks>
     /// Grains implementing <see cref="IMessagingGrain"/> or deriving from <see cref="DurableGrain"/>
@@ -33,7 +33,7 @@ public static class MessagingExtensions
     }
 
     /// <summary>
-    /// Adds inbox messaging services.
+    /// Adds inbox and outbox messaging services.
     /// </summary>
     /// <remarks>
     /// Grains implementing <see cref="IMessagingGrain"/> or deriving from <see cref="DurableGrain"/>
@@ -61,6 +61,7 @@ public static class MessagingExtensions
         services.Configure<JsonJournalOptions>(options =>
         {
             options.AddTypeInfoResolver(InboxJsonContext.Default);
+            options.AddTypeInfoResolver(OutboxJsonContext.Default);
         });
 
         var optionsBuilder = services.AddOptions<DurableMessagingOptions>();
@@ -86,9 +87,12 @@ public static class MessagingExtensions
 
         services.ConfigureNamedOptionForLogging<DurableMessagingOptions>(Options.DefaultName);
         services.TryAddSingleton<MessagingInstruments>();
+        services.TryAddSingleton<IOutboxTransport, GrainOutboxTransport>();
         services.TryAddScoped<MessagingPump>();
         services.TryAddScoped<Inbox>();
         services.Replace(ServiceDescriptor.Scoped<IInbox>(static sp => sp.GetRequiredService<Inbox>()));
+        services.TryAddScoped<Outbox>();
+        services.Replace(ServiceDescriptor.Scoped<IOutbox>(static sp => sp.GetRequiredService<Outbox>()));
         services.TryAddScoped<IMessagingDiagnostics, MessagingDiagnostics>();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<Orleans.Runtime.IConfigureGrainTypeComponents, MessagingGrainTypeConfigurator>());
