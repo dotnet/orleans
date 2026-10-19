@@ -360,12 +360,7 @@ namespace Orleans.Runtime.Messaging
                     else if (!_connection._transport.EnqueueWrite(writeRequest))
                     {
                         _connection.StartClosing(new ConnectionClosedException());
-                        for (var i = 0; i < writeRequest.MessageCount; i++)
-                        {
-                            _connection.RerouteMessage(writeRequest.GetMessage(i));
-                        }
-
-                        writeRequest.Reset();
+                        writeRequest.RerouteMessages(error: null);
                     }
                 }
                 finally

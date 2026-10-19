@@ -537,6 +537,58 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public async Task MessageWriteRequest_RetriedMessage_KeepsItsSerializedBody()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var serviceProvider = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(serviceProvider);
+        await using var transport = new CancelableTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(serviceProvider, shared), shared.MessageCenter);
+        var payload = Enumerable.Repeat((byte)0x5A, 20_000).ToArray();
+        var body = new PooledBuffer();
+        body.Write(payload);
+        using var message = new Message { Direction = Message.Directions.Request, BodyObject = body };
+        var request = shared.GetSendMessageHandler(connection);
+        request.WriteMessage(message);
+        request.CompleteWriting();
+        Assert.True(transport.EnqueueWrite(request));
+
+        // Serializing the message released its pooled buffer's storage. The write fails, and the message keeps its serialized body for its retry,
+        // so it is not serialized again.
+        await transport.CloseAsync(new ConnectionClosedException(), cancellationToken);
+        var retried = await connection.Retries.Reader.ReadAsync(cancellationToken);
+        Assert.Same(message, retried.Message);
+        Assert.IsType<MessageReadRequest>(message._bodyObject);
+        Assert.Equal(payload, ((PooledBuffer)message.BodyObject!).ToArray());
+
+        await connection.CloseAsync(null).WaitAsync(cancellationToken);
+    }
+
+    [Fact]
+    public async Task MessageWriteRequest_RetriedSuccessResponse_DecodesItsSerializedBody()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var serviceProvider = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(serviceProvider);
+        await using var transport = new CancelableTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(serviceProvider, shared), shared.MessageCenter);
+        using var message = new Message { Direction = Message.Directions.Response, BodyObject = Orleans.Serialization.Invocation.Response.FromResult(42) };
+        var request = shared.GetSendMessageHandler(connection);
+        request.WriteMessage(message);
+        request.CompleteWriting();
+        Assert.True(transport.EnqueueWrite(request));
+
+        // A successful response is serialized in its raw form, which the retried message decodes as a received response does.
+        await transport.CloseAsync(new ConnectionClosedException(), cancellationToken);
+        var retried = await connection.Retries.Reader.ReadAsync(cancellationToken);
+        Assert.Same(message, retried.Message);
+        Assert.IsType<MessageReadRequest>(message._bodyObject);
+        Assert.Equal(42, Assert.IsAssignableFrom<Orleans.Serialization.Invocation.Response>(message.BodyObject).Result);
+
+        await connection.CloseAsync(null).WaitAsync(cancellationToken);
+    }
+
+    [Fact]
     public void MessageWriteRequest_SerializationFailure_PreservesValidPrefix()
     {
         using var serviceProvider = CreateServiceProvider(new SiloMessagingOptions { MaxMessageBodySize = 1 });
