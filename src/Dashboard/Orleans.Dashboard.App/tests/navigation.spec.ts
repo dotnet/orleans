@@ -79,37 +79,6 @@ test('counter refresh keeps one request in flight', async ({ page }) => {
   await expect(page.getByRole('cell', { name: '12', exact: true })).toBeVisible();
 });
 
-test('silo summary counter refresh keeps one request in flight', async ({ page }) => {
-  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
-  await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
-  await page.route('**/HistoricalStats/*', route => route.fulfill({ json: [{ activationCount: 1, clientCount: 1 }] }));
-  await page.route('**/SiloStats/*', route => route.fulfill({ json: {} }));
-  await page.route('**/SiloProperties/*', route => route.fulfill({ json: {} }));
-  await page.route('**/SiloMetadata/*', route => route.fulfill({ json: {} }));
-  let release!: () => void;
-  let started!: () => void;
-  const pending = new Promise<void>(resolve => release = resolve);
-  const firstRequest = new Promise<void>(resolve => started = resolve);
-  let requests = 0;
-  await page.route('**/SiloCounters/*', async route => {
-    if (++requests === 1) {
-      started();
-      await pending;
-    }
-    await route.fulfill({
-      json: [{ name: 'orleans-messaging-received-messages-size', value: requests === 1 ? '7' : '12', delta: '5' }],
-    });
-  });
-  await page.goto('/#/host/test');
-  await firstRequest;
-  await page.clock.runFor(5_000);
-  expect(requests).toBe(1);
-  release();
-  await expect(page.getByRole('row', { name: 'Bytes received 7 B', exact: true })).toBeVisible();
-  await page.clock.runFor(1_000);
-  await expect(page.getByRole('row', { name: 'Bytes received 12 B', exact: true })).toBeVisible();
-});
-
 for (const path of ['/#/host/test', '/#/host/test/counters']) {
   test(`failed counter requests keep refreshing without page errors on ${path}`, async ({ page }) => {
     await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
@@ -124,6 +93,44 @@ for (const path of ['/#/host/test', '/#/host/test/counters']) {
       return route.fulfill({ status: 503 });
     });
     await page.goto(path);
+    await expect.poll(() => requests).toBe(1);
+    await page.clock.runFor(1_000);
+    await expect.poll(() => requests).toBe(2);
+  });
+}
+
+for (const { path, endpoint } of [
+  { path: '/#/host/test', endpoint: '**/HistoricalStats/*' },
+  { path: '/#/host/test', endpoint: '**/SiloStats/*' },
+  { path: '/#/host/test', endpoint: '**/SiloCounters/*' },
+  { path: '/#/grain/TestGrain', endpoint: '**/GrainStats/*' },
+]) {
+  test(`refresh keeps one ${endpoint} request in flight on ${path}`, async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+    await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
+    await page.route('**/HistoricalStats/*', route => route.fulfill({ json: [{ activationCount: 1, clientCount: 1 }] }));
+    await page.route('**/SiloStats/*', route => route.fulfill({ json: {} }));
+    await page.route('**/SiloProperties/*', route => route.fulfill({ json: {} }));
+    await page.route('**/SiloMetadata/*', route => route.fulfill({ json: {} }));
+    await page.route('**/SiloCounters/*', route => route.fulfill({ json: [] }));
+    await page.route('**/GrainStats/*', route => route.fulfill({ json: {} }));
+    let release!: () => void;
+    let started!: () => void;
+    const pending = new Promise<void>(resolve => release = resolve);
+    const firstRequest = new Promise<void>(resolve => started = resolve);
+    let requests = 0;
+    await page.route(endpoint, async route => {
+      if (++requests === 1) {
+        started();
+        await pending;
+      }
+      await route.fallback();
+    });
+    await page.goto(path);
+    await firstRequest;
+    await page.clock.runFor(5_000);
+    expect(requests).toBe(1);
+    release();
     await expect.poll(() => requests).toBe(1);
     await page.clock.runFor(1_000);
     await expect.poll(() => requests).toBe(2);

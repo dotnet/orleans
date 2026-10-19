@@ -279,23 +279,34 @@ function renderPage(jsx: JSX.Element, path: string) {
   let siloData: any[] = [];
   let siloStats: any[] = [];
   let siloCounters: Counter[] = [];
+  let historicalStatsIsPending = false;
+  let siloStatsIsPending = false;
   let siloCountersIsPending = false;
   const loadData = function () {
-    http.get(`HistoricalStats/${host}`, (err, data) => {
-      siloData = data;
-      render();
-    });
-    http.get(`SiloStats/${host}`, (err, data) => {
-      siloStats = data;
-      render();
-    });
-    if (siloCountersIsPending) return;
-    siloCountersIsPending = true;
-    http.get(`SiloCounters/${host}`, (_err, data) => {
-      if (routeIndex != thisRouteIndex) return;
-      siloCounters = data;
-      render();
-    }).finally(() => siloCountersIsPending = false).catch(() => {});
+    if (!historicalStatsIsPending) {
+      historicalStatsIsPending = true;
+      http.get(`HistoricalStats/${host}`, (err, data) => {
+        if (routeIndex != thisRouteIndex) return;
+        siloData = data;
+        render();
+      }).finally(() => historicalStatsIsPending = false).catch(() => {});
+    }
+    if (!siloStatsIsPending) {
+      siloStatsIsPending = true;
+      http.get(`SiloStats/${host}`, (err, data) => {
+        if (routeIndex != thisRouteIndex) return;
+        siloStats = data;
+        render();
+      }).finally(() => siloStatsIsPending = false).catch(() => {});
+    }
+    if (!siloCountersIsPending) {
+      siloCountersIsPending = true;
+      http.get(`SiloCounters/${host}`, (_err, data) => {
+        if (routeIndex != thisRouteIndex) return;
+        siloCounters = data;
+        render();
+      }).finally(() => siloCountersIsPending = false).catch(() => {});
+    }
   };
 
   const renderOverloaded = function () {
@@ -393,10 +404,11 @@ function renderPage(jsx: JSX.Element, path: string) {
   let loadDataIsPending = false;
   const loadData = function () {
     if (!loadDataIsPending) {
+      loadDataIsPending = true;
       http.get('GrainStats/' + grainType, function (err, data) {
         grainStats = data;
         render();
-      }).finally(() => loadDataIsPending = false);
+      }).finally(() => loadDataIsPending = false).catch(() => {});
     }
   };
 
