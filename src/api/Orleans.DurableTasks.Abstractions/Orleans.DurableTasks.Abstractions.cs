@@ -14,8 +14,6 @@ namespace Orleans.DurableTasks
 
         public override System.OperationCanceledException Exception { get { throw null; } }
 
-        public static CanceledDurableTaskResponse Instance { get { throw null; } }
-
         public override DurableTaskResponseKind ResponseKind { get { throw null; } }
 
         public override object? Result { get { throw null; } }
@@ -25,15 +23,11 @@ namespace Orleans.DurableTasks
 
     public readonly partial struct ConfiguredDurableTask
     {
-        public readonly System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public readonly System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
         public readonly ConfiguredDurableTask Detached() { throw null; }
 
-        public readonly DurableTaskAwaiter GetAwaiter() { throw null; }
+        public readonly ConfiguredDurableTask Detached(string rootId) { throw null; }
 
-        public readonly System.Threading.Tasks.Task<DurableTaskStatus> PollAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public readonly DurableTaskAwaiter GetAwaiter() { throw null; }
 
         public readonly ScheduledTask Post() { throw null; }
 
@@ -46,15 +40,11 @@ namespace Orleans.DurableTasks
 
     public readonly partial struct ConfiguredDurableTask<TResult>
     {
-        public readonly System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public readonly System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
         public readonly ConfiguredDurableTask<TResult> Detached() { throw null; }
 
-        public readonly DurableTaskAwaiter<TResult> GetAwaiter() { throw null; }
+        public readonly ConfiguredDurableTask<TResult> Detached(string rootId) { throw null; }
 
-        public readonly System.Threading.Tasks.Task<DurableTaskStatus> PollAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public readonly DurableTaskAwaiter<TResult> GetAwaiter() { throw null; }
 
         public readonly ScheduledTask<TResult> Post() { throw null; }
 
@@ -308,6 +298,8 @@ namespace Orleans.DurableTasks
     {
         protected DurableTaskContext(TaskId taskId) { }
 
+        protected internal DurableTaskAttemptCancellationReason? AttemptCancellationReason { get { throw null; } }
+
         public System.Threading.CancellationToken AttemptCancellationToken { get { throw null; } }
 
         public System.Threading.CancellationToken CancellationToken { get { throw null; } }
@@ -315,6 +307,8 @@ namespace Orleans.DurableTasks
         protected internal virtual string? HostId { get { throw null; } }
 
         public TaskId Id { get { throw null; } }
+
+        protected internal bool IsAttemptCanceled { get { throw null; } }
 
         public virtual bool IsReplaying { get { throw null; } }
 
@@ -326,14 +320,17 @@ namespace Orleans.DurableTasks
 
         public abstract System.DateTimeOffset UtcNow { get; }
 
-        protected internal virtual TaskId CreateChildTaskId(string? name) { throw null; }
+        protected internal void CancelAttempt(DurableTaskAttemptCancellationReason reason) { }
 
-        protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
+        protected internal DurableTaskAttemptCanceledException CreateAttemptCanceledException(System.Exception? innerException) { throw null; }
+
         protected internal virtual int GetVersion(string name, int minSupported, int maxSupported) { throw null; }
 
         protected internal virtual void OnBodyCompleted(DurableTaskResponse response) { }
 
         protected internal virtual IScheduledTaskHandle PostTask(TaskId taskId, DurableTask taskDefinition, DurableTaskStartOptions options) { throw null; }
+
+        protected internal void RequestTaskCancellation(string? reason) { }
 
         protected internal virtual DurableTaskResponse RunEffect<TState>(TaskId effectId, TState state, System.Func<TState, DurableTaskResponse> effect) { throw null; }
 
@@ -347,7 +344,11 @@ namespace Orleans.DurableTasks
 
     public static partial class DurableTaskExtensions
     {
+        public static ConfiguredDurableTask Detached(this DurableTask task, string rootId) { throw null; }
+
         public static ConfiguredDurableTask Detached(this DurableTask task) { throw null; }
+
+        public static ConfiguredDurableTask<TResult> Detached<TResult>(this DurableTask<TResult> task, string rootId) { throw null; }
 
         public static ConfiguredDurableTask<TResult> Detached<TResult>(this DurableTask<TResult> task) { throw null; }
 
@@ -539,10 +540,6 @@ namespace Orleans.DurableTasks
 
     public static partial class DurableTaskRuntimeHelper
     {
-        public static void CancelAttempt(DurableTaskContext context, DurableTaskAttemptCancellationReason reason) { }
-
-        public static void RequestTaskCancellation(DurableTaskContext context, string? reason = null) { }
-
         public static System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableTaskContext context) { throw null; }
     }
 
