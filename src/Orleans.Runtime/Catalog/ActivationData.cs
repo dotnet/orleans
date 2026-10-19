@@ -2516,7 +2516,6 @@ internal sealed partial class ActivationData :
         private const int IsStuckProcessingMessageFlag = 1 << 0;
         private const int IsStuckDeactivatingFlag = 1 << 1;
         private const int IsDisposingFlag = 1 << 2;
-
         private byte _flags;
 
         /// <summary>
@@ -2535,7 +2534,6 @@ internal sealed partial class ActivationData :
         /// If State == Invalid, this may contain a forwarding address for incoming messages
         /// </summary>
         public SiloAddress? ForwardingAddress { get => GetValueOrDefault<SiloAddress>(nameof(ForwardingAddress)); set => SetOrRemoveValue(nameof(ForwardingAddress), value); }
-
 
         /// <summary>
         /// A <see cref="TaskCompletionSource{TResult}"/> which completes when a grain has deactivated.
@@ -2564,9 +2562,6 @@ internal sealed partial class ActivationData :
         public bool IsStuckProcessingMessage { get => GetFlag(IsStuckProcessingMessageFlag); set => SetFlag(IsStuckProcessingMessageFlag, value); }
         public bool IsStuckDeactivating { get => GetFlag(IsStuckDeactivatingFlag); set => SetFlag(IsStuckDeactivatingFlag, value); }
         public bool IsDisposing { get => GetFlag(IsDisposingFlag); set => SetFlag(IsDisposingFlag, value); }
-
-
-
 
         private void SetFlag(int flag, bool value)
         {
