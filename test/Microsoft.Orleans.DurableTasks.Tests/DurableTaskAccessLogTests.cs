@@ -353,7 +353,8 @@ public sealed class DurableTaskAccessLogTests
 
     [Theory]
     [InlineData(0x01)] // A record of another format.
-    [InlineData(0xC1)] // A reserved bit.
+    [InlineData(0xC5)] // A position with a value.
+    [InlineData(0xE1)] // A position with a reference.
     [InlineData(0x89)] // An exception without a value.
     [InlineData(0xA5)] // A reference with a value.
     public void RecordWhichThisVersionCantReadDiverges(byte header)

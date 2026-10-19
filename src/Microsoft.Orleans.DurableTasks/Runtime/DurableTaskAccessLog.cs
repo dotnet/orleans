@@ -53,13 +53,24 @@ namespace Orleans.DurableTasks.Runtime;
 /// attempt's writes throw its cancellation and its reads run against the state directly, unrecorded.
 /// </para>
 /// <para>
+/// A pure read of a state which the log's own journal holds records the journal's position instead of its value, with
+/// the read's argument, when the journal offers positions (<see cref="JournaledStateOperations.IsPositional"/>): the read
+/// observed the state as the journal's entries before that position leave it. Writing a position costs a few bytes and no
+/// encoding of the value. While any execution's log holds such a record, the logs hold a compaction barrier on the
+/// journal, so its history stays. A recovery whose journal holds the barrier replays the history and replaces each
+/// position with the value which the read observed, before any attempt replays; a snapshot which must pass the barrier does
+/// the same first. A replay therefore meets values, and stalls as a divergence on a position which couldn't be resolved.
+/// </para>
+/// <para>
 /// Each record has this format:
 /// </para>
 /// <code>
 /// record    := header operation state [arguments] outcome
 /// header    := one byte: bits 0-1 the access's kind (1 read, 2 write); 0x04 the record holds a value; 0x08 the value is
 ///              an exception (only with 0x04); 0x10 an argument hash follows; 0x20 the record refers to an earlier read;
-///              0x40 is reserved and zero; 0x80 is set in every record of this format
+///              0x40 the record holds a position of the journal instead of a value; 0x80 is set in every record of this
+///              format. A record holds no value (no flag), a value (0x04), an exception (0x0C), a reference (0x20), or a
+///              position (0x40).
 /// operation := one byte, the JournaledStateOperation
 /// state     := varint index into the log's table of states; the index which equals the table's size adds a state, whose
 ///              stable id, a little-endian int32, follows
@@ -69,6 +80,8 @@ namespace Orleans.DurableTasks.Runtime;
 ///            | varint length, then the Orleans-serialized value or exception (0x04)
 ///            | varint count of reads which repeat the latest read of the same state and operation recorded with a
 ///              value (0x20)
+///            | varint position of the journal, then a varint length and the Orleans-serialized argument, if the read
+///              takes one (0x40)
 /// </code>
 /// <para>
 /// A replay stalls as a divergence on a record with another combination of bits, so a later version can add forms which an
@@ -87,9 +100,9 @@ internal sealed class DurableTaskAccessLog(
     private const byte IsException = 0x08;
     private const byte HasArgumentHash = 0x10;
     private const byte IsReference = 0x20;
+    private const byte IsPosition = 0x40;
     private const byte Format = 0x80;
-    private const byte FormMask = HasValue | IsException | IsReference;
-    private const byte ReservedBits = 0x40;
+    private const byte FormMask = HasValue | IsException | IsReference | IsPosition;
 
     // The longest header: kind and flags, operation, a five-byte varint index, a state's id, and an argument hash.
     private const int MaxHeaderLength = 2 + 5 + 4 + 4;
@@ -103,6 +116,14 @@ internal sealed class DurableTaskAccessLog(
     private readonly Serializer _serializer = serializer;
     private readonly TaskScheduler _scheduler = scheduler;
     private readonly Func<DurableTaskDivergenceException, Exception> _diverge = diverge;
+
+    // The holder of positional reads, when the log's reads can record positions of its journal; and the holder's barrier
+    // epoch in which this attempt last registered a positional read.
+    private readonly Storage.DurableTaskAccessLogs? _positionHolder = storage.PositionHolder;
+    private int _positionEpoch = -1;
+
+    // The size of the table of states when the pending records began.
+    private int _pendingStateBase;
 
     // The records which earlier attempts staged, the position of the next one which this attempt consumes, and the
     // number of accesses which it consumed.
@@ -252,6 +273,12 @@ internal sealed class DurableTaskAccessLog(
 
     private void StopRecording()
     {
+        // The attempt's pending records are dropped, so it no longer holds positional reads.
+        if (_positionEpoch >= 0)
+        {
+            _positionHolder!.OnRecorderClosed(_taskId, this);
+        }
+
         _pending = null;
         _liveReads = null;
         _liveReadCount = 0;
@@ -287,7 +314,7 @@ internal sealed class DurableTaskAccessLog(
             return RecordRead(access, argument, state, operation);
         }
 
-        return Record(access, ArgumentHash(argument), state, operation, apply);
+        return Record(access, argument, state, operation, apply);
     }
 
     private static int? ArgumentHash<TArgument>(TArgument argument) =>
@@ -300,19 +327,26 @@ internal sealed class DurableTaskAccessLog(
         return result;
     }
 
-    private TResult Record<TState, TResult>(
+    private TResult Record<TArgument, TState, TResult>(
         in JournaledStateAccess access,
-        int? argumentHash,
+        TArgument argument,
         TState state,
         Func<TState, TResult> operation,
         Action<TState, TResult>? apply)
     {
+        var argumentHash = ArgumentHash(argument);
         TResult result;
         ArrayBufferWriter<byte>? encoded;
         byte[]? copied = null;
         try
         {
             result = operation(state);
+
+            // A pure read can record the journal's position instead of its value.
+            if (apply is null && access.Kind is JournaledStateAccessKind.Read && IsOpen && TryRecordPosition<TArgument, TResult>(access, argumentHash, argument))
+            {
+                return result;
+            }
 
             // A change whose result is known first records it before applying, so a result which can't be recorded
             // leaves the state unchanged.
@@ -369,11 +403,14 @@ internal sealed class DurableTaskAccessLog(
         // which records its result, such as a serializer, could change the state.
         var stamp = target.Stamp;
         bool repeats;
+        var positional = false;
         try
         {
             result = operation(state);
             repeats = typed?.Repeats(argument, result, stamp) is true;
-            if (!repeats)
+
+            // A pure read can record the journal's position instead of its value.
+            if (!repeats && !(positional = IsOpen && TryRecordPosition<TArgument, TResult>(access, argumentHash, argument)))
             {
                 encoded = Encode(result);
             }
@@ -396,8 +433,12 @@ internal sealed class DurableTaskAccessLog(
             return result;
         }
 
-        AddRecord(access, argumentHash, HasValue, encoded!.WrittenSpan);
-        ReleaseEncodingBuffer(encoded);
+        if (!positional)
+        {
+            AddRecord(access, argumentHash, HasValue, encoded!.WrittenSpan);
+            ReleaseEncodingBuffer(encoded);
+        }
+
         if (typed is null)
         {
             typed = new(target, access.Operation);
@@ -466,6 +507,11 @@ internal sealed class DurableTaskAccessLog(
                 index,
                 access,
                 $"was recorded as {(JournaledStateAccessKind)(flags & KindMask)} '{(JournaledStateOperation)operation}' of state #{target:x8}");
+        }
+
+        if ((flags & IsPosition) != 0)
+        {
+            throw Diverge(index, access, "reads the state as of a position of the journal which recovery couldn't resolve to a value, because the history before it is unavailable");
         }
 
         if ((flags & IsReference) != 0)
@@ -566,7 +612,7 @@ internal sealed class DurableTaskAccessLog(
         {
             flags = input[position];
             var form = flags & FormMask;
-            if ((flags & (ReservedBits | Format)) != Format || form is not (0 or HasValue or (HasValue | IsException) or IsReference))
+            if ((flags & Format) == 0 || form is not (0 or HasValue or (HasValue | IsException) or IsReference or IsPosition))
             {
                 return $"has a representation, 0x{flags:x2}, which this version doesn't read";
             }
@@ -599,6 +645,19 @@ internal sealed class DurableTaskAccessLog(
             else if ((flags & IsReference) != 0)
             {
                 count = ReadVarUInt32(input, ref position);
+            }
+            else if ((flags & IsPosition) != 0)
+            {
+                if (!TryReadVarUInt64(input, ref position, out _) || !TryReadVarUInt32(input, ref position, out var argumentLength))
+                {
+                    throw new FormatException("A recorded position is truncated.");
+                }
+
+                position = checked(position + (int)argumentLength);
+                if (position > input.Length)
+                {
+                    throw new FormatException("A recorded argument is truncated.");
+                }
             }
 
             return null;
@@ -840,6 +899,11 @@ internal sealed class DurableTaskAccessLog(
     {
         EndRun();
         var pending = _pending ??= new();
+        if (pending.WrittenCount == 0)
+        {
+            _pendingStateBase = _stateCount;
+        }
+
         var span = pending.GetSpan(MaxHeaderLength);
         span[0] = (byte)(header | Format | (argumentHash is null ? 0 : HasArgumentHash));
         span[1] = operation;
@@ -876,6 +940,264 @@ internal sealed class DurableTaskAccessLog(
 
         pending.Advance(length);
         return pending;
+    }
+
+    // Records a pure read of a state in the log's own journal as the journal's position, with the read's argument and its
+    // hash, when the journal offers positions and the serializer encodes the read's argument and result types; otherwise
+    // the caller records the read's value. A replay checks the argument hash of the value record which resolution makes
+    // of it, as of any record.
+    private bool TryRecordPosition<TArgument, TResult>(in JournaledStateAccess access, int? argumentHash, TArgument argument)
+    {
+        var target = access.Target;
+        if (_positionHolder?.Journal is not { } journal
+            || target.History is not { } history
+            || !ReferenceEquals(target.Manager, journal)
+            || !JournaledStateOperations.IsPositional(access.Operation)
+            || !PositionalTypes<TArgument, TResult>.IsSupported(_serializer))
+        {
+            return false;
+        }
+
+        // The journal up to the position must hold what the read observed, including a value which a coalescing state
+        // would journal only at the next write.
+        history.StagePendingChanges();
+        if (!journal.TryGetPosition(out var position))
+        {
+            return false;
+        }
+
+        var encoded = GetEncodingBuffer();
+        if (typeof(TArgument) != typeof(JournaledStateAccessNoArgument))
+        {
+            try
+            {
+                _serializer.Serialize(argument, encoded);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        var pending = BeginRecord((byte)((byte)access.Kind | IsPosition), (byte)access.Operation, target, argumentHash);
+        var span = pending.GetSpan(MaxVarUInt64Length + 5 + encoded.WrittenCount);
+        var length = WriteVarUInt64(span, (ulong)position);
+        length += WriteVarUInt32(span[length..], (uint)encoded.WrittenCount);
+        encoded.WrittenSpan.CopyTo(span[length..]);
+        pending.Advance(length + encoded.WrittenCount);
+        ReleaseEncodingBuffer(encoded);
+        var holder = _positionHolder!;
+        if (_positionEpoch != holder.Epoch)
+        {
+            _positionEpoch = holder.OnPositionalRecord(_taskId, this, position);
+        }
+
+        AddPending();
+        return true;
+    }
+
+    private const int MaxVarUInt64Length = 10;
+
+    // Whether the serializer encodes a positional read's argument and result types, so the read's value can be recovered.
+    private static class PositionalTypes<TArgument, TResult>
+    {
+        private static Entry? s_entry;
+
+        public static bool IsSupported(Serializer serializer)
+        {
+            if (s_entry is { } entry && ReferenceEquals(entry.Serializer, serializer))
+            {
+                return entry.IsSupported;
+            }
+
+            var supported = (typeof(TArgument) == typeof(JournaledStateAccessNoArgument) || serializer.CanSerialize<TArgument>())
+                && serializer.CanSerialize<TResult>();
+            s_entry = new(serializer, supported);
+            return supported;
+        }
+
+        private sealed record Entry(Serializer Serializer, bool IsSupported);
+    }
+
+    /// <summary>Gets the records which this attempt made and hasn't staged.</summary>
+    internal ReadOnlyMemory<byte> PendingRecords => _pending is { } pending ? pending.WrittenMemory : default;
+
+    /// <summary>
+    /// Gets the table of states as <see cref="PendingRecords"/> begins: the states which earlier records named, in order.
+    /// </summary>
+    internal ReadOnlySpan<int> PendingStates => _states.AsSpan(0, _pendingStateBase);
+
+    /// <summary>Replaces <see cref="PendingRecords"/> with records which name the same states in the same order.</summary>
+    internal void ReplacePendingRecords(ReadOnlySpan<byte> records)
+    {
+        var pending = _pending!;
+        pending.ResetWrittenCount();
+        records.CopyTo(pending.GetSpan(records.Length));
+        pending.Advance(records.Length);
+    }
+
+    /// <summary>Finds the positional records of <paramref name="records"/>, whose table of states begins as <paramref name="states"/>.</summary>
+    /// <returns>The positional records, or <see langword="null"/> when there are none.</returns>
+    /// <remarks>
+    /// Records after one which this version can't read are skipped: a replay stalls at that record before it reaches them.
+    /// </remarks>
+    internal static List<PositionalRecord>? FindPositionalRecords(ReadOnlyMemory<byte> records, ReadOnlySpan<int> states)
+    {
+        List<PositionalRecord>? found = null;
+        var table = new List<int>(states.Length + 4);
+        foreach (var id in states)
+        {
+            table.Add(id);
+        }
+
+        var input = records.Span;
+        var position = 0;
+        while (position < input.Length)
+        {
+            var start = position;
+            var header = input[position];
+            var form = header & FormMask;
+            if ((header & Format) == 0 || form is not (0 or HasValue or (HasValue | IsException) or IsReference or IsPosition) || input.Length - position < 3)
+            {
+                break;
+            }
+
+            var operation = (JournaledStateOperation)input[position + 1];
+            position += 2;
+            if (!TryReadVarUInt32(input, ref position, out var index) || index > table.Count)
+            {
+                break;
+            }
+
+            var stateIndex = (int)index;
+            if (stateIndex == table.Count)
+            {
+                if (input.Length - position < 4)
+                {
+                    break;
+                }
+
+                table.Add(BinaryPrimitives.ReadInt32LittleEndian(input[position..]));
+                position += 4;
+            }
+
+            if ((header & HasArgumentHash) != 0)
+            {
+                if (input.Length - position < 4)
+                {
+                    break;
+                }
+
+                position += 4;
+            }
+
+            var outcomeStart = position;
+            switch (form)
+            {
+                case 0:
+                    break;
+                case HasValue or HasValue | IsException:
+                    if (!TryReadVarUInt32(input, ref position, out var valueLength) || valueLength > input.Length - position)
+                    {
+                        return found;
+                    }
+
+                    position += (int)valueLength;
+                    break;
+                case IsReference:
+                    if (!TryReadVarUInt32(input, ref position, out _))
+                    {
+                        return found;
+                    }
+
+                    break;
+                default:
+                    if (!TryReadVarUInt64(input, ref position, out var journalPosition)
+                        || !TryReadVarUInt32(input, ref position, out var argumentLength)
+                        || argumentLength > input.Length - position)
+                    {
+                        return found;
+                    }
+
+                    var argument = records.Slice(position, (int)argumentLength);
+                    position += (int)argumentLength;
+                    (found ??= []).Add(new(start, outcomeStart, position, (JournaledStateAccessKind)(header & KindMask), operation, table[stateIndex], (long)journalPosition, argument));
+                    break;
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>
+    /// Writes <paramref name="record"/>, a positional record of <paramref name="records"/>, as a record of the value which
+    /// the read observed, <paramref name="value"/>.
+    /// </summary>
+    internal static void WriteValueRecord(IBufferWriter<byte> output, ReadOnlySpan<byte> records, in PositionalRecord record, ReadOnlySpan<byte> value)
+    {
+        var headerLength = record.OutcomeStart - record.Start;
+        var span = output.GetSpan(headerLength + 5 + value.Length);
+        records.Slice(record.Start, headerLength).CopyTo(span);
+        span[0] = (byte)((records[record.Start] & ~IsPosition) | HasValue);
+        var length = headerLength + WriteVarUInt32(span[headerLength..], (uint)value.Length);
+        value.CopyTo(span[length..]);
+        output.Advance(length + value.Length);
+    }
+
+    /// <summary>A record of a read as of a position of the journal, within an access log's records.</summary>
+    internal readonly record struct PositionalRecord(
+        int Start,
+        int OutcomeStart,
+        int End,
+        JournaledStateAccessKind Kind,
+        JournaledStateOperation Operation,
+        int StateId,
+        long Position,
+        ReadOnlyMemory<byte> Argument);
+
+    private static int WriteVarUInt64(Span<byte> destination, ulong value)
+    {
+        var length = 0;
+        while (value >= 0x80)
+        {
+            destination[length++] = (byte)(value | 0x80);
+            value >>= 7;
+        }
+
+        destination[length++] = (byte)value;
+        return length;
+    }
+
+    private static bool TryReadVarUInt64(ReadOnlySpan<byte> input, ref int position, out ulong value)
+    {
+        value = 0;
+        for (var shift = 0; shift < 70 && position < input.Length; shift += 7)
+        {
+            var next = input[position++];
+            value |= (ulong)(next & 0x7F) << shift;
+            if (next < 0x80)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryReadVarUInt32(ReadOnlySpan<byte> input, ref int position, out uint value)
+    {
+        value = 0;
+        for (var shift = 0; shift < 35 && position < input.Length; shift += 7)
+        {
+            var next = input[position++];
+            value |= (uint)(next & 0x7F) << shift;
+            if (next < 0x80)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static int WriteVarUInt32(Span<byte> destination, uint value)
