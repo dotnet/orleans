@@ -130,6 +130,23 @@ internal sealed class DurableTaskSymbols
         type?.ContainingNamespace?.ToDisplayString() is { } name
         && (name == DurableTasksNamespace || name.StartsWith(DurableTasksNamespace + ".", StringComparison.Ordinal));
 
+    /// <summary>
+    /// Returns whether a type is declared in the durable task abstractions' namespace or a namespace within it, comparing
+    /// namespace symbols without formatting their names.
+    /// </summary>
+    public bool IsInDurableTasksNamespace(ITypeSymbol? type)
+    {
+        for (var current = type?.ContainingNamespace; current is { IsGlobalNamespace: false }; current = current.ContainingNamespace)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, DurableTask.ContainingNamespace))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>Returns whether a method returns a durable task definition or a configuration of one.</summary>
     public bool ReturnsDefinition(IMethodSymbol method) => IsDefinitionType(method.ReturnType);
 
