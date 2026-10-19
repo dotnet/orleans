@@ -833,7 +833,9 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             client.GetObjectAsync(Arg.Any<GetObjectRequest>(), Arg.Any<CancellationToken>())
                 .Returns(_ => Task.FromResult(new GetObjectResponse
                 {
-                    ETag = eTag, ContentLength = 1, ResponseStream = new MemoryStream([1], writable: false),
+                    ETag = eTag,
+                    ContentLength = 1,
+                    ResponseStream = new MemoryStream([1], writable: false),
                 }));
             var storage = CreateStorage(client, new() { BucketName = BucketName, MetadataOnlyConflictInitialBackoff = TimeSpan.Zero });
             await storage.ReadAsync(new CapturingJournalStorageConsumer(), token);
