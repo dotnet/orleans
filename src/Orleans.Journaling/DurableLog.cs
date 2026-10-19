@@ -70,7 +70,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
     }
 
     // The collection journals each change as it makes it.
-    void IReplicableState.StagePendingChanges() { }
+    bool IReplicableState.IsReproducibleFromJournal => true;
 
     IJournaledStateReplica IReplicableState.CreateReplica() => new DurableLog<T>(_codec);
 

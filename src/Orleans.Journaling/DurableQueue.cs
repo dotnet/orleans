@@ -109,7 +109,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
     }
 
     // The collection journals each change as it makes it.
-    void IReplicableState.StagePendingChanges() { }
+    bool IReplicableState.IsReproducibleFromJournal => true;
 
     IJournaledStateReplica IReplicableState.CreateReplica() => new DurableQueue<T>(_codec);
 

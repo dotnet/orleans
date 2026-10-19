@@ -11,11 +11,11 @@ namespace Orleans.Journaling;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A state which supplies this guarantees that, after <see cref="StagePendingChanges"/>, the journal's entries up to the
-/// manager's current position reproduce everything which its positional reads observe
-/// (<see cref="JournaledStateOperations.IsPositional"/>). States which journal each change as they make it, such as the
-/// collections, have nothing to stage; states which coalesce changes until a write, such as <see cref="DurableValue{T}"/>,
-/// journal their pending value when asked.
+/// While <see cref="IsReproducibleFromJournal"/> holds, the journal's entries up to the manager's current position
+/// reproduce exactly everything which the state's positional reads observe (<see cref="JournaledStateOperations.IsPositional"/>).
+/// States which journal each change as they make it, such as the collections, always reproduce; states which coalesce
+/// changes until a write, such as <see cref="DurableValue{T}"/>, don't while a change is pending, so their reads record
+/// values until the write journals it.
 /// </para>
 /// <para>
 /// A replica is an isolated instance of the state, with no manager, which replays the state's entries and evaluates a
@@ -24,8 +24,11 @@ namespace Orleans.Journaling;
 /// </remarks>
 internal interface IReplicableState
 {
-    /// <summary>Journals the state's pending changes now, so its current content is a prefix of its journal.</summary>
-    void StagePendingChanges();
+    /// <summary>
+    /// Gets whether the journal's committed entries reproduce exactly what the state's positional reads observe now: no
+    /// change is pending a write, and the journaled encoding of the content reproduces it.
+    /// </summary>
+    bool IsReproducibleFromJournal { get; }
 
     /// <summary>Creates an empty replica of the state.</summary>
     IJournaledStateReplica CreateReplica();

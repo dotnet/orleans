@@ -71,7 +71,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IReportsS
     }
 
     // The collection journals each change as it makes it.
-    void IReplicableState.StagePendingChanges() { }
+    bool IReplicableState.IsReproducibleFromJournal => true;
 
     IJournaledStateReplica IReplicableState.CreateReplica() => new DurableList<T>(_codec);
 

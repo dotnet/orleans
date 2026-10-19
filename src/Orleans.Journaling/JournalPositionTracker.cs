@@ -87,15 +87,17 @@ internal sealed partial class JournalPositionTracker
 
     /// <summary>
     /// Gets the logical position of the journal's next entry, which a positional read of <paramref name="target"/>
-    /// records, when the manager offers positions and the target is the registered state which its id names, so a
-    /// resolution replays that state.
+    /// records, when the manager offers positions, the target is the registered state which its id names, so a resolution
+    /// replays that state, and the journal reproduces what the state's reads observe now
+    /// (<see cref="IReplicableState.IsReproducibleFromJournal"/>).
     /// </summary>
     public bool TryGetPosition(JournaledStateAccessTarget target, out long position)
     {
         if (TryGetPosition(out position)
             && ReplicableStates.TryGetValue(target.Id, out var entry)
             && entry is not null
-            && ReferenceEquals(entry.State, target.ReplicableState))
+            && ReferenceEquals(entry.State, target.ReplicableState)
+            && entry.State.IsReproducibleFromJournal)
         {
             return true;
         }
