@@ -130,6 +130,60 @@ public sealed class DurableTaskTransactionTests
         }
     });
 
+    [Fact]
+    public Task TransactionDoomedByANestedFailureRecordsItsFailure() => ActivationScheduler.RunAsync(async () =>
+    {
+        await using var harness = new DurableTaskReplayHarness(static grain => DoomAsync(grain));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await WriteStockAsync(activation.Grain, "a", 5);
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await activation.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+            Assert.Equal(5, activation.Grain.Stock["a"]);
+            activation.Grain.RequestUnrelatedWrite();
+            await activation.Grain.UnrelatedWrites;
+        }
+
+        // The replay throws the recorded failure without running the body again.
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        Assert.Equal(1, harness.EffectRuns);
+        Assert.Equal(5, replay.Grain.Stock["a"]);
+        replay.Grain.OpenGate();
+        var outcome = (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<string>();
+        Assert.StartsWith(nameof(InvalidOperationException), outcome, StringComparison.Ordinal);
+
+        static async DurableTask<string> DoomAsync(ReplayGrain grain)
+        {
+            string outcome;
+            try
+            {
+                await DurableTaskTransactions.RunAsync("move", async cancellationToken =>
+                {
+                    grain.Harness.CountEffectRun();
+                    grain.Stock["a"] -= 1;
+                    try
+                    {
+                        await grain.Manager.RunTransactionAsync(_ => throw new FormatException("nested"), cancellationToken);
+                    }
+                    catch (FormatException)
+                    {
+                    }
+
+                    return 0;
+                });
+                outcome = "moved";
+            }
+            catch (Exception exception)
+            {
+                outcome = $"{exception.GetType().Name}: {exception.Message}";
+            }
+
+            await grain.WaitAtGateAsync();
+            return outcome;
+        }
+    });
+
     private static async DurableTask<int> MoveAsync(ReplayGrain grain)
     {
         var moved = await DurableTaskTransactions.RunAsync("move", async _ =>
