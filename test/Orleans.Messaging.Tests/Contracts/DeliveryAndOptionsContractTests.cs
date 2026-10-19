@@ -1,5 +1,4 @@
 using Orleans.Messaging.Configuration;
-using Polly;
 using Xunit;
 
 namespace Orleans.Messaging.Tests.Contracts;
@@ -14,6 +13,7 @@ public sealed class DeliveryAndOptionsContractTests
     {
         var handlerMissing = DeliveryResult.HandlerNotFound();
         var deadLettered = DeliveryResult.DeadLettered("poison body");
+        var coded = DeliveryResult.DeadLettered("duplicate order", "orders/duplicate");
 
         Assert.Equal(DeliveryStatus.Accepted, DeliveryResult.Accepted().Status);
         Assert.Equal(DeliveryStatus.Duplicate, DeliveryResult.Duplicate().Status);
@@ -22,6 +22,9 @@ public sealed class DeliveryAndOptionsContractTests
         Assert.Equal("No inbox handler is registered.", handlerMissing.Message);
         Assert.Equal(DeliveryStatus.DeadLettered, deadLettered.Status);
         Assert.Equal("poison body", deadLettered.Message);
+        Assert.Null(deadLettered.Code);
+        Assert.Equal("duplicate order", coded.Message);
+        Assert.Equal("orders/duplicate", coded.Code);
     }
 
     [Fact]
@@ -51,8 +54,6 @@ public sealed class DeliveryAndOptionsContractTests
         Assert.Equal(TimeSpan.FromDays(7), options.DeduplicationWindow);
         Assert.Equal(TimeSpan.FromHours(6), options.OutboxRetryTimeout);
         Assert.Equal(TimeSpan.FromDays(30), options.DeadLetterRetentionPeriod);
-        Assert.Equal(5, options.MaxProcessingAttempts);
-        Assert.Same(ResiliencePipeline.Empty, options.DeliveryResiliencePipeline);
         Assert.Equal(1000, options.MaxRetainedDeadLetters);
         Assert.Equal(32, options.InboxBatchSize);
         Assert.Equal(32, options.OutboxBatchSize);
@@ -67,7 +68,6 @@ public sealed class DeliveryAndOptionsContractTests
             (nameof(DurableMessagingOptions.DeduplicationWindow), options => options.DeduplicationWindow = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.RetryInitialInterval), options => options.RetryInitialInterval = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.RetryInitialInterval), options => options.RetryInitialInterval = TimeSpan.MaxValue),
-            (nameof(DurableMessagingOptions.MaxProcessingAttempts), options => options.MaxProcessingAttempts = 0),
             (nameof(DurableMessagingOptions.OutboxRetryTimeout), options => options.OutboxRetryTimeout = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.DeadLetterRetentionPeriod), options => options.DeadLetterRetentionPeriod = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.MaxRetainedDeadLetters), options => options.MaxRetainedDeadLetters = 0),
@@ -84,15 +84,6 @@ public sealed class DeliveryAndOptionsContractTests
         }
     }
 
-
-    [Fact]
-    public void Validate_NullDeliveryResiliencePipeline_Fails()
-    {
-        var options = new DurableMessagingOptions { DeliveryResiliencePipeline = null! };
-
-        var exception = Assert.Throws<ArgumentNullException>(options.Validate);
-        Assert.Equal(nameof(DurableMessagingOptions.DeliveryResiliencePipeline), exception.ParamName);
-    }
 
     [Fact]
     public void Validate_OutboxRetryTimeoutNotLessThanDeduplicationWindow_FailsAtBoundaryAndAbove()

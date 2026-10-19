@@ -27,6 +27,11 @@ public interface IOutbox
     /// or <see cref="IInboxHandlerContext.Fail"/>.
     /// Ordinary callers persist staged messages using their journaled state manager.
     /// An explicit write retry retains pending business changes and messages after a scheduling failure.
+    /// A message addressed to the sending grain bypasses the outbox: the grain's own inbox stages its acceptance
+    /// for the same journal write, applying the inbox identity rules, so a completed ID is a duplicate and a different
+    /// pending command with the ID conflicts. The inbox admits such a message regardless of its capacity and of handler
+    /// registration, and the send fails when an <see cref="IInboxMessageSink"/> reports
+    /// <see cref="DeliveryStatus.Backpressured"/> for it.
     /// </remarks>
     /// <exception cref="ArgumentException">The envelope has an unset identity, invalid subject or destination, or exceeds identity/subject limits.</exception>
     /// <exception cref="InvalidOperationException">
@@ -58,6 +63,24 @@ public interface IOutbox
     /// or the outbox is unavailable.
     /// </exception>
     void Send(MessageId messageId);
+
+    /// <summary>
+    /// Synchronously stages, for the grain's next journal write, the removal of a pending message which a registered
+    /// <see cref="IOutboxMessageSource"/> provides.
+    /// </summary>
+    /// <param name="messageId">The ID of a message sent through <see cref="Send(MessageId)"/>.</param>
+    /// <returns>
+    /// <see langword="true"/> when the outbox staged the removal; <see langword="false"/> when no such message is pending.
+    /// </returns>
+    /// <remarks>
+    /// Stage the source's release of the payload in the same journal write. The outbox makes no further delivery attempt
+    /// and doesn't call <see cref="IOutboxMessageSource.OnRetired"/>. An attempt already in flight can still deliver the
+    /// message.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The ID is pending as an ordinary message, or the outbox is unavailable.
+    /// </exception>
+    bool Withdraw(MessageId messageId);
 
     /// <summary>Registers a source which provides messages sent through <see cref="Send(MessageId)"/>.</summary>
     /// <param name="source">The source.</param>
