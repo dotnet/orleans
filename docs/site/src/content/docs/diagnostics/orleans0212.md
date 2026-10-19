@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0212: Filter cancellation handlers by IsTaskCancellationRequested"
 description: Understand ORLEANS0212, which reports a handler which catches cancellation around durable operations without filtering by DurableTask.Current.IsTaskCancellationRequested, and fix it with a filter or a rethrow.
-ms.date: 10/16/2026
+ms.date: 10/19/2026
 ms.topic: reference
 ---
 
@@ -9,7 +9,7 @@ ms.topic: reference
 
 | Property | Value |
 | --- | --- |
-| Severity | Info |
+| Severity | Warning |
 | Category | Usage |
 | Code fix | None |
 

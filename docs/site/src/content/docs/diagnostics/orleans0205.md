@@ -9,7 +9,7 @@ ms.topic: reference
 
 | Property | Value |
 | --- | --- |
-| Severity | Warning |
+| Severity | Error |
 | Category | Usage |
 | Code fix | None |
 
