@@ -43,7 +43,7 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IReportsStagedChanges, IDurableTaskCompletionSourceCommandHandler<T>, IJournaledStateHistory, IJournaledStateReplica
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IReportsStagedChanges, IDurableTaskCompletionSourceCommandHandler<T>, IReplicableState, IJournaledStateReplica
 {
     private readonly IDurableTaskCompletionSourceCommandCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
@@ -284,7 +284,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     private bool HasUncapturedCompletion => _status is not DurableTaskCompletionSourceStatus.Pending && !_isCompletionCaptured && !_completion.Task.IsCompleted;
 
     // A completion journals its state at the next write; a positional read journals it now, so the journal holds what it read.
-    void IJournaledStateHistory.StagePendingChanges()
+    void IReplicableState.StagePendingChanges()
     {
         if (HasUncapturedCompletion)
         {
@@ -294,7 +294,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableTaskCompletionSource<T>(_codec, _copier, _exceptionCopier);
+    IJournaledStateReplica IReplicableState.CreateReplica() => new DurableTaskCompletionSource<T>(_codec, _copier, _exceptionCopier);
 
     void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
     {

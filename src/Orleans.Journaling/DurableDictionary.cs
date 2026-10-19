@@ -22,7 +22,7 @@ public interface IDurableDictionary<TKey, TValue> : IDictionary<TKey, TValue> wh
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
 internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue>, IStateMachine, IReportsStagedChanges, IDurableDictionaryCommandHandler<TKey, TValue>,
-    IResyncSource<DictionaryChange<TKey, TValue>>, IJournaledStateHistory, IJournaledStateReplica where TKey : notnull
+    IResyncSource<DictionaryChange<TKey, TValue>>, IReplicableState, IJournaledStateReplica where TKey : notnull
 {
     private readonly IDurableDictionaryCommandCodec<TKey, TValue> _codec;
     private readonly Dictionary<TKey, TValue> _items = [];
@@ -350,9 +350,9 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         : ((IEnumerable<KeyValuePair<TKey, TValue>>)_items).GetEnumerator();
 
     // The collection journals each change as it makes it.
-    void IJournaledStateHistory.StagePendingChanges() { }
+    void IReplicableState.StagePendingChanges() { }
 
-    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableDictionary<TKey, TValue>(_codec);
+    IJournaledStateReplica IReplicableState.CreateReplica() => new DurableDictionary<TKey, TValue>(_codec);
 
     void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
     {

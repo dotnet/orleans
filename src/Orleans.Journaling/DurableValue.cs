@@ -21,7 +21,7 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReportsStagedChanges, IDurableValueCommandHandler<T>, IJournaledStateHistory, IJournaledStateReplica
+internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReportsStagedChanges, IDurableValueCommandHandler<T>, IReplicableState, IJournaledStateReplica
 {
     private readonly IDurableValueCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
@@ -175,7 +175,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
     }
 
     // A set journals the value at the next write; a positional read journals it now, so the journal holds what it read.
-    void IJournaledStateHistory.StagePendingChanges()
+    void IReplicableState.StagePendingChanges()
     {
         if (_isDirty)
         {
@@ -186,7 +186,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
         }
     }
 
-    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableValue<T>(_codec);
+    IJournaledStateReplica IReplicableState.CreateReplica() => new DurableValue<T>(_codec);
 
     void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
     {

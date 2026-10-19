@@ -484,9 +484,9 @@ internal sealed class AccessRecordingFixture<TValue> : AccessRecordingFixture wh
 
     public override int MeasureBarrierBytes()
     {
-        var positions = new JournalPositionState(() => _barrierCodecFactory());
+        var positions = new JournalBarrierState(() => _barrierCodecFactory());
         using var journal = _journalFormat.CreateWriter();
-        var stream = journal.CreateJournalStreamWriter(new JournalStreamId(JournalPositionState.Id));
+        var stream = journal.CreateJournalStreamWriter(new JournalStreamId(JournalBarrierState.Id));
         positions.Set(DurableTaskAccessLogs.StateMachineName, 12_345);
         ((IStateMachine)positions).WritePendingEntries(stream);
         positions.RemoveAll();
