@@ -51,6 +51,9 @@ internal sealed class JournaledTestOutbox(IDurableDictionary<MessageId, OutboxMe
     public void Send(MessageId messageId) =>
         throw new NotSupportedException("The test outbox stores complete envelopes only.");
 
+    public bool Withdraw(MessageId messageId) =>
+        throw new NotSupportedException("The test outbox stores complete envelopes only.");
+
     public IOutbox Register(IOutboxMessageSource source) =>
         throw new NotSupportedException("The test outbox stores complete envelopes only.");
 

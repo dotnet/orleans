@@ -37,4 +37,7 @@ internal sealed class InboxDeadLetter
 
     [Id(3)]
     public int AttemptCount { get; init; }
+
+    [Id(4)]
+    public string? Code { get; init; }
 }
