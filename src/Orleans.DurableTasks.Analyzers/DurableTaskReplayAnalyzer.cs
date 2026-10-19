@@ -48,7 +48,10 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
         DurableTaskDiagnostics.UnfilteredCancellationHandler,
         DurableTaskDiagnostics.AsyncVoidInBody,
         DurableTaskDiagnostics.RepeatedSignalWait,
-        DurableTaskDiagnostics.ReplayedLog);
+        DurableTaskDiagnostics.ReplayedLog,
+        DurableTaskDiagnostics.PollInBody,
+        DurableTaskDiagnostics.ContinuationOffScheduler,
+        DurableTaskDiagnostics.OperationInEffect);
 
     /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
@@ -361,7 +364,10 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             }
         }
 
-        /// <summary>Reports assignments to the body's variables and scheduler escapes in a <c>DurableTask.RunInline</c> effect.</summary>
+        /// <summary>
+        /// Reports, in a <c>DurableTask.RunInline</c> effect, assignments to the body's variables and changes to the objects
+        /// which they hold, durable operations, and scheduler escapes.
+        /// </summary>
         private void AnalyzeEffect(ControlFlowGraph graph)
         {
             var effect = graph.OriginalOperation switch
@@ -377,15 +383,23 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                     foreach (var operation in DurableTaskSymbols.DescendantsAndSelf(root))
                     {
                         CheckSchedulerEscape(operation);
+                        if (operation is IInvocationOperation invocation && symbols.IsOperationOutsideEffects(invocation))
+                        {
+                            Report(DurableTaskDiagnostics.OperationInEffect, invocation.Syntax.GetLocation(), invocation.TargetMethod.Name);
+                        }
+
                         var target = operation switch
                         {
                             ISimpleAssignmentOperation assignment => assignment.Target,
                             ICompoundAssignmentOperation assignment => assignment.Target,
                             IIncrementOrDecrementOperation increment => increment.Target,
                             ICoalesceAssignmentOperation assignment => assignment.Target,
+
+                            // A change in place, such as an item added to a captured list, is an output too.
+                            IInvocationOperation { Instance: { } instance } changed when DurableTaskSymbols.IsCollectionMutation(changed.TargetMethod) => instance,
                             _ => null,
                         };
-                        ISymbol? variable = target switch
+                        ISymbol? variable = (target is null ? null : RootOf(target)) switch
                         {
                             ILocalReferenceOperation local => local.Local,
                             IParameterReferenceOperation parameter => parameter.Parameter,
@@ -400,6 +414,18 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                         }
                     }
                 }
+            }
+
+            // The variable whose object an assignment or a change reaches, through member accesses such as order.Lines.
+            static IOperation RootOf(IOperation target)
+            {
+                var current = DurableTaskSymbols.Unwrap(target);
+                while (current is IMemberReferenceOperation { Instance: { } instance } && instance is not IInstanceReferenceOperation)
+                {
+                    current = DurableTaskSymbols.Unwrap(instance);
+                }
+
+                return current;
             }
         }
 
@@ -545,6 +571,9 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             {
                 IInvocationOperation { TargetMethod: { Name: "Yield", ContainingType: var type } } when IsTask(type) => false,
                 IPropertyReferenceOperation { Property.Name: "CompletedTask" } => false,
+
+                // ORLEANS0225 reports polls.
+                IInvocationOperation invocation when DurableTaskSymbols.IsPoll(invocation) => false,
                 _ => true,
             };
         }
@@ -728,6 +757,18 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                 if (Symbols.IsSignalWait(invocation) && IsInLoop(invocation.Syntax) && DurableTaskSymbols.GetExtensionReceiver(invocation) is { } signal && !IsDerivedSignal(signal))
                 {
                     _analysis.Report(DurableTaskDiagnostics.RepeatedSignalWait, invocation.Syntax.GetLocation(), signal.Syntax.ToString());
+                }
+
+                // Polls and context-free continuations are valid outside durable task bodies, such as in a client, so only
+                // a body reports them.
+                if (_kind == FunctionKind.Body && DurableTaskSymbols.IsPoll(invocation))
+                {
+                    _analysis.Report(DurableTaskDiagnostics.PollInBody, invocation.Syntax.GetLocation(), method.Name);
+                }
+
+                if (_kind == FunctionKind.Body && DurableTaskSymbols.ContinuesOffContext(invocation, out var argument))
+                {
+                    _analysis.Report(DurableTaskDiagnostics.ContinuationOffScheduler, invocation.Syntax.GetLocation(), argument);
                 }
 
                 // A WithId name identifies a child only in a durable task body; elsewhere, such as in a client, it names a

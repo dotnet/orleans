@@ -18,6 +18,98 @@ public class DurableTaskUsageRuleTests
         """;
 
     [Fact]
+    public Task RunInlineEffectsReturnTheirOutputsInsteadOfChangingCapturedObjects() => AnalyzerVerifier.VerifyAsync($$"""
+        public class C
+        {
+        {{Members}}
+            public sealed class Order
+            {
+                public int Total { get; set; }
+            }
+
+            public async DurableTask<int> RunAsync(Order order)
+            {
+                var reserved = new List<int>();
+                DurableTask.RunInline("reserve", () => { {|ORLEANS0204:reserved.Add(1)|}; });
+                DurableTask.RunInline("total", () => { {|ORLEANS0204:order.Total = 2|}; });
+                var returned = DurableTask.RunInline("return", () =>
+                {
+                    var lines = new List<int>();
+                    lines.Add(3);
+                    return lines.Count;
+                });
+                await Step(reserved.Count + returned).WithId("step");
+                return order.Total;
+            }
+        }
+        """);
+
+    [Fact]
+    public Task DurableOperationsRunOutsideEffects() => AnalyzerVerifier.VerifyAsync($$"""
+        public class C
+        {
+        {{Members}}
+            private static readonly DurableVersion Carrier = new("carrier", 0, 1);
+
+            public async DurableTask<int> RunAsync()
+            {
+                DurableTask.RunInline("post", () => { {|ORLEANS0227:Step(1).WithId("child").Post()|}; });
+                var version = DurableTask.RunInline("version", () => {|ORLEANS0227:DurableTask.GetVersion("change", 0, 1)|});
+                var carrier = DurableTask.RunInline("carrier", () => {|ORLEANS0227:Carrier.IsAtLeast(1)|});
+
+                // A nested effect runs as part of its enclosing effect.
+                var nested = DurableTask.RunInline("nested", () => DurableTask.RunInline("inner", () => 1));
+                return await Step(version + nested + (carrier ? 1 : 0)).WithId("step");
+            }
+        }
+        """);
+
+    [Fact]
+    public Task BodiesAwaitTasksInsteadOfPollingThem() => AnalyzerVerifier.VerifyAsync($$"""
+        public class C
+        {
+        {{Members}}
+            public async DurableTask<DurableTaskStatus> RunAsync()
+            {
+                var child = await Step(1).WithId("child").ScheduleAsync();
+                while (!await {|ORLEANS0225:child.IsCompletedAsync()|})
+                {
+                    await DurableTask.Delay(TimeSpan.FromMinutes(1)).WithId("wait");
+                }
+
+                _ = await {|ORLEANS0225:child.GetResponseAsync(new PollingOptions())|};
+                _ = await child.GetResponseAsync();
+                return await {|ORLEANS0225:child.GetStatusAsync()|};
+            }
+
+            // A client polls, because it has no execution to replay.
+            public async Task<bool> ClientAsync(ScheduledTask task) => await task.IsCompletedAsync();
+        }
+        """);
+
+    [Fact]
+    public Task BodiesContinueOnTheirScheduler() => AnalyzerVerifier.VerifyAsync($$"""
+        public class C
+        {
+        {{Members}}
+            public async DurableTask<int> RunAsync()
+            {
+                var step = await DurableTask.Run(async () => await {|ORLEANS0226:FetchAsync().ConfigureAwait(false)|});
+                var recorded = await Step(1).WithId("step");
+
+                // The tail runs once, after the last durable operation, and continues on the scheduler too.
+                var fetched = await {|ORLEANS0226:FetchAsync().ConfigureAwait(false)|};
+                await {|ORLEANS0226:Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing)|};
+                await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+                return fetched + step + recorded + await FetchAsync().ConfigureAwait(true);
+            }
+
+            // Code outside durable task bodies, such as a client, continues where it likes.
+            public async Task<int> ClientAsync() => await FetchAsync().ConfigureAwait(false);
+        }
+        """);
+
+    [Fact]
     public Task RunInlineEffectsReturnTheirOutputs() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {
