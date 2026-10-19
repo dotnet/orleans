@@ -116,22 +116,28 @@ internal abstract class JournaledStateContextProvider
 /// <summary>Identifies journaled state whose accesses run through a <see cref="JournaledStateContext"/>.</summary>
 /// <remarks>
 /// <see cref="Id"/> is a stable hash of <see cref="Name"/>, so a record of an access identifies its state across processes
-/// and deployments without storing the name.
+/// and deployments without storing the name. The identifiers of one manager's states are distinct: a manager rejects a
+/// state whose identifier another of its states has, so its name needs to change.
 /// </remarks>
 internal sealed class JournaledStateAccessTarget
 {
+    /// <exception cref="InvalidOperationException">Another state of <paramref name="manager"/> has the same identifier.</exception>
     public JournaledStateAccessTarget(string name, IJournaledStateManager manager)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         Name = name;
         Id = ComputeId(name);
         Manager = manager as JournaledStateManager;
+        Manager?.RegisterAccessTarget(this);
     }
 
     /// <summary>Gets the state's journal name.</summary>
     public string Name { get; }
 
-    /// <summary>Gets the stable hash of <see cref="Name"/>.</summary>
+    /// <summary>
+    /// Gets the stable hash of <see cref="Name"/>, which is unique among the states of <see cref="Manager"/>, so a record
+    /// identifies the state which it accessed.
+    /// </summary>
     public int Id { get; }
 
     /// <summary>Gets the manager whose provider supplies the state's context, or <see langword="null"/>.</summary>
