@@ -1,0 +1,5 @@
+﻿HEX: 011F000000080000000D5BAD8F0FCBD99F46A16570867728950E070B03400B616C706861
+DISASSEMBLY:
+[entry 0] frame-version=1 length=31 streamId=8 payload-bytes=27
+0000  0D 5B AD 8F 0F CB D9 9F  46 A1 65 70 86 77 28 95   |.[......F.ep.w(.|
+0010  0E 07 0B 03 40 0B 61 6C  70 68 61                  |....@.alpha|

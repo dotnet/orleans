@@ -1,3 +1,4 @@
+using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
@@ -16,6 +17,8 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
     private const uint SnapshotCommand = 2;
     private const uint ClearCommand = 3;
     private const uint SealCommand = 4;
+    private const uint EpochCommand = 5;
+    private const uint DraftCommitCommand = 6;
     private const uint SealedFlag = 1;
 
     /// <inheritdoc/>
@@ -31,6 +34,36 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(AppendCommand);
         payloadWriter.WriteVarUInt32((uint)items.Length);
+        payloadWriter.Commit();
+        foreach (var item in items)
+        {
+            OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
+        }
+
+        entry.Commit();
+    }
+
+    /// <inheritdoc/>
+    public void WriteEpoch(long epoch, JournalStreamWriter writer)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(epoch);
+        using var entry = writer.BeginEntry();
+        var payloadWriter = Writer.Create(entry.Writer, session: null!);
+        payloadWriter.WriteVarUInt32(EpochCommand);
+        payloadWriter.WriteVarUInt64((ulong)epoch);
+        payloadWriter.Commit();
+        entry.Commit();
+    }
+
+    /// <inheritdoc/>
+    public void WriteDraftCommit(LogDraftId draftId, long sequence, ReadOnlySpan<T> items, JournalStreamWriter writer)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(sequence);
+        using var entry = writer.BeginEntry();
+        var output = entry.Writer;
+        var payloadWriter = Writer.Create(output, session: null!);
+        payloadWriter.WriteVarUInt32(DraftCommitCommand);
+        WriteDraftCommit(ref payloadWriter, new(draftId, sequence, items.Length));
         payloadWriter.Commit();
         foreach (var item in items)
         {
@@ -59,16 +92,26 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
     public void WriteSeal(JournalStreamWriter writer) => WriteCommand(SealCommand, writer);
 
     /// <inheritdoc/>
-    public void WriteSnapshot(long firstSequence, long resetSequence, bool isSealed, IReadOnlyCollection<T> items, JournalStreamWriter writer)
+    public void WriteSnapshot(
+        long epoch,
+        long firstSequence,
+        long resetSequence,
+        bool isSealed,
+        IReadOnlyCollection<T> items,
+        IReadOnlyCollection<LogDraftCommit> draftCommits,
+        JournalStreamWriter writer)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(epoch);
         ArgumentOutOfRangeException.ThrowIfNegative(resetSequence);
         ArgumentOutOfRangeException.ThrowIfLessThan(firstSequence, resetSequence);
         ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(draftCommits);
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(SnapshotCommand);
+        payloadWriter.WriteVarUInt64((ulong)epoch);
         payloadWriter.WriteVarUInt64((ulong)firstSequence);
         payloadWriter.WriteVarUInt64((ulong)resetSequence);
         payloadWriter.WriteVarUInt32(isSealed ? SealedFlag : 0);
@@ -83,6 +126,19 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
         }
 
         CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
+        var commitCount = CollectionCodecHelpers.GetSnapshotCount(draftCommits);
+        payloadWriter = Writer.Create(output, session: null!);
+        payloadWriter.WriteVarUInt32((uint)commitCount);
+        written = 0;
+        foreach (var commit in draftCommits)
+        {
+            CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(commitCount, written);
+            WriteDraftCommit(ref payloadWriter, commit);
+            written++;
+        }
+
+        CollectionCodecHelpers.RequireSnapshotItemCount(commitCount, written);
+        payloadWriter.Commit();
         entry.Commit();
     }
 
@@ -127,6 +183,18 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
             case SealCommand:
                 consumer.ApplySeal();
                 break;
+            case EpochCommand:
+                consumer.ApplyEpoch(ReadSequence(ref reader));
+                break;
+            case DraftCommitCommand:
+                var commit = ReadDraftCommit(ref reader);
+                for (var i = 0; i < commit.Count; i++)
+                {
+                    consumer.ApplyAppend(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
+                }
+
+                consumer.ApplyDraftCommit(commit);
+                break;
             case SnapshotCommand:
                 ApplySnapshot(ref reader, consumer);
                 break;
@@ -137,6 +205,7 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
 
     private void ApplySnapshot<TInput>(ref Reader<TInput> reader, IDurableLogCommandHandler<T> consumer)
     {
+        var epoch = ReadSequence(ref reader);
         var firstSequence = ReadSequence(ref reader);
         var resetSequence = ReadSequence(ref reader);
         var flags = reader.ReadVarUInt32();
@@ -146,11 +215,40 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
         }
 
         var count = OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref reader);
-        consumer.Reset(firstSequence, resetSequence, (flags & SealedFlag) != 0, count);
+        consumer.Reset(epoch, firstSequence, resetSequence, count);
         for (var i = 0; i < count; i++)
         {
             consumer.ApplyAppend(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
         }
+
+        var commitCount = OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref reader);
+        for (var i = 0; i < commitCount; i++)
+        {
+            consumer.ApplyDraftCommit(ReadDraftCommit(ref reader));
+        }
+
+        if ((flags & SealedFlag) != 0)
+        {
+            consumer.ApplySeal();
+        }
+    }
+
+    private static void WriteDraftCommit<TBufferWriter>(ref Writer<TBufferWriter> writer, LogDraftCommit commit)
+        where TBufferWriter : IBufferWriter<byte>
+    {
+        GuidCodec.WriteRaw(ref writer, commit.DraftId.InstanceId);
+        writer.WriteVarUInt64((ulong)commit.DraftId.Number);
+        writer.WriteVarUInt64((ulong)commit.Sequence);
+        writer.WriteVarUInt32((uint)commit.Count);
+    }
+
+    private static LogDraftCommit ReadDraftCommit<TInput>(ref Reader<TInput> reader)
+    {
+        var instanceId = GuidCodec.ReadRaw(ref reader);
+        var number = ReadSequence(ref reader);
+        var sequence = ReadSequence(ref reader);
+        var count = OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref reader);
+        return new(new LogDraftId(instanceId, number), sequence, count);
     }
 
     private static void WriteCommand(uint command, JournalStreamWriter writer)

@@ -103,10 +103,10 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
         _items.Clear();
         _writer = writer;
         _hasStagedEntries = false;
-        PublishResync();
+        DurableStateObservation.PublishDurableResync<DurableQueue<T>, QueueChange<T>>(_manager, this);
     }
 
-    void IStateMachine.OnRecoveryCompleted() => PublishResync();
+    void IStateMachine.OnRecoveryCompleted() => DurableStateObservation.PublishDurableResync<DurableQueue<T>, QueueChange<T>>(_manager, this);
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
@@ -179,15 +179,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     {
         if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
         {
-            topic.Publish(new QueueChange<T> { Kind = kind, Item = item });
-        }
-    }
-
-    private void PublishResync()
-    {
-        if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
-        {
-            topic.Publish(((IResyncSource<QueueChange<T>>)this).CreateResync(), isDurable: true);
+            topic.PublishStaged(new QueueChange<T> { Kind = kind, Item = item });
         }
     }
 

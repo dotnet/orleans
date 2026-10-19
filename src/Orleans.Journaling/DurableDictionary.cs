@@ -78,10 +78,10 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         _items.Clear();
         _writer = writer;
         _hasStagedEntries = false;
-        PublishResync();
+        DurableStateObservation.PublishDurableResync<DurableDictionary<TKey, TValue>, DictionaryChange<TKey, TValue>>(_manager, this);
     }
 
-    void IStateMachine.OnRecoveryCompleted() => PublishResync();
+    void IStateMachine.OnRecoveryCompleted() => DurableStateObservation.PublishDurableResync<DurableDictionary<TKey, TValue>, DictionaryChange<TKey, TValue>>(_manager, this);
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
@@ -103,7 +103,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         ApplyClear();
         if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
         {
-            topic.Publish(new DictionaryChange<TKey, TValue> { Kind = DictionaryChangeKind.Cleared });
+            topic.PublishStaged(new DictionaryChange<TKey, TValue> { Kind = DictionaryChangeKind.Cleared });
         }
     }
 
@@ -204,7 +204,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     {
         if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
         {
-            topic.Publish(new DictionaryChange<TKey, TValue> { Kind = DictionaryChangeKind.Set, Key = key, Value = value });
+            topic.PublishStaged(new DictionaryChange<TKey, TValue> { Kind = DictionaryChangeKind.Set, Key = key, Value = value });
         }
     }
 
@@ -212,15 +212,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     {
         if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
         {
-            topic.Publish(new DictionaryChange<TKey, TValue> { Kind = DictionaryChangeKind.Removed, Key = key });
-        }
-    }
-
-    private void PublishResync()
-    {
-        if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
-        {
-            topic.Publish(((IResyncSource<DictionaryChange<TKey, TValue>>)this).CreateResync(), isDurable: true);
+            topic.PublishStaged(new DictionaryChange<TKey, TValue> { Kind = DictionaryChangeKind.Removed, Key = key });
         }
     }
 

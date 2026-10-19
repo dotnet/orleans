@@ -2,6 +2,10 @@ namespace Orleans.Journaling.Json;
 
 internal static class JsonJournalEntryFields
 {
+    public const string DraftCommits = "draftCommits";
+    public const string DraftId = "draftId";
+    public const string Count = "count";
+    public const string Epoch = "epoch";
     public const string Index = "index";
     public const string Item = "item";
     public const string Items = "items";
@@ -22,8 +26,10 @@ internal static class JsonJournalEntryCommands
     public const string Canceled = "canceled";
     public const string Clear = "clear";
     public const string Completed = "completed";
+    public const string CommitDraft = "commitDraft";
     public const string Dequeue = "dequeue";
     public const string Enqueue = "enqueue";
+    public const string Epoch = "epoch";
     public const string Faulted = "faulted";
     public const string Insert = "insert";
     public const string Pending = "pending";

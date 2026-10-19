@@ -79,7 +79,12 @@ internal sealed class JsonDurableLogCommandCodecService<T>(IOptions<JsonJournalO
 {
     private readonly JsonDurableLogCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).Value.SerializerOptions);
 
+    public void WriteEpoch(long epoch, JournalStreamWriter writer) => _inner.WriteEpoch(epoch, writer);
+
     public void WriteAppend(ReadOnlySpan<T> items, JournalStreamWriter writer) => _inner.WriteAppend(items, writer);
+
+    public void WriteDraftCommit(LogDraftId draftId, long sequence, ReadOnlySpan<T> items, JournalStreamWriter writer) =>
+        _inner.WriteDraftCommit(draftId, sequence, items, writer);
 
     public void WriteTrimBefore(long sequence, JournalStreamWriter writer) => _inner.WriteTrimBefore(sequence, writer);
 
@@ -87,8 +92,15 @@ internal sealed class JsonDurableLogCommandCodecService<T>(IOptions<JsonJournalO
 
     public void WriteSeal(JournalStreamWriter writer) => _inner.WriteSeal(writer);
 
-    public void WriteSnapshot(long firstSequence, long resetSequence, bool isSealed, IReadOnlyCollection<T> items, JournalStreamWriter writer) =>
-        _inner.WriteSnapshot(firstSequence, resetSequence, isSealed, items, writer);
+    public void WriteSnapshot(
+        long epoch,
+        long firstSequence,
+        long resetSequence,
+        bool isSealed,
+        IReadOnlyCollection<T> items,
+        IReadOnlyCollection<LogDraftCommit> draftCommits,
+        JournalStreamWriter writer) =>
+        _inner.WriteSnapshot(epoch, firstSequence, resetSequence, isSealed, items, draftCommits, writer);
 
     public void Apply(JournalBufferReader input, IDurableLogCommandHandler<T> consumer) => _inner.Apply(input, consumer);
 }
