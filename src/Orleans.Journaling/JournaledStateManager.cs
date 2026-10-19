@@ -952,20 +952,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         }
 
         // Recovered positional reads need history which the next snapshot could replace, and their executions are about to
-        // replay them: resolve them now, from a second read of the same history.
-        JournalPositionTracker.Resolution? positionResolution;
+        // replay them: resolve them now, from the history which recovery read.
         lock (_lock)
         {
-            positionResolution = _positions.BeginResolution();
-        }
-
-        if (positionResolution is not null)
-        {
-            await _positions.ReadHistoryAsync(positionResolution, cancellationToken).ConfigureAwait(true);
-            lock (_lock)
-            {
-                _positions.Resolve(positionResolution);
-            }
+            _positions.ResolveRecovered();
         }
     }
 
@@ -1088,6 +1078,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         }
 
         var journalFormatKey = GetStoredJournalFormatKey(metadata);
+        var retained = _positions.RetainsRecoveredHistory ? buffer.Peek(buffer.Length) : default;
+        var length = buffer.Length;
         try
         {
             if (!string.Equals(journalFormatKey, _shared.JournalFormatKey, StringComparison.Ordinal))
@@ -1096,10 +1088,22 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
             }
 
             Replay(buffer, journalFormatKey, this);
+            if (length > buffer.Length && _positions.RetainsRecoveredHistory)
+            {
+                // The entries which the format consumed, so resolving positional reads replays them without a second read.
+                _positions.RetainRecoveredHistory(retained.Slice(0, length - buffer.Length), journalFormatKey);
+            }
         }
         catch (Exception exception) when (ShouldWrapRecoveryFormatException(exception))
         {
             throw CreateRecoveryFormatException(exception, journalFormatKey);
+        }
+        finally
+        {
+            if (_positions.RetainsRecoveredHistory)
+            {
+                retained.Dispose();
+            }
         }
     }
 
@@ -1173,7 +1177,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         }
     }
 
-    internal async ValueTask ReadStorageAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+    private async ValueTask ReadStorageAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
     {
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
         try
@@ -1187,6 +1191,17 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
             throw;
         }
     }
+
+    /// <summary>
+    /// Reads the journal's history into <paramref name="consumer"/>, which must be the content which this manager last read
+    /// or wrote.
+    /// </summary>
+    /// <remarks>
+    /// Recovery's read set storage's write precondition, so this read adopts nothing: when another writer changed the
+    /// journal, storage throws <see cref="Orleans.Storage.InconsistentStateException"/>, which fences the manager.
+    /// </remarks>
+    internal ValueTask ReadHistoryAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken) =>
+        ReadStorageAsync(consumer, cancellationToken);
 
     private async ValueTask AppendStorageAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {

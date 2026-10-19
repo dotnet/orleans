@@ -6,6 +6,7 @@ using Orleans.DurableTasks.Runtime;
 using Orleans.DurableTasks.Storage;
 using Orleans.Journaling;
 using Orleans.Serialization;
+using Orleans.Storage;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
@@ -94,9 +95,11 @@ public sealed class DurableTaskPositionalReadTests
             harness.Storage.RequestCompaction = false;
         }
 
+        // Recovery resolves the positions from the history which it read.
         harness.Storage.Reads = 0;
         await using var replay = await harness.ActivateAsync();
-        Assert.Equal(2, harness.Storage.Reads);
+        Assert.Equal(1, harness.Storage.Reads);
+        Assert.Equal(0, replay.CountPositionalRecords());
         Assert.Equal(observed, await replay.RunAsync([Read(1, 0), Write(1, 0, 1), Read(1, 0), Read(4, 0)], replaying: true));
     }
 
@@ -250,6 +253,44 @@ public sealed class DurableTaskPositionalReadTests
 
         Assert.Null(DurableTaskAccessLog.FindPositionalRecords(log.PendingRecords, log.PendingStates));
         Assert.False(activation.Manager.Positions.HasBarriers);
+    }
+
+    [Fact]
+    public async Task ForcedResolutionFencesWhenAnotherWriterChangedTheJournal()
+    {
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
+        await using var first = await harness.ActivateAsync();
+        first.Dictionary["a"] = "first";
+        await first.Manager.WriteStateAsync(Cancellation);
+        var log = first.CreateLog();
+        first.Run(log, static activation => _ = activation.Dictionary["a"]);
+        log.Flush();
+        harness.Storage.RequestCompaction = true;
+        for (var i = 0; i < JournalPositionTracker.MaxDeferredSnapshots; i++)
+        {
+            await first.Manager.WriteStateAsync(Cancellation);
+        }
+
+        harness.Storage.RequestCompaction = false;
+        Assert.True(first.Manager.Positions.HasBarriers);
+
+        // A second activation of the same journal, as a split brain has, takes it over and writes.
+        await using (var second = await harness.ActivateAsync())
+        {
+            second.Dictionary["a"] = "second";
+            await second.Manager.WriteStateAsync(Cancellation);
+        }
+
+        // The first activation's forced resolution reads history which another writer changed, and fences.
+        harness.Storage.RequestCompaction = true;
+        harness.Storage.Replaces = 0;
+        await Assert.ThrowsAsync<InconsistentStateException>(async () => await first.Manager.WriteStateAsync(Cancellation));
+        harness.Storage.RequestCompaction = false;
+        Assert.Equal(0, harness.Storage.Replaces);
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await first.Manager.WriteStateAsync(Cancellation));
+
+        await using var recovered = await harness.ActivateAsync();
+        Assert.Equal("second", recovered.Dictionary["a"]);
     }
 
     [Fact]
@@ -500,6 +541,9 @@ public sealed class DurableTaskPositionalReadTests
 
         public int Reads { get; set; }
 
+        // Counts replacements which storage accepted.
+        public int Replaces { get; set; }
+
         // Holds the next read until the test completes it.
         public TaskCompletionSource? ReadGate { get; set; }
 
@@ -532,6 +576,7 @@ public sealed class DurableTaskPositionalReadTests
         {
             ThrowIf(Failure.ReplaceBefore);
             await inner.ReplaceAsync(value, cancellationToken);
+            control.Replaces++;
             ThrowIf(Failure.ReplaceAfter);
         }
 

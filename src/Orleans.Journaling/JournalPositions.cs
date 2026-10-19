@@ -342,17 +342,20 @@ internal sealed class JournalHistoryReplay : IJournalStorageConsumer, IJournalRe
         }
     }
 
-    /// <summary>Replays entries which the manager committed but hasn't written, which follow storage's content.</summary>
-    public void ReplayBuffered(ArcBuffer committed)
+    /// <summary>
+    /// Replays <paramref name="entries"/>, whole entries in the format of <paramref name="formatKey"/> which follow those
+    /// replayed so far: entries which recovery read, or entries which the manager committed but hasn't written.
+    /// </summary>
+    public void Replay(ArcBuffer entries, string formatKey)
     {
-        if (committed.Length == 0)
+        if (entries.Length == 0)
         {
             return;
         }
 
         using var buffer = new ArcBufferWriter();
-        buffer.AppendPinned(committed);
-        _manager.Replay(new JournalBufferReader(buffer.Reader, isCompleted: true), _manager.WriteJournalFormatKey, this);
+        buffer.AppendPinned(entries);
+        _manager.Replay(new JournalBufferReader(buffer.Reader, isCompleted: true), formatKey, this);
     }
 
     /// <summary>Resolves the reads at the position reached, after the last replayed entry.</summary>
