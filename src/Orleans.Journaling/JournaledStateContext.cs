@@ -145,7 +145,8 @@ internal abstract class JournaledStateContext
     /// <para>
     /// While the state's <see cref="JournaledStateAccessTarget.Stamp"/> is unchanged, reads of the same operation with equal
     /// arguments return equal results: the same instance, except for operations whose results are copies
-    /// (<see cref="JournaledStateOperations.ReturnsCopy"/>).
+    /// (<see cref="JournaledStateOperations.ReturnsCopy"/>). A context which relies on this compares arguments by value, and
+    /// only arguments whose equality is exact, such as strings and integers.
     /// </para>
     /// </remarks>
     protected abstract TResult Access<TArgument, TState, TResult>(
@@ -291,7 +292,7 @@ internal static class JournaledStateOperations
 {
     /// <summary>
     /// Gets whether <paramref name="operation"/> returns a detached copy of the state's content, which differs in identity
-    /// from every other result: a snapshot of the entries, the keys or the values.
+    /// from every other result: an array which holds a snapshot of the entries, the keys or the values.
     /// </summary>
     public static bool ReturnsCopy(JournaledStateOperation operation) => operation is
         JournaledStateOperation.DictionarySnapshot
