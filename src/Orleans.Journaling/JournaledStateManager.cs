@@ -342,6 +342,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
                                     lock (_lock)
                                     {
+                                        // Capture journals changes which states already staged, so it doesn't count as staging.
+                                        var stagedChangeCount = _journalWriter.StagedChangeCount;
                                         if (isSnapshot)
                                         {
                                             using var snapshotWriter = _shared.JournalFormat.CreateWriter();
@@ -427,6 +429,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                                 hasBufferToConsume = true;
                                             }
                                         }
+
+                                        _journalWriter.StagedChangeCount = stagedChangeCount;
                                     }
 
                                     _shared.Instruments.OnGather(
@@ -1100,6 +1104,17 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     }
 
     public long PendingWriteByteCount => _journalWriter.CommittedLength;
+
+    /// <summary>
+    /// Gets a count which advances whenever a registered state stages a change and never decreases.
+    /// </summary>
+    /// <remarks>
+    /// The built-in durable states advance it when they are modified, and any state advances it when it commits a
+    /// journal entry outside a write. A write captures changes without advancing it. Comparing two readings taken on the
+    /// activation's scheduler shows whether any state staged a change between them. Orleans.Messaging uses it to tell
+    /// whether a failed handler attempt staged changes.
+    /// </remarks>
+    internal long StagedChangeCount => _journalWriter.StagedChangeCount;
 
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer)
         => observer.Subscribe(GrainLifecycleStage.SetupState, this);
