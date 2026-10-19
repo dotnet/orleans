@@ -1,45 +1,43 @@
 namespace Documentation.Diagnostics.DurableTasks;
 
-public sealed class ShippingGrain : DurableGrain
+public sealed class DeliveryGrain : DurableGrain
 {
-    private const string CarrierChange = "carrier-api";
-
-    private static async DurableTask Book(string orderId) => await Task.CompletedTask;
-
-    private static async DurableTask Ship(string orderId) => await Task.CompletedTask;
-
 #pragma warning disable ORLEANS0218
     // <orleans0218_violation>
-    public async DurableTask ShipAsync(string orderId, string region, int newestVersion)
+    public async DurableTask<string> DeliverAsync(Guid orderId, string region, int newestVersion)
     {
-        // A name which depends on the region records a separate decision for each region, and the range follows the
-        // caller's argument rather than the code below it.
-        var version = DurableTask.GetVersion($"carrier-api-{region}", 0, newestVersion);
-        if (version >= 1)
-        {
-            await Book(orderId).WithId("book");
-        }
-        else
-        {
-            await Ship(orderId).WithId("ship");
-        }
+        // The name depends on the region, and the range on the caller.
+        var version = DurableTask.GetVersion($"carrier-booking-{region}", 0, newestVersion);
+        return version >= 1
+            ? await Book(orderId, region).WithId("book")
+            : await Ship(orderId, region).WithId("ship");
     }
     // </orleans0218_violation>
 #pragma warning restore ORLEANS0218
 
-    // <orleans0218_fix>
-    public async DurableTask ShipWithCarrierAsync(string orderId)
+    // <orleans0218_fix_constant>
+    private const string CarrierBookingChange = "carrier-booking";
+
+    public async DurableTask<string> DeliverByCarrierAsync(Guid orderId, string region)
     {
-        // The name identifies the change, and the range states the branches which this code keeps.
-        var version = DurableTask.GetVersion(CarrierChange, minSupported: 0, maxSupported: 1);
-        if (version >= 1)
-        {
-            await Book(orderId).WithId("book");
-        }
-        else
-        {
-            await Ship(orderId).WithId("ship");
-        }
+        // Every replay reads the version which the execution recorded under this name.
+        var version = DurableTask.GetVersion(CarrierBookingChange, minSupported: 0, maxSupported: 1);
+        return version >= 1
+            ? await Book(orderId, region).WithId("book")
+            : await Ship(orderId, region).WithId("ship");
     }
-    // </orleans0218_fix>
+    // </orleans0218_fix_constant>
+
+    // <orleans0218_fix_descriptor>
+    private static readonly DurableVersion CarrierBooking = new("carrier-booking", minSupported: 0, maxSupported: 1);
+
+    public async DurableTask<string> DeliverWithDescriptorAsync(Guid orderId, string region) =>
+        CarrierBooking.IsAtLeast(1)
+            ? await Book(orderId, region).WithId("book")
+            : await Ship(orderId, region).WithId("ship");
+    // </orleans0218_fix_descriptor>
+
+    private static async DurableTask<string> Book(Guid orderId, string region) => $"{region}/booked/{orderId:N}";
+
+    private static async DurableTask<string> Ship(Guid orderId, string region) => $"{region}/shipped/{orderId:N}";
 }

@@ -157,9 +157,11 @@ selection, it cancels and drains the losing wait operations without canceling th
 within a durable execution, then requests durable cancellation of the other tasks and returns the winner once every task
 is terminal, so each handle's outcome is observable. A handle's `WaitAsync(timeout)` and `WaitUntilAsync(dueTime)`
 return `Task` and `Task<T>`, with the outcomes of the definition overloads. Within a durable execution, the timeout is a
-durable delay which the execution schedules as `1` beneath a generated `$timeout-N` operation identifier, and the host
+durable delay which the execution schedules as `1` beneath the operation identifier `{segment}$timeout-N`, which the
+handle's segment and its count of timed waits determine, so operations on other tasks don't shift it, and the host
 selects the winner; outside one, the timeout elapses on the system clock, and the handle receives the cancellation
-request when it does. Their cancellation tokens abandon the wait without canceling the task.
+request when it does. Their cancellation tokens abandon the wait without canceling the task. Each kind of unnamed
+combinator counts its own operations, such as `$when-any-1` and `$when-any-2`.
 
 ## Scheduled task handles
 
@@ -167,7 +169,10 @@ A `ScheduledTask` is the durable counterpart of a hot `Task`: it carries the tas
 Once a wait, a poll, or a combinator observes the terminal response, the handle caches it, so `IsCompleted`, `Status`,
 and `Exception` inspect the task synchronously, and `ScheduledTask<T>.GetResult()` returns the result or throws the
 recorded failure or cancellation, as awaiting does. `TryGetResult(out value)` returns `true` with the result of a task
-which completed successfully. Before the handle observes the terminal response, `Status` is `Pending`.
+which completed successfully. Before the handle observes the terminal response, `Status` is `Pending`. Clients poll
+with `IsCompletedAsync`, `GetStatusAsync`, and `GetResponseAsync(PollingOptions)`; a durable task body awaits the
+handle or waits with a durable timeout instead, and its polls throw `NotSupportedException`
+([ORLEANS0225](https://aka.ms/orleans/diagnostics#orleans0225)).
 
 A handle's `Id` names the operation in the execution which started or observes the task, which combinators and replays
 address, and its `TargetTaskId` names the task on its host, which other parties address. The two are equal unless the
@@ -235,38 +240,48 @@ continues:
 | Attached (default) | Runs the child and returns its result once the result is durable. | Returns the child's handle once its host has accepted and durably stored it. | Stages the child with the execution's next durable write and returns its handle. |
 | `.Shielded()` | As attached; the caller's cancellation doesn't reach the child. | As attached; the caller's cancellation doesn't reach the child. | As attached; the caller's cancellation doesn't reach the child. |
 | `.Detached()` | Starts an independent root task and returns its result; canceling the wait ends only the caller's subscription. | Returns a handle to the root task once its host has accepted and durably stored it. | Stages the root task with the caller's next durable write and returns its handle. |
+| `.Detached(rootId)` | As `.Detached()`, under the root ID `rootId`. | As `.Detached()`, under the root ID `rootId`. | As `.Detached()`, under the root ID `rootId`. |
 
 - Within a durable execution, an attached child belongs to the execution's tree: the execution owns it,
   its durable cancellation reaches it, and deleting the execution's tree deletes it.
 - `.Shielded()` keeps the execution's cancellation from reaching the child, while the execution still
   owns it and waits for it; see [Compensating canceled work](#compensating-canceled-work).
+- `WithId(name)` names the execution's operation which starts the task, as a counted occurrence such as
+  `reserve$2`. The start allocates the identifier, so the order of the configuration calls doesn't change
+  it, and each start of a configuration takes the next occurrence.
 - `.Detached()` starts an independent root task. The starting execution can complete while it runs,
   and the execution's cancellation, abort, and deletion don't reach it. The start names the execution
   as a subscriber, so awaiting the task, or its handle, observes its result without a separate
-  subscription; canceling that wait ends only the subscription. Its root ID is the `WithId` name,
-  verbatim, so other parties can address it, or `{hostId}/{executionId}:{segment}`, where `{segment}`
-  is the generated ID of the execution's next unnamed operation and `{hostId}` is the identity which the
-  host supplies through `DurableTaskContext.HostId`, such as its grain, so executions with the same ID
-  on different hosts derive different root IDs. Starting it again under the same root ID, including
-  during a replay, reaches the same task.
+  subscription; canceling that wait ends only the subscription. Its root ID derives from the host's
+  identity, which the host supplies through `DurableTaskContext.HostId`, such as its grain, the
+  execution's ID, and the ID of the operation which starts it: the `WithId` name, or the execution's
+  next generated ID. The root ID is the single segment `{hostId}/{executionId}/{segment}`, in which each
+  part escapes its `/` and `\` as `TaskId` does, so distinct hosts, executions, and operations derive
+  distinct root IDs, and a replay derives the same one.
+- `.Detached(rootId)` starts the independent root task `rootId`, which other parties know in advance and
+  address, such as `place-order-42`. Every start of `rootId` on the task's host, from any execution or
+  caller, including a replay, reaches the same task.
 - `ScheduleAsync()` returns once the task's host holds the task, so its ID, the handle's `TargetTaskId`,
   can be handed to other parties, which address it with lookups such as `GetDurableTask`. A start which its host rejects, for
   example because the ID already identifies another definition, fails. Within a durable execution, the execution
   observes each attached child which it schedules by awaiting the handle, passing it to a combinator, or returning it.
 - `Post()` is synchronous: it stages the start, and the start commits with the caller's next durable
-  write, together with the state changes which the calling code made, and is then delivered once.
+  write, together with the state changes which the calling code made. The host then delivers the start,
+  retrying until the task's host accepts it, and the task's host deduplicates deliveries by the task's
+  ID, so the task starts once. A start which the task's host doesn't accept, for example because it
+  arrives after the host's admission window, fails the handle.
   Within a durable execution, the start is recorded like a `DurableTask.RunInline` effect, so a replay
   returns the same handle without starting the task again, and awaiting the handle later observes
   the result. Code without a durable outbox, such as a client, can't post.
 - Outside a durable execution, every task is a root task, so `.Detached()` changes nothing. `WithId`
-  supplies the root ID, which makes a start safe to retry: a caller which retries after an ambiguous
-  failure, such as a timeout, reaches the same task. A start without `WithId` receives a new random
-  root ID, which the handle's `Id` reports, and behaves like an ordinary call.
+  and `.Detached(rootId)` supply the root ID, which makes a start safe to retry: a caller which retries
+  after an ambiguous failure, such as a timeout, reaches the same task. A start without a name receives
+  a new random root ID, which the handle's `Id` reports, and behaves like an ordinary call.
 
 A workflow which starts follow-up work and completes without waiting for it posts a detached task:
 
 ```csharp
-order.PlaceOrderAsync(request).Detached().WithId($"place-order-{orderId}").Post();
+order.PlaceOrderAsync(request).Detached($"place-order-{orderId}").Post();
 ```
 
 ## Signals
@@ -414,6 +429,14 @@ Follow these rules in re-executed code:
   its own.
 - Logs in re-executed code repeat on replay. `logger.ReplaySafe()` writes each event once; see
   [Replay diagnostics and logging](#replay-diagnostics-and-logging).
+- Await the tasks which the body observes, or wait for them with a durable timeout, such as
+  `WaitAsync(timeout)` or `ScheduledTask.WhenAny` with `DurableTask.Delay`. A poll, such as
+  `IsCompletedAsync`, observes a task's status when it runs and records nothing, so a durable task body's
+  poll throws `NotSupportedException`.
+- Await without `ConfigureAwait(false)`. A body runs on its grain activation's scheduler, which orders
+  its durable operations and state changes and commits the tail's state changes with the result; a
+  continuation which leaves it races with the grain's other turns, and `DurableTask.RunInline` and
+  `DurableTask.GetVersion` throw there ([ORLEANS0226](https://aka.ms/orleans/diagnostics#orleans0226)).
 
 ## Recorded effects
 
@@ -433,6 +456,11 @@ var paymentId = DurableTask.RunInline("payment-id", Guid.NewGuid);
   the next run runs the effect again.
 - The effect passes data to the body through its result. It reads state which later steps change,
   changes state, and produces values such as identifiers and random numbers.
+- A `DurableTask.RunInline` call within the effect runs as part of it, and the effect's record holds its
+  outcome. Durable operations, such as starting a step or a child, posting, and `DurableTask.GetVersion`,
+  run in the body: within an effect they throw `InvalidOperationException`, which the effect records as
+  its outcome, because a replay returns the record without running the effect
+  ([ORLEANS0227](https://aka.ms/orleans/diagnostics#orleans0227)).
 - A failure is recorded too, because journaled state has no rollback: changes made before the throw
   commit with the recorded exception. A result which the host can't store, for example because it
   doesn't serialize, is recorded as that failure.
@@ -441,7 +469,7 @@ var paymentId = DurableTask.RunInline("payment-id", Guid.NewGuid);
   effect runs after task cancellation too, and returning doesn't mean that its record has committed.
 - A name identifies the effect as `WithId` identifies a step: `pay`, then `pay$2` for a later
   occurrence in the same run. Names don't contain `$`. `DurableTask.RunInline("get-id", Guid.NewGuid)`
-  and `await DurableTask.Run(async () => Guid.NewGuid()).WithId("get-id")` use the same identifier,
+  and `await DurableTask.Run(async () => await ids.NextAsync()).WithId("get-id")` use the same identifier,
   `get-id`, but run differently: the step runs when it is awaited, possibly in a later turn, as a
   child execution with its own `DurableTask.Current` and cancellation scope, and commits in a
   journal write of its own. A replay which finds one kind recorded where the body now runs the
@@ -522,7 +550,7 @@ ordinary grain methods. Logs inside a `DurableTask.RunInline` effect, or inside 
 don't repeat without it, because a replay returns their recorded results without running them.
 
 The package carries analyzers which report code that a replay would run differently, or which
-doesn't run as written, as diagnostics ORLEANS0200 to ORLEANS0223. Each diagnostic links to a page
+doesn't run as written, as diagnostics ORLEANS0200 to ORLEANS0227. Each diagnostic links to a page
 which describes the hazard and its fix.
 
 ## Host responsibilities
@@ -533,8 +561,9 @@ response, and cancellation state. The host returns the recorded response when an
 ID is scheduled again, returns the same `SelectCompletionAsync` selection for a decision ID on every call, by recording
 the selection or by deriving it from a durable completion order, and supplies
 replay-consistent `UtcNow` values. It runs and replays the body of a canceled task with the durable
-request and its recorded reason applied, and terminalizes canceled leaves as canceled. Hosts which record
-cancellation reasons implement `IScheduledTaskHandle.CancelAsync(reason, cancellationToken)`. Hosts start
+request and its recorded reason applied, and terminalizes canceled leaves as canceled. Hosts implement
+`IScheduledTaskHandle.CancelAsync(reason, cancellationToken)`, which records the first request's reason with the task's
+cancellation; a request without a reason passes `null`. Hosts start
 tasks in `DurableTaskContext.StartTaskAsync`, which receives `DurableTaskStartOptions`: `Detached` for an
 independent root task which names the execution as a subscriber, and `WaitForAcceptance` for a start which
 completes once the task's host has accepted the task. They read `DurableTaskContext.SchedulesShieldedChildren`
@@ -551,3 +580,14 @@ record in the same synchronous work, so the record commits with the state change
 which commit a body's state changes with its result stage the result in
 `DurableTaskContext.OnBodyCompleted`, which runs synchronously with the body's final code. Hosts which
 track replay override `DurableTaskContext.IsReplaying`.
+
+An execution's code runs on one scheduler, the one which is current when the host creates its
+`DurableTaskContext`, such as the grain activation's scheduler, and the context's state needs no
+synchronization: the host requests task cancellation with `RequestTaskCancellation` and cancels attempts with
+`CancelAttempt` on that scheduler, and debug builds assert it. The context owns the attempt's cancellation state.
+It cancels the attempt itself with `DurableTaskAttemptCancellationReason.Diverged` when a replay departs from
+its record in a way which the abstraction observes, such as a recorded result whose type the code no longer
+expects or a recorded selection which is no longer a candidate. A host discards the response of an attempt
+whose `IsAttemptCanceled` is `true` and handles the task as its `AttemptCancellationReason` describes. A start
+under an ID which the execution recorded, with the same definition, reattaches to the recorded task; another
+definition under a recorded ID is a divergence.

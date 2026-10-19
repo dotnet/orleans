@@ -13,7 +13,7 @@ internal sealed partial class DurableTaskGrainRuntime
 
         public DurableTaskResponse Response => response;
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
         public ValueTask AbortAsync(string reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 

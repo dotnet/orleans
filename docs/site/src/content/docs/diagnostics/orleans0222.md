@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0222: Pass delegates which return a task for asynchronous work"
-description: Understand ORLEANS0222, which reports an async void delegate passed to DurableTask.Run or DurableTask.RunInline, and fix it with a delegate which returns a Task.
-ms.date: 10/17/2026
+description: Understand ORLEANS0222, which reports async void delegates passed to DurableTask.Run and DurableTask.RunInline, and fix them with delegates which return a task or with async DurableTask methods.
+ms.date: 10/19/2026
 ms.topic: reference
 ---
 
@@ -15,24 +15,34 @@ ms.topic: reference
 
 ## Cause
 
-`DurableTask.Run` or `DurableTask.RunInline` receives an asynchronous delegate which returns `void`: an `async` lambda cast to `Action` or `Action<CancellationToken>`, an `async void` method, or a local which a declaration initializes with one of them:
+`DurableTask.Run` or `DurableTask.RunInline` receives a delegate which returns `void` and binds an `async` function: an `async` lambda converted to `Action` or `Action<CancellationToken>`, an `async void` method, or a local which holds one:
 
 :::code source="snippets/durable-tasks/Orleans0222.cs" id="orleans0222_violation" language="csharp":::
 
-An `async` lambda written directly in the call binds to the overloads which take a `Task`, so the C# compiler rejects it for `DurableTask.RunInline` and runs it as an asynchronous step for `DurableTask.Run`.
-
 ## Rule description
 
-An `async void` delegate returns to its caller at its first incomplete `await`. `DurableTask.Run` and `DurableTask.RunInline` record the delegate's completion when it returns, so the record precedes the work which follows the `await`. A replay returns the record without running the delegate, so work which didn't finish never runs, and its failures escape the task instead of failing it. In the example, the step completes before the email is sent, and a failed send is lost.
+An `async void` delegate returns to its caller at its first incomplete `await`. `DurableTask.Run` and `DurableTask.RunInline` record the delegate's completion when it returns, so the record precedes the work which follows the `await`:
+
+- The step or the effect completes, and the body continues, while the work is still running.
+- A replay returns the record without running the delegate, so the work runs only in the first run.
+- An exception which the work throws after the `await` escapes the task instead of failing the step or the effect.
+
+In the example, the step completes before the email is sent, and a failed send leaves the step's record successful.
+
+For steps and effects, see [Recorded effects](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#recorded-effects).
 
 ## How to fix violations
 
-Pass a delegate which returns the task of the work, so the step completes when the work completes:
+**Return a task.** `DurableTask.Run` with a delegate which returns a `Task` completes the step when the task completes, and records the task's outcome:
 
-:::code source="snippets/durable-tasks/Orleans0222.cs" id="orleans0222_fix" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0222.cs" id="orleans0222_fix_task" language="csharp":::
 
-`DurableTask.RunInline` records synchronous work only; run asynchronous work as an awaited step, with `DurableTask.Run` or an `async DurableTask` method.
+**Run the work in an `async DurableTask` method.** The method is a step which the body awaits:
+
+:::code source="snippets/durable-tasks/Orleans0222.cs" id="orleans0222_fix_durable_method" language="csharp":::
+
+`DurableTask.RunInline` runs synchronous work only. Asynchronous work runs as a step.
 
 ## When to suppress
 
-Don't suppress this diagnostic: the task records the work as complete before it runs.
+Suppress the diagnostic only for fire-and-forget work which the task neither records nor waits for, and whose failures the delegate handles itself.

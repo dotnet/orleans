@@ -150,6 +150,11 @@ public class DurableTaskState : IDurableTaskState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DateTimeOffset? RetainedSince { get; set; }
 
+    /// <inheritdoc cref="IDurableTaskState.Incarnation"/>
+    [Id(22)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public Guid Incarnation { get; set; }
+
     /// <inheritdoc cref="IDurableTaskState.CompletionSequence"/>
     [Id(20)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]

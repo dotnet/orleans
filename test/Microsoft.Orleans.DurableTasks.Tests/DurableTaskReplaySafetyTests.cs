@@ -520,29 +520,6 @@ public sealed class DurableTaskReplaySafetyTests
     });
 
     [Fact]
-    public Task RunInlineAfterConfigureAwaitFalseFailsWithoutRunning() => ActivationScheduler.RunAsync(async () =>
-    {
-        await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
-        await using var activation = await harness.ActivateAsync(TestCancellation);
-
-        await activation.ScheduleAsync(WorkflowId, TestCancellation);
-
-        var response = await activation.GetResponseAsync(WorkflowId, TestCancellation);
-        Assert.Contains("ConfigureAwait(false)", Assert.IsType<InvalidOperationException>(response.Exception).Message, StringComparison.Ordinal);
-        Assert.Equal(0, harness.EffectRuns);
-
-        static async DurableTask<int> Workflow(ReplayGrain grain)
-        {
-            await Task.Delay(1).ConfigureAwait(false);
-            return DurableTask.RunInline("increment", () =>
-            {
-                grain.Harness.CountEffectRun();
-                return ++grain.Counter.Value;
-            });
-        }
-    });
-
-    [Fact]
     public Task ReplayReportsIsReplayingUntilItReachesEveryRecordedOperation() => ActivationScheduler.RunAsync(async () =>
     {
         var observed = new List<string>();

@@ -1,56 +1,45 @@
 namespace Documentation.Diagnostics.DurableTasks;
 
-public sealed class BillingGrain : DurableGrain
+public sealed class LoyaltyGrain : DurableGrain
 {
+    private readonly IDurableValue<int> _points;
+
+    public LoyaltyGrain() => _points = StateManager.GetOrAddValue<int>("points");
+
 #pragma warning disable ORLEANS0220
     // <orleans0220_violation>
-    public async DurableTask<decimal> BillAsync(string[] items, bool express)
+    public async DurableTask<int> AwardAsync(string customer, bool firstOrder)
     {
-        if (express)
+        if (firstOrder)
         {
-            // Takes $child-1 when the order is express.
-            await Reserve("courier");
+            // $child-1, in the executions of first orders only.
+            await SendWelcome(customer);
         }
 
-        var total = 0m;
-        foreach (var item in items)
-        {
-            // Takes $child-1, $child-2, and so on, or $child-2, $child-3, and so on, depending on the branch above.
-            total += await Price(item);
-        }
-
-        // Takes the identifier after the last price, so a change to the items or the branch shifts it.
-        await Charge(total);
-        return total;
+        // $child-1 or $child-2, and the statement $child-2 or $child-3, depending on the condition.
+        var points = DurableTask.RunInline(() => _points.Value += 100);
+        await SendStatement(customer, points);
+        return points;
     }
     // </orleans0220_violation>
 #pragma warning restore ORLEANS0220
 
     // <orleans0220_fix>
-    public async DurableTask<decimal> BillByNameAsync(string[] items, bool express)
+    public async DurableTask<int> AwardNamedAsync(string customer, bool firstOrder)
     {
-        if (express)
+        if (firstOrder)
         {
-            await Reserve("courier").WithId("courier");
+            await SendWelcome(customer).WithId("send-welcome");
         }
 
-        var total = 0m;
-        foreach (var item in items)
-        {
-            // Takes price, price$2, and so on, whichever branch ran before it.
-            total += await Price(item).WithId("price");
-        }
-
-        await Charge(total).WithId("charge");
-        return total;
+        // Each name identifies its call site, whichever operations ran before it.
+        var points = DurableTask.RunInline("add-points", () => _points.Value += 100);
+        await SendStatement(customer, points).WithId("send-statement");
+        return points;
     }
     // </orleans0220_fix>
 
-    private static async DurableTask<bool> Reserve(string carrier) => true;
+    private static async DurableTask<bool> SendWelcome(string customer) => customer.Length > 0;
 
-    private static async DurableTask<decimal> Price(string item) => item.Length;
-
-    private static async DurableTask Charge(decimal total)
-    {
-    }
+    private static async DurableTask<bool> SendStatement(string customer, int points) => customer.Length > 0 && points > 0;
 }

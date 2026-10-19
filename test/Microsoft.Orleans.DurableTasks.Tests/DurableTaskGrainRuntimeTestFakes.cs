@@ -274,6 +274,6 @@ internal sealed class TestSchedulableTask(
         public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken) =>
             new(DurableTaskResponse.Pending);
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken) => default;
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => default;
     }
 }

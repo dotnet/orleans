@@ -76,24 +76,33 @@ public abstract partial class ScheduledTask
     public ScheduledTaskAwaiter GetAwaiter() => new(this, CancellationToken.None);
 
     /// <summary>Polls whether the task has reached a terminal state.</summary>
+    /// <remarks>
+    /// A poll observes the task's status when it runs, so code outside durable task bodies, such as a client, polls. A
+    /// durable task body awaits the task, or waits for it with a durable timeout.
+    /// </remarks>
+    /// <exception cref="NotSupportedException">The calling code runs in a durable task.</exception>
     public async Task<bool> IsCompletedAsync(PollingOptions options = default, CancellationToken cancellationToken = default)
-        => (await PollAsync(options, cancellationToken).ConfigureAwait(false)).IsCompleted;
+        => (await PollAsync(options, cancellationToken)).IsCompleted;
 
     /// <summary>Polls the current task status.</summary>
+    /// <remarks><inheritdoc cref="IsCompletedAsync" path="/remarks"/></remarks>
+    /// <exception cref="NotSupportedException">The calling code runs in a durable task.</exception>
     public async Task<DurableTaskStatus> GetStatusAsync(PollingOptions options = default, CancellationToken cancellationToken = default)
-        => (await PollAsync(options, cancellationToken).ConfigureAwait(false)).Status;
+        => (await PollAsync(options, cancellationToken)).Status;
 
     /// <summary>Waits for and returns the terminal response.</summary>
     public Task<DurableTaskResponse> GetResponseAsync(CancellationToken cancellationToken = default)
         => ObserveAsync(cancellationToken).AsTask();
 
     /// <summary>Polls and returns the current response.</summary>
+    /// <remarks><inheritdoc cref="IsCompletedAsync" path="/remarks"/></remarks>
+    /// <exception cref="NotSupportedException">The calling code runs in a durable task.</exception>
     public Task<DurableTaskResponse> GetResponseAsync(PollingOptions options, CancellationToken cancellationToken = default)
         => PollAsync(options, cancellationToken).AsTask();
 
     /// <summary>Waits for successful completion.</summary>
     public async ValueTask WaitAsync(CancellationToken cancellationToken = default)
-        => (await ObserveAsync(cancellationToken).ConfigureAwait(false)).EnsureSuccessfulCompletion();
+        => (await ObserveAsync(cancellationToken)).EnsureSuccessfulCompletion();
 
     /// <summary>Caches <paramref name="response"/> when it is terminal, and returns it.</summary>
     internal DurableTaskResponse Observe(DurableTaskResponse response)
@@ -114,14 +123,28 @@ public abstract partial class ScheduledTask
         return wait.IsCompletedSuccessfully ? new(Observe(wait.Result)) : ObserveAsync(wait);
     }
 
+    /// <summary>Polls the task's host, and caches a terminal response.</summary>
+    /// <remarks>
+    /// A replay of a durable task body re-runs its code at another time, when a poll observes another status. The poll
+    /// records nothing, so a body which branched on it would schedule other operations in the replay than in the run which
+    /// it replays.
+    /// </remarks>
     private ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
     {
+        if (DurableTaskContext.Ambient is not null)
+        {
+            throw new NotSupportedException(
+                "A durable task body can't poll a task: a poll observes the task's status when it runs, which a replay observes "
+                + "differently. Await the task, or wait for it with a durable timeout, such as WaitAsync with a timeout or "
+                + "ScheduledTask.WhenAny with a durable delay.");
+        }
+
         var poll = PollAsyncCore(options, cancellationToken);
         return poll.IsCompletedSuccessfully ? new(Observe(poll.Result)) : ObserveAsync(poll);
     }
 
     private async ValueTask<DurableTaskResponse> ObserveAsync(ValueTask<DurableTaskResponse> response)
-        => Observe(await response.ConfigureAwait(false));
+        => Observe(await response);
 
     /// <summary>
     /// Waits for the terminal response and caches it, rejecting an incomplete response from the host with an
@@ -141,7 +164,7 @@ public abstract partial class ScheduledTask
         => response.IsCompleted ? Observe(response) : throw new InvalidOperationException("The durable task has not completed.");
 
     private async ValueTask<DurableTaskResponse> ObserveTerminalAsync(ValueTask<DurableTaskResponse> response)
-        => ObserveTerminal(await response.ConfigureAwait(false));
+        => ObserveTerminal(await response);
 
     /// <summary>Durably requests cancellation.</summary>
     /// <remarks>
@@ -149,7 +172,7 @@ public abstract partial class ScheduledTask
     /// The task's body observes the request and decides its outcome: the task is canceled when the cancellation escapes
     /// its body, and otherwise completes with the body's result or failure. Await the task to observe the outcome.
     /// </remarks>
-    public abstract ValueTask CancelAsync(CancellationToken cancellationToken = default);
+    public ValueTask CancelAsync(CancellationToken cancellationToken = default) => CancelAsyncCore(reason: null, cancellationToken);
 
     /// <summary>Durably requests cancellation carrying <paramref name="reason"/>.</summary>
     /// <param name="reason">
@@ -164,13 +187,8 @@ public abstract partial class ScheduledTask
     public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken = default)
         => CancelAsyncCore(reason, cancellationToken);
 
-    /// <summary>Asks the host to cancel the task carrying <paramref name="reason"/>.</summary>
-    /// <remarks>
-    /// Hosts which record reasons override this default implementation, which requests cancellation through
-    /// <see cref="CancelAsync(CancellationToken)"/> without the reason.
-    /// </remarks>
-    protected virtual ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken)
-        => CancelAsync(cancellationToken);
+    /// <summary>Asks the host to cancel the task carrying <paramref name="reason"/>, or no reason when it is <see langword="null"/>.</summary>
+    protected abstract ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken);
 
     /// <summary>
     /// Administratively aborts the task: the host terminalizes it and its attached descendants as failed with a
@@ -213,14 +231,14 @@ public abstract partial class ScheduledTask
     public static async Task WhenAll(IReadOnlyList<ScheduledTask> tasks, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tasks);
-        EnsureSuccessfulCompletion(await WaitForAllAsync(tasks.ToArray(), cancellationToken).ConfigureAwait(false));
+        EnsureSuccessfulCompletion(await WaitForAllAsync(tasks.ToArray(), cancellationToken));
     }
 
     /// <inheritdoc cref="WhenAll(IReadOnlyList{ScheduledTask}, CancellationToken)"/>
     public static async Task WhenAll<TResult>(IReadOnlyList<ScheduledTask<TResult>> tasks, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tasks);
-        EnsureSuccessfulCompletion(await WaitForAllAsync(tasks.ToArray<ScheduledTask>(), cancellationToken).ConfigureAwait(false));
+        EnsureSuccessfulCompletion(await WaitForAllAsync(tasks.ToArray<ScheduledTask>(), cancellationToken));
     }
 
     /// <summary>Waits until every scheduled task is terminal, and returns the tasks in input order.</summary>
@@ -239,7 +257,7 @@ public abstract partial class ScheduledTask
     {
         ArgumentNullException.ThrowIfNull(tasks);
         var candidates = tasks.ToArray();
-        _ = await WaitForAllAsync(candidates, cancellationToken).ConfigureAwait(false);
+        _ = await WaitForAllAsync(candidates, cancellationToken);
         return candidates;
     }
 
@@ -250,7 +268,7 @@ public abstract partial class ScheduledTask
     {
         ArgumentNullException.ThrowIfNull(tasks);
         var candidates = tasks.ToArray();
-        _ = await WaitForAllAsync(candidates, cancellationToken).ConfigureAwait(false);
+        _ = await WaitForAllAsync(candidates, cancellationToken);
         return candidates;
     }
 
@@ -318,18 +336,18 @@ public abstract partial class ScheduledTask
         for (var step = 0; remaining.Count > 0; step++)
         {
             var decisionId = operationId.Child($"$next-{step.ToString(CultureInfo.InvariantCulture)}");
-            context.ThrowIfAttemptCanceled();
-            var selected = await context.ObserveAttempt(context.SelectCompletionAsync(decisionId, candidates, waitToken)).ConfigureAwait(false);
+            context.ThrowIfCannotRunOperation();
+            var selected = await context.ObserveAttempt(context.SelectCompletionAsync(decisionId, candidates, waitToken));
             var index = candidates.IndexOf(selected);
             if (index < 0)
             {
-                throw new InvalidOperationException($"The host selected '{selected}', which is not a remaining candidate of '{operationId}'.");
+                throw context.Diverge(new InvalidOperationException($"The recorded selection '{selected}' is not a remaining candidate of '{operationId}'."));
             }
 
             var next = remaining[index];
             remaining.RemoveAt(index);
             candidates.RemoveAt(index);
-            _ = await next.ObserveTerminalAsync(waitToken).ConfigureAwait(false);
+            _ = await next.ObserveTerminalAsync(waitToken);
             yield return next;
         }
     }
@@ -352,9 +370,9 @@ public abstract partial class ScheduledTask
 
             while (waits.Count > 0)
             {
-                var completed = await Task.WhenAny(waits).ConfigureAwait(false);
+                var completed = await Task.WhenAny(waits);
                 var index = waits.IndexOf(completed);
-                _ = await completed.ConfigureAwait(false);
+                _ = await completed;
                 var next = remaining[index];
                 remaining.RemoveAt(index);
                 waits.RemoveAt(index);
@@ -363,7 +381,7 @@ public abstract partial class ScheduledTask
         }
         finally
         {
-            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits).ConfigureAwait(false);
+            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits);
         }
     }
 
@@ -381,18 +399,18 @@ public abstract partial class ScheduledTask
             waits[index] = ObserveTaskAsync(tasks[index], cancellationToken);
         }
 
-        await ((Task)Task.WhenAll(waits)).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        await ((Task)Task.WhenAll(waits)).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
         var responses = new DurableTaskResponse[waits.Length];
         for (var index = 0; index < responses.Length; index++)
         {
-            responses[index] = await waits[index].ConfigureAwait(false);
+            responses[index] = await waits[index];
         }
 
         return responses;
 
         // A wait which fails synchronously fails only its own observation, so the other waits still start.
         static async Task<DurableTaskResponse> ObserveTaskAsync(ScheduledTask task, CancellationToken cancellationToken)
-            => await task.ObserveTerminalAsync(cancellationToken).ConfigureAwait(false);
+            => await task.ObserveTerminalAsync(cancellationToken);
     }
 
     /// <summary>
@@ -436,7 +454,7 @@ public abstract partial class ScheduledTask
     {
         ArgumentNullException.ThrowIfNull(tasks);
         var candidates = tasks.ToArray();
-        return candidates[await SelectAnyIndexAsync(candidates, cancellationToken).ConfigureAwait(false)];
+        return candidates[await SelectAnyIndexAsync(candidates, cancellationToken)];
     }
 
     /// <inheritdoc cref="WhenAny(IReadOnlyList{ScheduledTask}, CancellationToken)"/>
@@ -446,7 +464,7 @@ public abstract partial class ScheduledTask
     {
         ArgumentNullException.ThrowIfNull(tasks);
         var candidates = tasks.ToArray();
-        return candidates[await SelectAnyIndexAsync(candidates, cancellationToken).ConfigureAwait(false)];
+        return candidates[await SelectAnyIndexAsync(candidates, cancellationToken)];
     }
 
     /// <summary>
@@ -477,8 +495,8 @@ public abstract partial class ScheduledTask
         var waitToken = linked?.Token ?? context.AttemptCancellationToken;
         try
         {
-            var winnerIndex = await SelectIndexAsync(context, operationId, tasks, waitToken).ConfigureAwait(false);
-            _ = await tasks[winnerIndex].ObserveTerminalAsync(waitToken).ConfigureAwait(false);
+            var winnerIndex = await SelectIndexAsync(context, operationId, tasks, waitToken);
+            _ = await tasks[winnerIndex].ObserveTerminalAsync(waitToken);
             return winnerIndex;
         }
         catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
@@ -503,13 +521,12 @@ public abstract partial class ScheduledTask
             candidates[index] = tasks[index].Id;
         }
 
-        context.ThrowIfAttemptCanceled();
-        var selected = await context.ObserveAttempt(context.SelectCompletionAsync(operationId.Child("$winner"), candidates, cancellationToken))
-            .ConfigureAwait(false);
+        context.ThrowIfCannotRunOperation();
+        var selected = await context.ObserveAttempt(context.SelectCompletionAsync(operationId.Child("$winner"), candidates, cancellationToken));
         var winnerIndex = Array.IndexOf(candidates, selected);
         if (winnerIndex < 0)
         {
-            throw new InvalidOperationException($"The host selected '{selected}', which is not a candidate of '{operationId}'.");
+            throw context.Diverge(new InvalidOperationException($"The recorded selection '{selected}' is not a candidate of '{operationId}'."));
         }
 
         return winnerIndex;
@@ -544,20 +561,20 @@ public abstract partial class ScheduledTask
         }
         catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
         {
-            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits).ConfigureAwait(false);
+            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits);
             throw new OperationCanceledException(cancellationToken);
         }
         catch
         {
-            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits).ConfigureAwait(false);
+            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits);
             throw;
         }
 
-        var completed = await Task.WhenAny(waits).ConfigureAwait(false);
+        var completed = await Task.WhenAny(waits);
         var winnerIndex = waits.IndexOf(completed);
         try
         {
-            _ = await completed.ConfigureAwait(false);
+            _ = await completed;
             return winnerIndex;
         }
         catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
@@ -566,7 +583,7 @@ public abstract partial class ScheduledTask
         }
         finally
         {
-            await CancelAndDrainWaitsAsync(waitCancellation, waits, winnerIndex).ConfigureAwait(false);
+            await CancelAndDrainWaitsAsync(waitCancellation, waits, winnerIndex);
         }
     }
 
@@ -577,7 +594,7 @@ public abstract partial class ScheduledTask
     {
         try
         {
-            await CancelAndDrainWaitsAsync(waitCancellation, waits, winnerIndex: -1).ConfigureAwait(false);
+            await CancelAndDrainWaitsAsync(waitCancellation, waits, winnerIndex: -1);
         }
         catch
         {
@@ -601,7 +618,7 @@ public abstract partial class ScheduledTask
             // Canceling losing wait observations is best-effort cleanup.
         }
 
-        await DrainLosingWaitsAsync(waits, winnerIndex).ConfigureAwait(false);
+        await DrainLosingWaitsAsync(waits, winnerIndex);
     }
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Losing observation failures do not determine the WhenAny result.")]
@@ -618,7 +635,7 @@ public abstract partial class ScheduledTask
 
             try
             {
-                _ = await waits[index].ConfigureAwait(false);
+                _ = await waits[index];
             }
             catch
             {
@@ -677,8 +694,6 @@ internal sealed class ScheduledTaskHandle(IScheduledTaskHandle handle) : Schedul
     public override TFeature? GetFeature<TFeature>()
         where TFeature : class => handle.GetFeature<TFeature>();
 
-    public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => HostHandleOperations.CancelAsync(handle, cancellationToken);
-
     protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken)
         => HostHandleOperations.CancelAsync(handle, reason, cancellationToken);
 
@@ -689,7 +704,7 @@ internal sealed class ScheduledTaskHandle(IScheduledTaskHandle handle) : Schedul
         => HostHandleOperations.WaitAsync(handle, cancellationToken);
 
     protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken)
-        => HostHandleOperations.PollAsync(handle, options, cancellationToken);
+        => handle.PollAsync(options, cancellationToken);
 }
 
 internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) : ScheduledTask<TResult>
@@ -701,8 +716,6 @@ internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) 
     public override TFeature? GetFeature<TFeature>()
         where TFeature : class => handle.GetFeature<TFeature>();
 
-    public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => HostHandleOperations.CancelAsync(handle, cancellationToken);
-
     protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken)
         => HostHandleOperations.CancelAsync(handle, reason, cancellationToken);
 
@@ -713,7 +726,7 @@ internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) 
         => HostHandleOperations.WaitAsync(handle, cancellationToken);
 
     protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken)
-        => HostHandleOperations.PollAsync(handle, options, cancellationToken);
+        => handle.PollAsync(options, cancellationToken);
 }
 
 /// <summary>
@@ -723,6 +736,10 @@ internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) 
 /// <remarks>Outside a durable execution, the operations run unchanged.</remarks>
 internal static class HostHandleOperations
 {
+    /// <remarks>
+    /// The wait ends when the attempt is canceled, whether or not the host links the attempt's cancellation itself, so a
+    /// canceled attempt's waits throw <see cref="DurableTaskAttemptCanceledException"/>.
+    /// </remarks>
     public static ValueTask<DurableTaskResponse> WaitAsync(IScheduledTaskHandle handle, CancellationToken cancellationToken)
     {
         if (DurableTaskContext.Ambient is not { } context)
@@ -730,31 +747,29 @@ internal static class HostHandleOperations
             return handle.WaitAsync(cancellationToken);
         }
 
-        context.ThrowIfAttemptCanceled();
-        return context.ObserveAttempt(handle.WaitAsync(cancellationToken));
-    }
+        context.ThrowIfCannotRunOperation();
+        return cancellationToken.CanBeCanceled
+            ? WaitLinkedAsync(context, handle, cancellationToken)
+            : context.ObserveAttempt(handle.WaitAsync(context.AttemptCancellationToken));
 
-    public static ValueTask<DurableTaskResponse> PollAsync(IScheduledTaskHandle handle, PollingOptions options, CancellationToken cancellationToken)
-    {
-        if (DurableTaskContext.Ambient is not { } context)
+        static async ValueTask<DurableTaskResponse> WaitLinkedAsync(
+            DurableTaskContext context,
+            IScheduledTaskHandle handle,
+            CancellationToken cancellationToken)
         {
-            return handle.PollAsync(options, cancellationToken);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.AttemptCancellationToken);
+            try
+            {
+                return await context.ObserveAttempt(handle.WaitAsync(linked.Token));
+            }
+            catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
+            {
+                // The caller's cancellation ends the wait, so the wait reports the caller's token.
+                throw new OperationCanceledException(exception.Message, exception, cancellationToken);
+            }
         }
-
-        context.ThrowIfAttemptCanceled();
-        return context.ObserveAttempt(handle.PollAsync(options, cancellationToken));
     }
 
-    public static ValueTask CancelAsync(IScheduledTaskHandle handle, CancellationToken cancellationToken)
-    {
-        if (DurableTaskContext.Ambient is not { } context)
-        {
-            return handle.CancelAsync(cancellationToken);
-        }
-
-        context.ThrowIfAttemptCanceled();
-        return context.ObserveAttempt(handle.CancelAsync(cancellationToken));
-    }
 
     public static ValueTask CancelAsync(IScheduledTaskHandle handle, string? reason, CancellationToken cancellationToken)
     {
@@ -763,7 +778,7 @@ internal static class HostHandleOperations
             return handle.CancelAsync(reason, cancellationToken);
         }
 
-        context.ThrowIfAttemptCanceled();
+        context.ThrowIfCannotRunOperation();
         return context.ObserveAttempt(handle.CancelAsync(reason, cancellationToken));
     }
 
@@ -774,7 +789,7 @@ internal static class HostHandleOperations
             return handle.AbortAsync(reason, cancellationToken);
         }
 
-        context.ThrowIfAttemptCanceled();
+        context.ThrowIfCannotRunOperation();
         return context.ObserveAttempt(handle.AbortAsync(reason, cancellationToken));
     }
 }
@@ -792,7 +807,7 @@ internal sealed class CompletedScheduledTask : ScheduledTask
 
     public override TaskId Id => _id;
 
-    public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+    protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
     protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
@@ -814,7 +829,7 @@ internal sealed class CompletedScheduledTask<TResult> : ScheduledTask<TResult>
 
     public override TaskId Id => _id;
 
-    public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+    protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
     protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 

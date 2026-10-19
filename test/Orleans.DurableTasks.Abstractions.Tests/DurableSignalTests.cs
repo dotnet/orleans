@@ -116,7 +116,7 @@ public partial class DurableSignalTests
             context).AsTask();
         await host.WaitStarted("approved");
 
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context);
+        context.RequestTaskCancellation(null);
 
         Assert.Equal(DurableTaskStatus.Canceled, (await running).Status);
     }
@@ -131,7 +131,7 @@ public partial class DurableSignalTests
             context).AsTask();
         await host.WaitStarted("approved");
 
-        DurableTaskRuntimeHelper.CancelAttempt(context, DurableTaskAttemptCancellationReason.ActivationStopping);
+        context.CancelAttempt(DurableTaskAttemptCancellationReason.ActivationStopping);
 
         var response = await running;
         Assert.Equal(DurableTaskStatus.Canceled, response.Status);
@@ -152,7 +152,10 @@ public partial class DurableSignalTests
             DurableTask.Run(async _ => await Approved.WaitAsync()),
             new SignalContext(host, TaskId.CreateRoot("workflow")));
 
-        Assert.IsType<InvalidCastException>(response.Exception);
+        // A recorded value of another type means the code no longer matches the record, so the replay diverges.
+        var canceled = Assert.IsType<DurableTaskAttemptCanceledException>(response.Exception);
+        Assert.Equal(DurableTaskAttemptCancellationReason.Diverged, canceled.Reason);
+        Assert.IsType<InvalidCastException>(canceled.InnerException);
     }
 
     [Fact]
@@ -248,7 +251,7 @@ public partial class DurableSignalTests
             public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
             {
                 CancellationReason ??= reason;
-                DurableTaskRuntimeHelper.RequestTaskCancellation(context, reason);
+                context.RequestTaskCancellation(reason);
                 return ValueTask.CompletedTask;
             }
         }
@@ -257,6 +260,8 @@ public partial class DurableSignalTests
     private sealed class SignalContext(SignalHost host, TaskId taskId, bool supportsSignals = true) : DurableTaskContext(taskId)
     {
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
+
+        public override Guid Incarnation => Guid.Empty;
 
         protected override ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, CancellationToken cancellationToken) =>
             supportsSignals
@@ -274,7 +279,6 @@ public partial class DurableSignalTests
             DateTimeOffset dueTime,
             CancellationToken cancellationToken) => host.ScheduleDelayAsync(dueTime, cancellationToken);
 
-        protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId) => host.GetHandle(taskId);
 
         protected override async ValueTask<TaskId> SelectCompletionAsync(
             TaskId decisionId,

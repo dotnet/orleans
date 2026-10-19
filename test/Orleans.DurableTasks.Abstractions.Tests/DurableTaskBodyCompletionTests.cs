@@ -97,6 +97,8 @@ public sealed class DurableTaskBodyCompletionTests
     {
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 
+        public override Guid Incarnation => Guid.Empty;
+
         protected override void OnBodyCompleted(DurableTaskResponse response) =>
             events.Enqueue(response.Status == DurableTaskStatus.CompletedSuccessfully
                 ? $"completed:{response.Result}"
@@ -113,7 +115,6 @@ public sealed class DurableTaskBodyCompletionTests
             DateTimeOffset dueTime,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId) => throw new NotSupportedException();
 
         protected override ValueTask<TaskId> SelectCompletionAsync(
             TaskId decisionId,

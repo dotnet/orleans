@@ -76,6 +76,8 @@ public class DurableTaskLoggerExtensionsTests
     {
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 
+        public override Guid Incarnation => Guid.Empty;
+
         public override bool IsReplaying => isReplaying;
 
         protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(TaskId taskId, DurableTask taskDefinition, DurableTaskStartOptions options, CancellationToken cancellationToken)
@@ -84,7 +86,6 @@ public class DurableTaskLoggerExtensionsTests
         protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
-        protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId) => throw new NotSupportedException();
 
         protected override ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken)
             => throw new NotSupportedException();

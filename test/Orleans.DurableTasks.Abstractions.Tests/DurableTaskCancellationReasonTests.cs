@@ -17,9 +17,9 @@ public class DurableTaskCancellationReasonTests
         var context = new TestHost(DateTimeOffset.UnixEpoch).CreateContext(TaskId.CreateRoot("root"));
         Assert.Null(context.TaskCancellationReason);
 
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "buyer");
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "operator");
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context);
+        context.RequestTaskCancellation("buyer");
+        context.RequestTaskCancellation("operator");
+        context.RequestTaskCancellation(null);
 
         Assert.True(context.IsTaskCancellationRequested);
         Assert.True(context.CancellationToken.IsCancellationRequested);
@@ -31,8 +31,8 @@ public class DurableTaskCancellationReasonTests
     {
         var context = new TestHost(DateTimeOffset.UnixEpoch).CreateContext(TaskId.CreateRoot("root"));
 
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context);
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "late");
+        context.RequestTaskCancellation(null);
+        context.RequestTaskCancellation("late");
 
         Assert.True(context.IsTaskCancellationRequested);
         Assert.Null(context.TaskCancellationReason);
@@ -60,7 +60,7 @@ public class DurableTaskCancellationReasonTests
             context).AsTask();
         await started.Task.WaitAsync(TestCancellation);
 
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "Cancelled by the buyer");
+        context.RequestTaskCancellation("Cancelled by the buyer");
 
         Assert.Equal("Cancelled by the buyer", (await run.WaitAsync(TestCancellation)).GetResult<string>());
     }
@@ -72,7 +72,7 @@ public class DurableTaskCancellationReasonTests
         string? observed = null;
         using var registration = context.CancellationToken.Register(() => observed = context.TaskCancellationReason);
 
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "operator");
+        context.RequestTaskCancellation("operator");
 
         Assert.Equal("operator", observed);
     }
@@ -82,7 +82,7 @@ public class DurableTaskCancellationReasonTests
     {
         // A host replays a canceled task by requesting cancellation with the recorded reason before the body runs.
         var context = new TestHost(DateTimeOffset.UnixEpoch).CreateContext(TaskId.CreateRoot("root"));
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "recorded");
+        context.RequestTaskCancellation("recorded");
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
             DurableTask.Run(_ => (DurableTask.Current.IsTaskCancellationRequested, DurableTask.Current.TaskCancellationReason)),
@@ -103,35 +103,20 @@ public class DurableTaskCancellationReasonTests
         await typed.CancelAsync(reason: null, TestCancellation);
         await scheduled.CancelAsync(TestCancellation);
 
+        // A request without a reason reaches the host as a null reason, through the host's one cancellation operation.
         Assert.Equal(
-            new (string?, CancellationToken)[] { ("buyer", wait.Token), (null, TestCancellation) },
+            new (string?, CancellationToken)[] { ("buyer", wait.Token), (null, TestCancellation), (null, TestCancellation) },
             handle.Reasons);
-        Assert.Equal(1, handle.CancelCount);
     }
 
     [Fact]
-    public async Task ConfiguredTaskPassesTheReasonToItsHostHandle()
+    public async Task HandleCancellationWithoutAReasonCarriesANullReason()
     {
-        var handle = new ReasonRecordingHandle(TaskId.CreateRoot("root"));
+        IScheduledTaskHandle handle = new ReasonRecordingHandle(TaskId.CreateRoot("root"));
 
-        await new RootDefinition(handle).WithId("root").CancelAsync("buyer", TestCancellation);
-        await new RootDefinition<int>(handle).WithId("root").CancelAsync("operator", TestCancellation);
+        await handle.CancelAsync(TestCancellation);
 
-        Assert.Equal(
-            new (string?, CancellationToken)[] { ("buyer", TestCancellation), ("operator", TestCancellation) },
-            handle.Reasons);
-        Assert.Equal(0, handle.CancelCount);
-    }
-
-    [Fact]
-    public async Task HostWithoutReasonsCancelsWithoutTheReason()
-    {
-        var handle = new CancelOnlyHandle(TaskId.CreateRoot("root"));
-        var scheduled = await new RootDefinition(handle).WithId("root").ScheduleAsync(TestCancellation);
-
-        await scheduled.CancelAsync("buyer", TestCancellation);
-
-        Assert.Equal(1, handle.CancelCount);
+        Assert.Equal([(null, TestCancellation)], ((ReasonRecordingHandle)handle).Reasons);
     }
 
     private sealed class RootDefinition(IScheduledTaskHandle handle) : DurableTask, ISchedulableTask
@@ -156,9 +141,9 @@ public class DurableTaskCancellationReasonTests
             => throw new NotSupportedException();
     }
 
-    private class CancelOnlyHandle(TaskId taskId) : IScheduledTaskHandle
+    private sealed class ReasonRecordingHandle(TaskId taskId) : IScheduledTaskHandle
     {
-        public int CancelCount { get; private set; }
+        public List<(string? Reason, CancellationToken CancellationToken)> Reasons { get; } = [];
 
         public TaskId TaskId => taskId;
 
@@ -167,18 +152,7 @@ public class DurableTaskCancellationReasonTests
         public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
             => new(DurableTaskResponse.Pending);
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken)
-        {
-            CancelCount++;
-            return ValueTask.CompletedTask;
-        }
-    }
-
-    private sealed class ReasonRecordingHandle(TaskId taskId) : CancelOnlyHandle(taskId), IScheduledTaskHandle
-    {
-        public List<(string? Reason, CancellationToken CancellationToken)> Reasons { get; } = [];
-
-        ValueTask IScheduledTaskHandle.CancelAsync(string? reason, CancellationToken cancellationToken)
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
         {
             Reasons.Add((reason, cancellationToken));
             return ValueTask.CompletedTask;

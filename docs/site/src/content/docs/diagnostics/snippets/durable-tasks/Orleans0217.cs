@@ -1,49 +1,64 @@
 namespace Documentation.Diagnostics.DurableTasks;
 
-public interface IReservationService
-{
-    Task ReserveAsync(string reservationId, CancellationToken cancellationToken);
-
-    Task ReleaseAsync(string reservationId, CancellationToken cancellationToken);
-}
-
-public sealed class ReservationGrain(IReservationService reservations) : DurableGrain
+public sealed class RoomHoldGrain(IRoomInventory rooms) : DurableGrain
 {
 #pragma warning disable ORLEANS0217
     // <orleans0217_violation>
-    public async DurableTask<bool> HoldAsync(string reservationId)
+    public async DurableTask<OrderResult> HoldAsync(string room)
     {
         try
         {
-            await DurableTask.Run(cancellationToken => reservations.ReserveAsync(reservationId, cancellationToken)).WithId("reserve");
-            await DurableTask.Delay(TimeSpan.FromHours(1)).WithId("hold-period");
-            return true;
+            await Hold(room).WithId("hold");
+            await DurableTask.Delay(TimeSpan.FromMinutes(15)).WithId("hold-period");
+            return await Confirm(room).WithId("confirm");
         }
         catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
         {
-            // Task cancellation has already canceled CancellationToken, so the release ends before it reaches the service.
-            await reservations.ReleaseAsync(reservationId, DurableTask.Current.CancellationToken);
-            return false;
+            // Task cancellation has already canceled CancellationToken, so the release ends at once.
+            await rooms.ReleaseAsync(room, DurableTask.Current.CancellationToken);
+            return new OrderResult(OrderStatus.Cancelled, DurableTask.Current.TaskCancellationReason);
         }
     }
     // </orleans0217_violation>
 #pragma warning restore ORLEANS0217
 
-    // <orleans0217_fix>
-    public async DurableTask<bool> HoldOrReleaseAsync(string reservationId)
+    // <orleans0217_fix_attempt_token>
+    public async DurableTask<OrderResult> HoldOrReleaseAsync(string room)
     {
         try
         {
-            await DurableTask.Run(cancellationToken => reservations.ReserveAsync(reservationId, cancellationToken)).WithId("reserve");
-            await DurableTask.Delay(TimeSpan.FromHours(1)).WithId("hold-period");
-            return true;
+            await Hold(room).WithId("hold");
+            await DurableTask.Delay(TimeSpan.FromMinutes(15)).WithId("hold-period");
+            return await Confirm(room).WithId("confirm");
         }
         catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
         {
-            // Runs to completion, and ends promptly if the host cancels the attempt, for example when the activation stops.
-            await reservations.ReleaseAsync(reservationId, DurableTask.Current.AttemptCancellationToken);
-            return false;
+            // AttemptCancellationToken is canceled only when the host cancels the attempt, so the release runs to completion.
+            await rooms.ReleaseAsync(room, DurableTask.Current.AttemptCancellationToken);
+            return new OrderResult(OrderStatus.Cancelled, DurableTask.Current.TaskCancellationReason);
         }
     }
-    // </orleans0217_fix>
+    // </orleans0217_fix_attempt_token>
+
+    // <orleans0217_fix_shielded_step>
+    public async DurableTask<OrderResult> HoldOrReleaseOnceAsync(string room)
+    {
+        try
+        {
+            await Hold(room).WithId("hold");
+            await DurableTask.Delay(TimeSpan.FromMinutes(15)).WithId("hold-period");
+            return await Confirm(room).WithId("confirm");
+        }
+        catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
+        {
+            // The task's cancellation doesn't reach a shielded step, and the step records the release.
+            await DurableTask.Run(ct => rooms.ReleaseAsync(room, ct)).WithId("release").Shielded();
+            return new OrderResult(OrderStatus.Cancelled, DurableTask.Current.TaskCancellationReason);
+        }
+    }
+    // </orleans0217_fix_shielded_step>
+
+    private static async DurableTask<bool> Hold(string room) => room.Length > 0;
+
+    private static async DurableTask<OrderResult> Confirm(string room) => new(OrderStatus.Reserved, room);
 }

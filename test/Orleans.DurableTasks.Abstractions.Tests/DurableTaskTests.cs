@@ -121,7 +121,7 @@ public class DurableTaskTests
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var context = host.CreateContext(TaskId.CreateRoot("canceled-delay"));
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context);
+        context.RequestTaskCancellation(null);
 
         var response = await DurableTaskRuntimeHelper.RunAsync(DurableTask.Delay(TimeSpan.Zero), context);
 
@@ -167,11 +167,11 @@ public class DurableTaskTests
             Assert.Equal(context.CancellationToken, executionToken);
             if (durableCancellation)
             {
-                DurableTaskRuntimeHelper.RequestTaskCancellation(context);
+                context.RequestTaskCancellation(null);
             }
             else
             {
-                DurableTaskRuntimeHelper.CancelAttempt(context, DurableTaskAttemptCancellationReason.ActivationStopping);
+                context.CancelAttempt(DurableTaskAttemptCancellationReason.ActivationStopping);
             }
 
             var response = await execution.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
@@ -185,7 +185,7 @@ public class DurableTaskTests
         }
         finally
         {
-            DurableTaskRuntimeHelper.RequestTaskCancellation(context);
+            context.RequestTaskCancellation(null);
             await execution.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
         }
 
@@ -205,11 +205,11 @@ public class DurableTaskTests
         var context = host.CreateContext(TaskId.CreateRoot("abortable-sync-delegates"));
         if (durableCancellation)
         {
-            DurableTaskRuntimeHelper.RequestTaskCancellation(context);
+            context.RequestTaskCancellation(null);
         }
         else
         {
-            DurableTaskRuntimeHelper.CancelAttempt(context, DurableTaskAttemptCancellationReason.ActivationStopping);
+            context.CancelAttempt(DurableTaskAttemptCancellationReason.ActivationStopping);
         }
 
         var observedTokens = new List<CancellationToken>();
@@ -262,11 +262,11 @@ public class DurableTaskTests
             var executionToken = await started.Task.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
             if (durableCancellation)
             {
-                DurableTaskRuntimeHelper.RequestTaskCancellation(context);
+                context.RequestTaskCancellation(null);
             }
             else
             {
-                DurableTaskRuntimeHelper.CancelAttempt(context, DurableTaskAttemptCancellationReason.TaskDeleted);
+                context.CancelAttempt(DurableTaskAttemptCancellationReason.TaskDeleted);
             }
 
             var response = await execution.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
@@ -292,7 +292,7 @@ public class DurableTaskTests
         }
         finally
         {
-            DurableTaskRuntimeHelper.RequestTaskCancellation(context);
+            context.RequestTaskCancellation(null);
             await execution.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
         }
     }
@@ -352,8 +352,8 @@ public class DurableTaskTests
         var calls = 0;
         using var early = context.CancellationToken.Register(() => Interlocked.Increment(ref calls));
 
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "first");
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "second");
+        context.RequestTaskCancellation("first");
+        context.RequestTaskCancellation("second");
         using var late = context.CancellationToken.Register(() => Interlocked.Increment(ref calls));
 
         Assert.True(context.IsTaskCancellationRequested);
@@ -372,7 +372,7 @@ public class DurableTaskTests
         using var registration = context.CancellationToken.Register(
             () => observedCancellationState = (context.IsTaskCancellationRequested, context.TaskCancellationReason));
 
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "buyer");
+        context.RequestTaskCancellation("buyer");
 
         Assert.Equal((true, "buyer"), observedCancellationState);
     }
@@ -742,8 +742,8 @@ public class DurableTaskTests
         }, null);
         ambient.Value = "request";
 
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context);
-        DurableTaskRuntimeHelper.RequestTaskCancellation(alreadyCanceled);
+        context.RequestTaskCancellation(null);
+        alreadyCanceled.RequestTaskCancellation(null);
         ambient.Value = "immediate-registration";
         using var immediateRegistration = alreadyCanceled.CancellationToken.Register(() =>
         {
@@ -783,7 +783,7 @@ public class DurableTaskTests
 
         using (registration)
         {
-            DurableTaskRuntimeHelper.RequestTaskCancellation(context);
+            context.RequestTaskCancellation(null);
         }
 
         Assert.Same(synchronizationContext, observed);
@@ -800,13 +800,13 @@ public class DurableTaskTests
         using var firstRegistration = context.CancellationToken.Register(() => throw first);
         using var secondRegistration = context.CancellationToken.Register(() => throw second);
 
-        var exception = Assert.Throws<AggregateException>(() => DurableTaskRuntimeHelper.RequestTaskCancellation(context));
+        var exception = Assert.Throws<AggregateException>(() => context.RequestTaskCancellation(null));
 
         Assert.Contains(first, exception.InnerExceptions);
         Assert.Contains(second, exception.InnerExceptions);
         Assert.True(context.IsTaskCancellationRequested);
         Assert.True(context.CancellationToken.IsCancellationRequested);
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context);
+        context.RequestTaskCancellation(null);
     }
 
     [Fact]
@@ -1032,9 +1032,9 @@ public class DurableTaskTests
     [Fact]
     public void CompletedResponseTypedGetResultThrows()
     {
-        var exception = Assert.Throws<InvalidOperationException>(() => DurableTaskResponse.Completed.GetResult<int>());
+        var exception = Assert.Throws<InvalidCastException>(() => DurableTaskResponse.Completed.GetResult<int>());
 
-        Assert.Equal("The completed task has no result value.", exception.Message);
+        Assert.Equal("The completed task has no result value, not a 'System.Int32'.", exception.Message);
     }
 
     [Fact]
@@ -1048,15 +1048,9 @@ public class DurableTaskTests
             async () => await DurableTaskRuntimeHelper.RunAsync(null!, context));
         var contextException = await Assert.ThrowsAsync<ArgumentNullException>(
             async () => await DurableTaskRuntimeHelper.RunAsync(task, null!));
-        var cancellationContextException = Assert.Throws<ArgumentNullException>(
-            () => DurableTaskRuntimeHelper.RequestTaskCancellation(null!));
-        var attemptContextException = Assert.Throws<ArgumentNullException>(
-            () => DurableTaskRuntimeHelper.CancelAttempt(null!, DurableTaskAttemptCancellationReason.ActivationStopping));
 
         Assert.Equal("task", taskException.ParamName);
         Assert.Equal("context", contextException.ParamName);
-        Assert.Equal("context", cancellationContextException.ParamName);
-        Assert.Equal("context", attemptContextException.ParamName);
     }
 
     [Fact]
@@ -1228,8 +1222,8 @@ public class DurableTaskTests
         Assert.Null(response.Result);
         Assert.Null(response.ResultType);
         Assert.Null(response.Exception);
-        var exception = Assert.Throws<InvalidOperationException>(() => response.GetResult<int>());
-        Assert.Equal("The completed task has no result value.", exception.Message);
+        var exception = Assert.Throws<InvalidCastException>(() => response.GetResult<int>());
+        Assert.Equal("The completed task has no result value, not a 'System.Int32'.", exception.Message);
     }
 
     [Fact]
@@ -1703,9 +1697,9 @@ public class DurableTaskTests
         var exception = Assert.Throws<ArgumentException>(
             () => definition.WithId(string.Empty));
 
-        Assert.Equal("segment", exception.ParamName);
+        Assert.Equal("name", exception.ParamName);
         Assert.Equal(
-            "The value cannot be an empty string. (Parameter 'segment')",
+            "The value cannot be an empty string. (Parameter 'name')",
             exception.Message);
     }
 
@@ -2053,12 +2047,12 @@ public class SchedulingTests
     }
 
     [Fact]
-    public async Task RootSchedulingRequiresAnExplicitId()
+    public async Task AwaitingAResultOfAResponseWithoutAValueThrowsTheTypeMismatch()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var definition = host.CreateRootDefinition<object?>(_ => ValueTask.FromResult(DurableTaskResponse.Completed));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(AwaitWithoutIdAsync);
+        await Assert.ThrowsAsync<InvalidCastException>(AwaitWithoutIdAsync);
 
         async Task AwaitWithoutIdAsync() => _ = await definition;
     }
@@ -2091,15 +2085,11 @@ public class SchedulingTests
         {
             var configured = DurableTask.FromResult(42).WithId("ordinary-generic");
             await Assert.ThrowsAsync<InvalidOperationException>(() => configured.ScheduleAsync(Xunit.TestContext.Current.CancellationToken));
-            await Assert.ThrowsAsync<InvalidOperationException>(async () => await configured.CancelAsync(Xunit.TestContext.Current.CancellationToken));
-            await Assert.ThrowsAsync<InvalidOperationException>(() => configured.PollAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken));
         }
         else
         {
             var configured = DurableTask.Run(static _ => { }).WithId("ordinary");
             await Assert.ThrowsAsync<InvalidOperationException>(() => configured.ScheduleAsync(Xunit.TestContext.Current.CancellationToken));
-            await Assert.ThrowsAsync<InvalidOperationException>(async () => await configured.CancelAsync(Xunit.TestContext.Current.CancellationToken));
-            await Assert.ThrowsAsync<InvalidOperationException>(() => configured.PollAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken));
         }
     }
 
@@ -2253,7 +2243,7 @@ public class SchedulingTests
             context).AsTask();
 
         await waiting.Task.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context);
+        context.RequestTaskCancellation(null);
 
         // The input which ignores cancellation still completes, and the combinator returns both results.
         second.SetResult(2);
@@ -2342,7 +2332,7 @@ public class SchedulingTests
         Assert.Equal(1, Assert.Single(result.All));
         Assert.Equal((0, 1), result.Any);
         Assert.True(host.Contains(TaskId.Parse("snapshot/$when-all-1/0")));
-        Assert.True(host.Contains(TaskId.Parse("snapshot/$when-any-2/0")));
+        Assert.True(host.Contains(TaskId.Parse("snapshot/$when-any-1/0")));
     }
 
     [Fact]
@@ -3581,60 +3571,32 @@ public class SchedulingTests
     }
 
     [Fact]
-    public async Task ConfiguredTaskCopiesTargetTheScheduledTask()
+    public async Task ConfigurationCopiesAllocateTheirOccurrencesWhenTheyStart()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var parent = host.CreateContext(TaskId.CreateRoot("copy-parent"));
         var release = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
-        ScheduledTask<int>? scheduled = null;
+        ScheduledTask<int>? first = null;
+        ScheduledTask<int>? second = null;
 
         await host.RunWithAmbientAsync(parent, async () =>
         {
             var configured = DurableTask.Run(async _ => await release.Task).WithId("copied-child");
             var copy = configured;
-            scheduled = await configured.ScheduleAsync();
-            Assert.Equal(DurableTaskStatus.Pending, await copy.PollAsync());
-            await copy.CancelAsync();
+            first = await configured.ScheduleAsync();
+            second = await copy.ScheduleAsync();
+            await first.CancelAsync();
             Assert.Throws<InvalidOperationException>(() => copy.WithId("renamed"));
         });
 
-        var childId = TaskId.Parse("copy-parent/copied-child");
-        Assert.Equal(childId, scheduled!.Id);
-        Assert.Equal([childId], host.EntryIds);
-        Assert.True(host.IsCancellationRequested(childId));
+        var firstId = TaskId.Parse("copy-parent/copied-child");
+        var secondId = TaskId.Parse("copy-parent/copied-child$2");
+        Assert.Equal(firstId, first!.Id);
+        Assert.Equal(secondId, second!.Id);
+        Assert.Equal([firstId, secondId], host.EntryIds);
+        Assert.True(host.IsCancellationRequested(firstId));
+        Assert.False(host.IsCancellationRequested(secondId));
         release.SetResult(1);
-    }
-
-    [Fact]
-    public async Task ConfiguredTaskControlOperationsSelectParentAndRootHandles()
-    {
-        var host = new TestHost(DateTimeOffset.UnixEpoch);
-        var parent = host.CreateContext(TaskId.CreateRoot("control-parent"));
-        ConfiguredDurableTask<int> child = default;
-
-        await host.RunWithAmbientAsync(parent, async () =>
-        {
-            child = DurableTask.FromResult(41).WithId("controlled-child");
-            Assert.Equal(DurableTaskStatus.Pending, await child.PollAsync());
-            await child.CancelAsync();
-        });
-
-        var childId = TaskId.Parse("control-parent/controlled-child");
-        Assert.Equal([childId], host.EntryIds);
-        Assert.True(host.IsCancellationRequested(childId));
-
-        var rootDefinition = host.CreateRootDefinition<int>(
-            _ => ValueTask.FromResult<DurableTaskResponse>(DurableTaskResponse.FromResult(43)));
-        var root = rootDefinition.WithId("controlled-root");
-
-        Assert.Equal(DurableTaskStatus.Pending, await root.PollAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken));
-        await root.CancelAsync(Xunit.TestContext.Current.CancellationToken);
-
-        var rootId = TaskId.CreateRoot("controlled-root");
-        Assert.Equal([childId, rootId], host.EntryIds);
-        Assert.True(host.IsCancellationRequested(rootId));
-        Assert.Equal(0, host.ExecutionCount);
-        Assert.False(DurableTaskContext.TryGetCurrent(out _));
     }
 
     [Fact]
@@ -3998,7 +3960,7 @@ internal sealed class TestHost(DateTimeOffset utcNow)
 
             if (host.PropagatesCancellation && Context is { } context)
             {
-                DurableTaskRuntimeHelper.RequestTaskCancellation(context, reason);
+                context.RequestTaskCancellation(reason);
             }
 
             return ValueTask.CompletedTask;
@@ -4013,13 +3975,14 @@ internal sealed class TestContext(
 {
     public override DateTimeOffset UtcNow => utcNow;
 
+    public override Guid Incarnation => Guid.Empty;
+
     protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(TaskId taskId, DurableTask taskDefinition, DurableTaskStartOptions options, CancellationToken cancellationToken)
         => host.ScheduleChildAsync(taskId, taskDefinition, cancellationToken);
 
     protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken)
         => host.ScheduleDelayAsync(taskId, dueTime, cancellationToken);
 
-    protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId) => host.GetEntry(taskId);
 
     protected override ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken)
         => host.SelectCompletionAsync(decisionId, candidates, cancellationToken);
@@ -4222,7 +4185,7 @@ internal sealed class ControlledScheduledTaskHandle(TaskId id, ControlledSchedul
     public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
         => new(DurableTaskResponse.Pending);
 
-    public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
 internal sealed class RecordingRootDefinition<TResult>(RecordingScheduledTaskHandle handle) : DurableTask<TResult>, ISchedulableTask
@@ -4292,7 +4255,7 @@ internal sealed class RecordingScheduledTaskHandle(TaskId id) : IScheduledTaskHa
         return new(DurableTaskResponse.Pending);
     }
 
-    public ValueTask CancelAsync(CancellationToken cancellationToken)
+    public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
     {
         CancelCallCount++;
         LastCancelCancellationToken = cancellationToken;
@@ -4507,7 +4470,7 @@ internal sealed class DirectScheduledTaskHandle(TaskId id, DirectScheduledTaskSt
         CancellationToken cancellationToken)
         => new(DurableTaskResponse.Pending);
 
-    public ValueTask CancelAsync(CancellationToken cancellationToken) => state.CancelAsync();
+    public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => state.CancelAsync();
 }
 
 internal sealed class ControlledSafeReferenceAwaitable<TResult>(TResult result)

@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
 using Orleans.Diagnostics;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
@@ -47,8 +46,6 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
             silo.Services.AddSingleton(Gates);
             silo.Services.Configure<DurableMessagingOptions>(options => options.RetryInitialInterval = RetryInterval);
 
-            // A crash or deactivation while a step runs resumes the step promptly, as recovery tests observe.
-            silo.Services.Configure<DurableTaskOptions>(options => options.RunnableExecutionWakeupDelay = TimeSpan.FromSeconds(1));
             configureSilo?.Invoke(silo);
         });
     }

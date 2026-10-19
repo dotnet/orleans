@@ -102,7 +102,7 @@ public class DurableTaskShieldedTests
     {
         var log = new ConcurrentDictionary<string, bool>();
         var context = new RecordingContext(TaskId.CreateRoot("root"), log);
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "buyer");
+        context.RequestTaskCancellation("buyer");
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
             DurableTask.Run(async cancellationToken =>
@@ -122,7 +122,7 @@ public class DurableTaskShieldedTests
     {
         var log = new ConcurrentDictionary<string, bool>();
         var context = new RecordingContext(TaskId.CreateRoot("root"), log);
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "buyer");
+        context.RequestTaskCancellation("buyer");
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
             DurableTask.Run(async _ =>
@@ -151,6 +151,8 @@ public class DurableTaskShieldedTests
     {
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 
+        public override Guid Incarnation => Guid.Empty;
+
         protected override async ValueTask<IScheduledTaskHandle> StartTaskAsync(
             TaskId taskId,
             DurableTask taskDefinition,
@@ -173,7 +175,6 @@ public class DurableTaskShieldedTests
             DateTimeOffset dueTime,
             CancellationToken cancellationToken) => new(DurableTaskResponse.Completed);
 
-        protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId) => throw new NotSupportedException();
 
         protected override ValueTask<TaskId> SelectCompletionAsync(
             TaskId decisionId,
@@ -196,6 +197,6 @@ public class DurableTaskShieldedTests
 
         public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken) => new(response);
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 }

@@ -1,50 +1,56 @@
 namespace Documentation.Diagnostics.DurableTasks;
 
-// <orleans0219_contract>
-public interface INotificationGrain : IGrainWithStringKey
-{
-    DurableTask ShipThenNotifyAsync(string customer);
-
-    DurableTask NotifyAsync(string customer);
-}
-// </orleans0219_contract>
-
-public sealed class NotificationGrain(IEmailSender email) : DurableGrain, INotificationGrain
+public sealed class DispatchGrain(IEmailSender email) : DurableGrain
 {
 #pragma warning disable ORLEANS0219
     // <orleans0219_violation>
-    public async DurableTask ShipAsync(string customer)
+    public async DurableTask DispatchAsync(string customer)
     {
-        // Starts the notification and never observes it: a failure goes unnoticed, and deleting this task's tree
-        // cancels a notification which is still running.
-        await NotifyAsync(customer).WithId("notify").ScheduleAsync();
+        // Starts the notice and discards its handle: the notice's failure reaches no code.
+        await Notify(customer).WithId("notify").ScheduleAsync();
         await Pack().WithId("pack");
     }
     // </orleans0219_violation>
 #pragma warning restore ORLEANS0219
 
     // <orleans0219_fix_await>
-    public async DurableTask ShipWhileNotifyingAsync(string customer)
+    public async DurableTask DispatchAndNotifyAsync(string customer)
     {
-        // Notifies while the order is packed, and observes the notification's outcome before the task completes.
-        var notification = await NotifyAsync(customer).WithId("notify").ScheduleAsync();
+        // The notice runs while the body packs, and the body observes its outcome before it completes.
+        var notice = await Notify(customer).WithId("notify").ScheduleAsync();
         await Pack().WithId("pack");
-        await notification;
+        await notice;
     }
     // </orleans0219_fix_await>
 
-    // <orleans0219_fix_detach>
-    public async DurableTask ShipThenNotifyAsync(string customer)
+    // <orleans0219_fix_combinator>
+    public async DurableTask DispatchAndInvoiceAsync(string customer)
+    {
+        var notice = await Notify(customer).WithId("notify").ScheduleAsync();
+        var invoice = await Invoice(customer).WithId("invoice").ScheduleAsync();
+        await Pack().WithId("pack");
+        await ScheduledTask.WhenAll([notice, invoice]);
+    }
+    // </orleans0219_fix_combinator>
+
+    // <orleans0219_fix_detached>
+    public async DurableTask DispatchAndSurveyAsync(string customer)
     {
         await Pack().WithId("pack");
 
-        // Calls the grain through its reference, starting an independent root which continues after this task completes.
-        _ = this.AsReference<INotificationGrain>().NotifyAsync(customer).Detached().WithId($"notify-{customer}").Post();
+        // An independent root task, which continues after this execution completes and is deleted.
+        await Survey(customer).WithId("survey").Detached().ScheduleAsync();
     }
-    // </orleans0219_fix_detach>
+    // </orleans0219_fix_detached>
 
     private static async DurableTask<bool> Pack() => true;
 
-    public async DurableTask NotifyAsync(string customer) =>
-        await email.SendAsync(customer, "Your order shipped", DurableTask.Current.CancellationToken);
+    private async DurableTask Notify(string customer) =>
+        await email.SendAsync(customer, "Your order is on its way", DurableTask.Current.CancellationToken);
+
+    private async DurableTask Invoice(string customer) =>
+        await email.SendAsync(customer, "Your invoice", DurableTask.Current.CancellationToken);
+
+    private async DurableTask Survey(string customer) =>
+        await email.SendAsync(customer, "How was your order?", DurableTask.Current.CancellationToken);
 }

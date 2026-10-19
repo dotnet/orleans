@@ -25,6 +25,9 @@ public interface IDurableTaskGrainStorage
     void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string fingerprint);
     void SetCallerId(TaskId taskId, IDurableTaskState state, GrainId callerId);
 
+    /// <summary>Records the incarnation of an invoked task's run.</summary>
+    void SetIncarnation(TaskId taskId, IDurableTaskState state, System.Guid incarnation);
+
     /// <summary>
     /// Stores the task's terminal <paramref name="response"/>, stamping its completion time and the next
     /// <see cref="IDurableTaskState.CompletionSequence"/>.

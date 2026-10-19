@@ -433,8 +433,6 @@ internal sealed class GrainScheduledTaskHandle(
         where TFeature : class => new DurableTaskAddress(target, TaskId) as TFeature;
     public DurableTaskResponse? LastResponse { get; private set; } = lastResponse;
 
-    public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
-
     /// <remarks>Cancellation is idempotent, so failures to reach the grain are retried as polls are.</remarks>
     public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) =>
         DurableTaskPolling.SendAsync(

@@ -499,7 +499,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (_storage.TryGetTask(taskId, out var taskState) && taskState.CancellationRequestedAt.HasValue)
         {
             // Nothing observes the token before the body starts.
-            context.RequestTaskCancellation(taskState.CancellationReason);
+            context.DeliverTaskCancellation(taskState.CancellationReason);
         }
 
         return context;
@@ -1333,6 +1333,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             state = GetOrCreateTask(taskId, request);
             StageCaller(taskId, state, requestContext.CallerId);
             _storage.SetRequestFingerprint(taskId, state, fingerprint);
+            _storage.SetIncarnation(taskId, state, Guid.NewGuid());
             var subscribedNew = requestContext.SupportsDurableCompletion
                 && TryRegisterCompletionDestination(taskId, state, GetInvoker(requestContext.CallerId, taskId));
             return new(subscribedNew ? DurableTaskResponse.Subscribed : DurableTaskResponse.Pending, Start: true, CompletedResponse: null);
@@ -1388,6 +1389,13 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (state.RequestFingerprint is null)
         {
             _storage.SetRequestFingerprint(taskId, state, fingerprint);
+        }
+
+        // A run's incarnation is minted when its invocation is first stored, which a record of an earlier cancellation
+        // precedes.
+        if (state.Incarnation == Guid.Empty)
+        {
+            _storage.SetIncarnation(taskId, state, Guid.NewGuid());
         }
 
         // An invocation whose cancellation preceded its start terminalizes as canceled. A started body, which a duplicate
@@ -1586,8 +1594,13 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         _stalledExecutions.Add(context.Id);
-        _shared.Logger.LogWarning(exception, "{Id} durable task '{TaskId}' stalled: {Reason}.", GrainId, context.Id, reason);
-        DurableTaskEvents.EmitExecutionStalled(GrainContext, context.Id, reason, exception);
+        ReportStall(context.Id, reason, exception);
+    }
+
+    private void ReportStall(TaskId taskId, DurableTaskAttemptCancellationReason reason, Exception exception)
+    {
+        _shared.Logger.LogWarning(exception, "{Id} durable task '{TaskId}' stalled: {Reason}.", GrainId, taskId, reason);
+        DurableTaskEvents.EmitExecutionStalled(GrainContext, taskId, reason, exception);
     }
 
 
@@ -1745,7 +1758,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             try
             {
-                context.RequestTaskCancellation(propagation.CancellationReason);
+                context.DeliverTaskCancellation(propagation.CancellationReason);
             }
             catch (AggregateException exception)
             {
@@ -2076,7 +2089,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 try
                 {
-                    context.RequestTaskCancellation(ancestorState.CancellationReason);
+                    context.DeliverTaskCancellation(ancestorState.CancellationReason);
                 }
                 catch (AggregateException exception)
                 {
@@ -2153,7 +2166,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         try
         {
             // A canceled attempt's response is discarded: its task continues in the next activation, or has its outcome.
-            if (response.IsCompleted && !context.IsAttemptCanceled)
+            if (response.IsCompleted && !context.IsAttemptEnded)
             {
                 Debug.Assert(!_stopping && !IsUnregistered(context), "The runtime cancels every attempt which it stops or discards.");
                 await SetResponseAsync(context.Id, response, CancellationToken.None);
@@ -2171,6 +2184,14 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
         finally
         {
+            // The abstractions end an attempt whose replay departs from its record, such as a recorded result of another
+            // type, without the runtime; the attempt then stalls like one whose operation diverged.
+            if (context.AttemptEndReason is DurableTaskAttemptCancellationReason.Diverged or DurableTaskAttemptCancellationReason.UnsupportedVersion
+                && _stalledExecutions.Add(context.Id))
+            {
+                ReportStall(context.Id, context.AttemptEndReason.GetValueOrDefault(), response.Exception?.InnerException ?? response.Exception ?? new DurableTaskDivergenceException($"Durable task '{context.Id}' diverged from its record."));
+            }
+
             context.OnAttemptCompleted();
             if (_runningRequests.TryGetValue(context.Id, out var running)
                 && ReferenceEquals(running.Context, context))
@@ -2200,7 +2221,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </remarks>
     void IDurableTaskGrainRuntime.StageBodyResponse(GrainDurableTaskContext context, DurableTaskResponse response)
     {
-        Debug.Assert(!context.IsAttemptCanceled && !_stopping && !IsUnregistered(context), "Only a running attempt stages its response.");
+        Debug.Assert(!context.IsAttemptEnded && !_stopping && !IsUnregistered(context), "Only a running attempt stages its response.");
         try
         {
             // The handle completes when a write commits the response, as it does for a response which the attempt commits.
@@ -3036,6 +3057,24 @@ internal sealed partial class DurableTaskGrainRuntime(
         return state.RemoteTarget.IsDefault ? taskId : CallerScope.GetTaskId(GrainId, taskId);
     }
 
+    /// <remarks>
+    /// Every execution belongs to the tree of an invoked task, which records its incarnation when its invocation is first
+    /// stored, so the walk always ends at a stored invoked task.
+    /// </remarks>
+    public Guid GetIncarnation(TaskId executionId)
+    {
+        for (var taskId = executionId; !taskId.IsDefault; taskId = taskId.Parent())
+        {
+            if (_storage.TryGetTask(taskId, out var state) && IsInvoked(state))
+            {
+                Debug.Assert(state.Incarnation != Guid.Empty, "An invoked task records its incarnation with its invocation.");
+                return state.Incarnation;
+            }
+        }
+
+        throw new InvalidOperationException($"Durable task '{executionId}' belongs to no invoked task of grain '{GrainId}'.");
+    }
+
     public DateTimeOffset? GetCompletedAt(TaskId taskId) =>
         _storage.TryGetTask(taskId, out var state) ? state.CompletedAt : null;
 
@@ -3135,18 +3174,18 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </remarks>
     private bool CancelAttempt(GrainDurableTaskContext context, DurableTaskAttemptCancellationReason reason)
     {
-        if (!context.CancelAttempt(reason))
+        if (!context.EndAttempt(reason))
         {
             return false;
         }
 
-        TrackBackgroundTask(SignalAttemptCanceledAsync(context), "signaling a canceled durable task attempt");
+        TrackBackgroundTask(ApplyCancellationAsync(context), "canceling a durable task attempt");
         return true;
 
-        static async Task SignalAttemptCanceledAsync(GrainDurableTaskContext context)
+        static async Task ApplyCancellationAsync(GrainDurableTaskContext context)
         {
             await Task.Yield();
-            context.SignalAttemptCanceled();
+            context.ApplyCancellation();
         }
     }
 }

@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0219: Await, combine, or return the handles of scheduled children"
-description: Understand ORLEANS0219, which reports the handle of an attached child which a durable task body schedules and never observes, and fix it by awaiting the handle or detaching the task.
-ms.date: 10/17/2026
+description: Understand ORLEANS0219, which reports the handle of a scheduled child which a durable task body never observes, and fix it by awaiting the handle, combining it, or detaching the work.
+ms.date: 10/19/2026
 ms.topic: reference
 ---
 
@@ -15,32 +15,34 @@ ms.topic: reference
 
 ## Cause
 
-A durable task body awaits `ScheduleAsync` on a definition which isn't `Detached()`, and discards the handle, or keeps it in a local which no code awaits, passes on, or returns:
+A durable task body schedules an attached child with `ScheduleAsync` and discards the returned handle, or holds it in a local whose only uses read its properties, such as `Id`:
 
 :::code source="snippets/durable-tasks/Orleans0219.cs" id="orleans0219_violation" language="csharp":::
 
-A local whose only uses read the handle's properties, such as `Id` or `TargetTaskId`, is reported too.
-
 ## Rule description
 
-In a durable task body, `ScheduleAsync` starts an attached child and returns its handle once the child's host has accepted it. The execution owns the child: the child's result and failure reach only code which observes the handle, and when the execution's tree is deleted, after the execution is terminal, a child which is still running is canceled. In the example, a notification which fails goes unnoticed, and a notification which runs longer than the shipment is canceled with the shipment's tree.
+In a durable task body, `ScheduleAsync` starts an attached child and returns its handle once the child's host has accepted and stored the child. The execution owns the child: the execution's cancellation reaches it, and deleting the execution's tree, once the execution is terminal, cancels a child which is still running. The child's result and failure reach only code which observes the handle.
 
-For ownership and lifetimes, see [Structured concurrency](../grains/durable-tasks-structured-concurrency.md).
+In the example, the body completes while the notice can still be running. A notice which fails leaves the order dispatched with no record of the failure in the workflow, and a notice which is still running when the execution's tree is deleted is canceled.
+
+For attached and detached starts, see [Starting and observing tasks](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#starting-and-observing-tasks).
 
 ## How to fix violations
 
-**Await the handle** before the body completes, or pass it to a combinator, such as `ScheduledTask.WhenAll`, or return it. The child runs concurrently with the work between the start and the await:
+**Await the handle.** The child runs while the body continues, and the body observes its outcome before it completes:
 
 :::code source="snippets/durable-tasks/Orleans0219.cs" id="orleans0219_fix_await" language="csharp":::
 
-**Detach a durable grain call which outlives the execution.** Define the work as a durable grain-interface method:
+**Pass the handle to a combinator.** `ScheduledTask.WhenAll` waits for every handle and throws the first failure in input order:
 
-:::code source="snippets/durable-tasks/Orleans0219.cs" id="orleans0219_contract" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0219.cs" id="orleans0219_fix_combinator" language="csharp":::
 
-Call the durable method through a grain reference to start an independent root whose work continues across its starter's completion or deletion. Name it with `WithId`, so other parties can address it:
+**Return the handle.** A body which returns the handle passes the observation to its caller.
 
-:::code source="snippets/durable-tasks/Orleans0219.cs" id="orleans0219_fix_detach" language="csharp":::
+**Detach work which outlives the execution.** `Detached()` starts an independent root task, which continues after the execution completes and after its tree is deleted:
+
+:::code source="snippets/durable-tasks/Orleans0219.cs" id="orleans0219_fix_detached" language="csharp":::
 
 ## When to suppress
 
-Suppress the diagnostic for a child which the execution deliberately leaves to the end of its tree's lifetime, such as one which another party observes through the handle's ID.
+Suppress the diagnostic for a child whose outcome the workflow ignores, and which may stop when the execution's tree is deleted, such as a best-effort cache warm-up.

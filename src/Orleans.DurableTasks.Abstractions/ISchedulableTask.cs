@@ -22,8 +22,9 @@ public interface ISchedulableTask
     /// </summary>
     /// <remarks>
     /// The start commits with the caller's next durable write, together with the state changes which the calling code
-    /// staged, and its host then delivers it exactly once. Implementations which have no durable outbox to stage in, such
-    /// as clients, keep this default implementation, which throws <see cref="InvalidOperationException"/>.
+    /// staged. Its host then delivers it, retrying until the task's host accepts it, and the task's host deduplicates
+    /// deliveries by the task's identifier, so the task starts once. Implementations which have no durable outbox to
+    /// stage in, such as clients, keep this default implementation, which throws <see cref="InvalidOperationException"/>.
     /// </remarks>
     IScheduledTaskHandle Post(TaskId taskId)
         => throw new InvalidOperationException(
@@ -61,14 +62,13 @@ public interface IScheduledTaskHandle
     ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Durably requests task cancellation. The request is monotonic and idempotent. The token abandons
+    /// Durably requests task cancellation without a reason. The request is monotonic and idempotent. The token abandons
     /// waiting for acknowledgement.
     /// </summary>
     /// <remarks>
-    /// The operation completes once the host has durably recorded the request; the task's response reports the outcome.
-    /// A running task observes the request through its durable cancellation token and decides its own outcome.
+    /// The request is <see cref="CancelAsync(string, CancellationToken)"/> with a <see langword="null"/> reason.
     /// </remarks>
-    ValueTask CancelAsync(CancellationToken cancellationToken);
+    ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
 
     /// <summary>
     /// Durably requests task cancellation carrying <paramref name="reason"/>. The request is monotonic and idempotent.
@@ -80,11 +80,11 @@ public interface IScheduledTaskHandle
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
     /// <remarks>
-    /// The first request determines the reason, and the host retains it with the task's cancellation. Hosts which don't
-    /// record reasons keep this default implementation, which requests cancellation through
-    /// <see cref="CancelAsync(CancellationToken)"/> without the reason.
+    /// The operation completes once the host has durably recorded the request; the task's response reports the outcome.
+    /// A running task observes the request through its durable cancellation token and decides its own outcome. The first
+    /// request determines the reason, and the host retains it with the task's cancellation.
     /// </remarks>
-    ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => CancelAsync(cancellationToken);
+    ValueTask CancelAsync(string? reason, CancellationToken cancellationToken);
 
     /// <summary>
     /// Administratively aborts the task: the host terminalizes it and its attached descendants as failed with
@@ -102,6 +102,7 @@ public interface IScheduledTaskHandle
 }
 
 /// <summary>Configures a polling operation.</summary>
+[Alias("Orleans.DurableTasks.PollingOptions")]
 public readonly struct PollingOptions : IEquatable<PollingOptions>
 {
     private readonly TimeSpan? _pollTimeout;

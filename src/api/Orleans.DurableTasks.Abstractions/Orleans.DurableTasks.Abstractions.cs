@@ -8,13 +8,12 @@
 //------------------------------------------------------------------------------
 namespace Orleans.DurableTasks
 {
+    [Alias("Orleans.DurableTasks.CanceledDurableTaskResponse")]
     public sealed partial class CanceledDurableTaskResponse : DurableTaskResponse
     {
         public CanceledDurableTaskResponse(System.OperationCanceledException exception) { }
 
         public override System.OperationCanceledException Exception { get { throw null; } }
-
-        public static CanceledDurableTaskResponse Instance { get { throw null; } }
 
         public override DurableTaskResponseKind ResponseKind { get { throw null; } }
 
@@ -25,15 +24,11 @@ namespace Orleans.DurableTasks
 
     public readonly partial struct ConfiguredDurableTask
     {
-        public readonly System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public readonly System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
         public readonly ConfiguredDurableTask Detached() { throw null; }
 
-        public readonly DurableTaskAwaiter GetAwaiter() { throw null; }
+        public readonly ConfiguredDurableTask Detached(string rootId) { throw null; }
 
-        public readonly System.Threading.Tasks.Task<DurableTaskStatus> PollAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public readonly DurableTaskAwaiter GetAwaiter() { throw null; }
 
         public readonly ScheduledTask Post() { throw null; }
 
@@ -46,15 +41,11 @@ namespace Orleans.DurableTasks
 
     public readonly partial struct ConfiguredDurableTask<TResult>
     {
-        public readonly System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public readonly System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
         public readonly ConfiguredDurableTask<TResult> Detached() { throw null; }
 
-        public readonly DurableTaskAwaiter<TResult> GetAwaiter() { throw null; }
+        public readonly ConfiguredDurableTask<TResult> Detached(string rootId) { throw null; }
 
-        public readonly System.Threading.Tasks.Task<DurableTaskStatus> PollAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public readonly DurableTaskAwaiter<TResult> GetAwaiter() { throw null; }
 
         public readonly ScheduledTask<TResult> Post() { throw null; }
 
@@ -91,6 +82,7 @@ namespace Orleans.DurableTasks
     }
 
     [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
+    [Alias("Orleans.DurableTasks.DurableTask")]
     public abstract partial class DurableTask
     {
         public static DurableTaskContext Current { get { throw null; } }
@@ -249,6 +241,7 @@ namespace Orleans.DurableTasks
         public static System.Collections.Generic.IAsyncEnumerable<ScheduledTask<TResult>> WhenEach<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
     }
 
+    [Alias("Orleans.DurableTasks.DurableTaskAbortedException")]
     public sealed partial class DurableTaskAbortedException : System.Exception
     {
         public DurableTaskAbortedException() { }
@@ -258,6 +251,7 @@ namespace Orleans.DurableTasks
         public DurableTaskAbortedException(string reason) { }
     }
 
+    [Alias("Orleans.DurableTasks.DurableTaskAttemptCanceledException")]
     public sealed partial class DurableTaskAttemptCanceledException : System.OperationCanceledException
     {
         public DurableTaskAttemptCanceledException() { }
@@ -273,6 +267,7 @@ namespace Orleans.DurableTasks
         public DurableTaskAttemptCancellationReason Reason { get { throw null; } }
     }
 
+    [Alias("Orleans.DurableTasks.DurableTaskAttemptCancellationReason")]
     public enum DurableTaskAttemptCancellationReason
     {
         ActivationStopping = 0,
@@ -308,6 +303,8 @@ namespace Orleans.DurableTasks
     {
         protected DurableTaskContext(TaskId taskId) { }
 
+        protected internal DurableTaskAttemptCancellationReason? AttemptCancellationReason { get { throw null; } }
+
         public System.Threading.CancellationToken AttemptCancellationToken { get { throw null; } }
 
         public System.Threading.CancellationToken CancellationToken { get { throw null; } }
@@ -315,6 +312,10 @@ namespace Orleans.DurableTasks
         protected internal virtual string? HostId { get { throw null; } }
 
         public TaskId Id { get { throw null; } }
+
+        public abstract System.Guid Incarnation { get; }
+
+        protected internal bool IsAttemptCanceled { get { throw null; } }
 
         public virtual bool IsReplaying { get { throw null; } }
 
@@ -326,14 +327,17 @@ namespace Orleans.DurableTasks
 
         public abstract System.DateTimeOffset UtcNow { get; }
 
-        protected internal virtual TaskId CreateChildTaskId(string? name) { throw null; }
+        protected internal void CancelAttempt(DurableTaskAttemptCancellationReason reason) { }
 
-        protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
+        protected internal DurableTaskAttemptCanceledException CreateAttemptCanceledException(System.Exception? innerException) { throw null; }
+
         protected internal virtual int GetVersion(string name, int minSupported, int maxSupported) { throw null; }
 
         protected internal virtual void OnBodyCompleted(DurableTaskResponse response) { }
 
         protected internal virtual IScheduledTaskHandle PostTask(TaskId taskId, DurableTask taskDefinition, DurableTaskStartOptions options) { throw null; }
+
+        protected internal void RequestTaskCancellation(string? reason) { }
 
         protected internal virtual DurableTaskResponse RunEffect<TState>(TaskId effectId, TState state, System.Func<TState, DurableTaskResponse> effect) { throw null; }
 
@@ -347,7 +351,11 @@ namespace Orleans.DurableTasks
 
     public static partial class DurableTaskExtensions
     {
+        public static ConfiguredDurableTask Detached(this DurableTask task, string rootId) { throw null; }
+
         public static ConfiguredDurableTask Detached(this DurableTask task) { throw null; }
+
+        public static ConfiguredDurableTask<TResult> Detached<TResult>(this DurableTask<TResult> task, string rootId) { throw null; }
 
         public static ConfiguredDurableTask<TResult> Detached<TResult>(this DurableTask<TResult> task) { throw null; }
 
@@ -477,6 +485,7 @@ namespace Orleans.DurableTasks
             where TStateMachine : System.Runtime.CompilerServices.IAsyncStateMachine { }
     }
 
+    [Alias("Orleans.DurableTasks.DurableTaskResponse")]
     public abstract partial class DurableTaskResponse
     {
         internal DurableTaskResponse() { }
@@ -510,6 +519,7 @@ namespace Orleans.DurableTasks
         protected static System.InvalidOperationException Incomplete() { throw null; }
     }
 
+    [Alias("Orleans.DurableTasks.DurableTaskResponseKind")]
     public enum DurableTaskResponseKind
     {
         None = 0,
@@ -520,6 +530,7 @@ namespace Orleans.DurableTasks
         Failed = 5
     }
 
+    [Alias("Orleans.DurableTasks.DurableTaskResponse`1")]
     public sealed partial class DurableTaskResponse<TResult> : DurableTaskResponse
     {
         public DurableTaskResponse(TResult result) { }
@@ -539,14 +550,11 @@ namespace Orleans.DurableTasks
 
     public static partial class DurableTaskRuntimeHelper
     {
-        public static void CancelAttempt(DurableTaskContext context, DurableTaskAttemptCancellationReason reason) { }
-
-        public static void RequestTaskCancellation(DurableTaskContext context, string? reason = null) { }
-
         public static System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableTaskContext context) { throw null; }
     }
 
     [System.Flags]
+    [Alias("Orleans.DurableTasks.DurableTaskStartOptions")]
     public enum DurableTaskStartOptions
     {
         None = 0,
@@ -554,6 +562,7 @@ namespace Orleans.DurableTasks
         WaitForAcceptance = 2
     }
 
+    [Alias("Orleans.DurableTasks.DurableTaskStatus")]
     public enum DurableTaskStatus
     {
         None = 0,
@@ -563,6 +572,7 @@ namespace Orleans.DurableTasks
         Failed = 4
     }
 
+    [Alias("Orleans.DurableTasks.DurableTaskVersionException")]
     public sealed partial class DurableTaskVersionException : System.Exception
     {
         public DurableTaskVersionException(TaskId taskId, string name, int version, int minSupported, int maxSupported) { }
@@ -579,6 +589,7 @@ namespace Orleans.DurableTasks
     }
 
     [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
+    [Alias("Orleans.DurableTasks.DurableTask`1")]
     public abstract partial class DurableTask<TResult> : DurableTask
     {
     }
@@ -600,6 +611,7 @@ namespace Orleans.DurableTasks
         public override string ToString() { throw null; }
     }
 
+    [Alias("Orleans.DurableTasks.ExceptionDurableTaskResponse")]
     public sealed partial class ExceptionDurableTaskResponse : DurableTaskResponse
     {
         public ExceptionDurableTaskResponse(System.Exception exception) { }
@@ -635,6 +647,7 @@ namespace Orleans.DurableTasks
         System.Threading.Tasks.ValueTask<DurableTaskResponse> WaitAsync(System.Threading.CancellationToken cancellationToken);
     }
 
+    [Alias("Orleans.DurableTasks.PendingDurableTaskResponse")]
     public sealed partial class PendingDurableTaskResponse : DurableTaskResponse
     {
         internal PendingDurableTaskResponse() { }
@@ -650,6 +663,7 @@ namespace Orleans.DurableTasks
         public override T GetResult<T>() { throw null; }
     }
 
+    [Alias("Orleans.DurableTasks.PollingOptions")]
     public readonly partial struct PollingOptions : System.IEquatable<PollingOptions>
     {
         private readonly int _dummyPrimitive;
@@ -688,9 +702,9 @@ namespace Orleans.DurableTasks
 
         public System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public abstract System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default);
-        protected virtual System.Threading.Tasks.ValueTask CancelAsyncCore(string? reason, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
+        protected abstract System.Threading.Tasks.ValueTask CancelAsyncCore(string? reason, System.Threading.CancellationToken cancellationToken);
         public ScheduledTaskAwaiter GetAwaiter() { throw null; }
 
         public virtual TFeature? GetFeature<TFeature>()
@@ -775,6 +789,7 @@ namespace Orleans.DurableTasks
         public new System.Threading.Tasks.Task<TResult> WaitUntilAsync(System.DateTimeOffset dueTime, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
+    [Alias("Orleans.DurableTasks.SubscribedDurableTaskResponse")]
     public sealed partial class SubscribedDurableTaskResponse : DurableTaskResponse
     {
         internal SubscribedDurableTaskResponse() { }
@@ -790,6 +805,7 @@ namespace Orleans.DurableTasks
         public override T GetResult<T>() { throw null; }
     }
 
+    [Alias("Orleans.DurableTasks.SuccessDurableTaskResponse")]
     public sealed partial class SuccessDurableTaskResponse : DurableTaskResponse
     {
         internal SuccessDurableTaskResponse() { }
@@ -806,6 +822,7 @@ namespace Orleans.DurableTasks
     }
 
     [System.Text.Json.Serialization.JsonConverter(typeof(TaskIdJsonConverter))]
+    [Alias("Orleans.DurableTasks.TaskId")]
     public readonly partial struct TaskId : System.IEquatable<TaskId>, System.IParsable<TaskId>, System.ISpanParsable<TaskId>, System.ISpanFormattable, System.IFormattable
     {
         private readonly object _dummy;

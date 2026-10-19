@@ -193,7 +193,6 @@ public class DurableTaskReplayRegionTests
             private readonly IDurableQueue<int> _queue = null!;
             private readonly IDurableSet<int> _set = null!;
             private readonly IDurableTaskCompletionSource<int> _completion = null!;
-            private readonly IDurableLog<int> _log = null!;
             private readonly IPersistentState<int> _state = null!;
 
             public async DurableTask<int> RunAsync()
@@ -202,13 +201,13 @@ public class DurableTaskReplayRegionTests
                 {|ORLEANS0200:_queue|}.Enqueue(1);
                 {|ORLEANS0200:_set|}.Add(1);
                 {|ORLEANS0200:_completion|}.TrySetResult(1);
-                {|ORLEANS0200:_log|}.Append(1);
                 {|ORLEANS0200:_state|}.State = 1;
 
-                // A recorded effect appends once, and the tail appends with the task's result.
-                var sequence = DurableTask.RunInline("progress", () => _log.Append(2));
+                // A recorded effect enqueues once, and the tail enqueues with the task's result.
+                var count = DurableTask.RunInline("progress", () => { _queue.Enqueue(2); return _queue.Count; });
                 await Step(1).WithId("step");
-                return (int)(sequence + _log.Append(3));
+                _queue.Enqueue(3);
+                return count;
             }
         }
         """);
@@ -220,17 +219,18 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             private readonly IDurableList<int> _list = null!;
             private readonly IDurableSet<int> _set = null!;
-            private readonly IDurableLog<int> _log = null!;
+            private readonly IDurableQueue<int> _queue = null!;
 
             public async DurableTask<int> StepAsync()
             {
                 {|ORLEANS0203:_list.AddRange(new[] { 1, 2 })|};
                 {|ORLEANS0203:_set.UnionWith(new[] { 1, 2 })|};
                 {|ORLEANS0203:_set.ExceptWith(new[] { 3 })|};
-                {|ORLEANS0203:_log.Append(1)|};
-                {|ORLEANS0203:_log.TrimBefore(1)|};
+                {|ORLEANS0203:_queue.Enqueue(1)|};
+                {|ORLEANS0203:_queue.Dequeue()|};
                 await FetchAsync();
-                return (int)_log.Append(2);
+                _queue.Enqueue(2);
+                return _queue.Count;
             }
         }
         """);

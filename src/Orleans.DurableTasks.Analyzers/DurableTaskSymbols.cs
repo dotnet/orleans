@@ -130,6 +130,23 @@ internal sealed class DurableTaskSymbols
         type?.ContainingNamespace?.ToDisplayString() is { } name
         && (name == DurableTasksNamespace || name.StartsWith(DurableTasksNamespace + ".", StringComparison.Ordinal));
 
+    /// <summary>
+    /// Returns whether a type is declared in the durable task abstractions' namespace or a namespace within it, comparing
+    /// namespace symbols without formatting their names.
+    /// </summary>
+    public bool IsInDurableTasksNamespace(ITypeSymbol? type)
+    {
+        for (var current = type?.ContainingNamespace; current is { IsGlobalNamespace: false }; current = current.ContainingNamespace)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, DurableTask.ContainingNamespace))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>Returns whether a method returns a durable task definition or a configuration of one.</summary>
     public bool ReturnsDefinition(IMethodSymbol method) => IsDefinitionType(method.ReturnType);
 
@@ -326,7 +343,7 @@ internal sealed class DurableTaskSymbols
             return true;
         }
 
-        return awaited is IInvocationOperation invocation && IsDurableTasksType(invocation.TargetMethod.ContainingType);
+        return awaited is IInvocationOperation invocation && IsDurableTasksType(invocation.TargetMethod.ContainingType) && !IsPoll(invocation);
     }
 
     /// <summary>Returns whether an invocation records an effect: <c>DurableTask.RunInline</c>, named or unnamed.</summary>
@@ -354,6 +371,56 @@ internal sealed class DurableTaskSymbols
     /// <summary>Returns whether an invocation posts a definition or configuration.</summary>
     public static bool IsPost(IInvocationOperation invocation) =>
         invocation.TargetMethod.Name == "Post" && IsDurableTasksType(invocation.TargetMethod.ContainingType);
+
+    /// <summary>
+    /// Returns whether an invocation polls a scheduled task: <c>IsCompletedAsync</c>, <c>GetStatusAsync</c>, or
+    /// <c>GetResponseAsync</c> with polling options. A poll observes the task's status when it runs and records nothing.
+    /// </summary>
+    public static bool IsPoll(IInvocationOperation invocation) =>
+        IsDurableTasksType(invocation.TargetMethod.ContainingType)
+        && invocation.TargetMethod.ContainingType.Name == "ScheduledTask"
+        && (invocation.TargetMethod.Name is "IsCompletedAsync" or "GetStatusAsync"
+            || (invocation.TargetMethod.Name == "GetResponseAsync"
+                && invocation.TargetMethod.Parameters.Length > 0
+                && invocation.TargetMethod.Parameters[0].Type.Name == "PollingOptions"));
+
+    /// <summary>
+    /// Returns whether an invocation is a durable operation which a <c>DurableTask.RunInline</c> effect can't run: a start
+    /// such as <c>ScheduleAsync</c> or <c>Post</c>, or a version check. A nested <c>RunInline</c> runs as part of the
+    /// effect.
+    /// </summary>
+    public bool IsOperationOutsideEffects(IInvocationOperation invocation)
+    {
+        var method = invocation.TargetMethod;
+        return (IsPost(invocation) || (method.Name == "ScheduleAsync" && IsDurableTasksType(method.ContainingType)))
+            || (method.Name == "GetVersion" && SymbolEqualityComparer.Default.Equals(method.ContainingType, DurableTask))
+            || (method.Name is "Get" or "IsAtLeast" && SymbolEqualityComparer.Default.Equals(method.ContainingType, DurableVersion));
+    }
+
+    /// <summary>
+    /// Returns whether an invocation configures an await to continue without its captured context, such as
+    /// <c>ConfigureAwait(false)</c>, and returns the argument's text.
+    /// </summary>
+    public static bool ContinuesOffContext(IInvocationOperation invocation, out string argument)
+    {
+        argument = string.Empty;
+        if (invocation.TargetMethod.Name != "ConfigureAwait" || invocation.Arguments.Length != 1)
+        {
+            return false;
+        }
+
+        var value = invocation.Arguments[0].Value;
+        argument = value.Syntax.ToString();
+        return value.ConstantValue is { HasValue: true, Value: var constant }
+            && constant switch
+            {
+                bool continueOnCapturedContext => !continueOnCapturedContext,
+
+                // ConfigureAwaitOptions.ContinueOnCapturedContext is 1.
+                int options when value.Type?.TypeKind == TypeKind.Enum => (options & 1) == 0,
+                _ => false,
+            };
+    }
 
     /// <summary>Returns whether an invocation waits for a durable signal.</summary>
     public bool IsSignalWait(IInvocationOperation invocation) =>

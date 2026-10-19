@@ -117,7 +117,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var delaying = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         runtime.ScheduleFromInbox(rootId, CreateRequest(1, () => DurableTask.Run(async _ =>
         {
-            var shipment = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("shipment").Shielded().Post();
+            var shipment = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached("shipment").Shielded().Post();
             delaying.TrySetResult();
             await DurableTask.Delay(TimeSpan.FromMinutes(1)).Shielded();
             return $"{(await shipment.GetResponseAsync(CancellationToken.None)).Status}|{DurableTask.Current.IsTaskCancellationRequested}";
@@ -166,7 +166,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
             await before;
             await after;
-            return $"{await outside.GetStatusAsync(cancellationToken: CancellationToken.None)}";
+            return $"{(await outside.GetResponseAsync(CancellationToken.None)).Status}";
         })));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await ready.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);

@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0221: Run synchronous work with DurableTask.RunInline"
-description: Understand ORLEANS0221, which reports a DurableTask.Run step whose delegate neither awaits nor observes its CancellationToken, and fix it with DurableTask.RunInline.
-ms.date: 10/17/2026
+description: Understand ORLEANS0221, which reports DurableTask.Run steps which run only synchronous work, and fix them with DurableTask.RunInline effects, gated by DurableTask.GetVersion while executions are pending.
+ms.date: 10/19/2026
 ms.topic: reference
 ---
 
@@ -9,32 +9,36 @@ ms.topic: reference
 
 | Property | Value |
 | --- | --- |
-| Severity | Warning |
+| Severity | Info |
 | Category | Usage |
 | Code fix | None |
 
 ## Cause
 
-A durable task body awaits a `DurableTask.Run` step, optionally named or shielded, whose lambda doesn't await, doesn't return a task, and doesn't read the `CancellationToken` which it receives:
+A durable task body awaits a `DurableTask.Run` step where it defines it, optionally named or shielded, and the step's lambda awaits nothing, returns no task, and doesn't read the `CancellationToken` which the step receives:
 
 :::code source="snippets/durable-tasks/Orleans0221.cs" id="orleans0221_violation" language="csharp":::
 
-Steps which a body schedules, posts, detaches, or passes to a combinator aren't reported.
-
 ## Rule description
 
-A step runs its delegate as a child execution when the body awaits it, possibly in a later turn of the grain, with its own `DurableTask.Current` and cancellation scope, and commits its result in a journal write of its own. A delegate which completes synchronously uses none of that. `DurableTask.RunInline` runs the same work immediately, in the current work item, and records its result with the execution's next journal write, together with the state changes which it makes. Consecutive effects in one synchronous block commit in the same write, and no other turn of the grain runs between them.
+`DurableTask.Run` runs its delegate as a child execution, with its own `DurableTask.Current` and cancellation scope, when the body awaits the step, possibly in a later turn. The step commits its result in a journal write of its own.
 
-For the two kinds of recorded work, see [Recorded effects](../grains/durable-tasks.md#recorded-effects-local-steps-and-calls-to-other-grains).
+`DurableTask.RunInline` runs synchronous work in the current work item and records its outcome with the execution's next journal write, together with the state changes which the effect makes. Consecutive effects commit in the same journal write. In the fix, the status change and its record commit with the execution's next journal write instead of a write of their own.
+
+A step and an effect at the same call site use the same identifier, and the execution records which kind ran. A replay which finds a step recorded where the body now runs an effect diverges, so a deployment with pending executions branches the change on `DurableTask.GetVersion`.
+
+For effects and steps, see [Recorded effects](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#recorded-effects).
 
 ## How to fix violations
 
-Run the work with `DurableTask.RunInline`, under the name which the step had:
+**Run the work as an effect.** Pass the delegate to `DurableTask.RunInline` with the step's name:
 
 :::code source="snippets/durable-tasks/Orleans0221.cs" id="orleans0221_fix" language="csharp":::
 
-An effect and a step with the same name share an identifier, and a replay which finds a step recorded where the body now runs an effect diverges, which keeps the task pending until code which matches its record replays it. A deployment which changes a step of pending executions into an effect branches the change on `DurableTask.GetVersion`; see [Version durable tasks](../grains/durable-tasks-versioning.md).
+**Branch the change on a version.** While executions which recorded the step are pending, the body runs the effect for new executions and keeps the step for executions which recorded it:
+
+:::code source="snippets/durable-tasks/Orleans0221.cs" id="orleans0221_fix_versioned" language="csharp":::
 
 ## When to suppress
 
-Suppress the diagnostic for a step which needs a child execution of its own, for example one which other code cancels separately.
+Suppress the diagnostic for a step which needs a child execution of its own, for example for its own cancellation scope, and in the branch which executions that recorded the step replay.

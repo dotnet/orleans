@@ -21,7 +21,6 @@ public static class DurableTaskHostingExtensions
     /// <summary>Adds the client-side durable grain RPC adapter.</summary>
     public static IClientBuilder AddDurableTasks(this IClientBuilder clientBuilder)
     {
-        clientBuilder.Services.AddDurableTaskSerialization();
         clientBuilder.Services.TryAddSingleton<DurableTaskRequestShared>();
         clientBuilder.Configure<TypeManifestOptions>(
             options =>
@@ -61,7 +60,9 @@ public static class DurableTaskHostingExtensions
         options.Validate(
             value => value.StalledExecutionRetryInterval > TimeSpan.Zero,
             "The durable task stalled execution retry interval must be positive.");
-        siloBuilder.Services.AddDurableTaskSerialization();
+        options.Validate(
+            value => value.RunnableExecutionWakeupDelay > TimeSpan.Zero,
+            "The durable task runnable execution wake-up delay must be positive.");
         siloBuilder.Services.TryAddSingleton<DurableTaskRequestShared>();
         siloBuilder.Configure<TypeManifestOptions>(
             options =>

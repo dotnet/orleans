@@ -2,49 +2,56 @@ using System.Collections.Immutable;
 
 namespace Documentation.Diagnostics.DurableTasks;
 
+#pragma warning disable ORLEANS0223
+// <orleans0223_violation>
 [GenerateSerializer]
-public sealed class Basket
+public sealed class Wishlist
 {
     [Id(0)]
-    public List<string> Items { get; init; } = [];
+    public List<string> Items { get; set; } = [];
 }
 
-[GenerateSerializer, Immutable]
-public sealed record Cart(ImmutableList<string> Items);
-
-public sealed class CartGrain : DurableGrain
+public sealed class WishlistGrain : DurableGrain
 {
-    private readonly IDurableValue<Basket> _basket;
-    private readonly IDurableValue<Cart> _cart;
+    private readonly IDurableValue<Wishlist> _wishlist;
 
-    public CartGrain()
-    {
-        _basket = StateManager.GetOrAddValue<Basket>("basket");
-        _cart = StateManager.GetOrAddValue<Cart>("cart");
-    }
+    public WishlistGrain() => _wishlist = StateManager.GetOrAddValue<Wishlist>("wishlist");
 
-#pragma warning disable ORLEANS0223
-    // <orleans0223_violation>
     public async DurableTask AddAsync(string item)
     {
-        await Reserve(item).WithId("reserve");
+        await CheckStock(item).WithId("check-stock");
 
-        // Changes the list which the value holds: no record holds the item, and a canceled attempt still adds it.
-        _basket.Value!.Items.Add(item);
+        // Changes the list which the value holds: no journal record holds the new item.
+        _wishlist.Value!.Items.Add(item);
     }
-    // </orleans0223_violation>
+
+    private static async DurableTask<bool> CheckStock(string item) => item.Length > 0;
+}
+// </orleans0223_violation>
 #pragma warning restore ORLEANS0223
 
-    // <orleans0223_fix>
-    public async DurableTask AddToCartAsync(string item)
-    {
-        await Reserve(item).WithId("reserve");
-
-        // Assigns a new value, which the journal records and commits with the task's result.
-        var cart = _cart.Value ?? new Cart([]);
-        _cart.Value = cart with { Items = cart.Items.Add(item) };
-    }
-    // </orleans0223_fix>
-
-    private static async DurableTask<bool> Reserve(string item) => true;
+// <orleans0223_fix>
+[GenerateSerializer, Immutable]
+public sealed record SavedItems(ImmutableList<string> Items)
+{
+    public static SavedItems Empty { get; } = new([]);
 }
+
+public sealed class SavedItemsGrain : DurableGrain
+{
+    private readonly IDurableValue<SavedItems> _saved;
+
+    public SavedItemsGrain() => _saved = StateManager.GetOrAddValue<SavedItems>("saved-items");
+
+    public async DurableTask AddAsync(string item)
+    {
+        await CheckStock(item).WithId("check-stock");
+
+        // The assignment passes through the value's API, which records the new list.
+        var saved = _saved.Value ?? SavedItems.Empty;
+        _saved.Value = saved with { Items = saved.Items.Add(item) };
+    }
+
+    private static async DurableTask<bool> CheckStock(string item) => item.Length > 0;
+}
+// </orleans0223_fix>

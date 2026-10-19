@@ -755,20 +755,6 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
-    public Task ConcurrentHandleLookupReturnsOneHandle() => ActivationScheduler.RunAsync(async () =>
-    {
-        var (runtime, storage, _, _) = CreateRuntime();
-        var taskId = TaskId.Parse("root");
-        storage.GetOrCreate(taskId);
-
-        var handles = await Task.WhenAll(
-            Enumerable.Range(0, 100)
-                .Select(_ => Task.Run(() => runtime.GetScheduledTaskHandle(taskId))));
-
-        Assert.All(handles, handle => Assert.Same(handles[0], handle));
-    });
-
-    [Fact]
     public Task PreCanceledInboxInvocationStagesOneCompletion() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, _, manager, transport) = CreateRuntime();
@@ -1680,20 +1666,25 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var (runtime, storage, _, _) = CreateRuntime();
         var parentId = TaskId.Parse("root");
         var childId = TaskId.Parse("root/child");
-        IScheduledTaskHandle? capturedChildHandle = null;
+        ScheduledTask<int>? capturedChild = null;
+        var childRuns = 0;
         var parentRequest = CreateRequest(
             1,
-            () => new AwaitExistingChildTask(childId, handle => capturedChildHandle = handle));
-        var childRequest = CreateRequest(2, () => DurableTask.FromResult(42));
+            () => DurableTask.Run(async cancellationToken =>
+            {
+                // The replay reaches the child which the earlier run recorded.
+                capturedChild = await DurableTask.Run(_ => Interlocked.Increment(ref childRuns) * 42).WithId("child").ScheduleAsync(cancellationToken);
+                return await capturedChild;
+            }));
 
         if (parentFirst)
         {
             AddRequest(parentId, parentRequest);
-            AddRequest(childId, childRequest);
+            storage.GetOrCreate(childId);
         }
         else
         {
-            AddRequest(childId, childRequest);
+            storage.GetOrCreate(childId);
             AddRequest(parentId, parentRequest);
         }
 
@@ -1702,16 +1693,21 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             .WaitAsync(TestContext.Current.CancellationToken)
             .AsTask()
             .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        var capturedInnerHandle = Assert.IsAssignableFrom<IScheduledTaskHandle>(
-            capturedChildHandle!.GetType()
-                .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
-                .Single(field => typeof(IScheduledTaskHandle).IsAssignableFrom(field.FieldType))
-                .GetValue(capturedChildHandle));
+
+        // The execution's handle wraps the runtime's single handle for the child.
+        var executionHandle = GetInnerHandle(capturedChild!);
+        var capturedInnerHandle = GetInnerHandle(executionHandle);
 
         Assert.Equal(42, response.GetResult<int>());
         Assert.Same(runtime.GetScheduledTaskHandle(childId), capturedInnerHandle);
         Assert.Equal(1, parentRequest.CreateTaskCallCount);
-        Assert.Equal(1, childRequest.CreateTaskCallCount);
+        Assert.Equal(1, childRuns);
+
+        static IScheduledTaskHandle GetInnerHandle(object handle) => Assert.IsAssignableFrom<IScheduledTaskHandle>(
+            handle.GetType()
+                .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
+                .Single(field => typeof(IScheduledTaskHandle).IsAssignableFrom(field.FieldType))
+                .GetValue(handle));
 
         void AddRequest(TaskId taskId, RuntimeTestDurableTaskRequest request)
         {
@@ -1922,7 +1918,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
-    public Task ExecutionContextDispatchesRuntimeOperationsToCapturedScheduler() => ActivationScheduler.RunAsync(async () =>
+    public Task ExecutionContextRejectsRuntimeOperationsOffItsScheduler() => ActivationScheduler.RunAsync(async () =>
     {
         var schedulerPair = new ConcurrentExclusiveSchedulerPair();
         var scheduler = schedulerPair.ExclusiveScheduler;
@@ -1937,12 +1933,15 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             TaskCreationOptions.DenyChildAttach,
             scheduler);
 
-        var response = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.WhenAny([DurableTask.Run(static _ => { })]),
-            context);
+        // The operation runs off the activation's scheduler, which owns the attempt's state, so it fails without
+        // reaching the runtime rather than being dispatched to that scheduler.
+        var response = await DurableTaskRuntimeHelper.RunAsync(DurableTask.Delay(TimeSpan.FromMinutes(1)), context);
 
-        Assert.Equal(0, response.GetResult<int>());
-        Assert.Equal(2, runtime.SchedulerInvocationCount);
+        Assert.Contains(
+            "ConfigureAwait(false)",
+            Assert.IsType<InvalidOperationException>(response.Exception).Message,
+            StringComparison.Ordinal);
+        Assert.Equal(0, runtime.SchedulerInvocationCount);
         schedulerPair.Complete();
         await schedulerPair.Completion;
     });
@@ -2061,12 +2060,12 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Assert.False(context.CancellationToken.IsCancellationRequested);
         Assert.False(operationCancellation.IsCancellationRequested);
-        Assert.True(context.CancelAttempt(DurableTaskAttemptCancellationReason.ActivationStopping));
-        Assert.False(context.CancelAttempt(DurableTaskAttemptCancellationReason.TaskAborted));
+        Assert.True(context.EndAttempt(DurableTaskAttemptCancellationReason.ActivationStopping));
+        Assert.False(context.EndAttempt(DurableTaskAttemptCancellationReason.TaskAborted));
 
         // The attempt's tokens are signaled separately from its cancellation.
         Assert.False(operationCancellation.IsCancellationRequested);
-        context.SignalAttemptCanceled();
+        context.ApplyCancellation();
         var response = await invocation.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.Equal(DurableTaskStatus.Canceled, response.Status);
@@ -2094,7 +2093,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await runtime.SchedulingStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // An abort cancels the attempt, and the abort's commit completes the delay before the attempt's tokens are signaled.
-        Assert.True(context.CancelAttempt(DurableTaskAttemptCancellationReason.TaskAborted));
+        Assert.True(context.EndAttempt(DurableTaskAttemptCancellationReason.TaskAborted));
         var aborted = new DurableTaskAbortedException("operator");
         runtime.CompleteDelay(DurableTaskResponse.FromException(aborted));
         var response = await invocation.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -2477,8 +2476,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 var context = DurableTask.Current;
 
                 // The second start of the same detached task reaches the record which the first one reached.
-                _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("detached").Post();
-                _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("detached").Post();
+                _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached("detached").Post();
+                _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached("detached").Post();
                 observations.Enqueue((run, "detached", context.IsReplaying));
                 DurableTask.RunInline("effect", () => 1);
                 observations.Enqueue((run, "effect", context.IsReplaying));
@@ -2498,29 +2497,6 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Assert.Equal([(1, "detached", false), (1, "effect", false), (2, "detached", true), (2, "effect", true)], observations);
         await replacement.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-    });
-
-    [Fact]
-    public Task RunInlineOffTheActivationSchedulerFails() => ActivationScheduler.RunAsync(async () =>
-    {
-        var (runtime, storage, _, _) = CreateRuntime();
-        var taskId = TaskId.Parse("root/local");
-        var runs = 0;
-
-        var handle = await runtime.ScheduleChildAsync(
-            taskId,
-            DurableTask.Run(async token =>
-            {
-                await Task.Delay(1, token).ConfigureAwait(false);
-                return DurableTask.RunInline("effect", () => ++runs);
-            }),
-            TestContext.Current.CancellationToken);
-        var response = await handle.WaitAsync(TestContext.Current.CancellationToken).AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Equal(0, runs);
-        Assert.False(storage.Contains(TaskId.Parse("root/local/effect")));
     });
 
     [Fact]
@@ -3092,7 +3068,6 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Assert.Equal(childId, handle.TaskId);
         Assert.Equal(DurableTaskStatus.Canceled, rootResponse.Status);
-        Assert.Same(DurableTaskResponse.Canceled, response);
         Assert.Equal(DurableTaskResponseKind.Canceled, response.ResponseKind);
         Assert.Equal(DurableTaskStatus.Canceled, response.Status);
         Assert.Equal("The operation was canceled.", response.Exception.Message);
@@ -3285,7 +3260,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             () => DurableTask.Run(async executionToken =>
             {
                 var attempt = Interlocked.Increment(ref attempts) - 1;
-                _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("detached").Post();
+                _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached("detached").Post();
                 posted[attempt].TrySetResult();
                 await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("wait");
             }));
@@ -3341,9 +3316,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             {
                 // An unnamed child before the start doesn't change the record which the start reaches.
                 await DurableTask.Run(static _ => { });
-                _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("detached").Post();
-                _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("detached").Post();
-                _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("other:root").Post();
+                _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached("detached").Post();
+                _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached("detached").Post();
+                _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached("other:root").Post();
             }));
 
         runtime.ScheduleFromInbox(starterId, request);
@@ -3371,8 +3346,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await WaitUntilAsync(() => transport.DetachedInvocations.Count == 1);
 
-        // Another grain's execution with the same identifier derives a different root identifier.
-        Assert.Equal(TaskId.CreateRoot($"{runtime.GrainId}/starter:$child-1"), Assert.Single(transport.DetachedInvocations).TaskId);
+        // The root is the single segment {HostId}/{Id}/{segment}, whose parts escape their '/' as task identifiers do, so
+        // another grain's execution with the same identifier derives a different root identifier.
+        Assert.Equal("test/one", runtime.GrainId.ToString());
+        Assert.Equal(TaskId.CreateRoot(@"test\/one/starter/$child-1"), Assert.Single(transport.DetachedInvocations).TaskId);
     });
 
     [Fact]
@@ -3389,7 +3366,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             {
                 ScheduledTask[] handles =
                 [
-                    new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("detached").Post(),
+                    new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached("detached").Post(),
                     new TestStateManager.TestRemoteDurableTask(callRequest).WithId("call").Post(),
                     DurableTask.Run(static _ => { }).WithId("local").Post(),
                 ];
@@ -3448,7 +3425,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
                 {
                     // Cleanup outlives the canceled starter.
-                    _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("cleanup").Post();
+                    _ = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached("cleanup").Post();
                     throw;
                 }
             }));
@@ -3504,7 +3481,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 }
                 catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
                 {
-                    await new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("cleanup").ScheduleAsync(CancellationToken.None);
+                    await new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached("cleanup").ScheduleAsync(CancellationToken.None);
                     scheduled.TrySetResult();
                     throw;
                 }
@@ -3544,7 +3521,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var request = CreateRequest(
             1,
             () => DurableTask.Run(async _ =>
-                await new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("detached")));
+                await new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached("detached")));
 
         runtime.ScheduleFromInbox(starterId, request);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -3840,7 +3817,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 var current = Interlocked.Increment(ref attempt) - 1;
                 try
                 {
-                    await new TestStateManager.TestRemoteDurableTask(remote).Detached().WithId("place-order").ScheduleAsync(cancellationToken);
+                    await new TestStateManager.TestRemoteDurableTask(remote).Detached("place-order").ScheduleAsync(cancellationToken);
                     outcomes.Enqueue("accepted");
                 }
                 catch (DurableTaskConflictException conflict)
@@ -4003,7 +3980,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             1,
             () => DurableTask.Run(async cancellationToken =>
             {
-                var handle = await new TestStateManager.TestRemoteDurableTask(remote).Detached().WithId("detached").ScheduleAsync(cancellationToken);
+                var handle = await new TestStateManager.TestRemoteDurableTask(remote).Detached("detached").ScheduleAsync(cancellationToken);
                 scheduled.TrySetResult();
                 await handle;
             }));
@@ -4379,6 +4356,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         public DateTimeOffset? GetCompletedAt(TaskId taskId) => null;
 
+        public Guid GetIncarnation(TaskId executionId) => Guid.Empty;
+
         private static async ValueTask<DurableTaskResponse> WaitForCancellationAsync(
             Task<DurableTaskResponse> response,
             CancellationToken cancellationToken)
@@ -4462,6 +4441,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         public DateTimeOffset? GetCompletedAt(TaskId taskId) => null;
 
+        public Guid GetIncarnation(TaskId executionId) => Guid.Empty;
+
         private void AssertScheduler()
         {
             Assert.Same(scheduler, TaskScheduler.Current);
@@ -4473,7 +4454,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     {
         public TaskId TaskId { get; } = taskId;
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
         public ValueTask<DurableTaskResponse> PollAsync(
             PollingOptions options,
@@ -4483,27 +4464,13 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             new(DurableTaskResponse.Completed);
     }
 
-    private sealed class AwaitExistingChildTask(
-        TaskId childId,
-        Action<IScheduledTaskHandle>? handleCaptured = null) : DurableTask
-    {
-        protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
-        {
-            var handle = (IScheduledTaskHandle)typeof(DurableTaskContext)
-                .GetMethod("GetChildTaskHandle", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(context, [childId])!;
-            handleCaptured?.Invoke(handle);
-            return await handle.WaitAsync(CancellationToken.None);
-        }
-    }
-
     private sealed class ThrowingAbortHandle(
         TaskId taskId,
         TaskCompletionSource waitStarted) : IScheduledTaskHandle
     {
         public TaskId TaskId { get; } = taskId;
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken) => default;
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => default;
 
         public ValueTask<DurableTaskResponse> PollAsync(
             PollingOptions options,
@@ -4578,6 +4545,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             ((TestTaskState)state).RemoteTarget = target;
             ((TestTaskState)state).RemoteRequestFingerprint = fingerprint;
         }
+
+        public void SetIncarnation(TaskId taskId, IDurableTaskState state, Guid incarnation) =>
+            ((TestTaskState)state).Incarnation = incarnation;
 
         public void SetCallerId(TaskId taskId, IDurableTaskState state, GrainId callerId) =>
             ((TestTaskState)state).CallerId = callerId;
@@ -4673,6 +4643,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public GrainId RemoteTarget { get; set; }
         public string? RemoteRequestFingerprint { get; set; }
         public GrainId CallerId { get; set; }
+
+        public Guid Incarnation { get; set; }
         public long CompletionSequence { get; set; }
         IReadOnlySet<DurableTaskSubscriber> IDurableTaskState.CompletionDestinations => CompletionDestinations;
     }

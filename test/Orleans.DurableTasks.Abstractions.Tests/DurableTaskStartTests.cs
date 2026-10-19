@@ -1,3 +1,4 @@
+using CsCheck;
 using Orleans.DurableTasks;
 using Xunit;
 
@@ -49,9 +50,11 @@ public class DurableTaskStartTests
 
         var named = await definition.Detached().WithId("named").ScheduleAsync(TestCancellation);
         var renamed = await definition.WithId("renamed").Detached().ScheduleAsync(TestCancellation);
+        var rooted = await definition.Detached("rooted").ScheduleAsync(TestCancellation);
 
         Assert.Equal(TaskId.CreateRoot("named"), named.Id);
         Assert.Equal(TaskId.CreateRoot("renamed"), renamed.Id);
+        Assert.Equal(TaskId.CreateRoot("rooted"), rooted.Id);
     }
 
     [Fact]
@@ -103,26 +106,76 @@ public class DurableTaskStartTests
     }
 
     [Fact]
-    public async Task DetachedTasksWithinAnExecutionUseTheirNameVerbatimAsTheRootId()
+    public async Task DetachedTasksWithinAnExecutionUseASuppliedRootIdVerbatim()
     {
         var definition = new RootDefinition();
         var context = new StartRecordingContext(TaskId.CreateRoot("starter"));
 
         var response = await RunAsync(context, async () =>
         {
-            await definition.Detached().WithId("place-order-42");
-            _ = await definition.WithId("renamed").Detached().ScheduleAsync();
-            _ = definition.Detached().WithId("tenant/order$1").Post();
+            await definition.Detached("place-order-42");
+            _ = await definition.Detached("place-order-42").ScheduleAsync();
+            _ = definition.Detached("tenant/order$1").Post();
+            await definition;
+        });
+
+        // A supplied root identifier takes no identifier of the execution, so the unnamed child which follows is the first.
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.Equal(
+            [
+                ("start", TaskId.CreateRoot("place-order-42"), DurableTaskStartOptions.Detached),
+                ("start", TaskId.CreateRoot("place-order-42"), DurableTaskStartOptions.Detached | DurableTaskStartOptions.WaitForAcceptance),
+                ("post", TaskId.CreateRoot("tenant/order$1"), DurableTaskStartOptions.Detached),
+                ("start", TaskId.Parse("starter/$child-1"), DurableTaskStartOptions.None),
+            ],
+            context.Starts.Select(static start => (start.Kind, start.TaskId, start.Options)));
+    }
+
+    [Fact]
+    public async Task NamedDetachedTasksDeriveTheirRootIdsFromTheNamedOperationInAnyConfigurationOrder()
+    {
+        var definition = new RootDefinition();
+        var context = new StartRecordingContext(TaskId.CreateRoot("starter"));
+
+        var response = await RunAsync(context, async () =>
+        {
+            await definition.Detached().WithId("receipt");
+            await definition.WithId("receipt").Detached();
+            await definition.WithId("receipt");
         });
 
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
         Assert.Equal(
             [
-                ("start", TaskId.CreateRoot("place-order-42"), DurableTaskStartOptions.Detached),
-                ("start", TaskId.CreateRoot("renamed"), DurableTaskStartOptions.Detached | DurableTaskStartOptions.WaitForAcceptance),
-                ("post", TaskId.CreateRoot("tenant/order$1"), DurableTaskStartOptions.Detached),
+                TaskId.CreateRoot("starter/receipt"),
+                TaskId.CreateRoot("starter/receipt$2"),
+                TaskId.Parse("starter/receipt$3"),
             ],
-            context.Starts.Select(static start => (start.Kind, start.TaskId, start.Options)));
+            context.Starts.Select(static start => start.TaskId));
+    }
+
+    [Fact]
+    public async Task ConfiguringANameAllocatesNoIdentifierUntilTheTaskStarts()
+    {
+        var definition = new RootDefinition();
+        var context = new StartRecordingContext(TaskId.CreateRoot("starter"));
+
+        var response = await RunAsync(context, async () =>
+        {
+            var unused = definition.WithId("charge");
+            var configured = definition.WithId("charge");
+            var copy = configured;
+            await configured;
+            await copy;
+            GC.KeepAlive(unused);
+            Assert.Throws<InvalidOperationException>(() => copy.WithId("renamed"));
+            Assert.Throws<InvalidOperationException>(() => copy.Detached("renamed"));
+        });
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.Equal(
+            [TaskId.Parse("starter/charge"), TaskId.Parse("starter/charge$2")],
+            context.Starts.Select(static start => start.TaskId));
     }
 
     [Fact]
@@ -148,15 +201,15 @@ public class DurableTaskStartTests
         Assert.Equal(
             [
                 TaskId.Parse("order-42/charge/$child-1"),
-                TaskId.CreateRoot("order-42/charge:$child-2"),
-                TaskId.CreateRoot("order-42/charge:$child-3"),
+                TaskId.CreateRoot("order-42/charge/$child-2"),
+                TaskId.CreateRoot("order-42/charge/$child-3"),
             ],
             first.Starts.Select(static start => start.TaskId));
         Assert.Equal(first.Starts.Select(static start => start.TaskId), replay.Starts.Select(static start => start.TaskId));
     }
 
     [Fact]
-    public async Task HostIdentityQualifiesTheRootIdsOfUnnamedDetachedTasksAndNotNamedOnes()
+    public async Task HostIdentityQualifiesTheDerivedRootIdsOfDetachedTasks()
     {
         var definition = new RootDefinition();
         var context = new StartRecordingContext(TaskId.Parse("order-42/charge"), hostId: "order/42");
@@ -165,14 +218,50 @@ public class DurableTaskStartTests
         {
             await definition.Detached();
             await definition.Detached().WithId("receipt");
+            await definition.Detached("receipt");
         });
 
-        // Executions with the same identifier on different hosts derive different root identifiers, and a name is the
-        // root identifier on every host.
+        // Executions with the same identifier on different hosts derive different root identifiers, and a supplied root
+        // identifier is the same on every host. The host's identity escapes its '/'.
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
         Assert.Equal(
-            [TaskId.CreateRoot("order/42/order-42/charge:$child-1"), TaskId.CreateRoot("receipt")],
+            [
+                TaskId.CreateRoot(@"order\/42/order-42/charge/$child-1"),
+                TaskId.CreateRoot(@"order\/42/order-42/charge/receipt"),
+                TaskId.CreateRoot("receipt"),
+            ],
             context.Starts.Select(static start => start.TaskId));
+    }
+
+    [Fact]
+    public void DistinctHostsExecutionsAndOperationsDeriveDistinctRootIds()
+    {
+        var segment = Gen.Char['!', '~'].Array[1, 4].Select(static chars => new string(chars).Replace("$", "-", StringComparison.Ordinal));
+        var input = Gen.Select(segment.Array[0, 2], segment.Array[1, 3], segment);
+        Gen.Select(input, input).Sample(static (first, second) =>
+        {
+            var firstRoot = DeriveRoot(first);
+            var secondRoot = DeriveRoot(second);
+            var same = Equivalent(first, second);
+            return same ? firstRoot == secondRoot : firstRoot != secondRoot;
+        });
+
+        static TaskId DeriveRoot((string[] Host, string[] Execution, string Name) input)
+        {
+            var context = new StartRecordingContext(
+                TaskId.Parse(string.Join('/', input.Execution.Select(static segment => TaskId.CreateRoot(segment).ToString()))),
+                hostId: input.Host.Length == 0 ? null : string.Join('/', input.Host));
+            var definition = new RootDefinition();
+            var response = RunAsync(context, async () => await definition.Detached().WithId(input.Name)).GetAwaiter().GetResult();
+            Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+            return Assert.Single(context.Starts).TaskId;
+        }
+
+        static bool Equivalent((string[] Host, string[] Execution, string Name) left, (string[] Host, string[] Execution, string Name) right)
+            => string.Join('/', left.Host) == string.Join('/', right.Host)
+                && (left.Host.Length == 0) == (right.Host.Length == 0)
+                && left.Execution.SequenceEqual(right.Execution)
+                && left.Name == right.Name;
     }
 
     [Fact]
@@ -185,13 +274,13 @@ public class DurableTaskStartTests
 
         await RunAsync(context, async () =>
         {
-            var scheduled = await definition.Detached().WithId("scheduled").ScheduleAsync();
-            var posted = definition.Detached().WithId("posted").Post();
+            var scheduled = await definition.Detached("scheduled").ScheduleAsync();
+            var posted = definition.Detached("posted").Post();
             handles = [(scheduled.Id, scheduled.TargetTaskId), (posted.Id, posted.TargetTaskId)];
         });
         await RunAsync(plain, async () =>
         {
-            var scheduled = await definition.Detached().WithId("scheduled").ScheduleAsync();
+            var scheduled = await definition.Detached("scheduled").ScheduleAsync();
             handles = [.. handles, (scheduled.Id, scheduled.TargetTaskId)];
         });
 
@@ -216,13 +305,13 @@ public class DurableTaskStartTests
 
         await RunAsync(context, async () =>
         {
-            var scheduled = await definition.Detached().WithId("scheduled").ScheduleAsync();
-            var posted = definition.Detached().WithId("posted").Post();
+            var scheduled = await definition.Detached("scheduled").ScheduleAsync();
+            var posted = definition.Detached("posted").Post();
             features = (scheduled.GetFeature<HostLocation>(), posted.GetFeature<HostLocation>(), scheduled.GetFeature<string>(), null);
         });
         await RunAsync(plain, async () =>
         {
-            var scheduled = await definition.Detached().WithId("scheduled").ScheduleAsync();
+            var scheduled = await definition.Detached("scheduled").ScheduleAsync();
             features.Plain = scheduled.GetFeature<HostLocation>();
         });
 
@@ -233,14 +322,25 @@ public class DurableTaskStartTests
     }
 
     [Fact]
-    public async Task DetachedConfigurationsWithinAnExecutionHaveNoHandleOperations()
+    public async Task PollsWithinAnExecutionThrow()
     {
         var context = new StartRecordingContext(TaskId.CreateRoot("starter"));
+        var definition = new RootDefinition();
+        var polls = new List<Exception>();
 
-        var response = await RunAsync(context, async () => await new RootDefinition().Detached().WithId("detached").PollAsync());
+        var response = await RunAsync(context, async () =>
+        {
+            var scheduled = await definition.WithId("child").ScheduleAsync();
+            polls.Add(await Assert.ThrowsAsync<NotSupportedException>(() => scheduled.IsCompletedAsync(cancellationToken: TestCancellation)));
+            polls.Add(await Assert.ThrowsAsync<NotSupportedException>(() => scheduled.GetStatusAsync(cancellationToken: TestCancellation)));
+            polls.Add(await Assert.ThrowsAsync<NotSupportedException>(() => scheduled.GetResponseAsync(default(PollingOptions), TestCancellation)));
+            await scheduled;
+        });
 
-        Assert.Equal(DurableTaskStatus.Failed, response.Status);
-        Assert.Contains("ScheduleAsync or Post", Assert.IsType<InvalidOperationException>(response.Exception).Message, StringComparison.Ordinal);
+        // A poll observes the task's status when it runs, so a replay could branch differently; the body awaits instead.
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.Equal(3, polls.Count);
+        Assert.Single(context.Starts);
     }
 
     [Fact]
@@ -273,6 +373,8 @@ public class DurableTaskStartTests
 
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 
+        public override Guid Incarnation => Guid.Empty;
+
         protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(
             TaskId taskId,
             DurableTask taskDefinition,
@@ -302,7 +404,6 @@ public class DurableTaskStartTests
             DateTimeOffset dueTime,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId) => throw new NotSupportedException();
 
         protected override ValueTask<TaskId> SelectCompletionAsync(
             TaskId decisionId,
@@ -318,7 +419,7 @@ public class DurableTaskStartTests
 
         public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken) => new(DurableTaskResponse.Completed);
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 
     private sealed class TargetedHandle(TaskId taskId, TaskId targetTaskId) : IScheduledTaskHandle
@@ -334,7 +435,7 @@ public class DurableTaskStartTests
 
         public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken) => new(DurableTaskResponse.Completed);
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 
     private sealed record HostLocation(string Host);

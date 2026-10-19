@@ -5,3 +5,4 @@ dotnet_diagnostic.ORLEANS0214.severity = warning
 dotnet_diagnostic.ORLEANS0215.severity = warning
 dotnet_diagnostic.ORLEANS0219.severity = warning
 dotnet_diagnostic.ORLEANS0220.severity = warning
+dotnet_diagnostic.ORLEANS0221.severity = warning

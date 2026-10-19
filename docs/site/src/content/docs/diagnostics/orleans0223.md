@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0223: Assign new values to grain state instead of changing them in place"
-description: Understand ORLEANS0223, which reports durable task code that changes an object held by journaled or persistent grain state in place, and fix it by assigning a new immutable value.
-ms.date: 10/17/2026
+description: Understand ORLEANS0223, which reports durable task code which changes an object that journaled grain state holds in place, and fix it with immutable values which the code assigns.
+ms.date: 10/19/2026
 ms.topic: reference
 ---
 
@@ -15,26 +15,26 @@ ms.topic: reference
 
 ## Cause
 
-Code in a durable task body, including its effects and steps, changes an object which grain state holds instead of assigning a new value: it sets a member, increments it, or calls a collection method such as `Add` or `Clear` on `IDurableValue<T>.Value`, `IPersistentState<T>.State`, an entry of a durable dictionary or list, or an object which they reach:
+Durable task code changes an object which grain state holds, in place: it assigns, increments, or decrements a member or an element of the object, or calls a method which changes a collection, such as `Add` or `Clear`. The object is reached through `IDurableValue<T>.Value`, `IPersistentState<T>.State`, or an entry of a durable dictionary or list, directly or through a local which holds it:
 
 :::code source="snippets/durable-tasks/Orleans0223.cs" id="orleans0223_violation" language="csharp":::
 
-A local which a declaration initializes with such a value, and which no code assigns again, is followed too. Assignments to the state itself, such as `_cart.Value = cart`, changes through the state's own API, such as a durable list's `Add`, `with` expressions, and immutable collections, which return changed copies, aren't reported.
-
 ## Rule description
 
-Journaled grain state records each change which passes through its API, such as an assignment to `IDurableValue<T>.Value` or `IPersistentState<T>.State`, or to an entry of a durable dictionary, and commits the record with the task's next journal write.
+Journaled grain state records each change which passes through its API, such as an assignment to `IDurableValue<T>.Value` or `IPersistentState<T>.State`, or to an entry of a durable dictionary. The change commits with the grain's next journal write.
 
-A change made in place to an object which the state holds bypasses the API. No record holds it until another change writes the whole value, so the state in memory differs from the state which the journal recovers after a deactivation. In the example, no record holds the added item: the basket in memory has it, and the basket which the grain recovers after a deactivation doesn't.
+A change made in place to an object which the state holds bypasses the API. The object in memory holds the change, and no record holds it until another change writes the whole value. In the example, the task completes and its result commits while the journal holds the wishlist without the new item. An activation which recovers the grain from the journal loses the item.
 
-For journaled state, see [Durable state](../grains/journaling/durable-state.md).
+Value types, records whose members are init-only, and immutable collections change through assignment, which the API records, so the rule reports none of them.
+
+For replay-safe state, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 
-Store immutable values, such as records and immutable collections, and assign a new value to change one:
+**Store immutable values, and assign a new value.** A record with an immutable collection returns a changed copy, and the assignment records it:
 
 :::code source="snippets/durable-tasks/Orleans0223.cs" id="orleans0223_fix" language="csharp":::
 
 ## When to suppress
 
-Suppress the diagnostic for an object which grain state holds only as a cache which no journal write includes.
+Suppress the diagnostic for a member which the state holds in memory only, such as a cache which the serializer skips.

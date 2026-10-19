@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0218: Pass constant version names and ranges"
-description: Understand ORLEANS0218, which reports a DurableTask.GetVersion call whose change name or supported range isn't a constant, and fix it with constants.
-ms.date: 10/16/2026
+description: Understand ORLEANS0218, which reports version checks whose change name or supported range is computed at run time, and fix it with constants or a DurableVersion descriptor.
+ms.date: 10/19/2026
 ms.topic: reference
 ---
 
@@ -15,24 +15,30 @@ ms.topic: reference
 
 ## Cause
 
-A call to `DurableTask.GetVersion` passes a change name, a minimum supported version, or a maximum supported version which isn't a compile-time constant:
+`DurableTask.GetVersion` or the `DurableVersion` constructor receives a name, `minSupported`, or `maxSupported` argument which is computed at run time, such as an interpolated string or a parameter:
 
 :::code source="snippets/durable-tasks/Orleans0218.cs" id="orleans0218_violation" language="csharp":::
 
 ## Rule description
 
-An execution records the version of each change which it checks under the change's name, and every replay of the execution reads the version back under the same name. A name built from data, such as a region or a counter, records a separate decision for each value, so checks which concern one change can follow different versions in one execution.
+The first check of a change in an execution records the version under the change's name, and every later check, including every replay, reads the recorded version back under the same name. The execution's branches follow that version, so each replay schedules the operations which the first run scheduled.
 
-The supported range states which branches the calling code keeps: `maxSupported` is the newest branch, and `minSupported` the oldest. A range which comes from arguments or configuration changes independently of the branches, so new executions can record a version which no branch handles, and executions which a branch still handles can stall.
+A name built from data names one change per value. When the data differs between a run and its replay, or a deployment builds the name differently, the replay checks a name which the execution never recorded, records a second decision, and can take another branch than the run which scheduled the recorded operations. The replay then diverges.
 
-For versioning, see [Version durable tasks](../grains/durable-tasks-versioning.md).
+The range states which versions the deployed code supports: `maxSupported` is the newest version which the code implements, and `minSupported` is the oldest version which it still replays. Both belong to the code which branches on the version. A range which callers pass can admit a version for which the code has no branch, or retire a version which pending executions recorded, which stalls them.
+
+For versioning, see [Versioned changes](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#versioned-changes).
 
 ## How to fix violations
 
-Name the change with a string literal or a constant, and pass the range as constants next to the branches which they describe:
+**Pass constants.** Name the change with a constant, and state the range which the branches implement. Data which selects behavior, such as the region, goes to the operations in each branch:
 
-:::code source="snippets/durable-tasks/Orleans0218.cs" id="orleans0218_fix" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0218.cs" id="orleans0218_fix_constant" language="csharp":::
+
+**Declare a `DurableVersion`.** A static descriptor states the change's name and range once, and the body reads it with `Get` or `IsAtLeast`:
+
+:::code source="snippets/durable-tasks/Orleans0218.cs" id="orleans0218_fix_descriptor" language="csharp":::
 
 ## When to suppress
 
-Suppress the diagnostic for a helper which forwards a constant name and range from its callers, such as a method which wraps `GetVersion` for one change, and whose callers pass constants.
+Suppress the diagnostic for a value which stays constant for the lifetime of every execution which checks it, such as a name which a generated constant class supplies through a `static readonly` field.

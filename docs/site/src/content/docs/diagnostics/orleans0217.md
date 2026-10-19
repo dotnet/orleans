@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0217: Pass AttemptCancellationToken to calls in task-cancellation cleanup"
-description: Understand ORLEANS0217, which reports cleanup code that runs after task cancellation and passes the already-canceled DurableTaskContext.CancellationToken to a call, and fix it with AttemptCancellationToken.
-ms.date: 10/16/2026
+description: Understand ORLEANS0217, which reports cleanup after task cancellation which passes the already-canceled CancellationToken to a call, and fix it with AttemptCancellationToken or a shielded step.
+ms.date: 10/19/2026
 ms.topic: reference
 ---
 
@@ -15,34 +15,35 @@ ms.topic: reference
 
 ## Cause
 
-Code which runs only after task cancellation passes `DurableTaskContext.CancellationToken`, such as `DurableTask.Current.CancellationToken`, as an argument to a call. The rule recognizes two such regions:
-
-- The handler of a `catch` clause whose filter is `IsTaskCancellationRequested`, or a `&&` conjunction with it as an operand.
-- The true branch of an `if` statement or a conditional expression whose condition is `IsTaskCancellationRequested`, or a `&&` conjunction with it as an operand.
-
-The rule doesn't inspect lambdas and local functions in those regions, because they can run in another task's context, such as a `DurableTask.Run` step.
+Code which runs only after task cancellation passes `DurableTaskContext.CancellationToken` to a call. Such code is the handler of a `catch` clause, or the true branch of an `if` statement or a conditional expression, whose filter or condition is `DurableTaskContext.IsTaskCancellationRequested`, alone or as an operand of `&&`:
 
 :::code source="snippets/durable-tasks/Orleans0217.cs" id="orleans0217_violation" language="csharp":::
 
 ## Rule description
 
-A durable task's context provides two tokens:
+A durable task's context carries two cancellation tokens:
 
-- `CancellationToken` is canceled when task cancellation is requested and when the host cancels the attempt. Ordinary workflow code passes it to its calls, so they end promptly in both cases.
-- `AttemptCancellationToken` is canceled only when the host cancels the attempt, for example when the grain activation stops, or the task is aborted or deleted.
+- `CancellationToken` is canceled by task cancellation and by attempt cancellation, so the calls which ordinary task code makes end promptly in both cases.
+- `AttemptCancellationToken` is canceled only by attempt cancellation, for example when the task's activation stops.
 
-Task cancellation is durable, and `IsTaskCancellationRequested` stays `true` once it is requested, so code which that check guards always observes a canceled `CancellationToken`. A cleanup call which receives it, such as the release in the example, ends at once, and the reservation stays held.
+Task cancellation is recorded with the task, so `IsTaskCancellationRequested` stays `true`, and `CancellationToken` stays canceled, in the canceled attempt and in every later attempt. Cleanup which runs after task cancellation therefore passes a canceled token, and a call which observes it ends at once. In the example, `ReleaseAsync` throws `OperationCanceledException` before it releases the room, the exception escapes the body, and the task ends canceled with the room still held.
 
-For both kinds of cancellation, see [Task cancellation and attempt cancellation](../grains/durable-tasks-structured-concurrency.md#task-cancellation-and-attempt-cancellation).
+The rule inspects the code of the region itself. Lambdas and local functions in the region can run in another task's context, such as a step's, so the rule skips them.
+
+For the two tokens, see [Execution model](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#execution-model), and for cleanup, see [Compensating canceled work](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#compensating-canceled-work).
 
 ## How to fix violations
 
-**Pass `AttemptCancellationToken` to the cleanup's calls.** The call runs to completion, and still ends promptly when the host cancels the attempt; when the activation stops, the task's next attempt runs the cleanup again. Release in-process resources, such as semaphores and disposables, in `finally` blocks and `using` statements, which run for both kinds of cancellation:
+**Pass `AttemptCancellationToken`.** The code fix replaces `CancellationToken` with `AttemptCancellationToken` and keeps the receiver. The call runs to completion, and it still ends promptly when the host cancels the attempt:
 
-:::code source="snippets/durable-tasks/Orleans0217.cs" id="orleans0217_fix" language="csharp":::
+:::code source="snippets/durable-tasks/Orleans0217.cs" id="orleans0217_fix_attempt_token" language="csharp":::
 
-The code fix replaces `CancellationToken` with `AttemptCancellationToken` and keeps the receiver, such as `DurableTask.Current` or a context variable. Fix all occurrences in a document, project, or solution at once.
+**Release in a shielded step.** A step receives its own cancellation token, and the task's cancellation doesn't reach a shielded step. The step records its outcome, so a replay of the handler returns it and releases the room once:
+
+:::code source="snippets/durable-tasks/Orleans0217.cs" id="orleans0217_fix_shielded_step" language="csharp":::
+
+In-process cleanup, such as releasing a semaphore or disposing a resource, belongs in `finally` blocks and `using` statements, which run for both kinds of cancellation.
 
 ## When to suppress
 
-Suppress the diagnostic when the call should end immediately after task cancellation, for example a call which only checks the token to skip optional work.
+Suppress the diagnostic for a call which is meant to end at once after task cancellation, such as optional work which the cleanup skips once the task is canceled.

@@ -642,6 +642,8 @@ public sealed partial class DurableTaskSignalTests
 
         public void SetCallerId(TaskId taskId, IDurableTaskState state, GrainId callerId) => ((State)state).CallerId = callerId;
 
+    public void SetIncarnation(TaskId taskId, IDurableTaskState state, Guid incarnation) => ((State)state).Incarnation = incarnation;
+
         public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
         {
             var value = (State)state;
@@ -723,6 +725,8 @@ public sealed partial class DurableTaskSignalTests
         public GrainId RemoteTarget { get; set; }
         public string? RemoteRequestFingerprint { get; set; }
         public GrainId CallerId { get; set; }
+
+        public Guid Incarnation { get; set; }
 
         // This storage doesn't order completions, so the runtime records each completion decision.
         public long CompletionSequence => 0;

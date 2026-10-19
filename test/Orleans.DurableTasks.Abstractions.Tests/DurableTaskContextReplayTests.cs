@@ -51,6 +51,8 @@ public sealed class DurableTaskContextReplayTests
 
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 
+        public override Guid Incarnation => Guid.Empty;
+
         protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(
             TaskId taskId,
             DurableTask taskDefinition,
@@ -62,7 +64,6 @@ public sealed class DurableTaskContextReplayTests
             DateTimeOffset dueTime,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId) => throw new NotSupportedException();
 
         protected override ValueTask<TaskId> SelectCompletionAsync(
             TaskId decisionId,

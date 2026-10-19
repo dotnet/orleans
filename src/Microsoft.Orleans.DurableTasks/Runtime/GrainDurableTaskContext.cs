@@ -19,7 +19,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// <remarks>
 /// <para>
 /// The runtime cancels the attempt when the activation stops, or when the task is aborted or deleted with its execution
-/// tree, through <see cref="CancelAttempt"/>. From then on, the attempt's durable operations throw
+/// tree, through <see cref="EndAttempt"/>. From then on, the attempt's durable operations throw
 /// <see cref="DurableTaskAttemptCanceledException"/>, and the changes which its code makes to the grain's journaled state,
 /// such as cleanup, commit with the grain's next journal write. The runtime discards the canceled attempt's response;
 /// after the activation stops, the next activation replays the task in a new context.
@@ -58,8 +58,8 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     private readonly TaskScheduler _scheduler;
     private long _utcNowTicks;
 
-    // Why the runtime canceled the attempt, or null.
-    private DurableTaskAttemptCancellationReason? _attemptCancellationReason;
+    // Why the runtime ended the attempt, which it cancels in a later work item, or null.
+    private DurableTaskAttemptCancellationReason? _endReason;
 
     // The request of the segment which runs, or null while the attempt is parked or hasn't started; the segment requests
     // which are queued; the attempt's durable waits which are parked, and the tasks and signal records which they await;
@@ -91,6 +91,8 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     // doesn't support, or a divergence from the execution's record.
     private Exception? _stallException;
 
+    private Guid? _incarnation;
+
     public GrainDurableTaskContext(
         TaskId taskId,
         IDurableTaskGrainRuntime runtime,
@@ -107,14 +109,24 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         _replaying = _unreached is not null;
     }
 
-    /// <summary>Gets whether the runtime canceled this attempt.</summary>
-    internal bool IsAttemptCanceled => _attemptCancellationReason is not null;
+    /// <inheritdoc/>
+    /// <remarks>The incarnation of the invoked task whose execution tree contains this execution, read once.</remarks>
+    public override Guid Incarnation => _incarnation ??= _runtime.GetIncarnation(Id);
+
+    /// <summary>
+    /// Gets why the attempt ended, by the runtime or by a divergence which the abstractions detected, or
+    /// <see langword="null"/> while it runs.
+    /// </summary>
+    internal DurableTaskAttemptCancellationReason? AttemptEndReason => AttemptCancellationReason ?? _endReason;
+
+    /// <summary>Gets whether the attempt ended.</summary>
+    internal bool IsAttemptEnded => AttemptEndReason is not null;
 
     /// <summary>
     /// Gets whether the attempt ended without a record, so it is never resumed: the activation stops, or the running code
     /// can't replay the execution.
     /// </summary>
-    internal bool IsDiscarded => _attemptCancellationReason
+    internal bool IsDiscarded => AttemptEndReason
         is DurableTaskAttemptCancellationReason.ActivationStopping
         or DurableTaskAttemptCancellationReason.Diverged
         or DurableTaskAttemptCancellationReason.UnsupportedVersion;
@@ -137,13 +149,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
     }
 
-    /// <summary>Requests the task cancellation of this attempt, which releases its parked waits.</summary>
+    /// <summary>Delivers the task cancellation of this attempt, which releases its parked waits.</summary>
     /// <exception cref="AggregateException">A registration on a token threw.</exception>
-    internal void RequestTaskCancellation(string? reason)
+    internal void DeliverTaskCancellation(string? reason)
     {
         AssertOnScheduler();
         _resumePending |= _parkedWaits > 0;
-        DurableTaskRuntimeHelper.RequestTaskCancellation(this, reason);
+        RequestTaskCancellation(reason);
     }
 
     /// <summary>
@@ -370,24 +382,25 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     }
 
     /// <summary>
-    /// Cancels this attempt for <paramref name="reason"/>: from now on, its durable operations throw
-    /// <see cref="DurableTaskAttemptCanceledException"/>. A discarded attempt is never resumed.
+    /// Ends this attempt for <paramref name="reason"/> at once: from now on, its durable operations throw
+    /// <see cref="DurableTaskAttemptCanceledException"/>, and a discarded attempt isn't resumed.
+    /// <see cref="ApplyCancellation"/> then cancels the attempt's tokens.
     /// </summary>
-    /// <returns><see langword="true"/> when this call canceled the attempt, which the runtime then signals.</returns>
+    /// <returns><see langword="true"/> when this call ended the attempt.</returns>
     /// <remarks>
-    /// The runtime cancels attempts on the activation's scheduler, where the attempt's code runs, so a synchronous run of
-    /// that code observes one state of the attempt. The attempt's tokens are canceled by <see cref="SignalAttemptCanceled"/>,
-    /// which the runtime calls in a later work item, so code which observes them doesn't run within the runtime's operation.
+    /// The runtime ends attempts on the activation's scheduler, where the attempt's code runs, so a synchronous run of that
+    /// code observes one state of the attempt. Canceling the attempt's tokens runs their registrations and can continue the
+    /// attempt's code synchronously, so the runtime applies it outside its staging operations.
     /// </remarks>
-    internal bool CancelAttempt(DurableTaskAttemptCancellationReason reason)
+    internal bool EndAttempt(DurableTaskAttemptCancellationReason reason)
     {
         AssertOnScheduler();
-        if (_attemptCancellationReason is not null)
+        if (AttemptEndReason is not null)
         {
             return false;
         }
 
-        _attemptCancellationReason = reason;
+        _endReason = reason;
         if (IsDiscarded && _segment is null)
         {
             _settled.TrySetResult();
@@ -396,17 +409,14 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         return true;
     }
 
-    /// <summary>
-    /// Cancels <see cref="DurableTaskContext.AttemptCancellationToken"/> and
-    /// <see cref="DurableTaskContext.CancellationToken"/> of an attempt which <see cref="CancelAttempt"/> canceled.
-    /// </summary>
+    /// <summary>Cancels the tokens of an attempt which <see cref="EndAttempt"/> ended.</summary>
     /// <exception cref="AggregateException">A registration on a token threw.</exception>
-    internal void SignalAttemptCanceled()
+    internal void ApplyCancellation()
     {
         AssertOnScheduler();
-        Debug.Assert(_attemptCancellationReason is not null, "Only a canceled attempt is signaled.");
+        Debug.Assert(_endReason is not null, "Only an ended attempt is canceled.");
         _resumePending |= _parkedWaits > 0 && !IsDiscarded;
-        DurableTaskRuntimeHelper.CancelAttempt(this, _attemptCancellationReason.GetValueOrDefault());
+        CancelAttempt(_endReason.GetValueOrDefault());
     }
 
     /// <summary>Ends the attempt's segment and settles the attempt once its code has ended.</summary>
@@ -425,7 +435,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         _stallException ??= cause;
         _runtime.StallAttempt(this, reason, cause);
-        return CreateAttemptCanceledException();
+        return CreateAttemptEndedException();
     }
 
     /// <summary>Stalls this attempt because an operation diverged from the execution's record.</summary>
@@ -435,16 +445,16 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// <summary>Throws <see cref="DurableTaskAttemptCanceledException"/> when the runtime canceled this attempt.</summary>
     private void ThrowIfAttemptCanceled()
     {
-        if (IsAttemptCanceled)
+        if (IsAttemptEnded)
         {
-            throw CreateAttemptCanceledException();
+            throw CreateAttemptEndedException();
         }
     }
 
-    private DurableTaskAttemptCanceledException CreateAttemptCanceledException(Exception? innerException = null)
+    private DurableTaskAttemptCanceledException CreateAttemptEndedException(Exception? innerException = null)
     {
-        Debug.Assert(_attemptCancellationReason is not null, "Only a canceled attempt throws its cancellation.");
-        return new(_attemptCancellationReason.GetValueOrDefault(), AttemptCancellationToken, innerException ?? _stallException);
+        Debug.Assert(AttemptEndReason is not null, "Only an ended attempt throws its cancellation.");
+        return new(AttemptEndReason.GetValueOrDefault(), AttemptCancellationToken, innerException ?? _stallException);
     }
 
     /// <summary>
@@ -462,9 +472,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         {
             result = await operation;
         }
-        catch (Exception exception) when (exception is not DurableTaskAttemptCanceledException && IsAttemptCanceled)
+        catch (Exception exception) when (exception is not DurableTaskAttemptCanceledException && IsAttemptEnded)
         {
-            throw CreateAttemptCanceledException(exception);
+            throw CreateAttemptEndedException(exception);
         }
         catch (DurableTaskDivergenceException divergence)
         {
@@ -482,9 +492,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         {
             await operation;
         }
-        catch (Exception exception) when (exception is not DurableTaskAttemptCanceledException && IsAttemptCanceled)
+        catch (Exception exception) when (exception is not DurableTaskAttemptCanceledException && IsAttemptEnded)
         {
-            throw CreateAttemptCanceledException(exception);
+            throw CreateAttemptEndedException(exception);
         }
         catch (DurableTaskDivergenceException divergence)
         {
@@ -660,24 +670,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         return await CompleteOperationAsync(_runtime.ScheduleDelayAsync(taskId, dueTime, operationCts.Token));
     }
 
-    /// <exception cref="InvalidOperationException">The caller isn't running on the activation's scheduler.</exception>
-    protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)
-    {
-        ThrowIfOffScheduler("look up a child's handle");
-        ObserveOperation(taskId, recordsOperation: false);
-        return GetChildTaskHandleCore(taskId);
-    }
-
-    /// <summary>Throws unless the caller runs on the activation's scheduler, which the operation requires.</summary>
-    private void ThrowIfOffScheduler(string operation)
-    {
-        if (TaskScheduler.Current != _scheduler)
-        {
-            throw new InvalidOperationException(
-                $"Durable task '{Id}' can only {operation} on the scheduler of the grain activation which runs it. Code which continues elsewhere, for example after ConfigureAwait(false), can't.");
-        }
-    }
-
     /// <remarks>
     /// The body's final code runs in the work item which calls this, so staging the response here commits it in the same
     /// journal write as the journaled state that code changed, whichever operation requests that write. A body which
@@ -686,7 +678,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// </remarks>
     protected override void OnBodyCompleted(DurableTaskResponse response)
     {
-        if (TaskScheduler.Current != _scheduler || IsAttemptCanceled)
+        if (TaskScheduler.Current != _scheduler || IsAttemptEnded)
         {
             return;
         }
@@ -806,12 +798,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         return segment.ToString();
     }
 
-    private IScheduledTaskHandle GetChildTaskHandleCore(TaskId taskId)
-    {
-        ThrowIfNotChildTaskId(taskId);
-        return CreateExecutionHandle(_runtime.GetScheduledTaskHandle(taskId));
-    }
-
     /// <remarks>
     /// The wait observes the signals of the invoked task whose execution tree contains this execution, and advances this
     /// execution's logical time to when the signal was recorded.
@@ -913,38 +899,35 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             cancellationToken,
             AttemptCancellationToken);
 
+    /// <summary>Runs an entry point's <paramref name="callback"/>, which the activation's scheduler runs.</summary>
+    /// <exception cref="InvalidOperationException">The caller isn't running on the activation's scheduler.</exception>
     private static ValueTask RunOnScheduler(TaskScheduler scheduler, Func<ValueTask> callback)
     {
-        if (TaskScheduler.Current == scheduler)
-        {
-            return callback();
-        }
-
-        return new(
-            Task.Factory.StartNew(
-                static async state => await ((Func<ValueTask>)state!)(),
-                callback,
-                CancellationToken.None,
-                TaskCreationOptions.DenyChildAttach,
-                scheduler).Unwrap());
+        ThrowIfOffScheduler(scheduler);
+        return callback();
     }
 
-    private static ValueTask<TResult> RunOnScheduler<TResult>(
-        TaskScheduler scheduler,
-        Func<ValueTask<TResult>> callback)
+    /// <inheritdoc cref="RunOnScheduler(TaskScheduler, Func{ValueTask})"/>
+    private static ValueTask<TResult> RunOnScheduler<TResult>(TaskScheduler scheduler, Func<ValueTask<TResult>> callback)
     {
-        if (TaskScheduler.Current == scheduler)
-        {
-            return callback();
-        }
+        ThrowIfOffScheduler(scheduler);
+        return callback();
+    }
 
-        return new(
-            Task.Factory.StartNew(
-                static async state => await ((Func<ValueTask<TResult>>)state!)(),
-                callback,
-                CancellationToken.None,
-                TaskCreationOptions.DenyChildAttach,
-                scheduler).Unwrap());
+    /// <summary>
+    /// Throws unless the caller runs on <paramref name="scheduler"/>, the activation's, which owns the attempt's state.
+    /// </summary>
+    /// <remarks>
+    /// A body continues on the activation's scheduler at every await, unless it uses <c>ConfigureAwait(false)</c>, which
+    /// ORLEANS0226 reports.
+    /// </remarks>
+    private static void ThrowIfOffScheduler(TaskScheduler scheduler)
+    {
+        if (TaskScheduler.Current != scheduler)
+        {
+            throw new InvalidOperationException(
+                "A durable task's operations run on the scheduler of the grain activation which runs it. Code which continues elsewhere, for example after ConfigureAwait(false), can't run them.");
+        }
     }
 
     /// <summary>Wraps a handle of this execution's operation, which the activation's scheduler runs.</summary>
@@ -971,8 +954,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         public TFeature? GetFeature<TFeature>()
             where TFeature : class =>
             addressedHost.IsDefault ? null : new DurableTaskAddress(addressedHost, TargetTaskId) as TFeature;
-
-        public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
 
         public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) =>
             RunOnScheduler(
