@@ -4008,6 +4008,8 @@ internal sealed class TestContext(
 {
     public override DateTimeOffset UtcNow => utcNow;
 
+    public override Guid Incarnation => Guid.Empty;
+
     protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(TaskId taskId, DurableTask taskDefinition, DurableTaskStartOptions options, CancellationToken cancellationToken)
         => host.ScheduleChildAsync(taskId, taskDefinition, cancellationToken);
 

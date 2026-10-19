@@ -464,6 +464,8 @@ public class DurableTaskRunInlineTests
     {
         public override DateTimeOffset UtcNow => Now;
 
+        public override Guid Incarnation => Guid.Empty;
+
         protected override DurableTaskResponse RunEffect<TState>(TaskId effectId, TState state, Func<TState, DurableTaskResponse> effect)
         {
             if (log is null)

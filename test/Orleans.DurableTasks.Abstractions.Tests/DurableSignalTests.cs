@@ -261,6 +261,8 @@ public partial class DurableSignalTests
     {
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 
+        public override Guid Incarnation => Guid.Empty;
+
         protected override ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, CancellationToken cancellationToken) =>
             supportsSignals
                 ? host.WaitForSignalAsync(Id, name, cancellationToken)
