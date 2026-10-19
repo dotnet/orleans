@@ -205,8 +205,9 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
         Publish(QueueChangeKind.Enqueued, item);
     }
 
+    // A context records the item before the dequeue removes it, so an item which it can't record stays in the queue.
     public T Dequeue() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Write(_accessTarget, JournaledStateOperation.QueueDequeue, this, static self => self.DequeueCore())
+        ? context.Write(_accessTarget, JournaledStateOperation.QueueDequeue, this, static self => self._items.Peek(), static (self, _) => self.DequeueCore())
         : DequeueCore();
 
     private T DequeueCore()
@@ -227,7 +228,14 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
                 _accessTarget,
                 JournaledStateOperation.QueueTryDequeue,
                 this,
-                static self => self.TryDequeueCore(out var item) ? (true, item) : (false, default(T)!));
+                static self => self._items.TryPeek(out var item) ? (true, item) : (false, default(T)!),
+                static (self, result) =>
+                {
+                    if (result.Item1)
+                    {
+                        _ = self.TryDequeueCore(out _);
+                    }
+                });
             return found;
         }
 
