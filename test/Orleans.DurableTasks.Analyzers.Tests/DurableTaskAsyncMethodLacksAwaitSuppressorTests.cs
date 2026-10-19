@@ -144,12 +144,12 @@ public class DurableTaskAsyncMethodLacksAwaitSuppressorTests
         Assert.False(diagnostic.IsSuppressed);
     }
 
-    /// <summary>Compiles <paramref name="source"/> with the durable task stubs and returns its CS1998 diagnostics.</summary>
+    /// <summary>Compiles <paramref name="source"/> against the durable task abstractions and returns its CS1998 diagnostics.</summary>
     private static async Task<Diagnostic[]> GetCS1998DiagnosticsAsync(string source, CSharpCompilationOptions? options = null)
     {
         var compilation = CSharpCompilation.Create(
             "TestAssembly",
-            [CSharpSyntaxTree.ParseText(source, path: "Test.cs"), CSharpSyntaxTree.ParseText(DurableTaskStubs.Source, path: "Stubs.cs")],
+            [CSharpSyntaxTree.ParseText(source, path: "Test.cs")],
             AnalyzerVerifier.References,
             options ?? new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
