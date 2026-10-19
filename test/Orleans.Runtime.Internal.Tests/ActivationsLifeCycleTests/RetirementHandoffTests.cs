@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
 using Orleans.Configuration;
+using Orleans.Metadata;
 using Orleans.Placement;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
@@ -447,6 +448,57 @@ public sealed class RetirementHandoffTests
         Assert.Equal(target.SiloAddress, await fromSource.GetLocation().AsTask().WaitAsync(Timeout, Cancellation));
         Assert.Equal(1, state.HoldCount);
         Assert.Equal(0, Volatile.Read(ref retargets));
+    }
+
+    [Fact]
+    public async Task DestinationWithoutMigratedRequestSupport_ReceivesAnOrdinaryMigrationAndRequestsAreForwarded()
+    {
+        // The source sees the target's manifest without IMigratingRequestsSystemTarget, as it would for a silo running an earlier version.
+        var earlierVersionSilos = new ConcurrentDictionary<SiloAddress, bool>();
+        var calls = new ConcurrentQueue<string>();
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
+        {
+            silo.Services.AddSingleton<IClusterManifestProvider>(services => new EarlierVersionManifestProvider(
+                services.GetRequiredService<Orleans.Runtime.Metadata.ClusterManifestProvider>(),
+                services.GetRequiredService<Orleans.Metadata.GrainInterfaceTypeResolver>().GetGrainInterfaceType(typeof(IMigratingRequestsSystemTarget)),
+                earlierVersionSilos));
+            silo.AddIncomingGrainCallFilter(async context =>
+            {
+                if (context.Request.GetMethodName() is nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains)
+                    or nameof(IMigratingRequestsSystemTarget.AcceptMigratingGrainsWithRequests)
+                    or nameof(IMigratingRequestsSystemTarget.RetargetMigratedRequests))
+                {
+                    calls.Enqueue(context.Request.GetMethodName());
+                }
+
+                await context.Invoke();
+            });
+        }));
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        earlierVersionSilos[target.SiloAddress] = true;
+        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+        await PlaceOnAsync(source, () => grain.GetLocation());
+
+        var running = grain.Block().AsTask();
+        await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
+        var queued = grain.HoldThenGetLocation().AsTask();
+        await WaitUntilAsync(() => GetWaitingCount(source, grain.GetGrainId()) == 1);
+
+        // The grain migrates with the ordinary protocol, without its requests.
+        await grain.MigrateOnIdleTo(target.SiloAddress);
+        state.ReleaseBlock.TrySetResult();
+        await running.WaitAsync(Timeout, Cancellation);
+
+        // The source keeps the request unchanged and forwards it to the migrated activation, and its caller is not retargeted.
+        Assert.Equal(target.SiloAddress, await state.HoldEntered.Task.WaitAsync(Timeout, Cancellation));
+        state.ReleaseHold.TrySetResult();
+        Assert.Equal(target.SiloAddress, await queued.WaitAsync(Timeout, Cancellation));
+        Assert.Equal(1, state.HoldCount);
+        Assert.Equal([nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains)], calls);
     }
 
     [Fact]
@@ -1995,6 +2047,41 @@ public interface IStatelessRetirementHandoffGrain : IGrainWithGuidKey
 public sealed class StatelessRetirementHandoffGrain : Grain, IStatelessRetirementHandoffGrain
 {
     public ValueTask Ping() => default;
+}
+
+/// <summary>
+/// Presents the cluster manifest with <see cref="IMigratingRequestsSystemTarget"/> removed from the manifests of selected silos,
+/// as a silo sees silos which run an earlier version.
+/// </summary>
+internal sealed class EarlierVersionManifestProvider(
+    IClusterManifestProvider inner,
+    GrainInterfaceType migratingRequestsInterface,
+    ConcurrentDictionary<SiloAddress, bool> earlierVersionSilos) : IClusterManifestProvider
+{
+    public ClusterManifest Current => Transform(inner.Current);
+
+    public IAsyncEnumerable<ClusterManifest> Updates => inner.Updates;
+
+    public GrainManifest LocalGrainManifest => inner.LocalGrainManifest;
+
+    private ClusterManifest Transform(ClusterManifest manifest)
+    {
+        if (earlierVersionSilos.IsEmpty)
+        {
+            return manifest;
+        }
+
+        var silos = manifest.Silos;
+        foreach (var silo in earlierVersionSilos.Keys)
+        {
+            if (silos.TryGetValue(silo, out var siloManifest))
+            {
+                silos = silos.SetItem(silo, new GrainManifest(siloManifest.Grains, siloManifest.Interfaces.Remove(migratingRequestsInterface)));
+            }
+        }
+
+        return new ClusterManifest(manifest.Version, silos);
+    }
 }
 
 public interface IDisposalHeldGrain : IGrainWithGuidKey
