@@ -320,6 +320,33 @@ public sealed class DurableTaskPositionalReadTests
         harness.Storage.RequestCompaction = false;
     }
     [Fact]
+    public async Task ReadsOfAValueWithAPendingChangeRecordValuesAndJournalNothing()
+    {
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
+        await using var activation = await harness.ActivateAsync();
+        activation.Value.Value = "0";
+        await activation.Manager.WriteStateAsync(Cancellation);
+        Assert.True(activation.Manager.Positions.TryGetPosition(out var before));
+
+        var log = activation.CreateLog();
+        activation.Run(log, static activation =>
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                activation.Value.Value += "+";
+            }
+        });
+
+        // The value's sets coalesce until the next write, and only the first read, of the journaled value, is positional.
+        Assert.True(activation.Manager.Positions.TryGetPosition(out var after));
+        Assert.Equal(before, after);
+        log.Flush();
+        Assert.Single(DurableTaskAccessLog.FindPositionalRecords(activation.Storage.GetAccessLog(Execution), [])!);
+        Assert.Equal("0++++++++++", activation.Value.Value);
+        log.Close();
+    }
+
+    [Fact]
     public async Task ForcedResolutionFencesWhenAnotherWriterChangedTheJournal()
     {
         await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
@@ -455,6 +482,8 @@ public sealed class DurableTaskPositionalReadTests
         public DurableTaskGrainStorage Storage => storage;
 
         public DurableDictionary<string, string> Dictionary => dictionary;
+
+        public DurableValue<string> Value => value;
 
         public DurableTaskAccessLog CreateLog(TaskId? taskId = null) =>
             new(new TestDurableTaskAttempt(taskId ?? Execution), storage, serializer, TaskScheduler.Current, static exception => new DurableTaskAttemptCanceledException(exception.Message, exception));

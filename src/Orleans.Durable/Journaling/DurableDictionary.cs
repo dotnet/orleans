@@ -285,7 +285,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         : ((IEnumerable<KeyValuePair<TKey, TValue>>)_items).GetEnumerator();
 
     // The collection journals each change as it makes it.
-    void IReplicableState.StagePendingChanges() { }
+    bool IReplicableState.IsReproducibleFromJournal => true;
 
     IJournaledStateReplica IReplicableState.CreateReplica() => new DurableDictionary<TKey, TValue>(_codec);
 
