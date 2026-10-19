@@ -4,8 +4,8 @@ namespace Orleans.DurableTasks;
 
 internal abstract class DeferredMethodInvocation : DurableTask
 {
-    private readonly TaskCompletionSource<DurableTaskResponse> _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    // Created when the body first suspends, so a body which completes synchronously allocates no completion source.
+    private TaskCompletionSource<DurableTaskResponse>? _completion;
     private DurableTaskContext? _context;
     private ExecutionContext? _executionContext;
     private Action? _moveNextAction;
@@ -14,7 +14,12 @@ internal abstract class DeferredMethodInvocation : DurableTask
 
     public Action MoveNextAction => _moveNextAction ??= MoveNext;
 
-    public void CaptureExecutionContext() => _executionContext = ExecutionContext.Capture();
+    /// <summary>Prepares the body to resume after an incomplete await: captures its execution context and its completion.</summary>
+    public void PrepareToSuspend()
+    {
+        _executionContext = ExecutionContext.Capture();
+        _completion ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
 
     private void MoveNext()
     {
@@ -54,7 +59,7 @@ internal abstract class DeferredMethodInvocation : DurableTask
 
         if (terminalResponse is not null)
         {
-            _completion.TrySetResult(terminalResponse);
+            _completion?.TrySetResult(terminalResponse);
         }
     }
 
@@ -78,7 +83,7 @@ internal abstract class DeferredMethodInvocation : DurableTask
 
         _context = context;
         MoveNextInContext();
-        return new(_completion.Task);
+        return _completion is { } completion ? new(completion.Task) : new(_terminalResponse!);
     }
 }
 
@@ -107,8 +112,8 @@ internal sealed class VoidDurableTaskMethodInvocation<TStateMachine> : VoidDurab
 
 internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResult>
 {
-    private readonly TaskCompletionSource<DurableTaskResponse> _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    // Created when the body first suspends, so a body which completes synchronously allocates no completion source.
+    private TaskCompletionSource<DurableTaskResponse>? _completion;
     private DurableTaskContext? _context;
     private ExecutionContext? _executionContext;
     private Action? _moveNextAction;
@@ -117,7 +122,12 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
 
     public Action MoveNextAction => _moveNextAction ??= MoveNext;
 
-    public void CaptureExecutionContext() => _executionContext = ExecutionContext.Capture();
+    /// <summary>Prepares the body to resume after an incomplete await: captures its execution context and its completion.</summary>
+    public void PrepareToSuspend()
+    {
+        _executionContext = ExecutionContext.Capture();
+        _completion ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
 
     private void MoveNext()
     {
@@ -157,7 +167,7 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
 
         if (terminalResponse is not null)
         {
-            _completion.TrySetResult(terminalResponse);
+            _completion?.TrySetResult(terminalResponse);
         }
     }
 
@@ -185,7 +195,7 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
 
         _context = context;
         MoveNextInContext();
-        return new(_completion.Task);
+        return _completion is { } completion ? new(completion.Task) : new(_terminalResponse!);
     }
 }
 

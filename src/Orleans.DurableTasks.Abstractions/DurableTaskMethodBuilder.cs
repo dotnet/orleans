@@ -45,7 +45,7 @@ public struct DurableTaskMethodBuilder
         where TAwaiter : INotifyCompletion where TStateMachine : IAsyncStateMachine
     {
         var invocation = Invocation;
-        invocation.CaptureExecutionContext();
+        invocation.PrepareToSuspend();
         awaiter.OnCompleted(invocation.MoveNextAction);
     }
 
@@ -54,7 +54,7 @@ public struct DurableTaskMethodBuilder
         where TAwaiter : ICriticalNotifyCompletion where TStateMachine : IAsyncStateMachine
     {
         var invocation = Invocation;
-        invocation.CaptureExecutionContext();
+        invocation.PrepareToSuspend();
         awaiter.UnsafeOnCompleted(invocation.MoveNextAction);
     }
 }
@@ -100,7 +100,7 @@ public struct DurableTaskMethodBuilder<TResult>
         where TAwaiter : INotifyCompletion where TStateMachine : IAsyncStateMachine
     {
         var invocation = Invocation;
-        invocation.CaptureExecutionContext();
+        invocation.PrepareToSuspend();
         awaiter.OnCompleted(invocation.MoveNextAction);
     }
 
@@ -109,7 +109,7 @@ public struct DurableTaskMethodBuilder<TResult>
         where TAwaiter : ICriticalNotifyCompletion where TStateMachine : IAsyncStateMachine
     {
         var invocation = Invocation;
-        invocation.CaptureExecutionContext();
+        invocation.PrepareToSuspend();
         awaiter.UnsafeOnCompleted(invocation.MoveNextAction);
     }
 }
