@@ -280,7 +280,7 @@ public abstract class ProviderSelectionGrain : DurableGrain, IProviderSelectionG
     }
 
     public Task<int[]> GetValues() => Task.FromResult(Read());
-public Task<int[]> GetActivationValues() => Task.FromResult(_activationValues);
+    public Task<int[]> GetActivationValues() => Task.FromResult(_activationValues);
 
     public async Task<int[]> ReadLog()
     {
