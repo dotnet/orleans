@@ -90,11 +90,11 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     }
 
     public bool TrySetResult(T value) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Write(_accessTarget, JournaledStateOperation.CompletionSourceTrySetResult, (Self: this, Value: value), static state => state.Self.TrySetResultCore(state.Value))
+        ? context.Write(_accessTarget, JournaledStateOperation.CompletionSourceTrySetResult, value, (Self: this, Value: value), static state => state.Self.TrySetResultCore(state.Value))
         : TrySetResultCore(value);
 
     public bool TrySetException(Exception exception) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Write(_accessTarget, JournaledStateOperation.CompletionSourceTrySetException, (Self: this, Exception: exception), static state => state.Self.TrySetExceptionCore(state.Exception))
+        ? context.Write(_accessTarget, JournaledStateOperation.CompletionSourceTrySetException, exception.GetType().FullName, (Self: this, Exception: exception), static state => state.Self.TrySetExceptionCore(state.Exception))
         : TrySetExceptionCore(exception);
 
     public bool TrySetCanceled() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)

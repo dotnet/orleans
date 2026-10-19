@@ -72,7 +72,7 @@ internal sealed partial class Outbox : IStateMachine, IReportsStagedChanges, IDu
         _pump.ShutdownToken.ThrowIfCancellationRequested();
         if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
         {
-            context.Write(_accessTarget, JournaledStateOperation.OutboxSend, (Self: this, Message: message), static state => state.Self.SendCore(state.Message));
+            context.Write(_accessTarget, JournaledStateOperation.OutboxSend, message.Envelope.MessageId, (Self: this, Message: message), static state => state.Self.SendCore(state.Message));
             return;
         }
 
@@ -117,7 +117,7 @@ internal sealed partial class Outbox : IStateMachine, IReportsStagedChanges, IDu
         _pump.ShutdownToken.ThrowIfCancellationRequested();
         if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
         {
-            context.Write(_accessTarget, JournaledStateOperation.OutboxSend, (Self: this, MessageId: messageId), static state => state.Self.SendCore(state.MessageId));
+            context.Write(_accessTarget, JournaledStateOperation.OutboxSend, messageId, (Self: this, MessageId: messageId), static state => state.Self.SendCore(state.MessageId));
             return;
         }
 
@@ -162,7 +162,7 @@ internal sealed partial class Outbox : IStateMachine, IReportsStagedChanges, IDu
 
     /// <remarks>A withdrawal runs through the caller's <see cref="JournaledStateContext"/> as a write.</remarks>
     public bool Withdraw(MessageId messageId) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Write(_accessTarget, JournaledStateOperation.OutboxWithdraw, (Self: this, MessageId: messageId), static state => state.Self.WithdrawCore(state.MessageId))
+        ? context.Write(_accessTarget, JournaledStateOperation.OutboxWithdraw, messageId, (Self: this, MessageId: messageId), static state => state.Self.WithdrawCore(state.MessageId))
         : WithdrawCore(messageId);
 
     private bool WithdrawCore(MessageId messageId)

@@ -76,14 +76,14 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     public TValue this[TKey key]
     {
         get => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-            ? context.Read(_accessTarget!, JournaledStateOperation.DictionaryGet, (Self: this, Key: key), static state => state.Self._items[state.Key])
+            ? context.Read(_accessTarget!, JournaledStateOperation.DictionaryGet, key, (Self: this, Key: key), static state => state.Self._items[state.Key])
             : _items[key];
 
         set
         {
             if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
             {
-                context.Write(_accessTarget!, JournaledStateOperation.DictionarySet, (Self: this, Key: key, Value: value), static state => state.Self.SetCore(state.Key, state.Value));
+                context.Write(_accessTarget!, JournaledStateOperation.DictionarySet, (key, value), (Self: this, Key: key, Value: value), static state => state.Self.SetCore(state.Key, state.Value));
                 return;
             }
 
@@ -163,7 +163,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     public bool Contains(TKey key) => ContainsKey(key);
 
     public bool Remove(TKey key) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Write(_accessTarget!, JournaledStateOperation.DictionaryRemove, (Self: this, Key: key), static state => state.Self.RemoveCore(state.Key))
+        ? context.Write(_accessTarget!, JournaledStateOperation.DictionaryRemove, key, (Self: this, Key: key), static state => state.Self.RemoveCore(state.Key))
         : RemoveCore(key);
 
     private bool RemoveCore(TKey key)
@@ -222,7 +222,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     {
         if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
         {
-            context.Write(_accessTarget!, JournaledStateOperation.DictionaryAdd, (Self: this, Key: key, Value: value), static state => state.Self.AddCore(state.Key, state.Value));
+            context.Write(_accessTarget!, JournaledStateOperation.DictionaryAdd, (key, value), (Self: this, Key: key, Value: value), static state => state.Self.AddCore(state.Key, state.Value));
             return;
         }
 
@@ -243,7 +243,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     }
 
     public bool ContainsKey(TKey key) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget!, JournaledStateOperation.DictionaryContainsKey, (Self: this, Key: key), static state => state.Self._items.ContainsKey(state.Key))
+        ? context.Read(_accessTarget!, JournaledStateOperation.DictionaryContainsKey, key, (Self: this, Key: key), static state => state.Self._items.ContainsKey(state.Key))
         : _items.ContainsKey(key);
 
     public bool TryGetValue(TKey key, [MaybeNullWhen(false)] out TValue value)
@@ -253,6 +253,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
             (var found, value) = context.Read(
                 _accessTarget!,
                 JournaledStateOperation.DictionaryTryGetValue,
+                key,
                 (Self: this, Key: key),
                 static state => state.Self._items.TryGetValue(state.Key, out var value) ? (true, value) : (false, default(TValue)!));
             return found;
@@ -264,7 +265,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     public void Add(KeyValuePair<TKey, TValue> item) => Add(item.Key, item.Value);
 
     public bool Contains(KeyValuePair<TKey, TValue> item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget!, JournaledStateOperation.DictionaryContainsPair, (Self: this, Item: item), static state => ((ICollection<KeyValuePair<TKey, TValue>>)state.Self._items).Contains(state.Item))
+        ? context.Read(_accessTarget!, JournaledStateOperation.DictionaryContainsPair, (item.Key, item.Value), (Self: this, Item: item), static state => ((ICollection<KeyValuePair<TKey, TValue>>)state.Self._items).Contains(state.Item))
         : ((ICollection<KeyValuePair<TKey, TValue>>)_items).Contains(item);
 
     public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
@@ -279,7 +280,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     }
 
     public bool Remove(KeyValuePair<TKey, TValue> item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Write(_accessTarget!, JournaledStateOperation.DictionaryRemovePair, (Self: this, Item: item), static state => state.Self.RemoveCore(state.Item))
+        ? context.Write(_accessTarget!, JournaledStateOperation.DictionaryRemovePair, (item.Key, item.Value), (Self: this, Item: item), static state => state.Self.RemoveCore(state.Item))
         : RemoveCore(item);
 
     private bool RemoveCore(KeyValuePair<TKey, TValue> item)

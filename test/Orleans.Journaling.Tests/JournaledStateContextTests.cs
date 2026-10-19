@@ -291,8 +291,9 @@ public sealed class JournaledStateContextTests : JournalingTestBase
         /// <summary>Gets or sets a check which rejects a result before its change applies, as a context which can't record it does.</summary>
         public Func<object?, Exception?>? Rejects { get; set; }
 
-        protected override TResult Access<TState, TResult>(
+        protected override TResult Access<TArgument, TState, TResult>(
             in JournaledStateAccess access,
+            TArgument argument,
             TState state,
             Func<TState, TResult> operation,
             Action<TState, TResult>? apply)
