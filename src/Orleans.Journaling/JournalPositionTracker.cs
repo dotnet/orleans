@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
@@ -19,7 +20,7 @@ namespace Orleans.Journaling;
 /// where a member says so.
 /// </para>
 /// </remarks>
-internal sealed class JournalPositionTracker
+internal sealed partial class JournalPositionTracker
 {
     /// <summary>The number of consecutive snapshots which barriers defer, after which the next one resolves their reads.</summary>
     internal const int MaxDeferredSnapshots = 16;
@@ -77,6 +78,25 @@ internal sealed class JournalPositionTracker
         if (_manager.AcceptsPositions && !_suspended)
         {
             position = _offset + _writer.CommittedEntryCount;
+            return true;
+        }
+
+        position = 0;
+        return false;
+    }
+
+    /// <summary>
+    /// Gets the logical position of the journal's next entry, which a positional read of <paramref name="target"/>
+    /// records, when the manager offers positions and the target is the registered state which its id names, so a
+    /// resolution replays that state.
+    /// </summary>
+    public bool TryGetPosition(JournaledStateAccessTarget target, out long position)
+    {
+        if (TryGetPosition(out position)
+            && ReplicableStates.TryGetValue(target.Id, out var entry)
+            && entry is not null
+            && ReferenceEquals(entry.State, target.ReplicableState))
+        {
             return true;
         }
 
@@ -345,9 +365,17 @@ internal sealed class JournalPositionTracker
         }
 
         history.ResolveCurrent();
+        history.GiveUpPending();
         foreach (var (holder, batch) in later ?? [])
         {
             holder.ApplyResolvedReads(batch);
+        }
+
+        // An unresolved read keeps its record, and so the barrier and the history which it needs: a snapshot would destroy
+        // the only evidence of what the read observed, and its execution stalls with a divergence when it replays the read.
+        foreach (var read in history.Unresolved ?? [])
+        {
+            LogUnresolvedPositionalRead(_manager.Logger, read.Exception, read.StateId, read.Operation, read.Position, read.Reason);
         }
 
         _deferredSnapshots = 0;
@@ -430,4 +458,9 @@ internal sealed class JournalPositionTracker
         /// <summary>Gets or sets whether storage's history was replayed, so reads of positions after it can resolve.</summary>
         public bool HasReadStorage { get; set; }
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "The positional read of state #{StateId:x8} ('{Operation}') at journal position {Position} couldn't be resolved: {Reason}. The journal keeps its history and compaction stays deferred while the read's record exists; its execution stalls when it replays the read.")]
+    private static partial void LogUnresolvedPositionalRead(ILogger logger, Exception? exception, int stateId, JournaledStateOperation operation, long position, string reason);
 }

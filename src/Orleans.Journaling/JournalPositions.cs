@@ -269,14 +269,18 @@ internal sealed class JournalBarrierState(Func<IDurableDictionaryCommandCodec<st
 /// <summary>A registered state which supports positional reads, under its journal name.</summary>
 internal sealed record ReplicableStateEntry(string Name, IReplicableState State);
 
+/// <summary>A positional read which a history replay couldn't resolve.</summary>
+internal sealed record UnresolvedPositionalRead(long Position, int StateId, JournaledStateOperation Operation, string Reason, Exception? Exception);
+
 /// <summary>
 /// Replays a journal's history into replicas of the manager's replicable states, and resolves each positional read as of
 /// its position.
 /// </summary>
 /// <remarks>
 /// It counts positions as the manager does, from the start of storage's content: before the format replays each entry, the
-/// reads at the position which precedes it are evaluated. A read whose position passed without being reached stays
-/// unresolved, as does a read of a state which has no replica or whose replica fails to evaluate it.
+/// reads at the position which precedes it are evaluated. A read which can't be resolved, because its position passed
+/// without being reached, its state has no replica, or the replica fails to evaluate it, stays unresolved and is reported
+/// in <see cref="Unresolved"/>.
 /// </remarks>
 internal sealed class JournalHistoryReplay : IJournalStorageConsumer, IJournalReplayTarget
 {
@@ -287,6 +291,7 @@ internal sealed class JournalHistoryReplay : IJournalStorageConsumer, IJournalRe
     private readonly Dictionary<uint, IStateMachine> _streams = [];
     private readonly StreamDirectory _directory;
     private readonly Ignored _ignored = new();
+    private List<UnresolvedPositionalRead>? _unresolved;
     private int _next;
 
     /// <param name="manager">The manager whose journal's history is replayed.</param>
@@ -316,6 +321,9 @@ internal sealed class JournalHistoryReplay : IJournalStorageConsumer, IJournalRe
     /// <summary>Gets the logical position after the entries replayed so far.</summary>
     public long Position { get; private set; }
 
+    /// <summary>Gets the reads which the replay couldn't resolve, with the reason, or <see langword="null"/>.</summary>
+    public IReadOnlyList<UnresolvedPositionalRead>? Unresolved => _unresolved;
+
     string IJournalReplayTarget.WriteJournalFormatKey => _manager.WriteJournalFormatKey;
 
     IServiceProvider IJournalReplayTarget.ServiceProvider => _manager.ServiceProvider;
@@ -333,6 +341,16 @@ internal sealed class JournalHistoryReplay : IJournalStorageConsumer, IJournalRe
 
     /// <summary>Forgets the reads which the replay hasn't reached, so a later batch can supply them again.</summary>
     public void DropPending() => _reads.RemoveRange(_next, _reads.Count - _next);
+
+    /// <summary>Reports the reads which the replay hasn't reached as unresolved: the history ends before their positions.</summary>
+    public void GiveUpPending()
+    {
+        while (_next < _reads.Count)
+        {
+            var (_, batch, index) = _reads[_next++];
+            Fail(batch, index, "the journal's history ends before its position", exception: null);
+        }
+    }
 
     void IJournalStorageConsumer.Read(JournalBufferReader buffer, IJournalMetadata? metadata)
     {
@@ -374,18 +392,33 @@ internal sealed class JournalHistoryReplay : IJournalStorageConsumer, IJournalRe
         while (_next < _reads.Count && _reads[_next].Position <= position)
         {
             var (readPosition, batch, index) = _reads[_next++];
-            if (readPosition == position && _replicasById.TryGetValue(batch[index].StateId, out var replica))
+            if (readPosition != position)
+            {
+                Fail(batch, index, "the journal's history passed its position without reaching it", exception: null);
+            }
+            else if (!_replicasById.TryGetValue(batch[index].StateId, out var replica))
+            {
+                Fail(batch, index, "no registered state with that id replays positional reads, or two registered names share the id", exception: null);
+            }
+            else
             {
                 try
                 {
                     batch.Resolve(index, replica);
                 }
-                catch (Exception)
+                catch (Exception exception)
                 {
-                    // The read stays unresolved: its replay stalls rather than observing another value.
+                    Fail(batch, index, "the state's replica failed to evaluate it", exception);
                 }
             }
         }
+    }
+
+    // The read stays unresolved, so its record keeps holding the history: its replay stalls rather than observing another value.
+    private void Fail(JournalPositionalReads batch, int index, string reason, Exception? exception)
+    {
+        var read = batch[index];
+        (_unresolved ??= []).Add(new(read.Position, read.StateId, read.Operation, reason, exception));
     }
 
     private void Bind(string name, uint id)
