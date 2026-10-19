@@ -47,14 +47,13 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(0, await OnGrainAsync(receiver, context => Inbox(context).Count));
     }
 
-    [Theory]
-    [InlineData(SinkMode.Throw, SourceSinkGrain.Rejection)]
-    [InlineData(SinkMode.DeadLetter, SourceSinkGrain.Rejection)]
-    [InlineData(SinkMode.UnsupportedStatus, "The inbox message sink reported the unsupported delivery status 'HandlerNotFound'.")]
-    public async Task SinkRejection_DeadLettersTheMessageAndAnswersItsDuplicatesWithTheSameRejection(SinkMode mode, string reason)
+    [Fact]
+    public async Task SinkRejection_DeadLettersTheMessageAndAnswersItsDuplicatesWithTheSameRejection()
     {
+        const string reason = SourceSinkGrain.Rejection;
+        const string code = SourceSinkGrain.RejectionCode;
         var receiver = NewGrain();
-        Probe.For(receiver).Mode = mode;
+        Probe.For(receiver).Mode = SinkMode.DeadLetter;
         var payload = NewPayload();
         var message = NewInboxMessage("rejected", payload);
         var extension = receiver.AsReference<IMessagingExtension>();
@@ -65,6 +64,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
 
         Assert.Equal(DeliveryStatus.DeadLettered, result.Status);
         Assert.Equal(reason, result.Message);
+        Assert.Equal(code, result.Code);
         var grainType = receiver.GetGrainId().Type.ToString();
         Assert.Single(metrics.Read("inbox-messages-received")).AssertCounter(grainType, "dead_lettered");
         Assert.Single(metrics.Read("inbox-messages-processed")).AssertCounter(grainType, "dead_lettered");
@@ -77,6 +77,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         var letter = Assert.Single(letters);
         Assert.Equal(payload, letter.Message.Envelope.Payload);
         Assert.Equal(reason, letter.Reason);
+        Assert.Equal(code, letter.Code);
         Assert.Equal(1, letter.AttemptCount);
         Assert.Equal(1, Storage.CountPayloadOccurrences(Journal(receiver), payload));
 
@@ -97,11 +98,48 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(2, Probe.For(receiver).SinkOffers);
         Assert.Equal(1, Probe.For(receiver).SinkAcceptances);
 
-        void AssertRejected(DeliveryResult duplicate)
+        // The new completion replaces the old rejection, so a lost-answer retry learns that the message was processed.
+        Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(message, Token)).Status);
+        await receiver.DeactivateAsync();
+        Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(message, Token)).Status);
+        Assert.Equal(2, Probe.For(receiver).SinkOffers);
+
+        static void AssertRejected(DeliveryResult duplicate)
         {
             Assert.Equal(DeliveryStatus.DeadLettered, duplicate.Status);
             Assert.Equal(reason, duplicate.Message);
+            Assert.Equal(code, duplicate.Code);
         }
+    }
+
+    [Theory]
+    [InlineData(SinkMode.Throw, SourceSinkGrain.SinkFailure)]
+    [InlineData(SinkMode.UnsupportedStatus, "The inbox message sink reported the unsupported delivery status 'HandlerNotFound'.")]
+    public async Task SinkFailure_FailsTheDeliveryWithoutStagingAndTheRetryIsAccepted(SinkMode mode, string error)
+    {
+        var receiver = NewGrain();
+        Probe.For(receiver).Mode = mode;
+        var payload = NewPayload();
+        var message = NewInboxMessage("sink-failure", payload);
+        var extension = receiver.AsReference<IMessagingExtension>();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () => await extension.DeliverAsync(message, Token));
+
+        Assert.Equal(error, exception.Message);
+        var (state, count, letters) = await OnGrainAsync(receiver, context => (
+            Grain(context).GetState(),
+            Inbox(context).Count,
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().InboxDeadLetters));
+        Assert.Empty(state.Received);
+        Assert.Equal(0, count);
+        Assert.Empty(letters);
+        Assert.Equal(0, Storage.CountPayloadOccurrences(Journal(receiver), payload));
+
+        Probe.For(receiver).Mode = SinkMode.Accept;
+        Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(message, Token)).Status);
+        Assert.Equal(2, Probe.For(receiver).SinkOffers);
+        Assert.Equal(1, Probe.For(receiver).SinkAcceptances);
+        Assert.Equal(1, Storage.CountPayloadOccurrences(Journal(receiver), payload));
     }
 
     [Fact]
@@ -349,6 +387,8 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
 {
     internal const string Subject = "source-sink/payload";
     internal const string Rejection = "The sink rejected the message.";
+    internal const string RejectionCode = "source-sink/rejected";
+    internal const string SinkFailure = "The sink failed before deciding the message's outcome.";
     private readonly IJournaledStateManager _manager;
     private readonly IDurableDictionary<string, byte[]> _outgoing;
     private readonly IDurableDictionary<string, byte[]> _received;
@@ -395,9 +435,9 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
             case SinkMode.Decline:
                 return false;
             case SinkMode.Throw:
-                throw new InvalidOperationException(Rejection);
+                throw new InvalidOperationException(SinkFailure);
             case SinkMode.DeadLetter:
-                result = DeliveryResult.DeadLettered(Rejection);
+                result = DeliveryResult.DeadLettered(Rejection, RejectionCode);
                 return true;
             case SinkMode.Backpressure:
                 result = DeliveryResult.Backpressured();
