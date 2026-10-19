@@ -1,15 +1,20 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Routing.Template;
 
 namespace Orleans.DurableTasks.Http;
 
-/// <summary>Identifies the durable operations group of an endpoint, and derives the keys of its operations.</summary>
-/// <param name="Scope">The scope of the group's operations.</param>
-/// <param name="OperationEndpointName">The name of the group's status endpoint, which locates operations.</param>
-internal sealed record DurableOperationsMetadata(string Scope, string OperationEndpointName)
+/// <summary>Identifies the durable operations group of an endpoint, and derives the keys and locations of its operations.</summary>
+/// <param name="scope">The scope of the group's operations.</param>
+/// <remarks>Each group has its own instance, which its status endpoint's <see cref="DurableOperationStatusEndpoint"/> references.</remarks>
+internal sealed class DurableOperationsMetadata(string scope)
 {
     private RouteEndpoint? _operationEndpoint;
+    private TemplateBinder? _operationBinder;
+
+    /// <summary>Gets the scope of the group's operations.</summary>
+    public string Scope { get; } = scope;
 
     /// <summary>Returns the durable operations group of the request's endpoint.</summary>
     public static DurableOperationsMetadata Get(HttpContext context) =>
@@ -20,7 +25,27 @@ internal sealed record DurableOperationsMetadata(string Scope, string OperationE
     /// <summary>Returns the group's status endpoint, whose route pattern includes the group's prefix.</summary>
     public RouteEndpoint GetOperationEndpoint(EndpointDataSource endpoints) => _operationEndpoint ??= endpoints.Endpoints
         .OfType<RouteEndpoint>()
-        .Single(endpoint => endpoint.Metadata.GetMetadata<IEndpointNameMetadata>()?.EndpointName == OperationEndpointName);
+        .Single(endpoint => ReferenceEquals(endpoint.Metadata.GetMetadata<DurableOperationStatusEndpoint>()?.Group, this));
+
+    /// <summary>
+    /// Returns the path of the operation <paramref name="operationId"/>'s status monitor, with the request's values for
+    /// the group's route parameters.
+    /// </summary>
+    public string? GetOperationPath(HttpContext context, EndpointDataSource endpoints, TemplateBinderFactory binders, string operationId)
+    {
+        var endpoint = GetOperationEndpoint(endpoints);
+        var values = new RouteValueDictionary();
+        foreach (var parameter in endpoint.RoutePattern.Parameters)
+        {
+            if (context.Request.RouteValues.TryGetValue(parameter.Name, out var value))
+            {
+                values[parameter.Name] = value;
+            }
+        }
+
+        values[DurableHttpOperations.OperationIdParameter] = operationId;
+        return (_operationBinder ??= binders.Create(endpoint.RoutePattern)).BindValues(values);
+    }
 
     /// <summary>Returns the key of the operation <paramref name="operationId"/> which the request names.</summary>
     /// <remarks>
@@ -85,3 +110,7 @@ internal static class DurableOperationKeys
             : throw new InvalidOperationException("DurableHttpOptions.GetCallerScope returned an empty scope. A caller's scope has at least one character.");
     }
 }
+
+/// <summary>Marks the status endpoint of a durable operations group, which locates the group's operations.</summary>
+/// <param name="Group">The group.</param>
+internal sealed record DurableOperationStatusEndpoint(DurableOperationsMetadata Group);

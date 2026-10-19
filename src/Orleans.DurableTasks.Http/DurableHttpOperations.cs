@@ -5,7 +5,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Routing.Template;
 using Microsoft.Extensions.Options;
 using HttpJsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
@@ -18,7 +20,7 @@ namespace Orleans.DurableTasks.Http;
 internal sealed class DurableHttpOperations(
     DurableOperationService operations,
     DurableCallbackRegistrar callbacks,
-    LinkGenerator links,
+    TemplateBinderFactory binders,
     EndpointDataSource endpoints,
     IOptions<DurableHttpOptions> options,
     IOptions<HttpJsonOptions> jsonOptions)
@@ -289,21 +291,12 @@ internal sealed class DurableHttpOperations(
     /// </summary>
     private string GetOperationLocation(HttpContext context, DurableOperationsMetadata group, string operationId)
     {
-        var values = new RouteValueDictionary();
-        foreach (var parameter in group.GetOperationEndpoint(endpoints).RoutePattern.Parameters)
-        {
-            if (context.Request.RouteValues.TryGetValue(parameter.Name, out var value))
-            {
-                values[parameter.Name] = value;
-            }
-        }
-
-        values[OperationIdParameter] = operationId;
-        return links.GetUriByName(context, group.OperationEndpointName, values)
+        var path = group.GetOperationPath(context, endpoints, binders, operationId)
             ?? throw new InvalidOperationException(
                 $"The route values of '{context.GetEndpoint()?.DisplayName}' don't locate its group's operations. A durable task endpoint uses the route parameters of the group which WithDurableOperations configures.");
+        var request = context.Request;
+        return UriHelper.BuildAbsolute(request.Scheme, request.Host, request.PathBase, new PathString(path));
     }
-
     private static IResult OperationNotFound() => TypedResults.Problem(
         statusCode: StatusCodes.Status404NotFound,
         title: "The operation was not found",
