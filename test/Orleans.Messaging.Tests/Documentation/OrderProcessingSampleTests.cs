@@ -367,6 +367,8 @@ public sealed class OrderProcessingSampleTests : IAsyncLifetime
                 options.Classes.Remove(typeof(global::Documentation.Grains.Messaging.PaymentGrain));
                 options.AddClass(typeof(OrderProcessing.Grains.PaymentGrain));
             });
+            // Order dates and DeliverAt follow the Durable Jobs clock, which reads the test clock here.
+            UseTestClockForDurableJobs(services);
             services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "json");
             services.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(OrderProcessingJsonContext.Default));
             services.AddSingleton<OrderMessages>();
