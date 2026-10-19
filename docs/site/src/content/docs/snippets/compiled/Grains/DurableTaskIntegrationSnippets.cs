@@ -235,14 +235,20 @@ public sealed class LabelPrinterGrain([FromKeyedServices("labels")] IDurableHttp
 
         try
         {
-            // Reads the job's status events within a step, which records the result.
-            var label = await labels.WaitForOperationAsync<LabelResult>(job, new() { Mode = DurableHttpWaitMode.Events });
+            // Reads the job's status events within a step, which records the result, and gives up after a day of
+            // logical time.
+            var label = await labels.WaitForOperationAsync<LabelResult>(job, new() { Mode = DurableHttpWaitMode.Events })
+                .WaitAsync(TimeSpan.FromDays(1));
             return label.Url;
         }
-        catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested && job.Location is { } location)
+        catch (Exception exception) when (exception is TimeoutException || DurableTask.Current.IsTaskCancellationRequested && exception is OperationCanceledException)
         {
-            // Cancels the remote job, then lets this task end canceled.
-            await labels.CancelOperationAsync(location, DurableTask.Current.TaskCancellationReason).Shielded();
+            // Cancels the remote job, then lets this task end timed out or canceled.
+            if (job.Location is { } location)
+            {
+                await labels.CancelOperationAsync(location, DurableTask.Current.TaskCancellationReason ?? "The label wasn't printed within a day.").Shielded();
+            }
+
             throw;
         }
     }
@@ -275,10 +281,11 @@ internal static class ReturnEndpoints
         builder.Services.AddDurableHttp();
         var app = builder.Build();
 
-        // Each POST starts the grain call as an operation which the request's Idempotency-Key names, and the group serves
-        // its status monitor, events, cancellation, and signals under /returns/{returnId}/operations/{id}.
+        // Each POST starts the grain call as an operation which the request's Idempotency-Key names, within the caller's
+        // scope, and the group serves its status monitor, events, cancellation, and signals under
+        // /returns/{returnId}/operations/{id}. The scope "returns" names the operations, so renaming the routes keeps them.
         var returns = app.MapGroup("/returns/{returnId}")
-            .WithDurableOperations()
+            .WithDurableOperations("returns")
             .RequireAuthorization("returns");
 
         returns.MapPost("/process", (string returnId, string reason, IGrainFactory grains) =>
