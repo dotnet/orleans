@@ -30,6 +30,10 @@ internal static class AccessRecordingBytes
                 Report(f, context, $"Each read of 64 keys of an unchanged dictionary (of {AccessRecordingBenchmarks.KeysReads})", AccessRecordingScenario.Keys, AccessRecordingBenchmarks.KeysReads);
                 Report(f, context, "Typical body: 3 reads, 3 writes, 1 count", AccessRecordingScenario.TypicalBody, 1);
                 Console.WriteLine($"| Removal at completion | {context} | {f.MeasureBytes(AccessRecordingScenario.TypicalBody).Removal} |");
+                if (AccessRecordingFixture.Positions)
+                {
+                    Console.WriteLine($"| Barrier set and release, once per snapshot period in which executions hold positional reads | {context} | {f.MeasureBarrierBytes()} |");
+                }
             }
         }
     }
