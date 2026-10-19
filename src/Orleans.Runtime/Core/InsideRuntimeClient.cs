@@ -224,7 +224,7 @@ namespace Orleans.Runtime
             }
 
             this.messagingTrace.OnSendRequest(message);
-            this.MessageCenter.AddressAndSendMessage(message);
+            this.MessageCenter.AddressAndSendMessage(message, target);
         }
 
         public void SendResponse(Message request, Response response)

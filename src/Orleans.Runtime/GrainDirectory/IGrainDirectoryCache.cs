@@ -65,4 +65,9 @@ namespace Orleans.Runtime.GrainDirectory
             return cache.LookUp(key, out result, out _);
         }
     }
+
+    internal interface IGrainDirectoryCacheEntrySource
+    {
+        bool TryGetEntry(GrainId key, [NotNullWhen(true)] out GrainDirectoryCacheEntry? entry);
+    }
 }
