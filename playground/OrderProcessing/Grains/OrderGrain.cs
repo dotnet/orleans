@@ -1,5 +1,6 @@
-using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Messaging;
 
@@ -33,7 +34,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         IOutbox outbox,
         IOptions<OrderingOptions> options,
         OrderMessages messages,
-        TimeProvider timeProvider)
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider)
     {
         _outbox = outbox;
         _options = options.Value;
@@ -118,8 +119,8 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             request.CardLast4,
             Description: null);
 
-        // The inbox accepts this self-addressed message in the order's submission write
-        // and processes it once the grace period ends. The submission fixes its time across handler retries.
+        // The inbox accepts this self-addressed message in the order's submission write and processes it once the grace
+        // period ends. The order date is on the Durable Jobs clock, which DeliverAt uses, and stays fixed across retries.
         var status = CreateStatus(order);
         var gracePeriod = _messages.GracePeriodElapsed.Create(
             new MessageId(OrderKey.CreateChildKey("grace-period")),
@@ -196,8 +197,14 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
 
     private void HandlePaymentResult(PaymentResult result, IInboxHandlerContext context)
     {
-        // Buyers cannot cancel once stock is confirmed, so the order awaits this result.
-        Debug.Assert(_order.Value!.Status is OrderStatus.StockConfirmed);
+        // Buyers cannot cancel once stock is confirmed, so only a confirmed order awaits this result. A redelivery after
+        // the deduplication window finds the order already past it.
+        if (_order.Value?.Status is not OrderStatus.StockConfirmed)
+        {
+            context.Complete();
+            return;
+        }
+
         if (result.Succeeded)
         {
             var next = NextStatus(OrderStatus.Paid);
