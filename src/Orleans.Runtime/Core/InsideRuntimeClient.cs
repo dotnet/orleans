@@ -119,7 +119,7 @@ namespace Orleans.Runtime
 
         private List<IIncomingGrainCallFilter> GrainCallFilters => this.grainCallFilters;
 
-        internal MessageCenter MessageCenter => this.messageCenter;
+        private MessageCenter MessageCenter => this.messageCenter;
 
         public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime;
 

@@ -425,30 +425,27 @@ namespace Orleans.Runtime
             }
         }
 
-        /// <remarks>
-        /// The header holds one entry per grain. A later update for a grain which the header already covers replaces the entry's valid address,
-        /// keeping its invalid address, so that callers which cached the grain's original address cache the address which the message reached last.
-        /// </remarks>
         private static void AddCacheInvalidationHeaderEntry(List<GrainAddressCacheUpdate> cacheInvalidationHeader, GrainAddressCacheUpdate grainAddressCacheUpdate)
         {
-            for (var i = 0; i < cacheInvalidationHeader.Count; i++)
+            if (cacheInvalidationHeader.Count >= MaxCacheInvalidationHeaderEntries || ContainsCacheInvalidationHeaderEntry(cacheInvalidationHeader, grainAddressCacheUpdate.GrainId))
             {
-                var existing = cacheInvalidationHeader[i];
-                if (existing.GrainId.Equals(grainAddressCacheUpdate.GrainId))
-                {
-                    if (grainAddressCacheUpdate.ValidGrainAddress is { } validAddress)
-                    {
-                        cacheInvalidationHeader[i] = new GrainAddressCacheUpdate(existing.InvalidGrainAddress, validAddress);
-                    }
+                return;
+            }
 
-                    return;
+            cacheInvalidationHeader.Add(grainAddressCacheUpdate);
+        }
+
+        private static bool ContainsCacheInvalidationHeaderEntry(List<GrainAddressCacheUpdate> cacheInvalidationHeader, GrainId grainId)
+        {
+            foreach (var entry in cacheInvalidationHeader)
+            {
+                if (entry.GrainId.Equals(grainId))
+                {
+                    return true;
                 }
             }
 
-            if (cacheInvalidationHeader.Count < MaxCacheInvalidationHeaderEntries)
-            {
-                cacheInvalidationHeader.Add(grainAddressCacheUpdate);
-            }
+            return false;
         }
 
         public override string ToString() => $"{this}";

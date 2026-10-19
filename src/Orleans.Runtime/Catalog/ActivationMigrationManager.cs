@@ -17,8 +17,6 @@ using Orleans.Metadata;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime;
 
@@ -45,12 +43,12 @@ internal interface IActivationMigrationManagerSystemTarget : ISystemTarget
     /// </summary>
     /// <param name="migratingGrains">The migrating grains.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>
-    /// For each package, whether the grain's new activation on this silo took ownership of the package's requests.
-    /// Each activation queues its requests before it can receive any other request. When it did not take ownership, none of the package's requests were delivered.
-    /// </returns>
+    /// <remarks>
+    /// This silo takes ownership of the requests when it accepts the call. A grain's new activation queues its requests before it can receive any other request.
+    /// When the grain's activation is not new, or cannot queue the requests ahead of others, this silo delivers them as it delivers forwarded requests.
+    /// </remarks>
     [Alias("AcceptMigratingGrainsWithRequests")]
-    ValueTask<bool[]> AcceptMigratingGrainsWithRequests(
+    ValueTask AcceptMigratingGrainsWithRequests(
         [Immutable] List<GrainMigrationPackage> migratingGrains,
         CancellationToken cancellationToken = default);
 
@@ -85,20 +83,14 @@ internal struct GrainMigrationPackage
     public MigrationContext MigrationContext { get; set; }
 
     /// <summary>
-    /// The requests which were queued for the grain when it migrated, if any, in the framing which connections use.
+    /// The requests which were queued for the grain when it migrated, if any.
     /// </summary>
     /// <remarks>
-    /// <para>
     /// Only <see cref="IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests"/> carries requests.
-    /// </para>
-    /// <para>
-    /// The requests are serialized once, when the package is created, which fixes their remaining time to live and the package's size.
-    /// Time which the package spends in transit does not count against the requests' time to live.
-    /// The destination reads them as a connection would, so their bodies are decoded only when they are invoked.
-    /// </para>
+    /// The requests are serialized when the package is sent, as messages are, so the destination decodes their bodies only when it invokes them.
     /// </remarks>
     [Id(2)]
-    public byte[]? Requests { get; set; }
+    public List<Message>? Requests { get; set; }
 }
 
 /// <summary>
@@ -114,9 +106,8 @@ internal interface IActivationMigrationManager
     /// <param name="migrationContext">Information about the grain being migrated, which will be consumed by the new activation.</param>
     /// <param name="requests">The requests which were queued for the activation, if any. The migration takes ownership of them.</param>
     /// <param name="cancellationToken">
-    /// A token which ends the migration if it has not been sent yet, leaving its requests with this silo, or if the target has taken its requests
-    /// and their callers are being retargeted. A migration which has been sent and awaits the target's response completes when the target responds,
-    /// since the target may already have taken its requests.
+    /// A token which ends the migration if it has not been sent yet, or if the target has taken its requests and their callers are being retargeted.
+    /// A migration which has been sent and awaits the target's response completes when the target responds.
     /// </param>
     /// <returns>The migration.</returns>
     ActivationMigration StartMigration(SiloAddress target, GrainAddress source, MigrationContext migrationContext, List<Message>? requests, CancellationToken cancellationToken);
@@ -126,10 +117,15 @@ internal interface IActivationMigrationManager
 /// The migration of an activation, which owns the requests which were queued for the activation.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The activation transfers its queued requests when it starts the migration, and remains in the catalog until the migration completes,
 /// so that requests which reach this silo for the grain reach it. It then leaves the catalog and transfers the requests which reached it meanwhile
-/// through <see cref="Deliver"/>, which forwards the requests which the target did not take, followed by the later requests.
-/// The activation does not access the requests afterwards.
+/// through <see cref="Deliver"/>. The activation does not access the requests afterwards.
+/// </para>
+/// <para>
+/// Requests which the migration sent are released once the target accepts them, and are rejected if the migration fails or its outcome is unknown,
+/// so their callers can retry them. Requests which the migration did not send are forwarded, followed by the later requests.
+/// </para>
 /// </remarks>
 internal sealed class ActivationMigration(
     ActivationMigrationManager manager,
@@ -148,12 +144,13 @@ internal sealed class ActivationMigration(
 
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private CancellationTokenRegistration _cancellation;
-    private bool _requestsRetained;
+    private bool _sent;
+    private bool _requestsAccepted;
     private int _state;
 
     /// <summary>
-    /// Completes when the target has acknowledged the migration, and the callers of the requests which it took have been retargeted.
-    /// Faults if the migration failed or was canceled before it was sent.
+    /// Completes when the target has responded and, if it took the migration's requests, their callers' retargeting has completed or the activation's deadline has passed.
+    /// Faults if the migration failed, or was canceled before it was sent.
     /// </summary>
     public Task Completion => _completion.Task;
 
@@ -165,17 +162,35 @@ internal sealed class ActivationMigration(
     internal List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? Routes { get; } = routes;
 
     /// <summary>
-    /// The serialized size of the package, bounded from above for its migration context.
+    /// An estimate of the serialized size of the package.
     /// </summary>
     internal long Size { get; } = size;
 
     internal void RegisterCancellation()
-        => _cancellation = cancellationToken.UnsafeRegister(static state => ((ActivationMigration)state!).OnCanceled(), this);
+    {
+        _cancellation = cancellationToken.UnsafeRegister(static state => ((ActivationMigration)state!).OnCanceled(), this);
+
+        // Cancellation can complete the migration before the registration is published, in which case the registration is disposed here.
+        Interlocked.MemoryBarrier();
+        if (Volatile.Read(ref _state) == Completed)
+        {
+            _cancellation.Dispose();
+        }
+    }
 
     /// <summary>
     /// Commits the migration to being sent, unless it has been canceled or completed.
     /// </summary>
-    internal bool TrySend() => TryTransition(Queued, Sent);
+    internal bool TrySend()
+    {
+        if (!TryTransition(Queued, Sent))
+        {
+            return false;
+        }
+
+        _sent = true;
+        return true;
+    }
 
     /// <summary>
     /// Records that the target took the migration's requests, after which cancellation completes the migration while its callers are retargeted.
@@ -189,33 +204,18 @@ internal sealed class ActivationMigration(
     }
 
     /// <summary>
-    /// Forwards the requests which the target did not take, followed by <paramref name="laterRequests"/>, once the activation has left the catalog.
-    /// </summary>
-    /// <param name="laterRequests">The requests which reached the activation after the migration started, if any.</param>
-    /// <remarks>The activation calls this once, after <see cref="Completion"/> has completed.</remarks>
-    public void Deliver(List<Message>? laterRequests)
-    {
-        Debug.Assert(Completion.IsCompleted, "The migration delivers its requests once its outcome is known.");
-        manager.DeliverRequests(source, target, Package.Requests, _requestsRetained, requests, laterRequests);
-        requests = null;
-    }
-
-    /// <summary>
     /// Records the migration's outcome and completes it.
     /// </summary>
-    /// <param name="requestsRetained">
-    /// Whether the migration did not deliver the requests which it carried, if any, so that this silo forwards them.
-    /// Otherwise, the target owns them, or may own them, and they are not resent.
-    /// </param>
+    /// <param name="requestsAccepted">Whether the target took the requests which the migration carried.</param>
     /// <param name="exception">The error which prevented the migration, if any.</param>
-    internal void SetOutcome(bool requestsRetained, Exception? exception = null)
+    internal void SetOutcome(bool requestsAccepted, Exception? exception = null)
     {
         var state = Volatile.Read(ref _state);
         while (state != Completed)
         {
             if (TryTransition(state, Completed))
             {
-                Complete(requestsRetained, exception);
+                Complete(requestsAccepted, exception);
                 return;
             }
 
@@ -223,25 +223,37 @@ internal sealed class ActivationMigration(
         }
     }
 
+    /// <summary>
+    /// Disposes of the migration's requests, followed by <paramref name="laterRequests"/>, once the activation has left the catalog.
+    /// </summary>
+    /// <param name="laterRequests">The requests which reached the activation after the migration started, if any.</param>
+    /// <remarks>The activation calls this once, after <see cref="Completion"/> has completed.</remarks>
+    public void Deliver(List<Message>? laterRequests)
+    {
+        Debug.Assert(Completion.IsCompleted, "The migration delivers its requests once its outcome is known.");
+        manager.DeliverRequests(source, target, carried: _sent && Package.Requests is not null, _requestsAccepted, requests, laterRequests);
+        requests = null;
+    }
+
     private void OnCanceled()
     {
         if (TryTransition(Queued, Completed))
         {
             // The migration has not been sent, so its requests remain with this silo.
-            Complete(requestsRetained: true, new OperationCanceledException(cancellationToken));
+            Complete(requestsAccepted: false, new OperationCanceledException(cancellationToken));
         }
         else if (TryTransition(Accepted, Completed))
         {
             // The target owns the requests. Their callers' retargeting continues without this migration waiting for it.
-            Complete(requestsRetained: false, exception: null);
+            Complete(requestsAccepted: true, exception: null);
         }
     }
 
     private bool TryTransition(int from, int to) => Interlocked.CompareExchange(ref _state, to, from) == from;
 
-    private void Complete(bool requestsRetained, Exception? exception)
+    private void Complete(bool requestsAccepted, Exception? exception)
     {
-        _requestsRetained = requestsRetained;
+        _requestsAccepted = requestsAccepted;
         _cancellation.Dispose();
         if (exception is null)
         {
@@ -268,6 +280,10 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private const int MessageBodyFramingAllowance = 1_024;
     private const int PackageFramingAllowance = 64;
 
+    // Requests are serialized when their package is sent, so a package's size is estimated: a request which this silo received has a known serialized size,
+    // and other requests are assumed to be small.
+    private const int RequestSizeEstimate = 1_024;
+
     private readonly ConcurrentDictionary<SiloAddress, (Task PumpTask, Channel<ActivationMigration> WorkItemChannel)> _workers = new();
     private readonly CancellationTokenSource _shuttingDownCts = new();
     private readonly ILogger<ActivationMigrationManager> _logger;
@@ -277,7 +293,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private readonly IClusterMembershipService _clusterMembershipService;
     private readonly IClusterManifestProvider _clusterManifestProvider;
     private readonly GrainInterfaceType _migrationInterfaceType;
-    private MessageHandlerShared? _messageHandlerShared;
+    private MessageCenter? _messageCenter;
     private readonly int _maxMessageBodySize;
     private readonly ActivationDirectory _activations;
 #if NET9_0_OR_GREATER
@@ -325,30 +341,31 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     }
 
     /// <summary>
-    /// Gets the shared messaging services, which are resolved on first use, since they depend on the message center, which can depend on this migration manager.
+    /// Gets the message center, which is resolved on first use, since it can depend on this migration manager.
     /// </summary>
-    private MessageHandlerShared MessageHandlerShared => _messageHandlerShared ??= _runtimeClient.ServiceProvider.GetRequiredService<MessageHandlerShared>();
+    private MessageCenter MessageCenter => _messageCenter ??= _runtimeClient.ServiceProvider.GetRequiredService<MessageCenter>();
 
     public async ValueTask AcceptMigratingGrains(
         List<GrainMigrationPackage> migratingGrains,
         CancellationToken cancellationToken = default)
         => await AcceptMigratingGrainsWithRequests(migratingGrains, cancellationToken);
 
-    public async ValueTask<bool[]> AcceptMigratingGrainsWithRequests(
+    public async ValueTask AcceptMigratingGrainsWithRequests(
         List<GrainMigrationPackage> migratingGrains,
         CancellationToken cancellationToken = default)
     {
-        var requestsAccepted = new bool[migratingGrains.Count];
+        foreach (var package in migratingGrains)
+        {
+            ValidateRequests(package);
+        }
+
         var activations = new List<ActivationData>();
         var currentActivity = Activity.Current;
         for (var i = 0; i < migratingGrains.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var package = migratingGrains[i];
-            // A grain which is already active here cannot take the requests, so they are not read.
-            var requests = package.Requests is { Length: > 0 } frames && _activations.FindTarget(package.GrainId) is null
-                ? ReadRequests(package.GrainId, frames)
-                : null;
+            var requests = TakeRequests(package, Silo);
 
             // The new activation reads its previous address when it rehydrates, which happens after it queues the requests, so it is read here.
             GrainAddress? previousAddress = null;
@@ -360,14 +377,17 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             // If the activation does not exist, create it and provide it with the migration context and queued requests while doing so.
             // If the activation already exists or cannot be created, it is too late to perform migration, so ignore the request.
             var context = _catalog.GetOrCreateActivation(package.GrainId, requestContextData: null, package.MigrationContext, requests, previousAddress, out var accepted);
-            requestsAccepted[i] = accepted;
-
             if (!accepted && requests is not null)
             {
-                // The source delivers the requests instead, so these copies release their buffers.
+                // The requests reach the grain as forwarded requests do.
                 foreach (var request in requests)
                 {
-                    request.Dispose();
+                    if (previousAddress is not null && context is not null)
+                    {
+                        request.AddToCacheInvalidationHeader(previousAddress, context.Address);
+                    }
+
+                    MessageCenter.ReceiveMessage(request);
                 }
             }
 
@@ -388,30 +408,51 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         {
             await activation.WaitForActivationReadyAsync(cancellationToken);
         }
-
-        return requestsAccepted;
     }
 
-    private List<Message>? ReadRequests(GrainId grainId, byte[] frames)
+    /// <summary>
+    /// Ensures that a package carries only requests which target its grain.
+    /// </summary>
+    private static void ValidateRequests(GrainMigrationPackage package)
     {
-        try
+        if (package.Requests is { } requests
+            && !requests.TrueForAll(request => request.TargetGrain == package.GrainId && !request.IsLocalOnly && request.Direction is Message.Directions.Request or Message.Directions.OneWay))
         {
-            var requests = MessageFrames.Read(MessageHandlerShared, frames);
-            foreach (var request in requests)
-            {
-                // The migration counts as a forward.
-                request.TargetSilo = Silo;
-                request.ForwardCount++;
-            }
-
-            return requests;
+            throw new ArgumentException($"The migration package for grain {package.GrainId} carries messages which are not requests for the grain.", nameof(package));
         }
-        catch (Exception exception)
+    }
+
+    /// <summary>
+    /// Takes the requests which a package carries, which this silo now owns.
+    /// </summary>
+    /// <returns>The requests, or <see langword="null"/> if the package carries none.</returns>
+    private static List<Message>? TakeRequests(GrainMigrationPackage package, SiloAddress silo)
+    {
+        if (package.Requests is not { Count: > 0 } requests)
         {
-            // The source delivers the requests instead.
-            LogDebugMigratedRequestsNotReadable(exception, grainId);
             return null;
         }
+
+        // Requests which expired in transit are dropped, as they are when received.
+        requests.RemoveAll(static request =>
+        {
+            if (!request.IsExpired)
+            {
+                return false;
+            }
+
+            request.Dispose();
+            return true;
+        });
+
+        foreach (var request in requests)
+        {
+            // The migration counts as a forward.
+            request.TargetSilo = silo;
+            request.ForwardCount++;
+        }
+
+        return requests;
     }
 
     public ValueTask RetargetMigratedRequests(List<MigratedRequestRoute> routes, CancellationToken cancellationToken = default)
@@ -426,19 +467,38 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
 
     public ActivationMigration StartMigration(SiloAddress targetSilo, GrainAddress source, MigrationContext migrationContext, List<Message>? requests, CancellationToken cancellationToken)
     {
-        var package = new GrainMigrationPackage { GrainId = source.GrainId, MigrationContext = migrationContext };
-        long size = 0;
+        var grainId = source.GrainId;
+        var package = new GrainMigrationPackage { GrainId = grainId, MigrationContext = migrationContext };
+
+        // Serializing the migration context releases its buffer, so the package's size is bounded using the context's size bound rather than measured.
+        var size = PackageFramingAllowance + migrationContext.GetMaxSerializedSize() + grainId.Type.AsSpan().Length + grainId.Key.AsSpan().Length;
         List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes = null;
         if (requests is { Count: > 0 } && AcceptsMigratedRequests(targetSilo))
         {
-            PackageRequests(targetSilo, ref package, requests, out routes, out size);
+            var requestsSize = 0L;
+            foreach (var request in requests)
+            {
+                requestsSize += request._bodyObject is MessageReadRequest received ? received.PayloadLength + Message.LENGTH_HEADER_SIZE : RequestSizeEstimate;
+            }
+
+            if (size + requestsSize <= MaxBatchBodySize)
+            {
+                package.Requests = requests;
+                size += requestsSize;
+                routes = GetRoutes(targetSilo, requests);
+            }
+            else
+            {
+                // The requests are forwarded instead.
+                LogDebugMigratedRequestsTooLarge(requests.Count, grainId, targetSilo);
+            }
         }
 
         var migration = new ActivationMigration(this, source, targetSilo, package, requests, routes, size, cancellationToken);
         migration.RegisterCancellation();
         if (!GetOrCreateWorker(targetSilo).TryWrite(migration))
         {
-            migration.SetOutcome(requestsRetained: true, new SiloUnavailableException($"Silo {targetSilo} is no longer active"));
+            migration.SetOutcome(requestsAccepted: false, new SiloUnavailableException($"Silo {targetSilo} is no longer active"));
         }
 
         return migration;
@@ -455,137 +515,25 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             && version >= MigratedRequestsVersion;
 
     /// <summary>
-    /// Serializes queued requests into the form which a migration carries, and records the routes for retargeting their callers.
+    /// Gets the routes for retargeting the callers of <paramref name="requests"/> to <paramref name="target"/>.
     /// </summary>
-    /// <param name="target">The migration target.</param>
-    /// <param name="package">The migration package, which carries the requests unless they do not fit in a message or none can be serialized.</param>
-    /// <param name="requests">The queued requests.</param>
-    /// <param name="routes">The routes for retargeting the requests' callers.</param>
-    /// <param name="size">The serialized size of the complete package, including its framing within a batch.</param>
-    private void PackageRequests(
-        SiloAddress target,
-        ref GrainMigrationPackage package,
-        List<Message> requests,
-        out List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes,
-        out long size)
+    /// <remarks>
+    /// Each request's sending silo holds its callback, unless the caller is an outside client, which tracks the call against its gateway.
+    /// Routes are taken now: a caller on this silo shares its request message with its callback, which a later migration of the same request can retarget
+    /// while this one awaits acceptance. One-way requests have no pending callback to retarget.
+    /// </remarks>
+    private static List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? GetRoutes(SiloAddress target, List<Message> requests)
     {
-        var grainId = package.GrainId;
-        routes = null;
-        size = 0;
-
-        // Serializing the migration context releases its buffer, so the package's size is bounded using the context's size bound rather than measured.
-        var fixedSize = PackageFramingAllowance + package.MigrationContext.GetMaxSerializedSize() + grainId.Type.AsSpan().Length + grainId.Key.AsSpan().Length;
-        var maxSize = MaxBatchBodySize - fixedSize;
-        using var buffer = new ArcBufferWriter();
-        var written = 0;
-        while (written < requests.Count)
+        List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes = null;
+        foreach (var request in requests)
         {
-            var request = requests[written];
-            try
-            {
-                MessageFrames.Write(MessageHandlerShared, buffer, request);
-            }
-            catch (Exception exception)
-            {
-                // Serializing the request may have consumed some of its values. Forwarding it would serialize the same values with the same codecs,
-                // so it could not be delivered either way, and it fails instead.
-                LogDebugMigratedRequestNotSerializable(exception, request.Id, grainId);
-                requests.RemoveAt(written);
-                FailRequest(request, exception);
-                continue;
-            }
-
-            written++;
-            if (buffer.Length > maxSize)
-            {
-                // Requests which fit in their own messages can exceed the message size limit together, or with the migration context and its keys.
-                LogDebugMigratedRequestsTooLarge(requests.Count, grainId, target);
-                ReplaceWithCopies(requests, ReadFrames(buffer));
-                routes = null;
-                return;
-            }
-
-            // Each request's sending silo holds its callback, unless the caller is an outside client, which tracks the call against its gateway.
-            // Routes are taken from the sealed requests now: a caller on this silo shares its request message with its callback,
-            // which a later migration of the same request can retarget while this one awaits acceptance.
-            // One-way requests have no pending callback to retarget.
             if (request.Direction is not Message.Directions.OneWay && request.SendingSilo is { } callerSilo)
             {
                 (routes ??= []).Add((callerSilo, new(request.SendingGrain, request.Id, target, request.ForwardCount + 1)));
             }
         }
 
-        if (written == 0)
-        {
-            return;
-        }
-
-        // The requests are serialized once, here, which fixes their size and their remaining time to live.
-        package.Requests = ReadFrames(buffer);
-        size = fixedSize + package.Requests.Length;
-
-        static byte[] ReadFrames(ArcBufferWriter buffer)
-        {
-            var frames = new byte[buffer.Length];
-            buffer.Peek(frames);
-            return frames;
-        }
-    }
-
-    private void FailRequest(Message request, Exception exception)
-    {
-        if (request.Direction is Message.Directions.Request)
-        {
-            try
-            {
-                _runtimeClient.SendResponse(request, Response.FromException(exception));
-            }
-            finally
-            {
-                // A request which this silo received still holds its serialized body. A request from a caller on this silo shares its body with the caller's pending call, so it is left intact.
-                request.ReleaseBodyBuffer();
-            }
-        }
-        else
-        {
-            request.Dispose();
-        }
-    }
-
-    /// <summary>
-    /// Replaces the first requests with equivalent requests read from the frames which serializing them produced.
-    /// </summary>
-    /// <remarks>
-    /// Serializing a request can release the storage of some of its values, such as pooled buffers, so a request which was serialized but is not delivered
-    /// by the migration is forwarded as a request read back from its frame, which holds its serialized body, as a received request does.
-    /// </remarks>
-    private void ReplaceWithCopies(List<Message> requests, byte[] frames)
-    {
-        List<Message> copies;
-        try
-        {
-            copies = MessageFrames.Read(MessageHandlerShared, frames);
-        }
-        catch (Exception exception)
-        {
-            // This silo wrote the frames, so this is not expected. The requests may have lost the storage of their values, so they fail.
-            LogWarningMigratedRequestsNotRestorable(exception, requests.Count);
-            foreach (var request in requests)
-            {
-                FailRequest(request, exception);
-            }
-
-            requests.Clear();
-            return;
-        }
-
-        Debug.Assert(copies.Count <= requests.Count);
-        for (var i = 0; i < copies.Count; i++)
-        {
-            // A request which this silo received still holds its serialized body, which the copy duplicates.
-            requests[i].ReleaseBodyBuffer();
-            requests[i] = copies[i];
-        }
+        return routes;
     }
 
     /// <summary>
@@ -593,32 +541,31 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     /// </summary>
     /// <param name="source">The migrating activation's address.</param>
     /// <param name="target">The migration target.</param>
-    /// <param name="frames">The serialized requests which the migration carried, if any.</param>
-    /// <param name="requestsRetained">Whether the migration did not deliver the requests which it carried, if any.</param>
+    /// <param name="carried">Whether the migration sent the requests.</param>
+    /// <param name="accepted">Whether the target accepted the requests which the migration sent.</param>
     /// <param name="requests">The requests which were queued when the migration started.</param>
     /// <param name="laterRequests">The requests which reached the activation after the migration started.</param>
-    internal void DeliverRequests(GrainAddress source, SiloAddress target, byte[]? frames, bool requestsRetained, List<Message>? requests, List<Message>? laterRequests)
+    internal void DeliverRequests(GrainAddress source, SiloAddress target, bool carried, bool accepted, List<Message>? requests, List<Message>? laterRequests)
     {
-        if (requests is not null)
+        if (requests is not null && carried)
         {
-            if (requestsRetained)
+            foreach (var request in requests)
             {
-                if (frames is not null)
+                if (accepted)
                 {
-                    ReplaceWithCopies(requests, frames);
-                }
-            }
-            else
-            {
-                // The target owns the requests, or may own them. Requests which this silo received still hold their serialized bodies, which the migration copied.
-                // Requests from callers on this silo share their body with the caller's pending call, so they are left intact.
-                foreach (var request in requests)
-                {
+                    // The target owns the request. A request which this silo received still holds its serialized body.
+                    // A request from a caller on this silo shares its body with the caller's pending call, so it is left intact.
                     request.ReleaseBodyBuffer();
                 }
-
-                requests = null;
+                else if (request.Direction is Message.Directions.Request)
+                {
+                    // The target may have taken the request, and sending it may consume it, so it is rejected and its caller can retry it.
+                    // The migration's message may still be awaiting serialization, so the request is left intact rather than disposed.
+                    MessageCenter.SendRejectionResponse(request, Message.RejectionTypes.Transient, "The activation's migration did not deliver the request.", exception: null);
+                }
             }
+
+            requests = null;
         }
 
         if (laterRequests is { Count: > 0 })
@@ -635,7 +582,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
 
         if (requests is { Count: > 0 })
         {
-            _runtimeClient.MessageCenter.ProcessRequestsToInvalidActivation(requests, source, target, "The activation migrated.");
+            MessageCenter.ProcessRequestsToInvalidActivation(requests, source, target, "The activation migrated.");
         }
     }
 
@@ -693,14 +640,12 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             {
                 try
                 {
-                    // Collect a batch of work items. Packages which carry requests travel together, within the message size limit, which their measured sizes respect.
-                    // Other packages travel together as before.
+                    // Collect a batch of work items within the message size limit.
                     long batchSize = 0;
-                    var carriesRequests = reader.TryPeek(out var first) && first.Package.Requests is not null;
+                    var carriesRequests = false;
                     while (batch.Count < MaxBatchSize
                         && reader.TryPeek(out var next)
-                        && (next.Package.Requests is not null) == carriesRequests
-                        && (!carriesRequests || batchSize + next.Size <= maxBatchSize)
+                        && (batch.Count == 0 || batchSize + next.Size <= maxBatchSize)
                         && reader.TryRead(out var workItem))
                     {
                         if (!workItem.TrySend())
@@ -712,6 +657,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                         items.Add(workItem);
                         batch.Add(workItem.Package);
                         batchSize += workItem.Size;
+                        carriesRequests |= workItem.Package.Requests is not null;
                     }
 
                     if (items.Count == 0)
@@ -725,18 +671,13 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                         await remote.AcceptMigratingGrains(batch, _shuttingDownCts.Token);
                         foreach (var item in items)
                         {
-                            item.SetOutcome(requestsRetained: true);
+                            item.SetOutcome(requestsAccepted: false);
                         }
                     }
                     else
                     {
-                        var requestsAccepted = await remote.AcceptMigratingGrainsWithRequests(batch, _shuttingDownCts.Token);
-                        if (requestsAccepted.Length != items.Count)
-                        {
-                            throw new InvalidOperationException($"Expected {items.Count} results from {targetSilo} but received {requestsAccepted.Length}.");
-                        }
-
-                        CompleteAfterRetargeting(items, requestsAccepted);
+                        await remote.AcceptMigratingGrainsWithRequests(batch, _shuttingDownCts.Token);
+                        CompleteAfterRetargeting(items);
                     }
 
                     LogDebugMigratedActivations(items.Count, targetSilo);
@@ -748,11 +689,10 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                         LogErrorMigratingActivations(exception, items.Count, targetSilo);
                     }
 
-                    // The target may have accepted the batch even though this silo did not observe it.
+                    // The target may have taken the requests which the batch carried, so they are rejected rather than resent.
                     foreach (var item in items)
                     {
-                        // The target may have accepted the batch even though this silo did not observe it, so requests which it carried are not resent.
-                        item.SetOutcome(requestsRetained: item.Package.Requests is null, exception);
+                        item.SetOutcome(requestsAccepted: false, exception);
                     }
 
                     // If the silo is terminating, we should stop trying to migrate activations to it.
@@ -781,26 +721,26 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     /// Completes the work items, after retargeting the callers of the requests which the target accepted.
     /// </summary>
     /// <remarks>
-    /// A work item whose requests were accepted completes only after its callers acknowledge, so a retiring source departs only after its callers follow their requests.
-    /// Other work items complete immediately, so that declined requests are forwarded without waiting for unrelated callers.
-    /// The pump continues with the next batch meanwhile.
+    /// Retargeting is best-effort. A work item whose requests were accepted completes once its callers' retargeting completes, fails, or its deadline passes,
+    /// so a retiring source normally departs after its callers follow their requests. A caller which was not retargeted fails its call when the source departs.
+    /// Other work items complete immediately, without waiting for unrelated callers. The pump continues with the next batch meanwhile.
     /// </remarks>
-    private void CompleteAfterRetargeting(List<ActivationMigration> items, bool[] requestsAccepted)
+    private void CompleteAfterRetargeting(List<ActivationMigration> items)
     {
         Dictionary<SiloAddress, List<MigratedRequestRoute>>? routesBySilo = null;
         List<ActivationMigration>? awaitingRetarget = null;
         for (var i = 0; i < items.Count; i++)
         {
             var item = items[i];
-            if (!requestsAccepted[i])
+            if (item.Package.Requests is null)
             {
-                item.SetOutcome(requestsRetained: true);
+                item.SetOutcome(requestsAccepted: false);
                 continue;
             }
 
             if (item.Routes is not { } routes)
             {
-                item.SetOutcome(requestsRetained: false);
+                item.SetOutcome(requestsAccepted: true);
                 continue;
             }
 
@@ -852,7 +792,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             {
                 foreach (var item in items)
                 {
-                    item.SetOutcome(requestsRetained: false);
+                    item.SetOutcome(requestsAccepted: true);
                 }
             }
         }
@@ -896,7 +836,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             var exception = new SiloUnavailableException($"Silo {targetSilo} is no longer active");
             while (entry.WorkItemChannel.Reader.TryRead(out var item))
             {
-                item.SetOutcome(requestsRetained: true, exception);
+                item.SetOutcome(requestsAccepted: false, exception);
             }
         }
     }
@@ -1000,25 +940,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Request {MessageId} for migrating grain {GrainId} cannot be serialized, so it fails."
-    )]
-    private partial void LogDebugMigratedRequestNotSerializable(Exception exception, CorrelationId messageId, GrainId grainId);
-
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Declined the queued requests of migrating grain {GrainId} because they cannot be read. The source forwards them instead."
-    )]
-    private partial void LogDebugMigratedRequestsNotReadable(Exception exception, GrainId grainId);
-
-    [LoggerMessage(
-        Level = LogLevel.Warning,
-        Message = "{Count} requests which stayed with this silo when their activation migrated cannot be read back, so they fail."
-    )]
-    private partial void LogWarningMigratedRequestsNotRestorable(Exception exception, int count);
-
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Some callers of {Count} migrated grains did not acknowledge their retargeted requests"
+        Message = "Retargeting the callers of {Count} migrated grains failed. Callers which were not retargeted fail their calls when this silo departs."
     )]
     private partial void LogDebugRetargetMigratedRequestsFailed(Exception exception, int count);
 }

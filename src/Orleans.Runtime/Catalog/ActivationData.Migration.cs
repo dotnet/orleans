@@ -32,6 +32,7 @@ internal sealed partial class ActivationData
     {
         var maxForwardCount = _shared.MessagingOptions.MaxForwardCount;
         List<Message>? requests = null;
+        List<Message>? expired = null;
         lock (_lock)
         {
             _waitingRequests.RemoveAll(entry =>
@@ -43,9 +44,27 @@ internal sealed partial class ActivationData
                     return false;
                 }
 
-                (requests ??= []).Add(entry.Message);
+                // Expired requests are dropped, as they are when received. Their callers have already timed out.
+                if (entry.Message.IsExpired)
+                {
+                    (expired ??= []).Add(entry.Message);
+                }
+                else
+                {
+                    (requests ??= []).Add(entry.Message);
+                }
+
                 return true;
             });
+        }
+
+        if (expired is not null)
+        {
+            foreach (var message in expired)
+            {
+                _shared.InternalRuntime.MessagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Dispatch);
+                message.Dispose();
+            }
         }
 
         return requests;
@@ -99,16 +118,12 @@ internal sealed partial class ActivationData
 
         if (previousAddress is not null)
         {
-            var messageCenter = _shared.InternalRuntime.RuntimeClient.MessageCenter;
+            var messageCenter = _shared.InternalRuntime.MessageCenter;
             foreach (var message in messages)
             {
                 if (message.Direction is Message.Directions.OneWay)
                 {
-                    messageCenter.SendRejectionResponse(
-                        message,
-                        Message.RejectionTypes.CacheInvalidation,
-                        "One-way request migrated to a new activation",
-                        exception: null);
+                    messageCenter.SendRejectionResponse(message, Message.RejectionTypes.CacheInvalidation, "One-way request migrated to a new activation", exception: null);
                 }
             }
         }

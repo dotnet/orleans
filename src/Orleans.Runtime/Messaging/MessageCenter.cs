@@ -291,6 +291,10 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        /// <summary>
+        /// Sends a rejection response for <paramref name="message"/> to its sender, together with its cache invalidation header.
+        /// </summary>
+        /// <remarks>The caller retains ownership of <paramref name="message"/>.</remarks>
         internal void SendRejectionResponse(Message message, Message.RejectionTypes rejectionType, string reason, Exception? exception)
         {
             var rejection = messageFactory.CreateRejectionResponse(message, rejectionType, reason, exception);

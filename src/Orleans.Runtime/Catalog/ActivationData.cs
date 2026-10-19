@@ -2338,7 +2338,7 @@ internal sealed partial class ActivationData :
 
                 if (migration is not null)
                 {
-                    // The migration forwards the requests which the target did not take, followed by these.
+                    // The migration forwards the requests which it did not send, followed by these.
                     if (queued is not null)
                     {
                         RejectLocalOnlyRequests(queued);

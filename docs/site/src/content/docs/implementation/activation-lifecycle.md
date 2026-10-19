@@ -55,7 +55,7 @@ A deactivation reason distinguishes normal collection, application-requested dea
 
 Migration moves an activation while preserving its grain identity. `ActivationMigrationManager` starts migration by creating a `MigrationContext`, asking registered migration participants to dehydrate state, and deactivating with the `Migrating` reason. The target creates the activation, rehydrates participants, runs activation, and waits until the activation reaches a stable state.
 
-The migration package also carries the requests which are queued for the source activation. The target queues them in the new activation before it registers in the grain directory, so they run before any request which reaches the new activation directly. The target reports for each grain whether its new activation took ownership of the requests. The source then retargets their callers' pending calls to the target, so the calls survive the source silo's departure. The package carries the requests in the framing which silo connections use, so the target decodes a request's body only when it invokes the request. A source sends queued requests only to silos whose manifest lists version 1 or later of `IActivationMigrationManagerSystemTarget`, and it forwards requests which the target does not take. The source activation remains in the catalog until the target responds, so requests which reach the source silo for the grain reach it. A caller which cancels its call before the call is retargeted signals the cancellation to the target as well, once the call is retargeted. It then forwards the requests which the target did not take, followed by those which arrived meanwhile.
+The migration package also carries the requests which are queued for the source activation. The target queues them in the new activation before it registers in the grain directory, so they run before any request which reaches the new activation directly. When the grain is already active on the target, or its new activation can't queue them ahead of other requests, the target delivers them as it delivers forwarded requests. Once the target accepts the migration, the source retargets their callers' pending calls to the target on a best-effort basis, so the calls survive the source silo's departure. The package serializes each request in the framing which silo connections use when the package is sent, so the target decodes a request's body only when it invokes the request, and a request which the source silo received keeps its serialized body. The target drops requests which expired in transit. A source sends queued requests only to silos whose manifest lists version 1 or later of `IActivationMigrationManagerSystemTarget`. The source activation remains in the catalog until the migration completes, so requests which reach the source silo for the grain reach it. A caller which cancels its call before the call is retargeted signals the cancellation to the target as well, once the call is retargeted. When the migration fails or its outcome is unknown, the source rejects the requests which it carried, so their callers can retry them. It forwards the requests which arrived meanwhile.
 
 ```mermaid
 sequenceDiagram
@@ -66,13 +66,14 @@ sequenceDiagram
 
     Manager->>Source: Begin migration
     Source->>Source: OnDehydrate(MigrationContext)
-    Source->>Directory: Remove or transfer registration
     Manager->>Target: AcceptMigratingGrainsWithRequests
     Target->>Target: Create, OnRehydrate, and queue requests
-    Target->>Directory: Register target activation
+    Target->>Directory: Replace the source's registration
     Target->>Target: OnActivateAsync
     Target-->>Manager: Stable activation, requests accepted
-    Manager->>Manager: Retarget callers' pending calls
+    Manager->>Manager: Retarget callers' pending calls (best-effort)
+    Manager->>Source: Migration complete
+    Source->>Source: Leave the catalog and forward later requests
 ```
 
 Migration state is not the same as persisted grain state. <xref:Orleans.Runtime.IGrainMigrationParticipant> is intended for runtime or application components whose in-memory state must accompany a live move. Participants write versionable data to the migration context and must tolerate rehydration on another silo.
