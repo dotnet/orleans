@@ -415,10 +415,10 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     /// </summary>
     private static void ValidateRequests(GrainMigrationPackage package)
     {
-        if (package.Requests is { } requests
-            && !requests.TrueForAll(request => request.TargetGrain == package.GrainId && !request.IsLocalOnly && request.Direction is Message.Directions.Request or Message.Directions.OneWay))
+        var grainId = package.GrainId;
+        if (package.Requests?.Find(request => request.TargetGrain != grainId || request.IsLocalOnly || request.Direction is not (Message.Directions.Request or Message.Directions.OneWay)) is { } invalid)
         {
-            throw new ArgumentException($"The migration package for grain {package.GrainId} carries messages which are not requests for the grain.", nameof(package));
+            throw new ArgumentException($"The migration package for grain {grainId} carries a message which is not a request for the grain: {invalid}", nameof(package));
         }
     }
 
@@ -563,6 +563,8 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                     // The migration's message may still be awaiting serialization, so the request is left intact rather than disposed.
                     MessageCenter.SendRejectionResponse(request, Message.RejectionTypes.Transient, "The activation's migration did not deliver the request.", exception: null);
                 }
+
+                // A one-way request has no caller to reject, so it is dropped, as one-way requests are when their delivery fails.
             }
 
             requests = null;

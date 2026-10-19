@@ -114,6 +114,7 @@ namespace Orleans.Runtime
         /// </remarks>
         public bool TryRetarget(SiloAddress targetSilo, int forwardCount, Func<SiloAddress, bool> isDeadSilo)
         {
+            // The call owns its message, and only this class locks it, so the message serves as the lock without adding a field to every pending call.
             lock (Message)
             {
                 if (forwardCount <= Message.ForwardCount)
