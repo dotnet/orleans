@@ -156,6 +156,16 @@ public class MessagingClusterFixture : IAsyncLifetime
     public Task<EndpointSnapshot> WaitForOutboxCountAsync(IMessagingTestGrain grain, int expected) =>
         SnapshotProbe.WaitAsync(grain.GetGrainId(), snapshot => snapshot.OutboxCount == expected);
 
+    /// <summary>Gets the outbox depth which the cluster's silos report through the outbox depth metric.</summary>
+    public long GetOutboxDepth() =>
+        Cluster.Silos.Sum(silo => Metrics.GetDepth(
+            silo.ServiceProvider.GetRequiredService<OrleansInstruments>().Meter,
+            "orleans-messaging-outbox-depth"));
+
+    /// <summary>Waits until the cluster's silos report an outbox depth of <paramref name="expected"/>.</summary>
+    public Task WaitForOutboxDepthAsync(long expected) =>
+        Metrics.WaitUntilAsync(() => GetOutboxDepth() == expected, TestContext.Current.CancellationToken);
+
     public EndpointSnapshot GetSnapshot(IMessagingTestGrain grain) =>
         GetGrainInstance(grain).GetSnapshotForTest();
 
@@ -196,11 +206,18 @@ public class MessagingClusterFixture : IAsyncLifetime
     /// job would.
     /// </summary>
     internal Task<DurableJobRunResult> RunPumpAsync(IAddressable grain) =>
-        RunPumpAsync(grain, TestContext.Current.CancellationToken, duplicate: false);
+        RunCancelablePumpAsync(grain, TestContext.Current.CancellationToken);
 
     /// <summary>Executes the pump's durable job callback directly as a job other than its current wake-up job.</summary>
     internal Task<DurableJobRunResult> RunDuplicatePumpAsync(IAddressable grain) =>
         RunPumpAsync(grain, TestContext.Current.CancellationToken, duplicate: true);
+
+    /// <summary>
+    /// Executes the pump's durable job callback directly with <paramref name="runCancellation"/> as the run's token, so a
+    /// test can cancel the run as Durable Jobs does.
+    /// </summary>
+    internal Task<DurableJobRunResult> RunCancelablePumpAsync(IAddressable grain, CancellationToken runCancellation) =>
+        RunPumpAsync(grain, runCancellation, duplicate: false);
 
     private async Task<DurableJobRunResult> RunPumpAsync(IAddressable grain, CancellationToken runCancellation, bool duplicate)
     {
