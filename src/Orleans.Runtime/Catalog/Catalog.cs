@@ -19,7 +19,6 @@ namespace Orleans.Runtime
         private readonly CatalogInstruments _catalogInstruments;
         private readonly MessagingProcessingInstruments _messagingProcessingInstruments;
         private ISiloStatusOracle _siloStatusOracle = null!;
-        private volatile bool _isRetiring;
 
         // Lock striping is used for activation creation to reduce contention
         private const int LockCount = 32; // Must be a power of 2
@@ -331,11 +330,6 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Gets whether this silo is retiring, in which case an activation which still has queued requests when it deactivates migrates with them, including one whose deactivation was already underway.
-        /// </summary>
-        internal bool IsRetiring => _isRetiring;
-
-        /// <summary>
         /// Deactivates every activation in the catalog and waits for their deactivation to complete.
         /// </summary>
         /// <remarks>
@@ -344,7 +338,6 @@ namespace Orleans.Runtime
         /// </remarks>
         public async Task DeactivateAllActivations(CancellationToken cancellationToken)
         {
-            _isRetiring = true;
             LogDebugDeactivateAllActivations();
             LogDebugDeactivateActivations(activations.Count);
             var reason = new DeactivationReason(DeactivationReasonCode.ShuttingDown, "This process is terminating.");

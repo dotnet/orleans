@@ -61,8 +61,10 @@ class [GrainType("localgraindirectorypartitioncompatibility")] Orleans.Runtime.G
 
 class [GrainType("remotegraindirectory")] Orleans.Runtime.GrainDirectory.RemoteGrainDirectory
 
-interface [GrainInterfaceType("Orleans.Runtime.IActivationMigrationManagerSystemTarget")] Orleans.Runtime.IActivationMigrationManagerSystemTarget [Version(0)]
+interface [GrainInterfaceType("Orleans.Runtime.IActivationMigrationManagerSystemTarget")] Orleans.Runtime.IActivationMigrationManagerSystemTarget [Version(1)]
   29E9E63F: AcceptMigratingGrains(System.Collections.Generic.List<Orleans.Runtime.GrainMigrationPackage>, System.Threading.CancellationToken) -> ValueTask
+  AcceptMigratingGrainsWithRequests: AcceptMigratingGrainsWithRequests(System.Collections.Generic.List<Orleans.Runtime.GrainMigrationPackage>, System.Threading.CancellationToken) -> ValueTask<bool[]>
+  RetargetMigratedRequests: RetargetMigratedRequests(System.Collections.Generic.List<Orleans.Runtime.MigratedRequestRoute>, System.Threading.CancellationToken) -> ValueTask
 
 interface [GrainInterfaceType("Orleans.Runtime.ICatalog")] Orleans.Runtime.ICatalog [Version(0)]
   C4A56D7C: DeleteActivations(System.Collections.Generic.List<Orleans.Runtime.GrainAddress>, Orleans.DeactivationReasonCode, string, System.Threading.CancellationToken) -> Task
@@ -72,10 +74,6 @@ interface [GrainInterfaceType("Orleans.Runtime.IGrainCallCancellationManagerSyst
 
 interface [GrainInterfaceType("Orleans.Runtime.IGrainTimerInvoker")] Orleans.Runtime.IGrainTimerInvoker [Version(0)]
   3F6C2672: InvokeCallbackAsync(System.Threading.CancellationToken) -> Task
-
-interface [GrainInterfaceType("Orleans.Runtime.IMigratingRequestsSystemTarget")] Orleans.Runtime.IMigratingRequestsSystemTarget [Version(0)]
-  AcceptMigratingGrainsWithRequests: AcceptMigratingGrainsWithRequests(System.Collections.Generic.List<Orleans.Runtime.GrainMigrationPackage>, System.Threading.CancellationToken) -> ValueTask<bool[]>
-  RetargetMigratedRequests: RetargetMigratedRequests(System.Collections.Generic.List<Orleans.Runtime.MigratedRequestRoute>, System.Threading.CancellationToken) -> ValueTask
 
 interface [GrainInterfaceType("Orleans.Runtime.IRemoteGrainDirectory")] Orleans.Runtime.IRemoteGrainDirectory [Version(0)]
   9ABE3793: AcceptSplitPartition(System.Collections.Generic.List<Orleans.Runtime.GrainAddress>, System.Threading.CancellationToken) -> Task

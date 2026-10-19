@@ -406,10 +406,10 @@ public sealed class RetirementHandoffTests
         {
             switch (context.Request.GetMethodName())
             {
-                case nameof(IMigratingRequestsSystemTarget.AcceptMigratingGrainsWithRequests):
+                case nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests):
                     await context.Invoke();
                     throw new InvalidOperationException("The acknowledgement is lost.");
-                case nameof(IMigratingRequestsSystemTarget.RetargetMigratedRequests):
+                case nameof(IActivationMigrationManagerSystemTarget.RetargetMigratedRequests):
                     Interlocked.Increment(ref retargets);
                     break;
             }
@@ -453,20 +453,20 @@ public sealed class RetirementHandoffTests
     [Fact]
     public async Task DestinationWithoutMigratedRequestSupport_ReceivesAnOrdinaryMigrationAndRequestsAreForwarded()
     {
-        // The source sees the target's manifest without IMigratingRequestsSystemTarget, as it would for a silo running an earlier version.
+        // The source sees the target's manifest without the version of IActivationMigrationManagerSystemTarget which accepts requests, as it would for a silo running an earlier version.
         var earlierVersionSilos = new ConcurrentDictionary<SiloAddress, bool>();
         var calls = new ConcurrentQueue<string>();
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
         {
             silo.Services.AddSingleton<IClusterManifestProvider>(services => new EarlierVersionManifestProvider(
                 services.GetRequiredService<Orleans.Runtime.Metadata.ClusterManifestProvider>(),
-                services.GetRequiredService<Orleans.Metadata.GrainInterfaceTypeResolver>().GetGrainInterfaceType(typeof(IMigratingRequestsSystemTarget)),
+                services.GetRequiredService<Orleans.Metadata.GrainInterfaceTypeResolver>().GetGrainInterfaceType(typeof(IActivationMigrationManagerSystemTarget)),
                 earlierVersionSilos));
             silo.AddIncomingGrainCallFilter(async context =>
             {
                 if (context.Request.GetMethodName() is nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains)
-                    or nameof(IMigratingRequestsSystemTarget.AcceptMigratingGrainsWithRequests)
-                    or nameof(IMigratingRequestsSystemTarget.RetargetMigratedRequests))
+                    or nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests)
+                    or nameof(IActivationMigrationManagerSystemTarget.RetargetMigratedRequests))
                 {
                     calls.Enqueue(context.Request.GetMethodName());
                 }
@@ -519,49 +519,12 @@ public sealed class RetirementHandoffTests
         {
             GrainId = grain.GetGrainId(),
             MigrationContext = new MigrationContext(silo.ServiceProvider.GetRequiredService<SerializerSessionPool>()),
-            Requests = SerializeRequests(silo, [new() { Id = new CorrelationId(1), SendingGrain = GrainId.Create("test", "caller"), TimeToLiveMilliseconds = 60_000 }]),
+            Requests = SerializeRequests(silo, [CreateOneWayRequest(grain.GetGrainId(), 1)]),
         };
         var requestsAccepted = await migrationManager.AcceptMigratingGrainsWithRequests([package], Cancellation);
         Assert.False(Assert.Single(requestsAccepted));
         Assert.Equal(0, activation.WaitingCount);
         Assert.Same(activation, FindActivation(silo, grain.GetGrainId()));
-    }
-
-    [Fact]
-    public async Task MigratedRequests_AreDeclinedWhenTheirInterfaceVersionIsIncompatible()
-    {
-        await using var cluster = await DeployAsync();
-        var silo = cluster.Silos[1];
-        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
-        var migrationManager = silo.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
-        var key = Guid.NewGuid();
-        RetirementHandoffState.Create(key);
-        var grainId = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName).GetGrainId();
-
-        // The request targets a later version of the interface than this silo runs, which backward compatibility does not admit.
-        // Its body decodes, so only the version check keeps this silo from decoding it with an earlier version's types.
-        var request = MigratedRequest.FromMessage(new Message
-        {
-            Direction = Message.Directions.OneWay,
-            Id = new CorrelationId(1),
-            SendingGrain = GrainId.Create("test", "caller"),
-            TargetGrain = grainId,
-            InterfaceType = silo.ServiceProvider.GetRequiredService<Orleans.Metadata.GrainInterfaceTypeResolver>().GetGrainInterfaceType(typeof(IRetirementHandoffGrain)),
-            InterfaceVersion = 5,
-            BodyObject = new List<string> { "field" },
-        }, silo.ServiceProvider.GetRequiredService<SerializerSessionPool>());
-        GrainMigrationPackage package = new()
-        {
-            GrainId = grainId,
-            MigrationContext = new MigrationContext(silo.ServiceProvider.GetRequiredService<SerializerSessionPool>()),
-            Requests = SerializeRequests(silo, [request]),
-        };
-
-        // The new activation is created without the requests, which stay with the source, which forwards their original bytes.
-        var requestsAccepted = await migrationManager.AcceptMigratingGrainsWithRequests([package], Cancellation);
-        Assert.False(Assert.Single(requestsAccepted));
-        var activation = Assert.IsType<ActivationData>(FindActivation(silo, grainId));
-        Assert.Equal(0, activation.GetRequestCount());
     }
 
     [Fact]
@@ -581,19 +544,12 @@ public sealed class RetirementHandoffTests
         {
             GrainId = grainId,
             MigrationContext = new MigrationContext(silo.ServiceProvider.GetRequiredService<SerializerSessionPool>()),
-            Requests = SerializeRequests(silo, [CreateMigratedRequest(1), CreateMigratedRequest(2), CreateMigratedRequest(3)]),
+            Requests = SerializeRequests(silo, [CreateOneWayRequest(grainId, 1), CreateOneWayRequest(grainId, 2), CreateOneWayRequest(grainId, 3)]),
         };
         var requestsAccepted = await migrationManager.AcceptMigratingGrainsWithRequests([package], Cancellation);
         Assert.False(Assert.Single(requestsAccepted));
         var activation = Assert.IsType<ActivationData>(FindActivation(silo, grainId));
         Assert.Equal(0, activation.GetRequestCount());
-
-        static MigratedRequest CreateMigratedRequest(long id) => new()
-        {
-            Id = new CorrelationId(id),
-            SendingGrain = GrainId.Create("test", "caller"),
-            TimeToLiveMilliseconds = 60_000,
-        };
     }
 
     [Fact]
@@ -674,7 +630,7 @@ public sealed class RetirementHandoffTests
         {
             switch (context.Request.GetMethodName())
             {
-                case nameof(IMigratingRequestsSystemTarget.RetargetMigratedRequests):
+                case nameof(IActivationMigrationManagerSystemTarget.RetargetMigratedRequests):
                     retargetArrived.TrySetResult();
                     await releaseRetarget.Task;
                     break;
@@ -732,16 +688,17 @@ public sealed class RetirementHandoffTests
     public async Task MigrationRoutes_DoNotOverwriteALaterRetarget()
     {
         // Hold the destination's acknowledgement, so that a later route for the same call arrives while the migration awaits acceptance.
-        var accepted = new TaskCompletionSource<MigratedRequest>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var accepted = new TaskCompletionSource<(GrainId SendingGrain, CorrelationId Id)>(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseAcceptance = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
         {
             await context.Invoke();
-            if (context.Request.GetMethodName() == nameof(IMigratingRequestsSystemTarget.AcceptMigratingGrainsWithRequests))
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
             {
                 var package = Assert.Single((List<GrainMigrationPackage>)context.Request.GetArgument(0)!);
-                var requests = context.TargetContext.ActivationServices.GetRequiredService<Orleans.Serialization.Serializer>().Deserialize<List<MigratedRequest>>(package.Requests!)!;
-                accepted.TrySetResult(Assert.Single(requests));
+                var requests = Orleans.Runtime.Messaging.MessageFrames.Read(context.TargetContext.ActivationServices.GetRequiredService<Orleans.Runtime.Messaging.MessageHandlerShared>(), package.Requests!);
+                using var request = Assert.Single(requests);
+                accepted.TrySetResult((request.SendingGrain, request.Id));
                 await releaseAcceptance.Task;
             }
         })));
@@ -845,49 +802,6 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task DeactivationUnderwayWhenRetiring_HandsOffQueuedRequests()
-    {
-        await using var cluster = await DeployAsync();
-        var retiring = cluster.Silos[1];
-        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
-        var catalog = retiring.ServiceProvider.GetRequiredService<Catalog>();
-        var key = Guid.NewGuid();
-        var state = RetirementHandoffState.Create(key);
-        var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
-        await PlaceOnAsync(retiring, () => grain.GetLocation());
-
-        var running = grain.Block().AsTask();
-        await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
-        var queued = grain.HoldThenGetLocation().AsTask();
-        await WaitUntilAsync(() => GetWaitingCount(retiring, grain.GetGrainId()) == 1);
-
-        // The activation begins deactivating for another reason, and then its silo retires before the running request completes.
-        var activation = Assert.IsType<ActivationData>(FindActivation(retiring, grain.GetGrainId()));
-        activation.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationRequested, "Test"), Cancellation);
-        var stopping = cluster.StopSiloAsync(retiring, Cancellation);
-        await WaitUntilAsync(() => catalog.IsRetiring);
-        state.ReleaseBlock.TrySetResult();
-        await running.WaitAsync(Timeout, Cancellation);
-
-        try
-        {
-            // The queued request migrates with the activation, and its caller keeps waiting after the retiring silo departs.
-            var destination = await state.HoldEntered.Task.WaitAsync(Timeout, Cancellation);
-            Assert.NotEqual(retiring.SiloAddress, destination);
-            await stopping.WaitAsync(Timeout, Cancellation);
-            await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(Timeout, Cancellation);
-            Assert.False(queued.IsCompleted, $"{queued.Status}: {queued.Exception?.InnerException}");
-
-            state.ReleaseHold.TrySetResult();
-            Assert.Equal(destination, await queued.WaitAsync(Timeout, Cancellation));
-        }
-        finally
-        {
-            state.ReleaseHold.TrySetResult();
-        }
-    }
-
-    [Fact]
     public async Task MigrationUnderwayWhenRetiring_CarriesQueuedRequests()
     {
         // Hold the destination's acceptance of the migrating activation, so that retirement begins while the migration is underway.
@@ -895,7 +809,7 @@ public sealed class RetirementHandoffTests
         var releaseAccept = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
         {
-            if (context.Request.GetMethodName() == nameof(IMigratingRequestsSystemTarget.AcceptMigratingGrainsWithRequests))
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
             {
                 acceptArrived.TrySetResult();
                 await releaseAccept.Task;
@@ -906,7 +820,6 @@ public sealed class RetirementHandoffTests
         var retiring = cluster.Silos[1];
         var target = cluster.Silos[2];
         var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
-        var catalog = retiring.ServiceProvider.GetRequiredService<Catalog>();
         var key = Guid.NewGuid();
         var state = RetirementHandoffState.Create(key);
         var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
@@ -926,8 +839,9 @@ public sealed class RetirementHandoffTests
         try
         {
             await acceptArrived.Task.WaitAsync(Timeout, Cancellation);
+            using var stages = new SiloStageObserver(retiring.SiloAddress, ServiceLifecycleStage.GrainDeactivation, releaseAccept.Task);
             stopping = cluster.StopSiloAsync(retiring, Cancellation);
-            await WaitUntilAsync(() => catalog.IsRetiring);
+            await stages.Stopping.WaitAsync(Timeout, Cancellation);
         }
         finally
         {
@@ -1010,7 +924,7 @@ public sealed class RetirementHandoffTests
         {
             switch (context.Request.GetMethodName())
             {
-                case nameof(IMigratingRequestsSystemTarget.AcceptMigratingGrainsWithRequests):
+                case nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests):
                     acceptArrived.TrySetResult(context.TargetContext.Address.SiloAddress!);
                     await releaseAccept.Task;
                     break;
@@ -1140,7 +1054,7 @@ public sealed class RetirementHandoffTests
         {
             switch (context.Request.GetMethodName())
             {
-                case nameof(IMigratingRequestsSystemTarget.AcceptMigratingGrainsWithRequests):
+                case nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests):
                     acceptArrived.TrySetResult();
                     await releaseAccept.Task;
                     context.Result = new[] { false };
@@ -1299,7 +1213,7 @@ public sealed class RetirementHandoffTests
             silo.Services.AddSingleton<IMessageStatisticsSink>(services => services.GetRequiredService<OneWayCacheUpdateObserver>());
             silo.AddIncomingGrainCallFilter(async context =>
             {
-                if (context.Request.GetMethodName() == nameof(IMigratingRequestsSystemTarget.RetargetMigratedRequests))
+                if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.RetargetMigratedRequests))
                 {
                     Interlocked.Increment(ref retargets);
                 }
@@ -1374,56 +1288,6 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task MigratedRequest_CarriesReceivedBodiesWithoutDecodingThem()
-    {
-        await using var cluster = await DeployAsync();
-        var source = cluster.Silos[1];
-        var destination = cluster.Silos[2];
-        var pool = source.ServiceProvider.GetRequiredService<SerializerSessionPool>();
-
-        // A body which this silo received, with a field which the destination might understand and this silo might not.
-        var bodyBytes = SerializeBody(new List<string> { "first", "second" }, pool);
-        using var bodyWriter = new Orleans.Serialization.Buffers.ArcBufferWriter();
-        bodyWriter.Write(bodyBytes);
-        var readRequest = new Orleans.Runtime.Messaging.MessageReadRequest(source.ServiceProvider.GetRequiredService<Orleans.Runtime.Messaging.MessageHandlerShared>());
-        readRequest.Body = bodyWriter.ConsumeSlice(bodyBytes.Length);
-        typeof(Orleans.Runtime.Messaging.MessageReadRequest).GetField("_bodyLength", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(readRequest, bodyBytes.Length);
-        using var request = new Message
-        {
-            Direction = Message.Directions.Request,
-            Id = new CorrelationId(1),
-            SendingGrain = GrainId.Create("test", "caller"),
-            TargetGrain = GrainId.Create("test", "target"),
-        };
-        request.SetMessageReadRequest(readRequest);
-
-        // The migration copies the received bytes rather than decoding and re-encoding them, so no field is lost.
-        var migrated = MigratedRequest.FromMessage(request, pool);
-        Assert.Equal(bodyBytes, migrated.Body);
-        Assert.Same(readRequest, request._bodyObject);
-
-        // The destination decodes the body.
-        var delivered = migrated.ToMessage(request.TargetGrain, destination.SiloAddress, destination.ServiceProvider.GetRequiredService<SerializerSessionPool>());
-        Assert.Equal(["first", "second"], Assert.IsType<List<string>>(delivered.BodyObject));
-
-        static byte[] SerializeBody(object body, SerializerSessionPool pool)
-        {
-            using var session = pool.GetSession();
-            var writer = Orleans.Serialization.Buffers.Writer.CreatePooled(session);
-            try
-            {
-                session.CodecProvider.GetCodec(body.GetType()).WriteField(ref writer, 0, null, body);
-                writer.Commit();
-                return writer.Output.ToArray();
-            }
-            finally
-            {
-                writer.Dispose();
-            }
-        }
-    }
-
-    [Fact]
     public async Task QueuedRequestsTooLargeToMigrateTogether_AreForwardedToTheMigratedActivation()
     {
         const int MaxMessageBodySize = 1024 * 1024;
@@ -1450,48 +1314,6 @@ public sealed class RetirementHandoffTests
         await running.WaitAsync(Timeout, Cancellation);
         Assert.Equal(target.SiloAddress, await first.WaitAsync(Timeout, Cancellation));
         Assert.Equal(target.SiloAddress, await second.WaitAsync(Timeout, Cancellation));
-    }
-
-    [Fact]
-    public async Task Migration_RetainsRequestsWhoseBodyCannotBeDeserialized()
-    {
-        await using var cluster = await DeployAsync();
-        var source = cluster.Silos[1];
-        var destination = cluster.Silos[2];
-        var migrationManager = source.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
-        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
-        var key = Guid.NewGuid();
-        RetirementHandoffState.Create(key);
-        var grainId = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName).GetGrainId();
-
-        // The body stands in for one carrying a type which neither silo understands.
-        using var bodyWriter = new Orleans.Serialization.Buffers.ArcBufferWriter();
-        bodyWriter.Write([0xff]);
-        var readRequest = new Orleans.Runtime.Messaging.MessageReadRequest(source.ServiceProvider.GetRequiredService<Orleans.Runtime.Messaging.MessageHandlerShared>());
-        readRequest.Body = bodyWriter.ConsumeSlice(1);
-        typeof(Orleans.Runtime.Messaging.MessageReadRequest).GetField("_bodyLength", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(readRequest, 1);
-        using var request = new Message
-        {
-            Direction = Message.Directions.Request,
-            Id = new CorrelationId(1),
-            SendingGrain = GrainId.Create("test", "caller"),
-            SendingSilo = cluster.Silos[0].SiloAddress,
-            TargetGrain = grainId,
-        };
-        request.SetMessageReadRequest(readRequest);
-
-        // The grain migrates, but the destination cannot decode the body, so it declines the request.
-        // The request stays with the source, whose ordinary forwarding sends the serialized body unchanged.
-        var context = new MigrationContext(source.ServiceProvider.GetRequiredService<SerializerSessionPool>());
-        var migration = migrationManager.MigrateAsync(destination.SiloAddress, grainId, context, [request], out var carriesRequests);
-        Assert.True(carriesRequests);
-        var result = await migration.AsTask().WaitAsync(Timeout, Cancellation);
-        Assert.True(result.Migrated);
-        Assert.Equal(MigratedRequestsOutcome.Retained, result.Requests);
-        var activation = Assert.IsType<ActivationData>(FindActivation(destination, grainId));
-        Assert.Equal(0, activation.WaitingCount);
-        Assert.Same(readRequest, request._bodyObject);
-        Assert.Equal([0xff], readRequest.Body.ToArray());
     }
 
     [Fact]
@@ -1574,7 +1396,7 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task RequestWhichCannotBeCaptured_FailsAndTheOthersAreRetained()
+    public async Task RequestWhichCannotBeSerialized_FailsAndTheOthersMigrate()
     {
         await using var cluster = await DeployAsync();
         var source = cluster.Silos[1];
@@ -1591,16 +1413,15 @@ public sealed class RetirementHandoffTests
         var failed = CreateRequest(2, new() { ["pooled"] = CreatePooledBuffer(payload), ["unserializable"] = new UnserializableValue() });
         List<Message> requests = [retained, failed];
 
-        // The migration carries neither request. The request which cannot be captured can no longer be delivered, so it fails rather than staying queued,
-        // and the other request is restored for forwarding.
+        // The request which cannot be serialized can no longer be delivered, so it fails rather than staying queued, and the migration carries the other request.
         var context = new MigrationContext(source.ServiceProvider.GetRequiredService<SerializerSessionPool>());
         var migration = migrationManager.MigrateAsync(target.SiloAddress, grainId, context, requests, out var carriesRequests);
-        Assert.False(carriesRequests);
+        Assert.True(carriesRequests);
         Assert.Same(retained, Assert.Single(requests));
-        Assert.Equal(payload, ((Orleans.Serialization.Buffers.PooledBuffer)retained.RequestContextData!["pooled"]).ToArray());
 
         var result = await migration.AsTask().WaitAsync(Timeout, Cancellation);
         Assert.True(result.Migrated);
+        Assert.Equal(MigratedRequestsOutcome.Accepted, result.Requests);
 
         Message CreateRequest(long id, Dictionary<string, object> requestContext) => new()
         {
@@ -1620,7 +1441,7 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task ReceivedRequestWhichCannotBeCaptured_ReleasesItsBodyBuffer()
+    public async Task ReceivedRequestWhichCannotBeSerialized_ReleasesItsBodyBuffer()
     {
         await using var cluster = await DeployAsync();
         var source = cluster.Silos[1];
@@ -1666,7 +1487,7 @@ public sealed class RetirementHandoffTests
         var releaseRetarget = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
         {
-            if (context.Request.GetMethodName() == nameof(IMigratingRequestsSystemTarget.RetargetMigratedRequests))
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.RetargetMigratedRequests))
             {
                 retargetArrived.TrySetResult();
                 await releaseRetarget.Task;
@@ -1735,7 +1556,7 @@ public sealed class RetirementHandoffTests
         var migrationsReceived = 0;
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
         {
-            if (context.Request.GetMethodName() is nameof(IMigratingRequestsSystemTarget.AcceptMigratingGrainsWithRequests) or nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
+            if (context.Request.GetMethodName() is nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests) or nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
             {
                 Interlocked.Increment(ref migrationsReceived);
             }
@@ -1775,7 +1596,7 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task RequestWhichCannotBeRestored_FailsAndTheOthersAreRetained()
+    public async Task RequestsWhichDoNotFitTogether_AreReplacedWithCopiesHoldingTheirSerializedBodies()
     {
         const int MaxMessageBodySize = 1024 * 1024;
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
@@ -1788,24 +1609,24 @@ public sealed class RetirementHandoffTests
         RetirementHandoffState.Create(key);
         var grainId = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName).GetGrainId();
 
-        // The requests do not fit in a message together, so the migration carries none of them and restores them for forwarding.
-        // The first request's body serializes but cannot be deserialized, so it cannot be restored.
+        // The requests do not fit in a message together, so the migration carries none of them.
+        // Serializing them returned their pooled bodies' storage to the pool, so they are replaced with copies read back from their serialized form.
         var payload = Enumerable.Repeat((byte)0x5A, MaxMessageBodySize * 3 / 5).ToArray();
-        var unrestorable = CreateRequest(cluster, grainId, 1, new UnrestorableValue());
+        var first = CreateRequest(cluster, grainId, 1, CreatePooledBuffer(payload));
         var second = CreateRequest(cluster, grainId, 2, CreatePooledBuffer(payload));
-        var third = CreateRequest(cluster, grainId, 3, CreatePooledBuffer(payload));
-        List<Message> requests = [unrestorable, second, third];
+        List<Message> requests = [first, second];
         var migration = migrationManager.MigrateAsync(target.SiloAddress, grainId, new MigrationContext(source.ServiceProvider.GetRequiredService<SerializerSessionPool>()), requests, out var carriesRequests);
         Assert.False(carriesRequests);
 
-        // The unrestorable request fails, and the others are restored with their original bodies.
-        Assert.Equal([second, third], requests);
+        Assert.Equal([first.Id, second.Id], requests.Select(request => request.Id));
+        Assert.DoesNotContain(first, requests);
+        Assert.DoesNotContain(second, requests);
         Assert.All(requests, request => Assert.Equal(payload, ((Orleans.Serialization.Buffers.PooledBuffer)request.BodyObject!).ToArray()));
         Assert.True((await migration.AsTask().WaitAsync(Timeout, Cancellation)).Migrated);
     }
 
     [Fact]
-    public async Task DeclinedRequestWhichCannotBeRestored_FailsWithoutAffectingTheBatch()
+    public async Task DeclinedRequests_AreReplacedWithCopiesWithoutAffectingTheBatch()
     {
         await using var cluster = await DeployAsync();
         var source = cluster.Silos[1];
@@ -1820,10 +1641,10 @@ public sealed class RetirementHandoffTests
         var acceptedGrain = grainFactory.GetGrain<IRetirementHandoffGrain>(acceptedKey, typeof(RetirementHandoffGrain).FullName).GetGrainId();
         var declined = grainFactory.GetGrain<IRetirementHandoffGrain>(declinedKey, typeof(RetirementHandoffGrain).FullName);
 
-        // The declined grain is already active on the target, which therefore declines its requests, one of which cannot be restored.
+        // The declined grain is already active on the target, which therefore declines its requests, one of which holds a pooled body.
         await PlaceOnAsync(target, () => declined.GetLocation());
-        var retained = CreateRequest(cluster, declined.GetGrainId(), 3, new List<string> { "value" });
-        List<Message> declinedRequests = [CreateRequest(cluster, declined.GetGrainId(), 2, new UnrestorableValue()), retained];
+        var payload = Enumerable.Repeat((byte)0x5A, 20_000).ToArray();
+        List<Message> declinedRequests = [CreateRequest(cluster, declined.GetGrainId(), 2, CreatePooledBuffer(payload)), CreateRequest(cluster, declined.GetGrainId(), 3, new List<string> { "value" })];
 
         // Both migrations travel in one batch.
         ValueTask<MigrationResult> acceptedMigration = default;
@@ -1837,10 +1658,11 @@ public sealed class RetirementHandoffTests
             return Task.CompletedTask;
         });
 
-        // The decline stands: the unrestorable request fails, the other request is restored for forwarding, and the accepted grain is unaffected.
+        // The declined requests are replaced with copies which hold their serialized bodies, for forwarding, and the accepted grain is unaffected.
         Assert.Equal(MigratedRequestsOutcome.Retained, (await declinedMigration.AsTask().WaitAsync(Timeout, Cancellation)).Requests);
-        Assert.Same(retained, Assert.Single(declinedRequests));
-        Assert.Equal(["value"], Assert.IsType<List<string>>(retained.BodyObject));
+        Assert.Equal([new CorrelationId(2), new CorrelationId(3)], declinedRequests.Select(request => request.Id));
+        Assert.Equal(payload, ((Orleans.Serialization.Buffers.PooledBuffer)declinedRequests[0].BodyObject!).ToArray());
+        Assert.Equal(["value"], Assert.IsType<List<string>>(declinedRequests[1].BodyObject));
         Assert.Equal(MigratedRequestsOutcome.Accepted, (await acceptedMigration.AsTask().WaitAsync(Timeout, Cancellation)).Requests);
     }
 
@@ -1966,8 +1788,28 @@ public sealed class RetirementHandoffTests
         return pending.Key;
     }
 
-    private static byte[] SerializeRequests(InProcessSiloHandle silo, List<MigratedRequest> requests)
-        => silo.ServiceProvider.GetRequiredService<Orleans.Serialization.Serializer>().SerializeToArray(requests);
+    private static byte[] SerializeRequests(InProcessSiloHandle silo, List<Message> requests)
+    {
+        var shared = silo.ServiceProvider.GetRequiredService<Orleans.Runtime.Messaging.MessageHandlerShared>();
+        using var buffer = new Orleans.Serialization.Buffers.ArcBufferWriter();
+        foreach (var request in requests)
+        {
+            Orleans.Runtime.Messaging.MessageFrames.Write(shared, buffer, request);
+        }
+
+        var frames = new byte[buffer.Length];
+        buffer.Peek(frames);
+        return frames;
+    }
+
+    private static Message CreateOneWayRequest(GrainId grainId, long id) => new()
+    {
+        Direction = Message.Directions.OneWay,
+        Id = new CorrelationId(id),
+        SendingGrain = GrainId.Create("test", "caller"),
+        TargetGrain = grainId,
+        TimeToLive = TimeSpan.FromMinutes(1),
+    };
 
     private static IGrainContext? FindActivation(InProcessSiloHandle silo, GrainId grainId)
         => silo.ServiceProvider.GetRequiredService<ActivationDirectory>().FindTarget(grainId);
@@ -2050,12 +1892,12 @@ public sealed class StatelessRetirementHandoffGrain : Grain, IStatelessRetiremen
 }
 
 /// <summary>
-/// Presents the cluster manifest with <see cref="IMigratingRequestsSystemTarget"/> removed from the manifests of selected silos,
-/// as a silo sees silos which run an earlier version.
+/// Presents the cluster manifest with the version of <see cref="IActivationMigrationManagerSystemTarget"/> removed from the manifests of selected silos,
+/// as a silo sees silos which run an earlier version, which did not version the interface.
 /// </summary>
 internal sealed class EarlierVersionManifestProvider(
     IClusterManifestProvider inner,
-    GrainInterfaceType migratingRequestsInterface,
+    GrainInterfaceType migrationInterface,
     ConcurrentDictionary<SiloAddress, bool> earlierVersionSilos) : IClusterManifestProvider
 {
     public ClusterManifest Current => Transform(inner.Current);
@@ -2074,9 +1916,10 @@ internal sealed class EarlierVersionManifestProvider(
         var silos = manifest.Silos;
         foreach (var silo in earlierVersionSilos.Keys)
         {
-            if (silos.TryGetValue(silo, out var siloManifest))
+            if (silos.TryGetValue(silo, out var siloManifest) && siloManifest.Interfaces.TryGetValue(migrationInterface, out var properties))
             {
-                silos = silos.SetItem(silo, new GrainManifest(siloManifest.Grains, siloManifest.Interfaces.Remove(migratingRequestsInterface)));
+                var earlierProperties = new GrainInterfaceProperties(properties.Properties.Remove(WellKnownGrainInterfaceProperties.Version));
+                silos = silos.SetItem(silo, new GrainManifest(siloManifest.Grains, siloManifest.Interfaces.SetItem(migrationInterface, earlierProperties)));
             }
         }
 
@@ -2319,24 +2162,4 @@ public sealed class RetirementHandoffState
     public static RetirementHandoffState Create(Guid key) => States[key] = new();
 
     public static RetirementHandoffState Get(Guid key) => States[key];
-}
-
-/// <summary>
-/// A value which serializes but cannot be deserialized.
-/// </summary>
-public sealed class UnrestorableValue;
-
-[Orleans.RegisterSerializer]
-internal sealed class UnrestorableValueCodec : Orleans.Serialization.Codecs.IFieldCodec<UnrestorableValue>
-{
-    public void WriteField<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, Type? expectedType, UnrestorableValue? value)
-        where TBufferWriter : System.Buffers.IBufferWriter<byte>
-    {
-        Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(writer.Session);
-        writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(UnrestorableValue), Orleans.Serialization.WireProtocol.WireType.VarInt);
-        writer.WriteVarUInt32(0);
-    }
-
-    public UnrestorableValue ReadValue<TInput>(ref Orleans.Serialization.Buffers.Reader<TInput> reader, Orleans.Serialization.WireProtocol.Field field)
-        => throw new InvalidOperationException("This value cannot be deserialized.");
 }

@@ -12,20 +12,14 @@ namespace Orleans.Runtime;
 internal sealed partial class ActivationData
 {
     /// <summary>
-    /// Gets whether this activation migrates because its silo is retiring.
+    /// Gets whether this activation migrates because its silo is shutting down.
     /// </summary>
     /// <remarks>
-    /// This includes an activation whose deactivation began before retirement for a routine reason. An activation which is deactivating
-    /// because it failed, is a duplicate, is unresponsive, or has suspect state or registration does not migrate, so its requests are
-    /// forwarded or rejected as before.
+    /// The silo deactivates its activations with <see cref="DeactivationReasonCode.ShuttingDown"/> when it shuts down.
+    /// An activation which is deactivating for any other reason forwards or rejects its requests.
     /// </remarks>
     private bool MigratesOnRetirement()
-        => _shared.InternalRuntime.Catalog.IsRetiring
-            && DeactivationReason.ReasonCode is DeactivationReasonCode.ShuttingDown
-                or DeactivationReasonCode.ActivationIdle
-                or DeactivationReasonCode.ApplicationRequested
-                or DeactivationReasonCode.RuntimeRequested
-                or DeactivationReasonCode.HighMemoryPressure
+        => DeactivationReason.ReasonCode is DeactivationReasonCode.ShuttingDown
             && IsUsingGrainDirectory
             && _shared.Runtime.ServiceProvider.GetService<GrainMigratabilityChecker>() is { } checker
             && checker.IsMigratable(GrainId.Type, ImmovableKind.Any);
