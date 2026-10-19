@@ -36,6 +36,28 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     /// <see langword="null"/> when every access runs against the state directly.
     /// </summary>
     internal JournaledStateContextProvider? ContextProvider { get; set; }
+
+    // The names of the states whose accesses run through a context, by identifier, which records of accesses store.
+    private Dictionary<int, string>? _accessTargetNames;
+
+    /// <summary>
+    /// Registers a state whose accesses run through this manager's context, which identifies the state by
+    /// <see cref="JournaledStateAccessTarget.Id"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Another state of this manager has the same identifier.</exception>
+    internal void RegisterAccessTarget(JournaledStateAccessTarget target)
+    {
+        _accessTargetNames ??= [];
+        if (_accessTargetNames.TryAdd(target.Id, target.Name)
+            || string.Equals(_accessTargetNames[target.Id], target.Name, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"The journaled states '{_accessTargetNames[target.Id]}' and '{target.Name}' have the same identifier, #{target.Id:x8}, "
+            + "which identifies a state in the records of durable task bodies' accesses. Rename one of the states.");
+    }
     private Task? _workLoop;
     private ManagerState _state;
     private long _deletionGeneration;

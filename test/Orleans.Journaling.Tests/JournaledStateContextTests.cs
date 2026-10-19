@@ -238,6 +238,24 @@ public sealed class JournaledStateContextTests : JournalingTestBase
         Assert.Equal(unchecked((int)0xE40C292Cu), new JournaledStateAccessTarget("a", manager).Id);
     }
 
+    [Fact]
+    public void ManagerRejectsAStateWhoseIdentifierAnotherStateHas()
+    {
+        var manager = CreateTestSystem().Manager;
+
+        // Distinct names whose FNV-1a hashes are both 0xE256D750.
+        var first = new JournaledStateAccessTarget("vmXuqzvn", manager);
+        Assert.Equal(unchecked((int)0xE256D750u), first.Id);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new DurableValue<int>(
+            "prcxZS4u",
+            manager,
+            new OrleansBinaryDurableValueCommandCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        Assert.Contains("'vmXuqzvn' and 'prcxZS4u'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Rename", exception.Message, StringComparison.Ordinal);
+        Assert.False(manager.TryGetStateMachine("prcxZS4u", out _));
+    }
+
     private async Task<(DurableList<string> List, DurableDictionary<string, int> Dictionary, DurableValue<int> Value, TestProvider Provider)> CreateStatesAsync()
     {
         var sut = CreateTestSystem();
