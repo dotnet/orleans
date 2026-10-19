@@ -3,6 +3,15 @@
 Apply these principles during design, implementation, and validation, alongside
 correctness, security, compatibility, concurrency, and reliability.
 
+## Priorities
+
+- Rank goals as correctness (including safety) > simplicity > performance >
+  convenience; seek a design that serves all of them before trading one away.
+- Safety (no corruption, data loss, broken invariants, or security violations)
+  precedes liveness.
+- Ask before relying on an invariant that almost holds, changing a surface that
+  may have shipped or been persisted, or adding a dependency.
+
 ## Layering, contracts, and invariants
 
 - Establish each layer's required and provided guarantees. Keep responsibilities

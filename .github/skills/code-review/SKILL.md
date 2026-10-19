@@ -21,7 +21,15 @@ description: Review Orleans changes for layer contracts, invariants, minimal com
    then we could simplify this by Y." Identify the owning layer, enforcement, and
    feasibility; distinguish conditional design suggestions from confirmed
    contract violations.
+6. Apply each lens skill to the affected code:
+   `.github/skills/review-architecture/SKILL.md`,
+   `.github/skills/review-invariants/SKILL.md`,
+   `.github/skills/review-testing/SKILL.md`,
+   `.github/skills/review-performance/SKILL.md`, and
+   `.github/skills/review-code-craft/SKILL.md`.
 
 Report actionable findings tied to changed lines, explaining the consequence,
 evidence, and correction. Prioritize correctness and meaningful runtime or
 maintenance costs over subjective preferences; keep recommendations within scope.
+Merge findings that share a root cause, rank them by the priorities in root
+`AGENTS.md`, and list open invariant and compatibility questions separately.
