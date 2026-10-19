@@ -106,8 +106,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                 return sinkResult;
             }
 
-            // Scheduled messages never count toward capacity, so they are not backpressured either.
-            if (message.Envelope.DeliverAt is null && _messages.Count - _scheduledCount >= Options.MaxCapacity)
+            // Every pending message, scheduled or not, holds capacity until it completes.
+            if (_messages.Count >= Options.MaxCapacity)
             {
                 Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "backpressured");
                 return DeliveryResult.Backpressured();
