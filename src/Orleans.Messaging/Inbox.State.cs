@@ -18,9 +18,6 @@ internal sealed partial class Inbox
     private readonly Dictionary<MessageId, InboxDeadLetter> _deadLetters = [];
     private JournalStreamWriter _writer;
 
-    // Pending messages with a delivery time, which do not count toward MaxCapacity.
-    private int _scheduledCount;
-
     // Acceptances and completions are durable once a completed write captured their sequence number.
     private long _lastSequence;
     private long _capturedSequence;
@@ -82,7 +79,6 @@ internal sealed partial class Inbox
         _processed.Clear();
         _rejections.Clear();
         _deadLetters.Clear();
-        _scheduledCount = 0;
         _stagedWakeup = null;
         _lastSequence = _capturedSequence = _durableSequence = _lastCompletionSequence = 0;
     }
@@ -157,18 +153,13 @@ internal sealed partial class Inbox
                 _messages.Add(message.Envelope.MessageId, new InboxEntry { Message = message, State = new(), Sequence = ++_lastSequence });
                 _processed.Remove(message.Envelope.MessageId);
                 _rejections.Remove(message.Envelope.MessageId);
-                if (message.Envelope.DeliverAt is not null) _scheduledCount++;
                 ReportDepth(1);
                 break;
             case InboxCommandKind.Retry:
                 _messages[command.MessageId].State = command.State ?? throw new InvalidOperationException("A retry command requires its state.");
                 break;
             case InboxCommandKind.Complete:
-                if (_messages.Remove(command.MessageId, out var completed))
-                {
-                    if (completed.Message.Envelope.DeliverAt is not null) _scheduledCount--;
-                    ReportDepth(-1);
-                }
+                if (_messages.Remove(command.MessageId)) ReportDepth(-1);
 
                 _processed[command.MessageId] = command.ProcessedAt;
                 _lastCompletionSequence = ++_lastSequence;
@@ -187,12 +178,7 @@ internal sealed partial class Inbox
                 _processed.Clear();
                 _rejections.Clear();
                 _deadLetters.Clear();
-                _scheduledCount = 0;
-                foreach (var restored in snapshot.Messages)
-                {
-                    _messages.Add(restored.Message.Envelope.MessageId, restored);
-                    if (restored.Message.Envelope.DeliverAt is not null) _scheduledCount++;
-                }
+                foreach (var restored in snapshot.Messages) _messages.Add(restored.Message.Envelope.MessageId, restored);
 
                 ReportDepth(_messages.Count - previousCount);
 
