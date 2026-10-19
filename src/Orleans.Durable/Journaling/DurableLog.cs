@@ -221,10 +221,21 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
     public IDurableLogDraft<T> BeginDraft()
     {
-        // A draft can't begin on a sealed log, so the check reads the state through the context, as other reads do.
-        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-            ? context.Read(_accessTarget, JournaledStateOperation.LogIsSealed, this, static self => self._isSealed)
-            : _isSealed)
+        // A draft can't begin on a sealed log. The check and its failure are one read through the context, so a replay
+        // begins the draft exactly when the recording attempt did.
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Read(
+                _accessTarget,
+                JournaledStateOperation.LogBeginDraft,
+                this,
+                static self =>
+                {
+                    self.ThrowIfSealed();
+                    return default(JournaledStateAccessNoResult);
+                });
+        }
+        else
         {
             ThrowIfSealed();
         }
@@ -670,7 +681,8 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     {
         if (_committed.IsSealed && reader.Cursor >= _committed.NextSequence)
         {
-            Debug.Assert(reader.IsCaughtUp && _drafts is not { Open.Count: > 0 });
+            // A replaying durable task body can hold a draft open on a sealed log until its recorded commit closes it.
+            Debug.Assert(reader.IsCaughtUp);
             logEvent = new() { Kind = LogEventKind.Sealed, Sequence = _committed.NextSequence };
             return true;
         }
@@ -877,11 +889,32 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
         public long Commit(params ReadOnlySpan<T> entries)
         {
-            // Validation and append share one recorded outcome; each attempt closes its own successful draft.
-            var sequence = JournaledStateContext.TryGetCurrent(log._accessTarget, out var context)
-                ? context.Write(log._accessTarget, JournaledStateOperation.LogCommitDraft, (Self: this, Entries: entries.ToArray()), static state => state.Self.CommitCore(state.Entries))
-                : CommitCore(entries);
-            log.CloseDraft(this, log.GetCommittedOutcome(Id, sequence, entries.Length));
+            if (!JournaledStateContext.TryGetCurrent(log._accessTarget, out var context))
+            {
+                ThrowIfClosed();
+                var outcome = log.CommitDraft(Id, entries);
+                log.CloseDraft(this, outcome);
+                return outcome.Sequence;
+            }
+
+            // Validation and append share one recorded outcome, and each attempt closes its own draft. A replayed seal can
+            // already have closed it, and a replayed failure closes the draft which the recording attempt found closed.
+            long sequence;
+            try
+            {
+                sequence = context.Write(log._accessTarget, JournaledStateOperation.LogCommitDraft, (Self: this, Entries: entries.ToArray()), static state => state.Self.CommitCore(state.Entries));
+            }
+            catch when (IsOpen)
+            {
+                log.CloseDraft(this, DraftOutcome.Abandoned(log._isSealed ? LogDraftAbandonReason.Sealed : LogDraftAbandonReason.Unknown, message: null));
+                throw;
+            }
+
+            if (IsOpen)
+            {
+                log.CloseDraft(this, log.GetCommittedOutcome(Id, sequence, entries.Length));
+            }
+
             return sequence;
         }
 

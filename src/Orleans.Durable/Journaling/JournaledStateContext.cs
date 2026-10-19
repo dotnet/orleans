@@ -321,6 +321,7 @@ internal enum JournaledStateOperation : byte
     LogGet = 95,
     LogTryGet = 96,
     LogSnapshot = 97,
+    LogBeginDraft = 98,
     LogEpoch = 99,
     LogAppend = 100,
     LogTrimBefore = 101,
