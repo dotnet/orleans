@@ -25,7 +25,7 @@ A durable task body runs on its grain activation's scheduler, which runs one pie
 
 An await which continues without its captured context resumes the body on the thread pool:
 
-- `DurableTask.RunInline` and `DurableTask.GetVersion` throw there, because they stage their records with the activation's state changes.
+- Durable operations, such as `DurableTask.RunInline`, task starts, and `DurableTask.GetVersion`, throw `InvalidOperationException` there, because the execution orders and records its operations on its scheduler.
 - State changes race with the grain's other turns, including its methods and other executions.
 - The tail's state changes and the body's result commit separately. In the example, a crash after `_lastRate` commits and before the result commits runs the tail again, which fetches a rate and assigns `_lastRate` again.
 

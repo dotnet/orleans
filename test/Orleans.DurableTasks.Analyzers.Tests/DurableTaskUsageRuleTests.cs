@@ -18,6 +18,30 @@ public class DurableTaskUsageRuleTests
         """;
 
     [Fact]
+    public Task DetachedTasksAreDurableGrainCalls() => AnalyzerVerifier.VerifyAsync($$"""
+        public interface IShipping
+        {
+            DurableTask<int> ShipAsync(int order);
+        }
+
+        public class C(IShipping shipping)
+        {
+        {{Members}}
+            public async DurableTask<int> RunAsync()
+            {
+                await DurableTask.Run(static _ => 1).{|ORLEANS0228:Detached|}();
+                _ = LocalStep(2).WithId("local").{|ORLEANS0228:Detached|}().Post();
+                _ = await DurableTask.WhenAll([Step(1), Step(2)]).{|ORLEANS0228:Detached|}("batch").ScheduleAsync();
+
+                // A durable grain call starts as a root task on its grain, in any configuration order.
+                _ = shipping.ShipAsync(1).WithId("ship-1").Detached().Post();
+                _ = shipping.ShipAsync(2).WithId("ship").Detached().Post();
+                return await shipping.ShipAsync(3).Detached("ship-3");
+            }
+        }
+        """);
+
+    [Fact]
     public Task RunInlineEffectsReturnTheirOutputsInsteadOfChangingCapturedObjects() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {
@@ -285,7 +309,7 @@ public class DurableTaskUsageRuleTests
                 await reusable.WithId("run-1");
                 await reusable.WithId("run-2");
 
-                var configured = LocalStep(3).Detached();
+                var configured = LocalStep(3).Shielded();
                 configured.Post();
                 {|ORLEANS0206:configured|}.Post();
             }
