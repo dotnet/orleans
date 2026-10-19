@@ -743,6 +743,58 @@ public sealed class JournalTransactionTests
     }
 
     /// <summary>
+    /// A watch which waited for a transaction begins once the transaction ends, when its commit is in the journal buffer
+    /// but no write has captured it yet: the watch delivers the committed value once the commit's write completes.
+    /// </summary>
+    [Fact]
+    public Task WatchStartedAsTheTransactionEndsDeliversItsValueOnceTheCommitIsDurable() => ObservationTestHelpers.RunOnActivationSchedulerAsync(async () =>
+    {
+        using var host = new TransactionTestHost(Binary);
+        var storage = new ControlledJournalStorage(Binary);
+        var activation = await host.ActivateAsync(storage);
+        activation.Value.Value = "x";
+        await activation.Manager.WriteStateAsync(Cancellation);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
+        cts.CancelAfter(Timeout);
+        Task<ValueChange<string>>? first = null;
+        var held = storage.HoldAppends();
+
+        // The manager, the watch and the transaction share one scheduler, as on an activation; the watch is another flow.
+        var commit = activation.Manager.RunTransactionAsync(_ =>
+        {
+            activation.Value.Value = "y";
+            using (ExecutionContext.SuppressFlow())
+            {
+                first = Task.Factory.StartNew(
+                    () => FirstAsync(activation.Value.WatchAsync(cts.Token)),
+                    CancellationToken.None,
+                    TaskCreationOptions.None,
+                    TaskScheduler.Current).Unwrap();
+            }
+
+            return Task.CompletedTask;
+        }, Cancellation);
+
+        await held.WaitAsync(Timeout, Cancellation);
+        await Task.Yield();
+        Assert.False(first!.IsCompleted);
+
+        storage.ReleaseAppends();
+        await commit.WaitAsync(Timeout, Cancellation);
+        Assert.Equal("y", (await first.WaitAsync(Timeout, Cancellation)).Value);
+
+        static async Task<ValueChange<string>> FirstAsync(IAsyncEnumerable<ValueChange<string>> changes)
+        {
+            await foreach (var change in changes)
+            {
+                return change;
+            }
+
+            throw new InvalidOperationException("The watch ended.");
+        }
+    });
+
+    /// <summary>
     /// Runs random histories of direct changes to every kind of state, transactions which commit or abort (with nested
     /// transactions, writes by other flows to held and unheld states, and crashes while they're open), writes, snapshots
     /// and recoveries against a model which applies committed transactions directly and drops aborted ones. A committed
