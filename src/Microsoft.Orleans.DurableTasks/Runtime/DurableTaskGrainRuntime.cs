@@ -962,16 +962,18 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <summary>
     /// Runs <paramref name="body"/> as a transaction over the grain's journaled state, whose commit stages a record of the
-    /// result under <paramref name="effectId"/> together with the transaction's changes.
+    /// result under <paramref name="effectId"/> together with the transaction's changes, and returns once a journal write
+    /// holds the commit.
     /// </summary>
     /// <remarks>
-    /// A body which fails, or whose result doesn't serialize, aborts the transaction, which leaves no trace, and the task
-    /// faults; the caller records the failure in its place. A run which ends before a write captures the commit loses both
-    /// the changes and the record, so the next run runs the body again.
+    /// A body which fails, a nested transaction whose failure dooms it, or a result which doesn't serialize aborts the
+    /// transaction, which leaves no trace, and <paramref name="onAbort"/> records the failure in its place. A commit whose
+    /// write fails fails the journal, so the next activation runs the body again.
     /// </remarks>
     Task<T> IDurableTaskGrainRuntime.RunTransactionAsync<T>(
         TaskId effectId,
         Func<CancellationToken, Task<T>> body,
+        Action<Exception> onAbort,
         CancellationToken cancellationToken)
     {
         ThrowIfStopping();
@@ -979,7 +981,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         return manager.RunTransactionAsync(
             body,
             onCommit: result => AddRecord(effectId, DurableTaskRecordKind.Effect, EffectFingerprint, DurableTaskResponse.FromResult(result)),
-            onAbort: null,
+            onAbort,
             cancellationToken);
     }
 

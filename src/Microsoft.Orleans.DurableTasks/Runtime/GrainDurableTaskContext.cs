@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using Orleans.DurableTasks;
@@ -896,10 +895,12 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// <remarks>
     /// The transaction is an effect: it shares <c>RunInline</c>'s identifiers, and a replay returns the recorded result, or
     /// throws the recorded exception, without running the body. The body's accesses aren't recorded, so it never replays
-    /// partially. A body which fails aborts the transaction, which leaves no trace, and its failure is recorded.
+    /// partially. The result's record commits with the transaction's changes, and the call returns once a journal write
+    /// holds both. A transaction which aborts cleanly, because its body or a nested transaction failed or its result doesn't
+    /// serialize, leaves no trace, and its failure is recorded. A failed journal records nothing: the next activation runs
+    /// the body again.
     /// </remarks>
     /// <exception cref="InvalidOperationException">The caller isn't running on the activation's scheduler.</exception>
-    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A failed transaction is recorded as its outcome.")]
     internal async Task<T> RunTransactionAsync<T>(string name, Func<CancellationToken, Task<T>> body, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
@@ -912,7 +913,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         ThrowIfAttemptCanceled();
         var effectId = CreateChildTaskId(name);
         ObserveOperation(effectId, recordsOperation: true);
-        Exception? bodyFailure = null;
         Task<T> transaction;
         using (EnterCoveredRegion())
         {
@@ -928,34 +928,22 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
                 throw Diverge(divergence);
             }
 
-            transaction = _runtime.RunTransactionAsync(effectId, async cancellationToken =>
+            transaction = _runtime.RunTransactionAsync(effectId, body, exception =>
             {
-                try
+                if (exception is DurableTaskAttemptCanceledException || IsAttemptCanceled)
                 {
-                    return await body(cancellationToken);
+                    return;
                 }
-                catch (Exception exception)
+
+                // The failure is the transaction's outcome, which a replay throws again.
+                using (EnterCoveredRegion())
                 {
-                    bodyFailure = exception;
-                    throw;
+                    _runtime.RecordEffect(effectId, DurableTaskResponse.FromException(exception));
                 }
             }, cancellationToken);
         }
 
-        try
-        {
-            return await transaction;
-        }
-        catch (Exception exception) when (ReferenceEquals(exception, bodyFailure) && exception is not DurableTaskAttemptCanceledException && !IsAttemptCanceled)
-        {
-            // The body's failure is its outcome. Failures of the transaction itself, such as a fenced journal, aren't.
-            using (EnterCoveredRegion())
-            {
-                _runtime.RecordEffect(effectId, DurableTaskResponse.FromException(exception));
-            }
-
-            throw;
-        }
+        return await transaction;
     }
 
     /// <remarks>
