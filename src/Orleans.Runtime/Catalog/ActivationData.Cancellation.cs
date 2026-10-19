@@ -85,8 +85,8 @@ internal sealed partial class ActivationData
 
             if (sendAsRequest)
             {
-                // A migration of this activation owns the request, or the cancellation follows the request as a request.
-                if (_shared.MigrationManager?.TryCancelMigratingRequest(GrainId, senderGrainId, messageId) is not true)
+                // This activation's migration may own the request. Otherwise, the cancellation follows the request as a request.
+                if (Migration?.TryCancel(senderGrainId, messageId) is not true)
                 {
                     _shared.InternalRuntime.RuntimeClient.CancellationManager.SignalCancellation(targetSilo: null, GrainId, senderGrainId, messageId);
                 }

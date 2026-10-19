@@ -57,7 +57,7 @@ Requests which can't migrate with their activation are forwarded instead. This i
 
 A migration counts as a forward. Requests which have already been forwarded <xref:Orleans.Configuration.SiloMessagingOptions.MaxForwardCount> times stay with the original activation and are rejected when it deactivates, so their callers fail with a rejection without the request executing.
 
-Migration adds activation time on the destination silo to shutdown, bounded by <xref:Orleans.Configuration.GrainCollectionOptions.DeactivationTimeout> and the host shutdown budget.
+Migration adds activation time on the destination silo to shutdown. A migrating activation remains until the destination silo responds, within <xref:Orleans.Configuration.MessagingOptions.ResponseTimeout>, since the destination may already have taken its requests. A migration which has not been sent when <xref:Orleans.Configuration.GrainCollectionOptions.DeactivationTimeout> elapses is canceled, and its requests are forwarded.
 
 ## Containers and orchestrators
 

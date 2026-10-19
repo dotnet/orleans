@@ -451,23 +451,29 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task MigrationDeclinedAfterTheActivationStopsWaiting_ForwardsItsRequestsOnce()
+    public async Task MigrationOutcome_IsAwaitedPastTheDeactivationTimeout()
     {
-        // The target holds the migration past the source activation's deactivation timeout, and then declines its requests.
+        // The target holds the migration past the source activation's deactivation timeout. It then creates the grain's new activation but declines its requests,
+        // as it does when they would exceed its hard limit.
         var acceptArrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseDecline = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var declined = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
         {
-            silo.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = TimeSpan.FromSeconds(3));
+            silo.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = DeactivationTimeout);
             silo.AddIncomingGrainCallFilter(async context =>
             {
                 if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
                 {
                     acceptArrived.TrySetResult();
                     await releaseDecline.Task;
-                    context.Result = new bool[((List<GrainMigrationPackage>)context.Request.GetArgument(0)!).Count];
-                    declined.TrySetResult();
+                    var packages = (List<GrainMigrationPackage>)context.Request.GetArgument(0)!;
+                    for (var i = 0; i < packages.Count; i++)
+                    {
+                        packages[i] = packages[i] with { Requests = null };
+                    }
+
+                    await context.Invoke();
+                    context.Result = new bool[packages.Count];
                     return;
                 }
 
@@ -494,10 +500,13 @@ public sealed class RetirementHandoffTests
 
         try
         {
-            // The activation stops waiting when its deactivation times out, and finishes deactivating. The migration owns its requests.
+            // The target may take the requests until it responds, so the source activation remains in the catalog past its deactivation timeout,
+            // and no other activation of the grain starts.
             await acceptArrived.Task.WaitAsync(Timeout, Cancellation);
-            await activation.Deactivated.WaitAsync(Timeout, Cancellation);
-            Assert.Equal(0, activation.GetRequestCount());
+            await Task.Delay(DeactivationTimeout * 2, Cancellation);
+            Assert.False(activation.Deactivated.IsCompleted);
+            Assert.Same(activation, FindActivation(source, grain.GetGrainId()));
+            Assert.Null(FindActivation(target, grain.GetGrainId()));
             Assert.False(state.HoldEntered.Task.IsCompleted);
         }
         finally
@@ -505,15 +514,13 @@ public sealed class RetirementHandoffTests
             releaseDecline.TrySetResult();
         }
 
-        // The late decline leaves the requests with the migration, which forwards them, so the queued request runs once.
-        await declined.Task.WaitAsync(Timeout, Cancellation);
+        // Once the target declines, the migration forwards the request, which runs once.
+        await activation.Deactivated.WaitAsync(Timeout, Cancellation);
         await state.HoldEntered.Task.WaitAsync(Timeout, Cancellation);
         state.ReleaseHold.TrySetResult();
         await queued.WaitAsync(Timeout, Cancellation);
         Assert.Equal(1, state.HoldCount);
-        Assert.Equal(0, activation.GetRequestCount());
     }
-
     [Fact]
     public async Task MigrationCanceledBeforeItIsSent_IsNotSentAndForwardsItsRequests()
     {
@@ -544,27 +551,35 @@ public sealed class RetirementHandoffTests
 
         // The requests remain with the migration until the activation stops receiving requests, and are then forwarded as copies of their serialized form.
         Assert.Same(original, Assert.Single(requests));
-        migration.SourceDeactivated();
+        migration.Deliver(laterRequests: null);
         Assert.NotSame(original, Assert.Single(requests));
         Assert.Equal(original.Id, requests[0].Id);
     }
 
     [Fact]
-    public async Task CancellationAfterTheSourceDeactivates_CancelsTheRequestWhichTheMigrationRetains()
+    public async Task CancellationWhileTheMigrationOutcomeIsPending_CancelsTheRequestWhichTheMigrationRetains()
     {
-        // The target holds the migration past the source activation's deactivation timeout, and then declines its requests.
+        // The target holds the migration past the source activation's deactivation timeout. It then creates the grain's new activation but declines its requests,
+        // as it does when they would exceed its hard limit.
         var acceptArrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseDecline = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
         {
-            silo.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = TimeSpan.FromSeconds(3));
+            silo.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = DeactivationTimeout);
             silo.AddIncomingGrainCallFilter(async context =>
             {
                 if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
                 {
                     acceptArrived.TrySetResult();
                     await releaseDecline.Task;
-                    context.Result = new bool[((List<GrainMigrationPackage>)context.Request.GetArgument(0)!).Count];
+                    var packages = (List<GrainMigrationPackage>)context.Request.GetArgument(0)!;
+                    for (var i = 0; i < packages.Count; i++)
+                    {
+                        packages[i] = packages[i] with { Requests = null };
+                    }
+
+                    await context.Invoke();
+                    context.Result = new bool[packages.Count];
                     return;
                 }
 
@@ -591,9 +606,9 @@ public sealed class RetirementHandoffTests
 
         try
         {
-            // The source activation stops waiting and leaves the catalog while the migration owns the request, and then the caller cancels the call.
+            // The caller cancels after the source activation's deactivation timeout, while the migration which carries the request awaits the target.
             await acceptArrived.Task.WaitAsync(Timeout, Cancellation);
-            await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+            await Task.Delay(DeactivationTimeout, Cancellation);
             state.Cancellation.Cancel();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => call.WaitAsync(Timeout, Cancellation));
 
@@ -605,9 +620,8 @@ public sealed class RetirementHandoffTests
             releaseDecline.TrySetResult();
         }
 
-        // The migration applies the cancellation to the request it retains, rather than forwarding the request to run uncanceled.
-        var migrations = GetMigrations(source);
-        await WaitUntilAsync(() => !migrations.ContainsKey(grain.GetGrainId()));
+        // The migration cancels the request which it retains, rather than forwarding it to run uncanceled.
+        await activation.Deactivated.WaitAsync(Timeout, Cancellation);
         var fromSource = source.ServiceProvider.GetRequiredService<IGrainFactory>().GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
         try
         {
@@ -620,7 +634,6 @@ public sealed class RetirementHandoffTests
             state.ReleaseHold.TrySetResult();
         }
     }
-
     [Fact]
     public async Task CancellationWhileTheSourceIsDisposed_CancelsTheRequestWhichTheMigrationRetains()
     {
@@ -649,6 +662,7 @@ public sealed class RetirementHandoffTests
         var state = RetirementHandoffState.Create(key);
         var grain = caller.ServiceProvider.GetRequiredService<IGrainFactory>().GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
         await PlaceOnAsync(source, () => grain.GetLocation());
+        var activation = Assert.IsType<ActivationData>(FindActivation(source, grain.GetGrainId()));
 
         var running = grain.Block().AsTask();
         await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
@@ -675,8 +689,7 @@ public sealed class RetirementHandoffTests
         }
 
         // The migration applies the cancellation to the request it retains, rather than forwarding the request to run uncanceled.
-        var migrations = GetMigrations(source);
-        await WaitUntilAsync(() => !migrations.ContainsKey(grain.GetGrainId()));
+        await activation.Deactivated.WaitAsync(Timeout, Cancellation);
         var fromSource = source.ServiceProvider.GetRequiredService<IGrainFactory>().GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
         try
         {
@@ -691,21 +704,29 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task RequestDeliveredToTheSourceAfterItLeavesTheCatalog_FollowsTheMigrationsRequests()
+    public async Task RequestWhileTheMigrationOutcomeIsPending_WaitsForTheMigrationAndIsForwardedWithItsRequests()
     {
-        // The target holds the migration past the source activation's deactivation timeout, and then declines its requests.
+        // The target holds the migration past the source activation's deactivation timeout. It then creates the grain's new activation but declines its requests,
+        // as it does when they would exceed its hard limit.
         var acceptArrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseDecline = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
         {
-            silo.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = TimeSpan.FromSeconds(3));
+            silo.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = DeactivationTimeout);
             silo.AddIncomingGrainCallFilter(async context =>
             {
                 if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
                 {
                     acceptArrived.TrySetResult();
                     await releaseDecline.Task;
-                    context.Result = new bool[((List<GrainMigrationPackage>)context.Request.GetArgument(0)!).Count];
+                    var packages = (List<GrainMigrationPackage>)context.Request.GetArgument(0)!;
+                    for (var i = 0; i < packages.Count; i++)
+                    {
+                        packages[i] = packages[i] with { Requests = null };
+                    }
+
+                    await context.Invoke();
+                    context.Result = new bool[packages.Count];
                     return;
                 }
 
@@ -729,19 +750,17 @@ public sealed class RetirementHandoffTests
         state.ReleaseBlock.TrySetResult();
         await running.WaitAsync(Timeout, Cancellation);
 
-        var migrations = GetMigrations(source);
-        var late = CreateRequest(cluster, grain.GetGrainId(), 1, new List<string> { "late" });
+        Task<SiloAddress> later;
         try
         {
-            // The source activation leaves the catalog while the migration's outcome is unknown. A request which reaches it afterwards,
-            // through a reference captured before it left, joins the requests which the migration forwards once its outcome is known.
+            // After the source activation's deactivation timeout, a call from the source's silo reaches the source activation, which is still in the catalog,
+            // rather than a new activation, and waits there while the migration awaits the target.
             await acceptArrived.Task.WaitAsync(Timeout, Cancellation);
-            await activation.Deactivated.WaitAsync(Timeout, Cancellation);
-            var migration = migrations[grain.GetGrainId()];
-            activation.ReceiveMessage(late);
-            var laterRequestsField = typeof(ActivationMigration).GetField("_laterRequests", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
-            await WaitUntilAsync(() => activation.WaitingCount == 0 && laterRequestsField.GetValue(migration) is not null);
-            Assert.Same(late, Assert.Single((List<Message>)laterRequestsField.GetValue(migration)!));
+            await Task.Delay(DeactivationTimeout, Cancellation);
+            var fromSource = source.ServiceProvider.GetRequiredService<IGrainFactory>().GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+            later = fromSource.GetLocation().AsTask();
+            await WaitUntilAsync(() => activation.WaitingCount == 1);
+            Assert.Same(activation, FindActivation(source, grain.GetGrainId()));
             Assert.Null(FindActivation(target, grain.GetGrainId()));
         }
         finally
@@ -749,11 +768,12 @@ public sealed class RetirementHandoffTests
             releaseDecline.TrySetResult();
         }
 
-        // Once the target declines, the migration forwards the queued request, followed by the late one.
-        await WaitUntilAsync(() => !migrations.ContainsKey(grain.GetGrainId()));
-        await state.HoldEntered.Task.WaitAsync(Timeout, Cancellation);
+        // Once the target declines, the migration forwards its request together with the later call, and both run on the grain's new activation.
+        Assert.Equal(target.SiloAddress, await state.HoldEntered.Task.WaitAsync(Timeout, Cancellation));
         state.ReleaseHold.TrySetResult();
-        await queued.WaitAsync(Timeout, Cancellation);
+        Assert.Equal(target.SiloAddress, await queued.WaitAsync(Timeout, Cancellation));
+        Assert.Equal(target.SiloAddress, await later.WaitAsync(Timeout, Cancellation));
+        Assert.Equal(1, state.HoldCount);
     }
 
     [Fact]
@@ -1453,8 +1473,6 @@ public sealed class RetirementHandoffTests
         try
         {
             await activation.Deactivated.WaitAsync(Timeout, Cancellation);
-            var migrations = GetMigrations(source);
-            await WaitUntilAsync(() => !migrations.ContainsKey(grain.GetGrainId()));
             Assert.False(state.HoldEntered.Task.IsCompleted);
         }
         finally
@@ -1996,7 +2014,7 @@ public sealed class RetirementHandoffTests
 
         // It then forwards copies which hold their serialized bodies in place of the requests, whose pooled values serializing them released.
         // The accepted grain is unaffected.
-        declinedMigration.SourceDeactivated();
+        declinedMigration.Deliver(laterRequests: null);
         Assert.DoesNotContain(originals[0], declinedRequests);
         Assert.DoesNotContain(originals[1], declinedRequests);
         Assert.Equal([new CorrelationId(2), new CorrelationId(3)], declinedRequests.Select(request => request.Id));
@@ -2079,6 +2097,8 @@ public sealed class RetirementHandoffTests
         builder.ConfigureSiloHost((_, host) => host.Services.PostConfigure<Microsoft.Extensions.Hosting.HostOptions>(options => options.ShutdownTimeout = timeout));
     }
 
+    private static readonly TimeSpan DeactivationTimeout = TimeSpan.FromSeconds(3);
+
     private static async Task<InProcessTestCluster> DeployAsync(Action<InProcessTestClusterBuilder>? configure = null)
     {
         var builder = new InProcessTestClusterBuilder(3);
@@ -2148,11 +2168,6 @@ public sealed class RetirementHandoffTests
         TargetGrain = grainId,
         TimeToLive = TimeSpan.FromMinutes(1),
     };
-
-    private static ConcurrentDictionary<GrainId, ActivationMigration> GetMigrations(InProcessSiloHandle silo)
-        => (ConcurrentDictionary<GrainId, ActivationMigration>)typeof(ActivationMigrationManager)
-            .GetField("_migrations", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
-            .GetValue(silo.ServiceProvider.GetRequiredService<ActivationMigrationManager>())!;
 
     private static IGrainContext? FindActivation(InProcessSiloHandle silo, GrainId grainId)
         => silo.ServiceProvider.GetRequiredService<ActivationDirectory>().FindTarget(grainId);
