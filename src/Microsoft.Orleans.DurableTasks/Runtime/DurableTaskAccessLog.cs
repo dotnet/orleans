@@ -962,7 +962,7 @@ internal sealed class DurableTaskAccessLog(
         // The journal up to the position must hold what the read observed, including a value which a coalescing state
         // would journal only at the next write.
         history.StagePendingChanges();
-        if (!journal.Positions.TryGetPosition(out var position))
+        if (!journal.Positions.TryGetPosition(target, out var position))
         {
             return false;
         }

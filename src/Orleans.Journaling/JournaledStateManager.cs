@@ -1024,6 +1024,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
     /// <summary>Gets whether the manager can honor positions: it's ready and no format migration is pending.</summary>
     internal bool AcceptsPositions => _state is ManagerState.Ready && !_migrationSnapshotRequired;
 
+    internal ILogger Logger => _shared.Logger;
+
     /// <summary>Gets the registered states by name.</summary>
     /// <remarks>Registration closes when the manager initializes.</remarks>
     internal IReadOnlyDictionary<string, IStateMachine> States => _states;
