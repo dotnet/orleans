@@ -19,6 +19,8 @@ public sealed class DurableTaskAccessRecordingTests
 {
     private static readonly TaskId WorkflowId = TaskId.CreateRoot("workflow");
     private static readonly DurableSignal<int> Ready = new("ready");
+    private static readonly DurableSignal<int> Next = new("next");
+    private static readonly DurableSignal<int> End = new("end");
 
     private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
 
@@ -363,6 +365,153 @@ public sealed class DurableTaskAccessRecordingTests
             return choice;
         }
     });
+
+    [Fact]
+    public Task ReplayAfterAPartlyReplayedAttemptReturnsAllOutcomes() => ActivationScheduler.RunAsync(async () =>
+    {
+        var controls = new Controls();
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, controls));
+
+        // The first attempt commits its first segment's records, and its activation ends.
+        await using (var first = await harness.ActivateAsync(TestCancellation))
+        {
+            await first.ScheduleAsync(WorkflowId, TestCancellation);
+            await controls.Reached("after-one").WaitAsync(Timeout, TestCancellation);
+            first.Grain.RequestUnrelatedWrite();
+            await first.Grain.UnrelatedWrites;
+        }
+
+        // The second attempt replays the first segment and commits the second's records, and its activation ends.
+        controls = new Controls();
+        await using (var second = await harness.ActivateAsync(TestCancellation))
+        {
+            await controls.Pass("after-one");
+            await controls.Reached("after-two").WaitAsync(Timeout, TestCancellation);
+            Assert.Equal(2, second.Grain.Counter.Value);
+            second.Grain.RequestUnrelatedWrite();
+            await second.Grain.UnrelatedWrites;
+        }
+
+        // The third attempt replays both segments' records and applies neither increment again.
+        controls = new Controls();
+        await using var third = await harness.ActivateAsync(TestCancellation);
+        await controls.Pass("after-one");
+        await controls.Pass("after-two");
+        Assert.Equal(1, (await third.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<int>());
+        Assert.Equal(2, third.Grain.Counter.Value);
+
+        static async DurableTask<int> Workflow(ReplayGrain grain, Controls controls)
+        {
+            var first = grain.Counter.Value++;
+            await DurableTask.Run(static _ => { }).WithId("one");
+            await controls.Wait("after-one");
+            var second = grain.Counter.Value++;
+            await DurableTask.Run(static _ => { }).WithId("two");
+            await controls.Wait("after-two");
+            return first * 10 + second;
+        }
+    });
+
+    [Fact]
+    public Task InterleavedBodiesReplayTheirOwnRecordsInAnotherOrder() => ActivationScheduler.RunAsync(async () =>
+    {
+        var bodyA = TaskId.CreateRoot("a");
+        var bodyB = TaskId.CreateRoot("b");
+        var probes = new InterleavingProbes();
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, probes));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            // Bodies interleave where a durable wait parks one: A reads the counter and parks, B writes it, then A reads
+            // it again.
+            var tasks = (IDurableTaskManager)activation.Runtime;
+            await activation.ScheduleAsync(bodyA, TestCancellation);
+            await activation.ScheduleAsync(bodyB, TestCancellation);
+            await probes.FirstRead.Task.WaitAsync(Timeout, TestCancellation);
+            await tasks.SignalAsync(bodyB, Next, 1, TestCancellation);
+            await probes.Written.Task.WaitAsync(Timeout, TestCancellation);
+            await tasks.SignalAsync(bodyA, Next, 1, TestCancellation);
+            Assert.Equal("0,10", await probes.Observed.Task.WaitAsync(Timeout, TestCancellation));
+            activation.Grain.RequestUnrelatedWrite();
+            await activation.Grain.UnrelatedWrites;
+        }
+
+        // The replay starts both bodies from the committed state, which holds B's write, and A reads both values without B
+        // running in between: each body returns its own records, so A observes the values which it observed first, and
+        // B's write doesn't apply again.
+        probes = new InterleavingProbes();
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        Assert.Equal("0,10", await probes.Observed.Task.WaitAsync(Timeout, TestCancellation));
+        await probes.Written.Task.WaitAsync(Timeout, TestCancellation);
+        Assert.Equal(10, replay.Grain.Counter.Value);
+
+        static async DurableTask Workflow(ReplayGrain grain, InterleavingProbes probes)
+        {
+            if (DurableTask.Current.Id.ToString() == "a")
+            {
+                var first = grain.Counter.Value;
+                probes.FirstRead.TrySetResult();
+                _ = await Next.WaitAsync();
+                var second = grain.Counter.Value;
+                probes.Observed.TrySetResult($"{first},{second}");
+            }
+            else
+            {
+                _ = await Next.WaitAsync();
+                grain.Counter.Value = 10;
+                probes.Written.TrySetResult();
+            }
+
+            // The bodies stay pending, so the next activation replays them.
+            _ = await End.WaitAsync();
+        }
+    });
+
+    /// <summary>Lets a test observe the points which interleaved bodies reach.</summary>
+    private sealed class InterleavingProbes
+    {
+        public TaskCompletionSource FirstRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Written { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource<string> Observed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    /// <summary>Lets a test release each named point of bodies and observe when a body reaches it.</summary>
+    private sealed class Controls
+    {
+        private readonly Dictionary<string, (TaskCompletionSource Reached, TaskCompletionSource Release)> _points = [];
+
+        public string? Observed { get; set; }
+
+        public Task Reached(string name) => Get(name).Reached.Task;
+
+        /// <summary>Waits until a body reaches <paramref name="name"/>, then lets it continue.</summary>
+        public async Task Pass(string name)
+        {
+            await Reached(name).WaitAsync(Timeout, TestCancellation);
+            Get(name).Release.TrySetResult();
+        }
+
+        public Task Wait(string name)
+        {
+            var point = Get(name);
+            point.Reached.TrySetResult();
+            return point.Release.Task.WaitAsync(DurableTask.Current.CancellationToken);
+        }
+
+        private (TaskCompletionSource Reached, TaskCompletionSource Release) Get(string name)
+        {
+            lock (_points)
+            {
+                if (!_points.TryGetValue(name, out var point))
+                {
+                    _points[name] = point = (new(TaskCreationOptions.RunContinuationsAsynchronously), new(TaskCreationOptions.RunContinuationsAsynchronously));
+                }
+
+                return point;
+            }
+        }
+    }
 
     [Fact]
     public void TransportSendsThroughTheOutboxAsTheJournaledStateHostsWork()

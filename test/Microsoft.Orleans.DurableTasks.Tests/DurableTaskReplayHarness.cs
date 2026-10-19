@@ -62,8 +62,11 @@ internal sealed class DurableTaskReplayHarness(
             var log = services.GetRequiredKeyedService<IDurableLog<int>>("log");
             var stock = services.GetRequiredKeyedService<IDurableDictionary<string, int>>("stock");
             var list = services.GetRequiredKeyedService<IDurableList<int>>("list");
+            var queue = services.GetRequiredKeyedService<IDurableQueue<int>>("queue");
+            var set = services.GetRequiredKeyedService<IDurableSet<int>>("set");
+            var completion = services.GetRequiredKeyedService<IDurableTaskCompletionSource<int>>("completion");
             var manager = services.GetRequiredService<IJournaledStateManager>();
-            var grain = new ReplayGrain(this, counter, log, stock, list, manager);
+            var grain = new ReplayGrain(this, counter, log, stock, list, manager) { Queue = queue, Set = set, Completion = completion };
             var grainContext = Substitute.For<IGrainContext>();
             grainContext.GrainId.Returns(GrainId);
             grainContext.GetTarget().Returns(grain);
@@ -172,6 +175,15 @@ internal sealed class ReplayGrain(
 
     /// <summary>Gets the grain's journaled list.</summary>
     public IDurableList<int> List { get; } = list;
+
+    /// <summary>Gets the grain's journaled queue.</summary>
+    public required IDurableQueue<int> Queue { get; init; }
+
+    /// <summary>Gets the grain's journaled set.</summary>
+    public required IDurableSet<int> Set { get; init; }
+
+    /// <summary>Gets the grain's journaled completion source.</summary>
+    public required IDurableTaskCompletionSource<int> Completion { get; init; }
 
     /// <summary>Completes once the workflow waits at the gate.</summary>
     public Task AtGate => _atGate.Task;
