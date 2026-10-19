@@ -1,6 +1,7 @@
 using System.Buffers;
 using CsCheck;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization;
 using Xunit;
 
@@ -148,9 +149,35 @@ public sealed class JournalPositionTests : JournalingTestBase
         }, iter: 100);
     }
 
-    private async Task<Activation> ActivateAsync(ControlledStorage storage)
+    [Fact]
+    public async Task UnresolvableReadKeepsItsBarrierAndIsReported()
     {
-        var sut = CreateTestSystem(storage);
+        var storage = new ControlledStorage(new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey));
+        var logger = new RecordingLogger();
+        var activation = await ActivateAsync(storage, logger);
+        activation.Dictionary["a"] = "x";
+
+        // A read which its state's replica can't evaluate: the key is absent at the read's position.
+        var read = activation.Probe.Read(activation.Dictionary, "dictionary", JournaledStateOperation.DictionaryGet, "missing", "never");
+        storage.RequestCompaction = true;
+        for (var window = 1; window <= 2; window++)
+        {
+            for (var i = 0; i <= JournalPositionTracker.MaxDeferredSnapshots; i++)
+            {
+                await activation.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+            }
+
+            // Each window ends with one resolution, which reports the read and keeps the history which it needs.
+            Assert.Equal(0, storage.Replaces);
+            Assert.True(activation.Manager.Positions.HasBarriers);
+            Assert.False(read.IsResolved);
+            Assert.Equal(window, logger.Errors.Count(static message => message.Contains("couldn't be resolved", StringComparison.Ordinal)));
+        }
+    }
+
+    private async Task<Activation> ActivateAsync(ControlledStorage storage, ILogger<JournaledStateManager>? logger = null)
+    {
+        var sut = CreateTestSystem(storage, logger: logger);
         var manager = (JournaledStateManager)sut.Manager;
         var dictionary = new DurableDictionary<string, string>(
             "dictionary",
@@ -369,5 +396,23 @@ public sealed class JournalPositionTests : JournalingTestBase
             IEnumerable<string>? remove = null,
             string? expectedETag = null,
             CancellationToken cancellationToken = default) => inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
+    }
+
+    /// <summary>Records the messages of errors which the manager logs.</summary>
+    private sealed class RecordingLogger : ILogger<JournaledStateManager>
+    {
+        public List<string> Errors { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel >= LogLevel.Error)
+            {
+                Errors.Add(formatter(state, exception));
+            }
+        }
     }
 }
