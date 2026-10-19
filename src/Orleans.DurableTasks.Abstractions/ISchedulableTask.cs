@@ -22,8 +22,9 @@ public interface ISchedulableTask
     /// </summary>
     /// <remarks>
     /// The start commits with the caller's next durable write, together with the state changes which the calling code
-    /// staged, and its host then delivers it exactly once. Implementations which have no durable outbox to stage in, such
-    /// as clients, keep this default implementation, which throws <see cref="InvalidOperationException"/>.
+    /// staged. Its host then delivers it, retrying until the task's host accepts it, and the task's host deduplicates
+    /// deliveries by the task's identifier, so the task starts once. Implementations which have no durable outbox to
+    /// stage in, such as clients, keep this default implementation, which throws <see cref="InvalidOperationException"/>.
     /// </remarks>
     IScheduledTaskHandle Post(TaskId taskId)
         => throw new InvalidOperationException(
