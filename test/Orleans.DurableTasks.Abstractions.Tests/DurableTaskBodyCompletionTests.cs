@@ -97,6 +97,8 @@ public sealed class DurableTaskBodyCompletionTests
     {
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 
+        public override Guid Incarnation => Guid.Empty;
+
         protected override void OnBodyCompleted(DurableTaskResponse response) =>
             events.Enqueue(response.Status == DurableTaskStatus.CompletedSuccessfully
                 ? $"completed:{response.Result}"

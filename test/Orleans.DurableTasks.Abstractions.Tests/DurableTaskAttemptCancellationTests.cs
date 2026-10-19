@@ -649,6 +649,8 @@ public class DurableTaskAttemptCancellationTests
 
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 
+        public override Guid Incarnation => Guid.Empty;
+
         protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(
             TaskId taskId,
             DurableTask taskDefinition,
@@ -708,6 +710,8 @@ public class DurableTaskAttemptCancellationTests
         public RespondingHandle Handle { get; } = new(taskId.Child("child"));
 
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
+
+        public override Guid Incarnation => Guid.Empty;
 
         protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(
             TaskId taskId,
