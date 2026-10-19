@@ -40,6 +40,11 @@ public interface IDocumentHasher
     Task<string> HashAsync(byte[] document, CancellationToken cancellationToken);
 }
 
+public interface IRoomInventory
+{
+    Task ReleaseAsync(string room, CancellationToken cancellationToken);
+}
+
 // Stands in for a grain interface whose durable methods return DurableTask, such as an order grain's.
 public interface IOrderWorkflows
 {
