@@ -941,26 +941,9 @@ internal sealed partial class DurableTaskGrainRuntime(
         Func<TState, DurableTaskResponse> effect)
     {
         ThrowIfStopping();
-        if (_storage.TryGetTask(effectId, out var record))
+        if (TryGetEffectOutcome(effectId, "a DurableTask.RunInline effect") is { } outcome)
         {
-            if (!IsEffectRecord(record) || ReadRecordedResult(effectId, record) is not { IsCompleted: true } outcome)
-            {
-                throw CreateDivergenceException(
-                    $"Durable child task '{effectId}' is already associated with a different operation.",
-                    record,
-                    "a DurableTask.RunInline effect");
-            }
-
             return outcome;
-        }
-
-        // A named combinator records only its inputs, beneath its identifier.
-        if (_storage.GetChildren(effectId).FirstOrDefault() is (var inputId, { } input))
-        {
-            throw CreateDivergenceException(
-                $"Durable child task '{effectId}' holds '{inputId}', which an earlier run recorded.",
-                input,
-                "a DurableTask.RunInline effect");
         }
 
         var response = effect(state);
@@ -975,6 +958,72 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         return response;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="body"/> as a transaction over the grain's journaled state, whose commit stages a record of the
+    /// result under <paramref name="effectId"/> together with the transaction's changes.
+    /// </summary>
+    /// <remarks>
+    /// A body which fails, or whose result doesn't serialize, aborts the transaction, which leaves no trace, and the task
+    /// faults; the caller records the failure in its place. A run which ends before a write captures the commit loses both
+    /// the changes and the record, so the next run runs the body again.
+    /// </remarks>
+    Task<T> IDurableTaskGrainRuntime.RunTransactionAsync<T>(
+        TaskId effectId,
+        Func<CancellationToken, Task<T>> body,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfStopping();
+        var manager = _stateManager as JournaledStateManager ?? throw new NotSupportedException("Durable transactions require the journaled state manager which Orleans.Journaling registers.");
+        return manager.RunTransactionAsync(
+            body,
+            onCommit: result => AddRecord(effectId, DurableTaskRecordKind.Effect, EffectFingerprint, DurableTaskResponse.FromResult(result)),
+            cancellationToken);
+    }
+
+    /// <summary>Stages a record of an effect's outcome under <paramref name="effectId"/>, without writing.</summary>
+    void IDurableTaskGrainRuntime.RecordEffect(TaskId effectId, DurableTaskResponse response)
+    {
+        ThrowIfStopping();
+        AddRecord(effectId, DurableTaskRecordKind.Effect, EffectFingerprint, response);
+    }
+
+    /// <summary>Returns the outcome which an effect recorded under <paramref name="effectId"/>, or <see langword="null"/>.</summary>
+    /// <param name="effectId">The effect's identifier.</param>
+    /// <param name="requested">A description of the requested operation, for a divergence.</param>
+    /// <exception cref="DurableTaskDivergenceException">Another kind of operation is recorded under the identifier.</exception>
+    DurableTaskResponse? IDurableTaskGrainRuntime.TryGetEffectOutcome(TaskId effectId, string requested)
+    {
+        ThrowIfStopping();
+        return TryGetEffectOutcome(effectId, requested);
+    }
+
+    private DurableTaskResponse? TryGetEffectOutcome(TaskId effectId, string requested)
+    {
+        if (_storage.TryGetTask(effectId, out var record))
+        {
+            if (!IsEffectRecord(record) || ReadRecordedResult(effectId, record) is not { IsCompleted: true } outcome)
+            {
+                throw CreateDivergenceException(
+                    $"Durable child task '{effectId}' is already associated with a different operation.",
+                    record,
+                    requested);
+            }
+
+            return outcome;
+        }
+
+        // A named combinator records only its inputs, beneath its identifier.
+        if (_storage.GetChildren(effectId).FirstOrDefault() is (var inputId, { } input))
+        {
+            throw CreateDivergenceException(
+                $"Durable child task '{effectId}' holds '{inputId}', which an earlier run recorded.",
+                input,
+                requested);
+        }
+
+        return null;
     }
 
     // Version records are terminal records of their execution, as effect records are, whose result is the version.

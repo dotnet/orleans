@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using Orleans.DurableTasks;
@@ -884,6 +885,76 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         catch (DurableTaskDivergenceException divergence)
         {
             throw Diverge(divergence);
+        }
+    }
+
+    /// <summary>
+    /// Returns the outcome which an earlier run recorded for the transaction named <paramref name="name"/>, or runs
+    /// <paramref name="body"/> as a transaction over the grain's journaled state whose commit records the result together
+    /// with the transaction's changes.
+    /// </summary>
+    /// <remarks>
+    /// The transaction is an effect: it shares <c>RunInline</c>'s identifiers, and a replay returns the recorded result, or
+    /// throws the recorded exception, without running the body. The body's accesses aren't recorded, so it never replays
+    /// partially. A body which fails aborts the transaction, which leaves no trace, and its failure is recorded.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The caller isn't running on the activation's scheduler.</exception>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A failed transaction is recorded as its outcome.")]
+    internal async Task<T> RunTransactionAsync<T>(string name, Func<CancellationToken, Task<T>> body, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        if (TaskScheduler.Current != _scheduler)
+        {
+            throw new InvalidOperationException(
+                $"A durable transaction runs on the scheduler of the grain activation which runs durable task '{Id}', so its record commits with its changes. Code which continues elsewhere, for example after ConfigureAwait(false), can't run one.");
+        }
+
+        ThrowIfAttemptCanceled();
+        var effectId = CreateChildTaskId(name);
+        ObserveOperation(effectId, recordsOperation: true);
+        Exception? bodyFailure = null;
+        Task<T> transaction;
+        using (EnterCoveredRegion())
+        {
+            try
+            {
+                if (_runtime.TryGetEffectOutcome(effectId, "a durable transaction") is { } recorded)
+                {
+                    return recorded.GetResult<T>();
+                }
+            }
+            catch (DurableTaskDivergenceException divergence)
+            {
+                throw Diverge(divergence);
+            }
+
+            transaction = _runtime.RunTransactionAsync(effectId, async cancellationToken =>
+            {
+                try
+                {
+                    return await body(cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    bodyFailure = exception;
+                    throw;
+                }
+            }, cancellationToken);
+        }
+
+        try
+        {
+            return await transaction;
+        }
+        catch (Exception exception) when (ReferenceEquals(exception, bodyFailure) && exception is not DurableTaskAttemptCanceledException && !IsAttemptCanceled)
+        {
+            // The body's failure is its outcome. Failures of the transaction itself, such as a fenced journal, aren't.
+            using (EnterCoveredRegion())
+            {
+                _runtime.RecordEffect(effectId, DurableTaskResponse.FromException(exception));
+            }
+
+            throw;
         }
     }
 
