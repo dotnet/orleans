@@ -42,7 +42,7 @@ Keyed injection of `IDurableValue<int>` with the key `"count"` and `stateManager
 | <xref:Orleans.Journaling.IDurableList`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddList*> | <xref:System.Collections.Generic.IList`1> plus `AddRange` | Add, insert, set, remove, clear, snapshot |
 | <xref:Orleans.Journaling.IDurableQueue`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddQueue*> | Queue operations | Enqueue, dequeue, clear, snapshot |
 | <xref:Orleans.Journaling.IDurableSet`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddSet*> | <xref:System.Collections.Generic.ISet`1> | Add, remove, clear, snapshot |
-| <xref:Orleans.Journaling.IDurableLog`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddLog*> | Append-only entries addressed by sequence number, reads, and drafts | Append, trim, snapshot |
+| <xref:Orleans.Journaling.IDurableLog`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddLog*> | Append-only entries addressed by epoch and sequence number, reads, and drafts | Epoch, append, draft commit, trim, clear, seal, snapshot |
 | <xref:Orleans.Journaling.IDurableTaskCompletionSource`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddTaskCompletionSource*> | Durable task completion | Complete, fault, or cancel |
 | <xref:Orleans.Runtime.IPersistentState`1> | <xref:Orleans.Journaling.DurableStateManagerExtensions.GetOrAddPersistentState*> | Record-style state | Set or clear a versioned state value |
 

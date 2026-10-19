@@ -37,7 +37,7 @@ a fresh activation reconstructs the durable outcome before processing resumes.
 
 Each named state has a stable stream identity within the grain journal. Keep those names stable across deployments so recovery can bind stored operations to the intended state.
 
-Grains can expose watch streams over their durable state. Committed-mode streams deliver changes after their journal write is acknowledged; speculative streams also deliver staged changes and volatile log drafts. See [Observe state and stream drafts](observe-state.md).
+Grains can expose watch streams over their durable state. Committed-mode streams deliver changes after their journal write is acknowledged. Streams with the `Staged` flag also deliver staged changes, and streams with the `Drafts` flag also deliver volatile log drafts. See [Observe state and stream drafts](observe-state.md).
 
 ## Journal lifecycle
 
