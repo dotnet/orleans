@@ -21,12 +21,12 @@ A durable task body reads or changes persistent grain state at a point from whic
 
 ## Rule description
 
-A replay runs the body from the start, and each recorded operation returns its recorded outcome. Persistent state isn't rebuilt: it holds every committed change, including the changes which later operations made, and the grain changes its value in place. The code before the body's last durable operation therefore runs again against newer state:
+A replay runs the body from the start, and each recorded operation returns its recorded outcome. Persistent state holds its latest committed value, including the changes which later operations made, and the grain changes that value in place. The code before the body's last durable operation therefore runs again against newer state:
 
 - **Writes apply again.** After a deactivation, the replay of `RemindAsync` increments `_remindersSent` a second time, although the reminder was sent once.
 - **Reads observe later writes.** The replay of `ShipWhenPaidAsync` reads `_status`, which the recorded `ship` step wrote, and skips the branch which the first run took. A replay which schedules different operations, or the same operations with different arguments, returns a different result or diverges and stalls the execution.
 
-Journaled state, such as `IDurableValue<T>` and the durable collections, records each access of a durable task body, and a replay returns the recorded outcomes, so the rule doesn't apply to it. Three places access persistent state once:
+Journaled state, such as `IDurableValue<T>` and the durable collections, records each access of a durable task body, and a replay returns the recorded outcomes, so the rule covers persistent state only. Three places access persistent state once:
 
 - A `DurableTask.RunInline` effect runs once, and its state changes commit with its record.
 - A local step, an `async DurableTask` method of the same grain, commits the state changes of its final code with its recorded result.
