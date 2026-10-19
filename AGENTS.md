@@ -13,6 +13,20 @@ correctness, security, compatibility, concurrency, and reliability.
   that is not yet established, changing a surface that may have shipped or been
   persisted, or adding a dependency.
 
+## Approach
+
+- **Essence over accident.** The hard part is the spec and the conceptual model;
+  code is its representation. Spend effort there.
+- **KISS.** Simplicity is the hardest revision, not the first draft. Iterate until
+  the design is obviously right.
+- **YAGNI.** Build for today's requirements. "If in doubt, leave it out."
+- **Grow, don't build.** Keep a running end-to-end skeleton; add function
+  incrementally.
+- **Zero debt in what ships.** Fewer features, each solid. Fix showstoppers when
+  found.
+- **Always say why.** Every non-obvious decision carries its rationale (comment,
+  commit message, PR).
+
 ## Layering, contracts, and invariants
 
 - Establish each layer's required and provided guarantees. Keep responsibilities
