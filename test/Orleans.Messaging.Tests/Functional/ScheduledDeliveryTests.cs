@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Messaging.Tests.Support;
@@ -76,6 +76,20 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         Assert.Equal(0, recovered.InboxCount);
     }
 
+    [Fact]
+    public async Task Pump_StartsWhenActivationCompletesSoStagedWorkRunsWithoutAWakeup()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+
+        // No messaging call has reached this activation, and its wake-up is suppressed.
+        Fixture.JobManagerProbe.SkipNext(MessagingPump.JobName);
+        var staged = CreateEnvelope(receiver, NewMessage(83, "staged"));
+        await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.StageAcceptance(Fixture.GetInbox(receiver), staged));
+        await receiver.RetryWriteStateAsync();
+
+        Assert.Equal("staged", Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Value);
+    }
     [Fact]
     public async Task Wakeup_ForDueWorkIsScheduledOncePerIdlePeriodWithinTheRecheckDelay()
     {
