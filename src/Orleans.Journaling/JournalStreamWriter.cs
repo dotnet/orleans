@@ -26,6 +26,9 @@ public readonly struct JournalStreamWriter
 
     internal bool IsInitialized => _writer is not null;
 
+    /// <summary>Records a change which the state journals when a write captures it.</summary>
+    internal void MarkModified() => _writer?.MarkModified();
+
     /// <summary>
     /// Appends a format-owned entry for retired or unknown state preservation.
     /// </summary>

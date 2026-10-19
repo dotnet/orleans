@@ -1101,6 +1101,16 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public long PendingWriteByteCount => _journalWriter.CommittedLength;
 
+    /// <summary>
+    /// Begins recording whether the calling asynchronous flow stages a change in this manager's states.
+    /// </summary>
+    /// <remarks>
+    /// Call it from the async method whose flow the scope covers; see <see cref="StagedChangeScope"/>. The built-in
+    /// durable states report a change when they are modified, and any state reports one when it commits a journal entry
+    /// outside a write. Orleans.Messaging uses a scope to tell whether a failed handler attempt staged changes.
+    /// </remarks>
+    internal StagedChangeScope BeginStagedChangeScope() => StagedChangeScope.Begin(_journalWriter);
+
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer)
         => observer.Subscribe(GrainLifecycleStage.SetupState, this);
 

@@ -265,6 +265,9 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
         }
     }
 
+    /// <summary>Records a change which a state stages in memory and journals when a write captures it.</summary>
+    internal void MarkModified() => StagedChangeScope.OnStaged(this);
+
     internal void CommitActiveEntry(JournalStreamId streamId)
     {
         lock (_lock)
@@ -275,6 +278,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             {
                 FinishEntry(streamId);
                 _committedLength = _buffer.Length;
+                StagedChangeScope.OnStaged(this);
             }
             catch
             {

@@ -52,6 +52,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     private DurableTaskCompletionSourceStatus _status;
     private T? _value;
     private Exception? _exception;
+    private JournalStreamWriter _writer;
 
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
@@ -89,8 +90,10 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             return false;
         }
 
+        var copy = _copier.Copy(value);
         _status = DurableTaskCompletionSourceStatus.Completed;
-        _value = _copier.Copy(value);
+        _writer.MarkModified();
+        _value = copy;
         return true;
     }
 
@@ -101,8 +104,10 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             return false;
         }
 
+        var copy = _exceptionCopier.Copy(exception);
         _status = DurableTaskCompletionSourceStatus.Faulted;
-        _exception = _exceptionCopier.Copy(exception);
+        _writer.MarkModified();
+        _exception = copy;
         return true;
     }
 
@@ -114,6 +119,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
 
         _status = DurableTaskCompletionSourceStatus.Canceled;
+        _writer.MarkModified();
         return true;
     }
 
@@ -154,6 +160,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
+        _writer = writer;
         _status = DurableTaskCompletionSourceStatus.Pending;
         _value = default;
         _exception = null;

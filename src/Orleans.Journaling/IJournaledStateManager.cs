@@ -84,4 +84,5 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// concurrent writers and should not be used for correctness decisions.
     /// </remarks>
     long PendingWriteByteCount => -1;
+
 }
