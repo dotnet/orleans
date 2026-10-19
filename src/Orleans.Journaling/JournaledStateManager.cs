@@ -343,7 +343,15 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                 || _storage.IsCompactionRequested;
                             if (isSnapshot)
                             {
-                                (isSnapshot, positionResolution) = await PlanSnapshotAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                try
+                                {
+                                    (isSnapshot, positionResolution) = await PlanSnapshotAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                }
+                                catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+                                {
+                                    workItem.TrySetCanceled(_shutdownCancellation.Token);
+                                    return;
+                                }
                             }
 
                             try
@@ -619,7 +627,16 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
 
                                     if (positionResolution is not null)
                                     {
-                                        await _positions.ReadHistoryAsync(positionResolution, _shutdownCancellation.Token).ConfigureAwait(true);
+                                        try
+                                        {
+                                            await _positions.ReadHistoryAsync(positionResolution, _shutdownCancellation.Token).ConfigureAwait(true);
+                                        }
+                                        catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+                                        {
+                                            workItem.TrySetCanceled(_shutdownCancellation.Token);
+                                            return;
+                                        }
+
                                         lock (_lock)
                                         {
                                             _positions.Resolve(positionResolution);

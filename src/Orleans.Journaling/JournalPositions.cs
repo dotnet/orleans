@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Globalization;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
@@ -176,24 +177,50 @@ internal sealed class JournalPositionalReads(Serializer serializer)
 /// </para>
 /// <para>
 /// The entries reuse the dictionary commands of <see cref="string"/> keys and values, with positions in invariant decimal.
-/// The codec is resolved when the journal first holds a barrier, so journals whose reads never record positions need no
-/// codec for them.
+/// The write format's codec is looked up once, when positions are first requested, so journals whose reads never record
+/// positions, and format registrations without that codec, need none: without it, the manager offers no positions.
 /// </para>
 /// </remarks>
-internal sealed class JournalBarrierState(Func<IDurableDictionaryCommandCodec<string, string>> getCodec) : IStateMachine, IDurableDictionaryCommandHandler<string, string>
+internal sealed class JournalBarrierState(Func<IDurableDictionaryCommandCodec<string, string>?> tryGetCodec) : IStateMachine, IDurableDictionaryCommandHandler<string, string>
 {
     /// <summary>The reserved stream id of the journal's barriers.</summary>
     public const uint Id = 2u;
 
-    private readonly Func<IDurableDictionaryCommandCodec<string, string>> _getCodec = getCodec;
+    private readonly Func<IDurableDictionaryCommandCodec<string, string>?> _tryGetCodec = tryGetCodec;
     private readonly Dictionary<string, long> _barriers = new(StringComparer.Ordinal);
     private readonly HashSet<string> _changed = new(StringComparer.Ordinal);
     private IDurableDictionaryCommandCodec<string, string>? _codec;
+    private bool _hasLookedUpCodec;
 
     /// <summary>Gets whether any owner holds a barrier.</summary>
     public bool HasBarriers => _barriers.Count > 0;
 
-    private IDurableDictionaryCommandCodec<string, string> Codec => _codec ??= _getCodec();
+    /// <summary>Gets whether the write format has a codec for barriers, so the journal can hold them.</summary>
+    public bool CanHoldBarriers => Codec is not null;
+
+    private IDurableDictionaryCommandCodec<string, string>? Codec
+    {
+        get
+        {
+            if (!_hasLookedUpCodec)
+            {
+                _codec = _tryGetCodec();
+                _hasLookedUpCodec = true;
+            }
+
+            return _codec;
+        }
+    }
+
+    // Barriers are set only while positions are offered, which requires the codec, or replayed, which required it.
+    private IDurableDictionaryCommandCodec<string, string> RequiredCodec
+    {
+        get
+        {
+            Debug.Assert(Codec is not null, "The journal holds barriers only when the write format has their codec.");
+            return Codec!;
+        }
+    }
 
     /// <summary>Holds a barrier for <paramref name="owner"/> from <paramref name="position"/>, unless it holds one.</summary>
     public void Set(string owner, long position)
@@ -223,8 +250,13 @@ internal sealed class JournalBarrierState(Func<IDurableDictionaryCommandCodec<st
         _changed.Clear();
     }
 
-    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, Codec).Apply(entry.Reader, this);
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context)
+    {
+        var codec = Codec is { } writeCodec
+            ? context.GetRequiredCommandCodec(entry.FormatKey, writeCodec)
+            : JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, string>>(context.ServiceProvider, entry.FormatKey);
+        codec.Apply(entry.Reader, this);
+    }
 
     void IStateMachine.Reset(JournalStreamWriter writer) => ResetVolatileState();
 
@@ -234,11 +266,11 @@ internal sealed class JournalBarrierState(Func<IDurableDictionaryCommandCodec<st
         {
             if (_barriers.TryGetValue(owner, out var position))
             {
-                Codec.WriteSet(owner, Format(position), writer);
+                RequiredCodec.WriteSet(owner, Format(position), writer);
             }
             else
             {
-                Codec.WriteRemove(owner, writer);
+                RequiredCodec.WriteRemove(owner, writer);
             }
         }
 
@@ -250,7 +282,7 @@ internal sealed class JournalBarrierState(Func<IDurableDictionaryCommandCodec<st
     {
         if (_barriers.Count > 0)
         {
-            Codec.WriteSnapshot([.. _barriers.Select(static pair => KeyValuePair.Create(pair.Key, Format(pair.Value)))], writer);
+            RequiredCodec.WriteSnapshot([.. _barriers.Select(static pair => KeyValuePair.Create(pair.Key, Format(pair.Value)))], writer);
         }
 
         _changed.Clear();

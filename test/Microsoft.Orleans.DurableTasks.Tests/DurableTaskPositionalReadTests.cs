@@ -383,6 +383,32 @@ public sealed class DurableTaskPositionalReadTests
     }
 
     [Fact]
+    public async Task ShutdownDuringAHistoryReadCancelsTheWrite()
+    {
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
+        var activation = await harness.ActivateAsync();
+        activation.Dictionary["a"] = "x";
+        await activation.Manager.WriteStateAsync(Cancellation);
+        var log = activation.CreateLog();
+        activation.Run(log, static activation => _ = activation.Dictionary["a"]);
+        log.Flush();
+        harness.Storage.RequestCompaction = true;
+        for (var i = 0; i < JournalPositionTracker.MaxDeferredSnapshots; i++)
+        {
+            await activation.Manager.WriteStateAsync(Cancellation);
+        }
+
+        harness.Storage.ReadGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var snapshot = activation.Manager.WriteStateAsync(Cancellation).AsTask();
+        await harness.Storage.ReadStarted.Task.WaitAsync(Cancellation);
+
+        // Deactivation cancels the write which waits for history, as it cancels one which waits for its states to prepare.
+        await activation.DisposeAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => snapshot);
+        Assert.True(snapshot.IsCanceled);
+    }
+
+    [Fact]
     public async Task ForcedResolutionFencesWhenAnotherWriterChangedTheJournal()
     {
         await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
@@ -695,7 +721,7 @@ public sealed class DurableTaskPositionalReadTests
             {
                 control.ReadGate = null;
                 control.ReadStarted.TrySetResult();
-                await gate.Task;
+                await gate.Task.WaitAsync(cancellationToken);
             }
 
             await inner.ReadAsync(consumer, cancellationToken);
