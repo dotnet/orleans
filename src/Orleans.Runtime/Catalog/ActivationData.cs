@@ -2365,8 +2365,8 @@ internal sealed partial class ActivationData :
 
                 // Send the dehydration context to the target host, together with the queued requests, which the new activation runs before any other request.
                 requests = TakeRequestsForMigration();
-                var migration = migrationManager.MigrateAsync(ForwardingAddress, GrainId, context.MigrationContext, requests, out var carriesRequests);
-                if (!carriesRequests)
+                var migration = migrationManager.MigrateAsync(ForwardingAddress, GrainId, context.MigrationContext, requests, out var carriedRequests);
+                if (carriedRequests is null)
                 {
                     // The requests stay queued and are forwarded.
                     EndRequestMigration(requests, MigratedRequestsOutcome.Retained);
@@ -2378,8 +2378,16 @@ internal sealed partial class ActivationData :
                     requestsOutcome = MigratedRequestsOutcome.Unknown;
                 }
 
+                // If this stops waiting, the outcome stays unknown and the requests are released, and a later outcome does not affect them,
+                // since this activation is their only owner.
                 var result = await migration.AsTask().WaitAsync(cancellationToken);
                 requestsOutcome = result.Requests;
+                if (requestsOutcome is MigratedRequestsOutcome.Retained && carriedRequests is not null)
+                {
+                    // Serializing the requests can release the storage of their values, so they are delivered as copies read back from their serialized form.
+                    migrationManager.ReplaceWithCopies(requests!, carriedRequests);
+                }
+
                 if (!result.Migrated)
                 {
                     LogFailedToMigrateActivation(_shared.Logger, result.Exception!, this);

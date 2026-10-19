@@ -145,18 +145,32 @@ internal interface IActivationMigrationManager
     /// <param name="migrationContext">Information about the grain being migrated, which will be consumed by the new activation.</param>
     /// <param name="requests">
     /// The requests which were queued for the grain, if any. A request which cannot be serialized is removed and failed, since it cannot be delivered.
-    /// If the migration does not carry the requests, or the target declines them, they are replaced with equivalent requests, since serializing them can
-    /// release the storage of their values.
+    /// If the migration does not carry the requests because they do not fit in a message, they are replaced with equivalent requests, since serializing them can
+    /// release the storage of their values. The caller owns the requests: this method does not access them after it returns.
     /// </param>
-    /// <param name="carriesRequests">
-    /// Whether the migration carries <paramref name="requests"/>. A migration carries them only when <paramref name="target"/> accepts queued requests
-    /// and they fit in a message. Otherwise, the caller retains them.
+    /// <param name="carriedRequests">
+    /// The serialized requests which the migration carries, or <see langword="null"/> if it carries none. A migration carries them only when
+    /// <paramref name="target"/> accepts queued requests and they fit in a message. Otherwise, the caller retains them.
     /// </param>
     /// <returns>The outcome of the migration.</returns>
     /// <remarks>
     /// When the target accepts the requests, their callers are retargeted to it before this completes, so that their calls survive the source's departure.
+    /// When the outcome is <see cref="MigratedRequestsOutcome.Retained"/>, the caller passes <paramref name="requests"/> and <paramref name="carriedRequests"/>
+    /// to <see cref="ReplaceWithCopies"/> before delivering the requests.
     /// </remarks>
-    ValueTask<MigrationResult> MigrateAsync(SiloAddress target, GrainId grainId, MigrationContext migrationContext, List<Message>? requests, out bool carriesRequests);
+    ValueTask<MigrationResult> MigrateAsync(SiloAddress target, GrainId grainId, MigrationContext migrationContext, List<Message>? requests, out byte[]? carriedRequests);
+
+    /// <summary>
+    /// Replaces requests which a migration carried, but which remain with the caller, with equivalent requests read from their serialized form.
+    /// </summary>
+    /// <param name="requests">The requests which the migration carried.</param>
+    /// <param name="carriedRequests">The serialized requests which <see cref="MigrateAsync"/> returned.</param>
+    /// <remarks>
+    /// Serializing a request can release the storage of some of its values, such as pooled buffers, so a request which was serialized but remains
+    /// with this silo is delivered as a request read back from its serialized form, which holds its serialized body, as a received request does.
+    /// Forwarding it then sends that body without serializing the request's values again.
+    /// </remarks>
+    void ReplaceWithCopies(List<Message> requests, byte[] carriedRequests);
 }
 
 /// <summary>
@@ -340,17 +354,19 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         return default;
     }
 
-    public ValueTask<MigrationResult> MigrateAsync(SiloAddress targetSilo, GrainId grainId, MigrationContext migrationContext, List<Message>? requests, out bool carriesRequests)
+    public ValueTask<MigrationResult> MigrateAsync(SiloAddress targetSilo, GrainId grainId, MigrationContext migrationContext, List<Message>? requests, out byte[]? carriedRequests)
     {
         var package = new GrainMigrationPackage { GrainId = grainId, MigrationContext = migrationContext };
         long size = 0;
         List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes = null;
-        carriesRequests = requests is { Count: > 0 }
+        var carriesRequests = requests is { Count: > 0 }
             && AcceptsMigratedRequests(targetSilo)
             && TryPackageRequests(targetSilo, ref package, requests, out routes, out size);
+        carriedRequests = carriesRequests ? package.Requests : null;
 
+        // The work item holds only the serialized requests, so that the caller remains the requests' only owner, even if it stops waiting for the outcome.
         var workItem = _workItemPool.Get();
-        workItem.Initialize(package, carriesRequests ? requests : null, routes, size, this);
+        workItem.Initialize(package, routes, size);
         var workItemWriter = GetOrCreateWorker(targetSilo);
         if (!workItemWriter.TryWrite(workItem))
         {
@@ -470,20 +486,13 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         }
     }
 
-    /// <summary>
-    /// Replaces the first requests with equivalent requests read from the frames which serializing them produced.
-    /// </summary>
-    /// <remarks>
-    /// Serializing a request can release the storage of some of its values, such as pooled buffers, so a request which was serialized but remains
-    /// with this silo is delivered as a request read back from its frame, which holds its serialized body, as a received request does.
-    /// Forwarding it then sends that body without serializing the request's values again.
-    /// </remarks>
-    private void ReplaceWithCopies(List<Message> requests, byte[] frames)
+    /// <inheritdoc />
+    public void ReplaceWithCopies(List<Message> requests, byte[] carriedRequests)
     {
         List<Message> copies;
         try
         {
-            copies = MessageFrames.Read(MessageHandlerShared, frames);
+            copies = MessageFrames.Read(MessageHandlerShared, carriedRequests);
         }
         catch (Exception exception)
         {
@@ -796,19 +805,12 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         private ManualResetValueTaskSourceCore<MigrationResult> _core = new() { RunContinuationsAsynchronously = true };
         private GrainMigrationPackage _migrationPackage;
 
-        private List<Message>? _requests;
-        private ActivationMigrationManager? _owner;
-
         public void Initialize(
             GrainMigrationPackage package,
-            List<Message>? requests,
             List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes,
-            long size,
-            ActivationMigrationManager owner)
+            long size)
         {
             _migrationPackage = package;
-            _requests = requests;
-            _owner = owner;
             Routes = routes;
             Size = size;
         }
@@ -817,8 +819,6 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         {
             _core.Reset();
             _migrationPackage = default;
-            _requests = null;
-            _owner = null;
             Routes = null;
             Size = 0;
         }
@@ -835,16 +835,8 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         /// </summary>
         public long Size { get; private set; }
 
-        public void SetResult(MigrationResult result)
-        {
-            // Requests which the migration carried but which remain with the source are replaced with copies read from the package before the source forwards them.
-            if (result.Requests is MigratedRequestsOutcome.Retained && _requests is not null && _migrationPackage.Requests is { } frames)
-            {
-                _owner!.ReplaceWithCopies(_requests, frames);
-            }
+        public void SetResult(MigrationResult result) => _core.SetResult(result);
 
-            _core.SetResult(result);
-        }
         public ValueTask<MigrationResult> AsValueTask() => new(this, _core.Version);
 
         public MigrationResult GetResult(short token)
