@@ -17,6 +17,39 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
     // Attempts run at 0, 1, 3, 7, 15, 31 and 63 retry delays; the eighth and last runs when the timeout elapses.
     private static readonly TimeSpan RetryTimeout = RetryDelay * 100;
 
+    // Retry deadlines follow the Durable Jobs clock, which these tests move independently of the grain clock.
+    private ManualJobClock JobClock => ((RetryFixture)Fixture).JobClock;
+
+    [Fact]
+    public async Task HandlerFailure_RetriesOnTheDurableJobsClockAndNotTheGrainClock()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+        var inbox = Fixture.GetInbox(receiver);
+        var envelope = CreateEnvelope(receiver, NewMessage(197, "job-clock") with { ThrowOnceDuringPreparation = true });
+        var messageId = envelope.Envelope.MessageId;
+        var start = JobClock.GetUtcNow();
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        await Fixture.WaitUntilAsync(receiver, () => inbox.Count == 1 && InboxTestAccess.GetMessageState(inbox, messageId).AttemptCount == 1);
+        var state = await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetMessageState(inbox, messageId));
+        Assert.Equal(start + RetryDelay, state.NextAttemptAt);
+        Assert.Equal(start + RetryTimeout, state.ExpirationTime);
+
+        // Moving the grain clock past the retry timeout neither retries nor dead-letters the message.
+        Fixture.Clock.Advance(RetryTimeout * 2);
+        Assert.Equal(DurableJobRunStatus.RescheduleRequested, (await Fixture.RunPumpAsync(receiver)).Status);
+        var pending = await receiver.GetSnapshotAsync();
+        Assert.Equal(1, pending.InboxCount);
+        Assert.Empty(pending.Effects);
+        Assert.Empty(pending.InboxDeadLetters);
+        Assert.Equal(1, (await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetMessageState(inbox, messageId))).AttemptCount);
+
+        JobClock.Advance(RetryDelay);
+        Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(receiver)).Status);
+        Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
+    }
+
     [Fact]
     public async Task HandlerFailure_RetriesAfterBackoffAndEarlyWakeupsAreHarmless()
     {
@@ -25,7 +58,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         var inbox = Fixture.GetInbox(receiver);
         var envelope = CreateEnvelope(receiver, NewMessage(192, "retry") with { ThrowOnceDuringPreparation = true });
         var messageId = envelope.Envelope.MessageId;
-        var now = Fixture.Clock.GetUtcNow();
+        var now = JobClock.GetUtcNow();
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await Fixture.WaitUntilAsync(receiver, () => inbox.Count == 1 && InboxTestAccess.GetMessageState(inbox, messageId).AttemptCount == 1);
@@ -41,7 +74,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         Assert.Equal(1, pending.InboxCount);
         Assert.Empty(pending.Effects);
 
-        Fixture.Clock.Advance(RetryDelay);
+        JobClock.Advance(RetryDelay);
         Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(receiver)).Status);
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
@@ -62,7 +95,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         var inbox = Fixture.GetInbox(receiver);
         var envelope = CreateEnvelope(receiver, NewMessage(196, "transient") with { ThrowForAttempts = 6 });
         var messageId = envelope.Envelope.MessageId;
-        var start = Fixture.Clock.GetUtcNow();
+        var start = JobClock.GetUtcNow();
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await Fixture.WaitUntilAsync(receiver, () => inbox.Count == 1 && InboxTestAccess.GetMessageState(inbox, messageId).AttemptCount == 1);
@@ -88,7 +121,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
             Assert.Equal(expirationTime, state.ExpirationTime);
             var backoff = start + RetryDelay * ((1 << attempt) - 1);
             Assert.Equal(backoff < expirationTime ? backoff : expirationTime, state.NextAttemptAt);
-            Fixture.Clock.Advance(state.NextAttemptAt!.Value - Fixture.Clock.GetUtcNow());
+            JobClock.Advance(state.NextAttemptAt!.Value - JobClock.GetUtcNow());
             if (attempt == failedAttempts)
             {
                 return;
@@ -106,14 +139,14 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         var inbox = Fixture.GetInbox(receiver);
         var envelope = CreateEnvelope(receiver, NewMessage(193, "always-fails") with { ThrowDuringPreparation = true });
         var messageId = envelope.Envelope.MessageId;
-        var start = Fixture.Clock.GetUtcNow();
+        var start = JobClock.GetUtcNow();
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await Fixture.WaitUntilAsync(receiver, () => inbox.Count == 1 && InboxTestAccess.GetMessageState(inbox, messageId).AttemptCount == 1);
 
         // Backoff doubles per attempt, and the last attempt runs when InboxRetryTimeout elapses after the first failure.
         await RunFailedAttemptsAsync(receiver, inbox, messageId, start, failedAttempts: 7);
-        Assert.Equal(start + RetryTimeout, Fixture.Clock.GetUtcNow());
+        Assert.Equal(start + RetryTimeout, JobClock.GetUtcNow());
         Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(receiver)).Status);
         var deadLettered = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
         var deadLetter = Assert.Single(deadLettered.InboxDeadLetters);
@@ -191,6 +224,9 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
 
     private sealed class RetryFixture : MessagingClusterFixture
     {
+        // Days apart from the grain clock, so a test which reads the wrong clock sees the wrong deadline.
+        public ManualJobClock JobClock { get; } = new(DateTimeOffset.UtcNow + TimeSpan.FromDays(3));
+
         protected override void ConfigureOptions(DurableMessagingOptions options)
         {
             base.ConfigureOptions(options);
@@ -201,7 +237,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         protected override void ConfigureServices(IServiceCollection services)
         {
             base.ConfigureServices(services);
-            UseTestClockForDurableJobs(services);
+            services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs, JobClock);
         }
     }
 }
