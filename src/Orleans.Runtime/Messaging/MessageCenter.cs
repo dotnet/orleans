@@ -290,63 +290,70 @@ namespace Orleans.Runtime.Messaging
                         }
                         else
                         {
-                            _ = SendAsync(this, connectionTask, msg, sendMessage, allowResponseReaddress);
-
-                            static async Task SendAsync(
-                                MessageCenter messageCenter,
-                                ValueTask<Connection> connectionTask,
-                                Message msg,
-                                Action<Message, Connection?, Exception?>? sendMessage,
-                                bool allowResponseReaddress)
-                            {
-                                try
-                                {
-                                    var sender = await connectionTask;
-                                    if (sendMessage is null)
-                                    {
-                                        sender.Send(msg);
-                                    }
-                                    else
-                                    {
-                                        sendMessage(msg, sender, null);
-                                    }
-                                }
-                                catch (Exception exception)
-                                {
-                                    if (msg.Direction == Message.Directions.Response
-                                        && msg.TargetSilo is { } targetSilo)
-                                    {
-                                        var targetSiloIsDead = messageCenter.siloStatusOracle.IsDeadSilo(targetSilo);
-                                        if (messageCenter.TryDeliverToProxyLocally(msg, targetSiloIsDead))
-                                        {
-                                            return;
-                                        }
-
-                                        if (allowResponseReaddress
-                                            && ShouldReaddressResponse(msg, targetSiloIsDead))
-                                        {
-                                            _ = messageCenter.ReaddressResponse(msg, targetSilo);
-                                            return;
-                                        }
-                                    }
-
-                                    if (sendMessage is null)
-                                    {
-                                        RejectMessage();
-                                    }
-                                    else
-                                    {
-                                        sendMessage(msg, null, exception);
-                                    }
-
-                                    void RejectMessage() => messageCenter.SendRejection(
-                                        msg,
-                                        Message.RejectionTypes.Transient,
-                                        $"Exception while sending message: {exception}");
-                                }
-                            }
+                            _ = SendMessageAsync(connectionTask, msg, sendMessage, allowResponseReaddress);
                         }
                     }
+                }
+            }
+        }
+
+        internal async Task SendMessageAsync(
+            ValueTask<Connection> connectionTask,
+            Message message,
+            Action<Message, Connection?, Exception?>? sendMessage,
+            bool allowResponseReaddress)
+        {
+            try
+            {
+                var sender = await connectionTask;
+                if (sendMessage is null)
+                {
+                    sender.Send(message);
+                }
+                else
+                {
+                    sendMessage(message, sender, null);
+                }
+            }
+            catch (Exception exception)
+            {
+                if (message.Direction == Message.Directions.Response
+                    && message.TargetSilo is { } targetSilo)
+                {
+                    var targetSiloIsDead = siloStatusOracle.IsDeadSilo(targetSilo);
+                    if (TryDeliverToProxyLocally(message, targetSiloIsDead))
+                    {
+                        return;
+                    }
+
+                    if (allowResponseReaddress
+                        && ShouldReaddressResponse(message, targetSiloIsDead))
+                    {
+                        _ = ReaddressResponse(message, targetSilo);
+                        return;
+                    }
+
+                    if (message.Result != Message.ResponseTypes.Status)
+                    {
+                        if (Gateway?.TryQueueResponseToKnownClient(message) is not true)
+                        {
+                            RejectMessage(message, Message.RejectionTypes.Transient, exception);
+                        }
+
+                        return;
+                    }
+                }
+
+                if (sendMessage is null)
+                {
+                    SendRejection(
+                        message,
+                        Message.RejectionTypes.Transient,
+                        $"Exception while sending message: {exception}");
+                }
+                else
+                {
+                    sendMessage(message, null, exception);
                 }
             }
         }

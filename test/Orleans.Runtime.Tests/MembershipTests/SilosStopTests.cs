@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Reflection;
@@ -194,6 +195,128 @@ namespace UnitTests.MembershipTests
             finally
             {
                 directory.UnavailableClient = default;
+                client.RecordConnection(connection);
+            }
+        }
+
+        [Theory, TestCategory("Liveness")]
+        [InlineData((int)Message.ResponseTypes.Success, false, false)]
+        [InlineData((int)Message.ResponseTypes.Success, true, false)]
+        [InlineData((int)Message.ResponseTypes.Error, false, false)]
+        [InlineData((int)Message.ResponseTypes.Error, true, false)]
+        [InlineData((int)Message.ResponseTypes.Rejection, false, false)]
+        [InlineData((int)Message.ResponseTypes.Rejection, true, false)]
+        [InlineData((int)Message.ResponseTypes.Success, false, true)]
+        [InlineData((int)Message.ResponseTypes.Success, true, true)]
+        [InlineData((int)Message.ResponseTypes.Error, false, true)]
+        [InlineData((int)Message.ResponseTypes.Error, true, true)]
+        [InlineData((int)Message.ResponseTypes.Rejection, false, true)]
+        [InlineData((int)Message.ResponseTypes.Rejection, true, true)]
+        public async Task GatewayConnectionFailureQueuesOriginalBufferedTerminalResponse(
+            int responseType,
+            bool failureAlreadyCompleted,
+            bool allowResponseReaddress)
+        {
+            var services = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
+            var messageCenter = services.GetRequiredService<MessageCenter>();
+            var gateway = messageCenter.Gateway!;
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
+            var replacementGateway = HostedCluster.SecondarySilos[0].SiloAddress;
+            var request = new Message
+            {
+                Id = new CorrelationId(-4),
+                Direction = Message.Directions.Request,
+                SendingSilo = HostedCluster.Primary.SiloAddress,
+                SendingGrain = clientId,
+                TargetSilo = replacementGateway,
+                TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
+            };
+            Assert.True(gateway.TryGetClientState(request, out var client));
+            var connection = Assert.IsType<GatewayInboundConnection>(client.Connection);
+            var pendingResponses = (ConcurrentQueue<Message>)typeof(Gateway.ClientState)
+                .GetField("_pendingToSend", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(client)!;
+            using var shared = ActivatorUtilities.CreateInstance<MessageHandlerShared>(services);
+            using var response = services.GetRequiredService<MessageFactory>().CreateResponseMessage(request);
+            response.TargetSilo = replacementGateway;
+            response.GatewayRequestAttempt = -42;
+            response.GatewayResponseRoutingHistory = [HostedCluster.Primary.SiloAddress];
+            response.Result = (Message.ResponseTypes)responseType;
+            using var buffer = new ArcBufferWriter();
+            buffer.Write([1, 2, 3]);
+            var readRequest = shared.GetReceiveMessageHandler();
+            readRequest.Body = buffer.ConsumeSlice(3);
+            typeof(MessageReadRequest).GetField("_bodyLength", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(readRequest, 3);
+            response.SetMessageReadRequest(readRequest);
+            var acquisition = new TaskCompletionSource<Connection>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var failure = new ConnectionFailedException("Transient replacement gateway connection failure.");
+            if (failureAlreadyCompleted)
+            {
+                acquisition.SetException(failure);
+            }
+
+            Task? sending = null;
+            client.RecordDisconnection();
+            try
+            {
+                Assert.Empty(pendingResponses);
+                Assert.False(services.GetRequiredService<ISiloStatusOracle>().IsDeadSilo(replacementGateway));
+
+                sending = messageCenter.SendMessageAsync(
+                    new ValueTask<Connection>(acquisition.Task),
+                    response,
+                    sendMessage: null,
+                    allowResponseReaddress);
+                if (!failureAlreadyCompleted)
+                {
+                    Assert.False(sending.IsCompleted);
+                    Assert.Empty(pendingResponses);
+                    Assert.Same(readRequest, response._bodyObject);
+                    acquisition.SetException(failure);
+                }
+
+                await sending.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+                Assert.Same(response, Assert.Single(pendingResponses));
+                Assert.Equal((Message.ResponseTypes)responseType, response.Result);
+                Assert.Equal(clientId, response.TargetGrain);
+                Assert.Null(response.TargetSilo);
+                Assert.Equal(0, response.GatewayRequestAttempt);
+                Assert.Null(response.GatewayResponseRoutingHistory);
+                Assert.Same(readRequest, response._bodyObject);
+                Assert.Equal([1, 2, 3], readRequest.Body.ToArray());
+                Assert.Equal(0, gateway.TrackedRequestClientCount);
+                Assert.True(pendingResponses.TryDequeue(out var queued));
+                Assert.Same(response, queued);
+                response.Dispose();
+                Assert.Null(response._bodyObject);
+                Assert.Equal(0, readRequest.Body.Length);
+                var first = shared.GetReceiveMessageHandler();
+                var second = shared.GetReceiveMessageHandler();
+                try
+                {
+                    Assert.Same(readRequest, first);
+                    Assert.NotSame(first, second);
+                }
+                finally
+                {
+                    first.Reset();
+                    second.Reset();
+                }
+            }
+            finally
+            {
+                acquisition.TrySetException(failure);
+                if (sending is not null)
+                {
+                    await sending.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+                }
+
+                if (pendingResponses.TryPeek(out var queued) && ReferenceEquals(queued, response))
+                {
+                    pendingResponses.TryDequeue(out _);
+                }
+
                 client.RecordConnection(connection);
             }
         }
