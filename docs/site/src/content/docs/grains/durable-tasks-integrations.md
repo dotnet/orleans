@@ -165,13 +165,14 @@ returns, and inject the client as a keyed service:
   locates the operation through `Operation-Location`, `Azure-AsyncOperation`, or
   `Location`. `DurableHttpWaitMode.Events` reads the status monitor's server-sent events
   within one step, and `DurableHttpWaitMode.Poll` polls after the interval which
-  `Retry-After` advertises, with durable delays between polls, so a long wait doesn't
-  hold the grain active. A failed or canceled operation throws
+  `Retry-After` advertises, within the task's poll intervals, with durable delays
+  between polls, so a long wait doesn't hold the grain active. `WaitAsync` bounds the
+  wait with a deadline in logical time. A failed or canceled operation throws
   `DurableHttpOperationException`.
 - **Cancellation reaches the remote operation.** `CancelOperationAsync` sends
-  `POST {status monitor}:cancel` with the task's cancellation reason, shielded so it
-  runs after the workflow's cancellation. `SignalOperationAsync` delivers a signal the
-  same way.
+  `POST {status monitor}:cancel` with the task's cancellation reason, or the deadline's,
+  shielded so it runs after the workflow's cancellation. `SignalOperationAsync` delivers
+  a signal the same way.
 
 A step which sends its own requests with `DurableTask.Run` gets the same keys from an
 `HttpClient` which `AddDurableIdempotencyKey` configures. For every method and option,
@@ -192,10 +193,11 @@ durable grain call start an operation which performs it:
 :::code source="../snippets/compiled/Grains/DurableTaskIntegrationSnippets.cs" id="durable_tasks_http_operations" language="csharp":::
 
 - **The `Idempotency-Key` names the operation.** Each retry of a request reaches the
-  operation which its first attempt started. The operation's key combines the group's
-  path, its route values, and the identifier, and the call runs as a root task named by
-  that key. A key which another request used to start other work
-  receives `422 Unprocessable Content`.
+  operation which its first attempt started, and a start without a key receives
+  `400 Bad Request`. The operation's key combines the group's scope, its route values,
+  the caller's authorization scope, and the identifier, so a caller reaches only its
+  own operations, and the call runs as a root task named by that key. A key which
+  another request used to start other work receives `422 Unprocessable Content`.
 - **The status monitor reports progress.** A start answers `200 OK` with the result when
   the operation completes, including within the wait which `Prefer: wait=N` requests,
   and otherwise `202 Accepted` with an `Operation-Location` header, the URL of
@@ -206,7 +208,9 @@ durable grain call start an operation which performs it:
   `EventSource` follows it without polling.
 - **Clients cancel and signal the task.** `POST {group}/operations/{id}:cancel` requests
   durable cancellation with a reason, and `POST {group}/operations/{id}/signals/{name}`
-  delivers a signal which `MapDurableSignal` maps.
+  delivers a signal which `MapDurableSignal` maps. The operation's host records the task
+  which performs its work in its journal, so cancellations and signals reach that task
+  whichever activation serves them.
 - **Authorization is the application's.** Policies and filters on the group cover its
   starts and the routes which serve its operations.
 
