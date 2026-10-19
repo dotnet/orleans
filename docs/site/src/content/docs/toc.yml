@@ -503,6 +503,8 @@ items:
             href: diagnostics/orleans0226.md
           - name: ORLEANS0227
             href: diagnostics/orleans0227.md
+          - name: ORLEANS0228
+            href: diagnostics/orleans0228.md
       - name: API context and examples
         href: resources/api-reference-guide.md
       - name: Best practices
