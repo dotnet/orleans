@@ -20,11 +20,12 @@ under failure.
 ## Checklist
 
 - **Example tests** pin specific regressions and scenarios.
-- **Model-based tests (Accordant)** check stateful components that have a simpler reference model against it across operation sequences, including concurrency and failures where the contract covers them (see `test/Orleans.Clustering.TestKit.Tests/MembershipTableModelBasedTestRunnerTests.cs`).
-- **Property-based tests (CsCheck)** cover invariants, round-trips, and algebraic laws with reproducible seeds and effective shrinking (see `test/Orleans.Core.Tests/Directory/RingRangeTests.cs`).
-- **Deterministic simulation** drives concurrent and distributed behavior with the controlled clocks and explicit phase barriers in `test/AGENTS.md`, using `InProcessTestCluster` when the property crosses runtime boundaries.
+- **Model-based tests ([Accordant](https://www.nuget.org/packages/Microsoft.Accordant))** check stateful components that have a simpler reference model against it across operation sequences, including concurrency and failures where the contract covers them (see `test/Orleans.Clustering.TestKit.Tests/MembershipTableModelBasedTestRunnerTests.cs`).
+- **Property-based tests ([CsCheck](https://github.com/AnthonyLloyd/CsCheck))** cover invariants, round-trips, and algebraic laws with reproducible seeds and effective shrinking (see `test/Orleans.Core.Tests/Directory/RingRangeTests.cs`).
+- **Deterministic simulation** drives concurrent and distributed behavior with the controlled clocks and explicit phase barriers in `test/AGENTS.md`, using `InProcessTestCluster` when the property crosses runtime boundaries ([FoundationDB](https://apple.github.io/foundationdb/testing.html)).
 - **Fault injection** exercises changed failure boundaries: storage (`FaultInjectionGrainStorage`, `AddFaultInjectionMemoryStorage`), transactions (`src/Orleans.Transactions.TestKit.Base/FaultInjection`), and silo stops and kills (`StopSiloAsync`, `KillSiloAsync`).
-- **Snapshots (Verify)** pin wire formats and generated output; baseline changes are reviewed as semantic changes (see `test/Orleans.Serialization.UnitTests/GeneratedSerializerBitwiseCompatibilityTests.cs`).
+- **Safety and progress phases.** Failure tests check safety while faults are active, then restore the protocol's progress assumptions and verify completion under a stated bound ([Paxos Made Live](https://research.google/pubs/paxos-made-live-an-engineering-perspective-2006-invited-talk/)).
+- **Snapshots ([Verify](https://github.com/VerifyTests/Verify))** pin wire formats and generated output; baseline changes are reviewed as semantic changes (see `test/Orleans.Serialization.UnitTests/GeneratedSerializerBitwiseCompatibilityTests.cs`).
 - **Compatibility tests** cover changes to shipped serialization or persisted data in both directions the rolling-upgrade window requires.
 - **Right level.** Unit tests cover pure logic, cluster tests cover runtime boundaries, and provider TestKits cover provider contracts; new tests follow the containing suite's `[TestCategory]` conventions.
 - **Contract assertions.** Assertions check the observable contract exactly: precise where the contract is precise (values, ordering under controlled time), and silent on incidental details.
