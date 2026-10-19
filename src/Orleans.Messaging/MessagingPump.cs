@@ -58,6 +58,14 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         jobHandlers.Register(this);
         grainContext.ObservableLifecycle.Subscribe(nameof(MessagingPump), GrainLifecycleStage.Activate, this);
 
+        // Wake-ups for due work fire up to RecheckDelay later, so the loop starts once activation completes and performs
+        // recovered and newly staged work without waiting for one.
+        grainContext.ObservableLifecycle.Subscribe(nameof(MessagingPump), GrainLifecycleStage.Last, _ =>
+        {
+            EnsureStarted();
+            return Task.CompletedTask;
+        }, static _ => Task.CompletedTask);
+
         // Recovery reports depth during SetupState, so releasing it there covers activations which fail before Activate.
         grainContext.ObservableLifecycle.Subscribe(nameof(MessagingPump), GrainLifecycleStage.SetupState, static _ => Task.CompletedTask, _ =>
         {
@@ -100,7 +108,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         RepairWakeupAsync().Ignore();
     }
 
-    /// <summary>Starts the loop once the activation is servicing grain calls.</summary>
+    /// <summary>Starts the loop once activation completes, when the activation services grain calls.</summary>
     public void EnsureStarted()
     {
         if (_loop is null && !_shutdown.IsCancellationRequested)
