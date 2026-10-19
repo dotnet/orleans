@@ -778,7 +778,11 @@ namespace UnitTests.Grains
 
         public Task LongWaitGrainCancellationInterleaving(GrainCancellationToken tc, TimeSpan delay, Guid callId) => LongWaitGrainCancellation(tc, delay, callId);
 
-        public Task LongWaitGrainCancellationAsObject(object tc, TimeSpan delay, Guid callId) => LongWaitGrainCancellation((GrainCancellationToken)tc, delay, callId);
+        public Task LongWaitGrainCancellationAsObject(object tc, TimeSpan delay, Guid callId, ILongRunningTaskObserver observer)
+        {
+            observer.OnCallStarted(callId);
+            return LongWaitGrainCancellation((GrainCancellationToken)tc, delay, callId);
+        }
 
         public async Task LongWaitGrainCancellation(GrainCancellationToken ct, TimeSpan delay, Guid callId)
         {

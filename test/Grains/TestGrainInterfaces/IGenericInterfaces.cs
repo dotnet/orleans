@@ -203,7 +203,7 @@ namespace UnitTests.GrainInterfaces
         Task<T> FanOutOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay, int degreeOfParallelism);
 
         Task LongWaitGrainCancellation(GrainCancellationToken tc, TimeSpan delay, Guid callId);
-        Task LongWaitGrainCancellationAsObject(object tc, TimeSpan delay, Guid callId);
+        Task LongWaitGrainCancellationAsObject(object tc, TimeSpan delay, Guid callId, ILongRunningTaskObserver observer);
         [AlwaysInterleave]
         Task LongWaitGrainCancellationInterleaving(GrainCancellationToken tc, TimeSpan delay, Guid callId);
         Task LongWait(TimeSpan delay, Guid callId, CancellationToken tc);

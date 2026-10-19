@@ -55,19 +55,50 @@ namespace UnitTests.CancellationTests
             await WaitForCallCancellation(grain, callId);
         }
 
-        [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
-        [InlineData(0)]
-        [InlineData(300)]
-        public async Task GrainTaskCancellationWithTokenPassedAsObject(int delay)
+        [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
+        public async Task GrainTaskCancellationWithTokenPassedAsObject()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+            var observer = new LongRunningTaskObserver();
+            var observerReference = fixture.GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
             using var cts = new GrainCancellationTokenSource();
-            var callId = Guid.NewGuid();
-            var grainTask = grain.LongWaitGrainCancellationAsObject(cts.Token, TimeSpan.FromSeconds(10), callId);
-            await Task.Delay(TimeSpan.FromMilliseconds(delay), TestContext.Current.CancellationToken);
-            await cts.Cancel();
-            await Assert.ThrowsAsync<TaskCanceledException>(() => grainTask);
-            await WaitForCallCancellation(grain, callId);
+            try
+            {
+                var callId = Guid.NewGuid();
+                var grainTask = grain.LongWaitGrainCancellationAsObject(cts.Token, TimeSpan.FromSeconds(10), callId, observerReference);
+                await observer.WaitForCallToStart(callId);
+
+                await cts.Cancel();
+                await Assert.ThrowsAsync<TaskCanceledException>(() => grainTask);
+                await WaitForCallCancellation(grain, callId);
+            }
+            finally
+            {
+                fixture.GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+                GC.KeepAlive(observer);
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
+        public async Task PreCancelledGrainTokenPassedAsObjectCancelsCall()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+            var observer = new LongRunningTaskObserver();
+            var observerReference = fixture.GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+            using var cts = new GrainCancellationTokenSource();
+            try
+            {
+                await cts.Cancel();
+                var callId = Guid.NewGuid();
+
+                await Assert.ThrowsAsync<TaskCanceledException>(() => grain.LongWaitGrainCancellationAsObject(cts.Token, TimeSpan.FromSeconds(10), callId, observerReference));
+                await WaitForCallCancellation(grain, callId);
+            }
+            finally
+            {
+                fixture.GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+                GC.KeepAlive(observer);
+            }
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
