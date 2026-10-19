@@ -179,6 +179,7 @@ namespace Orleans.Messaging
     public partial interface IMessagingExtension : Runtime.IGrainExtension, Runtime.IAddressable
     {
         [Alias("DeliverAsync")]
+        [Concurrency.AlwaysInterleave]
         System.Threading.Tasks.ValueTask<DeliveryResult> DeliverAsync(InboxMessage message, System.Threading.CancellationToken cancellationToken = default);
     }
 
