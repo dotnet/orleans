@@ -8,7 +8,7 @@ using StackExchange.Redis;
 
 namespace Orleans.Journaling;
 
-internal sealed class RedisJournalStorage : IJournalStorage
+internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStorage
 {
     private static readonly RedisValue[] NoValues = [];
     private static readonly IReadOnlyDictionary<string, string> EmptyProperties
@@ -180,7 +180,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
         if state[1] ~= ARGV[6] then
             return { -2 }
         end
-        if ARGV[1] == '1' and state[3] ~= ARGV[2] then
+        if ARGV[1] == '2' or (ARGV[1] == '1' and state[3] ~= ARGV[2]) then
             return { -1 }
         end
 
@@ -248,7 +248,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
         if state[1] ~= ARGV[6] then
             return { -2 }
         end
-        if ARGV[1] == '1' and state[3] ~= ARGV[2] then
+        if ARGV[1] == '2' or (ARGV[1] == '1' and state[3] ~= ARGV[2]) then
             return { -1 }
         end
 
@@ -396,6 +396,9 @@ internal sealed class RedisJournalStorage : IJournalStorage
     private string? _contentETag;
     private long _appendLength;
 
+    // Set once this instance has read or written the journal; a known journal without a content ETag was observed absent.
+    private bool _isStateKnown;
+
     public RedisJournalStorage(
         IDatabase database,
         string keyPrefix,
@@ -449,11 +452,36 @@ internal sealed class RedisJournalStorage : IJournalStorage
         }
 
         var state = CreateStorageState(result, startIndex: 1, nameof(CreateIfNotExistsAsync));
-        SetState(state);
+        if (status == SuccessStatus)
+        {
+            // Creating the journal is a write by this instance; finding an existing journal leaves the precondition unchanged.
+            SetState(state);
+        }
+
         return status == SuccessStatus;
     }
 
     public async ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
+    {
+        var state = await GetStorageStateAsync(cancellationToken).ConfigureAwait(false);
+        if (state is { } current)
+        {
+            AdoptIfUnknown(current);
+        }
+
+        return state?.Metadata;
+    }
+
+    // Metadata operations never move an established content precondition; they establish it only for an instance which has none.
+    private void AdoptIfUnknown(StorageState state)
+    {
+        if (!_isStateKnown)
+        {
+            SetState(state);
+        }
+    }
+
+    private async ValueTask<StorageState?> GetStorageStateAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var result = await EvaluateArrayAsync(
@@ -463,14 +491,11 @@ internal sealed class RedisJournalStorage : IJournalStorage
         var status = GetStatus(result, nameof(GetMetadataAsync));
         if (status == MissingStatus)
         {
-            ClearState();
             return null;
         }
 
         ThrowForStatus(status, nameof(GetMetadataAsync), expectedETag: null);
-        var state = CreateStorageState(result, startIndex: 1, nameof(GetMetadataAsync));
-        SetState(state);
-        return state.Metadata;
+        return CreateStorageState(result, startIndex: 1, nameof(GetMetadataAsync));
     }
 
     public async ValueTask<IJournalMetadata?> UpdateMetadataAsync(
@@ -501,11 +526,22 @@ internal sealed class RedisJournalStorage : IJournalStorage
 
         ThrowForStatus(status, nameof(UpdateMetadataAsync), expectedETag);
         var state = CreateStorageState(result, startIndex: 1, nameof(UpdateMetadataAsync));
-        SetState(state);
+        AdoptIfUnknown(state);
         return state.Metadata;
     }
 
     public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        => await ReadCoreAsync(consumer, adoptVersion: true, cancellationToken).ConfigureAwait(false);
+
+    JournalStorageVersion IJournalHistoryStorage.WriteVersion
+        => !_isStateKnown
+            ? JournalStorageVersion.Unknown
+            : _contentETag is null ? JournalStorageVersion.Absent : JournalStorageVersion.Create(_contentETag);
+
+    ValueTask<JournalStorageVersion> IJournalHistoryStorage.ReadHistoryAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        => ReadCoreAsync(consumer, adoptVersion: false, cancellationToken);
+
+    private async ValueTask<JournalStorageVersion> ReadCoreAsync(IJournalStorageConsumer consumer, bool adoptVersion, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         cancellationToken.ThrowIfCancellationRequested();
@@ -517,18 +553,26 @@ internal sealed class RedisJournalStorage : IJournalStorage
         var status = GetStatus(result, nameof(ReadAsync));
         if (status == MissingStatus)
         {
-            ClearState();
+            if (adoptVersion)
+            {
+                ClearState();
+            }
+
             consumer.Complete(metadata: null);
-            return;
+            return JournalStorageVersion.Absent;
         }
 
         ThrowForStatus(status, nameof(ReadAsync), expectedETag: null);
         var state = CreateStorageState(result, startIndex: 2, nameof(ReadAsync));
-        SetState(state);
+        if (adoptVersion)
+        {
+            SetState(state);
+        }
 
         ReadOnlyMemory<byte> data = (RedisValue)result[1];
         cancellationToken.ThrowIfCancellationRequested();
         consumer.Read(GetSegments(data, _options.ReadChunkSize, cancellationToken), state.Metadata, complete: true);
+        return JournalStorageVersion.Create(state.ContentETag);
     }
 
     public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
@@ -541,7 +585,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
             AppendOrCreateScript,
             _journalKeys,
             [
-                expectedContentETag is null ? "0" : "1",
+                GetWriteMode(),
                 expectedContentETag ?? string.Empty,
                 newETag,
                 payload,
@@ -551,8 +595,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
         var status = GetStatus(result, nameof(AppendAsync));
         ThrowForStatus(status, nameof(AppendAsync), expectedContentETag);
 
-        _contentETag = newETag;
-        _appendLength = (long)result[1];
+        SetWritten(newETag, (long)result[1]);
     }
 
     public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
@@ -565,7 +608,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
             ReplaceOrCreateScript,
             _journalKeys,
             [
-                expectedContentETag is null ? "0" : "1",
+                GetWriteMode(),
                 expectedContentETag ?? string.Empty,
                 newETag,
                 payload,
@@ -575,32 +618,52 @@ internal sealed class RedisJournalStorage : IJournalStorage
         var status = GetStatus(result, nameof(ReplaceAsync));
         ThrowForStatus(status, nameof(ReplaceAsync), expectedContentETag);
 
-        _contentETag = newETag;
-        _appendLength = (long)result[1];
+        SetWritten(newETag, (long)result[1]);
     }
 
     public async ValueTask DeleteAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var expectedExists = true;
-        if (_contentETag is null)
+        bool expectedExists;
+        string? expectedContentETag;
+        if (_isStateKnown)
         {
-            expectedExists = await GetMetadataAsync(cancellationToken).ConfigureAwait(false) is not null;
+            expectedExists = _contentETag is not null;
+            expectedContentETag = _contentETag;
+        }
+        else
+        {
+            // An instance which has neither read nor written the journal deletes the version it finds.
+            expectedContentETag = (await GetStorageStateAsync(cancellationToken).ConfigureAwait(false))?.ContentETag;
+            expectedExists = expectedContentETag is not null;
         }
 
-        var expectedContentETag = expectedExists ? _contentETag! : string.Empty;
         var result = await EvaluateArrayAsync(
             DeleteScript,
             _journalKeys,
-            [expectedContentETag, expectedExists ? "1" : "0", _encodedJournalId]).ConfigureAwait(false);
+            [expectedContentETag ?? string.Empty, expectedExists ? "1" : "0", _encodedJournalId]).ConfigureAwait(false);
         var status = GetStatus(result, nameof(DeleteAsync));
-        if (status != AppearedStatus)
+        if (status == AppearedStatus)
+        {
+            // The journal was created after this instance observed it absent. An instance which never observed the journal
+            // leaves the newly created journal, and its own unknown precondition, in place.
+            if (_isStateKnown)
+            {
+                ThrowForStatus(ConflictStatus, nameof(DeleteAsync), expectedContentETag);
+            }
+
+            return;
+        }
+        else
         {
             ThrowForStatus(status, nameof(DeleteAsync), expectedContentETag);
         }
 
         ClearState();
     }
+
+    // "1" requires the observed content ETag, "2" requires the observed absence, and "0" adopts the current journal.
+    private string GetWriteMode() => _contentETag is not null ? "1" : _isStateKnown ? "2" : "0";
 
     internal static RedisKey GetMetadataKey(string keyPrefix, string keyName)
     {
@@ -797,16 +860,21 @@ internal sealed class RedisJournalStorage : IJournalStorage
         return new(new RedisJournalMetadata(format, eTag, properties ?? EmptyProperties), contentETag, appendLength);
     }
 
-    private void SetState(StorageState state)
+    private void SetState(StorageState state) => SetWritten(state.ContentETag, state.AppendLength);
+
+    private void SetWritten(string contentETag, long appendLength)
     {
-        _contentETag = state.ContentETag;
-        _appendLength = state.AppendLength;
+        _contentETag = contentETag;
+        _appendLength = appendLength;
+        _isStateKnown = true;
     }
 
+    // Records that this instance observed the journal absent.
     private void ClearState()
     {
         _contentETag = null;
         _appendLength = 0;
+        _isStateKnown = true;
     }
 
     private static IEnumerable<ReadOnlyMemory<byte>> GetSegments(

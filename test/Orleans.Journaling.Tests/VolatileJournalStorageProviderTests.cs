@@ -157,6 +157,9 @@ public sealed class VolatileJournalStorageProviderTests
         await second.ReplaceAsync(new ReadOnlySequence<byte>(new byte[100]), token);
         Assert.False(first.IsCompactionRequested);
         Assert.False(other.IsCompactionRequested);
+
+        // Each handle holds its own write precondition, so a handle reads the journal before writing after another handle.
+        await ReadToAdoptVersionAsync(first, token);
         await first.AppendAsync(new ReadOnlySequence<byte>([4]), token);
         Assert.False(second.IsCompactionRequested);
         await other.AppendAsync(new ReadOnlySequence<byte>([5]), token);
@@ -223,7 +226,11 @@ public sealed class VolatileJournalStorageProviderTests
         Assert.All(handles, static handle => Assert.True(handle.IsCompactionRequested));
         Assert.False(other.IsCompactionRequested);
 
+        await ReadToAdoptVersionAsync(handles[^1], token);
         await handles[^1].ReplaceAsync(new ReadOnlySequence<byte>([99]), token);
+
+        // Handles which have not read or written the journal adopt its current version on their first write.
+        handles = Enumerable.Range(0, 8).Select(_ => provider.CreateStorage(id)).ToArray();
         Assert.Equal([99], Assert.Single(storage.Segments));
         Assert.All(handles, static handle => Assert.False(handle.IsCompactionRequested));
         await AppendConcurrently(7);
@@ -231,6 +238,7 @@ public sealed class VolatileJournalStorageProviderTests
         Assert.Equal(Enumerable.Range(0, 7).Select(static index => (byte)index),
             storage.Segments.Skip(1).SelectMany(static segment => segment).Order());
         Assert.All(handles, static handle => Assert.False(handle.IsCompactionRequested));
+        await ReadToAdoptVersionAsync(handles[^1], token);
         await handles[^1].AppendAsync(new ReadOnlySequence<byte>([7]), token);
         Assert.All(handles, static handle => Assert.True(handle.IsCompactionRequested));
         Assert.False(other.IsCompactionRequested);
@@ -596,5 +604,13 @@ public sealed class VolatileJournalStorageProviderTests
         }
 
         return result;
+    }
+
+    private static ValueTask ReadToAdoptVersionAsync(IJournalStorage storage, CancellationToken cancellationToken)
+        => storage.ReadAsync(new DiscardingConsumer(), cancellationToken);
+
+    private sealed class DiscardingConsumer : IJournalStorageConsumer
+    {
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata) => buffer.Skip(buffer.Length);
     }
 }

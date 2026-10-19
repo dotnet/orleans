@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Options;
 using Orleans.Journaling.Json;
+using Orleans.Storage;
 
 namespace Orleans.Journaling;
 
@@ -170,9 +171,10 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 /// <summary>
 /// An in-memory, volatile implementation of <see cref="IJournalStorage"/> for non-durable use cases, such as development and testing.
 /// </summary>
-public sealed class VolatileJournalStorage : IJournalStorage
+public sealed class VolatileJournalStorage : IJournalStorage, IJournalHistoryStorage
 {
     private readonly Store _store;
+    private JournalStorageVersion _writeVersion;
     private readonly int _maxAppendsBeforeSnapshot;
     private readonly long _maxBytesBeforeSnapshot;
     private string? _configuredJournalFormatKey;
@@ -266,6 +268,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
             }
 
             _store.Create(values);
+            _writeVersion = _store.ContentVersion;
             return new(true);
         }
     }
@@ -305,18 +308,37 @@ public sealed class VolatileJournalStorage : IJournalStorage
     /// <inheritdoc/>
     public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
     {
+        ReadCore(consumer, adoptVersion: true, cancellationToken);
+        return default;
+    }
+
+    /// <inheritdoc/>
+    JournalStorageVersion IJournalHistoryStorage.WriteVersion => _writeVersion;
+
+    /// <inheritdoc/>
+    ValueTask<JournalStorageVersion> IJournalHistoryStorage.ReadHistoryAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        => new(ReadCore(consumer, adoptVersion: false, cancellationToken));
+
+    private JournalStorageVersion ReadCore(IJournalStorageConsumer consumer, bool adoptVersion, CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(consumer);
 
         byte[][] segments;
         IJournalMetadata metadata;
+        JournalStorageVersion version;
         lock (_store.SyncRoot)
         {
             metadata = _store.Exists ? _store.GetMetadata() : JournalMetadata.Empty;
             segments = _store.Segments.ToArray();
+            version = _store.ContentVersion;
+            if (adoptVersion)
+            {
+                _writeVersion = version;
+            }
         }
 
         consumer.Read(GetSegments(segments, cancellationToken), metadata, complete: true);
-        return default;
+        return version;
     }
 
     private static IEnumerable<ReadOnlyMemory<byte>> GetSegments(IEnumerable<byte[]> segments, CancellationToken cancellationToken)
@@ -334,12 +356,15 @@ public sealed class VolatileJournalStorage : IJournalStorage
         cancellationToken.ThrowIfCancellationRequested();
         lock (_store.SyncRoot)
         {
+            ThrowIfVersionChanged(nameof(AppendAsync));
+            var data = segment.ToArray();
             _store.Exists = true;
             _store.StoredJournalFormatKey = _configuredJournalFormatKey;
-            _store.Segments.Add(segment.ToArray());
+            _store.Segments.Add(data);
             _store.AppendedBytes += segment.Length;
             _store.AppendCount++;
-            _store.RefreshETag();
+            _store.OnContentChanged();
+            _writeVersion = _store.ContentVersion;
         }
 
         return default;
@@ -352,13 +377,15 @@ public sealed class VolatileJournalStorage : IJournalStorage
         var data = snapshot.ToArray();
         lock (_store.SyncRoot)
         {
+            ThrowIfVersionChanged(nameof(ReplaceAsync));
             _store.Exists = true;
             _store.StoredJournalFormatKey = _configuredJournalFormatKey;
             _store.Segments.Clear();
             _store.Segments.Add(data);
             _store.AppendedBytes = 0;
             _store.AppendCount = 0;
-            _store.RefreshETag();
+            _store.OnContentChanged();
+            _writeVersion = _store.ContentVersion;
         }
 
         return default;
@@ -370,10 +397,25 @@ public sealed class VolatileJournalStorage : IJournalStorage
         cancellationToken.ThrowIfCancellationRequested();
         lock (_store.SyncRoot)
         {
+            ThrowIfVersionChanged(nameof(DeleteAsync));
             _store.Delete();
+            _writeVersion = JournalStorageVersion.Absent;
         }
 
         return default;
+    }
+
+    // Callers hold the store lock.
+    private void ThrowIfVersionChanged(string operation)
+    {
+        var current = _store.ContentVersion;
+        if (_writeVersion.Value is not null && _writeVersion != current)
+        {
+            throw new InconsistentStateException(
+                $"Version conflict ({operation}): the volatile journal '{_store}' changed since this storage instance last read or wrote it.",
+                _writeVersion.ToString(),
+                current.ToString());
+        }
     }
 
     private static string CreateVolatileStorageId() => $"volatile/{Guid.NewGuid():N}";
@@ -397,7 +439,19 @@ public sealed class VolatileJournalStorage : IJournalStorage
 
         public long Version { get; private set; }
 
+        // Counts content changes (creation, writes, and deletion) so content versions are never reused; metadata updates leave it unchanged.
+        private long _contentChangeCount;
+
+        public JournalStorageVersion ContentVersion
+            => Exists ? JournalStorageVersion.Create(_contentChangeCount.ToString("D", CultureInfo.InvariantCulture)) : JournalStorageVersion.Absent;
+
         public string? ETag { get; private set; }
+
+        public void OnContentChanged()
+        {
+            _contentChangeCount++;
+            RefreshETag();
+        }
 
         public void Create(IReadOnlyDictionary<string, string>? properties)
         {
@@ -415,7 +469,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
                 }
             }
 
-            RefreshETag();
+            OnContentChanged();
         }
 
         public void Delete()
@@ -428,6 +482,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
             StoredJournalFormatKey = null;
             ETag = null;
             Version++;
+            _contentChangeCount++;
         }
 
         public IJournalMetadata GetMetadata() => new JournalMetadata(StoredJournalFormatKey, ETag, Properties);

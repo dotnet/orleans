@@ -10,7 +10,7 @@ using Orleans.Storage;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class AzureBlobJournalStorage : IJournalStorage
+internal sealed partial class AzureBlobJournalStorage : IJournalStorage, IJournalHistoryStorage
 {
     // WAL and checkpoint blobs use this metadata key to declare which journal format their bytes contain.
     internal const string FormatMetadataKey = "format";
@@ -43,7 +43,14 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     private ETag _walETag;
     private WalProviderState _walProviderState;
 
+    // Set once this instance has read or written the WAL; a known WAL without an ETag was observed absent.
+    private bool _isWalKnown;
+
     private bool WalExists => _walETag != default;
+
+    private bool IsWalObservedAbsent => _isWalKnown && !WalExists;
+
+    JournalStorageVersion IJournalHistoryStorage.WriteVersion => _isWalKnown ? CreateVersion(_walETag, _walProviderState) : JournalStorageVersion.Unknown;
 
     public bool IsCompactionRequested => _numBlocks > RequestCompactionBlockCount;
 
@@ -160,7 +167,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 var metadata = CopyMetadata(properties.Metadata);
                 if (!ApplyCallerMetadataUpdate(metadata, setValues, removeValues))
                 {
-                    SetWal(walState.ETag, walState.ProviderState);
+                    RefreshWalETag(walState.ETag, walState.ProviderState);
                     succeeded = true;
                     return CreateJournalMetadata(properties.ETag, metadata);
                 }
@@ -173,7 +180,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 try
                 {
                     var response = await _walClient.SetMetadataAsync(metadata, conditions, cancellationToken).ConfigureAwait(false);
-                    SetWal(response.Value.ETag, walState.ProviderState);
+                    RefreshWalETag(response.Value.ETag, walState.ProviderState);
                     succeeded = true;
                     return CreateJournalMetadata(response.Value.ETag, metadata);
                 }
@@ -293,11 +300,12 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             WalState? walState;
             var expectedETag = _walETag;
             var expectedProviderState = _walProviderState;
+            var observedAbsent = IsWalObservedAbsent;
             var conditions = WalExists ? new BlobRequestConditions { IfMatch = expectedETag } : null;
             try
             {
                 // Load the WAL manifest only when deletion needs to know which checkpoint may become unreachable.
-                walState = await TryLoadWalStateAsync(conditions, cancellationToken).ConfigureAwait(false);
+                walState = await TryLoadWalStateAsync(conditions, cancellationToken, updateCache: !observedAbsent).ConfigureAwait(false);
             }
             catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
             {
@@ -324,6 +332,13 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
                 succeeded = true;
                 return;
+            }
+
+            if (observedAbsent)
+            {
+                throw CreateInconsistentWalStateException(
+                    "Azure Blob journal WAL was created by another writer after this instance observed it absent; recovery is required.",
+                    expectedETag);
             }
 
             // Remember the checkpoint before clearing local WAL state so obsolete checkpoint cleanup can still run.
@@ -380,6 +395,12 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     }
 
     public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        => await ReadCoreAsync(consumer, adoptVersion: true, cancellationToken).ConfigureAwait(false);
+
+    ValueTask<JournalStorageVersion> IJournalHistoryStorage.ReadHistoryAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        => ReadCoreAsync(consumer, adoptVersion: false, cancellationToken);
+
+    private async ValueTask<JournalStorageVersion> ReadCoreAsync(IJournalStorageConsumer consumer, bool adoptVersion, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         var startTimestamp = Stopwatch.GetTimestamp();
@@ -397,17 +418,25 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             catch (RequestFailedException exception) when (exception.Status is 404)
             {
                 // A missing WAL is an empty journal; clear cached state before reporting completion.
-                SetWal(eTag: default, providerState: default);
+                if (adoptVersion)
+                {
+                    SetWal(eTag: default, providerState: default);
+                }
+
                 consumer.Complete(metadata: null);
                 succeeded = true;
-                return;
+                return JournalStorageVersion.Absent;
             }
 
             var walDetails = walResult.Value.Details;
             var manifest = CreateWalManifest(walDetails.Metadata);
+            var walProviderState = CreateWalProviderState(manifest, walDetails.ContentLength, walDetails.BlobCommittedBlockCount);
 
             // Recovery refreshes the cached ETag and block count from the WAL manifest.
-            SetWal(walDetails.ETag, CreateWalProviderState(manifest, walDetails.ContentLength, walDetails.BlobCommittedBlockCount));
+            if (adoptVersion)
+            {
+                SetWal(walDetails.ETag, walProviderState);
+            }
 
             await using var walStream = walResult.Value.Content;
             var expectedFormat = manifest.Metadata.FormatKey;
@@ -458,6 +487,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             // Complete only after checkpoint and WAL tail have streamed as one logical journal.
             consumer.Complete(walMetadata);
             succeeded = true;
+            return CreateVersion(walDetails.ETag, walProviderState);
         }
         finally
         {
@@ -617,6 +647,9 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private async ValueTask EnsureWalAsync(CancellationToken cancellationToken)
     {
+        // An instance which observed the WAL absent requires it to still be absent; one which never observed it adopts a racing creator's WAL.
+        var observedAbsent = IsWalObservedAbsent;
+
         // Either create the initial WAL or load the WAL created by a racing instance, then loop until state is cached.
         while (!WalExists)
         {
@@ -632,6 +665,14 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             }
             catch (RequestFailedException exception) when (IsBlobAlreadyExists(exception))
             {
+                if (observedAbsent)
+                {
+                    throw CreateInconsistentWalStateException(
+                        "Azure Blob journal WAL was created by another writer after this instance observed it absent; recovery is required.",
+                        _walETag,
+                        exception);
+                }
+
                 // Another instance created the WAL first; load only the properties needed before appending.
                 await TryLoadWalStateAsync(conditions: null, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
@@ -719,13 +760,35 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         return walState;
     }
 
+    // Metadata operations never move an established content precondition: they refresh only the ETag of the WAL content version
+    // this instance holds, and establish the precondition only for an instance which has none.
+    private void RefreshWalETag(ETag eTag, WalProviderState providerState)
+    {
+        if (!_isWalKnown || (WalExists && providerState == _walProviderState))
+        {
+            SetWal(eTag, providerState);
+        }
+    }
+
     private void SetWal(ETag eTag, WalProviderState providerState)
     {
         // Keep the cached WAL mutation precondition and compaction counter in sync.
         _walETag = eTag;
         _walProviderState = providerState;
         _numBlocks = providerState.CommittedBlockCount;
+        _isWalKnown = true;
     }
+
+    // Content versions follow the WAL precondition: the provider state which survives metadata-only ETag changes, or the
+    // ETag itself for WALs without a generation, whose writes do not tolerate metadata-only changes.
+    private static JournalStorageVersion CreateVersion(ETag eTag, WalProviderState providerState)
+        => eTag == default
+            ? JournalStorageVersion.Absent
+            : JournalStorageVersion.Create(providerState.Generation is null
+                ? $"etag:{eTag}"
+                : string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{providerState.Generation}|{providerState.Format}|{providerState.CheckpointName}|{providerState.CheckpointOffset}|{providerState.ContentLength}|{providerState.CommittedBlockCount}"));
 
     private AppendBlobClient GetWalClient()
     {
