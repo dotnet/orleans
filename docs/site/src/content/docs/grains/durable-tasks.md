@@ -157,15 +157,16 @@ execution's access log, in order, and a replay returns the recorded outcomes:
 - A read returns the value which the recording run read, including after other grain
   work changed the state, so a replay takes the same branches and schedules the same
   operations with the same arguments. An enumeration returns the recorded items.
-- A committed write isn't applied again, and returns its recorded result, such as the
-  `bool` which `Remove` returned or the sequence number which `Append` returned. A
-  committed send isn't sent again.
+- A committed write returns its recorded result, such as the `bool` which `Remove`
+  returned or the sequence number which `Append` returned, and leaves the state as the
+  recording run changed it. A committed send returns its record, so the outbox holds one
+  message.
 - An access which threw records its exception, and a replay throws it again.
 - A write's record is staged in the work item which makes the write, so every journal
-  write which commits the change also commits its record. A read's record is staged
-  with the execution's next write or durable operation, which are the ways a decision
-  based on the read becomes durable. A run which ends before a journal write commits a
-  change loses the change with its record, so the next run makes the change again.
+  write which commits the change also commits its record. A read's record commits with
+  the next journal write of the grain, which is how any decision based on the read
+  becomes durable. A run which ends before a journal write commits a change loses the
+  change with its record, so the next run makes the change again.
 
 The order workflow changes its status this way:
 
@@ -175,9 +176,9 @@ The order workflow changes its status this way:
   writing it back, such as `orders[id] = order with { Status = OrderStatus.Paid }`. Values
   and exceptions are recorded with the Orleans serializer in every journal format, as
   `DurableTask.RunInline` results are, so the state's types are Orleans-serializable.
-- Every run accesses the same state in the same order. A replay which makes a different
-  access, such as reading other state at a recorded position, or whose recorded value no
-  longer decodes, stalls: the runtime cancels the attempt for `Diverged`, discards its
+- Every run accesses the same state, with the same keys, indexes, and written values, in
+  the same order. A replay which makes a different access, such as reading other state or
+  another key at a recorded position, or whose recorded value no longer decodes, stalls: the runtime cancels the attempt for `Diverged`, discards its
   result, and keeps the task pending until code which makes the recorded accesses replays
   it. The attempt's handlers can't continue the task: its durable operations throw
   `DurableTaskAttemptCanceledException`, whose inner exception names the recorded and the
@@ -187,12 +188,26 @@ The order workflow changes its status this way:
   state as it changes: `IDurableTaskCompletionSource<T>.Task`, `IDurableLog<T>.ReadAsync`,
   and `WatchAsync` report changes as they happen, unrecorded, so a replay can observe
   different changes.
-- Once the runtime cancels an attempt, or the body completes, the attempt's later code,
-  such as cleanup in a `catch` or `finally` block and work which the body started without
-  awaiting it, accesses state directly, unrecorded, as other grain code does. Its changes
-  commit with the grain's next journal write. A canceled attempt's task replays in a new
-  attempt, which runs the cleanup again.
-- A `DurableTask.RunInline` effect records the accesses which it makes with its own result.
+- Task cancellation keeps recording: compensation in a `catch` block is part of the
+  execution's history, and a replay returns its records as it returns the body's others.
+- Once the task ends without its body, because it's aborted or deleted, or the body
+  completes, the attempt's later code, such as cleanup in a `catch` or `finally` block and
+  work which the body started without awaiting it, first returns the records which the
+  attempt hasn't replayed yet, then accesses state directly, as other grain code does. Its
+  changes commit with the grain's next journal write.
+- When the activation stops, or the attempt stalls, a later attempt runs the body again
+  from its records, so the stopped attempt's later code reads state directly, and its
+  writes throw `DurableTaskAttemptCanceledException` and leave the state unchanged. The
+  next attempt runs that code again and records it.
+- A `DurableTask.RunInline` effect's record covers the accesses which it makes, and so
+  does a journaled state operation's record cover the code which the operation runs, such as
+  a comparer or the source which `AddRange` enumerates. An effect inside them runs as part
+  of them, and a durable operation inside them, such as starting a child, throws
+  `InvalidOperationException`, because a replay returns the record without running that code.
+- Registrations on the body's cancellation tokens observe the cancellation without
+  accessing journaled state: they run when the token is canceled, which can be inside
+  another operation, so a replay runs them at another point. The body's `catch` block is
+  where compensation changes state.
 - The access log holds one record for each access in re-executed code and is deleted when
   the execution completes. A workflow which loops indefinitely bounds its history as
   [Replay-safety rules](durable-tasks-replay-rules.md#rules-which-the-analyzers-dont-check)

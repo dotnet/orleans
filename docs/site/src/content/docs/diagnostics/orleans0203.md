@@ -25,7 +25,7 @@ A step's result is staged in the work item which runs its final synchronous code
 
 When the run then ends before the result commits, for example because the activation deactivates, the next run runs the step again: it counts the notice a second time and sends the email again. The task's record shows one notice, and the grain's state shows two.
 
-Journaled state, such as `IDurableValue<T>` and the durable collections, stages each change with its record, so a step which runs again returns the recorded outcome without making the change again, and the rule doesn't apply to it. For the commit model, see [Replay-safety rules](../grains/durable-tasks-replay-rules.md).
+Journaled state, such as `IDurableValue<T>` and the durable collections, stages each change with its record, so a step which runs again returns the recorded outcome and leaves the change as it committed, and the rule covers persistent state only. For the commit model, see [Replay-safety rules](../grains/durable-tasks-replay-rules.md).
 
 ## How to fix violations
 
