@@ -34,7 +34,7 @@ export class DurableOperations {
    *   survives refreshes of the tab.
    * @param {string} [options.prefix] Prefixes the storage keys.
    * @param {number[]} [options.retryDelays] Delays, in milliseconds, before each retry of a request which fails with a
-   *   network error.
+   *   network error or 503 Service Unavailable without a Retry-After.
    * @param {number} [options.wait] Seconds which a long poll asks the server to wait.
    */
   constructor({ storage = sessionStorage, prefix = "durable-operations", retryDelays = [250, 1000, 3000], wait = 30 } = {}) {
@@ -211,15 +211,22 @@ export class DurableOperations {
     });
   }
 
-  // Sends a request, retrying network failures with the configured delays. The headers may vary by attempt.
+  // Sends a request, retrying network failures and 503 Service Unavailable, which leaves the operation unchanged, with
+  // the configured delays, or the response's Retry-After. The headers may vary by attempt.
   async #fetch(url, { method = "GET", headers = {}, body, signal } = {}) {
     for (let attempt = 0; ; attempt++) {
+      let delay;
       try {
-        return await fetch(url, { method, headers: typeof headers === "function" ? headers(attempt) : headers, body, signal });
+        const response = await fetch(url, { method, headers: typeof headers === "function" ? headers(attempt) : headers, body, signal });
+        if (response.status !== 503 || attempt >= this.retryDelays.length) return response;
+        const retryAfter = Number(response.headers.get("Retry-After"));
+        delay = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : this.retryDelays[attempt];
       } catch (error) {
         if (signal?.aborted || attempt >= this.retryDelays.length) throw error;
-        await new Promise(resolve => setTimeout(resolve, this.retryDelays[attempt]));
+        delay = this.retryDelays[attempt];
       }
+
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 
