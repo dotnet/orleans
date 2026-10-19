@@ -257,7 +257,11 @@ continues:
   execution's ID, and the ID of the operation which starts it: the `WithId` name, or the execution's
   next generated ID. The root ID is the single segment `{hostId}/{executionId}/{segment}`, in which each
   part escapes its `/` and `\` as `TaskId` does, so distinct hosts, executions, and operations derive
-  distinct root IDs, and a replay derives the same one.
+  distinct root IDs, and a replay derives the same one. A detached task's definition is one which a host
+  starts as a root task, such as a durable grain call, because its host stores and runs it on its own;
+  steps, `async DurableTask` methods, and combinators run as part of the execution which starts them, and
+  starting one detached throws `InvalidOperationException`
+  ([ORLEANS0228](https://aka.ms/orleans/diagnostics#orleans0228)).
 - `.Detached(rootId)` starts the independent root task `rootId`, which other parties know in advance and
   address, such as `place-order-42`. Every start of `rootId` on the task's host, from any execution or
   caller, including a replay, reaches the same task.
@@ -435,8 +439,9 @@ Follow these rules in re-executed code:
   poll throws `NotSupportedException`.
 - Await without `ConfigureAwait(false)`. A body runs on its grain activation's scheduler, which orders
   its durable operations and state changes and commits the tail's state changes with the result; a
-  continuation which leaves it races with the grain's other turns, and `DurableTask.RunInline` and
-  `DurableTask.GetVersion` throw there ([ORLEANS0226](https://aka.ms/orleans/diagnostics#orleans0226)).
+  continuation which leaves it races with the grain's other turns, and durable operations started there,
+  such as `DurableTask.RunInline`, starts, and `DurableTask.GetVersion`, throw `InvalidOperationException`
+  ([ORLEANS0226](https://aka.ms/orleans/diagnostics#orleans0226)).
 
 ## Recorded effects
 
@@ -550,7 +555,7 @@ ordinary grain methods. Logs inside a `DurableTask.RunInline` effect, or inside 
 don't repeat without it, because a replay returns their recorded results without running them.
 
 The package carries analyzers which report code that a replay would run differently, or which
-doesn't run as written, as diagnostics ORLEANS0200 to ORLEANS0227. Each diagnostic links to a page
+doesn't run as written, as diagnostics ORLEANS0200 to ORLEANS0228. Each diagnostic links to a page
 which describes the hazard and its fix.
 
 ## Host responsibilities

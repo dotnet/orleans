@@ -96,13 +96,13 @@ public sealed class ReplayIdentityPropertyTests
                     await DurableTask.WhenAll(Enumerable.Range(0, operation.Width).Select(static _ => DurableTask.Run(static _ => 0)));
                     break;
                 case Kind.UnnamedDetachedPost:
-                    _ = DurableTask.Run(static _ => 0).Detached().Post();
+                    _ = new RootCall().Detached().Post();
                     break;
                 case Kind.NamedDetachedPost:
-                    _ = DurableTask.Run(static _ => 0).WithId(name).Detached().Post();
+                    _ = new RootCall().WithId(name).Detached().Post();
                     break;
                 case Kind.RootedDetachedPost:
-                    _ = DurableTask.Run(static _ => 0).Detached($"root-{name}").Post();
+                    _ = new RootCall().Detached($"root-{name}").Post();
                     break;
                 case Kind.Version:
                     _ = DurableTask.GetVersion(name, 0, 1);
@@ -179,6 +179,16 @@ public sealed class ReplayIdentityPropertyTests
 
         protected override ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken)
             => throw new NotSupportedException();
+    }
+
+    /// <summary>A definition which a host starts as a root task, such as a durable grain call.</summary>
+    private sealed class RootCall : DurableTask, ISchedulableTask
+    {
+        public ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken) => new(DurableTaskResponse.Completed);
+
+        public IScheduledTaskHandle GetHandle(TaskId taskId) => new CompletedHandle(taskId);
+
+        protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context) => throw new NotSupportedException();
     }
 
     private sealed class CompletedHandle(TaskId taskId) : IScheduledTaskHandle

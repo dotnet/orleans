@@ -230,3 +230,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 ## ORLEANS0227
 
 [Run durable operations outside DurableTask.RunInline effects](orleans0227.md) — Error. A `DurableTask.RunInline` effect starts a task or checks a version, which throws `InvalidOperationException`.
+
+## ORLEANS0228
+
+[Detach durable grain calls](orleans0228.md) — Error. Durable task code detaches a step, an `async DurableTask` method, or a combinator, which runs only as part of the execution which starts it.

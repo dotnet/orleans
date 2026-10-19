@@ -187,7 +187,7 @@ internal static class DurableTaskDiagnostics
         "Continue durable task bodies on their scheduler",
         "Remove 'ConfigureAwait({0})': the body's continuation would run off its grain's scheduler, where durable operations throw and state changes race with the grain's other work",
         DiagnosticSeverity.Error,
-        "A durable task body runs on its grain activation's scheduler, which orders its durable operations and state changes, and commits the body's result with the state changes which its final code makes. An await configured not to continue on its captured context, such as ConfigureAwait(false), resumes the body on the thread pool: DurableTask.RunInline and DurableTask.GetVersion throw there, state changes race with the grain's other turns, and the final code's state changes and the body's result commit separately, so a crash applies the changes again. Await without ConfigureAwait, or with ConfigureAwait(true).");
+        "A durable task body runs on its grain activation's scheduler, which orders its durable operations and state changes, and commits the body's result with the state changes which its final code makes. An await configured not to continue on its captured context, such as ConfigureAwait(false), resumes the body on the thread pool: durable operations, such as DurableTask.RunInline, task starts, and DurableTask.GetVersion, throw InvalidOperationException there, state changes race with the grain's other turns, and the final code's state changes and the body's result commit separately, so a crash applies the changes again. Await without ConfigureAwait, or with ConfigureAwait(true).");
 
     public static readonly DiagnosticDescriptor OperationInEffect = Create(
         "ORLEANS0227",
@@ -196,6 +196,12 @@ internal static class DurableTaskDiagnostics
         DiagnosticSeverity.Error,
         "A replay returns a DurableTask.RunInline effect's recorded outcome without running the effect, so a durable operation in the effect, such as a start or a version check, would be missing from the replay, and the identifiers of the body's later operations would shift. The runtime rejects durable operations in effects, and the effect records that failure as its outcome. A DurableTask.RunInline call in an effect runs as part of the effect. Start tasks and check versions in the body, and pass values to the effect.");
 
+    public static readonly DiagnosticDescriptor DetachedLocalTask = Create(
+        "ORLEANS0228",
+        "Detach durable grain calls",
+        "Start '{0}' attached, or detach a durable grain call which runs it: a detached task is a root task which its host stores and runs on its own, and '{0}' runs as part of the execution which starts it",
+        DiagnosticSeverity.Error,
+        "Detached() and Detached(rootId) start an independent root task, which its host stores and runs on its own after the starting execution completes, so its definition is one which a host starts as a root task, such as a durable grain call. A DurableTask.Run step, an async DurableTask method, and a combinator run as part of the execution which starts them, and starting one detached throws InvalidOperationException. Start the work attached, or call a grain whose durable method runs it, and detach that call.");
     private static DiagnosticDescriptor Create(
         string id,
         string title,

@@ -273,6 +273,27 @@ internal sealed class DurableTaskSymbols
     }
 
     /// <summary>
+    /// Returns whether the configuration calls which wrap a definition include <c>Detached(rootId)</c>, which supplies the
+    /// task's root identifier, so the start takes no identifier of the execution.
+    /// </summary>
+    public static bool SuppliesRootId(IOperation value)
+    {
+        var current = Unwrap(value);
+        while (current is IInvocationOperation invocation && IsConfiguration(invocation) && GetExtensionReceiver(invocation) is { } receiver)
+        {
+            if (invocation.TargetMethod.Name == "Detached"
+                && invocation.TargetMethod.Parameters.Any(static parameter => parameter.Type.SpecialType == SpecialType.System_String))
+            {
+                return true;
+            }
+
+            current = Unwrap(receiver);
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Returns whether an invocation creates a combinator, which an awaiting execution runs as part of itself under a
     /// generated operation identifier: <c>WhenAll</c>, <c>WhenAny</c>, <c>Race</c>, <c>ScheduleAll</c>,
     /// <c>WhenAllCompleted</c>, a definition's <c>WaitAsync</c> or <c>WaitUntilAsync</c>, or a signal's <c>TryWaitAsync</c>.
