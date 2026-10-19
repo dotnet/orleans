@@ -10,7 +10,7 @@ namespace Orleans.Journaling;
 // Every change commits a journal entry when it is made: an append, trim, clear, seal, epoch, or draft commit. An open
 // draft stages nothing until it commits, so the log reports each change it stages.
 [DebuggerDisplay("Count = {Count}, NextSequence = {NextSequence}")]
-internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsStagedChanges, IDurableLogCommandHandler<T>, IJournaledStateHistory, IJournaledStateReplica
+internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsStagedChanges, IDurableLogCommandHandler<T>, IReplicableState, IJournaledStateReplica
 {
     private readonly IDurableLogCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
@@ -70,9 +70,9 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
     }
 
     // The collection journals each change as it makes it.
-    void IJournaledStateHistory.StagePendingChanges() { }
+    void IReplicableState.StagePendingChanges() { }
 
-    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableLog<T>(_codec);
+    IJournaledStateReplica IReplicableState.CreateReplica() => new DurableLog<T>(_codec);
 
     void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
     {

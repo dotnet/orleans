@@ -45,7 +45,7 @@ public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsStagedChanges, IDurableSetCommandHandler<T>, IResyncSource<SetChange<T>>, IJournaledStateHistory, IJournaledStateReplica
+internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsStagedChanges, IDurableSetCommandHandler<T>, IResyncSource<SetChange<T>>, IReplicableState, IJournaledStateReplica
 {
     private readonly IDurableSetCommandCodec<T> _codec;
     private readonly HashSet<T> _items = [];
@@ -84,9 +84,9 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsSta
     }
 
     // The collection journals each change as it makes it.
-    void IJournaledStateHistory.StagePendingChanges() { }
+    void IReplicableState.StagePendingChanges() { }
 
-    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableSet<T>(_codec);
+    IJournaledStateReplica IReplicableState.CreateReplica() => new DurableSet<T>(_codec);
 
     void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
     {

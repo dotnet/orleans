@@ -651,7 +651,7 @@ internal sealed class DurableTaskAccessLog(
     {
         var target = access.Target;
         if (_positionHolder?.Journal is not { } journal
-            || target.History is not { } history
+            || target.ReplicableState is not { } history
             || !ReferenceEquals(target.Manager, journal)
             || !JournaledStateOperations.IsPositional(access.Operation)
             || !PositionalTypes<TArgument, TResult>.IsSupported(_serializer))
@@ -662,7 +662,7 @@ internal sealed class DurableTaskAccessLog(
         // The journal up to the position must hold what the read observed, including a value which a coalescing state
         // would journal only at the next write.
         history.StagePendingChanges();
-        if (!journal.TryGetPosition(out var position))
+        if (!journal.Positions.TryGetPosition(out var position))
         {
             return false;
         }

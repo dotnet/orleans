@@ -22,7 +22,7 @@ namespace Orleans.Journaling;
 /// positional read from its encoded argument. Only the manager's history replay uses replicas.
 /// </para>
 /// </remarks>
-internal interface IJournaledStateHistory
+internal interface IReplicableState
 {
     /// <summary>Journals the state's pending changes now, so its current content is a prefix of its journal.</summary>
     void StagePendingChanges();
@@ -70,7 +70,7 @@ internal static class JournaledStateReplicaEncoding
 /// </remarks>
 internal interface IJournalPositionHolder
 {
-    /// <summary>Gets whether the holder holds positional reads which aren't resolved, staged or not.</summary>
+    /// <summary>Gets whether the holder holds positional reads which aren't resolved.</summary>
     /// <remarks>A holder keeps its barrier while it holds none; the manager releases it before a snapshot.</remarks>
     bool HoldsPositionalReads { get; }
 
@@ -81,9 +81,10 @@ internal interface IJournalPositionHolder
     void ApplyResolvedReads(JournalPositionalReads reads);
 
     /// <summary>
-    /// Releases the holder's barrier: every read which it held was resolved, or can't be resolved and stays unresolved.
+    /// Notes that the manager resolved the holder's reads and released its barrier: every read which it held was resolved,
+    /// or can't be resolved and stays unresolved.
     /// </summary>
-    void ReleasePositions();
+    void OnPositionsResolved();
 }
 
 /// <summary>A batch of positional reads, which the manager resolves by replaying its journal's history.</summary>
@@ -146,7 +147,6 @@ internal sealed class JournalPositionalReads(Serializer serializer)
         _reads[index] = read;
     }
 
-
     internal struct Read
     {
         public long Position;
@@ -162,8 +162,14 @@ internal sealed class JournalPositionalReads(Serializer serializer)
 /// <remarks>
 /// <para>
 /// A barrier, journaled under its owner's name with the position from which it holds history, keeps every snapshot from
-/// passing it until the owner releases it or the manager resolves the owner's positional reads. Changes are journaled at
-/// the next write, so a barrier which is set and released between two writes journals nothing.
+/// passing it until the manager releases it. Changes are journaled at the next write, so a barrier which is set and
+/// released between two writes journals nothing.
+/// </para>
+/// <para>
+/// The barriers are the manager's bookkeeping for reads which record positions, on a reserved stream rather than a
+/// registered state: a barrier follows such a read, whose record commits with whichever write captures next, so setting
+/// or releasing one stages no change of the grain's state, and <see cref="JournaledStateManager.StagedChangeCount"/>
+/// doesn't count it.
 /// </para>
 /// <para>
 /// The entries reuse the dictionary commands of <see cref="string"/> keys and values, with positions in invariant decimal.
@@ -171,7 +177,7 @@ internal sealed class JournalPositionalReads(Serializer serializer)
 /// codec for them.
 /// </para>
 /// </remarks>
-internal sealed class JournalPositionState(Func<IDurableDictionaryCommandCodec<string, string>> getCodec) : IStateMachine, IDurableDictionaryCommandHandler<string, string>
+internal sealed class JournalBarrierState(Func<IDurableDictionaryCommandCodec<string, string>> getCodec) : IStateMachine, IDurableDictionaryCommandHandler<string, string>
 {
     /// <summary>The reserved stream id of the journal's barriers.</summary>
     public const uint Id = 2u;
@@ -195,7 +201,6 @@ internal sealed class JournalPositionState(Func<IDurableDictionaryCommandCodec<s
             _changed.Add(owner);
         }
     }
-
 
     /// <summary>Releases every barrier.</summary>
     public void RemoveAll()
@@ -261,64 +266,63 @@ internal sealed class JournalPositionState(Func<IDurableDictionaryCommandCodec<s
     private static long Parse(string value) => long.Parse(value, NumberStyles.None, CultureInfo.InvariantCulture);
 }
 
+/// <summary>A registered state which supports positional reads, under its journal name.</summary>
+internal sealed record ReplicableStateEntry(string Name, IReplicableState State);
+
 /// <summary>
-/// Replays a journal's history into replicas of the states which positional reads name, and resolves each read as of its
-/// position.
+/// Replays a journal's history into replicas of the manager's replicable states, and resolves each positional read as of
+/// its position.
 /// </summary>
 /// <remarks>
 /// It counts positions as the manager does, from the start of storage's content: before the format replays each entry, the
 /// reads at the position which precedes it are evaluated. A read whose position passed without being reached stays
-/// unresolved, as does a read of a state which isn't registered or whose replica fails to evaluate it.
+/// unresolved, as does a read of a state which has no replica or whose replica fails to evaluate it.
 /// </remarks>
 internal sealed class JournalHistoryReplay : IJournalStorageConsumer, IJournalReplayTarget
 {
     private readonly JournaledStateManager _manager;
-    private readonly IJournalFormat _writeFormat;
     private readonly List<(long Position, JournalPositionalReads Batch, int Index)> _reads = [];
     private readonly Dictionary<int, IJournaledStateReplica> _replicasById = [];
     private readonly Dictionary<string, IJournaledStateReplica> _replicasByName = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, IStateMachine> _streams = [];
-    private readonly Directory _directory;
+    private readonly StreamDirectory _directory;
     private readonly Ignored _ignored = new();
     private int _next;
-    private long _count;
 
-    public JournalHistoryReplay(JournaledStateManager manager, IJournalFormat writeFormat, IDurableDictionaryCommandCodec<string, uint> directoryCodec)
+    /// <param name="manager">The manager whose journal's history is replayed.</param>
+    /// <param name="states">The manager's replicable states by their names' stable ids; <see langword="null"/> marks ids which two names share.</param>
+    /// <param name="directoryCodec">The codec of the manager's stream directory, which binds names to stream ids.</param>
+    public JournalHistoryReplay(
+        JournaledStateManager manager,
+        IReadOnlyDictionary<int, ReplicableStateEntry?> states,
+        IDurableDictionaryCommandCodec<string, uint> directoryCodec)
     {
         _manager = manager;
-        _writeFormat = writeFormat;
         _directory = new(this, directoryCodec);
 
-        // Every state which supports positional reads replays, since reads collected later can name any of them.
-        foreach (var (id, target) in manager.AccessTargets)
+        // Every replicable state replays, since reads collected later can name any of them.
+        foreach (var (id, entry) in states)
         {
-            if (target?.History is { } history)
+            if (entry is not null)
             {
-                var replica = history.CreateReplica();
+                var replica = entry.State.CreateReplica();
                 replica.Reset(default);
                 _replicasById[id] = replica;
-                _replicasByName[target.Name] = replica;
+                _replicasByName[entry.Name] = replica;
             }
         }
     }
 
-    /// <summary>Gets the batch of reads which each holder supplied last.</summary>
-    public Dictionary<IJournalPositionHolder, JournalPositionalReads> Batches { get; } = new(ReferenceEqualityComparer.Instance);
-
-    /// <summary>Gets or sets whether storage's history was replayed, so reads of positions after it can resolve.</summary>
-    public bool HasReadStorage { get; set; }
-
     /// <summary>Gets the logical position after the entries replayed so far.</summary>
-    public long Position => _count;
+    public long Position { get; private set; }
 
     string IJournalReplayTarget.WriteJournalFormatKey => _manager.WriteJournalFormatKey;
 
     IServiceProvider IJournalReplayTarget.ServiceProvider => _manager.ServiceProvider;
 
-    /// <summary>Adds a holder's reads to resolve, whose positions are at or after the position reached so far.</summary>
-    public void Add(IJournalPositionHolder holder, JournalPositionalReads batch)
+    /// <summary>Adds reads to resolve, whose positions are at or after the position reached so far.</summary>
+    public void Add(JournalPositionalReads batch)
     {
-        Batches[holder] = batch;
         for (var i = 0; i < batch.Count; i++)
         {
             _reads.Add((batch[i].Position, batch, i));
@@ -327,20 +331,14 @@ internal sealed class JournalHistoryReplay : IJournalStorageConsumer, IJournalRe
         _reads.Sort(_next, _reads.Count - _next, ReadOrder.Instance);
     }
 
+    /// <summary>Forgets the reads which the replay hasn't reached, so a later batch can supply them again.</summary>
+    public void DropPending() => _reads.RemoveRange(_next, _reads.Count - _next);
+
     void IJournalStorageConsumer.Read(JournalBufferReader buffer, IJournalMetadata? metadata)
     {
-        if (buffer.Length == 0)
+        if (buffer.Length > 0)
         {
-            return;
-        }
-
-        var format = metadata?.FormatKey is { } key
-            ? _manager.GetJournalFormat(JournalFormatServices.ValidateJournalFormatKey(key))
-            : _writeFormat;
-        format.Replay(buffer, new JournalReplayContext(this));
-        if (buffer.IsCompleted && buffer.Length > 0)
-        {
-            throw new InvalidOperationException("The journal format did not read the completed journal data.");
+            _manager.Replay(buffer, _manager.GetStoredJournalFormatKey(metadata), this);
         }
     }
 
@@ -354,8 +352,7 @@ internal sealed class JournalHistoryReplay : IJournalStorageConsumer, IJournalRe
 
         using var buffer = new ArcBufferWriter();
         buffer.AppendPinned(committed);
-        var reader = new JournalBufferReader(buffer.Reader, isCompleted: true);
-        _writeFormat.Replay(reader, new JournalReplayContext(this));
+        _manager.Replay(new JournalBufferReader(buffer.Reader, isCompleted: true), _manager.WriteJournalFormatKey, this);
     }
 
     /// <summary>Resolves the reads at the position reached, after the last replayed entry.</summary>
@@ -364,7 +361,7 @@ internal sealed class JournalHistoryReplay : IJournalStorageConsumer, IJournalRe
     IStateMachine IJournalReplayTarget.ResolveStateMachine(JournalStreamId streamId)
     {
         ResolveThrough(Position);
-        _count++;
+        Position++;
         return streamId.Value is 0u ? _directory : _streams.TryGetValue(streamId.Value, out var state) ? state : _ignored;
     }
 
@@ -421,7 +418,7 @@ internal sealed class JournalHistoryReplay : IJournalStorageConsumer, IJournalRe
     }
 
     // The stream directory, which binds replicas to their states' stream ids.
-    private sealed class Directory(JournalHistoryReplay owner, IDurableDictionaryCommandCodec<string, uint> codec)
+    private sealed class StreamDirectory(JournalHistoryReplay owner, IDurableDictionaryCommandCodec<string, uint> codec)
         : IStateMachine, IDurableDictionaryCommandHandler<string, uint>
     {
         private readonly Dictionary<string, uint> _ids = new(StringComparer.Ordinal);

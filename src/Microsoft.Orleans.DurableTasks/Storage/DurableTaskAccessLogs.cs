@@ -143,7 +143,7 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IReportsStagedChang
     {
         if (_positionalTasks.Add(taskId))
         {
-            Journal!.SetBarrier(StateMachineName, position);
+            Journal!.Positions.HoldBarrier(StateMachineName, position);
         }
 
         _recorders[taskId] = recorder;
@@ -288,7 +288,7 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IReportsStagedChang
         }
     }
 
-    void IJournalPositionHolder.ReleasePositions()
+    void IJournalPositionHolder.OnPositionsResolved()
     {
         // The manager releases the barrier itself.
         _positionalTasks.Clear();
