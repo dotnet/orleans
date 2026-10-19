@@ -9,8 +9,9 @@ correctness, security, compatibility, concurrency, and reliability.
   convenience; seek a design that serves all of them before trading one away.
 - Safety (no corruption, data loss, broken invariants, or security violations)
   precedes liveness.
-- Ask before relying on an invariant that almost holds, changing a surface that
-  may have shipped or been persisted, or adding a dependency.
+- Ask the maintainer (in reviews, raise a question) before relying on an invariant
+  that is not yet established, changing a surface that may have shipped or been
+  persisted, or adding a dependency.
 
 ## Layering, contracts, and invariants
 

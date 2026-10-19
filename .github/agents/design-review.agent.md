@@ -14,7 +14,7 @@ Follow root `AGENTS.md` and `.github/skills/code-review/SKILL.md`.
 2. Launch these agents in parallel, each with the full scope and context: `architect`, `invariants`, `test-engineer`, `performance`, and `code-craft`. Ask each for review findings only.
 3. Merge the results. Deduplicate findings that share a root cause and keep the most precise framing.
 4. Rank findings by the priorities in root `AGENTS.md`.
-5. Surface every open invariant or compatibility question verbatim.
+5. Surface each open invariant or compatibility question that can change correctness or rollout, deduplicated, with its impact.
 
 ## Output
 

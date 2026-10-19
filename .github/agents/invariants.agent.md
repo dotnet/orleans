@@ -11,5 +11,5 @@ checklist.
 
 ## Output
 
-- **Implementing:** code with invariants encoded in types and assertions, plus a short provides/demands list per component.
+- **Implementing:** code with each relevant invariant enforced at its owning boundary (types where practical, assertions for programming invariants), plus a short provides/demands list for affected components.
 - **Reviewing:** findings ordered by severity, as the skill describes, with invariant questions listed separately.

@@ -12,23 +12,23 @@ names. It covers changed code; unrelated refactoring stays out of scope.
 ## Procedure
 
 1. Read the change top-down as a newcomer would.
-2. Flag control flow that hides cases, functions that do more than one thing, state with more than one copy, and names that misdescribe.
+2. Flag control flow that hides cases, functions that do more than one thing, mutable state with more than one copy, and names that misdescribe.
 3. Prefer refactors that remove code or branches to those that add structure.
 4. Keep behavior identical when refactoring, verified by existing tests.
 5. Skip formatting the build already enforces.
 
 ## Checklist
 
-- **Simple, explicit control flow.** [Push `if`s up and `for`s down](https://matklad.github.io/2023/11/15/push-ifs-up-and-fors-down.html); the parent centralizes state mutation and leaves stay pure.
-- **Functions fit on a screen** (about 70 lines).
-- **Smallest scope.** Values are computed close to their use, with no gap between check and use; each piece of state has one copy and no aliases.
-- **Simple signatures.** Each extra return dimension (nullable, error, async) spreads branches to every caller: `void` > `bool` > `int` > `int?`.
-- **Positive conditions** (`index < count`); compound conditions are split and both branches handled.
-- **Explicit options.** Behavior-critical options are passed at call sites.
-- **Precise names.** Nouns and verbs are precise, unabbreviated, and carry one meaning each.
-- **Units in types.** Durations and instants use `TimeSpan` and `DateTimeOffset`; raw numbers carry the unit in the name (`timeoutMs`).
-- **Grouped names.** Related names share a prefix (`LatencyMax`, `LatencyMin`).
-- **Compiler strictness.** Code builds cleanly under the repository's warnings-as-errors and nullable settings; nullable annotations state the contract, and each null-forgiving operator or suppression carries its reason.
+- **Push `if`s up, `for`s down.** Callers decide which case applies and pass helpers the whole batch; the coordinating method owns state mutation while the helpers it calls compute results without side effects ([matklad](https://matklad.github.io/2023/11/15/push-ifs-up-and-fors-down.html)).
+- **Functions fit on a screen.** A function reads as one unit; one beyond about 70 lines prompts a check for mixed responsibilities.
+- **Smallest scope.** Values are computed close to their use, so nothing can invalidate a check between the check and the use; each piece of mutable state has one owner and one copy.
+- **Simple signatures.** Each extra return dimension (nullability, error result, async) adds branches to every caller, so a method returns the simplest shape its contract allows (`void` over `bool` over `int` over `int?`).
+- **Positive conditions.** Conditions read in positive form (`index < count`, not `!(index >= count)`); compound conditions whose terms need different handling are split, and each branch is handled deliberately.
+- **Explicit options.** Behavior-critical choices are visible at the call site or the configuration boundary that owns them.
+- **Precise names.** Names are precise nouns and verbs with one meaning each; abbreviations are limited to established terms (ID, ETag, GC, RPC).
+- **Units in types.** Durations use `TimeSpan`, instants use `DateTimeOffset` in new APIs and the established type in existing contracts, and raw numbers carry the unit in the name (`timeoutMs`).
+- **Grouped names.** In new code, related names share a prefix so they sort together (`LatencyMax`, `LatencyMin`), unless local conventions establish another pattern.
+- **Compiler strictness.** Code builds cleanly under warnings-as-errors and the repository's nullable settings; each null-forgiving operator or suppression relies on an invariant that is evident nearby or stated in a comment.
 
 ## Findings
 

@@ -1,6 +1,6 @@
 ---
 name: review-testing
-description: Testing lens for Orleans — spec-derived oracles, Accordant model-based tests, CsCheck property-based tests, deterministic simulation with controlled time, fault injection, and Verify snapshots. Use during code review, and when planning or writing tests.
+description: Testing lens for Orleans — spec-derived oracles, example tests, Accordant model-based tests, CsCheck property-based tests, deterministic simulation with controlled time, fault injection, and Verify snapshots. Use during code review, and when planning or writing tests.
 ---
 
 # Testing lens
@@ -12,22 +12,23 @@ under failure.
 ## Procedure
 
 1. Derive the oracle from the spec and the component's invariants, independent of the current implementation.
-2. Choose the technique per property using the checklist below.
-3. Cover valid input, invalid input, and the transition between them; exercise every error path.
-4. Keep each test deterministic and seeded so every failure reproduces.
+2. Choose the simplest technique that establishes each property, using the checklist below.
+3. Cover representative valid and invalid inputs, the boundary between them, and the changed error paths.
+4. Make each failure reproducible: record seeds for randomized tests and control time, synchronization, and external state.
 5. Reuse existing test infrastructure, fixtures, and TestKits.
 
 ## Checklist
 
-- **Model-based tests (Accordant)** check stateful components against a simple reference model across operation sequences, concurrency, and failures (see `test/Orleans.Clustering.TestKit.Tests/MembershipTableModelBasedTestRunnerTests.cs`).
+- **Example tests** pin specific regressions and scenarios.
+- **Model-based tests (Accordant)** check stateful components that have a simpler reference model against it across operation sequences, including concurrency and failures where the contract covers them (see `test/Orleans.Clustering.TestKit.Tests/MembershipTableModelBasedTestRunnerTests.cs`).
 - **Property-based tests (CsCheck)** cover invariants, round-trips, and algebraic laws with reproducible seeds and effective shrinking (see `test/Orleans.Core.Tests/Directory/RingRangeTests.cs`).
-- **Deterministic simulation** drives concurrent and distributed code with `InProcessTestCluster`, `FakeTimeProvider`, and explicit phase barriers.
-- **Fault injection** exercises every boundary: storage (`FaultInjectionStorageProvider`, `FaultyMemoryStorage`), transactions (`src/Orleans.Transactions.TestKit.Base/FaultInjection`), and silo stops and kills (`StopSiloAsync`, `KillSiloAsync`).
+- **Deterministic simulation** drives concurrent and distributed behavior with the controlled clocks and explicit phase barriers in `test/AGENTS.md`, using `InProcessTestCluster` when the property crosses runtime boundaries.
+- **Fault injection** exercises changed failure boundaries: storage (`FaultInjectionGrainStorage`, `AddFaultInjectionMemoryStorage`), transactions (`src/Orleans.Transactions.TestKit.Base/FaultInjection`), and silo stops and kills (`StopSiloAsync`, `KillSiloAsync`).
 - **Snapshots (Verify)** pin wire formats and generated output; baseline changes are reviewed as semantic changes (see `test/Orleans.Serialization.UnitTests/GeneratedSerializerBitwiseCompatibilityTests.cs`).
-- **Compatibility tests** cover serialization and persisted-data changes across versions.
-- **Right level.** Unit tests cover pure logic; cluster tests cover runtime boundaries; provider TestKits cover provider contracts. Each test carries the appropriate `[TestCategory]`.
-- **Behavioral assertions.** Tests assert observable outcomes and contracts with exact expectations.
-- **Fuzzing finds bugs; it does not prove absence.** A clear mental model and assertions come first; simulation is the last line of defense.
+- **Compatibility tests** cover changes to shipped serialization or persisted data in both directions the rolling-upgrade window requires.
+- **Right level.** Unit tests cover pure logic, cluster tests cover runtime boundaries, and provider TestKits cover provider contracts; new tests follow the containing suite's `[TestCategory]` conventions.
+- **Contract assertions.** Assertions check the observable contract exactly: precise where the contract is precise (values, ordering under controlled time), and silent on incidental details.
+- **Reasoning first.** Randomized testing finds bugs but cannot prove their absence; a clear model of the invariants and assertions in code establish correctness, and tests confirm it.
 
 ## Findings
 

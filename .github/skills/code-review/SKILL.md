@@ -9,11 +9,12 @@ description: Review Orleans changes for layer contracts, invariants, minimal com
    implementation principles alongside standard correctness, security,
    compatibility, concurrency, reliability, and testing checks.
 2. Establish the change's goal and each affected layer's required and provided
-   guarantees. Trace callers, ownership, lifetimes, and transitions to verify the
-   contracts and distinguish proven invariants from assumptions.
-3. Check the diff for unnecessary state, abstractions, work, allocations, retained
-   memory, error handling, and documentation edits. Recommend the simplest complete
-   correction that preserves required behavior and contracts.
+   guarantees. Trace the callers, ownership, lifetimes, and transitions relevant to
+   the change to verify the contracts and distinguish proven invariants from assumptions.
+3. Check that each addition in the diff (state, abstractions, work, allocations,
+   retained memory, error handling, documentation) serves a concrete requirement.
+   Recommend the simplest complete correction that preserves required behavior and
+   contracts.
 4. Examine behavioral tests and the automated PR coverage comment. Identify
    meaningful gaps or regressions in affected code; state when evidence is missing.
    Support performance claims with measurements or explicit cost assumptions.
@@ -21,7 +22,8 @@ description: Review Orleans changes for layer contracts, invariants, minimal com
    then we could simplify this by Y." Identify the owning layer, enforcement, and
    feasibility; distinguish conditional design suggestions from confirmed
    contract violations.
-6. Apply each lens skill to the affected code:
+6. Review the affected code through each lens skill, reporting only material,
+   in-scope findings:
    `.github/skills/review-architecture/SKILL.md`,
    `.github/skills/review-invariants/SKILL.md`,
    `.github/skills/review-testing/SKILL.md`,

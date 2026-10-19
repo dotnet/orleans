@@ -11,5 +11,5 @@ checklist.
 
 ## Output
 
-- **Designing:** spec (state and actions), layer/contract table, invariants per boundary, and open questions.
+- **Designing:** the contract (client-visible state and actions for stateful behavior), affected layers with the guarantees each provides and requires, and open questions, proportional to the scope.
 - **Reviewing:** findings ordered by severity, as the skill describes, with open questions about invariants or shipped status listed separately.
