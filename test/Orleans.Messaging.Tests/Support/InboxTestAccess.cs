@@ -36,6 +36,12 @@ internal static class InboxTestAccess
     public static InboxMessageState GetMessageState(Inbox inbox, MessageId messageId) =>
         inbox.MessageState[messageId].State;
 
+    public static void StageAcceptance(Inbox inbox, InboxMessage message) =>
+        Emit(inbox, new() { Kind = InboxCommandKind.Accept, Message = message });
+
+    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "Emit")]
+    private static extern void Emit(Inbox inbox, InboxCommand command);
+
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_wakeupJobId")]
     public static extern ref string? WakeupJobId(MessagingPump pump);
 
