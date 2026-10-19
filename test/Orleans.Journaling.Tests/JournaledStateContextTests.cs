@@ -200,6 +200,34 @@ public sealed class JournaledStateContextTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task DequeueWhoseResultTheContextRejectsLeavesTheItemQueued()
+    {
+        var sut = CreateTestSystem();
+        var provider = new TestProvider();
+        ((JournaledStateManager)sut.Manager).ContextProvider = provider;
+        var queue = new DurableQueue<string>("queue", sut.Manager, new OrleansBinaryDurableQueueCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        queue.Enqueue("a");
+
+        // A context which can't record the item, such as one without a codec for it, fails the dequeue before it applies.
+        var context = provider.Context = new RecordingContext { Rejects = static _ => new NotSupportedException("no codec") };
+        Assert.Throws<NotSupportedException>(() => queue.Dequeue());
+        Assert.Throws<NotSupportedException>(() => queue.TryDequeue(out _));
+
+        provider.Context = null;
+        Assert.Equal(["a"], queue);
+        Assert.Equal(
+            [JournaledStateOperation.QueueDequeue, JournaledStateOperation.QueueTryDequeue],
+            context.Accesses.Select(static access => access.Operation));
+
+        // A context which records the item applies the dequeue after recording it.
+        provider.Context = new RecordingContext();
+        Assert.Equal("a", queue.Dequeue());
+        provider.Context = null;
+        Assert.Empty(queue);
+    }
+
+    [Fact]
     public void TargetIdentifiersAreStableHashesOfTheirNames()
     {
         var manager = CreateTestSystem().Manager;
@@ -242,7 +270,14 @@ public sealed class JournaledStateContextTests : JournalingTestBase
 
         public Queue<object?> Recorded { get; } = new();
 
-        protected override TResult Access<TState, TResult>(in JournaledStateAccess access, TState state, Func<TState, TResult> operation)
+        /// <summary>Gets or sets a check which rejects a result before its change applies, as a context which can't record it does.</summary>
+        public Func<object?, Exception?>? Rejects { get; set; }
+
+        protected override TResult Access<TState, TResult>(
+            in JournaledStateAccess access,
+            TState state,
+            Func<TState, TResult> operation,
+            Action<TState, TResult>? apply)
         {
             if (Recorded.TryDequeue(out var outcome))
             {
@@ -253,6 +288,12 @@ public sealed class JournaledStateContextTests : JournalingTestBase
             try
             {
                 var result = operation(state);
+                if (Rejects?.Invoke(result) is { } rejection)
+                {
+                    throw rejection;
+                }
+
+                apply?.Invoke(state, result);
                 Accesses.Add((access.Kind, access.Operation, access.Target.Name, result));
                 return result;
             }

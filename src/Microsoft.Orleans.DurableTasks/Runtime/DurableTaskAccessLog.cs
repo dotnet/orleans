@@ -158,7 +158,11 @@ internal sealed class DurableTaskAccessLog(
         }
     }
 
-    protected override TResult Access<TState, TResult>(in JournaledStateAccess access, TState state, Func<TState, TResult> operation)
+    protected override TResult Access<TState, TResult>(
+        in JournaledStateAccess access,
+        TState state,
+        Func<TState, TResult> operation,
+        Action<TState, TResult>? apply)
     {
         Debug.Assert(TaskScheduler.Current == _scheduler, "A durable task body accesses journaled state on its activation's scheduler.");
         Debug.Assert(!access.Target.Name.StartsWith("$task", StringComparison.Ordinal), "The runtime's own state belongs to its operations, not to the body's accesses.");
@@ -177,32 +181,54 @@ internal sealed class DurableTaskAccessLog(
 
             if (_state is AccessLogState.Closed)
             {
-                return operation(state);
+                return RunLive(state, operation, apply);
             }
 
-            TResult result;
-            try
-            {
-                result = operation(state);
-            }
-            catch (Exception exception) when (IsOpen && IsRecordable(exception))
-            {
-                RecordAndThrowException(access, exception);
-                throw;
-            }
-
-            // The runtime can end the attempt while the operation runs, such as from a callback which it calls.
-            if (IsOpen)
-            {
-                RecordResult(access, result);
-            }
-
-            return result;
+            return Record(access, state, operation, apply);
         }
         finally
         {
             Depth--;
         }
+    }
+
+    private static TResult RunLive<TState, TResult>(TState state, Func<TState, TResult> operation, Action<TState, TResult>? apply)
+    {
+        var result = operation(state);
+        apply?.Invoke(state, result);
+        return result;
+    }
+
+    private TResult Record<TState, TResult>(
+        in JournaledStateAccess access,
+        TState state,
+        Func<TState, TResult> operation,
+        Action<TState, TResult>? apply)
+    {
+        TResult result;
+        byte[]? value;
+        try
+        {
+            result = operation(state);
+
+            // A change whose result is known first records it before applying, so a result which can't be recorded
+            // leaves the state unchanged.
+            value = EncodeResult(result);
+            apply?.Invoke(state, result);
+        }
+        catch (Exception exception) when (IsOpen && IsRecordable(exception))
+        {
+            RecordAndThrowException(access, exception);
+            throw;
+        }
+
+        // The runtime can end the attempt while the operation runs, such as from a callback which it calls.
+        if (IsOpen)
+        {
+            AddRecord(access, value is null ? (byte)0 : HasValue, value);
+        }
+
+        return result;
     }
 
     // The cancellation of the attempt ends it, so it's no outcome of the access which every later attempt observes.
@@ -287,28 +313,9 @@ internal sealed class DurableTaskAccessLog(
     private static bool Matches(in JournaledStateAccess access, byte flags, byte operation, int target) =>
         (flags & KindMask) == (byte)access.Kind && operation == (byte)access.Operation && target == access.Target.Id;
 
-    private void RecordResult<TResult>(in JournaledStateAccess access, TResult result)
-    {
-        if (typeof(TResult) == typeof(JournaledStateAccessNoResult))
-        {
-            AddRecord(access, flags: 0, value: null);
-            return;
-        }
-
-        byte[] value;
-        try
-        {
-            value = _serializer.SerializeToArray(result);
-        }
-        catch (Exception exception)
-        {
-            // A value which doesn't serialize is recorded as that failure, so every attempt observes the same failure.
-            RecordAndThrowException(access, exception);
-            throw;
-        }
-
-        AddRecord(access, HasValue, value);
-    }
+    // A value which doesn't serialize throws, and the caller records that failure, so every attempt observes it.
+    private byte[]? EncodeResult<TResult>(TResult result) =>
+        typeof(TResult) == typeof(JournaledStateAccessNoResult) ? null : _serializer.SerializeToArray(result);
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "An exception which doesn't serialize is recorded as a description of it.")]
     [DoesNotReturn]

@@ -115,7 +115,15 @@ public class JournaledStateContextBenchmarks
 
     private sealed class PassThroughContext : JournaledStateContext
     {
-        protected override TResult Access<TState, TResult>(in JournaledStateAccess access, TState state, Func<TState, TResult> operation) =>
-            operation(state);
+        protected override TResult Access<TState, TResult>(
+            in JournaledStateAccess access,
+            TState state,
+            Func<TState, TResult> operation,
+            Action<TState, TResult>? apply)
+        {
+            var result = operation(state);
+            apply?.Invoke(state, result);
+            return result;
+        }
     }
 }
