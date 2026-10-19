@@ -91,7 +91,7 @@ internal static class PositionResolutionCost
                 WriteHistory(activation);
                 RecordReads(activation, complete: false);
                 storage.RequestCompaction = true;
-                for (var deferred = 0; deferred < JournaledStateManager.MaxDeferredSnapshots && activation.Manager.HasBarriers; deferred++)
+                for (var deferred = 0; deferred < JournalPositionTracker.MaxDeferredSnapshots && activation.Manager.Positions.HasBarriers; deferred++)
                 {
                     activation.Manager.WriteStateAsync().AsTask().GetAwaiter().GetResult();
                 }
@@ -102,7 +102,7 @@ internal static class PositionResolutionCost
                 times.Add(Stopwatch.GetElapsedTime(timestamp).TotalMicroseconds);
                 allocated += GC.GetTotalAllocatedBytes(precise: true) - start;
                 written += storage.ReplacedBytes;
-                if (storage.Replaces != 1 || activation.Manager.HasBarriers)
+                if (storage.Replaces != 1 || activation.Manager.Positions.HasBarriers)
                 {
                     throw new InvalidOperationException("The snapshot didn't resolve the reads.");
                 }

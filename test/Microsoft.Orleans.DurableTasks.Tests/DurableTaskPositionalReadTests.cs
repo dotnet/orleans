@@ -84,7 +84,7 @@ public sealed class DurableTaskPositionalReadTests
             observed = await first.RunAsync([Read(1, 0), Write(1, 0, 1), Read(1, 0), Read(4, 0)], replaying: false);
             Assert.True(first.CountPositionalRecords() > 0);
             harness.Storage.RequestCompaction = true;
-            for (var i = 0; i < JournaledStateManager.MaxDeferredSnapshots; i++)
+            for (var i = 0; i < JournalPositionTracker.MaxDeferredSnapshots; i++)
             {
                 await first.Manager.WriteStateAsync(Cancellation);
             }
@@ -110,7 +110,7 @@ public sealed class DurableTaskPositionalReadTests
         {
             observed = await first.RunAsync([Read(0, 0), Write(0, 0, 2), Read(0, 0), Read(6, 0)], replaying: false);
             harness.Storage.RequestCompaction = true;
-            for (var i = 0; i < JournaledStateManager.MaxDeferredSnapshots; i++)
+            for (var i = 0; i < JournalPositionTracker.MaxDeferredSnapshots; i++)
             {
                 await first.Manager.WriteStateAsync(Cancellation);
             }
@@ -138,7 +138,7 @@ public sealed class DurableTaskPositionalReadTests
             var log = first.CreateLog();
             first.Run(log, static activation => _ = activation.Dictionary.Count);
             log.Flush();
-            Assert.True(first.Manager.HasBarriers);
+            Assert.True(first.Manager.Positions.HasBarriers);
             harness.Storage.FailNext = Failure.AppendBefore;
             await Assert.ThrowsAnyAsync<Exception>(async () => await first.Manager.WriteStateAsync(Cancellation));
         }
@@ -146,7 +146,7 @@ public sealed class DurableTaskPositionalReadTests
         harness.Storage.Reads = 0;
         await using var recovered = await harness.ActivateAsync();
         Assert.Equal(1, harness.Storage.Reads);
-        Assert.False(recovered.Manager.HasBarriers);
+        Assert.False(recovered.Manager.Positions.HasBarriers);
         Assert.False(recovered.CreateLog().IsReplaying);
     }
 
@@ -176,7 +176,7 @@ public sealed class DurableTaskPositionalReadTests
         log.Flush();
         Assert.Null(DurableTaskAccessLog.FindPositionalRecords(migrating.Storage.GetAccessLog(other), []));
         await migrating.Manager.WriteStateAsync(Cancellation);
-        Assert.True(migrating.Manager.TryGetPosition(out _));
+        Assert.True(migrating.Manager.Positions.TryGetPosition(out _));
     }
 
     [Theory]
@@ -198,7 +198,7 @@ public sealed class DurableTaskPositionalReadTests
             log.Flush();
             first.Run(log, activation => observed.Add(activation.Dictionary["a"]));
             harness.Storage.RequestCompaction = true;
-            for (var i = 0; i < JournaledStateManager.MaxDeferredSnapshots; i++)
+            for (var i = 0; i < JournalPositionTracker.MaxDeferredSnapshots; i++)
             {
                 await first.Manager.WriteStateAsync(Cancellation);
             }
@@ -215,7 +215,7 @@ public sealed class DurableTaskPositionalReadTests
             harness.Storage.RequestCompaction = false;
             gate.SetResult();
             await snapshot;
-            Assert.False(first.Manager.HasBarriers);
+            Assert.False(first.Manager.Positions.HasBarriers);
             log.Flush();
             await first.Manager.WriteStateAsync(Cancellation);
             log.Close();
@@ -249,7 +249,7 @@ public sealed class DurableTaskPositionalReadTests
         await activation.Manager.DeleteStateAsync(Cancellation);
 
         Assert.Null(DurableTaskAccessLog.FindPositionalRecords(log.PendingRecords, log.PendingStates));
-        Assert.False(activation.Manager.HasBarriers);
+        Assert.False(activation.Manager.Positions.HasBarriers);
     }
 
     [Fact]
@@ -420,7 +420,7 @@ public sealed class DurableTaskPositionalReadTests
                         break;
                     case StepKind.ForceResolution when !replaying:
                         harness.Storage.RequestCompaction = true;
-                        for (var i = 0; i <= JournaledStateManager.MaxDeferredSnapshots && manager.HasBarriers; i++)
+                        for (var i = 0; i <= JournalPositionTracker.MaxDeferredSnapshots && manager.Positions.HasBarriers; i++)
                         {
                             await manager.WriteStateAsync(Cancellation);
                         }

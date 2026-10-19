@@ -23,21 +23,21 @@ public sealed class JournalPositionTests : JournalingTestBase
     {
         var storage = new ControlledStorage(new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey));
         var first = await ActivateAsync(storage);
-        Assert.True(first.Manager.TryGetPosition(out var start));
+        Assert.True(first.Manager.Positions.TryGetPosition(out var start));
         first.Dictionary["a"] = "x";
         first.Dictionary["b"] = "y";
-        Assert.True(first.Manager.TryGetPosition(out var afterSets));
+        Assert.True(first.Manager.Positions.TryGetPosition(out var afterSets));
         Assert.Equal(start + 2, afterSets);
 
         // The value journals at the next write, unless a positional read stages it first.
         first.Value.Value = "v";
-        Assert.True(first.Manager.TryGetPosition(out var afterValue));
+        Assert.True(first.Manager.Positions.TryGetPosition(out var afterValue));
         Assert.Equal(afterSets, afterValue);
         await first.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        Assert.True(first.Manager.TryGetPosition(out var written));
+        Assert.True(first.Manager.Positions.TryGetPosition(out var written));
 
         var second = await ActivateAsync(storage);
-        Assert.True(second.Manager.TryGetPosition(out var recovered));
+        Assert.True(second.Manager.Positions.TryGetPosition(out var recovered));
         Assert.Equal(written, recovered);
 
         // A snapshot replaces storage's content; positions restart at its entries, in this activation and in recovery.
@@ -45,9 +45,9 @@ public sealed class JournalPositionTests : JournalingTestBase
         second.Dictionary["c"] = "z";
         await second.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         storage.RequestCompaction = false;
-        Assert.True(second.Manager.TryGetPosition(out var afterSnapshot));
+        Assert.True(second.Manager.Positions.TryGetPosition(out var afterSnapshot));
         var third = await ActivateAsync(storage);
-        Assert.True(third.Manager.TryGetPosition(out var recoveredSnapshot));
+        Assert.True(third.Manager.Positions.TryGetPosition(out var recoveredSnapshot));
         Assert.Equal(afterSnapshot, recoveredSnapshot);
     }
 
@@ -61,7 +61,7 @@ public sealed class JournalPositionTests : JournalingTestBase
         activation.Dictionary["a"] = "changed";
         storage.RequestCompaction = true;
 
-        for (var i = 0; i < JournaledStateManager.MaxDeferredSnapshots; i++)
+        for (var i = 0; i < JournalPositionTracker.MaxDeferredSnapshots; i++)
         {
             await activation.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
             Assert.Equal(0, storage.Replaces);
@@ -72,7 +72,7 @@ public sealed class JournalPositionTests : JournalingTestBase
         Assert.Equal(1, storage.Replaces);
         Assert.True(read.IsResolved);
         Assert.True(read.Matches(activation.Serializer));
-        Assert.False(activation.Manager.HasBarriers);
+        Assert.False(activation.Manager.Positions.HasBarriers);
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public sealed class JournalPositionTests : JournalingTestBase
         storage.Reads = 0;
         var second = await ActivateAsync(storage);
         Assert.Equal(1, storage.Reads);
-        Assert.False(second.Manager.HasBarriers);
+        Assert.False(second.Manager.Positions.HasBarriers);
 
         // The release journals with the next write.
         await second.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -134,7 +134,7 @@ public sealed class JournalPositionTests : JournalingTestBase
 
             // Storage asks for compaction until the barrier's deferrals run out and its reads resolve.
             storage.RequestCompaction = true;
-            for (var i = 0; i <= JournaledStateManager.MaxDeferredSnapshots && reads.Exists(static read => !read.IsResolved); i++)
+            for (var i = 0; i <= JournalPositionTracker.MaxDeferredSnapshots && reads.Exists(static read => !read.IsResolved); i++)
             {
                 activation.Dictionary["a"] = $"write-{i}";
                 await activation.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -271,10 +271,10 @@ public sealed class JournalPositionTests : JournalingTestBase
             manager.RegisterStateMachine("probe", this);
         }
 
-        public ProbeRead Read<TArgument, TResult>(IJournaledStateHistory state, string name, JournaledStateOperation operation, TArgument argument, TResult expected)
+        public ProbeRead Read<TArgument, TResult>(IReplicableState state, string name, JournaledStateOperation operation, TArgument argument, TResult expected)
         {
             state.StagePendingChanges();
-            Assert.True(_manager.TryGetPosition(out var position));
+            Assert.True(_manager.Positions.TryGetPosition(out var position));
             var encoded = new ArrayBufferWriter<byte>();
             if (typeof(TArgument) != typeof(JournaledStateAccessNoArgument))
             {
@@ -283,7 +283,7 @@ public sealed class JournalPositionTests : JournalingTestBase
 
             var read = new ProbeRead<TResult>(position, new JournaledStateAccessTarget(name).Id, operation, encoded.WrittenSpan.ToArray(), expected);
             _reads.Add(read);
-            _manager.SetBarrier("probe", position);
+            _manager.Positions.HoldBarrier("probe", position);
             return read;
         }
 
@@ -316,7 +316,7 @@ public sealed class JournalPositionTests : JournalingTestBase
             }
         }
 
-        void IJournalPositionHolder.ReleasePositions()
+        void IJournalPositionHolder.OnPositionsResolved()
         {
         }
 

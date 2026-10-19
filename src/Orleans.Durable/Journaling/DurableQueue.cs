@@ -70,7 +70,7 @@ public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 
 [DebuggerTypeProxy(typeof(DurableQueueDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurableQueueCommandHandler<T>, IJournaledStateHistory, IJournaledStateReplica
+internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurableQueueCommandHandler<T>, IReplicableState, IJournaledStateReplica
 {
     private readonly IDurableQueueCommandCodec<T> _codec;
     private readonly Queue<T> _items = new();
@@ -105,9 +105,9 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     }
 
     // The collection journals each change as it makes it.
-    void IJournaledStateHistory.StagePendingChanges() { }
+    void IReplicableState.StagePendingChanges() { }
 
-    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableQueue<T>(_codec);
+    IJournaledStateReplica IReplicableState.CreateReplica() => new DurableQueue<T>(_codec);
 
     void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
     {

@@ -8,7 +8,7 @@ using Orleans.Serialization;
 namespace Orleans.Durable.Journaling;
 
 [DebuggerDisplay("Count = {Count}, NextSequence = {NextSequence}")]
-internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLogCommandHandler<T>, IJournaledStateHistory, IJournaledStateReplica
+internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLogCommandHandler<T>, IReplicableState, IJournaledStateReplica
 {
     private readonly IDurableLogCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
@@ -68,9 +68,9 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     }
 
     // The collection journals each change as it makes it.
-    void IJournaledStateHistory.StagePendingChanges() { }
+    void IReplicableState.StagePendingChanges() { }
 
-    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableLog<T>(_codec);
+    IJournaledStateReplica IReplicableState.CreateReplica() => new DurableLog<T>(_codec);
 
     void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
     {

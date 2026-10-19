@@ -32,7 +32,7 @@ public interface IDurableList<T> : IList<T>
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableListCommandHandler<T>, IJournaledStateHistory, IJournaledStateReplica
+internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableListCommandHandler<T>, IReplicableState, IJournaledStateReplica
 {
     private readonly IDurableListCommandCodec<T> _codec;
     private readonly List<T> _items = [];
@@ -67,9 +67,9 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     }
 
     // The collection journals each change as it makes it.
-    void IJournaledStateHistory.StagePendingChanges() { }
+    void IReplicableState.StagePendingChanges() { }
 
-    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableList<T>(_codec);
+    IJournaledStateReplica IReplicableState.CreateReplica() => new DurableList<T>(_codec);
 
     void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
     {
