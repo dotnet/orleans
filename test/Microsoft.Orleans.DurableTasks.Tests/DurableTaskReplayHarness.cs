@@ -185,6 +185,9 @@ internal sealed class ReplayGrain(
     /// <summary>Gets the grain's journaled completion source.</summary>
     public required IDurableTaskCompletionSource<int> Completion { get; init; }
 
+    /// <summary>Gets or sets what the workflow observed, for the test to assert.</summary>
+    public string? Observed { get; set; }
+
     /// <summary>Completes once the workflow waits at the gate.</summary>
     public Task AtGate => _atGate.Task;
 

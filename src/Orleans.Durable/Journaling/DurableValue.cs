@@ -83,6 +83,9 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
 
     internal bool IsValueCaptured => _isValueCaptured;
 
+    /// <summary>Gets the value without running through a context, for observations which report it live.</summary>
+    internal T? LiveValue => _value;
+
     public Action? OnPersisted { get; set; }
 
     private void OnValuePersisted() => OnPersisted?.Invoke();
