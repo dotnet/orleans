@@ -583,13 +583,21 @@ synchronously on the activation which makes them, when the runtime stages them: 
   position, or a recorded outcome which no longer decodes, stalls the attempt for
   `Diverged`, as an unsupported version does. Values and exceptions are recorded with the Orleans
   serializer in every journal format, and each journal write journals one entry per
-  execution whose log grew. A pure read of state in the activation's journal, such as `TryGetValue`, `Count` or a value's `Value`,
-  records the journal's position instead of its value; while an execution holds such
-  records, the journal keeps the history after them, and a recovery replays it to
-  replace each position with the value which the read observed before the execution
-  replays. A snapshot which storage requests waits for up to 16 writes, then resolves
-  the positions first. Every other read records its value, so a replay returns what each
-  read observed when it ran. Live observations, `IDurableTaskCompletionSource<T>.Task`,
+  execution whose log grew. In the binary journal format, a pure read of state in the
+  activation's journal, such as a
+  dictionary's indexer or `TryGetValue`, a list's indexer, or a value's `Value`, records
+  the journal's position and the read's argument hash instead of its value when the
+  journal holds exactly what the read observed: the state has no change waiting for a
+  write, the result is a value type or a sealed class (or an array of value types), and
+  an argument compares by value. Counts, flags, indexes and other small results record
+  values. While an execution holds such records, the journal keeps the history after
+  them, and a recovery replays that history to replace each position with the value
+  which the read observed before the execution replays. A snapshot, whether storage or
+  the application requests it, is deferred up to 16 times and then resolves the
+  positions first; an attempt which outlives that resolution records values from then
+  on, and a discarded attempt's unstaged positions hold no history. Every other read
+  records its value, so a replay returns what each read observed when it ran. Live
+  observations, `IDurableTaskCompletionSource<T>.Task`,
   `IDurableLog<T>.ReadAsync`, and `WatchAsync`, run unrecorded. The runtime's own state
   and its durable messages run as the host's work, so a body's log holds only the body's
   accesses. Aborting or deleting the task, or completing its body, closes the access
