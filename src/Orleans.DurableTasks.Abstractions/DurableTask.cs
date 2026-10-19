@@ -8,6 +8,7 @@ namespace Orleans.DurableTasks;
 
 /// <summary>Defines a deferred, host-scheduled durable asynchronous operation.</summary>
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
+[Alias("Orleans.DurableTasks.DurableTask")]
 public abstract partial class DurableTask
 {
     /// <summary>Gets the context of the durable task which the calling code runs in.</summary>
@@ -189,6 +190,7 @@ public abstract partial class DurableTask
 
 /// <summary>Defines a deferred durable asynchronous operation with a result.</summary>
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
+[Alias("Orleans.DurableTasks.DurableTask`1")]
 public abstract class DurableTask<TResult> : DurableTask;
 
 internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask<TResult>

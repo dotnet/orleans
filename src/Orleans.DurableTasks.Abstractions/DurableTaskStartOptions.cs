@@ -2,6 +2,7 @@ namespace Orleans.DurableTasks;
 
 /// <summary>Describes how a durable execution starts a task, for hosts which implement <see cref="DurableTaskContext"/>.</summary>
 [Flags]
+[Alias("Orleans.DurableTasks.DurableTaskStartOptions")]
 public enum DurableTaskStartOptions
 {
     /// <summary>The task is an attached child, which the starting execution owns.</summary>

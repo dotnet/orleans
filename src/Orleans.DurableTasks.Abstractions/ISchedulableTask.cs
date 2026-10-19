@@ -102,6 +102,7 @@ public interface IScheduledTaskHandle
 }
 
 /// <summary>Configures a polling operation.</summary>
+[Alias("Orleans.DurableTasks.PollingOptions")]
 public readonly struct PollingOptions : IEquatable<PollingOptions>
 {
     private readonly TimeSpan? _pollTimeout;

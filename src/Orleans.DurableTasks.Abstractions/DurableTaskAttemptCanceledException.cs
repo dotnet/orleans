@@ -1,6 +1,7 @@
 namespace Orleans.DurableTasks;
 
 /// <summary>Identifies why a host canceled an attempt of a durable task.</summary>
+[Alias("Orleans.DurableTasks.DurableTaskAttemptCancellationReason")]
 public enum DurableTaskAttemptCancellationReason
 {
     /// <summary>The grain activation which runs the attempt is stopping. The task replays in its next activation.</summary>
@@ -52,6 +53,7 @@ public enum DurableTaskAttemptCancellationReason
 /// <see langword="using"/> statements, which run for both.
 /// </para>
 /// </remarks>
+[Alias("Orleans.DurableTasks.DurableTaskAttemptCanceledException")]
 public sealed class DurableTaskAttemptCanceledException : OperationCanceledException
 {
     /// <summary>Initializes an exception for an attempt canceled because its activation is stopping.</summary>
