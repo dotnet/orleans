@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -46,6 +47,9 @@ internal sealed class JournalPositionTracker
     // Whether a deletion of the journal is replacing its history, so positions aren't offered.
     private bool _suspended;
 
+    // The entries which recovery read, while it retains them for resolving recovered positional reads.
+    private List<(ArcBuffer Data, string FormatKey)>? _recoveredHistory;
+
     public JournalPositionTracker(JournaledStateManager manager, JournalBufferWriter writer, IDurableDictionaryCommandCodec<string, uint> directoryCodec)
     {
         _manager = manager;
@@ -65,7 +69,7 @@ internal sealed class JournalPositionTracker
 
     /// <summary>
     /// Gets the logical position of the journal's next entry, which a positional read records, when the manager offers
-    /// positions: it's ready, and no format migration is pending and no deletion is in progress.
+    /// positions: it's ready, no format migration is pending, and no deletion is in progress.
     /// </summary>
     /// <remarks>A read observes the entries before the position.</remarks>
     public bool TryGetPosition(out long position)
@@ -91,11 +95,26 @@ internal sealed class JournalPositionTracker
     public void HoldBarrier(string owner, long position) => Barriers.Set(owner, position);
 
     /// <summary>Notes that recovery starts replaying storage's content, with no barriers.</summary>
+    /// <remarks>
+    /// When the manager holds positional reads, recovery retains the entries which it reads, so it can resolve recovered
+    /// reads from the same content without reading storage again.
+    /// </remarks>
     public void OnRecoveryStarting()
     {
         _replayedEntryCount = 0;
         Barriers.ResetVolatileState();
+        ReleaseRecoveredHistory();
+        if (Holders.Length > 0)
+        {
+            _recoveredHistory = [];
+        }
     }
+
+    /// <summary>Gets whether recovery retains the entries which it reads.</summary>
+    public bool RetainsRecoveredHistory => _recoveredHistory is not null;
+
+    /// <summary>Retains <paramref name="entries"/>, whole entries which recovery replayed, in the format of <paramref name="formatKey"/>.</summary>
+    public void RetainRecoveredHistory(ArcBuffer entries, string formatKey) => _recoveredHistory!.Add((entries, formatKey));
 
     /// <summary>Counts an entry which recovery replays.</summary>
     public void OnEntryReplayed() => _replayedEntryCount++;
@@ -215,18 +234,69 @@ internal sealed class JournalPositionTracker
 
     /// <summary>
     /// Replays storage's history into the replicas of <paramref name="resolution"/>, resolving every read which storage's
-    /// content reaches. The history must end where this manager last wrote: otherwise another writer changed the journal.
+    /// content reaches.
     /// </summary>
+    /// <remarks>
+    /// Recovery's read set storage's write precondition, so this read adopts nothing: when another writer changed the
+    /// journal, storage throws <see cref="Orleans.Storage.InconsistentStateException"/>, which fences the manager.
+    /// </remarks>
     public async ValueTask ReadHistoryAsync(Resolution resolution, CancellationToken cancellationToken)
     {
         var history = resolution.History;
-        await _manager.ReadStorageAsync(history, cancellationToken).ConfigureAwait(true);
+        await _manager.ReadHistoryAsync(history, cancellationToken).ConfigureAwait(true);
+        OnHistoryRead(resolution);
+    }
+
+    /// <summary>
+    /// Resolves, under the manager's lock, the positional reads which recovery found, from the entries which it read, and
+    /// releases the barriers which no read needs.
+    /// </summary>
+    public void ResolveRecovered()
+    {
+        try
+        {
+            if (BeginResolution() is not { } resolution)
+            {
+                return;
+            }
+
+            Debug.Assert(_recoveredHistory is not null, "Recovery retains its history while holders exist.");
+            foreach (var (entries, formatKey) in _recoveredHistory)
+            {
+                resolution.History.Replay(entries, formatKey);
+            }
+
+            OnHistoryRead(resolution);
+            Resolve(resolution);
+        }
+        finally
+        {
+            ReleaseRecoveredHistory();
+        }
+    }
+
+    private static void OnHistoryRead(Resolution resolution)
+    {
+        var history = resolution.History;
         resolution.HasReadStorage = true;
         history.ResolveCurrent();
-        if (history.Position != resolution.StoredPosition)
+
+        // Storage's write precondition establishes that the history is the content which this manager last read or wrote,
+        // and positions count that content's entries.
+        Debug.Assert(
+            history.Position == resolution.StoredPosition,
+            $"The journal's history ends at position {history.Position}, and this activation last wrote it at position {resolution.StoredPosition}.");
+    }
+
+    private void ReleaseRecoveredHistory()
+    {
+        if (_recoveredHistory is { } entries)
         {
-            throw new InvalidOperationException(
-                $"The journal's history ends at position {history.Position}, and this activation last wrote it at position {resolution.StoredPosition}: another writer changed the journal.");
+            _recoveredHistory = null;
+            foreach (var (data, _) in entries)
+            {
+                data.Dispose();
+            }
         }
     }
 
@@ -260,7 +330,7 @@ internal sealed class JournalPositionTracker
         if (later is not null && _writer.CommittedEntryCount > _storedEntryCount)
         {
             using var committed = _writer.GetCommittedBuffer();
-            history.ReplayBuffered(committed);
+            history.Replay(committed, _manager.WriteJournalFormatKey);
         }
 
         history.ResolveCurrent();
