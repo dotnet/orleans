@@ -342,6 +342,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
                                     lock (_lock)
                                     {
+                                        // Capture journals changes which states already staged, so it doesn't count as staging.
+                                        var stagedChangeCount = _journalWriter.StagedChangeCount;
                                         if (isSnapshot)
                                         {
                                             using var snapshotWriter = _shared.JournalFormat.CreateWriter();
@@ -427,6 +429,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                                 hasBufferToConsume = true;
                                             }
                                         }
+
+                                        _journalWriter.StagedChangeCount = stagedChangeCount;
                                     }
 
                                     _shared.Instruments.OnGather(
@@ -1100,6 +1104,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     }
 
     public long PendingWriteByteCount => _journalWriter.CommittedLength;
+
+    /// <inheritdoc/>
+    public long StagedChangeCount => _journalWriter.StagedChangeCount;
 
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer)
         => observer.Subscribe(GrainLifecycleStage.SetupState, this);
