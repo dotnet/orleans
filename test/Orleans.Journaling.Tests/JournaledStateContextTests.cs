@@ -145,7 +145,7 @@ public sealed class JournaledStateContextTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task BeginningADraftReadsWhetherTheLogIsSealedThroughTheContext()
+    public async Task BeginningADraftChecksTheSealInOneRecordedRead()
     {
         var sut = CreateTestSystem();
         var provider = new TestProvider();
@@ -154,14 +154,16 @@ public sealed class JournaledStateContextTests : JournalingTestBase
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         log.Seal();
 
-        // A replay of a run which began the draft before the seal returns the recorded state, so the draft begins.
+        // A replay of a run which began the draft before the seal returns the recorded outcome, so the draft begins.
         var context = provider.Context = new RecordingContext();
-        context.Recorded.Enqueue(false);
+        context.Recorded.Enqueue(default(JournaledStateAccessNoResult));
         _ = log.BeginDraft();
 
+        // A run which records the check records its failure, which a replay throws without checking the seal again.
         Assert.Throws<InvalidOperationException>(() => log.BeginDraft());
         var access = Assert.Single(context.Accesses);
-        Assert.Equal((JournaledStateAccessKind.Read, JournaledStateOperation.LogIsSealed, true), (access.Kind, access.Operation, access.Outcome));
+        Assert.Equal((JournaledStateAccessKind.Read, JournaledStateOperation.LogBeginDraft), (access.Kind, access.Operation));
+        Assert.IsType<InvalidOperationException>(access.Outcome);
     }
 
     [Fact]
@@ -175,9 +177,9 @@ public sealed class JournaledStateContextTests : JournalingTestBase
         log.Seal();
 
         var context = provider.Context = new RecordingContext();
-        context.Recorded.Enqueue(false);
+        context.Recorded.Enqueue(default(JournaledStateAccessNoResult));
         using var first = log.BeginDraft();
-        context.Recorded.Enqueue(false);
+        context.Recorded.Enqueue(default(JournaledStateAccessNoResult));
         using var second = log.BeginDraft();
         first.Write("first");
         second.Write("second");
@@ -197,6 +199,37 @@ public sealed class JournaledStateContextTests : JournalingTestBase
         Assert.Equal(0, second.Count);
         Assert.Empty(context.Accesses);
         Assert.Empty(context.Recorded);
+    }
+
+    [Fact]
+    public async Task ReplayedCommitsCloseOnlyTheDraftsWhichAreStillOpen()
+    {
+        var sut = CreateTestSystem();
+        var provider = new TestProvider();
+        ((JournaledStateManager)sut.Manager).ContextProvider = provider;
+        var log = new DurableLog<string>("log", sut.Manager, new OrleansBinaryDurableLogCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        log.Seal();
+
+        // Another replaying execution's recorded seal closed the first draft before its recorded commit replays.
+        var context = provider.Context = new RecordingContext();
+        context.Recorded.Enqueue(default(JournaledStateAccessNoResult));
+        using var closedBySeal = log.BeginDraft();
+        context.Recorded.Enqueue(default(JournaledStateAccessNoResult));
+        log.Seal();
+        context.Recorded.Enqueue(0L);
+        Assert.Equal(0, closedBySeal.Commit("a"));
+        Assert.False(closedBySeal.IsOpen);
+
+        // The recording run's commit failed because the live seal closed its draft, so the replayed failure closes the
+        // recreated draft too.
+        context.Recorded.Enqueue(default(JournaledStateAccessNoResult));
+        using var failed = log.BeginDraft();
+        context.Recorded.Enqueue(new InvalidOperationException("recorded commit failure"));
+        Assert.Equal("recorded commit failure", Assert.Throws<InvalidOperationException>(() => failed.Commit("b")).Message);
+        Assert.False(failed.IsOpen);
+        Assert.Contains("was closed by the log", Assert.Throws<InvalidOperationException>(() => failed.Write("c")).Message, StringComparison.Ordinal);
+        Assert.Empty(context.Accesses);
     }
 
     [Fact]
