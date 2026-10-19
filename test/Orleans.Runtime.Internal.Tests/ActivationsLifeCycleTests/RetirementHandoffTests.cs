@@ -630,6 +630,99 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
+    public async Task MigrationQueuedBehindABlockedBatch_IsCanceledWithoutBeingSent()
+    {
+        // The target holds the first migration's batch, so the migration manager's pump to the target waits for it.
+        var acceptArrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseAccept = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var received = new ConcurrentQueue<GrainId>();
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
+        {
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
+            {
+                foreach (var package in (List<GrainMigrationPackage>)context.Request.GetArgument(0)!)
+                {
+                    received.Enqueue(package.GrainId);
+                }
+
+                acceptArrived.TrySetResult();
+                await releaseAccept.Task;
+            }
+
+            await context.Invoke();
+        })));
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var migrationManager = source.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
+        var pool = source.ServiceProvider.GetRequiredService<SerializerSessionPool>();
+        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var blockedGrain = grainFactory.GetGrain<IRetirementHandoffGrain>(Guid.NewGuid(), typeof(RetirementHandoffGrain).FullName).GetGrainId();
+        var queuedGrain = grainFactory.GetGrain<IRetirementHandoffGrain>(Guid.NewGuid(), typeof(RetirementHandoffGrain).FullName).GetGrainId();
+
+        var blocked = migrationManager.StartMigration(target.SiloAddress, CreateSourceAddress(source, blockedGrain), new MigrationContext(pool), [CreateOneWayRequest(blockedGrain, 1)], CancellationToken.None);
+        await acceptArrived.Task.WaitAsync(Timeout, Cancellation);
+
+        // The second migration waits behind the first. Its activation's deadline passes before the pump reaches it, so it completes without being sent.
+        using var deadline = new CancellationTokenSource();
+        var queued = migrationManager.StartMigration(target.SiloAddress, CreateSourceAddress(source, queuedGrain), new MigrationContext(pool), [CreateOneWayRequest(queuedGrain, 2)], deadline.Token);
+        try
+        {
+            deadline.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queued.Completion.WaitAsync(Timeout, Cancellation));
+            Assert.False(blocked.Completion.IsCompleted);
+        }
+        finally
+        {
+            releaseAccept.TrySetResult();
+        }
+
+        await blocked.Completion.WaitAsync(Timeout, Cancellation);
+        Assert.Equal([blockedGrain], received);
+    }
+
+    [Fact]
+    public async Task AcceptedMigrationWhoseRetargetIsHeld_CompletesAtItsDeadline()
+    {
+        // The target takes the migration's requests, and the caller's silo holds the retarget of their calls.
+        var retargetArrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRetarget = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
+        {
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.RetargetMigratedRequests))
+            {
+                retargetArrived.TrySetResult();
+                await releaseRetarget.Task;
+            }
+
+            await context.Invoke();
+        })));
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var migrationManager = source.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
+        var grainId = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>().GetGrain<IRetirementHandoffGrain>(Guid.NewGuid(), typeof(RetirementHandoffGrain).FullName).GetGrainId();
+
+        using var deadline = new CancellationTokenSource();
+        var migration = migrationManager.StartMigration(
+            target.SiloAddress,
+            CreateSourceAddress(source, grainId),
+            new MigrationContext(source.ServiceProvider.GetRequiredService<SerializerSessionPool>()),
+            [CreateRequest(cluster, grainId, 1, new List<string> { "value" })],
+            deadline.Token);
+        try
+        {
+            // The activation's deadline passes while the retarget is held. The target owns the requests, so the migration completes, and the requests are not resent.
+            await retargetArrived.Task.WaitAsync(Timeout, Cancellation);
+            deadline.Cancel();
+            await migration.Completion.WaitAsync(Timeout, Cancellation);
+            Assert.True(migration.Completion.IsCompletedSuccessfully);
+        }
+        finally
+        {
+            releaseRetarget.TrySetResult();
+        }
+    }
+
+    [Fact]
     public async Task DeclinedRequestFromCallerOnTheSource_IsForwardedWithItsPooledArgument()
     {
         // The target declines the migrating grain's requests.
