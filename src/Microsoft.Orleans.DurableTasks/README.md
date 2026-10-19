@@ -588,9 +588,14 @@ synchronously on the activation which makes them, when the runtime stages them: 
   result is equal and compares exactly, as strings, integers, and enumerations do, or
   when the state is unchanged since that read, the read's key or index is equal, and
   its result is immutable, such as a `double`, a date, or a copy of such values.
-  Consecutive references with the same arguments share one record. Every other read
-  records its value, so a replay returns what each read observed when it ran. Live
-  observations, `IDurableTaskCompletionSource<T>.Task`,
+  Consecutive references with the same arguments share one record. Another pure read of
+  state in the activation's journal, such as `TryGetValue`, `Count` or a value's `Value`,
+  records the journal's position instead of its value; while an execution holds such
+  records, the journal keeps the history after them, and a recovery replays it to
+  replace each position with the value which the read observed before the execution
+  replays. A snapshot which storage requests waits for up to 16 writes, then resolves
+  the positions first. Every other read records its value, so a replay returns what each
+  read observed when it ran. Live observations, `IDurableTaskCompletionSource<T>.Task`,
   `IDurableLog<T>.ReadAsync`, and `WatchAsync`, run unrecorded. The runtime's own state
   and its durable messages run as the host's work, so a body's log holds only the body's
   accesses. Aborting or deleting the task, or completing its body, closes the access
