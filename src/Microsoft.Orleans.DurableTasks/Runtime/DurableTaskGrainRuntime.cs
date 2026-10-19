@@ -219,8 +219,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// and in every replay, in which more candidates can have completed.
     /// </para>
     /// <para>
-    /// A candidate can complete without a sequence: a child which a custom scheduler runs, a child of a canceled ancestor
-    /// which isn't stored, or a result stored before sequences were stamped. When such a completion is observed first, or a
+    /// A candidate can complete without a sequence: a child of a canceled ancestor which isn't stored, or a result stored
+    /// before sequences were stamped. When such a completion is observed first, or a
     /// recorded decision already exists, the selection is recorded under <paramref name="decisionId"/> and replays from
     /// that record.
     /// </para>
@@ -1726,7 +1726,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <summary>
     /// Runs the committed effects which wait for task cancellation, in commit order: each write's cancellation of
-    /// attempts, then its handle completions, then its cancellation or abort of scheduler-owned children.
+    /// attempts, then its handle completions, then its cancellation of the leaves which it reaches, such as delays.
     /// </summary>
     /// <remarks>Effects which writes commit while this runs join it, so their handles complete after the earlier cancellations.</remarks>
     private async Task RunOrderedCommittedEffectsAsync()
@@ -1751,8 +1751,8 @@ internal sealed partial class DurableTaskGrainRuntime(
                 for (var index = 0; index < committedPropagations.Count; index++)
                 {
                     TrackBackgroundTask(
-                        PropagateToSchedulerOwnedChildrenAsync(committedPropagations[index], failures[index]),
-                        "propagating committed durable task cancellation to scheduler-owned children");
+                        PropagateToLeavesAsync(committedPropagations[index], failures[index]),
+                        "propagating committed durable task cancellation to leaves");
                 }
             }
         }
@@ -1763,7 +1763,6 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <summary>Requests the task cancellation of a committed propagation's attempts, and returns their registrations' failures.</summary>
     private static List<Exception>? RequestTaskCancellation(CancellationPropagation propagation)
     {
-        Debug.Assert(propagation.AbortReason is null || propagation.Contexts.Count == 0, "An abort cancels the attempts of its tree when it stages.");
         List<Exception>? failures = null;
         foreach (var context in propagation.Contexts)
         {
@@ -1782,17 +1781,16 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     /// <summary>
-    /// Cancels, or for an abort aborts, the scheduler-owned children of a committed propagation, then completes the
-    /// propagation with every failure.
+    /// Cancels the leaves of a committed propagation, such as delays and children whose bodies haven't started, then
+    /// completes the propagation with every failure.
     /// </summary>
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Every failure is reported through the propagation's completion.")]
-    private static async Task PropagateToSchedulerOwnedChildrenAsync(CancellationPropagation propagation, List<Exception>? failures)
+    private static async Task PropagateToLeavesAsync(CancellationPropagation propagation, List<Exception>? failures)
     {
         try
         {
-            await Task.WhenAll(propagation.Handles.Select(handle => propagation.AbortReason is { } reason
-                ? AbortSchedulerOwnedChildAsync(handle, reason)
-                : handle.CancelAsync(propagation.CancellationReason, CancellationToken.None).AsTask()));
+            await Task.WhenAll(propagation.Handles.Select(
+                handle => handle.CancelAsync(propagation.CancellationReason, CancellationToken.None).AsTask()));
         }
         catch (Exception exception)
         {
@@ -1852,15 +1850,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             return subscriptionHandle;
         }
 
-        if (durableTask is ISchedulableTask schedulableTask and not IDurableTaskRequest)
-        {
-            return await ScheduleCustomChildAsync(
-                taskId,
-                schedulableTask,
-                shielded,
-                cancellationToken);
-        }
-
+        ThrowIfCustomScheduled(durableTask);
         var staged = StageChild(taskId, durableTask, shielded);
         if (staged.RequiresWrite)
         {
@@ -1877,20 +1867,32 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <summary>Stages the start of a child on the activation, without writing, and returns its handle.</summary>
     /// <remarks>
-    /// The start commits with the next journal write, together with the state changes which the calling work item made. A
-    /// definition which a custom host schedules starts asynchronously, so it can't be posted.
+    /// The start commits with the next journal write, together with the state changes which the calling work item made.
     /// </remarks>
     /// <exception cref="NotSupportedException">A custom host schedules the definition.</exception>
     public IScheduledTaskHandle PostChild(TaskId taskId, DurableTask durableTask, bool shielded)
     {
         ThrowIfStopping();
-        return durableTask switch
+        if (durableTask is IDurableTaskSubscription subscription)
         {
-            IDurableTaskSubscription subscription => StageSubscription(taskId, subscription, shielded).Handle,
-            ISchedulableTask and not IDurableTaskRequest => throw new NotSupportedException(
-                "A durable task which a custom host schedules starts asynchronously, so it can't be posted. Await it, or schedule it with ScheduleAsync."),
-            _ => StageChild(taskId, durableTask, shielded).Handle,
-        };
+            return StageSubscription(taskId, subscription, shielded).Handle;
+        }
+
+        ThrowIfCustomScheduled(durableTask);
+        return StageChild(taskId, durableTask, shielded).Handle;
+    }
+
+    /// <summary>
+    /// Throws for a child definition which a host other than this runtime schedules: an execution's children are its
+    /// grain's local children, calls to other grains, and subscriptions, all of which this runtime records and replays.
+    /// </summary>
+    private static void ThrowIfCustomScheduled(DurableTask durableTask)
+    {
+        if (durableTask is ISchedulableTask and not IDurableTaskRequest)
+        {
+            throw new NotSupportedException(
+                $"A durable execution runs its grain's local children, durable grain calls, and subscriptions. '{durableTask.GetType()}' is scheduled by another host.");
+        }
     }
 
     /// <summary>Stages the start of a local child or of a call to another grain, without writing.</summary>
@@ -2129,203 +2131,6 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
     }
 
-    private async ValueTask<IScheduledTaskHandle> ScheduleCustomChildAsync(
-        TaskId taskId,
-        ISchedulableTask schedulableTask,
-        bool shielded,
-        CancellationToken cancellationToken)
-    {
-        var stateExisted = _storage.TryGetTask(taskId, out var state);
-        if (state is not null)
-        {
-            ReadRecordedResult(taskId, state);
-        }
-
-        if (state is not null
-            && (state.Request is not null
-                || state.RequestFingerprint is not null
-                || !state.CallerId.IsDefault
-                || !state.RemoteTarget.IsDefault
-                || state.RemoteRequestFingerprint is not null))
-        {
-            throw CreateDivergenceException(
-                $"Durable child task '{taskId}' is already associated with a different request.",
-                state,
-                "a custom child task");
-        }
-
-        IScheduledTaskHandle? replaceableHandle = null;
-        if (stateExisted && TryGetScheduledTaskHandle(taskId, out var existingHandle))
-        {
-            if (existingHandle is not TaskHandle localHandle || localHandle.IsRunning)
-            {
-                return existingHandle;
-            }
-
-            replaceableHandle = existingHandle;
-        }
-
-        if (state is { CancellationRequestedAt: not null, Result: not { IsCompleted: true } })
-        {
-            return new CompletedTaskHandle(
-                taskId,
-                await CommitResponseAsync(taskId, DurableTaskResponse.Canceled, CancellationToken.None));
-        }
-
-        if (IsStartRefusedByAncestorCancellation(taskId, state, shielded))
-        {
-            if (state is null)
-            {
-                return new CompletedTaskHandle(taskId, DurableTaskResponse.Canceled);
-            }
-
-            _storage.RequestCancellation(taskId, state);
-            return new CompletedTaskHandle(
-                taskId,
-                await CommitResponseAsync(taskId, DurableTaskResponse.Canceled, CancellationToken.None));
-        }
-
-        // The deferred handle claims the child while its scheduler runs, so concurrent callers and cancellation
-        // observe the scheduler's handle once it is available.
-        var deferredHandle = new DeferredScheduledTaskHandle(taskId);
-        if (replaceableHandle is not null)
-        {
-            if (!_taskHandles.TryUpdate(taskId, deferredHandle, replaceableHandle))
-            {
-                return _taskHandles[taskId];
-            }
-        }
-        else
-        {
-            var registeredHandle = _taskHandles.GetOrAdd(taskId, deferredHandle);
-            if (!ReferenceEquals(registeredHandle, deferredHandle))
-            {
-                return registeredHandle;
-            }
-        }
-
-        // The child state lets cancellation of the child or its ancestors reach the deferred handle.
-        state ??= GetOrCreateTask(taskId, null);
-        MarkShielded(taskId, state, shielded);
-
-        DurableTaskResponse schedulingResponse;
-        IScheduledTaskHandle? scheduledHandle = null;
-        try
-        {
-            schedulingResponse = await schedulableTask.ScheduleAsync(taskId, cancellationToken);
-            if (!schedulingResponse.IsCompleted)
-            {
-                scheduledHandle = schedulableTask.GetHandle(taskId);
-                deferredHandle.SetSchedulerHandle(scheduledHandle);
-            }
-        }
-        catch (Exception exception)
-        {
-            FailDeferredCustomHandle(taskId, deferredHandle, exception);
-
-            // Forget a child which only this attempt created, unless cancellation was requested for it meanwhile.
-            if (!stateExisted
-                && _storage.TryGetTask(taskId, out var created)
-                && !created.CancellationRequestedAt.HasValue
-                && created.Result is null)
-            {
-                RemoveTask(taskId);
-            }
-
-            throw;
-        }
-
-        try
-        {
-            IScheduledTaskHandle resultHandle;
-            if (!_storage.TryGetTask(taskId, out state))
-            {
-                throw new InvalidOperationException($"Cannot complete unknown task '{taskId}'.");
-            }
-
-            if (state.Result is { IsCompleted: true } completedResponse)
-            {
-                resultHandle = new CompletedTaskHandle(taskId, completedResponse);
-            }
-            else if (state.CancellationRequestedAt.HasValue)
-            {
-                resultHandle = new CompletedTaskHandle(
-                    taskId,
-                    await CommitResponseAsync(taskId, DurableTaskResponse.Canceled, cancellationToken));
-            }
-            else if (schedulingResponse.IsCompleted)
-            {
-                StoreResult(taskId, state, schedulingResponse);
-                await WriteStateAsync(cancellationToken);
-                resultHandle = new CompletedTaskHandle(taskId, schedulingResponse);
-            }
-            else
-            {
-                await WriteStateAsync(cancellationToken);
-                resultHandle = scheduledHandle
-                    ?? throw new InvalidOperationException(
-                        $"The scheduler for durable child task '{taskId}' did not provide a handle.");
-            }
-
-            deferredHandle.SetResultHandle(resultHandle);
-            _taskHandles.TryUpdate(taskId, resultHandle, deferredHandle);
-            return resultHandle;
-        }
-        catch (Exception exception)
-        {
-            FailDeferredCustomHandle(taskId, deferredHandle, exception);
-            throw;
-        }
-    }
-
-    private void FailDeferredCustomHandle(TaskId taskId, DeferredScheduledTaskHandle deferredHandle, Exception exception)
-    {
-        deferredHandle.SetException(exception);
-        ((ICollection<KeyValuePair<TaskId, IScheduledTaskHandle>>)_taskHandles)
-            .Remove(new(taskId, deferredHandle));
-    }
-
-    private sealed class DeferredScheduledTaskHandle(TaskId taskId) : IScheduledTaskHandle
-    {
-        private readonly TaskCompletionSource<IScheduledTaskHandle> _handle =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource<IScheduledTaskHandle> _schedulerHandle =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public TaskId TaskId { get; } = taskId;
-
-        public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) =>
-            await (await _handle.Task.WaitAsync(cancellationToken)).WaitAsync(cancellationToken);
-
-        public async ValueTask<DurableTaskResponse> PollAsync(
-            PollingOptions options,
-            CancellationToken cancellationToken) =>
-            await (await _handle.Task.WaitAsync(cancellationToken)).PollAsync(options, cancellationToken);
-
-        public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
-
-        public async ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) =>
-            await (await _schedulerHandle.Task.WaitAsync(cancellationToken)).CancelAsync(reason, cancellationToken);
-
-        public async ValueTask AbortAsync(string reason, CancellationToken cancellationToken) =>
-            await (await _schedulerHandle.Task.WaitAsync(cancellationToken)).AbortAsync(reason, cancellationToken);
-
-        public void SetSchedulerHandle(IScheduledTaskHandle handle) =>
-            _schedulerHandle.TrySetResult(handle);
-
-        public void SetResultHandle(IScheduledTaskHandle handle)
-        {
-            _schedulerHandle.TrySetResult(handle);
-            _handle.TrySetResult(handle);
-        }
-
-        public void SetException(Exception exception)
-        {
-            _schedulerHandle.TrySetException(exception);
-            _handle.TrySetException(exception);
-        }
-    }
-
     private void StartInvocation<TState>(
         TaskId taskId,
         Func<TState, DurableTask> createTask,
@@ -2449,13 +2254,12 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <summary>
     /// The cancellation which a committed write propagates: task cancellation, carrying <see cref="CancellationReason"/>,
-    /// of running attempts and of scheduler-owned children, or, for an abort with <see cref="AbortReason"/>, the
-    /// children's abort. <see cref="Completion"/>, when supplied, completes once the propagation has run.
+    /// of running attempts, and the cancellation of leaves such as delays. <see cref="Completion"/>, when supplied,
+    /// completes once the propagation has run.
     /// </summary>
     private sealed record CancellationPropagation(
         List<GrainDurableTaskContext> Contexts,
         List<IScheduledTaskHandle> Handles,
-        string? AbortReason = null,
         string? CancellationReason = null,
         TaskCompletionSource? Completion = null);
 
@@ -2612,19 +2416,6 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
 
-    /// <summary>Aborts a child which a custom scheduler runs, or requests its cancellation when the scheduler can't abort.</summary>
-    private static async Task AbortSchedulerOwnedChildAsync(IScheduledTaskHandle handle, string reason)
-    {
-        try
-        {
-            await handle.AbortAsync(reason, CancellationToken.None);
-        }
-        catch (NotSupportedException)
-        {
-            await handle.CancelAsync(CancellationToken.None);
-        }
-    }
-
     private void CompleteTaskHandle(TaskId taskId, DurableTaskResponse response)
     {
         if (_taskHandles.TryGetValue(taskId, out var handle) && handle is TaskHandle localHandle)
@@ -2776,30 +2567,21 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </summary>
     /// <remarks>
     /// Costs time proportional to the size of the tree. Each non-terminal task in the tree is canceled: a pending remote
-    /// child's cancellation is staged with the deletion, a running attempt is canceled and its result discarded, and a
-    /// scheduler-owned child's cancellation is requested after the deletion commits.
+    /// child's cancellation is staged with the deletion, and a running attempt is canceled and its result discarded.
     /// </remarks>
     private void DeleteTree(TaskId taskId, IDurableTaskState state)
     {
         Debug.Assert(state.CompletionDestinations.Count == 0, "A pending completion retains its task's result.");
-        List<IScheduledTaskHandle>? handles = null;
-        DeleteTreeCore(taskId, state, ref handles);
-        if (handles is not null)
-        {
-            _pendingCancellationPropagations[Interlocked.Increment(ref _cancellationPropagationId)] = new([], handles);
-        }
+        DeleteTreeCore(taskId, state);
     }
 
-    private void DeleteTreeCore(
-        TaskId taskId,
-        IDurableTaskState state,
-        ref List<IScheduledTaskHandle>? handles)
+    private void DeleteTreeCore(TaskId taskId, IDurableTaskState state)
     {
         foreach (var (childId, child) in _storage.GetChildren(taskId).ToList())
         {
             if (!IsInvoked(child))
             {
-                DeleteTreeCore(childId, child, ref handles);
+                DeleteTreeCore(childId, child);
             }
         }
 
@@ -2836,11 +2618,6 @@ internal sealed partial class DurableTaskGrainRuntime(
             if (handle is TaskHandle { ResponseTask.IsCompleted: false } localHandle)
             {
                 localHandle.TrySetResponse(terminal ? state.Result! : DurableTaskResponse.Canceled);
-            }
-            else if (!terminal && handle is not TaskHandle and not CompletedTaskHandle)
-            {
-                // A custom scheduler owns the child's work.
-                (handles ??= []).Add(handle);
             }
         }
 
@@ -3008,7 +2785,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     /// <summary>
-    /// Stages the propagation of a cancellation to the attempts and scheduler-owned children which it reaches, which the
+    /// Stages the propagation of a cancellation to the attempts and leaves which it reaches, which the
     /// write that commits the cancellation runs, and returns its completion.
     /// </summary>
     private Task StagePropagation(List<GrainDurableTaskContext> contexts, List<IScheduledTaskHandle> handles, string? reason)
@@ -3171,14 +2948,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         // Every task in the tree records the same failure, so one response serves them all.
         var response = DurableTaskResponse.FromException(new DurableTaskAbortedException(reason));
-        List<IScheduledTaskHandle>? handles = null;
-        AbortTreeCore(taskId, state, reason, response, ref handles);
-        if (handles is not null)
-        {
-            _pendingCancellationPropagations[Interlocked.Increment(ref _cancellationPropagationId)] =
-                new([], handles, AbortReason: reason);
-        }
-
+        AbortTreeCore(taskId, state, reason, response);
         return true;
     }
 
@@ -3186,14 +2956,13 @@ internal sealed partial class DurableTaskGrainRuntime(
         TaskId taskId,
         IDurableTaskState state,
         string reason,
-        DurableTaskResponse response,
-        ref List<IScheduledTaskHandle>? handles)
+        DurableTaskResponse response)
     {
         foreach (var (childId, child) in _storage.GetChildren(taskId).ToList())
         {
             if (!IsInvoked(child))
             {
-                AbortTreeCore(childId, child, reason, response, ref handles);
+                AbortTreeCore(childId, child, reason, response);
             }
         }
 
@@ -3217,12 +2986,6 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             TrackBackgroundTask(running.Task, "running an aborted durable task");
             DurableTaskEvents.EmitExecutionStopped(GrainContext, taskId);
-        }
-
-        if (_taskHandles.TryGetValue(taskId, out var handle) && handle is not TaskHandle and not CompletedTaskHandle)
-        {
-            // A custom scheduler owns the child's work.
-            (handles ??= []).Add(handle);
         }
 
         _pendingStarts.TryRemove(taskId, out _);

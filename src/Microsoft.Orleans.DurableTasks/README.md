@@ -417,8 +417,7 @@ synchronously on the activation which makes them, when the runtime stages them: 
   abort runs no compensation. The tree's delays terminalize with it, so their
   resumes are stale. The stored exception's message is the abort reason, and the task's completion time
   records when it was aborted; diagnostics report the task as `Faulted` with
-  `DurableTaskAbortedException: <reason>`. A child which a custom scheduler runs receives the abort through its
-  handle, or a cancellation request when its scheduler doesn't support abort. Aborting a terminal task changes
+  `DurableTaskAbortedException: <reason>`. Aborting a terminal task changes
   nothing, and an abort which arrives before its invocation is recorded as a cancellation.
 - A detached task is a root on its target with no caller. Durable cancellation and abort of its
   starter don't reach it, and deleting the starter's execution tree deletes only the record which
@@ -524,8 +523,8 @@ synchronously on the activation which makes them, when the runtime stages them: 
   the last sequence from the recovered tasks. `WhenAny` and `WhenEach` select the
   completed candidate with the lowest sequence, so a replay selects the same
   candidates without a recorded decision, including when several results commit in
-  one write. A candidate which completes without a sequence, such as a child run by a
-  custom scheduler or a result stored before sequences were stamped, is selected by a
+  one write. A candidate which completes without a sequence, such as a child of a
+  canceled ancestor whose start was refused or a result stored before sequences were stamped, is selected by a
   decision recorded in the execution's tree, and a recorded decision keeps its winner.
 
 Durability covers state and messages participating in Orleans Journaling and

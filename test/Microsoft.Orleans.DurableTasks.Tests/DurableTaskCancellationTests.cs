@@ -618,65 +618,6 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         AssertAborted(copied, "operator");
     }
 
-    [Fact]
-    public Task AbortReachesSchedulerOwnedChildrenThroughTheirHandles() => ActivationScheduler.RunAsync(async () =>
-    {
-        var (runtime, storage, _, _) = CreateRuntime();
-        var rootId = TaskId.Parse("root");
-        storage.GetOrCreate(rootId);
-        var abortable = new RecordingSchedulerHandle(TaskId.Parse("root/abortable"), supportsAbort: true);
-        var cancelOnly = new RecordingSchedulerHandle(TaskId.Parse("root/cancel-only"), supportsAbort: false);
-        foreach (var handle in new[] { abortable, cancelOnly })
-        {
-            _ = await runtime.ScheduleChildAsync(
-                handle.TaskId,
-                new TestSchedulableTask(static (_, _) => new(DurableTaskResponse.Pending), _ => handle),
-                TestContext.Current.CancellationToken);
-        }
-
-        await runtime.AbortTaskAsync(rootId, "operator", TestContext.Current.CancellationToken);
-
-        Assert.Equal("operator", await abortable.Aborted.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken));
-        await cancelOnly.Canceled.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
-        Assert.False(abortable.Canceled.IsCompleted);
-        AssertAborted(storage.Get(abortable.TaskId).Result, "operator");
-        AssertAborted(storage.Get(cancelOnly.TaskId).Result, "operator");
-    });
-
-    private sealed class RecordingSchedulerHandle(TaskId taskId, bool supportsAbort) : IScheduledTaskHandle
-    {
-        private readonly TaskCompletionSource<string> _aborted = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource _canceled = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public TaskId TaskId { get; } = taskId;
-
-        public Task<string> Aborted => _aborted.Task;
-
-        public Task Canceled => _canceled.Task;
-
-        public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
-
-        public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken) =>
-            new(DurableTaskResponse.Pending);
-
-        public ValueTask CancelAsync(CancellationToken cancellationToken)
-        {
-            _canceled.TrySetResult();
-            return default;
-        }
-
-        public ValueTask AbortAsync(string reason, CancellationToken cancellationToken)
-        {
-            if (!supportsAbort)
-            {
-                throw new NotSupportedException();
-            }
-
-            _aborted.TrySetResult(reason);
-            return default;
-        }
-    }
-
     private static DurableTask<int> BlockedChild(TaskCompletionSource started) => DurableTask.Run(async cancellationToken =>
     {
         started.TrySetResult();
