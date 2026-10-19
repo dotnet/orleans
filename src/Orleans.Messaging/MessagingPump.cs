@@ -18,6 +18,11 @@ namespace Orleans.Messaging;
 /// Work staged with an earlier due time than the current wake-up schedules an earlier one, and the job which a newer,
 /// earlier wake-up supersedes completes when it runs.
 /// Wake-ups may be early, late, or duplicated: every pass derives the work to perform from current state.
+/// The wake-up is crash insurance for work which the live loop performs as soon as it is signaled, so work which is
+/// already due needs a wake-up within <see cref="RecheckDelay"/>, and a write schedules a job only when no tracked or
+/// scheduling job is due by then. A running job re-arms itself once per run, so a busy grain performs no job operation
+/// per write. The job retries indefinitely when an activation fails (see <see cref="GetRetryTime"/>), and every
+/// activation re-arms it from recovered state, so committed work always keeps a wake-up.
 /// Wake-up bookkeeping runs on the activation scheduler: journal writes prepare on it and serialize with job runs.
 /// The loop keeps the activation alive while a pass runs over queued work.
 /// Work which only becomes due later relies on the durable job, so the activation can be collected while it waits.
@@ -25,7 +30,7 @@ namespace Orleans.Messaging;
 internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecycleObserver
 {
     internal const string JobName = "orleans.messaging.pump";
-    private static readonly TimeSpan RecheckDelay = TimeSpan.FromSeconds(1);
+    internal static readonly TimeSpan RecheckDelay = TimeSpan.FromSeconds(1);
     private readonly SingleWaiterAutoResetEvent _signal = new() { RunContinuationsAsynchronously = true };
     private readonly CancellationTokenSource _shutdown = new();
     private Inbox? _inbox;
@@ -100,13 +105,15 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     }
 
     /// <summary>
-    /// Ensures a durable job will wake this grain no later than <paramref name="dueTime"/>, on the Durable Jobs clock.
+    /// Ensures a durable job will wake this grain no later than <paramref name="dueTime"/>, or within
+    /// <see cref="RecheckDelay"/> for work which is due sooner, on the Durable Jobs clock.
     /// </summary>
     public async ValueTask EnsureWakeupAsync(DateTimeOffset dueTime, CancellationToken cancellationToken)
     {
-        // Work which is already due needs a wake-up due now, which any tracked or scheduling wake-up due by now satisfies.
-        var now = Shared.JobTimeProvider.GetUtcNow();
-        if (dueTime < now) dueTime = now;
+        // The live loop performs work as soon as it is due, so any tracked or scheduling wake-up within RecheckDelay
+        // covers it should the activation fail.
+        var earliest = MessagingTime.AddClamped(Shared.JobTimeProvider.GetUtcNow(), RecheckDelay);
+        if (dueTime < earliest) dueTime = earliest;
         if (_wakeupJobId is not null && _wakeupDueTime <= dueTime) return;
         if (_scheduling is null || _schedulingEpoch != _wakeupEpoch || _schedulingDueTime > dueTime)
         {
@@ -157,13 +164,8 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         }
         catch
         {
-            // This attempt no longer guarantees a future wake-up.
+            // Durable Jobs retries the failed run (see GetRetryTime), which wakes a recovered activation.
             CompleteWakeup(jobId);
-            if (!_shutdown.IsCancellationRequested && Inbox.HasWork)
-            {
-                RepairWakeupAsync().Ignore();
-            }
-
             throw;
         }
 
@@ -262,11 +264,25 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     public async Task OnStart(CancellationToken cancellationToken)
     {
         await Inbox.StartAsync(cancellationToken).ConfigureAwait(true);
-        if (Inbox.HasWork)
+
+        // Recovered work keeps a wake-up at its real due time, even if the job which woke this activation completes.
+        var now = Shared.JobTimeProvider.GetUtcNow();
+        if (Inbox.GetNextWakeupDelay(now) is { } delay)
         {
-            await EnsureWakeupAsync(Shared.JobTimeProvider.GetUtcNow(), cancellationToken).ConfigureAwait(true);
+            await EnsureWakeupAsync(MessagingTime.AddClamped(now, delay), cancellationToken).ConfigureAwait(true);
         }
     }
+
+    /// <summary>
+    /// Returns when Durable Jobs retries a pump job whose run failed, which it does indefinitely with backoff on the
+    /// Durable Jobs clock.
+    /// </summary>
+    /// <remarks>
+    /// The job is the grain's only durable wake-up for committed work, so giving up after a bounded number of attempts
+    /// would strand that work after a long outage until an unrelated call reactivated the grain.
+    /// </remarks>
+    internal static DateTimeOffset GetRetryTime(IJobRunContext context, DateTimeOffset now, TimeSpan initialInterval) =>
+        MessagingTime.AddClamped(now, MessagingTime.GetBackoff(initialInterval, context.DequeueCount));
 
     public async Task OnStop(CancellationToken cancellationToken)
     {

@@ -15,6 +15,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
     private readonly ConcurrentDictionary<JournalId, byte> _postDeleteFailures = new();
     private readonly ConcurrentDictionary<JournalId, int> _successfulWrites = new();
     private readonly ConcurrentDictionary<JournalId, int> _reads = new();
+    private readonly ConcurrentDictionary<JournalId, int> _readFailures = new();
     private readonly ConcurrentDictionary<JournalId, int> _creations = new();
     private readonly ConcurrentDictionary<JournalId, int> _initializations = new();
 
@@ -76,6 +77,13 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         }
 
         return new WriteBarrier(plan);
+    }
+
+    /// <summary>Fails the next <paramref name="count"/> reads of the journal, as a storage outage would.</summary>
+    public void FailReads(JournalId journalId, int count)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
+        _readFailures[journalId] = count;
     }
 
     public void FailWrite(JournalId journalId, int matchingWrite = 1)
@@ -143,6 +151,12 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
 
     private async ValueTask BeforeReadAsync(JournalId journalId, CancellationToken cancellationToken)
     {
+        if (_readFailures.TryGetValue(journalId, out var remaining) && remaining > 0
+            && _readFailures.TryUpdate(journalId, remaining - 1, remaining))
+        {
+            throw new IOException("Injected journal read failure.");
+        }
+
         if (!_readPlans.TryGetValue(journalId, out var plan)
             || Interlocked.Increment(ref plan.Seen) != plan.Target)
         {
