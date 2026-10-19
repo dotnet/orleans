@@ -30,7 +30,7 @@ public sealed class JournalPositionTests : JournalingTestBase
         Assert.True(first.Manager.Positions.TryGetPosition(out var afterSets));
         Assert.Equal(start + 2, afterSets);
 
-        // The value journals at the next write, unless a positional read stages it first.
+        // The value journals at the next write; until then, reads of it record values.
         first.Value.Value = "v";
         Assert.True(first.Manager.Positions.TryGetPosition(out var afterValue));
         Assert.Equal(afterSets, afterValue);
@@ -82,6 +82,7 @@ public sealed class JournalPositionTests : JournalingTestBase
         var storage = new ControlledStorage(new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey));
         var first = await ActivateAsync(storage);
         first.Value.Value = "v";
+        await first.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         first.Probe.Read(first.Value, "value", JournaledStateOperation.ValueGet, default(JournaledStateAccessNoArgument), "v");
         await first.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
@@ -120,7 +121,10 @@ public sealed class JournalPositionTests : JournalingTestBase
                         activation.Change(step);
                         break;
                     case StepKind.Read:
-                        reads.Add(activation.Read(step));
+                        if (activation.Read(step) is { } read)
+                        {
+                            reads.Add(read);
+                        }
                         break;
                     case StepKind.Write:
                         await activation.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -173,6 +177,30 @@ public sealed class JournalPositionTests : JournalingTestBase
             Assert.False(read.IsResolved);
             Assert.Equal(window, logger.Errors.Count(static message => message.Contains("couldn't be resolved", StringComparison.Ordinal)));
         }
+    }
+
+    /// <summary>
+    /// A compaction barrier is the manager's bookkeeping for a read which records a position, so holding one leaves the
+    /// staged change count known and unchanged, and the write which journals it stages nothing new. Messaging therefore
+    /// retries a failed handler attempt which only read state in the same activation.
+    /// </summary>
+    [Fact]
+    public async Task HoldingABarrierLeavesTheStagedChangeCountKnownAndUnchanged()
+    {
+        var storage = new ControlledStorage(new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey));
+        var activation = await ActivateAsync(storage);
+        activation.Dictionary["a"] = "x";
+        await activation.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        var before = activation.Manager.StagedChangeCount;
+        Assert.True(before >= 0, $"Staged change count {before} is unknown.");
+
+        _ = activation.Probe.Read(activation.Dictionary, "dictionary", JournaledStateOperation.DictionaryTryGetValue, "a", (true, "x"));
+        Assert.True(activation.Manager.Positions.HasBarriers);
+        Assert.Equal(before, activation.Manager.StagedChangeCount);
+
+        await activation.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.True(activation.Manager.Positions.HasBarriers);
+        Assert.Equal(before, activation.Manager.StagedChangeCount);
     }
 
     private async Task<Activation> ActivateAsync(ControlledStorage storage, ILogger<JournaledStateManager>? logger = null)
@@ -235,18 +263,18 @@ public sealed class JournalPositionTests : JournalingTestBase
             }
         }
 
-        public ProbeRead Read(Step step)
+        public ProbeRead? Read(Step step)
         {
             var key = Keys[step.Key];
             return step.Operation switch
             {
-                0 => Probe.Read(Value, "value", JournaledStateOperation.ValueGet, default(JournaledStateAccessNoArgument), Value.Value),
-                1 => Probe.Read(Dictionary, "dictionary", JournaledStateOperation.DictionaryTryGetValue, key, Dictionary.TryGetValue(key, out var found) ? (true, found) : (false, default(string)!)),
-                2 => Probe.Read(Dictionary, "dictionary", JournaledStateOperation.DictionaryContainsKey, key, Dictionary.ContainsKey(key)),
-                3 => Probe.Read(Dictionary, "dictionary", JournaledStateOperation.DictionaryCount, default(JournaledStateAccessNoArgument), Dictionary.Count),
-                4 => Probe.Read(List, "list", JournaledStateOperation.ListCount, default(JournaledStateAccessNoArgument), List.Count),
-                5 => Probe.Read(List, "list", JournaledStateOperation.ListSnapshot, default(JournaledStateAccessNoArgument), List.ToArray()),
-                _ => Probe.Read(List, "list", JournaledStateOperation.ListContains, Values[step.Key], List.Contains(Values[step.Key])),
+                0 => Probe.TryRead(Value, "value", JournaledStateOperation.ValueGet, default(JournaledStateAccessNoArgument), Value.Value),
+                1 => Probe.TryRead(Dictionary, "dictionary", JournaledStateOperation.DictionaryTryGetValue, key, Dictionary.TryGetValue(key, out var found) ? (true, found) : (false, default(string)!)),
+                2 => Probe.TryRead(Dictionary, "dictionary", JournaledStateOperation.DictionaryContainsKey, key, Dictionary.ContainsKey(key)),
+                3 => Probe.TryRead(Dictionary, "dictionary", JournaledStateOperation.DictionaryCount, default(JournaledStateAccessNoArgument), Dictionary.Count),
+                4 => Probe.TryRead(List, "list", JournaledStateOperation.ListCount, default(JournaledStateAccessNoArgument), List.Count),
+                5 => Probe.TryRead(List, "list", JournaledStateOperation.ListSnapshot, default(JournaledStateAccessNoArgument), List.ToArray()),
+                _ => Probe.TryRead(List, "list", JournaledStateOperation.ListContains, Values[step.Key], List.Contains(Values[step.Key])),
             };
         }
     }
@@ -284,7 +312,8 @@ public sealed class JournalPositionTests : JournalingTestBase
     }
 
     /// <summary>Holds positional reads, as an access log does, and keeps their results when the manager resolves them.</summary>
-    private sealed class Probe : IStateMachine, IJournalPositionHolder
+    // Like an access log, the probe holds its reads in memory and journals nothing, so it reports every change it stages.
+    private sealed class Probe : IStateMachine, IReportsStagedChanges, IJournalPositionHolder
     {
         private readonly JournaledStateManager _manager;
         private readonly Serializer _serializer;
@@ -298,21 +327,29 @@ public sealed class JournalPositionTests : JournalingTestBase
             manager.RegisterStateMachine("probe", this);
         }
 
-        public ProbeRead Read<TArgument, TResult>(IReplicableState state, string name, JournaledStateOperation operation, TArgument argument, TResult expected)
+        /// <summary>Records a positional read, as an access log does, or returns <see langword="null"/> when the read records its value.</summary>
+        public ProbeRead? TryRead<TArgument, TResult>(IReplicableState state, string name, JournaledStateOperation operation, TArgument argument, TResult expected)
         {
-            state.StagePendingChanges();
-            Assert.True(_manager.Positions.TryGetPosition(out var position));
+            var target = new JournaledStateAccessTarget(name, _manager, state);
+            if (!_manager.Positions.TryGetPosition(target, out var position))
+            {
+                return null;
+            }
+
             var encoded = new ArrayBufferWriter<byte>();
             if (typeof(TArgument) != typeof(JournaledStateAccessNoArgument))
             {
                 _serializer.Serialize(argument, encoded);
             }
 
-            var read = new ProbeRead<TResult>(position, new JournaledStateAccessTarget(name).Id, operation, encoded.WrittenSpan.ToArray(), expected);
+            var read = new ProbeRead<TResult>(position, target.Id, operation, encoded.WrittenSpan.ToArray(), expected);
             _reads.Add(read);
             _manager.Positions.HoldBarrier("probe", position);
             return read;
         }
+
+        public ProbeRead Read<TArgument, TResult>(IReplicableState state, string name, JournaledStateOperation operation, TArgument argument, TResult expected) =>
+            TryRead(state, name, operation, argument, expected) ?? throw new InvalidOperationException($"The read of '{name}' records its value.");
 
         bool IJournalPositionHolder.HoldsPositionalReads => _reads.Exists(static read => !read.IsResolved);
 

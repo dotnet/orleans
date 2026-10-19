@@ -951,19 +951,13 @@ internal sealed class DurableTaskAccessLog(
     {
         var target = access.Target;
         if (_positionHolder?.Journal is not { } journal
-            || target.ReplicableState is not { } history
             || !ReferenceEquals(target.Manager, journal)
             || !JournaledStateOperations.IsPositional(access.Operation)
-            || !PositionalTypes<TArgument, TResult>.IsSupported(_serializer))
+            || !PositionalTypes<TArgument, TResult>.IsSupported(_serializer)
+            || !journal.Positions.TryGetPosition(target, out var position))
         {
-            return false;
-        }
-
-        // The journal up to the position must hold what the read observed, including a value which a coalescing state
-        // would journal only at the next write.
-        history.StagePendingChanges();
-        if (!journal.Positions.TryGetPosition(target, out var position))
-        {
+            // The journal up to a position reproduces the read only when the state has no change pending a write, so a
+            // read of a state with pending changes records its value, and leaves the state's coalescing alone.
             return false;
         }
 
