@@ -25,7 +25,7 @@ public sealed class TypedOutboxExtensionsTests
     private static MessageId CommandId => MessageId.Create("orders", "42", "reserve");
 
     [Fact]
-    public void SendBatch_EnumeratesOnceAndStagesEachMessageBeforeAdvancing()
+    public void SendBatch_EnumeratesOnceAndEncodesEveryMessageBeforeStaging()
     {
         using var services = CreateServices();
         var type = new MessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
@@ -35,9 +35,9 @@ public sealed class TypedOutboxExtensionsTests
         {
             Assert.Equal(1, ++enumerations);
             yield return (CommandId, Destination, "first");
-            Assert.Equal(1, outbox.RawSendCalls);
-            Assert.Equal("first", type.Decode(Assert.Single(outbox.Messages).Envelope));
+            Assert.Equal(0, outbox.RawSendCalls);
             yield return (new MessageId(CommandId.Key.CreateChildKey("second")), ReceivedSender, "second");
+            Assert.Equal(0, outbox.RawSendCalls);
         }
 
         outbox.Send(type, Messages());
@@ -53,7 +53,7 @@ public sealed class TypedOutboxExtensionsTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void SendBatch_PreparationFailurePreservesEarlierIntentAndOriginalError(bool encodingFailure)
+    public void SendBatch_PreparationFailureStagesNothingAndPreservesOriginalError(bool encodingFailure)
     {
         using var services = CreateServices();
         var sessions = services.GetRequiredService<SerializerSessionPool>();
@@ -70,22 +70,9 @@ public sealed class TypedOutboxExtensionsTests
         }
 
         Assert.Same(sentinel, Assert.Throws<InvalidDataException>(() => outbox.Send(type, Messages())));
-        Assert.Equal(1, outbox.RawSendCalls);
-        var earlier = Assert.Single(outbox.Messages);
-        Assert.Equal(CommandId, earlier.Envelope.MessageId);
-        Assert.Equal(Destination, earlier.ReceiverId);
-        Assert.Equal(Subject, GetSubject(earlier.Envelope));
-        var earlierPayload = earlier.Envelope.Payload.ToArray();
-        Assert.Equal("first", type.Decode(earlier.Envelope));
+        Assert.Equal(0, outbox.RawSendCalls);
+        Assert.Empty(outbox.Messages);
         Assert.Equal(encodingFailure ? 2 : 1, codec.Writes);
-        outbox.Send(type, new MessageId(CommandId.Key.CreateChildKey("second")), Destination, "recovered");
-        Assert.Equal(new[] { "first", "recovered" }, outbox.Messages.Select(message => type.Decode(message.Envelope)));
-        Assert.Equal(2, outbox.RawSendCalls);
-        var retained = outbox.Messages.First();
-        Assert.Equal(earlierPayload, retained.Envelope.Payload);
-        Assert.Equal(new[] { CommandId, new MessageId(CommandId.Key.CreateChildKey("second")) },
-            outbox.Messages.Select(message => message.Envelope.MessageId));
-        Assert.All(outbox.Messages, message => Assert.Equal(Destination, message.ReceiverId));
     }
 
     [Theory]
@@ -570,6 +557,8 @@ public sealed class TypedOutboxExtensionsTests
         }
 
         public void Send(MessageId messageId) => throw new NotSupportedException();
+
+        public bool Withdraw(MessageId messageId) => throw new NotSupportedException();
 
         public IOutbox Register(IOutboxMessageSource source) => throw new NotSupportedException();
 
