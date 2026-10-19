@@ -155,7 +155,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     }
 
     public bool Contains(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.QueueContains, (Self: this, Item: item), static state => state.Self._items.Contains(state.Item))
+        ? context.Read(_accessTarget, JournaledStateOperation.QueueContains, item, (Self: this, Item: item), static state => state.Self._items.Contains(state.Item))
         : _items.Contains(item);
 
     public void CopyTo(T[] array, int arrayIndex)
@@ -177,7 +177,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     {
         if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
         {
-            context.Write(_accessTarget, JournaledStateOperation.QueueEnqueue, (Self: this, Item: item), static state => state.Self.EnqueueCore(state.Item));
+            context.Write(_accessTarget, JournaledStateOperation.QueueEnqueue, item, (Self: this, Item: item), static state => state.Self.EnqueueCore(state.Item));
             return;
         }
 

@@ -85,7 +85,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         : _isSealed;
 
     public T this[long sequence] => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.LogGet, (Self: this, Sequence: sequence), static state => state.Self.GetCore(state.Sequence))
+        ? context.Read(_accessTarget, JournaledStateOperation.LogGet, sequence, (Self: this, Sequence: sequence), static state => state.Self.GetCore(state.Sequence))
         : GetCore(sequence);
 
     private T GetCore(long sequence) => TryGetIndex(sequence, out var index)
@@ -101,6 +101,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             (var found, item) = context.Read(
                 _accessTarget,
                 JournaledStateOperation.LogTryGet,
+                sequence,
                 (Self: this, Sequence: sequence),
                 static state => state.Self.TryGetIndex(state.Sequence, out var index) ? (true, state.Self._items[index]) : (false, default(T)!));
             return found;
@@ -117,7 +118,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     }
 
     public long Append(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Write(_accessTarget, JournaledStateOperation.LogAppend, (Self: this, Item: item), static state => state.Self.AppendCore(state.Item))
+        ? context.Write(_accessTarget, JournaledStateOperation.LogAppend, item, (Self: this, Item: item), static state => state.Self.AppendCore(state.Item))
         : AppendCore(item);
 
     private long AppendCore(T item)
@@ -137,7 +138,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     {
         if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
         {
-            context.Write(_accessTarget, JournaledStateOperation.LogTrimBefore, (Self: this, Sequence: sequence), static state => state.Self.TrimBeforeCore(state.Sequence));
+            context.Write(_accessTarget, JournaledStateOperation.LogTrimBefore, sequence, (Self: this, Sequence: sequence), static state => state.Self.TrimBeforeCore(state.Sequence));
             return;
         }
 

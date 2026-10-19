@@ -772,7 +772,7 @@ public sealed class DurableTaskJournaledStateAccessTests
             await activation.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
 
             // A record which a later version wrote, with a representation which this version doesn't know.
-            activation.Storage.AppendAccessLog(WorkflowId, [0x11, (byte)JournaledStateOperation.ValueGet, 0, 0, 0, 0]);
+            activation.Storage.AppendAccessLog(WorkflowId, [0x21, (byte)JournaledStateOperation.ValueGet, 0, 0, 0, 0]);
             activation.Grain.RequestUnrelatedWrite();
             await activation.Grain.UnrelatedWrites;
         }
@@ -781,7 +781,7 @@ public sealed class DurableTaskJournaledStateAccessTests
         await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
         replay.Grain.OpenGate();
         var divergence = await stalled.Task.WaitAsync(Timeout, TestCancellation);
-        Assert.IsType<NotSupportedException>(Assert.IsType<DurableTaskDivergenceException>(divergence).InnerException);
+        Assert.Contains("has a representation, 0x21, which this version doesn't read", Assert.IsType<DurableTaskDivergenceException>(divergence).Message, StringComparison.Ordinal);
         Assert.True(replay.Storage.TryGetTask(WorkflowId, out var state));
         Assert.False(state.Result is { IsCompleted: true });
 

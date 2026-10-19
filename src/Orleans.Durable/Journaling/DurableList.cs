@@ -60,14 +60,14 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     public T this[int index]
     {
         get => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-            ? context.Read(_accessTarget, JournaledStateOperation.ListGet, (Self: this, Index: index), static state => state.Self._items[state.Index])
+            ? context.Read(_accessTarget, JournaledStateOperation.ListGet, index, (Self: this, Index: index), static state => state.Self._items[state.Index])
             : _items[index];
 
         set
         {
             if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
             {
-                context.Write(_accessTarget, JournaledStateOperation.ListSet, (Self: this, Index: index, Value: value), static state => state.Self.SetCore(state.Index, state.Value));
+                context.Write(_accessTarget, JournaledStateOperation.ListSet, (index, value), (Self: this, Index: index, Value: value), static state => state.Self.SetCore(state.Index, state.Value));
                 return;
             }
 
@@ -115,7 +115,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     {
         if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
         {
-            context.Write(_accessTarget, JournaledStateOperation.ListAdd, (Self: this, Item: item), static state => state.Self.AddCore(state.Item));
+            context.Write(_accessTarget, JournaledStateOperation.ListAdd, item, (Self: this, Item: item), static state => state.Self.AddCore(state.Item));
             return;
         }
 
@@ -146,7 +146,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     }
 
     public bool Contains(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.ListContains, (Self: this, Item: item), static state => state.Self._items.Contains(state.Item))
+        ? context.Read(_accessTarget, JournaledStateOperation.ListContains, item, (Self: this, Item: item), static state => state.Self._items.Contains(state.Item))
         : _items.Contains(item);
 
     public void CopyTo(T[] array, int arrayIndex)
@@ -165,14 +165,14 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
         : _items.GetEnumerator();
 
     public int IndexOf(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.ListIndexOf, (Self: this, Item: item), static state => state.Self._items.IndexOf(state.Item))
+        ? context.Read(_accessTarget, JournaledStateOperation.ListIndexOf, item, (Self: this, Item: item), static state => state.Self._items.IndexOf(state.Item))
         : _items.IndexOf(item);
 
     public void Insert(int index, T item)
     {
         if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
         {
-            context.Write(_accessTarget, JournaledStateOperation.ListInsert, (Self: this, Index: index, Item: item), static state => state.Self.InsertCore(state.Index, state.Item));
+            context.Write(_accessTarget, JournaledStateOperation.ListInsert, (index, item), (Self: this, Index: index, Item: item), static state => state.Self.InsertCore(state.Index, state.Item));
             return;
         }
 
@@ -191,7 +191,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     }
 
     public bool Remove(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Write(_accessTarget, JournaledStateOperation.ListRemove, (Self: this, Item: item), static state => state.Self.RemoveCore(state.Item))
+        ? context.Write(_accessTarget, JournaledStateOperation.ListRemove, item, (Self: this, Item: item), static state => state.Self.RemoveCore(state.Item))
         : RemoveCore(item);
 
     private bool RemoveCore(T item)
@@ -210,7 +210,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     {
         if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
         {
-            context.Write(_accessTarget, JournaledStateOperation.ListRemoveAt, (Self: this, Index: index), static state => state.Self.RemoveAtCore(state.Index));
+            context.Write(_accessTarget, JournaledStateOperation.ListRemoveAt, index, (Self: this, Index: index), static state => state.Self.RemoveAtCore(state.Index));
             return;
         }
 
