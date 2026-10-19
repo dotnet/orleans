@@ -696,7 +696,7 @@ internal static class DurableStateObservation
                 var (state, mode) = arg;
                 var manager = hub.Manager;
                 var initialVersion = state.IsDirty ? manager.StagingWriteVersion : manager.CapturedWriteVersion;
-                return new ValueWatcher<T>(hub, state, mode, state.Value, initialVersion);
+                return new ValueWatcher<T>(hub, state, mode, state.LiveValue, initialVersion);
             },
             cancellationToken);
     }
