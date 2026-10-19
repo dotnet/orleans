@@ -26,7 +26,6 @@ by bandwidth and latency.
 - **Run at your own pace.** External events are enqueued and processed in batches.
 - **Simple algorithms for small N.** N is usually small; complexity is justified by measured N.
 - **GC-aware hot paths.** Steady state on messaging, serialization, and scheduling paths is allocation-free, using pooled buffers, pre-sized collections, `Span<T>`, and structs where they pay off.
-- **Bounded memory.** Memory per request, connection, and activation has an explicit bound.
 
 ## Findings
 
