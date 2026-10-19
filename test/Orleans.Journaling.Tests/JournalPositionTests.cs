@@ -316,9 +316,6 @@ public sealed class JournalPositionTests : JournalingTestBase
             }
         }
 
-        void IJournalPositionHolder.OnPositionsResolved()
-        {
-        }
 
         void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) => throw new NotSupportedException();
 
