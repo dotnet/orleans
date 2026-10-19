@@ -63,12 +63,12 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         await barrier.WaitUntilEnteredAsync();
         var second = DeliverAsync(receiver, envelope);
 
+        // The pending acceptance is durable, so the duplicate is answered without waiting for the handler.
         Assert.Equal(DeliveryStatus.Accepted, first.Status);
-        Assert.False(second.IsCompleted);
+        Assert.Equal(DeliveryStatus.Duplicate, (await second).Status);
         Assert.Equal(1, Fixture.GetSnapshot(receiver).InboxCount);
 
         barrier.Release();
-        Assert.Equal(DeliveryStatus.Duplicate, (await second).Status);
         var state = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, Assert.Single(state.Effects).Count);
         Assert.Equal(1, state.MaxConcurrentHandlers);
@@ -87,12 +87,15 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await barrier.WaitUntilEnteredAsync();
 
-        var duplicate = DeliverAsync(receiver, envelope);
-        await Task.WhenAny(duplicate, Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken));
-        Assert.False(duplicate.IsCompleted);
+        // Whenever the duplicate is answered, the completion it depends on must already be durable.
+        var duplicate = DeliverAsync(receiver, envelope).ContinueWith(
+            task => (task.Result.Status, Writes: Fixture.Storage.GetSuccessfulWriteCount(journalId)),
+            TaskScheduler.Default);
 
         barrier.Release();
-        Assert.Equal(DeliveryStatus.Duplicate, (await duplicate).Status);
+        var (status, writes) = await duplicate;
+        Assert.Equal(DeliveryStatus.Duplicate, status);
+        Assert.True(writes >= 2, $"The duplicate was answered after {writes} durable writes, before its completion was durable.");
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
