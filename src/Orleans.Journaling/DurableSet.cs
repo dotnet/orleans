@@ -79,10 +79,10 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
         _items.Clear();
         _writer = writer;
         _hasStagedEntries = false;
-        PublishResync(isDurable: true);
+        DurableStateObservation.PublishDurableResync<DurableSet<T>, SetChange<T>>(_manager, this);
     }
 
-    void IStateMachine.OnRecoveryCompleted() => PublishResync(isDurable: true);
+    void IStateMachine.OnRecoveryCompleted() => DurableStateObservation.PublishDurableResync<DurableSet<T>, SetChange<T>>(_manager, this);
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
@@ -187,7 +187,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
             WriteSnapshot(next);
             _items.Clear();
             _items.UnionWith(next);
-            PublishResync(isDurable: false);
+            DurableStateObservation.PublishStagedResync<DurableSet<T>, SetChange<T>>(_manager, this);
         }
     }
 
@@ -200,7 +200,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
             WriteSnapshot(next);
             _items.Clear();
             _items.UnionWith(next);
-            PublishResync(isDurable: false);
+            DurableStateObservation.PublishStagedResync<DurableSet<T>, SetChange<T>>(_manager, this);
         }
     }
 
@@ -223,15 +223,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
     {
         if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
         {
-            topic.Publish(new SetChange<T> { Kind = kind, Item = item });
-        }
-    }
-
-    private void PublishResync(bool isDurable)
-    {
-        if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
-        {
-            topic.Publish(((IResyncSource<SetChange<T>>)this).CreateResync(), isDurable);
+            topic.PublishStaged(new SetChange<T> { Kind = kind, Item = item });
         }
     }
 }
