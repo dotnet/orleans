@@ -58,7 +58,28 @@ public class DurableTaskDelegateRuleTests
                 await DurableTask.Run(async () => await FetchAsync()).WithId("task");
             }
 
-            public static DurableTask Define() => DurableTask.Run({|ORLEANS0222:(Action<CancellationToken>)(async _ => await FetchAsync())|});
+                public static DurableTask Define() => DurableTask.Run({|ORLEANS0222:(Action<CancellationToken>)(async _ => await FetchAsync())|});
+        }
+        """);
+
+    [Fact]
+    public Task RealOverloadsBindTheDelegatesWhichTheRulesInspect() => AnalyzerVerifier.VerifyAsync($$"""
+        public class C
+        {
+        {{Members}}
+            private static ValueTask<int> FetchValueAsync() => new(1);
+
+            public async DurableTask<int> RunAsync(int seed)
+            {
+                // ValueTask steps and steps with state run asynchronous work, so they're steps.
+                var value = await DurableTask.Run(async () => await FetchValueAsync()).WithId("value-task");
+                await DurableTask.Run(async () => { await FetchValueAsync(); }).WithId("value-task-action");
+                var stateful = await DurableTask.Run(static async (state, _) => await FetchAsync() + state, seed).WithId("state");
+
+                // A synchronous delegate with state is a step which runs no asynchronous work.
+                var synchronous = await DurableTask.{|ORLEANS0221:Run|}(static (state, _) => state + 1, seed).WithId("synchronous-state");
+                return value + stateful + synchronous;
+            }
         }
         """);
 }

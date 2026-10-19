@@ -38,9 +38,9 @@ internal static class DurableTaskDiagnostics
     public static readonly DiagnosticDescriptor RunInlineAssignsCapturedVariable = Create(
         "ORLEANS0204",
         "Return the outputs of a DurableTask.RunInline effect",
-        "Return '{0}' from the effect instead of assigning it: a replay returns the recorded result without running the effect",
+        "Return '{0}' from the effect instead of assigning or changing it: a replay returns the recorded result without running the effect",
         DiagnosticSeverity.Warning,
-        "A replay returns an effect's recorded result without running the effect, so assignments to the body's variables happen only in the run which runs it. Return every output from the effect, for example as a tuple or a record.");
+        "A replay returns an effect's recorded result without running the effect, so assignments to the body's variables, and changes to the objects which they hold, such as items added to a list, happen only in the run which runs it. Return every output from the effect, for example as a tuple or a record.");
 
     public static readonly DiagnosticDescriptor UnobservedDefinition = Create(
         "ORLEANS0205",
@@ -94,8 +94,8 @@ internal static class DurableTaskDiagnostics
     public static readonly DiagnosticDescriptor UnfilteredCancellationHandler = Create(
         "ORLEANS0212",
         "Filter cancellation handlers by IsTaskCancellationRequested",
-        "Add 'when (DurableTask.Current.IsTaskCancellationRequested)' to this handler: attempt cancellation, such as a stopping activation, also throws OperationCanceledException",
-        DiagnosticSeverity.Info,
+        "Add 'when (DurableTask.Current.IsTaskCancellationRequested)' to this handler: attempt cancellation, such as a stopping activation, also throws OperationCanceledException, and compensation which runs then runs again in the next attempt",
+        DiagnosticSeverity.Warning,
         "A durable task observes two kinds of cancellation through OperationCanceledException. Task cancellation is durable: a caller requests it, the host records it, and the body decides the task's outcome, for example by compensating. Attempt cancellation stops the current run, for example when its activation deactivates, and the run's later durable operations throw. A handler which filters by DurableTask.Current.IsTaskCancellationRequested, or which rethrows, compensates for task cancellation and lets a canceled attempt end.");
 
     public static readonly DiagnosticDescriptor AsyncVoidInBody = Create(
@@ -157,8 +157,8 @@ internal static class DurableTaskDiagnostics
     public static readonly DiagnosticDescriptor SynchronousStep = Create(
         "ORLEANS0221",
         "Run synchronous work with DurableTask.RunInline",
-        "Run this delegate with DurableTask.RunInline: it neither awaits nor observes its CancellationToken, so a step adds a child execution and a journal write without running asynchronous work",
-        DiagnosticSeverity.Warning,
+        "Run this delegate with DurableTask.RunInline: it neither awaits nor observes its CancellationToken, so a step adds a child execution and a journal write without running asynchronous work; executions which recorded the step diverge on an effect, so gate the change with DurableTask.GetVersion while any are pending",
+        DiagnosticSeverity.Info,
         "DurableTask.Run runs its delegate as a child execution when the step is awaited, possibly in a later turn, and commits the result in a journal write of its own. DurableTask.RunInline runs synchronous work in the current work item and records its result with the execution's next journal write, together with the state changes which it makes, so consecutive effects commit together. An execution which recorded the step diverges when it replays an effect in its place, so a deployment with pending executions branches the change on DurableTask.GetVersion.");
 
     public static readonly DiagnosticDescriptor AsyncVoidDelegate = Create(
@@ -174,6 +174,27 @@ internal static class DurableTaskDiagnostics
         "Assign a new value to '{0}' instead of changing the object which it holds: grain state records each change which passes through its API, and a change in place bypasses it",
         DiagnosticSeverity.Warning,
         "Journaled grain state records each change which passes through its API, such as an assignment to IDurableValue<T>.Value or IPersistentState<T>.State, or to an entry of a durable dictionary. A change made in place to an object which the state holds, such as an item added to a list in the value or a property set on an entry, bypasses the API: no record holds it until another change writes the whole value, so the state in memory differs from the state which the journal recovers. Store immutable values, such as records and immutable collections, and assign a new value to change one.");
+
+    public static readonly DiagnosticDescriptor PollInBody = Create(
+        "ORLEANS0225",
+        "Await durable tasks instead of polling them in durable task bodies",
+        "Await the task, or wait for it with a durable timeout, instead of calling '{0}': a poll observes the task's status when it runs, so a replay observes another status, and a durable task body's poll throws NotSupportedException",
+        DiagnosticSeverity.Error,
+        "A poll, such as ScheduledTask.IsCompletedAsync or GetStatusAsync, reports the task's status when the poll runs, and the execution records nothing about it. A replay re-runs the body at another time, when the poll observes another status, so a body which branched on it schedules other operations, and the runtime rejects polls in durable task bodies. Await the task, or wait with a durable timeout, such as WaitAsync with a timeout or ScheduledTask.WhenAny with DurableTask.Delay, whose outcome the execution records.");
+
+    public static readonly DiagnosticDescriptor ContinuationOffScheduler = Create(
+        "ORLEANS0226",
+        "Continue durable task bodies on their scheduler",
+        "Remove 'ConfigureAwait({0})': the body's continuation would run off its grain's scheduler, where durable operations throw and state changes race with the grain's other work",
+        DiagnosticSeverity.Error,
+        "A durable task body runs on its grain activation's scheduler, which orders its durable operations and state changes, and commits the body's result with the state changes which its final code makes. An await configured not to continue on its captured context, such as ConfigureAwait(false), resumes the body on the thread pool: DurableTask.RunInline and DurableTask.GetVersion throw there, state changes race with the grain's other turns, and the final code's state changes and the body's result commit separately, so a crash applies the changes again. Await without ConfigureAwait, or with ConfigureAwait(true).");
+
+    public static readonly DiagnosticDescriptor OperationInEffect = Create(
+        "ORLEANS0227",
+        "Run durable operations outside DurableTask.RunInline effects",
+        "Run '{0}' in the body, before or after the effect: an effect records only its outcome, so a replay doesn't run the operation, and the operation throws InvalidOperationException in an effect",
+        DiagnosticSeverity.Error,
+        "A replay returns a DurableTask.RunInline effect's recorded outcome without running the effect, so a durable operation in the effect, such as a start or a version check, would be missing from the replay, and the identifiers of the body's later operations would shift. The runtime rejects durable operations in effects, and the effect records that failure as its outcome. A DurableTask.RunInline call in an effect runs as part of the effect. Start tasks and check versions in the body, and pass values to the effect.");
 
     private static DiagnosticDescriptor Create(
         string id,
