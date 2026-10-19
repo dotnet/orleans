@@ -157,6 +157,8 @@ internal sealed class LibraryTypes
         _ipEndPoint = Type("System.Net.IPEndPoint");
         CancellationToken = Type("System.Threading.CancellationToken");
         CancellationTokenSource = Type("System.Threading.CancellationTokenSource");
+        GrainCancellationTokenOrDefault = TypeOrDefault("Orleans.GrainCancellationToken");
+        RequestBaseOrDefault = TypeOrDefault("Orleans.Runtime.RequestBase");
         _immutableContainerTypes =
         [
                 compilation.GetSpecialType(SpecialType.System_Nullable_T),
@@ -265,6 +267,8 @@ internal sealed class LibraryTypes
     public INamedTypeSymbol CopyContext { get; private set; }
     public INamedTypeSymbol CancellationToken { get; private set; }
     public INamedTypeSymbol CancellationTokenSource { get; }
+    public INamedTypeSymbol? GrainCancellationTokenOrDefault { get; }
+    public INamedTypeSymbol? RequestBaseOrDefault { get; }
     public INamedTypeSymbol Guid { get; private set; }
     public Compilation Compilation { get; private set; }
     public INamedTypeSymbol TimeSpan { get; private set; }
