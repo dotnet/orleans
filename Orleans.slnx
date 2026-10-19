@@ -27,6 +27,9 @@
     <Project Path="playground/DashboardCohosted/DashboardCohosted.csproj" />
     <Project Path="playground/DashboardSeparateHost/DashboardSeparateHost.csproj" />
   </Folder>
+  <Folder Name="/playground/OrderProcessing/">
+    <Project Path="playground/OrderProcessing/OrderProcessing.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Build.props" />
