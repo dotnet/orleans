@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableTasks.Runtime;
@@ -52,10 +53,9 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IReportsStagedChang
     // The serializer of positional reads' arguments and results; without one, reads record values.
     private readonly Serializer? _serializer;
 
-    // The executions whose logs or running attempts hold positional reads, which the barrier holds history for; and the
-    // running attempts which recorded positional reads.
-    private readonly HashSet<TaskId> _positionalTasks = [];
-    private readonly Dictionary<TaskId, DurableTaskAccessLog> _recorders = [];
+    // The running attempts which recorded positional reads, until they close: their records which aren't staged yet hold
+    // positional reads too.
+    private readonly HashSet<DurableTaskAccessLog> _recorders = [];
 
     /// <summary>Creates the access logs of <paramref name="manager"/>'s activation, which journal through it.</summary>
     /// <param name="manager">The manager which journals the logs.</param>
@@ -74,14 +74,34 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IReportsStagedChang
     /// <summary>Gets the journal whose positions the logs' reads can record, or <see langword="null"/>.</summary>
     public JournaledStateManager? Journal { get; }
 
-    /// <summary>
-    /// Gets the number of times the logs forgot which executions hold positional reads: an attempt registers its positional
-    /// reads again in each epoch.
-    /// </summary>
-    public int Epoch { get; private set; }
-
     /// <inheritdoc/>
-    public bool HoldsPositionalReads => _positionalTasks.Count > 0;
+    /// <remarks>
+    /// Derived from the records: a log, or the pending records of an open attempt which recorded positions, holds a
+    /// positional record. An attempt which closes discards its pending records, so they hold nothing from then on.
+    /// </remarks>
+    public bool HoldsPositionalReads
+    {
+        get
+        {
+            foreach (var log in _logs.Values)
+            {
+                if (DurableTaskAccessLog.FindPositionalRecords(log.Records.AsMemory(0, log.Length), []) is not null)
+                {
+                    return true;
+                }
+            }
+
+            foreach (var recorder in _recorders)
+            {
+                if (DurableTaskAccessLog.FindPositionalRecords(recorder.PendingRecords, recorder.PendingStates) is not null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
 
     /// <summary>Creates the access logs of the activation whose services <paramref name="services"/> resolves.</summary>
     public static DurableTaskAccessLogs Create(IServiceProvider services) =>
@@ -131,38 +151,29 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IReportsStagedChang
         _pendingSources.Clear();
     }
 
-    /// <summary>
-    /// Notes that a running attempt of execution <paramref name="taskId"/> recorded a read as of
-    /// <paramref name="position"/>, and holds the barrier; returns the epoch.
-    /// </summary>
+    /// <summary>Notes that the open attempt <paramref name="recorder"/> records positional reads.</summary>
+    /// <remarks>The logs collect and resolve its pending records until it closes or is discarded.</remarks>
+    public void OnRecorderOpened(DurableTaskAccessLog recorder)
+    {
+        Debug.Assert(recorder.IsOpen, "Only an open attempt records.");
+        _recorders.Add(recorder);
+    }
+
+    /// <summary>Holds the journal's barrier for a positional read as of <paramref name="position"/>, unless it holds one.</summary>
     /// <remarks>
     /// The barrier stays while no execution holds positional reads, so executions which come and go journal no barrier
     /// commands; the journal releases an idle barrier before a snapshot.
     /// </remarks>
-    public int OnPositionalRecord(TaskId taskId, DurableTaskAccessLog recorder, long position)
-    {
-        if (_positionalTasks.Add(taskId))
-        {
-            Journal!.Positions.HoldBarrier(StateMachineName, position);
-        }
+    public void OnPositionalRecord(long position) => Journal!.Positions.HoldBarrier(StateMachineName, position);
 
-        _recorders[taskId] = recorder;
-        return Epoch;
-    }
-
-    /// <summary>Notes that a running attempt stopped recording; its staged records stay in its execution's log.</summary>
-    public void OnRecorderClosed(TaskId taskId, DurableTaskAccessLog recorder)
-    {
-        if (_recorders.TryGetValue(taskId, out var current) && ReferenceEquals(current, recorder))
-        {
-            _recorders.Remove(taskId);
-        }
-    }
+    /// <summary>
+    /// Notes that an attempt stopped recording: its pending records are discarded, and its staged records stay in its
+    /// execution's log.
+    /// </summary>
+    public void OnRecorderClosed(DurableTaskAccessLog recorder) => _recorders.Remove(recorder);
 
     public void Remove(TaskId taskId)
     {
-        _recorders.Remove(taskId);
-        _positionalTasks.Remove(taskId);
         if (!_logs.Remove(taskId, out var log))
         {
             return;
@@ -183,9 +194,6 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IReportsStagedChang
         _logs.Clear();
         _appended.Clear();
         _removed.Clear();
-        _recorders.Clear();
-        _positionalTasks.Clear();
-        Epoch++;
         _writer.MarkModified();
     }
 
@@ -196,11 +204,6 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IReportsStagedChang
         _appended.Clear();
         _removed.Clear();
         _cleared = false;
-
-        // The manager resets its barriers with its states.
-        _recorders.Clear();
-        _positionalTasks.Clear();
-        Epoch++;
     }
 
     JournalPositionalReads? IJournalPositionHolder.CollectPositionalReads(long fromPosition)
@@ -211,12 +214,9 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IReportsStagedChang
             Collect(log.Records.AsMemory(0, log.Length), [], fromPosition, ref reads);
         }
 
-        foreach (var recorder in _recorders.Values)
+        foreach (var recorder in _recorders)
         {
-            if (recorder.IsOpen)
-            {
-                Collect(recorder.PendingRecords, recorder.PendingStates, fromPosition, ref reads);
-            }
+            Collect(recorder.PendingRecords, recorder.PendingStates, fromPosition, ref reads);
         }
 
         return reads;
@@ -278,21 +278,14 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IReportsStagedChang
             _writer.MarkModified();
         }
 
-        foreach (var recorder in _recorders.Values)
+        foreach (var recorder in _recorders)
         {
             var pending = recorder.PendingRecords;
-            if (recorder.IsOpen && Rewrite(pending.Span, pending, recorder.PendingStates, resolved, reads) is { } rewritten)
+            if (Rewrite(pending.Span, pending, recorder.PendingStates, resolved, reads) is { } rewritten)
             {
                 recorder.ReplacePendingRecords(rewritten);
             }
         }
-    }
-
-    void IJournalPositionHolder.OnPositionsResolved()
-    {
-        // The manager releases the barrier itself.
-        _positionalTasks.Clear();
-        Epoch++;
     }
 
     // Returns the records with each resolved positional record replaced by a record of its value, or null if none was.

@@ -255,6 +255,70 @@ public sealed class DurableTaskPositionalReadTests
         Assert.False(activation.Manager.Positions.HasBarriers);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AttemptEndedWithoutStagingDoesNotHoldCompactionBack(bool discard)
+    {
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
+        await using var activation = await harness.ActivateAsync();
+        activation.Dictionary["a"] = "x";
+        await activation.Manager.WriteStateAsync(Cancellation);
+        var log = activation.CreateLog();
+        activation.Run(log, static activation => _ = activation.Dictionary["a"]);
+        Assert.NotNull(DurableTaskAccessLog.FindPositionalRecords(log.PendingRecords, log.PendingStates));
+        Assert.True(activation.Manager.Positions.HasBarriers);
+
+        // The attempt ends before a write captures its pending read, its only positional record, which it drops: it
+        // completes, or it stalls and is discarded. A write while it runs would stage the read, which then holds history.
+        if (discard)
+        {
+            log.Discard(static () => new OperationCanceledException());
+        }
+        else
+        {
+            log.Close();
+        }
+
+        harness.Storage.RequestCompaction = true;
+        harness.Storage.Replaces = 0;
+        await activation.Manager.WriteStateAsync(Cancellation);
+        Assert.Equal(1, harness.Storage.Replaces);
+        Assert.False(activation.Manager.Positions.HasBarriers);
+        harness.Storage.RequestCompaction = false;
+    }
+    [Fact]
+    public async Task BarrierDefersBoundedSnapshotsAndEachResolutionStartsANewWindow()
+    {
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
+        await using var activation = await harness.ActivateAsync();
+        activation.Dictionary["a"] = "x";
+        await activation.Manager.WriteStateAsync(Cancellation);
+        harness.Storage.RequestCompaction = true;
+        for (var window = 0; window < 2; window++)
+        {
+            // Each window's execution reads anew, so it holds a new barrier.
+            var execution = TaskId.CreateRoot($"window-{window}");
+            var log = activation.CreateLog(execution);
+            activation.Run(log, static activation => _ = activation.Dictionary["a"]);
+            log.Flush();
+            harness.Storage.Replaces = 0;
+            for (var i = 0; i < JournalPositionTracker.MaxDeferredSnapshots; i++)
+            {
+                await activation.Manager.WriteStateAsync(Cancellation);
+                Assert.Equal(0, harness.Storage.Replaces);
+                Assert.True(activation.Manager.Positions.HasBarriers);
+            }
+
+            await activation.Manager.WriteStateAsync(Cancellation);
+            Assert.Equal(1, harness.Storage.Replaces);
+            Assert.False(activation.Manager.Positions.HasBarriers);
+            Assert.Null(DurableTaskAccessLog.FindPositionalRecords(activation.Storage.GetAccessLog(execution), []));
+            log.Close();
+        }
+
+        harness.Storage.RequestCompaction = false;
+    }
     [Fact]
     public async Task ForcedResolutionFencesWhenAnotherWriterChangedTheJournal()
     {

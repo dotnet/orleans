@@ -117,10 +117,10 @@ internal sealed class DurableTaskAccessLog(
     private readonly TaskScheduler _scheduler = scheduler;
     private readonly Func<DurableTaskDivergenceException, Exception> _diverge = diverge;
 
-    // The holder of positional reads, when the log's reads can record positions of its journal; and the holder's barrier
-    // epoch in which this attempt last registered a positional read.
+    // The holder of positional reads, when the log's reads can record positions of its journal; and whether this attempt
+    // registered its pending records with it.
     private readonly Storage.DurableTaskAccessLogs? _positionHolder = storage.PositionHolder;
-    private int _positionEpoch = -1;
+    private bool _holdsPositions;
 
     // The size of the table of states when the pending records began.
     private int _pendingStateBase;
@@ -274,9 +274,10 @@ internal sealed class DurableTaskAccessLog(
     private void StopRecording()
     {
         // The attempt's pending records are dropped, so it no longer holds positional reads.
-        if (_positionEpoch >= 0)
+        if (_holdsPositions)
         {
-            _positionHolder!.OnRecorderClosed(_taskId, this);
+            _holdsPositions = false;
+            _positionHolder!.OnRecorderClosed(this);
         }
 
         _pending = null;
@@ -987,11 +988,13 @@ internal sealed class DurableTaskAccessLog(
         pending.Advance(length + encoded.WrittenCount);
         ReleaseEncodingBuffer(encoded);
         var holder = _positionHolder!;
-        if (_positionEpoch != holder.Epoch)
+        if (!_holdsPositions)
         {
-            _positionEpoch = holder.OnPositionalRecord(_taskId, this, position);
+            _holdsPositions = true;
+            holder.OnRecorderOpened(this);
         }
 
+        holder.OnPositionalRecord(position);
         AddPending();
         return true;
     }
