@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Messaging.Tests.Support;
@@ -171,10 +171,6 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         Assert.Equal(2, jobs.Count);
         Assert.Equal(earlier, jobs[1].DueTime);
 
-        // Work due later than the earliest wake-up schedules nothing further.
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(22, "last")), later + Delay))).Status);
-        Assert.Equal(2, Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grainId).Count);
-
         // Any other wake-up completes in favour of the earliest one, whose run reschedules for the remaining work.
         Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunDuplicatePumpAsync(receiver)).Status);
         await AssertWakeupAtAsync(receiver, earlier);
@@ -182,6 +178,11 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         await AssertWakeupAtAsync(receiver, later);
         Assert.Equal("earlier", Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Value);
         Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunDuplicatePumpAsync(receiver)).Status);
+
+        // Work due later than the earliest wake-up schedules nothing further.
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, Schedule(CreateEnvelope(receiver, NewMessage(22, "last")), later + Delay))).Status);
+        Assert.Equal(2, Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grainId).Count);
+        await AssertWakeupAtAsync(receiver, later);
     }
 
     [Theory]
@@ -212,15 +213,17 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         await AssertWakeupAtAsync(receiver, deliverAt);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
 
-        // The recovered scheduled message does not count toward MaxCapacity (2).
+        // The recovered scheduled message counts toward MaxCapacity (2).
+        var second = CreateEnvelope(receiver, NewMessage(4, "second"));
         using (var held = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), HeldRoute))
         {
             Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(3, "held"), HeldRoute))).Status);
             await WaitForBarrierAsync(receiver, held);
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(4, "second")))).Status);
-            Assert.Equal(DeliveryStatus.Backpressured, (await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(5, "third")))).Status);
+            Assert.Equal(DeliveryStatus.Backpressured, (await DeliverAsync(receiver, second)).Status);
         }
 
+        Assert.Equal("held", Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Value);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, second)).Status);
         var unscheduled = await Fixture.WaitForEffectCountAsync(receiver, 2);
         Assert.DoesNotContain(unscheduled.Effects, effect => effect.Value == "recovered");
 
@@ -233,44 +236,36 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
     }
 
     [Fact]
-    public async Task ScheduledMessages_DoNotCountTowardCapacityEvenWhenDue()
+    public async Task ScheduledMessages_CountTowardCapacityFromAcceptance()
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
         var deliverAt = JobClock.GetUtcNow() + Delay;
 
-        // MaxCapacity is 2; scheduled messages are admitted beyond it.
-        for (var sequence = 10; sequence < 13; sequence++)
+        // MaxCapacity is 2, and scheduled messages hold capacity while they wait.
+        for (var sequence = 10; sequence < 12; sequence++)
         {
             var scheduled = Schedule(CreateEnvelope(receiver, NewMessage(sequence, $"scheduled-{sequence}")), deliverAt);
             Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, scheduled)).Status);
         }
 
-        var rejected = CreateEnvelope(receiver, NewMessage(22, "backpressured"));
-        using (var held = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), HeldRoute))
-        {
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(20, "held"), HeldRoute))).Status);
-            await WaitForBarrierAsync(receiver, held);
+        var laterScheduled = Schedule(CreateEnvelope(receiver, NewMessage(12, "scheduled-12")), deliverAt);
+        var unscheduled = CreateEnvelope(receiver, NewMessage(20, "unscheduled"));
+        var past = Schedule(CreateEnvelope(receiver, NewMessage(21, "past")), DateTimeOffset.MinValue);
+        Assert.Equal(DeliveryStatus.Backpressured, (await DeliverAsync(receiver, laterScheduled)).Status);
+        Assert.Equal(DeliveryStatus.Backpressured, (await DeliverAsync(receiver, unscheduled)).Status);
+        Assert.Equal(DeliveryStatus.Backpressured, (await DeliverAsync(receiver, past)).Status);
+        Assert.Equal(2, (await receiver.GetSnapshotAsync()).InboxCount);
 
-            // The held pass has not processed the scheduled messages, which are now due and still pending.
-            JobClock.Advance(Delay);
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, CreateEnvelope(receiver, NewMessage(21, "second")))).Status);
-            Assert.Equal(5, (await receiver.GetSnapshotAsync()).InboxCount);
-            Assert.Equal(DeliveryStatus.Backpressured, (await DeliverAsync(receiver, rejected)).Status);
+        JobClock.Advance(Delay);
+        _ = await Fixture.RunPumpAsync(receiver);
+        Assert.Equal(0, (await Fixture.WaitForEffectCountAsync(receiver, 2)).InboxCount);
 
-            // A due scheduled message is still accepted while unscheduled messages fill the inbox.
-            var due = Schedule(CreateEnvelope(receiver, NewMessage(13, "scheduled-13")), JobClock.GetUtcNow());
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, due)).Status);
-            Assert.Equal(6, (await receiver.GetSnapshotAsync()).InboxCount);
-        }
-
-        var completed = await Fixture.WaitForEffectCountAsync(receiver, 6);
-        Assert.Equal(0, completed.InboxCount);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, rejected)).Status);
-        var all = await Fixture.WaitForEffectCountAsync(receiver, 7);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, laterScheduled)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, unscheduled)).Status);
+        var all = await Fixture.WaitForEffectCountAsync(receiver, 4);
         Assert.All(all.Effects, static effect => Assert.Equal(1, effect.Count));
     }
-
     [Fact]
     public async Task ScheduledMessage_RedeliveryCoalescesAndDifferentDeliverAtConflicts()
     {
