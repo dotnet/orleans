@@ -129,6 +129,8 @@ public sealed class MessagingInstrumentTagTests
     [Theory]
     [InlineData("inbox-messages-received", "accepted")]
     [InlineData("inbox-messages-processed", "success")]
+    [InlineData("outbox-messages-sent", null)]
+    [InlineData("outbox-messages-delivered", "duplicate")]
     public void Counters_EmitExactBoundedTags(string instrumentName, string? status)
     {
         using var factory = new TestMeterFactory();
@@ -138,7 +140,9 @@ public sealed class MessagingInstrumentTagTests
         Action emit = instrumentName switch
         {
             "inbox-messages-received" => () => instruments.OnInboxMessageReceived(grainType, status!),
-            _ => () => instruments.OnInboxMessageProcessed(grainType, status!),
+            "inbox-messages-processed" => () => instruments.OnInboxMessageProcessed(grainType, status!),
+            "outbox-messages-sent" => () => instruments.OnOutboxMessageSent(grainType),
+            _ => () => instruments.OnOutboxMessageDelivered(grainType, status!),
         };
         emit();
         var measurement = Assert.Single(probe.Read(instrumentName));
@@ -148,13 +152,16 @@ public sealed class MessagingInstrumentTagTests
 
     [Theory]
     [InlineData("inbox-processing-duration")]
+    [InlineData("outbox-delivery-duration")]
     public void Durations_RecordMillisecondsAndClampNegativeValues(string instrumentName)
     {
         using var factory = new TestMeterFactory();
         var instruments = new Orleans.Messaging.MessagingInstruments(new OrleansInstruments(factory));
         using var probe = new MessageMetricListener(factory.Meter);
         const string grainType = "instrument-test";
-        Action<TimeSpan> record = duration => instruments.OnInboxProcessingDuration(duration, grainType);
+        Action<TimeSpan> record = instrumentName == "inbox-processing-duration"
+            ? duration => instruments.OnInboxProcessingDuration(duration, grainType)
+            : duration => instruments.OnOutboxDeliveryDuration(duration, grainType);
         record(TimeSpan.FromMilliseconds(12.5));
         record(TimeSpan.FromMilliseconds(-10));
         var values = probe.Read(instrumentName);
@@ -177,9 +184,12 @@ public sealed class MessagingInstrumentTagTests
         instruments.OnInboxDepthChanged("instrument-test", 3);
         instruments.OnInboxDepthChanged("instrument-test", 0);
         instruments.OnInboxDepthChanged("instrument-test", -1);
+        instruments.OnOutboxDepthChanged("instrument-test", 4);
         var inboxDepth = probe.Read("inbox-depth");
+        var outboxDepth = Assert.Single(probe.Read("outbox-depth"));
         Assert.Equal([3d, -1d], inboxDepth.Select(static row => row.Value));
-        Assert.All(inboxDepth, row =>
+        Assert.Equal(4, outboxDepth.Value);
+        Assert.All(inboxDepth.Append(outboxDepth), row =>
         {
             Assert.Null(row.Unit);
             Assert.Equal(new[] { new KeyValuePair<string, object?>("grain_type", "instrument-test") }, row.Tags);

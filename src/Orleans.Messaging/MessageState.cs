@@ -20,11 +20,48 @@ internal sealed class InboxMessageState
     public DateTimeOffset? ExpirationTime { get; set; }
 }
 
+[GenerateSerializer, Alias("Orleans.Messaging.OutboxMessageState")]
+internal sealed class OutboxMessageState
+{
+    [Id(0)]
+    public int AttemptCount { get; set; }
+
+    [Id(1)]
+    public DateTimeOffset? NextAttemptAt { get; set; }
+
+    [Id(2)]
+    public string? LastError { get; set; }
+
+    /// <summary>
+    /// Gets or sets when the outbox stops attempting the message and dead-letters it, on the Durable Jobs clock:
+    /// <c>OutboxRetryTimeout</c> after the send, or after the start of the latest attempt which the receiver answered with
+    /// <see cref="DeliveryStatus.Backpressured"/>.
+    /// </summary>
+    [Id(3)]
+    public DateTimeOffset? ExpirationTime { get; set; }
+}
+
 [GenerateSerializer, Alias("Orleans.Messaging.InboxDeadLetter")]
 internal sealed class InboxDeadLetter
 {
     [Id(0)]
     public required InboxMessage Message { get; init; }
+
+    [Id(1)]
+    public required DateTimeOffset DeadLetteredAt { get; init; }
+
+    [Id(2)]
+    public required string Reason { get; init; }
+
+    [Id(3)]
+    public int AttemptCount { get; init; }
+}
+
+[GenerateSerializer, Alias("Orleans.Messaging.OutboxDeadLetterRecord")]
+internal sealed class OutboxDeadLetterRecord
+{
+    [Id(0)]
+    public required OutboxMessage Message { get; init; }
 
     [Id(1)]
     public required DateTimeOffset DeadLetteredAt { get; init; }

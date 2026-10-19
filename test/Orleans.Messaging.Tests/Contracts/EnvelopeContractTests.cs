@@ -171,13 +171,15 @@ public sealed class EnvelopeContractTests
     [InlineData("InboxMessage")]
     [InlineData("OutboxMessage")]
     [InlineData("InboxDeadLetter")]
+    [InlineData("OutboxDeadLetter")]
+    [InlineData("OutboxDeadLetterRecord")]
     public void MessageAndDeadLetterCopyPreservesMetadataAndIsolation(string kind)
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var envelope = Create([0, 255]) with { Subject = "subject.v1", Headers = new() { ["custom"] = "value"u8.ToArray() } };
         object value = kind.StartsWith("Inbox", StringComparison.Ordinal) ? new InboxMessage { Envelope = envelope, SentAt = SentAt }
             : new OutboxMessage { Envelope = envelope, ReceiverId = Receiver };
-        if (kind.EndsWith("DeadLetter", StringComparison.Ordinal))
+        if (kind.Contains("DeadLetter", StringComparison.Ordinal))
         {
             var type = typeof(Envelope).Assembly.GetType("Orleans.Messaging." + kind, true)!;
             var record = Activator.CreateInstance(type)!;
@@ -191,7 +193,7 @@ public sealed class EnvelopeContractTests
         foreach (var result in new[] { serializer.Deserialize<object>(serializer.SerializeToArray(value)), services.GetRequiredService<DeepCopier>().Copy(value) })
         {
             Assert.NotNull(result);
-            var message = kind.EndsWith("DeadLetter", StringComparison.Ordinal) ? result.GetType().GetProperty("Message")!.GetValue(result)! : result;
+            var message = kind.Contains("DeadLetter", StringComparison.Ordinal) ? result.GetType().GetProperty("Message")!.GetValue(result)! : result;
             var actual = message is InboxMessage incoming ? incoming.Envelope : Assert.IsType<OutboxMessage>(message).Envelope;
             Assert.Equal(new byte[] { 0, 255 }, actual.Payload);
             Assert.NotSame(envelope.Payload, actual.Payload);
@@ -202,7 +204,7 @@ public sealed class EnvelopeContractTests
             Assert.NotSame(envelope.Headers!["custom"], actual.Headers["custom"]);
             if (message is OutboxMessage outgoing) Assert.Equal(Receiver, outgoing.ReceiverId);
             if (message is InboxMessage received) Assert.Equal(SentAt, received.SentAt);
-            if (kind.EndsWith("DeadLetter", StringComparison.Ordinal)) Assert.Equal(3, result.GetType().GetProperty("AttemptCount")!.GetValue(result));
+            if (kind.Contains("DeadLetter", StringComparison.Ordinal)) Assert.Equal(3, result.GetType().GetProperty("AttemptCount")!.GetValue(result));
         }
     }
 
