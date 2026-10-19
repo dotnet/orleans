@@ -17,8 +17,8 @@ namespace Orleans.DurableTasks.Analyzers.Tests;
 /// verifies code fixes for them.
 /// </summary>
 /// <remarks>
-/// The source compiles against <see cref="DurableTaskStubs"/>, which declares the durable task programming model by the
-/// metadata names which the analyzers match, so the tests don't depend on the abstractions assembly's version.
+/// The source compiles against the shipped durable task abstractions, Orleans, and journaling assemblies which this test
+/// assembly references, so the analyzers bind the real overloads and an API change which disables a rule fails a test.
 /// </remarks>
 internal static partial class AnalyzerVerifier
 {
@@ -29,19 +29,23 @@ internal static partial class AnalyzerVerifier
         using System.Threading;
         using System.Threading.Tasks;
         using Microsoft.Extensions.Logging;
+        using Orleans;
         using Orleans.DurableTasks;
         using Orleans.Journaling;
 
         """;
 
-    /// <summary>The framework and logging assemblies which test sources compile against.</summary>
+    /// <summary>The framework, Orleans, and logging assemblies which test sources compile against.</summary>
     internal static readonly ImmutableArray<MetadataReference> References =
     [
         .. ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)
-            .Where(static path => Path.GetFileName(path).StartsWith("System.", StringComparison.Ordinal) || Path.GetFileName(path) is "mscorlib.dll" or "netstandard.dll")
+            .Where(static path => Path.GetFileName(path) is var name
+                && (name.StartsWith("System.", StringComparison.Ordinal)
+                    || name.StartsWith("Microsoft.Extensions.", StringComparison.Ordinal)
+                    || (name.StartsWith("Orleans.", StringComparison.Ordinal) && !name.StartsWith("Orleans.DurableTasks.Analyzers", StringComparison.Ordinal))
+                    || name is "mscorlib.dll" or "netstandard.dll"))
             .Select(static path => MetadataReference.CreateFromFile(path)),
-        MetadataReference.CreateFromFile(typeof(ILogger).Assembly.Location),
     ];
 
     private static readonly ImmutableArray<DiagnosticAnalyzer> Analyzers =
@@ -114,11 +118,14 @@ internal static partial class AnalyzerVerifier
                 "Test",
                 "Test",
                 LanguageNames.CSharp,
-                compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable),
+                compilationOptions: new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary,
+                    nullableContextOptions: NullableContextOptions.Enable,
+                    // Journaled state is experimental.
+                    specificDiagnosticOptions: [new("ORLEANSEXP005", ReportDiagnostic.Suppress)]),
                 parseOptions: new CSharpParseOptions(LanguageVersion.Preview),
                 metadataReferences: References))
-            .AddDocument(DocumentId.CreateNewId(projectId), "Test.cs", text, filePath: "Test.cs")
-            .AddDocument(DocumentId.CreateNewId(projectId), "Stubs.cs", DurableTaskStubs.Source, filePath: "Stubs.cs");
+            .AddDocument(DocumentId.CreateNewId(projectId), "Test.cs", text, filePath: "Test.cs");
         return solution.GetProject(projectId)!;
     }
 
