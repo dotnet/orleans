@@ -103,21 +103,20 @@ public class DurableTaskCancellationReasonTests
         await typed.CancelAsync(reason: null, TestCancellation);
         await scheduled.CancelAsync(TestCancellation);
 
+        // A request without a reason reaches the host as a null reason, through the host's one cancellation operation.
         Assert.Equal(
-            new (string?, CancellationToken)[] { ("buyer", wait.Token), (null, TestCancellation) },
+            new (string?, CancellationToken)[] { ("buyer", wait.Token), (null, TestCancellation), (null, TestCancellation) },
             handle.Reasons);
-        Assert.Equal(1, handle.CancelCount);
     }
 
     [Fact]
-    public async Task HostWithoutReasonsCancelsWithoutTheReason()
+    public async Task HandleCancellationWithoutAReasonCarriesANullReason()
     {
-        var handle = new CancelOnlyHandle(TaskId.CreateRoot("root"));
-        var scheduled = await new RootDefinition(handle).WithId("root").ScheduleAsync(TestCancellation);
+        IScheduledTaskHandle handle = new ReasonRecordingHandle(TaskId.CreateRoot("root"));
 
-        await scheduled.CancelAsync("buyer", TestCancellation);
+        await handle.CancelAsync(TestCancellation);
 
-        Assert.Equal(1, handle.CancelCount);
+        Assert.Equal([(null, TestCancellation)], ((ReasonRecordingHandle)handle).Reasons);
     }
 
     private sealed class RootDefinition(IScheduledTaskHandle handle) : DurableTask, ISchedulableTask
@@ -142,9 +141,9 @@ public class DurableTaskCancellationReasonTests
             => throw new NotSupportedException();
     }
 
-    private class CancelOnlyHandle(TaskId taskId) : IScheduledTaskHandle
+    private sealed class ReasonRecordingHandle(TaskId taskId) : IScheduledTaskHandle
     {
-        public int CancelCount { get; private set; }
+        public List<(string? Reason, CancellationToken CancellationToken)> Reasons { get; } = [];
 
         public TaskId TaskId => taskId;
 
@@ -153,18 +152,7 @@ public class DurableTaskCancellationReasonTests
         public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
             => new(DurableTaskResponse.Pending);
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken)
-        {
-            CancelCount++;
-            return ValueTask.CompletedTask;
-        }
-    }
-
-    private sealed class ReasonRecordingHandle(TaskId taskId) : CancelOnlyHandle(taskId), IScheduledTaskHandle
-    {
-        public List<(string? Reason, CancellationToken CancellationToken)> Reasons { get; } = [];
-
-        ValueTask IScheduledTaskHandle.CancelAsync(string? reason, CancellationToken cancellationToken)
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
         {
             Reasons.Add((reason, cancellationToken));
             return ValueTask.CompletedTask;

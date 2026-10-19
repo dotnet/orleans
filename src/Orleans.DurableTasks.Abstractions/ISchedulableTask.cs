@@ -62,14 +62,13 @@ public interface IScheduledTaskHandle
     ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Durably requests task cancellation. The request is monotonic and idempotent. The token abandons
+    /// Durably requests task cancellation without a reason. The request is monotonic and idempotent. The token abandons
     /// waiting for acknowledgement.
     /// </summary>
     /// <remarks>
-    /// The operation completes once the host has durably recorded the request; the task's response reports the outcome.
-    /// A running task observes the request through its durable cancellation token and decides its own outcome.
+    /// The request is <see cref="CancelAsync(string, CancellationToken)"/> with a <see langword="null"/> reason.
     /// </remarks>
-    ValueTask CancelAsync(CancellationToken cancellationToken);
+    ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
 
     /// <summary>
     /// Durably requests task cancellation carrying <paramref name="reason"/>. The request is monotonic and idempotent.
@@ -81,11 +80,11 @@ public interface IScheduledTaskHandle
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
     /// <remarks>
-    /// The first request determines the reason, and the host retains it with the task's cancellation. Hosts which don't
-    /// record reasons keep this default implementation, which requests cancellation through
-    /// <see cref="CancelAsync(CancellationToken)"/> without the reason.
+    /// The operation completes once the host has durably recorded the request; the task's response reports the outcome.
+    /// A running task observes the request through its durable cancellation token and decides its own outcome. The first
+    /// request determines the reason, and the host retains it with the task's cancellation.
     /// </remarks>
-    ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => CancelAsync(cancellationToken);
+    ValueTask CancelAsync(string? reason, CancellationToken cancellationToken);
 
     /// <summary>
     /// Administratively aborts the task: the host terminalizes it and its attached descendants as failed with
