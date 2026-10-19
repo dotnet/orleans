@@ -41,7 +41,7 @@ internal abstract class JournaledStateContext
         JournaledStateOperation operation,
         TState state,
         Func<TState, TResult> read)
-        => Access(new(target, JournaledStateAccessKind.Read, operation), state, read);
+        => Access(new(target, JournaledStateAccessKind.Read, operation), state, read, apply: null);
 
     /// <summary>Changes <paramref name="target"/> through this context and returns the change's result.</summary>
     public TResult Write<TState, TResult>(
@@ -49,7 +49,24 @@ internal abstract class JournaledStateContext
         JournaledStateOperation operation,
         TState state,
         Func<TState, TResult> write)
-        => Access(new(target, JournaledStateAccessKind.Write, operation), state, write);
+        => Access(new(target, JournaledStateAccessKind.Write, operation), state, write, apply: null);
+
+    /// <summary>
+    /// Changes <paramref name="target"/> through this context with a change whose result <paramref name="observe"/>
+    /// determines from the state before <paramref name="apply"/> changes it, such as the item which a dequeue removes, and
+    /// returns the result.
+    /// </summary>
+    /// <remarks>
+    /// A context which records the result does so before the change applies, so a result which it can't record, such as a
+    /// value without a codec, fails the change and leaves the state unchanged.
+    /// </remarks>
+    public TResult Write<TState, TResult>(
+        JournaledStateAccessTarget target,
+        JournaledStateOperation operation,
+        TState state,
+        Func<TState, TResult> observe,
+        Action<TState, TResult> apply)
+        => Access(new(target, JournaledStateAccessKind.Write, operation), state, observe, apply);
 
     /// <summary>Changes <paramref name="target"/> through this context.</summary>
     public void Write<TState>(
@@ -64,16 +81,28 @@ internal abstract class JournaledStateContext
             {
                 state.Write(state.State);
                 return default(JournaledStateAccessNoResult);
-            });
+            },
+            apply: null);
 
     /// <summary>
     /// Runs <paramref name="operation"/> against the state which <paramref name="access"/> describes, or supplies its
     /// outcome without running it: a result, or an exception which this throws.
     /// </summary>
+    /// <param name="access">The access.</param>
+    /// <param name="state">The state which <paramref name="operation"/> and <paramref name="apply"/> take.</param>
+    /// <param name="operation">
+    /// Runs the access and returns its result; when <paramref name="apply"/> is supplied, determines the result of the
+    /// change which <paramref name="apply"/> makes, without changing the state.
+    /// </param>
+    /// <param name="apply">Makes the change whose result <paramref name="operation"/> returned, or <see langword="null"/>.</param>
     /// <remarks>
     /// <typeparamref name="TResult"/> is <see cref="JournaledStateAccessNoResult"/> for a write which returns nothing.
     /// </remarks>
-    protected abstract TResult Access<TState, TResult>(in JournaledStateAccess access, TState state, Func<TState, TResult> operation);
+    protected abstract TResult Access<TState, TResult>(
+        in JournaledStateAccess access,
+        TState state,
+        Func<TState, TResult> operation,
+        Action<TState, TResult>? apply);
 }
 
 /// <summary>Supplies the <see cref="JournaledStateContext"/> of the states of one manager.</summary>
