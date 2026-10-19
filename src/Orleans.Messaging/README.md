@@ -213,7 +213,11 @@ outcome and follow-up work have the lifetime the application gives them.
 Each activation runs one messaging pump on its scheduler, processing inbox batches.
 One durable job per grain wakes the pump while the inbox or a registered work source
 holds work. Journaled state determines which messages are due, so each wake-up
-processes exactly the ready work.
+processes exactly the ready work. A live activation processes due work as soon as it is
+durable; the job covers a failed activation, so work that is already due resumes within
+about a second of recovery. The job retries indefinitely with backoff while activation
+fails, and every activation re-arms it from recovered state, so committed work always
+keeps a wake-up.
 
 ## State
 
