@@ -17,9 +17,9 @@ namespace Orleans.Journaling;
 /// a log's stream, run against the state directly.
 /// </para>
 /// <para>
-/// An operation which runs within another operation of the same context, such as the removal which
-/// <c>IList{T}.Remove</c> performs through <c>RemoveAt</c>, belongs to the outer operation: a provider supplies no context
-/// while its context runs an operation.
+/// An operation which runs within another operation of the same context, such as an access which a comparer or an
+/// enumerated source makes while a collection operation runs, belongs to the outer operation: a provider supplies no
+/// context while its context runs an operation.
 /// </para>
 /// </remarks>
 internal abstract class JournaledStateContext
@@ -29,7 +29,7 @@ internal abstract class JournaledStateContext
     /// <param name="context">The context, or <see langword="null"/>.</param>
     /// <returns><see langword="true"/> when an access runs through <paramref name="context"/>.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool TryGetCurrent(JournaledStateAccessTarget? target, [NotNullWhen(true)] out JournaledStateContext? context)
+    public static bool TryGetCurrent([NotNullWhen(true)] JournaledStateAccessTarget? target, [NotNullWhen(true)] out JournaledStateContext? context)
     {
         context = target?.Manager is { HostAccessDepth: 0 } manager ? manager.ContextProvider?.Current : null;
         return context is not null;
