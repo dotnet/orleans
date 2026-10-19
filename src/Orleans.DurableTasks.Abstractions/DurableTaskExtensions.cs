@@ -49,6 +49,12 @@ public static partial class DurableTaskExtensions
     /// replay, reaches the same task. <see cref="Detached(DurableTask, string)"/> supplies a root identifier which other
     /// parties know in advance.
     /// </para>
+    /// <para>
+    /// A detached task's definition is one which a host starts as a root task, an <see cref="ISchedulableTask"/> such as a
+    /// durable grain call, because its host stores and runs it on its own. Steps, <c>async DurableTask</c> methods, and
+    /// combinators run as part of the execution which starts them, and starting one detached throws
+    /// <see cref="InvalidOperationException"/> (ORLEANS0228).
+    /// </para>
     /// <para>Outside a durable execution, every task is already a root task, so the configuration is unchanged.</para>
     /// </remarks>
     public static ConfiguredDurableTask Detached(this DurableTask task) => new ConfiguredDurableTask(task).Detached();
@@ -64,7 +70,8 @@ public static partial class DurableTaskExtensions
     /// The task relates to the starting execution as <see cref="Detached(DurableTask)"/> describes, under the root
     /// identifier <paramref name="rootId"/>, which other parties address, for example with <c>GetDurableTask</c>. Every start
     /// of <paramref name="rootId"/> on the task's host, from any execution or caller, including a replay, reaches the same
-    /// task, so the identifier names the task globally, such as <c>place-order-42</c>.
+    /// task, so the identifier names the task globally, such as <c>place-order-42</c>. The definition is one which a host
+    /// starts as a root task, as <see cref="Detached(DurableTask)"/> describes.
     /// </para>
     /// <para>Outside a durable execution, the task is the root task <paramref name="rootId"/>.</para>
     /// </remarks>

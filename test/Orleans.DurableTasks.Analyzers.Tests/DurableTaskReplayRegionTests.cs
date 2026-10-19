@@ -82,7 +82,7 @@ public class DurableTaskReplayRegionTests
             }
 
             private static void Record(string buyerId, int summary) =>
-                DurableTask.FromResult(summary).Detached().WithId($"buyer-{buyerId}-v{summary}").Post();
+                Step(summary).Detached($"buyer-{buyerId}-v{summary}").Post();
 
             private static DurableTask<bool> Reserve(int line) => DurableTask.FromResult(line > 0);
         }

@@ -367,6 +367,12 @@ internal sealed class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, 
 /// </remarks>
 internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
 {
+    private const string DetachedDefinitionMessage =
+        "A detached task is an independent root task, which its host stores and runs on its own, so its definition is "
+        + "one which a host starts as a root task, such as a durable grain call. A step, an async DurableTask method, "
+        + "or a combinator runs as part of the execution which starts it: start it attached, or call a grain whose "
+        + "durable method runs it (ORLEANS0228).";
+
     // An explicit identifier: a verbatim root identifier which Detached(string) supplies, or a combinator input's identifier.
     private readonly TaskId _taskId;
     private readonly string? _name;
@@ -451,8 +457,14 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
     }
 
     /// <summary>Allocates the identifier under which the task starts.</summary>
+    /// <exception cref="InvalidOperationException">A detached task's definition isn't one which a host starts as a root task.</exception>
     private TaskId CreateId()
     {
+        if (_detached && ParentContext is not null && Task is not ISchedulableTask)
+        {
+            throw new InvalidOperationException(DetachedDefinitionMessage);
+        }
+
         if (!_taskId.IsDefault)
         {
             return _taskId;

@@ -10,7 +10,8 @@ public enum DurableTaskStartOptions
 
     /// <summary>
     /// The task is an independent root task, which the starting execution observes as a subscriber. No cancellation,
-    /// abort, or deletion of the starting execution reaches it.
+    /// abort, or deletion of the starting execution reaches it. Its definition is an <see cref="ISchedulableTask"/>, which
+    /// the host starts as a root task.
     /// </summary>
     Detached = 1,
 

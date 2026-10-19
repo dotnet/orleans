@@ -50,3 +50,14 @@ public interface IOrderWorkflows
 {
     DurableTask<OrderResult> PlaceOrderAsync(Guid orderId);
 }
+
+// Stand in for grain interfaces whose durable methods return DurableTask, which a detached start runs as a root task.
+public interface ICustomerSurveys
+{
+    DurableTask SendSurveyAsync(string customer);
+}
+
+public interface IStudentMail
+{
+    DurableTask<bool> WelcomeAsync(string student, int seat);
+}

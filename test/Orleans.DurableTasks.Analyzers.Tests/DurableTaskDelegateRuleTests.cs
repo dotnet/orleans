@@ -30,7 +30,7 @@ public class DurableTaskDelegateRuleTests
                 await DurableTask.Run(_ => FetchAsync()).WithId("returns-task");
                 var reusable = DurableTask.Run(_ => 3);
                 await reusable.WithId("reusable");
-                await DurableTask.Run(_ => 4).Detached().WithId("detached");
+                await DurableTask.Run(_ => 4).{|ORLEANS0228:Detached|}().WithId("detached");
                 var handle = await DurableTask.Run(_ => 5).WithId("scheduled").ScheduleAsync();
                 return await handle;
             }
