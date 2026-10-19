@@ -12,7 +12,7 @@ namespace Microsoft.AspNetCore.Builder
     {
         public static IEndpointConventionBuilder MapDurableSignal<T>(this Routing.IEndpointRouteBuilder endpoints, Orleans.DurableTasks.DurableSignal<T> signal) { throw null; }
 
-        public static Routing.RouteGroupBuilder WithDurableOperations(this Routing.RouteGroupBuilder group, string? scope = null) { throw null; }
+        public static Routing.RouteGroupBuilder WithDurableOperations(this Routing.RouteGroupBuilder group, string scope) { throw null; }
     }
 
     public static partial class NexusEndpointRouteBuilderExtensions
@@ -47,9 +47,8 @@ namespace Orleans.DurableTasks.Http
     [GenerateSerializer]
     [Immutable]
     [Alias("Orleans.DurableTasks.Http.DurableCallback")]
-    public sealed partial record DurableCallback(DurableCallbackProtocol Protocol, Orleans.Runtime.GrainId Operation, string OperationId, System.Uri Url, System.Collections.Generic.SortedDictionary<string, string> Headers, string? OperationLocation)
+    public sealed partial record DurableCallback(DurableCallbackProtocol Protocol, Orleans.Runtime.GrainId OperationHost, string OperationId, System.Uri Url, System.Collections.Generic.IReadOnlyDictionary<string, string> Headers, string? OperationLocation)
     {
-        public string GetCallbackId() { throw null; }
     }
 
     [GenerateSerializer]
@@ -62,11 +61,15 @@ namespace Orleans.DurableTasks.Http
     public sealed partial class DurableCallbackOptions
     {
         public const string HttpClientName = "Orleans.DurableTasks.Http.Callbacks";
+        public System.Func<System.Net.IPAddress, bool>? AllowAddress { get { throw null; } set { } }
+
         public System.TimeSpan InitialRetryInterval { get { throw null; } set { } }
 
         public System.TimeSpan MaxRetryInterval { get { throw null; } set { } }
 
         public System.TimeSpan RetryTimeout { get { throw null; } set { } }
+
+        public static bool IsPublicAddress(System.Net.IPAddress address) { throw null; }
     }
 
     [GenerateSerializer]
@@ -83,7 +86,13 @@ namespace Orleans.DurableTasks.Http
 
     public sealed partial class DurableHttpClientOptions
     {
+        public System.Func<System.Uri, System.Uri, bool> FollowOperationLocation { get { throw null; } set { } }
+
+        public long MaxResponseContentLength { get { throw null; } set { } }
+
         public System.Text.Json.JsonSerializerOptions SerializerOptions { get { throw null; } set { } }
+
+        public static bool IsSameOrigin(System.Uri requestUri, System.Uri location) { throw null; }
     }
 
     public static partial class DurableHttpHeaders
@@ -117,6 +126,8 @@ namespace Orleans.DurableTasks.Http
 
     public sealed partial record DurableHttpOperationOptions()
     {
+        public System.TimeSpan MaxPollInterval { get { throw null; } init { } }
+
         public DurableHttpWaitMode Mode { get { throw null; } init { } }
 
         public System.TimeSpan PollInterval { get { throw null; } init { } }
@@ -130,7 +141,7 @@ namespace Orleans.DurableTasks.Http
 
         public System.Func<System.Exception, DurableOperationError> CreateError { get { throw null; } set { } }
 
-        public System.Func<Microsoft.AspNetCore.Http.HttpContext, string, string> MapOperationId { get { throw null; } set { } }
+        public System.Func<Microsoft.AspNetCore.Http.HttpContext, string?> GetCallerScope { get { throw null; } set { } }
 
         public System.TimeSpan MaxWait { get { throw null; } set { } }
 
@@ -139,6 +150,8 @@ namespace Orleans.DurableTasks.Http
         public System.TimeSpan RetryAfter { get { throw null; } set { } }
 
         public static DurableOperationError DefaultCreateError(System.Exception exception) { throw null; }
+
+        public static string? DefaultGetCallerScope(Microsoft.AspNetCore.Http.HttpContext context) { throw null; }
     }
 
     [GenerateSerializer]
@@ -188,6 +201,7 @@ namespace Orleans.DurableTasks.Http
     [Alias("Orleans.DurableTasks.Http.DurableOperationError")]
     public sealed partial record DurableOperationError(string Code, string Message)
     {
+        public const string NotStartedCode = "NotStarted";
     }
 
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<DurableOperationStatus>))]

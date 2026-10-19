@@ -99,10 +99,16 @@ public sealed record DurableHttpOperationOptions
     public DurableHttpWaitMode Mode { get; init; }
 
     /// <summary>
-    /// Gets the interval between polls of a running operation whose response doesn't advertise one with
-    /// <c>Retry-After</c>. The default is five seconds.
+    /// Gets the shortest interval between polls of a running operation, which applies when a response doesn't advertise
+    /// a longer one with <c>Retry-After</c>. The default is five seconds.
     /// </summary>
     public TimeSpan PollInterval { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Gets the longest interval between polls, which bounds a response's <c>Retry-After</c>. The default is one minute,
+    /// and an interval shorter than <see cref="PollInterval"/> applies as <see cref="PollInterval"/>.
+    /// </summary>
+    public TimeSpan MaxPollInterval { get; init; } = TimeSpan.FromMinutes(1);
 
     /// <summary>
     /// Gets the wait which each poll requests with a <c>Prefer: wait</c> header, so a server which long-polls answers once
@@ -114,19 +120,52 @@ public sealed record DurableHttpOperationOptions
 /// <summary>Configures an <see cref="IDurableHttpClient"/>.</summary>
 public sealed class DurableHttpClientOptions
 {
+    /// <summary>The options which read responses for callers which don't pass their own; no caller configures them.</summary>
     internal static JsonSerializerOptions WebSerializerOptions { get; } = new Microsoft.AspNetCore.Http.Json.JsonOptions().SerializerOptions;
 
     /// <summary>
-    /// Gets or sets the options which serialize request values and deserialize results. The default is ASP.NET Core's
-    /// Minimal API JSON options: <see cref="JsonSerializerDefaults.Web"/>, which serialize by reflection where the
-    /// application allows it.
+    /// Gets or sets the options which serialize request values and deserialize results. The default is a new instance of
+    /// ASP.NET Core's Minimal API JSON options for each client: <see cref="JsonSerializerDefaults.Web"/>, which serialize
+    /// by reflection where the application allows it.
     /// </summary>
     /// <remarks>
     /// The client resolves each type's contract from the options' <see cref="JsonSerializerOptions.TypeInfoResolver"/>. A
     /// trimmed or NativeAOT application sets options whose resolver, such as a source-generated
     /// <see cref="System.Text.Json.Serialization.JsonSerializerContext"/>, handles its request and result types.
     /// </remarks>
-    public JsonSerializerOptions SerializerOptions { get; set; } = WebSerializerOptions;
+    public JsonSerializerOptions SerializerOptions { get; set; } = new Microsoft.AspNetCore.Http.Json.JsonOptions().SerializerOptions;
+
+    /// <summary>
+    /// Gets or sets the largest response content, in bytes, which a step reads and records. The default is one mebibyte.
+    /// </summary>
+    /// <remarks>
+    /// A task records each response, so the limit keeps a response from exceeding what its journal stores in one entry. A
+    /// larger response fails its step with an <see cref="HttpRequestException"/>, which the task records like any failure.
+    /// </remarks>
+    public long MaxResponseContentLength { get; set; } = 1024 * 1024;
+
+    /// <summary>
+    /// Gets or sets the function which decides whether the client follows the URL which a start response locates its
+    /// operation at, given the start request's URL and the operation's location.
+    /// </summary>
+    /// <remarks>
+    /// The client sends its polls, cancellations, and signals, with its handlers' credentials, to the operation's location.
+    /// The default follows locations of the start request's origin, its scheme, host, and port, only, so a server can't
+    /// direct those requests at another one. A location which the function declines fails the start with an
+    /// <see cref="HttpRequestException"/>.
+    /// </remarks>
+    public Func<Uri, Uri, bool> FollowOperationLocation { get; set; } = IsSameOrigin;
+
+    /// <summary>Returns whether <paramref name="location"/> has the scheme, host, and port of <paramref name="requestUri"/>.</summary>
+    /// <param name="requestUri">The URL of the request which started the operation.</param>
+    /// <param name="location">The operation's location.</param>
+    /// <returns><see langword="true"/> when both URLs have one origin.</returns>
+    public static bool IsSameOrigin(Uri requestUri, Uri location)
+    {
+        ArgumentNullException.ThrowIfNull(requestUri);
+        ArgumentNullException.ThrowIfNull(location);
+        return Uri.Compare(requestUri, location, UriComponents.SchemeAndServer, UriFormat.SafeUnescaped, StringComparison.OrdinalIgnoreCase) == 0;
+    }
 }
 
 /// <summary>Represents an HTTP operation which failed or was canceled.</summary>

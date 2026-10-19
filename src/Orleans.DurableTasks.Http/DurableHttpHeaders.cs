@@ -7,8 +7,9 @@ public static class DurableHttpHeaders
     /// The request header which identifies a request to start an operation, so retries of the request start it once.
     /// </summary>
     /// <remarks>
-    /// The value follows Stripe and the IETF <c>Idempotency-Key</c> draft: up to 255 printable ASCII characters, sent
-    /// bare or as a quoted structured-field string.
+    /// The value follows Stripe and the IETF <c>Idempotency-Key</c> draft: 1 to 255 printable ASCII characters, sent
+    /// bare or as a quoted structured-field string. The key is the operation's identifier, a URL path segment, so it has
+    /// no <c>/</c> and isn't <c>.</c> or <c>..</c>.
     /// </remarks>
     public const string IdempotencyKey = "Idempotency-Key";
 

@@ -10,8 +10,9 @@ namespace Orleans.DurableTasks.Http;
 /// <param name="Headers">The response's headers and content headers, whose names compare case-insensitively.</param>
 /// <param name="Content">The response's content.</param>
 /// <remarks>
-/// The task records the whole response, so replays read it without sending the request again. It suits API responses;
-/// stream large content within a step of the task instead.
+/// The task records the response, so replays read it without sending the request again. It suits API responses, up to
+/// <see cref="DurableHttpClientOptions.MaxResponseContentLength"/>; stream large content within a step of the task instead.
+/// The record omits <c>Set-Cookie</c> headers, which carry the server's credentials for the client.
 /// </remarks>
 [GenerateSerializer, Immutable]
 [Alias("Orleans.DurableTasks.Http.DurableHttpResponse")]
@@ -54,7 +55,10 @@ public sealed record DurableHttpResponse(
         var headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, values) in response.Headers.NonValidated)
         {
-            headers[name] = [.. values];
+            if (!name.Equals("Set-Cookie", StringComparison.OrdinalIgnoreCase) && !name.Equals("Set-Cookie2", StringComparison.OrdinalIgnoreCase))
+            {
+                headers[name] = [.. values];
+            }
         }
 
         foreach (var (name, values) in response.Content.Headers.NonValidated)

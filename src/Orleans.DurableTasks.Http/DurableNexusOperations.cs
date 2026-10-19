@@ -30,7 +30,7 @@ internal sealed class DurableNexusOperations(
             return NexusProtocol.HandlerError(
                 StatusCodes.Status400BadRequest,
                 "BAD_REQUEST",
-                $"A Nexus-Request-Id has 1 to {DurableHttpRequestHeaders.MaxIdempotencyKeyLength} printable ASCII characters other than '/'.");
+                $"A Nexus-Request-Id has 1 to {DurableHttpRequestHeaders.MaxIdempotencyKeyLength} printable ASCII characters other than '/', and isn't '.' or '..'.");
         }
 
 
@@ -45,7 +45,7 @@ internal sealed class DurableNexusOperations(
         }
 
         DurableTaskResponse response;
-        var key = NexusServiceMetadata.Get(context).GetKey(_options.MapOperationId(context, operationId));
+        var key = NexusServiceMetadata.Get(context).GetKey(context, _options, operationId);
         try
         {
             response = await operations.StartAsync(key, work, TimeSpan.Zero, context.RequestAborted);
@@ -57,12 +57,9 @@ internal sealed class DurableNexusOperations(
                 "CONFLICT",
                 "The Nexus-Request-Id identifies an operation which another request started.");
         }
-        catch (Exception exception) when (exception is DurableTaskRejectedException or DurableTaskDeliveryException)
+        catch (DurableOperationUnavailableException)
         {
-            return NexusProtocol.HandlerError(
-                StatusCodes.Status503ServiceUnavailable,
-                "UNAVAILABLE",
-                "The grain which runs the operation didn't accept it.");
+            return Unavailable();
         }
 
         switch (response.Status)
@@ -71,12 +68,8 @@ internal sealed class DurableNexusOperations(
                 context.Response.Headers[NexusProtocol.OperationState] = NexusProtocol.Succeeded;
                 return response.ResultType is { } resultType ? Results.Json(response.Result, _json.GetTypeInfo(resultType)) : TypedResults.Ok();
             case DurableTaskStatus.Failed or DurableTaskStatus.Canceled:
-                var error = _options.CreateError(response.Exception!);
                 return TypedResults.Json(
-                    new NexusFailure(
-                        error.Message,
-                        new() { ["type"] = NexusProtocol.OperationErrorType },
-                        new() { ["state"] = response.Status == DurableTaskStatus.Failed ? NexusProtocol.Failed : NexusProtocol.Canceled, ["code"] = error.Code }),
+                    DurableOperationResponses.ToNexusFailure(response, _options),
                     NexusJsonContext.Default.NexusFailure,
                     statusCode: StatusCodes.Status424FailedDependency);
             default:
@@ -108,12 +101,16 @@ internal sealed class DurableNexusOperations(
 
         try
         {
-            var key = NexusServiceMetadata.Get(context).GetKey(_options.MapOperationId(context, operationId));
+            var key = NexusServiceMetadata.Get(context).GetKey(context, _options, operationId);
             await operations.CancelAsync(key, reason: null, context.RequestAborted);
         }
         catch (DurableTaskNotFoundException)
         {
             return NotFound();
+        }
+        catch (DurableOperationUnavailableException)
+        {
+            return Unavailable();
         }
 
         return TypedResults.Accepted((string?)null);
@@ -121,4 +118,11 @@ internal sealed class DurableNexusOperations(
 
     private static IResult NotFound() =>
         NexusProtocol.HandlerError(StatusCodes.Status404NotFound, "NOT_FOUND", "The operation doesn't exist, or its retention has ended.");
+
+    /// <summary>Returns an <c>UNAVAILABLE</c> handler error for a request which left its operation as it was, which the caller retries.</summary>
+    private static IResult Unavailable() =>
+        NexusProtocol.HandlerError(
+            StatusCodes.Status503ServiceUnavailable,
+            "UNAVAILABLE",
+            "The request didn't reach the operation, which it left unchanged. Send the request again with the same Nexus-Request-Id.");
 }

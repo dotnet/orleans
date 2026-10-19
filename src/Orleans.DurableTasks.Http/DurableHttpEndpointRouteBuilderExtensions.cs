@@ -21,11 +21,11 @@ namespace Microsoft.AspNetCore.Builder;
 /// <para>
 /// An operation is named by the <c>Idempotency-Key</c> of the request which starts it, so a retried request reaches the
 /// operation which the first request started. Its key combines the group's scope, the request's values for the group's
-/// route parameters, such as an order's identifier, and the identifier which
-/// <see cref="DurableHttpOptions.MapOperationId"/> maps, for example into an account's scope. An operation host grain,
-/// which that key addresses, holds the operation, so requests which observe, cancel, or signal it reach it by its
-/// identifier alone. Authentication and authorization belong to the application, which configures them on the group's
-/// endpoints, such as with <c>RequireAuthorization</c> or endpoint filters.
+/// route parameters, such as an order's identifier, the caller's scope, which
+/// <see cref="DurableHttpOptions.GetCallerScope"/> returns, and the identifier. An operation host grain, which that key
+/// addresses, holds the operation, so requests which observe, cancel, or signal it reach it by its identifier alone, and
+/// only from its caller's scope. Authentication and authorization belong to the application, which configures them on the
+/// group's endpoints, such as with <c>RequireAuthorization</c> or endpoint filters.
 /// </para>
 /// </remarks>
 public static class DurableHttpEndpointRouteBuilderExtensions
@@ -36,8 +36,9 @@ public static class DurableHttpEndpointRouteBuilderExtensions
     /// </summary>
     /// <param name="group">The route group, such as <c>app.MapGroup("/orders/{orderId}")</c>.</param>
     /// <param name="scope">
-    /// The scope of the group's operations, such as <c>orders</c>, or <see langword="null"/> for the group's route prefix.
-    /// Groups, and Nexus services, with equal scopes and route values address the same operations.
+    /// The scope of the group's operations, such as <c>orders</c>, which is part of every operation's key, so it stays
+    /// equal while the group's routes change. Groups, and Nexus services, with equal scopes and route values address the
+    /// same operations.
     /// </param>
     /// <returns>The group, which maps the group's durable starts and signals, and configures its endpoints.</returns>
     /// <remarks>
@@ -52,10 +53,18 @@ public static class DurableHttpEndpointRouteBuilderExtensions
     /// completes: the retry reaches the running operation, as Azure repeatable requests and Stripe's v2 idempotency resume
     /// work, where the IETF <c>Idempotency-Key</c> draft returns <c>409 Conflict</c>.
     /// </description></item>
-    /// <item><description><c>424 Failed Dependency</c> with the status monitor of an operation which failed or was canceled.</description></item>
     /// <item><description>
-    /// <c>400 Bad Request</c> for an invalid key, <c>422 Unprocessable Content</c> for a key which another request used to
-    /// start other work, and <c>502 Bad Gateway</c> when the operation's host doesn't accept it.
+    /// <c>424 Failed Dependency</c> with the status monitor of an operation which failed or was canceled. An operation whose
+    /// work's grain didn't accept the work, so it never ran, fails with the <see cref="DurableOperationError.NotStartedCode"/>
+    /// error code, and a new key starts the work again.
+    /// </description></item>
+    /// <item><description>
+    /// <c>400 Bad Request</c> for an invalid or missing key, and <c>422 Unprocessable Content</c> for a key which another
+    /// request used to start other work.
+    /// </description></item>
+    /// <item><description>
+    /// <c>503 Service Unavailable</c> with a <c>Retry-After</c> header when the request didn't reach the operation, which it
+    /// left unchanged, so the client sends it again with the same key.
     /// </description></item>
     /// </list>
     /// <para>
@@ -78,14 +87,17 @@ public static class DurableHttpEndpointRouteBuilderExtensions
     /// <item><description>
     /// <c>POST {group}/operations/{operationId}:cancel</c> durably requests cancellation of a running operation, carrying
     /// the optional <c>reason</c> of a JSON body, and returns <c>202 Accepted</c> with its status monitor; a terminal
-    /// operation returns <c>200 OK</c> unchanged. An operation which subscribes to an existing task cancels that task.
+    /// operation returns <c>200 OK</c> unchanged. An operation which subscribes to an existing task ends its subscription
+    /// and reports that it was canceled, and the task, which other parties own, continues.
     /// </description></item>
     /// </list>
     /// <para>An operation which doesn't exist, or whose retention has ended, returns <c>404 Not Found</c>.</para>
     /// </remarks>
-    public static RouteGroupBuilder WithDurableOperations(this RouteGroupBuilder group, string? scope = null)
+    /// <exception cref="ArgumentException"><paramref name="scope"/> is empty.</exception>
+    public static RouteGroupBuilder WithDurableOperations(this RouteGroupBuilder group, string scope)
     {
         ArgumentNullException.ThrowIfNull(group);
+        ArgumentException.ThrowIfNullOrEmpty(scope);
         var metadata = new DurableOperationsMetadata(scope, $"Orleans.DurableTasks.Http.Operation:{Guid.NewGuid():N}");
         group.WithMetadata(metadata);
         group.AddEndpointFilterFactory(static (context, next) =>
@@ -95,7 +107,8 @@ public static class DurableHttpEndpointRouteBuilderExtensions
         group.MapGet("/operations/{operationId}", static context => ExecuteAsync(context, Operations(context).GetAsync(context)))
             .WithName(metadata.OperationEndpointName)
             .WithResponse(StatusCodes.Status200OK, typeof(DurableOperation))
-            .WithProblem(StatusCodes.Status404NotFound);
+            .WithProblem(StatusCodes.Status404NotFound)
+            .WithProblem(StatusCodes.Status503ServiceUnavailable);
 
         group.MapGet("/operations/{operationId}/events", static context => ExecuteAsync(context, Operations(context).WatchAsync(context)))
             .WithResponse(StatusCodes.Status200OK, typeof(DurableOperation), "text/event-stream")
@@ -122,14 +135,18 @@ public static class DurableHttpEndpointRouteBuilderExtensions
     /// <returns>A builder which configures the endpoint.</returns>
     /// <remarks>
     /// The endpoint returns <c>204 No Content</c> once the work's task durably holds the value, including for a repeated
-    /// signal with an equal value, so a client retries a signal safely. A value which differs from the one the task holds,
-    /// or an operation which completed without the signal, returns <c>409 Conflict</c>, and an unknown operation returns
-    /// <c>404 Not Found</c>.
+    /// signal with an equal value, so a client retries a signal safely. A request without a body returns
+    /// <c>400 Bad Request</c>. A value which differs from the one the task holds, or an operation which completed without
+    /// the signal, returns <c>409 Conflict</c>, and an unknown operation returns <c>404 Not Found</c>. A request which
+    /// reaches an operation before its host records its work returns <c>503 Service Unavailable</c> with a
+    /// <c>Retry-After</c> header.
     /// </remarks>
+    /// <exception cref="ArgumentException">The signal's name has characters other than URL-unreserved ones.</exception>
     public static IEndpointConventionBuilder MapDurableSignal<T>(this IEndpointRouteBuilder endpoints, DurableSignal<T> signal)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         ArgumentNullException.ThrowIfNull(signal);
+        DurableTaskEndpointConventions.ThrowIfInvalidName(signal.Name, nameof(signal));
         return endpoints.MapPost(
                 $"/operations/{{operationId}}/signals/{signal.Name}",
                 context => ExecuteAsync(context, Operations(context).SignalAsync(context, signal)))
@@ -137,7 +154,8 @@ public static class DurableHttpEndpointRouteBuilderExtensions
             .WithResponse(StatusCodes.Status204NoContent)
             .WithProblem(StatusCodes.Status400BadRequest)
             .WithProblem(StatusCodes.Status404NotFound)
-            .WithProblem(StatusCodes.Status409Conflict);
+            .WithProblem(StatusCodes.Status409Conflict)
+            .WithProblem(StatusCodes.Status503ServiceUnavailable);
     }
 
     /// <summary>Executes the <paramref name="result"/> of an operation endpoint's handler.</summary>

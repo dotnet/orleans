@@ -18,6 +18,7 @@ internal sealed class DurableHttpClient(IHttpClientFactory clientFactory, string
     /// <summary>The reconnection interval of an event stream which doesn't advertise one, as browsers' <c>EventSource</c> uses.</summary>
     private static readonly TimeSpan DefaultReconnectionInterval = TimeSpan.FromSeconds(3);
 
+    private readonly DurableHttpClientOptions _options = options;
     private readonly JsonSerializerOptions _json = options.SerializerOptions;
 
     public DurableTask<DurableHttpResponse> SendAsync(Func<HttpRequestMessage> createRequest)
@@ -27,6 +28,7 @@ internal sealed class DurableHttpClient(IHttpClientFactory clientFactory, string
             static async (state, cancellationToken) =>
             {
                 using var request = state.createRequest();
+                // The client buffers the response's content, up to DurableHttpClientOptions.MaxResponseContentLength.
                 using var response = await state.client.CreateClient().SendAsync(request, cancellationToken);
                 return await DurableHttpResponse.ReadAsync(response, cancellationToken);
             },
@@ -38,8 +40,19 @@ internal sealed class DurableHttpClient(IHttpClientFactory clientFactory, string
         ArgumentNullException.ThrowIfNull(createRequest);
         return StartAsync(this, createRequest);
 
-        static async DurableTask<DurableHttpOperation> StartAsync(DurableHttpClient client, Func<HttpRequestMessage> createRequest) =>
-            DurableHttpOperation.FromStart(await client.SendAsync(createRequest));
+        static async DurableTask<DurableHttpOperation> StartAsync(DurableHttpClient client, Func<HttpRequestMessage> createRequest)
+        {
+            var operation = DurableHttpOperation.FromStart(await client.SendAsync(createRequest));
+            if (operation is { Location: { } location, Response.RequestUri: { } requestUri } && !client._options.FollowOperationLocation(requestUri, location))
+            {
+                throw new HttpRequestException(
+                    $"'{requestUri}' located its operation at '{location}', which DurableHttpClientOptions.FollowOperationLocation doesn't follow.",
+                    inner: null,
+                    operation.Response.StatusCode);
+            }
+
+            return operation;
+        }
     }
 
     public DurableTask<TResult> WaitForOperationAsync<TResult>(DurableHttpOperation operation, DurableHttpOperationOptions? options = null)
@@ -158,7 +171,12 @@ internal sealed class DurableHttpClient(IHttpClientFactory clientFactory, string
         }
     }
 
-    private HttpClient CreateClient() => clientFactory.CreateClient(name);
+    private HttpClient CreateClient()
+    {
+        var client = clientFactory.CreateClient(name);
+        client.MaxResponseContentBufferSize = _options.MaxResponseContentLength;
+        return client;
+    }
 
     private async DurableTask<TResult> WaitAsync<TResult>(DurableHttpOperation operation, DurableHttpOperationOptions options)
     {
@@ -193,13 +211,10 @@ internal sealed class DurableHttpClient(IHttpClientFactory clientFactory, string
         var response = operation.Response;
         while (true)
         {
-            if (RetryAt(response) is { } retryAt)
+            // A server which applied the poll's wait preference already waited, so the next poll follows at once.
+            if (response.GetHeader(DurableHttpHeaders.PreferenceApplied) is null)
             {
-                await DurableTask.DelayUntil(retryAt);
-            }
-            else
-            {
-                await DurableTask.Delay(RetryAfter(response) ?? options.PollInterval);
+                await DurableTask.Delay(GetPollDelay(response, options));
             }
 
             response = await SendAsync(() =>
@@ -212,6 +227,14 @@ internal sealed class DurableHttpClient(IHttpClientFactory clientFactory, string
 
                 return request;
             });
+
+            // A transient failure of one poll, such as 429 Too Many Requests or 503 Service Unavailable, leaves the
+            // operation as it was, so the next poll follows its Retry-After.
+            if (IsTransient(response.StatusCode))
+            {
+                continue;
+            }
+
             if (TryComplete(response, operation.IsStatusMonitor, out TResult result))
             {
                 return result;
@@ -271,11 +294,23 @@ internal sealed class DurableHttpClient(IHttpClientFactory clientFactory, string
         return DurableOperation.Read(response.Content.Span);
     }
 
-    private static TimeSpan? RetryAfter(DurableHttpResponse response) =>
-        RetryConditionHeaderValue.TryParse(response.GetHeader("Retry-After"), out var value) ? value.Delta : null;
+    /// <summary>
+    /// Returns the delay before the next poll: the response's <c>Retry-After</c>, at least
+    /// <see cref="DurableHttpOperationOptions.PollInterval"/> and at most <see cref="DurableHttpOperationOptions.MaxPollInterval"/>,
+    /// so a server's short or past <c>Retry-After</c> doesn't poll faster than the task chose, and a long one doesn't stall it.
+    /// </summary>
+    internal static TimeSpan GetPollDelay(DurableHttpResponse response, DurableHttpOperationOptions options)
+    {
+        TimeSpan? retryAfter = RetryConditionHeaderValue.TryParse(response.GetHeader("Retry-After"), out var value)
+            ? value.Delta ?? value.Date - DurableTask.Current.UtcNow
+            : null;
+        var max = options.MaxPollInterval > options.PollInterval ? options.MaxPollInterval : options.PollInterval;
+        return retryAfter is not { } delay || delay < options.PollInterval ? options.PollInterval : delay > max ? max : delay;
+    }
 
-    private static DateTimeOffset? RetryAt(DurableHttpResponse response) =>
-        RetryConditionHeaderValue.TryParse(response.GetHeader("Retry-After"), out var value) ? value.Date : null;
+    /// <summary>Returns whether a poll's status reports a transient failure, after which the poll is retried.</summary>
+    private static bool IsTransient(HttpStatusCode statusCode) => statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
+        or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout;
 
     /// <summary>Appends <paramref name="suffix"/> to the path of <paramref name="location"/>, keeping its query.</summary>
     private static Uri Append(Uri location, string suffix) => new(location.GetLeftPart(UriPartial.Path) + suffix + location.Query);

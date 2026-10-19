@@ -1,4 +1,7 @@
+using System.Net;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Options;
 using Orleans.DurableTasks.Http;
 
@@ -24,6 +27,7 @@ public static class DurableHttpServiceCollectionExtensions
             options.Configure(configureOptions);
         }
 
+        services.AddDataProtection();
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<DurableOperationService>();
         services.TryAddSingleton<DurableCallbackRegistrar>();
@@ -82,13 +86,29 @@ public static class DurableHttpServiceCollectionExtensions
     /// <param name="configureOptions">Configures delivery, or <see langword="null"/> for the defaults.</param>
     /// <returns>
     /// The builder of the client which delivers callbacks, which configures its handlers, such as a proxy. The client
-    /// doesn't follow redirects, which retries as undelivered.
+    /// doesn't follow redirects, which retries as undelivered, and connects only to the addresses which
+    /// <see cref="DurableCallbackOptions.AllowAddress"/> accepts.
     /// </returns>
     /// <remarks>
+    /// <para>
     /// Each callback is a detached durable task on a relay grain, which waits for its operation's outcome and delivers it
     /// with durable retries. Deliveries describe failures with <see cref="DurableHttpOptions.CreateError"/>, so configure
     /// <see cref="DurableHttpOptions"/> in the silos as in the hosts which serve the operations; a host which runs both
     /// shares one configuration. Register an <see cref="IDurableWebhookSigner"/> to sign webhooks.
+    /// </para>
+    /// <para>
+    /// The hosts protect the values of the headers which callbacks carry, which can be credentials, with ASP.NET Core Data
+    /// Protection before the silos store them, and deliveries unprotect them, so hosts and silos share a Data Protection
+    /// key ring and application name, such as with <c>AddDataProtection().PersistKeysTo...().SetApplicationName(...)</c>.
+    /// </para>
+    /// <para>
+    /// The client's primary handler is a <see cref="SocketsHttpHandler"/>, whose <c>ConnectCallback</c> applies
+    /// <see cref="DurableCallbackOptions.AllowAddress"/>. A primary handler which the application configures is a
+    /// <see cref="SocketsHttpHandler"/> without a <c>ConnectCallback</c>, or, when <c>AllowAddress</c> is
+    /// <see langword="null"/>, a <see cref="SocketsHttpHandler"/> or an <see cref="HttpClientHandler"/>; building the client
+    /// with another handler throws <see cref="InvalidOperationException"/>, since the package can't keep it from following
+    /// redirects or connecting to internal addresses.
+    /// </para>
     /// </remarks>
     public static IHttpClientBuilder AddDurableHttpCallbacks(this IServiceCollection services, Action<DurableCallbackOptions>? configureOptions = null)
     {
@@ -100,33 +120,52 @@ public static class DurableHttpServiceCollectionExtensions
         }
 
         services.AddOptions<DurableHttpOptions>();
-
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.Extensions.Http.IHttpMessageHandlerBuilderFilter, DurableCallbackRedirectFilter>());
-        return services.AddHttpClient(DurableCallbackOptions.HttpClientName);
+        services.AddDataProtection();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHttpMessageHandlerBuilderFilter, DurableCallbackHandlerFilter>());
+        return services.AddHttpClient(DurableCallbackOptions.HttpClientName)
+            .ConfigurePrimaryHttpMessageHandler(static () => new SocketsHttpHandler { MaxConnectionsPerServer = DurableCallbackHandlerFilter.MaxConnectionsPerServer });
     }
 }
 
-/// <summary>Keeps the callback client from following redirects, whichever primary handler the application configures.</summary>
+/// <summary>
+/// Keeps the callback client from following redirects and from connecting to addresses which
+/// <see cref="DurableCallbackOptions.AllowAddress"/> doesn't accept, whichever primary handler the application configures.
+/// </summary>
 /// <remarks>
-/// A redirect would send a delivery to a URL which <see cref="Orleans.DurableTasks.Http.DurableHttpOptions.AllowCallback"/>
-/// didn't accept. The filter runs after every configuration of the client's handlers.
+/// A redirect, or a host name which resolves to another address than when the application accepted the URL, would send a
+/// delivery to a receiver which <see cref="DurableHttpOptions.AllowCallback"/> didn't accept. The filter runs after every
+/// configuration of the client's handlers, and fails to build a client whose primary handler it can't constrain.
 /// </remarks>
-internal sealed class DurableCallbackRedirectFilter : Microsoft.Extensions.Http.IHttpMessageHandlerBuilderFilter
+internal sealed class DurableCallbackHandlerFilter(Microsoft.Extensions.Options.IOptions<DurableCallbackOptions> options) : IHttpMessageHandlerBuilderFilter
 {
-    public Action<Microsoft.Extensions.Http.HttpMessageHandlerBuilder> Configure(Action<Microsoft.Extensions.Http.HttpMessageHandlerBuilder> next) => builder =>
+    /// <summary>The most connections which the default primary handler opens to one receiver.</summary>
+    internal const int MaxConnectionsPerServer = 16;
+
+    public Action<HttpMessageHandlerBuilder> Configure(Action<HttpMessageHandlerBuilder> next) => builder =>
     {
         next(builder);
-        if (builder.Name == DurableCallbackOptions.HttpClientName)
+        if (builder.Name != DurableCallbackOptions.HttpClientName)
         {
-            switch (builder.PrimaryHandler)
-            {
-                case SocketsHttpHandler sockets:
-                    sockets.AllowAutoRedirect = false;
-                    break;
-                case HttpClientHandler client:
-                    client.AllowAutoRedirect = false;
-                    break;
-            }
+            return;
+        }
+
+        var allowAddress = options.Value.AllowAddress;
+        switch (builder.PrimaryHandler)
+        {
+            case SocketsHttpHandler sockets when sockets.ConnectCallback is null && allowAddress is not null:
+                sockets.AllowAutoRedirect = false;
+                sockets.ConnectCallback = (context, cancellationToken) =>
+                    DurableCallbackConnections.ConnectAsync(context.DnsEndPoint, allowAddress, cancellationToken);
+                break;
+            case SocketsHttpHandler sockets when allowAddress is null:
+                sockets.AllowAutoRedirect = false;
+                break;
+            case HttpClientHandler client when allowAddress is null:
+                client.AllowAutoRedirect = false;
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"The callback client's primary handler, '{builder.PrimaryHandler.GetType()}', can't be kept from following redirects or connecting to addresses which DurableCallbackOptions.AllowAddress doesn't accept. Use a SocketsHttpHandler without a ConnectCallback, or set AllowAddress to null to leave connections to the handler.");
         }
     };
 }

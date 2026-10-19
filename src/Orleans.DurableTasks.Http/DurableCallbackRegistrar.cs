@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
@@ -5,8 +6,10 @@ using Orleans.Runtime;
 namespace Orleans.DurableTasks.Http;
 
 /// <summary>Reads callback registrations from requests which start operations, and starts their relays.</summary>
-internal sealed class DurableCallbackRegistrar(IGrainFactory grainFactory, IOptions<DurableHttpOptions> options)
+internal sealed class DurableCallbackRegistrar(IGrainFactory grainFactory, IDataProtectionProvider dataProtection, IOptions<DurableHttpOptions> options)
 {
+    private readonly IDataProtector _headers = dataProtection.CreateProtector(DurableCallback.HeaderProtectionPurpose);
+
     /// <summary>The names, and name prefixes, of headers which deliveries set themselves or which address the connection.</summary>
     private static readonly string[] ReservedHeaders =
         ["host", "connection", "keep-alive", "te", "trailer", "transfer-encoding", "upgrade", "expect", "operation-location"];
@@ -67,7 +70,7 @@ internal sealed class DurableCallbackRegistrar(IGrainFactory grainFactory, IOpti
                     return false;
                 }
 
-                headers[deliveryHeader] = values.ToString();
+                headers[deliveryHeader] = _headers.Protect(values.ToString());
             }
         }
 
@@ -77,7 +80,8 @@ internal sealed class DurableCallbackRegistrar(IGrainFactory grainFactory, IOpti
 
     /// <summary>
     /// Starts the relay which delivers the outcome of the operation which <paramref name="host"/> hosts to the registered
-    /// callback; a repeated registration of the same callback reaches the same relay.
+    /// callback. A repeated registration of the receiver, such as a retried start's, reaches the same relay, which keeps
+    /// the headers of the first registration.
     /// </summary>
     public async ValueTask RegisterAsync(
         DurableCallbackRegistration registration,
@@ -94,13 +98,21 @@ internal sealed class DurableCallbackRegistrar(IGrainFactory grainFactory, IOpti
             registration.Url,
             registration.Headers,
             operationLocation);
-        await grainFactory.GetGrain<IDurableCallbackRelayGrain>(callback.GetCallbackId())
-            .DeliverAsync(callback)
-            .WithId(DurableCallbackRelayGrain.DeliveryRootId).ScheduleAsync(cancellationToken);
+        try
+        {
+            await grainFactory.GetGrain<IDurableCallbackRelayGrain>(callback.GetCallbackId())
+                .DeliverAsync(callback)
+                .WithId(DurableCallbackRelayGrain.DeliveryRootId).ScheduleAsync(cancellationToken);
+        }
+        catch (DurableTaskConflictException)
+        {
+            // An earlier registration of the receiver started the relay. Protected header values differ between
+            // registrations, so the relay keeps the first registration's.
+        }
     }
 }
 
 /// <summary>A callback which a request registers.</summary>
 /// <param name="Url">The URL which receives the callback.</param>
-/// <param name="Headers">The headers which each delivery carries.</param>
-internal sealed record DurableCallbackRegistration(Uri Url, SortedDictionary<string, string> Headers);
+/// <param name="Headers">The headers which each delivery carries, whose values are protected.</param>
+internal sealed record DurableCallbackRegistration(Uri Url, IReadOnlyDictionary<string, string> Headers);

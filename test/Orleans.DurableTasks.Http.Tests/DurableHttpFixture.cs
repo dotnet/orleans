@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
@@ -9,7 +10,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Http;
-using Orleans.DurableTasks.Protocol;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.TestingHost;
@@ -36,6 +36,25 @@ public sealed class DurableHttpFixture : IAsyncLifetime
     /// <summary>Gets the jobs of the <c>/jobs</c> API, and how many times each was polled.</summary>
     public static ConcurrentDictionary<string, (string Value, int Polls)> Jobs { get; } = new();
 
+    /// <summary>Gets the requests of <c>/effects/{id}</c>, by identifier: the <c>Idempotency-Key</c> of each request.</summary>
+    /// <remarks>
+    /// The first request of an identifier which starts with <c>held-</c> waits until its client abandons it, as a request
+    /// which the server applied, but whose response a crash lost, does.
+    /// </remarks>
+    public static ConcurrentDictionary<string, ConcurrentQueue<string>> Effects { get; } = new();
+
+    /// <summary>
+    /// Gets the jobs of the <c>/held-jobs</c> API, by value: how many requests started each, and whether the test released
+    /// it, after which its monitor returns its result.
+    /// </summary>
+    public static ConcurrentDictionary<string, HeldJob> HeldJobs { get; } = new();
+
+    /// <summary>
+    /// Protects callback headers in the test server and unprotects them in the silos, as a key ring which hosts and silos
+    /// share does.
+    /// </summary>
+    private static readonly IDataProtectionProvider DataProtection = new EphemeralDataProtectionProvider();
+
     private readonly InProcessTestCluster _cluster;
     private TestServer? _server;
     private WebApplication? _app;
@@ -59,12 +78,17 @@ public sealed class DurableHttpFixture : IAsyncLifetime
             siloBuilder.Services.AddHttpClient(RawClientName, static client => client.BaseAddress = new Uri("http://localhost/"))
                 .AddDurableIdempotencyKey()
                 .ConfigurePrimaryHttpMessageHandler(() => Server.CreateHandler());
-            siloBuilder.Services.AddDurableHttpCallbacks(static options => options.InitialRetryInterval = TimeSpan.FromMilliseconds(100))
+            // The test server's handler has no sockets, so connections are left to it.
+            siloBuilder.Services.AddDurableHttpCallbacks(static options =>
+                {
+                    options.InitialRetryInterval = TimeSpan.FromMilliseconds(100);
+                    options.AllowAddress = null;
+                })
                 .ConfigurePrimaryHttpMessageHandler(() => new RedirectingHandler(Server.CreateHandler()))
                 .ConfigureHttpClient(static client => client.Timeout = TimeSpan.FromMilliseconds(500));
             siloBuilder.Services.Configure<DurableHttpOptions>(ConfigureOperations);
             siloBuilder.Services.AddSingleton<IDurableWebhookSigner, TestWebhookSigner>();
-            siloBuilder.AddIncomingGrainCallFilter<StartFailureFilter>();
+            siloBuilder.Services.AddSingleton(DataProtection);
         });
         _cluster = builder.Build();
     }
@@ -92,6 +116,7 @@ public sealed class DurableHttpFixture : IAsyncLifetime
         builder.WebHost.UseTestServer();
         builder.Services.AddSingleton<IGrainFactory>(_cluster.Client);
         builder.Services.AddDurableHttp(ConfigureOperations);
+        builder.Services.AddSingleton(DataProtection);
 
         _app = builder.Build();
 
@@ -108,7 +133,7 @@ public sealed class DurableHttpFixture : IAsyncLifetime
         // Each order's group starts operations which run its grain's durable methods. An endpoint filter authorizes every
         // request of the group, including those which observe, cancel, or signal its operations: 'mallory' may access no order.
         var orders = _app.MapGroup("/orders/{orderId}")
-            .WithDurableOperations()
+            .WithDurableOperations("orders")
             .AddEndpointFilter(static (context, next) =>
                 context.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value == ForbiddenUser
                     ? ValueTask.FromResult<object?>(Results.Problem(statusCode: StatusCodes.Status403Forbidden))
@@ -130,8 +155,11 @@ public sealed class DurableHttpFixture : IAsyncLifetime
         orders.MapGet("/summary", static (string orderId) => $"order {orderId}");
         orders.MapPost("/shipment", static (string orderId, ApprovalRequest request, IGrainFactory grains) =>
             grains.GetGrain<IDurableHttpTestGrain>(orderId).WaitForShipmentAsync(request.Item));
+        orders.MapPost("/confirmation", static (string orderId, ApprovalRequest request, IGrainFactory grains) =>
+            grains.GetGrain<IDurableHttpTestGrain>(orderId).WaitForConfirmationAsync(request.Item));
         orders.MapDurableSignal(DurableHttpTestGrain.Approved);
         orders.MapDurableSignal(DurableHttpTestGrain.Shipped);
+        orders.MapDurableSignal(DurableHttpTestGrain.Confirmed);
         // Receives callbacks, which tests await through Callbacks.
         _app.MapPost("/callbacks/{name}", static async (string name, HttpRequest request) =>
             await Callbacks.ReceiveAsync(name, request));
@@ -209,6 +237,34 @@ public sealed class DurableHttpFixture : IAsyncLifetime
             await context.Response.WriteAsync($"event: status\nid: Succeeded\ndata: {{\"id\":\"{id}\",\"status\":\"Succeeded\",\"result\":\"done\"}}\n\n");
         });
 
+        // Records each request's Idempotency-Key, and returns how many requests of its identifier the server applied.
+        _app.MapPost("/effects/{id}", static async (string id, HttpContext context) =>
+        {
+            var requests = Effects.GetOrAdd(id, static _ => new());
+            requests.Enqueue(context.Request.Headers[DurableHttpHeaders.IdempotencyKey].ToString());
+            if (requests.Count == 1 && id.StartsWith("held-", StringComparison.Ordinal))
+            {
+                await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, context.RequestAborted).ContinueWith(static _ => { });
+                return Results.Empty;
+            }
+
+            return Results.Ok(requests.Count);
+        });
+
+        // A job which runs until the test releases it.
+        _app.MapPost("/held-jobs", static (EchoRequest request) =>
+        {
+            var job = HeldJobs.GetOrAdd(request.Value, static _ => new());
+            Interlocked.Increment(ref job.Starts);
+            return Results.Accepted($"/held-jobs/{request.Value}");
+        });
+        _app.MapGet("/held-jobs/{value}", static (string value) =>
+        {
+            var job = HeldJobs[value];
+            Interlocked.Increment(ref job.Polls);
+            return job.Released.Task.IsCompleted ? Results.Ok(value) : Results.Accepted($"/held-jobs/{value}");
+        });
+
         // Echoes the idempotency key of each request, by method, which idempotency key tests read.
         _app.MapMethods("/echo-idempotency-key", [HttpMethods.Get, HttpMethods.Post], static (HttpRequest request) => request.Headers[DurableHttpHeaders.IdempotencyKey].ToString());
 
@@ -229,10 +285,6 @@ public sealed class DurableHttpFixture : IAsyncLifetime
             InvalidOperationException => new(nameof(InvalidOperationException), exception.Message),
             _ => DurableHttpOptions.DefaultCreateError(exception),
         };
-
-        // Scopes the operations of authenticated users to the user.
-        options.MapOperationId = static (context, operationId) =>
-            context.User.FindFirst(ClaimTypes.NameIdentifier) is { } user ? $"{user.Value}:{operationId}" : operationId;
 
         // Accepts callbacks to the test server's receiver only.
         options.AllowCallback = static (_, url) => url.Host == "localhost" && url.AbsolutePath.StartsWith("/callbacks/", StringComparison.Ordinal);
@@ -353,29 +405,10 @@ public sealed class RedirectingHandler(HttpMessageHandler inner) : HttpClientHan
     }
 }
 
-/// <summary>
-/// Fails the starts of operations whose keys contain <c>rejected-</c> or <c>undelivered-</c>, as an operation host which
-/// rejects an invocation or doesn't receive it fails <c>ScheduleAsync</c>.
-/// </summary>
-public sealed class StartFailureFilter : IIncomingGrainCallFilter
+/// <summary>A job of <c>/held-jobs</c>.</summary>
+public sealed class HeldJob
 {
-    public Task Invoke(IIncomingGrainCallContext context)
-    {
-        if (context.InterfaceMethod.Name == nameof(IDurableTaskServer.ScheduleAsync)
-            && context.TargetId.Key.ToString() is var key
-            && context.Request.GetArgument(0) is TaskId taskId)
-        {
-            if (key.Contains("rejected-", StringComparison.Ordinal))
-            {
-                throw new DurableTaskRejectedException(taskId, context.TargetId, "test", "The order is closed.");
-            }
-
-            if (key.Contains("undelivered-", StringComparison.Ordinal))
-            {
-                throw new DurableTaskDeliveryException(taskId, context.TargetId, "The outbox retry timeout elapsed.");
-            }
-        }
-
-        return context.Invoke();
-    }
+    public readonly TaskCompletionSource Released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public int Starts;
+    public int Polls;
 }

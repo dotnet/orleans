@@ -50,7 +50,7 @@ internal static class DurableHttpRequestHeaders
         if (!IsValidOperationId(key))
         {
             key = null;
-            error = $"An Idempotency-Key has 1 to {MaxIdempotencyKeyLength} printable ASCII characters other than '/'.";
+            error = $"An Idempotency-Key has 1 to {MaxIdempotencyKeyLength} printable ASCII characters other than '/', and isn't '.' or '..'.";
             return false;
         }
 
@@ -59,15 +59,16 @@ internal static class DurableHttpRequestHeaders
 
     /// <summary>
     /// Returns whether <paramref name="operationId"/> is a valid operation identifier: 1 to
-    /// <see cref="MaxIdempotencyKeyLength"/> printable ASCII characters other than <c>/</c>.
+    /// <see cref="MaxIdempotencyKeyLength"/> printable ASCII characters other than <c>/</c>, other than <c>.</c> and <c>..</c>.
     /// </summary>
     /// <remarks>
-    /// An operation identifier is a URL path segment of its status monitor, and ASP.NET Core leaves an escaped <c>/</c> in a
-    /// path segment escaped, so an identifier with one wouldn't address its operation.
+    /// An operation identifier is a URL path segment of its status monitor. ASP.NET Core leaves an escaped <c>/</c> in a
+    /// path segment escaped, and clients remove the dot segments <c>.</c> and <c>..</c> from paths, so such identifiers
+    /// wouldn't address their operations.
     /// </remarks>
     public static bool IsValidOperationId(string operationId)
     {
-        if (operationId.Length is 0 or > MaxIdempotencyKeyLength)
+        if (operationId.Length is 0 or > MaxIdempotencyKeyLength || operationId is "." or "..")
         {
             return false;
         }
