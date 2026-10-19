@@ -15,7 +15,6 @@ internal sealed class DurableTaskSymbols
     private const string DurableTasksNamespace = "Orleans.DurableTasks";
 
     private readonly ImmutableArray<INamedTypeSymbol> _grainStateTypes;
-    private readonly ImmutableArray<INamedTypeSymbol> _unrecordedStateTypes;
     private readonly INamedTypeSymbol? _durableValue;
     private readonly INamedTypeSymbol? _persistentState;
 
@@ -52,11 +51,6 @@ internal sealed class DurableTaskSymbols
             "Orleans.Journaling.IDurableLog`1",
             "Orleans.Runtime.IPersistentState`1");
         _grainStateTypes = stateTypes;
-
-        // Journaled state, such as IDurableValue<T> and the durable collections, records its accesses from durable task
-        // bodies, so a replay returns their recorded outcomes. A persistent state's value changes in place, so its accesses
-        // aren't recorded.
-        _unrecordedStateTypes = Resolve(compilation, "Orleans.Runtime.IPersistentState`1");
         _durableValue = compilation.GetTypeByMetadataName("Orleans.Journaling.IDurableValue`1");
         _persistentState = compilation.GetTypeByMetadataName("Orleans.Runtime.IPersistentState`1");
         NonDeterministicTypes = Resolve(
@@ -318,7 +312,7 @@ internal sealed class DurableTaskSymbols
     public bool IsStateValue(IOperation operation) =>
         operation is IPropertyReferenceOperation { Instance.Type: { } stateType, Property: var property }
         && (property.IsIndexer
-            ? IsStateType(stateType, _grainStateTypes)
+            ? IsGrainState(stateType)
             : (property.Name == "Value" && Implements(stateType, _durableValue))
                 || (property.Name == "State" && Implements(stateType, _persistentState)));
 
@@ -335,26 +329,28 @@ internal sealed class DurableTaskSymbols
         && method.ContainingNamespace?.ToDisplayString() != "System.Collections.Immutable";
 
     /// <summary>
-    /// Returns whether a type is grain state whose accesses a replay doesn't record, such as a persistent state, or
-    /// implements one of those types.
+    /// Returns whether a type is persistent grain state (<c>IPersistentState&lt;T&gt;</c>), or implements it. Durable task bodies
+    /// access journaled state, such as <c>IDurableValue&lt;T&gt;</c> and the durable collections, through recorded operations, so
+    /// a replay returns their outcomes; a persistent state's value changes in place, so its accesses aren't recorded.
     /// </summary>
-    public bool IsGrainState(ITypeSymbol? type) => IsStateType(type, _unrecordedStateTypes);
+    public bool IsPersistentState(ITypeSymbol? type) => type is not null && Implements(type, _persistentState);
 
-    private static bool IsStateType(ITypeSymbol? type, ImmutableArray<INamedTypeSymbol> stateTypes)
+    /// <summary>Returns whether a type is journaled or persistent grain state, or implements one of those types.</summary>
+    public bool IsGrainState(ITypeSymbol? type)
     {
-        if (type is not INamedTypeSymbol named || stateTypes.IsEmpty)
+        if (type is not INamedTypeSymbol named || _grainStateTypes.IsEmpty)
         {
             return false;
         }
 
-        if (IsStateDefinition(named, stateTypes))
+        if (IsGrainStateDefinition(named))
         {
             return true;
         }
 
         foreach (var @interface in named.AllInterfaces)
         {
-            if (IsStateDefinition(@interface, stateTypes))
+            if (IsGrainStateDefinition(@interface))
             {
                 return true;
             }
@@ -536,9 +532,9 @@ internal sealed class DurableTaskSymbols
         }
     }
 
-    private static bool IsStateDefinition(INamedTypeSymbol type, ImmutableArray<INamedTypeSymbol> stateTypes)
+    private bool IsGrainStateDefinition(INamedTypeSymbol type)
     {
-        foreach (var stateType in stateTypes)
+        foreach (var stateType in _grainStateTypes)
         {
             if (SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, stateType))
             {
