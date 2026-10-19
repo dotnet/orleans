@@ -53,13 +53,16 @@ namespace Orleans.DurableTasks.Runtime;
 /// attempt's writes throw its cancellation and its reads run against the state directly, unrecorded.
 /// </para>
 /// <para>
-/// A pure read of a state which the log's own journal holds records the journal's position instead of its value, with
-/// the read's argument, when the journal offers positions (<see cref="JournaledStateOperations.IsPositional"/>): the read
-/// observed the state as the journal's entries before that position leave it. Writing a position costs a few bytes and no
-/// encoding of the value. While any execution's log holds such a record, the logs hold a compaction barrier on the
-/// journal, so its history stays. A recovery whose journal holds the barrier replays the history and replaces each
+/// A pure read of a state which the log's own journal holds can record the journal's position instead of its value, with
+/// the read's argument (<see cref="JournaledStateOperations.IsPositional"/>): the read observed the state as the journal's
+/// entries before that position leave it. It does so only when a replay provably returns what this read observed: the
+/// journal's codecs reproduce values exactly, the state has no change waiting for a write, the result is a value type or a
+/// sealed class (or an array of value types) and isn't small, and an argument compares by value. Writing a position costs
+/// a few bytes and no encoding of the value. While any execution's log holds such a record, the journal holds a compaction
+/// barrier, so its history stays. A recovery whose journal holds the barrier replays the history and replaces each
 /// position with the value which the read observed, before any attempt replays; a snapshot which must pass the barrier does
-/// the same first. A replay therefore meets values, and stalls as a divergence on a position which couldn't be resolved.
+/// the same first, after which the running attempts record values. A replay therefore meets values, and stalls as a
+/// divergence on a position which couldn't be resolved.
 /// </para>
 /// <para>
 /// Each record has this format:
