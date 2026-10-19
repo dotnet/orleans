@@ -1,7 +1,7 @@
 ---
 title: Orleans analyzer diagnostics
 description: Reference for Orleans compiler analyzer diagnostic IDs, impacts, fixes, code fixes, and suppression guidance.
-ms.date: 10/15/2026
+ms.date: 10/19/2026
 ms.topic: reference
 ---
 
@@ -141,7 +141,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 
 ## ORLEANS0205
 
-[Await, schedule, or post durable task definitions](orleans0205.md) — Warning. Durable task code creates a durable task definition and never runs it.
+[Await, schedule, or post durable task definitions](orleans0205.md) — Error. Durable task code creates a durable task definition and never runs it.
 
 ## ORLEANS0206
 
@@ -169,7 +169,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 
 ## ORLEANS0212
 
-[Filter cancellation handlers by IsTaskCancellationRequested](orleans0212.md) — Info. Durable task code catches cancellation without telling task cancellation from attempt cancellation.
+[Filter cancellation handlers by IsTaskCancellationRequested](orleans0212.md) — Warning. Durable task code catches cancellation without telling task cancellation from attempt cancellation.
 
 ## ORLEANS0213
 
@@ -187,6 +187,46 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 
 [Post durable tasks from grains or durable task bodies](orleans0216.md) — Warning. Code outside grains and durable task bodies posts a durable task, which throws.
 
+## ORLEANS0217
+
+[Pass AttemptCancellationToken to calls in task-cancellation cleanup](orleans0217.md) — Warning. Cleanup after task cancellation passes `CancellationToken`, which task cancellation has already canceled, so its calls end at once.
+
+## ORLEANS0218
+
+[Pass constant version names and ranges](orleans0218.md) — Warning. A version check computes its change name or supported range at run time.
+
+## ORLEANS0219
+
+[Await, combine, or return the handles of scheduled children](orleans0219.md) — Info. A durable task body schedules an attached child and never observes its handle.
+
+## ORLEANS0220
+
+[Name durable operations whose position can change](orleans0220.md) — Info. An unnamed durable operation runs in a loop, a condition, or after another unnamed operation, so its generated identifier can shift.
+
+## ORLEANS0221
+
+[Run synchronous work with DurableTask.RunInline](orleans0221.md) — Info. A `DurableTask.Run` step runs only synchronous work, which an effect records without a child execution.
+
+## ORLEANS0222
+
+[Pass delegates which return a task for asynchronous work](orleans0222.md) — Error. `DurableTask.Run` or `DurableTask.RunInline` receives an `async void` delegate, whose completion is recorded before its work completes.
+
+## ORLEANS0223
+
+[Assign new values to grain state instead of changing them in place](orleans0223.md) — Warning. Durable task code changes an object which grain state holds, and the journal records no change.
+
 ## ORLEANS0224
 
 [Suppress CS1998 for async durable task methods](orleans0224.md) — Suppressor. An `async DurableTask` method which completes without awaiting is a normal durable step.
+
+## ORLEANS0225
+
+[Await durable tasks instead of polling them in durable task bodies](orleans0225.md) — Error. A durable task body polls a scheduled task, which throws `NotSupportedException`.
+
+## ORLEANS0226
+
+[Continue durable task bodies on their scheduler](orleans0226.md) — Error. A durable task body awaits with `ConfigureAwait(false)`, which resumes it off its grain's scheduler.
+
+## ORLEANS0227
+
+[Run durable operations outside DurableTask.RunInline effects](orleans0227.md) — Error. A `DurableTask.RunInline` effect starts a task or checks a version, which throws `InvalidOperationException`.
