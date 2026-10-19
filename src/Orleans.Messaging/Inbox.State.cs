@@ -32,10 +32,20 @@ internal sealed partial class Inbox
     // Whether every processed record which deduplication relies on is durable.
     private bool AreCompletionsDurable => _lastCompletionSequence <= _durableSequence;
 
+    // The handler attempt in progress, whose staged changes the inbox discards if it fails.
+    private HandlerExecution? _execution;
+
     // Every journal write prepares every state, so a write which makes a message or a work source's work pending ensures
-    // its wake-up before it can become durable.
+    // its wake-up before it can become durable. After messaging fails, in-memory state may hold changes which must not
+    // commit, such as a failed handler's, so every later write fails and recovery starts from the journal.
     ValueTask IStateMachine.PrepareWriteAsync(CancellationToken cancellationToken)
     {
+        if (_pump.IsFailed)
+        {
+            return ValueTask.FromException(new InvalidOperationException(
+                "Messaging failed for this activation, so its uncommitted changes are discarded by recovery from the journal."));
+        }
+
         var dueTime = _stagedWakeup;
         if (GetWorkSourceDelay() is { } delay)
         {

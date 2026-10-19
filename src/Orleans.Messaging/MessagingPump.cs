@@ -70,6 +70,11 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     public IJournaledStateManager StateManager { get; }
 
+    /// <summary>
+    /// Gets the state manager's count of staged changes, or a negative value when a replacement manager doesn't track them.
+    /// </summary>
+    public long StagedChangeCount => StateManager is JournaledStateManager manager ? manager.StagedChangeCount : -1;
+
     public MessagingShared Shared { get; }
 
     /// <summary>Gets the token which is canceled when messaging stops for this activation.</summary>
@@ -319,9 +324,17 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         }
     }
 
+    /// <summary>Gets whether messaging failed, so the activation's uncommitted changes must not commit.</summary>
+    internal bool IsFailed { get; private set; }
+
     /// <summary>Stops messaging and deactivates the grain after an unrecoverable failure.</summary>
+    /// <remarks>
+    /// In-memory state may no longer match what the activation may commit, so every later journal write fails and the
+    /// next activation recovers from the journal.
+    /// </remarks>
     internal void Fail(Exception exception, string description)
     {
+        IsFailed = true;
         if (_shutdown.IsCancellationRequested) return;
         Stop();
         try
