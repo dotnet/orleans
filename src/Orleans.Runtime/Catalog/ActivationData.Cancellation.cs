@@ -121,15 +121,6 @@ internal sealed partial class ActivationData
         }
     }
 
-    private bool LockIsHeld()
-    {
-#if NET10_0_OR_GREATER
-        return _lock.IsHeldByCurrentThread;
-#else
-        return Monitor.IsEntered(_lock);
-#endif
-    }
-
     [LoggerMessage(
         Level = LogLevel.Warning,
         Message = "One or more cancellation callbacks failed."

@@ -38,30 +38,11 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
 
     public void WriteMessage(Message message)
     {
-        var startLength = _buffer.Length;
         var messageSerializer = _messageSerializer ??= _shared.GetMessageSerializer();
-        try
-        {
-            // Reserve space for framing
-            var framingBytes = _buffer.GetSpan(Message.LENGTH_HEADER_SIZE);
-            _buffer.AdvanceWriter(Message.LENGTH_HEADER_SIZE);
-
-            // Serialize the message in full
-            var (headerLength, bodyLength) = messageSerializer.Write(_buffer, message);
-
-            // Write the framing
-            BinaryPrimitives.WriteInt32LittleEndian(framingBytes, headerLength);
-            BinaryPrimitives.WriteInt32LittleEndian(framingBytes[sizeof(int)..], bodyLength);
-
-            var totalLength = headerLength + bodyLength;
-            _messages.Add((message, totalLength, headerLength));
-            _hasLargeMessages |= totalLength >= LargeMessageSize;
-        }
-        catch
-        {
-            _buffer.Truncate(startLength);
-            throw;
-        }
+        var (headerLength, bodyLength) = MessageFrames.Write(messageSerializer, _buffer, message);
+        var totalLength = headerLength + bodyLength;
+        _messages.Add((message, totalLength, headerLength));
+        _hasLargeMessages |= totalLength >= LargeMessageSize;
     }
 
     public void CompleteWriting()

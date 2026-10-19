@@ -55,30 +55,6 @@ internal sealed partial class ActivationData
     }
 
     /// <summary>
-    /// Adds an update to <paramref name="message"/> which replaces the grain's previous address with this activation's address in callers' caches.
-    /// </summary>
-    /// <remarks>
-    /// A request which an earlier forward or migration moved already carries an update for this grain, from its original address to the address it moved to.
-    /// That update is composed with this one, so that callers which cached the original address cache this activation's address.
-    /// </remarks>
-    private void AddMigratedCacheUpdate(Message message, GrainAddress previousAddress)
-    {
-        if (message.CacheInvalidationHeader is { } updates)
-        {
-            for (var i = 0; i < updates.Count; i++)
-            {
-                if (updates[i].GrainId == GrainId)
-                {
-                    updates[i] = new GrainAddressCacheUpdate(updates[i].InvalidGrainAddress, Address);
-                    return;
-                }
-            }
-        }
-
-        message.AddToCacheInvalidationHeader(previousAddress, Address);
-    }
-
-    /// <summary>
     /// Queues the requests which were queued for this grain's previous activation when it migrated here, ahead of any other request.
     /// </summary>
     /// <param name="messages">The requests.</param>
@@ -115,7 +91,7 @@ internal sealed partial class ActivationData
             {
                 if (previousAddress is not null)
                 {
-                    AddMigratedCacheUpdate(message, previousAddress);
+                    message.AddToCacheInvalidationHeader(previousAddress, Address);
                 }
 
                 migrated.Add((message, queuedTime));

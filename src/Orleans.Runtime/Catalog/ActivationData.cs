@@ -1319,14 +1319,7 @@ internal sealed partial class ActivationData :
                 }
             }
 
-            var requests = new List<Message>(_waitingRequests.Count);
-            foreach (var (message, _) in _waitingRequests)
-            {
-                requests.Add(message);
-            }
-
-            _waitingRequests.Clear();
-            return requests;
+            return TakeWaitingRequests();
         }
 
         void AbandonStuckDeactivatingActivation()
@@ -1788,6 +1781,27 @@ internal sealed partial class ActivationData :
     /// Requests are forwarded if this was a duplicate activation or it was at some point successfully activated, and rejected otherwise.
     /// Local requests never leave the activation, so they are rejected.
     /// </remarks>
+    /// <summary>
+    /// Removes all queued requests. The caller holds <see cref="_lock"/>.
+    /// </summary>
+    /// <returns>The requests, or <see langword="null"/> if there are none.</returns>
+    private List<Message>? TakeWaitingRequests()
+    {
+        if (_waitingRequests.Count == 0)
+        {
+            return null;
+        }
+
+        var requests = new List<Message>(_waitingRequests.Count);
+        foreach (var (message, _) in _waitingRequests)
+        {
+            requests.Add(message);
+        }
+
+        _waitingRequests.Clear();
+        return requests;
+    }
+
     private void RejectOrForwardRequests(List<Message>? requests, ActivationMigration? migration = null)
     {
         if (requests is not null)
@@ -2319,19 +2333,10 @@ internal sealed partial class ActivationData :
             UnregisterMessageTarget();
             try
             {
-                List<Message>? queued = null;
+                List<Message>? queued;
                 lock (_lock)
                 {
-                    if (_waitingRequests.Count > 0)
-                    {
-                        queued = new List<Message>(_waitingRequests.Count);
-                        foreach (var (message, _) in _waitingRequests)
-                        {
-                            queued.Add(message);
-                        }
-
-                        _waitingRequests.Clear();
-                    }
+                    queued = TakeWaitingRequests();
                 }
 
                 if (queued is not null || migration is not null)
@@ -2377,7 +2382,7 @@ internal sealed partial class ActivationData :
                 // Send the dehydration context to the target host. The migration takes ownership of the queued requests, which the new activation runs before any other request,
                 // and of any which arrive later. It delivers the requests which the new activation does not take.
                 migration = migrationManager.StartMigration(ForwardingAddress, Address, context.MigrationContext, TakeRequestsForMigration(), cancellationToken);
-                await migration.Completion;
+                await migration.Completion.WaitAsync(cancellationToken);
                 _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, ForwardingAddress);
                 return true;
             }

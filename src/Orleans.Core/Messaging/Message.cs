@@ -425,27 +425,30 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <remarks>
+        /// The header holds one entry per grain. A later update for a grain which the header already covers replaces the entry's valid address,
+        /// keeping its invalid address, so that callers which cached the grain's original address cache the address which the message reached last.
+        /// </remarks>
         private static void AddCacheInvalidationHeaderEntry(List<GrainAddressCacheUpdate> cacheInvalidationHeader, GrainAddressCacheUpdate grainAddressCacheUpdate)
         {
-            if (cacheInvalidationHeader.Count >= MaxCacheInvalidationHeaderEntries || ContainsCacheInvalidationHeaderEntry(cacheInvalidationHeader, grainAddressCacheUpdate.GrainId))
+            for (var i = 0; i < cacheInvalidationHeader.Count; i++)
             {
-                return;
-            }
-
-            cacheInvalidationHeader.Add(grainAddressCacheUpdate);
-        }
-
-        private static bool ContainsCacheInvalidationHeaderEntry(List<GrainAddressCacheUpdate> cacheInvalidationHeader, GrainId grainId)
-        {
-            foreach (var entry in cacheInvalidationHeader)
-            {
-                if (entry.GrainId.Equals(grainId))
+                var existing = cacheInvalidationHeader[i];
+                if (existing.GrainId.Equals(grainAddressCacheUpdate.GrainId))
                 {
-                    return true;
+                    if (grainAddressCacheUpdate.ValidGrainAddress is { } validAddress)
+                    {
+                        cacheInvalidationHeader[i] = new GrainAddressCacheUpdate(existing.InvalidGrainAddress, validAddress);
+                    }
+
+                    return;
                 }
             }
 
-            return false;
+            if (cacheInvalidationHeader.Count < MaxCacheInvalidationHeaderEntries)
+            {
+                cacheInvalidationHeader.Add(grainAddressCacheUpdate);
+            }
         }
 
         public override string ToString() => $"{this}";

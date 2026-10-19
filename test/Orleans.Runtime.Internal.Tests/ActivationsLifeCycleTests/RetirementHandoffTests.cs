@@ -515,6 +515,41 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
+    public async Task MigrationCanceledBeforeItIsSent_IsNotSentAndForwardsItsRequests()
+    {
+        var migrationsReceived = 0;
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
+        {
+            if (context.Request.GetMethodName() is nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests) or nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
+            {
+                Interlocked.Increment(ref migrationsReceived);
+            }
+
+            await context.Invoke();
+        })));
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var migrationManager = source.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
+        var grainId = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>().GetGrain<IRetirementHandoffGrain>(Guid.NewGuid(), typeof(RetirementHandoffGrain).FullName).GetGrainId();
+        var original = CreateRequest(cluster, grainId, 1, CreatePooledBuffer(Enumerable.Repeat((byte)0x5A, 20_000).ToArray()));
+        List<Message> requests = [original];
+
+        // The activation stops waiting before the manager sends the migration, so the manager does not send it.
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        var migration = migrationManager.StartMigration(target.SiloAddress, CreateSourceAddress(source, grainId), new MigrationContext(source.ServiceProvider.GetRequiredService<SerializerSessionPool>()), requests, canceled.Token);
+        Assert.NotNull(migration.Package.Requests);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => migration.Completion.WaitAsync(Timeout, Cancellation));
+        Assert.Equal(0, Volatile.Read(ref migrationsReceived));
+
+        // The requests remain with the migration until the activation stops receiving requests, and are then forwarded as copies of their serialized form.
+        Assert.Same(original, Assert.Single(requests));
+        migration.SourceDeactivated(laterRequests: null);
+        Assert.NotSame(original, Assert.Single(requests));
+        Assert.Equal(original.Id, requests[0].Id);
+    }
+
+    [Fact]
     public async Task DeclinedRequestFromCallerOnTheSource_IsForwardedWithItsPooledArgument()
     {
         // The target declines the migrating grain's requests.

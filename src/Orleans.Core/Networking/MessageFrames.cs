@@ -25,8 +25,26 @@ internal static class MessageFrames
     /// </remarks>
     public static int Write(MessageHandlerShared shared, ArcBufferWriter buffer, Message message)
     {
-        var startLength = buffer.Length;
         var serializer = shared.GetMessageSerializer();
+        try
+        {
+            var (headerLength, bodyLength) = Write(serializer, buffer, message);
+            return Message.LENGTH_HEADER_SIZE + headerLength + bodyLength;
+        }
+        finally
+        {
+            shared.Return(serializer);
+        }
+    }
+
+    /// <summary>
+    /// Appends a frame for <paramref name="message"/> to <paramref name="buffer"/> using <paramref name="serializer"/>.
+    /// </summary>
+    /// <returns>The lengths of the message's serialized headers and body.</returns>
+    /// <remarks>If writing fails, <paramref name="buffer"/> is left unchanged.</remarks>
+    public static (int HeaderLength, int BodyLength) Write(MessageSerializer serializer, ArcBufferWriter buffer, Message message)
+    {
+        var startLength = buffer.Length;
         try
         {
             var framing = buffer.GetSpan(Message.LENGTH_HEADER_SIZE);
@@ -34,16 +52,12 @@ internal static class MessageFrames
             var (headerLength, bodyLength) = serializer.Write(buffer, message);
             BinaryPrimitives.WriteInt32LittleEndian(framing, headerLength);
             BinaryPrimitives.WriteInt32LittleEndian(framing[sizeof(int)..], bodyLength);
-            return Message.LENGTH_HEADER_SIZE + headerLength + bodyLength;
+            return (headerLength, bodyLength);
         }
         catch
         {
             buffer.Truncate(startLength);
             throw;
-        }
-        finally
-        {
-            shared.Return(serializer);
         }
     }
 

@@ -102,27 +102,6 @@ internal struct GrainMigrationPackage
 }
 
 /// <summary>
-/// What became of the requests which a migration carried.
-/// </summary>
-internal enum MigratedRequestsOutcome : byte
-{
-    /// <summary>
-    /// The requests were not delivered, so the source forwards them.
-    /// </summary>
-    Retained,
-
-    /// <summary>
-    /// The grain's new activation took ownership of the requests, and their callers were retargeted to it.
-    /// </summary>
-    Accepted,
-
-    /// <summary>
-    /// The target may have taken ownership of the requests. They are not resent, since the target may be executing them.
-    /// </summary>
-    Unknown,
-}
-
-/// <summary>
 /// Functionality for migrating an activation to a new location.
 /// </summary>
 internal interface IActivationMigrationManager
@@ -134,7 +113,10 @@ internal interface IActivationMigrationManager
     /// <param name="source">The address of the migrating activation.</param>
     /// <param name="migrationContext">Information about the grain being migrated, which will be consumed by the new activation.</param>
     /// <param name="requests">The requests which were queued for the activation, if any. The migration takes ownership of them.</param>
-    /// <param name="cancellationToken">A token which ends the wait for the migration's completion. The migration continues, and still delivers its requests.</param>
+    /// <param name="cancellationToken">
+    /// A token which cancels the migration if it has not been sent yet. A migration which has been sent continues, since the target may already have accepted it.
+    /// Either way, the migration delivers its requests.
+    /// </param>
     /// <returns>The migration.</returns>
     ActivationMigration StartMigration(SiloAddress target, GrainAddress source, MigrationContext migrationContext, List<Message>? requests, CancellationToken cancellationToken);
 }
@@ -153,62 +135,43 @@ internal interface IActivationMigrationManager
 /// Requests are not forwarded before then, so that a request does not create an activation on the target before the migration does, or return to the source activation.
 /// </para>
 /// </remarks>
-internal sealed class ActivationMigration
+internal sealed class ActivationMigration(
+    ActivationMigrationManager manager,
+    GrainAddress source,
+    SiloAddress target,
+    GrainMigrationPackage package,
+    List<Message>? requests,
+    List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes,
+    long size,
+    CancellationToken cancellationToken)
 {
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly ActivationMigrationManager _manager;
-    private readonly GrainAddress _source;
-    private readonly SiloAddress _target;
-    private readonly CancellationToken _cancellationToken;
-    private CancellationTokenRegistration _cancellation;
-    private List<Message>? _requests;
+    private List<Message>? _requests = requests;
     private List<Message>? _laterRequests;
-    private MigratedRequestsOutcome? _outcome;
-    private bool _sourceDeactivated;
-    private bool _delivered;
-#if NET9_0_OR_GREATER
-    private readonly Lock _lock = new();
-#else
-    private readonly object _lock = new();
-#endif
+    private bool _requestsRetained;
 
-    internal ActivationMigration(
-        ActivationMigrationManager manager,
-        GrainAddress source,
-        SiloAddress target,
-        GrainMigrationPackage package,
-        List<Message>? requests,
-        List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes,
-        long size,
-        CancellationToken cancellationToken)
-    {
-        _manager = manager;
-        _source = source;
-        _target = target;
-        _requests = requests;
-        _cancellationToken = cancellationToken;
-        Package = package;
-        Routes = routes;
-        Size = size;
-    }
+    // The outcome and the source's deactivation each signal once. The second signal delivers the requests.
+    private int _pendingSignals = 2;
 
     /// <summary>
     /// Completes when the target has acknowledged the migration, and the callers of the requests which it took have been retargeted.
-    /// Faults if the migration failed, and is canceled when the cancellation token passed to <see cref="IActivationMigrationManager.StartMigration"/> is canceled first.
+    /// Faults if the migration failed or was canceled before it was sent.
     /// </summary>
     public Task Completion => _completion.Task;
 
-    internal GrainMigrationPackage Package { get; }
+    internal GrainMigrationPackage Package { get; } = package;
 
     /// <summary>
     /// The routes for retargeting the callers of the requests which the migration carries.
     /// </summary>
-    internal List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? Routes { get; }
+    internal List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? Routes { get; } = routes;
 
     /// <summary>
     /// The serialized size of the package, bounded from above for its migration context.
     /// </summary>
-    internal long Size { get; }
+    internal long Size { get; } = size;
+
+    internal CancellationToken CancellationToken { get; } = cancellationToken;
 
     /// <summary>
     /// Takes ownership of the requests which reached the activation after the migration started, once the activation has stopped receiving requests.
@@ -216,38 +179,22 @@ internal sealed class ActivationMigration
     /// <param name="laterRequests">The requests, if any.</param>
     public void SourceDeactivated(List<Message>? laterRequests)
     {
-        lock (_lock)
-        {
-            Debug.Assert(!_sourceDeactivated);
-            _laterRequests = laterRequests;
-            _sourceDeactivated = true;
-        }
-
-        TryDeliverRequests();
+        _laterRequests = laterRequests;
+        Signal();
     }
-
-    internal void RegisterCancellation()
-        => _cancellation = _cancellationToken.UnsafeRegister(
-            static state =>
-            {
-                var migration = (ActivationMigration)state!;
-                migration._completion.TrySetCanceled(migration._cancellationToken);
-            },
-            this);
 
     /// <summary>
     /// Records the migration's outcome, delivering its requests if the activation has stopped receiving requests.
     /// </summary>
-    internal void SetOutcome(MigratedRequestsOutcome requests, Exception? exception = null)
+    /// <param name="requestsRetained">
+    /// Whether the migration did not deliver the requests which it carried, if any, so that this silo forwards them.
+    /// Otherwise, the target owns them, or may own them, and they are not resent.
+    /// </param>
+    /// <param name="exception">The error which prevented the migration, if any.</param>
+    internal void SetOutcome(bool requestsRetained, Exception? exception = null)
     {
-        lock (_lock)
-        {
-            Debug.Assert(_outcome is null);
-            _outcome = requests;
-        }
-
-        _cancellation.Dispose();
-        TryDeliverRequests();
+        _requestsRetained = requestsRetained;
+        Signal();
         if (exception is null)
         {
             _completion.TrySetResult();
@@ -258,26 +205,17 @@ internal sealed class ActivationMigration
         }
     }
 
-    private void TryDeliverRequests()
+    private void Signal()
     {
-        List<Message>? requests;
-        List<Message>? laterRequests;
-        MigratedRequestsOutcome outcome;
-        lock (_lock)
+        var pending = Interlocked.Decrement(ref _pendingSignals);
+        Debug.Assert(pending >= 0);
+        if (pending == 0)
         {
-            if (!_sourceDeactivated || _outcome is not { } value || _delivered)
-            {
-                return;
-            }
-
-            _delivered = true;
-            outcome = value;
-            requests = _requests;
-            laterRequests = _laterRequests;
+            var requests = _requests;
+            var laterRequests = _laterRequests;
             _requests = _laterRequests = null;
+            manager.DeliverRequests(source, target, Package.Requests, _requestsRetained, requests, laterRequests);
         }
-
-        _manager.DeliverRequests(_source, _target, Package.Requests, outcome, requests, laterRequests);
     }
 }
 
@@ -356,25 +294,16 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     /// </summary>
     private MessageHandlerShared MessageHandlerShared => _messageHandlerShared ??= _runtimeClient.ServiceProvider.GetRequiredService<MessageHandlerShared>();
 
-    public ValueTask AcceptMigratingGrains(
+    public async ValueTask AcceptMigratingGrains(
         List<GrainMigrationPackage> migratingGrains,
         CancellationToken cancellationToken = default)
-        => new(AcceptMigratingGrainsCoreAsync(migratingGrains, requestsAccepted: null, cancellationToken));
+        => await AcceptMigratingGrainsWithRequests(migratingGrains, cancellationToken);
 
     public async ValueTask<bool[]> AcceptMigratingGrainsWithRequests(
         List<GrainMigrationPackage> migratingGrains,
         CancellationToken cancellationToken = default)
     {
         var requestsAccepted = new bool[migratingGrains.Count];
-        await AcceptMigratingGrainsCoreAsync(migratingGrains, requestsAccepted, cancellationToken);
-        return requestsAccepted;
-    }
-
-    private async Task AcceptMigratingGrainsCoreAsync(
-        List<GrainMigrationPackage> migratingGrains,
-        bool[]? requestsAccepted,
-        CancellationToken cancellationToken)
-    {
         var activations = new List<ActivationData>();
         var currentActivity = Activity.Current;
         for (var i = 0; i < migratingGrains.Count; i++)
@@ -396,10 +325,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             // If the activation does not exist, create it and provide it with the migration context and queued requests while doing so.
             // If the activation already exists or cannot be created, it is too late to perform migration, so ignore the request.
             var context = _catalog.GetOrCreateActivation(package.GrainId, requestContextData: null, package.MigrationContext, requests, previousAddress, out var accepted);
-            if (requestsAccepted is not null)
-            {
-                requestsAccepted[i] = accepted;
-            }
+            requestsAccepted[i] = accepted;
 
             if (!accepted && requests is not null)
             {
@@ -427,6 +353,8 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         {
             await activation.WaitForActivationReadyAsync(cancellationToken);
         }
+
+        return requestsAccepted;
     }
 
     private List<Message>? ReadRequests(GrainId grainId, byte[] frames)
@@ -472,10 +400,9 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         }
 
         var migration = new ActivationMigration(this, source, targetSilo, package, requests, routes, size, cancellationToken);
-        migration.RegisterCancellation();
         if (!GetOrCreateWorker(targetSilo).TryWrite(migration))
         {
-            migration.SetOutcome(MigratedRequestsOutcome.Retained, new SiloUnavailableException($"Silo {targetSilo} is no longer active"));
+            migration.SetOutcome(requestsRetained: true, new SiloUnavailableException($"Silo {targetSilo} is no longer active"));
         }
 
         return migration;
@@ -631,14 +558,14 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     /// <param name="source">The migrating activation's address.</param>
     /// <param name="target">The migration target.</param>
     /// <param name="frames">The serialized requests which the migration carried, if any.</param>
-    /// <param name="outcome">What became of the requests which the migration carried.</param>
+    /// <param name="requestsRetained">Whether the migration did not deliver the requests which it carried, if any.</param>
     /// <param name="requests">The requests which were queued when the migration started.</param>
     /// <param name="laterRequests">The requests which reached the activation after the migration started.</param>
-    internal void DeliverRequests(GrainAddress source, SiloAddress target, byte[]? frames, MigratedRequestsOutcome outcome, List<Message>? requests, List<Message>? laterRequests)
+    internal void DeliverRequests(GrainAddress source, SiloAddress target, byte[]? frames, bool requestsRetained, List<Message>? requests, List<Message>? laterRequests)
     {
         if (requests is not null)
         {
-            if (outcome is MigratedRequestsOutcome.Retained)
+            if (requestsRetained)
             {
                 if (frames is not null)
                 {
@@ -740,9 +667,21 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                         && (!carriesRequests || batchSize + next.Size <= maxBatchSize)
                         && reader.TryRead(out var workItem))
                     {
+                        if (workItem.CancellationToken.IsCancellationRequested)
+                        {
+                            // The migration has not been sent, so its requests remain with this silo.
+                            workItem.SetOutcome(requestsRetained: true, new OperationCanceledException(workItem.CancellationToken));
+                            continue;
+                        }
+
                         items.Add(workItem);
                         batch.Add(workItem.Package);
                         batchSize += workItem.Size;
+                    }
+
+                    if (items.Count == 0)
+                    {
+                        continue;
                     }
 
                     // Attempt to migrate the batch.
@@ -751,7 +690,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                         await remote.AcceptMigratingGrains(batch, _shuttingDownCts.Token);
                         foreach (var item in items)
                         {
-                            item.SetOutcome(MigratedRequestsOutcome.Retained);
+                            item.SetOutcome(requestsRetained: true);
                         }
                     }
                     else
@@ -762,7 +701,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                             throw new InvalidOperationException($"Expected {items.Count} results from {targetSilo} but received {requestsAccepted.Length}.");
                         }
 
-                        CompleteAfterRetargeting([.. items], requestsAccepted);
+                        CompleteAfterRetargeting(items, requestsAccepted);
                     }
 
                     LogDebugMigratedActivations(items.Count, targetSilo);
@@ -777,7 +716,8 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                     // The target may have accepted the batch even though this silo did not observe it.
                     foreach (var item in items)
                     {
-                        item.SetOutcome(item.Package.Requests is null ? MigratedRequestsOutcome.Retained : MigratedRequestsOutcome.Unknown, exception);
+                        // The target may have accepted the batch even though this silo did not observe it, so requests which it carried are not resent.
+                        item.SetOutcome(requestsRetained: item.Package.Requests is null, exception);
                     }
 
                     // If the silo is terminating, we should stop trying to migrate activations to it.
@@ -817,15 +757,15 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         for (var i = 0; i < items.Count; i++)
         {
             var item = items[i];
-            if (item.Package.Requests is null || !requestsAccepted[i])
+            if (!requestsAccepted[i])
             {
-                item.SetOutcome(MigratedRequestsOutcome.Retained);
+                item.SetOutcome(requestsRetained: true);
                 continue;
             }
 
-            if (item.Routes is not { Count: > 0 } routes)
+            if (item.Routes is not { } routes)
             {
-                item.SetOutcome(MigratedRequestsOutcome.Accepted);
+                item.SetOutcome(requestsRetained: false);
                 continue;
             }
 
@@ -876,7 +816,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             {
                 foreach (var item in items)
                 {
-                    item.SetOutcome(MigratedRequestsOutcome.Accepted);
+                    item.SetOutcome(requestsRetained: false);
                 }
             }
         }
@@ -920,7 +860,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             var exception = new SiloUnavailableException($"Silo {targetSilo} is no longer active");
             while (entry.WorkItemChannel.Reader.TryRead(out var item))
             {
-                item.SetOutcome(MigratedRequestsOutcome.Retained, exception);
+                item.SetOutcome(requestsRetained: true, exception);
             }
         }
     }
