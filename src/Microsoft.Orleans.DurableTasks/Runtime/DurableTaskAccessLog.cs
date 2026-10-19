@@ -995,13 +995,28 @@ internal sealed class DurableTaskAccessLog(
 
     private const int MaxVarUInt64Length = 10;
 
-    // Whether the serializer encodes a positional read's argument and result types, so the read's value can be recovered.
+    // Whether a positional read of these types replays exactly what the first run observed, and the serializer encodes
+    // them, so the read's value can be recovered.
     private static class PositionalTypes<TArgument, TResult>
     {
+        // Reads which compare their argument with the state's content need an argument whose default equality compares
+        // values, so the decoded argument finds what the live one did. Results are re-encoded from the journal, so they
+        // must be exactly the types which the live read returned; small results record values, which cost no more than a
+        // position and hold no barrier.
+        private static readonly bool s_eligible =
+            (typeof(TArgument) == typeof(JournaledStateAccessNoArgument) || ValueEquality<TArgument>.IsSupported)
+            && PositionalResults.IsExact(typeof(TResult))
+            && !PositionalResults.IsSmall(typeof(TResult));
+
         private static Entry? s_entry;
 
         public static bool IsSupported(Serializer serializer)
         {
+            if (!s_eligible)
+            {
+                return false;
+            }
+
             if (s_entry is { } entry && ReferenceEquals(entry.Serializer, serializer))
             {
                 return entry.IsSupported;
@@ -1411,5 +1426,93 @@ internal static class ValueKinds
         }
 
         return true;
+    }
+}
+
+/// <summary>
+/// Describes whether the default equality of <typeparamref name="T"/> compares values, so an argument which a positional
+/// read decodes finds in the decoded content what the live argument found in the live content.
+/// </summary>
+/// <remarks>
+/// Primitives, strings, enumerations, decimals, dates, times, <see cref="Guid"/>, and nullable values, pairs and tuples of
+/// these compare values, as do non-generic types which implement <see cref="IEquatable{T}"/> of themselves, such as records.
+/// Arrays and other types compare references, or can't be shown to compare values, so their reads record values.
+/// </remarks>
+internal static class ValueEquality<T>
+{
+    public static bool IsSupported { get; } =
+        PositionalResults.HasValueEquality(typeof(T))
+        || (!typeof(T).IsArray && !typeof(T).IsGenericType && typeof(IEquatable<T>).IsAssignableFrom(typeof(T)));
+}
+
+/// <summary>Describes the result types of positional reads.</summary>
+internal static class PositionalResults
+{
+    /// <summary>
+    /// Gets whether a result of <paramref name="type"/>, decoded from the journal and encoded again, is the encoding of the
+    /// value which the live read returned: a value type or a sealed class, whose generic arguments are such types, or an
+    /// array of such value types.
+    /// </summary>
+    /// <remarks>
+    /// A runtime subtype of any other type can encode differently, or not at all. An array of references is excluded too:
+    /// the state journals its elements one by one, so an instance which it holds more than once decodes as separate
+    /// instances, while the live copy, and its value record, share it.
+    /// </remarks>
+    public static bool IsExact(Type type)
+    {
+        if (type.IsArray)
+        {
+            var element = type.GetElementType()!;
+            return type.GetArrayRank() == 1 && element.IsValueType && IsExact(element);
+        }
+
+        if (!type.IsValueType && !type.IsSealed)
+        {
+            return false;
+        }
+
+        return !type.IsGenericType || type.GetGenericArguments().All(IsExact);
+    }
+
+    /// <summary>
+    /// Gets whether a result of <paramref name="type"/> is small and of fixed size, such as a count, a flag, or an index, so
+    /// its value is no larger than a position.
+    /// </summary>
+    public static bool IsSmall(Type type)
+    {
+        if (type.IsPrimitive || type.IsEnum)
+        {
+            return true;
+        }
+
+        return IsPairOrNullable(type) && type.GetGenericArguments().All(IsSmall);
+    }
+
+    /// <summary>Gets whether the default equality of <paramref name="type"/> is known to compare values.</summary>
+    public static bool HasValueEquality(Type type)
+    {
+        if (type.IsPrimitive || type.IsEnum
+            || type == typeof(string) || type == typeof(decimal) || type == typeof(Guid)
+            || type == typeof(TimeSpan) || type == typeof(DateTime) || type == typeof(DateTimeOffset))
+        {
+            return true;
+        }
+
+        return IsPairOrNullable(type) && type.GetGenericArguments().All(HasValueEquality);
+    }
+
+    // Generic values whose equality and encoding are those of their components.
+    private static bool IsPairOrNullable(Type type)
+    {
+        if (!type.IsGenericType)
+        {
+            return false;
+        }
+
+        var definition = type.GetGenericTypeDefinition();
+        return definition == typeof(Nullable<>)
+            || definition == typeof(KeyValuePair<,>)
+            || definition == typeof(ValueTuple<,>)
+            || definition == typeof(ValueTuple<,,>);
     }
 }
