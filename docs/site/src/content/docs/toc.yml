@@ -481,8 +481,28 @@ items:
             href: diagnostics/orleans0215.md
           - name: ORLEANS0216
             href: diagnostics/orleans0216.md
+          - name: ORLEANS0217
+            href: diagnostics/orleans0217.md
+          - name: ORLEANS0218
+            href: diagnostics/orleans0218.md
+          - name: ORLEANS0219
+            href: diagnostics/orleans0219.md
+          - name: ORLEANS0220
+            href: diagnostics/orleans0220.md
+          - name: ORLEANS0221
+            href: diagnostics/orleans0221.md
+          - name: ORLEANS0222
+            href: diagnostics/orleans0222.md
+          - name: ORLEANS0223
+            href: diagnostics/orleans0223.md
           - name: ORLEANS0224
             href: diagnostics/orleans0224.md
+          - name: ORLEANS0225
+            href: diagnostics/orleans0225.md
+          - name: ORLEANS0226
+            href: diagnostics/orleans0226.md
+          - name: ORLEANS0227
+            href: diagnostics/orleans0227.md
       - name: API context and examples
         href: resources/api-reference-guide.md
       - name: Best practices
