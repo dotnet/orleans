@@ -361,7 +361,8 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
                 WalState? walState;
                 try
                 {
-                    walState = await TryLoadWalStateAsync(expectedETag, cancellationToken).ConfigureAwait(false);
+                    // Only an instance without a precondition adopts the WAL it finds; a failed delete leaves an established precondition in place.
+                    walState = await TryLoadWalStateAsync(expectedETag, cancellationToken, updateCache: !_isWalKnown).ConfigureAwait(false);
                 }
                 catch (AmazonS3Exception exception) when (IsWalMutationConflict(exception))
                 {
@@ -614,7 +615,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
             WalState? walState;
             try
             {
-                walState = await TryLoadWalStateAsync(expectedWalETag, cancellationToken).ConfigureAwait(false);
+                walState = await TryLoadWalStateAsync(expectedWalETag, cancellationToken, updateCache: false).ConfigureAwait(false);
                 if (walState is null)
                 {
                     throw CreateInconsistentWalStateException(

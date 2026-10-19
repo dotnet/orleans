@@ -1,7 +1,7 @@
 ---
 title: Journaling runtime behavior and consistency
 description: Understand Orleans Journaling activation, write, recovery, compaction, concurrency, and failure semantics.
-ms.date: 08/21/2026
+ms.date: 10/19/2026
 ms.topic: conceptual
 ---
 
@@ -72,9 +72,31 @@ staged mutations from other calls.
 
 Orleans grain placement normally supplies a single active writer for a grain identity. Journal storage providers also use optimistic concurrency to protect the journal when a stale or competing writer reaches storage.
 
+Each storage instance writes only on top of the journal version it last read or wrote. That version includes an absent journal: a writer which recovered an empty journal can create it, and fails if another writer created it first.
+
 An append, replacement, or delete with stale storage metadata throws <xref:Orleans.Storage.InconsistentStateException>. The state manager permanently fences further operations, faults queued work, and requests grain deactivation. The failed operation reports its original exception. A new activation replays the stored journal to determine the durable outcome.
 
 Design commands to tolerate retries at the application boundary. Use operation identifiers when a caller can repeat a command after an uncertain network outcome.
+
+## Journal storage contract
+
+The journal is the source of truth for durable state, so every <xref:Orleans.Journaling.IJournalStorage> provider guarantees the following, and the provider conformance suite in the Orleans repository verifies each guarantee for every provider:
+
+- **All-or-nothing writes.** An append makes its whole segment visible after every earlier segment, or none of it. A replacement makes its whole value the journal's only segment, or the journal keeps its earlier content. This holds across process and storage crashes, timeouts, conflicts, and retries inside the provider.
+- **Whole-call limit failures.** A segment which exceeds a provider limit fails the call with an exception, and nothing of it becomes visible.
+- **Unchanged storage after a rejected write.** A write which the provider rejects leaves the earlier content in place. A write with an indeterminate outcome, such as a timeout after the request was sent, applied its whole segment or none of it; the next read shows which.
+- **Whole, ordered reads.** A read returns one version of the journal: every segment written up to that version, whole and in write order.
+- **Write preconditions.** A write succeeds only if the journal is still at the version the storage instance last read or wrote, including an observed absence. Metadata operations never move that precondition.
+
+Each provider documents its limits:
+
+| Provider | Largest append | Largest replacement |
+| --- | --- | --- |
+| Azure Blob Storage | 100 MiB (one append block) | Azure block blob limits |
+| Azure Table Storage | 2 MiB (one entity group transaction) | Partition capacity; rows publish through one header update |
+| Redis | The whole journal string, including the append, fits the server's string limit (512 MB by default) | The server's string limit |
+| Amazon S3 | 5 GB per request; conditional-rewrite appends keep the whole WAL within 5 GB | 5 GB |
+| Volatile (development) | Process memory | Process memory |
 
 ## Storage failures
 

@@ -300,6 +300,18 @@ State registration stays closed after initialization first begins.
 Cancelling a caller's wait leaves an already queued write running. Observe durability through write
 acknowledgement or a fresh activation before deciding whether to retry an application command.
 
+## Storage provider contract
+
+The journal is the source of truth for durable state. Every `IJournalStorage` implementation provides these guarantees:
+
+- `AppendAsync` makes its whole segment visible after every earlier segment, or none of it, and `ReplaceAsync` makes its whole value the journal's only segment, or the journal keeps its earlier content. A segment stored across several records or requests becomes visible through one atomic publication step, so no reader observes part of a segment after a crash, timeout, conflict, or retry inside the provider.
+- A segment which exceeds a provider limit fails the whole call with an exception, and nothing of it becomes visible.
+- A write which the provider rejects leaves the earlier content in place. A write with an indeterminate outcome, such as a timeout after the request was sent, applied its whole segment or none of it; the next read shows which.
+- `ReadAsync` returns one version of the journal: every segment written up to that version, whole and in write order.
+- Each storage instance holds a write precondition: the version it last read or wrote, including an observed absence. `AppendAsync`, `ReplaceAsync`, and `DeleteAsync` succeed only at that version and otherwise throw `InconsistentStateException`. Metadata operations never move the precondition.
+
+The provider conformance suite (`JournalStorageConformanceTests` in `test/Orleans.Journaling.Tests/Conformance`) verifies these guarantees with limit, concurrency, fault-injection, and model-based tests. Each provider in this repository runs it.
+
 ## Storage format
 
 The JSON journaling format stores journal entries as true JSON Lines: UTF-8 text, no byte order mark, and one JSON array per journal entry line. Each line is terminated by `\n`. Recovery accepts both LF and CRLF line endings. Storage providers which use format metadata should store `JsonLinesJournalFormat.JournalFormatKey` as the format key and may use `application/jsonl` as the MIME type.

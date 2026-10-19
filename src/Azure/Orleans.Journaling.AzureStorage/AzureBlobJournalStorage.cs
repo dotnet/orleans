@@ -305,7 +305,8 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage, IJourna
             try
             {
                 // Load the WAL manifest only when deletion needs to know which checkpoint may become unreachable.
-                walState = await TryLoadWalStateAsync(conditions, cancellationToken, updateCache: !observedAbsent).ConfigureAwait(false);
+                // Only an instance without a precondition adopts the WAL it finds; a failed delete leaves an established precondition in place.
+                walState = await TryLoadWalStateAsync(conditions, cancellationToken, updateCache: !_isWalKnown).ConfigureAwait(false);
             }
             catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
             {
@@ -514,7 +515,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage, IJourna
             try
             {
                 // Read the WAL manifest so compaction preserves caller-owned metadata while replacing provider-owned checkpoint metadata.
-                walState = await TryLoadWalStateAsync(new BlobRequestConditions { IfMatch = expectedWalETag }, cancellationToken).ConfigureAwait(false);
+                walState = await TryLoadWalStateAsync(new BlobRequestConditions { IfMatch = expectedWalETag }, cancellationToken, updateCache: false).ConfigureAwait(false);
                 if (walState is null)
                 {
                     throw CreateInconsistentWalStateException(

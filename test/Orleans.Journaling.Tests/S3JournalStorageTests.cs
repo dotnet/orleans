@@ -2283,7 +2283,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         }
     }
 
-    private static string? GetDockerSkipReason()
+    internal static string? GetDockerSkipReason()
     {
         try
         {
