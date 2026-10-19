@@ -25,7 +25,22 @@ internal sealed partial class DynamoDBReminderTable
         return result;
     }
 
-    private Task<ReminderEntry?> ReadLegacyRow(GrainId grainId, string reminderName)
-        => storage.ReadSingleEntryAsync(options.TableName, GetLegacyKey(grainId, reminderName), Resolve);
+    private async Task<ReminderEntry?> ReadLegacyRow(GrainId grainId, string reminderName)
+    {
+        var item = await storage.ReadSingleEntryAsync(options.TableName, GetLegacyKey(grainId, reminderName), static item => item);
+        if (item is null)
+        {
+            return null;
+        }
 
+        if (item[SERVICE_ID_PROPERTY_NAME].S != serviceId
+            || item[GRAIN_REFERENCE_PROPERTY_NAME].S != grainId.ToString()
+            || item[REMINDER_NAME_PROPERTY_NAME].S != reminderName)
+        {
+            throw new InvalidOperationException(
+                $"DynamoDB legacy reminder '{reminderName}' for grain '{grainId}' in '{options.TableName}' has a conflicting stored identity.");
+        }
+
+        return Resolve(item);
+    }
 }

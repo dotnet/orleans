@@ -359,10 +359,11 @@ internal sealed partial class DynamoDBReminderTable
         {
             TableName = v2TableName,
             Key = MetadataKey(MigrationStateSortKey),
-            ConditionExpression = $"attribute_not_exists({StatusAttribute}) OR {StatusAttribute} <> :retired",
+            ConditionExpression = $"attribute_not_exists({V2PartitionKeyName}) OR ({SERVICE_ID_PROPERTY_NAME} = :service AND {StatusAttribute} <> :retired)",
             ExpressionAttributeValues = new()
             {
                 [":retired"] = new(MigrationStatus.Retired.ToString()),
+                [":service"] = new(serviceId),
             },
         };
 

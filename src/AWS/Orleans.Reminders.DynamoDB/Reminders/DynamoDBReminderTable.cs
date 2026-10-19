@@ -110,10 +110,12 @@ namespace Orleans.Reminders.DynamoDB
 
             LogInformationInitializingDynamoDBRemindersTable(logger);
 
+            bool requireExistingLegacyTable;
             if (options.TableMode != DynamoDBReminderTableMode.Legacy)
             {
                 await InitializeV2Table(cancellationToken);
                 var migrationState = await ReadMigrationState(cancellationToken);
+                requireExistingLegacyTable = migrationState is not null;
                 ValidateRollbackState(migrationState);
                 if (migrationState?.Status == MigrationStatus.Retired)
                 {
@@ -129,6 +131,10 @@ namespace Orleans.Reminders.DynamoDB
                         throw;
                     }
                 }
+            }
+            else
+            {
+                requireExistingLegacyTable = await ValidateLegacyModeMigrationState(cancellationToken);
             }
 
             var serviceIdGrainHashGlobalSecondaryIndex = new GlobalSecondaryIndex
@@ -153,7 +159,7 @@ namespace Orleans.Reminders.DynamoDB
                 }
             };
 
-            await this.storage.InitializeTable(this.options.TableName,
+            await storage.InitializeTable(this.options.TableName,
                 new List<KeySchemaElement>
                 {
                     new KeySchemaElement { AttributeName = REMINDER_ID_PROPERTY_NAME, KeyType = KeyType.HASH },
@@ -167,11 +173,11 @@ namespace Orleans.Reminders.DynamoDB
                     new AttributeDefinition { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
                 },
                 new List<GlobalSecondaryIndex> { serviceIdGrainHashGlobalSecondaryIndex, serviceIdGrainReferenceGlobalSecondaryIndex },
-                cancellationToken: cancellationToken);
+                cancellationToken: cancellationToken,
+                requireExisting: requireExistingLegacyTable);
 
             if (options.TableMode == DynamoDBReminderTableMode.Legacy)
             {
-                await ValidateLegacyModeMigrationState(cancellationToken);
                 return;
             }
 

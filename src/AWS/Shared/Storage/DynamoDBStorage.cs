@@ -116,11 +116,17 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="ttlAttributeName">(optional) The name of the item attribute that indicates the item TTL (if null, ttl won't be enabled)</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
-        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex>? secondaryIndexes = null, string? ttlAttributeName = null, CancellationToken cancellationToken = default)
+        public Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex>? secondaryIndexes = null, string? ttlAttributeName = null, CancellationToken cancellationToken = default)
+            => InitializeTableCore(tableName, keys, attributes, secondaryIndexes, ttlAttributeName, cancellationToken, requireExisting: false);
+
+        internal Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex>? secondaryIndexes, CancellationToken cancellationToken, bool requireExisting)
+            => InitializeTableCore(tableName, keys, attributes, secondaryIndexes, null, cancellationToken, requireExisting);
+
+        private async Task InitializeTableCore(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex>? secondaryIndexes, string? ttlAttributeName, CancellationToken cancellationToken, bool requireExisting)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (!this._createIfNotExists && !this._updateIfExists)
+            if (!requireExisting && !this._createIfNotExists && !this._updateIfExists)
             {
                 LogInformationTableNotCreatedOrUpdated(_logger, tableName);
                 return;
@@ -129,6 +135,12 @@ namespace Orleans.Transactions.DynamoDB
             try
             {
                 TableDescription? tableDescription = await GetTableDescription(tableName, cancellationToken);
+                if (requireExisting && tableDescription is null)
+                {
+                    throw new OrleansConfigurationException(
+                        $"Existing DynamoDB table '{tableName}' is required. Restore the table before restarting the provider.");
+                }
+
                 await (tableDescription == null
                     ? CreateTableAsync(tableName, keys, attributes, secondaryIndexes, ttlAttributeName, cancellationToken)
                     : UpdateTableAsync(tableDescription, attributes, secondaryIndexes, ttlAttributeName, cancellationToken));
@@ -811,7 +823,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <summary>
         /// Queries one page of entries with cancellation support.
         /// </summary>
-        public Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryPageAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true, CancellationToken cancellationToken = default) where TResult : class
+        internal Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryPageAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true, CancellationToken cancellationToken = default) where TResult : class
             => QueryAsync(tableName, keys, keyConditionExpression, resolver, cancellationToken, indexName, scanIndexForward, lastEvaluatedKey, consistentRead);
 
         /// <summary>Queries a page of entries using the supplied cancellation token.</summary>
@@ -993,7 +1005,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <summary>
         /// Strongly consistently scans one bounded page from a DynamoDB table.
         /// </summary>
-        public async Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> ScanPageAsync<TResult>(
+        internal async Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> ScanPageAsync<TResult>(
             string tableName,
             Dictionary<string, AttributeValue> attributes,
             string expression,

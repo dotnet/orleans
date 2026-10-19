@@ -475,11 +475,11 @@ public sealed class DynamoDBReminderMigrationTests
 
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => migration.StartAsync(TestContext.Current.CancellationToken));
-            Assert.Contains("verification failed", exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(corruptServiceId ? "stored service identity" : "verification failed", exception.Message, StringComparison.OrdinalIgnoreCase);
             var state = await ReadState(client, tableName, serviceId);
-            Assert.Equal("VerificationFailed", state["MigrationStatus"].S);
-            Assert.Equal("1", state["SourceCount"].N);
-            Assert.Equal(corruptServiceId ? "1" : "0", state["TargetCount"].N);
+            Assert.Equal(corruptServiceId ? "Verifying" : "VerificationFailed", state["MigrationStatus"].S);
+            Assert.Equal(corruptServiceId ? "0" : "1", state["SourceCount"].N);
+            Assert.Equal("0", state["TargetCount"].N);
             Assert.NotNull(await legacy.ReadRow(entry.GrainId, entry.ReminderName));
         }
         finally
@@ -647,6 +647,152 @@ public sealed class DynamoDBReminderMigrationTests
         finally
         {
             await StopAndDelete(client, tableName, prepare, rollback);
+        }
+    }
+
+    [Fact]
+    public async Task MigrationRejectsForeignServiceRowsBeforeDeletingOrphans()
+    {
+        EnsureDynamoDb();
+        var tableName = NewTableName();
+        const string serviceId = "foreign-orphan";
+        using var client = CreateClient();
+        var prepare = CreateTable(tableName, serviceId, DynamoDBReminderTableMode.Migrate);
+        var migration = CreateTable(tableName, serviceId, DynamoDBReminderTableMode.Migrate);
+        try
+        {
+            await prepare.StartAsync(TestContext.Current.CancellationToken);
+            var entry = Entry(1);
+            var etag = await prepare.UpsertRow(entry);
+            var key = V2Key(serviceId, entry);
+            await client.DeleteItemAsync(
+                new()
+                {
+                    TableName = tableName,
+                    Key = new()
+                    {
+                        ["ReminderId"] = new($"{serviceId}_{entry.GrainId}_{entry.ReminderName}"),
+                        ["GrainHash"] = new() { N = entry.GrainId.GetUniformHashCode().ToString(CultureInfo.InvariantCulture) },
+                    },
+                },
+                TestContext.Current.CancellationToken);
+            await client.UpdateItemAsync(
+                new()
+                {
+                    TableName = $"{tableName}-v2",
+                    Key = key,
+                    UpdateExpression = "SET ServiceId = :service",
+                    ExpressionAttributeValues = new() { [":service"] = new("foreign-service") },
+                },
+                TestContext.Current.CancellationToken);
+
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => migration.StartAsync(TestContext.Current.CancellationToken));
+
+            Assert.Contains("stored service identity", error.Message, StringComparison.Ordinal);
+            var retained = await client.GetItemAsync(
+                new() { TableName = $"{tableName}-v2", Key = key, ConsistentRead = true },
+                TestContext.Current.CancellationToken);
+            Assert.Equal("foreign-service", retained.Item["ServiceId"].S);
+            Assert.Equal(etag, retained.Item["ETag"].N);
+            Assert.Equal("Verifying", (await ReadState(client, tableName, serviceId))["MigrationStatus"].S);
+        }
+        finally
+        {
+            await StopAndDelete(client, tableName, prepare, migration);
+        }
+    }
+
+    [Fact]
+    public async Task MigrationStateWriteRejectsServiceIdentityChangedAfterRead()
+    {
+        EnsureDynamoDb();
+        var tableName = NewTableName();
+        const string serviceId = "state-identity-race";
+        using var client = CreateClient();
+        var table = CreateTable(
+            tableName,
+            serviceId,
+            DynamoDBReminderTableMode.Migrate,
+            hooks: new()
+            {
+                AfterLegacyPageRead = async () =>
+                {
+                    var state = await ReadState(client, tableName, serviceId);
+                    await client.UpdateItemAsync(
+                        new()
+                        {
+                            TableName = $"{tableName}-v2",
+                            Key = new() { ["PartitionKey"] = state["PartitionKey"], ["SortKey"] = state["SortKey"] },
+                            UpdateExpression = "SET ServiceId = :service",
+                            ExpressionAttributeValues = new() { [":service"] = new("foreign-service") },
+                        },
+                        TestContext.Current.CancellationToken);
+                },
+            });
+        try
+        {
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => table.StartAsync(TestContext.Current.CancellationToken));
+
+            var canceled = Assert.IsType<TransactionCanceledException>(error.InnerException);
+            Assert.Equal("ConditionalCheckFailed", canceled.CancellationReasons[1].Code);
+            var preserved = await ReadState(client, tableName, serviceId);
+            Assert.Equal("foreign-service", preserved["ServiceId"].S);
+            Assert.Equal("Backfilling", preserved["MigrationStatus"].S);
+        }
+        finally
+        {
+            await StopAndDelete(client, tableName, table);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MigrationRejectsForeignOrUnidentifiedExpiredLease(bool missingIdentity)
+    {
+        EnsureDynamoDb();
+        var tableName = NewTableName();
+        const string serviceId = "metadata-identity";
+        using var client = CreateClient();
+        var table = CreateTable(tableName, serviceId, DynamoDBReminderTableMode.Migrate);
+        try
+        {
+            await table.StartAsync(TestContext.Current.CancellationToken);
+            var state = await ReadState(client, tableName, serviceId);
+            Assert.Equal(serviceId, state["ServiceId"].S);
+            var key = new Dictionary<string, AttributeValue>
+            {
+                ["PartitionKey"] = state["PartitionKey"],
+                ["SortKey"] = new("LEASE"),
+            };
+            var lease = new Dictionary<string, AttributeValue>(key)
+            {
+                ["LeaseOwner"] = new("foreign-owner"),
+                ["LeaseToken"] = new("foreign-token"),
+                ["ExpiresAt"] = new() { N = "0" },
+            };
+            if (!missingIdentity)
+            {
+                lease["ServiceId"] = new("foreign-service");
+            }
+
+            await client.PutItemAsync(new() { TableName = $"{tableName}-v2", Item = lease }, TestContext.Current.CancellationToken);
+            var acquisition = (Task<bool>)typeof(DynamoDBReminderTable)
+                .GetMethod("TryAcquireMigrationLease", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(table, null)!;
+
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => acquisition);
+
+            Assert.Contains("stored service identity", error.Message, StringComparison.Ordinal);
+            var retained = await client.GetItemAsync(
+                new() { TableName = $"{tableName}-v2", Key = key, ConsistentRead = true },
+                TestContext.Current.CancellationToken);
+            Assert.Equal("foreign-token", retained.Item["LeaseToken"].S);
+            Assert.Equal("0", retained.Item["ExpiresAt"].N);
+            Assert.Equal(!missingIdentity, retained.Item.ContainsKey("ServiceId"));
+        }
+        finally
+        {
+            await StopAndDelete(client, tableName, table);
         }
     }
 

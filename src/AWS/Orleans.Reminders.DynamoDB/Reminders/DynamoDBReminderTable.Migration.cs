@@ -101,12 +101,12 @@ internal sealed partial class DynamoDBReminderTable
         useV2OnlyWrites = state?.Status == MigrationStatus.Retired;
     }
 
-    private async Task ValidateLegacyModeMigrationState(CancellationToken cancellationToken)
+    private async Task<bool> ValidateLegacyModeMigrationState(CancellationToken cancellationToken)
     {
         // A derived name beyond DynamoDB's limit cannot identify an existing migration table.
         if (options.V2TableName is null && v2TableName.Length > 255)
         {
-            return;
+            return false;
         }
 
         MigrationState? state;
@@ -116,7 +116,7 @@ internal sealed partial class DynamoDBReminderTable
         }
         catch (ResourceNotFoundException)
         {
-            return;
+            return false;
         }
         catch (AmazonDynamoDBException exception) when (exception.ErrorCode == "AccessDeniedException")
         {
@@ -133,6 +133,8 @@ internal sealed partial class DynamoDBReminderTable
                 $"DynamoDB reminder table '{options.TableName}' for service '{serviceId}' has reached migration state "
                 + $"'{state.Status}' and cannot start in {DynamoDBReminderTableMode.Legacy} mode.");
         }
+
+        return state is not null;
     }
 
     private void ValidateRollbackState(MigrationState? state)
@@ -504,8 +506,8 @@ internal sealed partial class DynamoDBReminderTable
                             [V2PartitionKeyName] = record.Item[V2PartitionKeyName],
                             [V2SortKeyName] = record.Item[V2SortKeyName],
                         },
-                        ConditionExpression = $"{ETAG_PROPERTY_NAME} = :targetETag",
-                        ExpressionAttributeValues = new() { [":targetETag"] = etag },
+                        ConditionExpression = $"{SERVICE_ID_PROPERTY_NAME} = :service AND {ETAG_PROPERTY_NAME} = :targetETag",
+                        ExpressionAttributeValues = new() { [":service"] = new(serviceId), [":targetETag"] = etag },
                     },
                 },
             ]);
@@ -564,6 +566,7 @@ internal sealed partial class DynamoDBReminderTable
                     cancellationToken: cancellationToken);
                 foreach (var record in records)
                 {
+                    ValidateStoredServiceIdentity(record.Item);
                     await action(record);
                 }
 
@@ -616,16 +619,22 @@ internal sealed partial class DynamoDBReminderTable
             await storage.PutEntryAsync(
                 v2TableName,
                 item,
-                $"attribute_not_exists({OwnerAttribute}) OR {ExpiresAtAttribute} <= :now",
+                $"attribute_not_exists({V2PartitionKeyName}) OR ({SERVICE_ID_PROPERTY_NAME} = :service AND {ExpiresAtAttribute} <= :now)",
                 new()
                 {
                     [":now"] = new() { N = now.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture) },
+                    [":service"] = new(serviceId),
                 });
             leaseToken = token;
             return true;
         }
         catch (ConditionalCheckFailedException)
         {
+            await storage.ReadSingleEntryAsync(v2TableName, MetadataKey(MigrationLeaseSortKey), item =>
+            {
+                ValidateStoredServiceIdentity(item);
+                return item;
+            });
             return false;
         }
     }
@@ -700,11 +709,12 @@ internal sealed partial class DynamoDBReminderTable
             await storage.DeleteEntryAsync(
                 v2TableName,
                 MetadataKey(MigrationLeaseSortKey),
-                $"{OwnerAttribute} = :owner AND {LeaseTokenAttribute} = :token",
+                $"{SERVICE_ID_PROPERTY_NAME} = :service AND {OwnerAttribute} = :owner AND {LeaseTokenAttribute} = :token",
                 new()
                 {
                     [":owner"] = new(migrationOwner),
                     [":token"] = new(token),
+                    [":service"] = new(serviceId),
                 });
         }
         catch (ConditionalCheckFailedException)
@@ -749,7 +759,10 @@ internal sealed partial class DynamoDBReminderTable
         {
             N = timeProvider.GetUtcNow().Add(CompatibilityMarkerLifetime).ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture),
         };
-        return storage.PutEntryAsync(v2TableName, item, cancellationToken);
+        return storage.PutEntryAsync(
+            v2TableName, item, cancellationToken,
+            $"attribute_not_exists({V2PartitionKeyName}) OR {SERVICE_ID_PROPERTY_NAME} = :service",
+            new() { [":service"] = new(serviceId) });
     }
 
     private async Task<MembershipVersion> EnsureCompatibleCluster(CancellationToken cancellationToken)
@@ -772,6 +785,11 @@ internal sealed partial class DynamoDBReminderTable
             $"{V2PartitionKeyName} = :partition AND begins_with({V2SortKeyName}, :prefix)",
             static item => item,
             cancellationToken);
+        foreach (var marker in markers)
+        {
+            ValidateStoredServiceIdentity(marker);
+        }
+
         var now = timeProvider.GetUtcNow().ToUnixTimeMilliseconds();
         var compatible = markers
             .Where(item => long.Parse(item[ExpiresAtAttribute].N, CultureInfo.InvariantCulture) >= now)
@@ -793,7 +811,20 @@ internal sealed partial class DynamoDBReminderTable
     }
 
     private async Task<MigrationState?> ReadMigrationState(CancellationToken cancellationToken = default)
-        => await storage.ReadSingleEntryAsync(v2TableName, MetadataKey(MigrationStateSortKey), MigrationState.FromItem, cancellationToken);
+        => await storage.ReadSingleEntryAsync(v2TableName, MetadataKey(MigrationStateSortKey), item =>
+        {
+            ValidateStoredServiceIdentity(item);
+            return MigrationState.FromItem(item);
+        }, cancellationToken);
+
+    private void ValidateStoredServiceIdentity(Dictionary<string, AttributeValue> item)
+    {
+        if (!item.TryGetValue(SERVICE_ID_PROPERTY_NAME, out var storedService) || storedService.S != serviceId)
+        {
+            throw new InvalidOperationException(
+                $"DynamoDB reminder migration for service '{serviceId}' in '{v2TableName}' encountered a missing or conflicting stored service identity.");
+        }
+    }
 
     private async Task WriteMigrationState(MigrationState state)
     {
@@ -806,27 +837,15 @@ internal sealed partial class DynamoDBReminderTable
         {
             await storage.WriteTxAsync(
             [
-                new()
-                {
-                    ConditionCheck = new()
-                    {
-                        TableName = v2TableName,
-                        Key = MetadataKey(MigrationLeaseSortKey),
-                        ConditionExpression = $"{OwnerAttribute} = :owner AND {LeaseTokenAttribute} = :token AND {ExpiresAtAttribute} > :now",
-                        ExpressionAttributeValues = new()
-                        {
-                            [":owner"] = new(migrationOwner),
-                            [":token"] = new(leaseToken),
-                            [":now"] = new() { N = timeProvider.GetUtcNow().ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture) },
-                        },
-                    },
-                },
+                new() { ConditionCheck = CreateMigrationLeaseFence() },
                 new()
                 {
                     Put = new()
                     {
                         TableName = v2TableName,
-                        Item = state.ToItem(v2MetadataPartitionKey),
+                        Item = state.ToItem(v2MetadataPartitionKey, serviceId),
+                        ConditionExpression = $"attribute_not_exists({V2PartitionKeyName}) OR {SERVICE_ID_PROPERTY_NAME} = :service",
+                        ExpressionAttributeValues = new() { [":service"] = new(serviceId) },
                     },
                 },
             ]);
@@ -848,24 +867,30 @@ internal sealed partial class DynamoDBReminderTable
         {
             TableName = v2TableName,
             Key = MetadataKey(MigrationLeaseSortKey),
-            ConditionExpression = $"{OwnerAttribute} = :owner AND {LeaseTokenAttribute} = :token AND {ExpiresAtAttribute} > :now",
+            ConditionExpression = $"{SERVICE_ID_PROPERTY_NAME} = :service AND {OwnerAttribute} = :owner AND {LeaseTokenAttribute} = :token AND {ExpiresAtAttribute} > :now",
             ExpressionAttributeValues = new()
             {
                 [":owner"] = new(migrationOwner),
                 [":token"] = new(leaseToken),
+                [":service"] = new(serviceId),
                 [":now"] = new() { N = timeProvider.GetUtcNow().ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture) },
             },
         };
     }
 
     private Dictionary<string, AttributeValue> MetadataItem(string sortKey)
+    {
+        var item = MetadataKey(sortKey);
+        item[SERVICE_ID_PROPERTY_NAME] = new(serviceId);
+        return item;
+    }
+
+    private Dictionary<string, AttributeValue> MetadataKey(string sortKey)
         => new()
         {
             [V2PartitionKeyName] = new(v2MetadataPartitionKey),
             [V2SortKeyName] = new(sortKey),
         };
-
-    private Dictionary<string, AttributeValue> MetadataKey(string sortKey) => MetadataItem(sortKey);
 
     private static AttributeValue Clone(AttributeValue value)
         => new() { S = value.S, N = value.N, B = value.B };
@@ -938,12 +963,13 @@ internal sealed partial class DynamoDBReminderTable
             CheckpointGrainHash = checkpoint is { Count: > 0 } ? checkpoint[GRAIN_HASH_PROPERTY_NAME].N : null;
         }
 
-        public Dictionary<string, AttributeValue> ToItem(string partitionKey)
+        public Dictionary<string, AttributeValue> ToItem(string partitionKey, string serviceId)
         {
             var result = new Dictionary<string, AttributeValue>
             {
                 [V2PartitionKeyName] = new(partitionKey),
                 [V2SortKeyName] = new(MigrationStateSortKey),
+                [SERVICE_ID_PROPERTY_NAME] = new(serviceId),
                 [StatusAttribute] = new(Status.ToString()),
                 [SourceCountAttribute] = new() { N = SourceCount.ToString(CultureInfo.InvariantCulture) },
                 [TargetCountAttribute] = new() { N = TargetCount.ToString(CultureInfo.InvariantCulture) },

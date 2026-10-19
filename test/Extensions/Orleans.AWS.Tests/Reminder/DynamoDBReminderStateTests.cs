@@ -140,6 +140,83 @@ public sealed class DynamoDBReminderStateTests
     [InlineData("ServiceId")]
     [InlineData("GrainReference")]
     [InlineData("ReminderName")]
+    public async Task LegacyDiscoveryRejectsConflictingCandidateIdentity(string attribute)
+    {
+        var entry = Entry();
+        var stored = RowItem(entry);
+        using var client = new RequestClient
+        {
+            Read = (request, _) => Task.FromResult(new GetItemResponse { Item = request.TableName == "reminders-v2" ? null : stored }),
+            Query = _ => new() { Items = [RowItem(entry)] },
+        };
+        var table = CreateTable(client, DynamoDBReminderTableMode.Legacy);
+        await table.StartAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(entry.GrainId, Assert.Single((await table.ReadRows(entry.GrainId)).Reminders).GrainId);
+
+        stored[attribute] = new("conflicting-identity");
+
+        var grainError = await Assert.ThrowsAsync<InvalidOperationException>(() => table.ReadRows(entry.GrainId));
+        var rangeError = await Assert.ThrowsAsync<InvalidOperationException>(() => table.ReadRows(1, 10));
+        Assert.Contains("conflicting stored identity", grainError.Message, StringComparison.Ordinal);
+        Assert.Contains("conflicting stored identity", rangeError.Message, StringComparison.Ordinal);
+        Assert.Equal(0, client.WriteCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MigrationStateRejectsMissingOrForeignServiceBeforeWrites(bool missing)
+    {
+        var state = StateItem("Ready");
+        if (missing)
+        {
+            state.Remove("ServiceId");
+        }
+        else
+        {
+            state["ServiceId"] = new("foreign-service");
+        }
+
+        using var client = new RequestClient { Read = (_, _) => Task.FromResult(new GetItemResponse { Item = state }) };
+        var table = CreateTable(client, DynamoDBReminderTableMode.Migrate);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => table.StartAsync(TestContext.Current.CancellationToken));
+
+        Assert.Contains("stored service identity", error.Message, StringComparison.Ordinal);
+        Assert.Equal(1, client.ReadCount);
+        Assert.Equal(0, client.WriteCount);
+        Assert.Equal(0, client.DeleteCount);
+    }
+
+    [Theory]
+    [InlineData(DynamoDBReminderTableMode.Legacy, "Ready")]
+    [InlineData(DynamoDBReminderTableMode.Migrate, "Ready")]
+    [InlineData(DynamoDBReminderTableMode.V2, "Cutover")]
+    [InlineData(DynamoDBReminderTableMode.V2Only, "Cutover")]
+    [InlineData(DynamoDBReminderTableMode.Rollback, "Cutover")]
+    public async Task ExistingMigrationStateRequiresLegacyTableBeforeMutations(DynamoDBReminderTableMode mode, string state)
+    {
+        using var client = new RequestClient
+        {
+            Read = (_, _) => Task.FromResult(new GetItemResponse { Item = StateItem(state) }),
+            Describe = tableName => tableName == "reminders"
+                ? throw new ResourceNotFoundException("V1 was deleted.")
+                : new() { Table = new() { TableName = tableName, TableStatus = TableStatus.ACTIVE } },
+        };
+        var table = CreateTable(client, mode, createIfNotExists: true);
+
+        var error = await Assert.ThrowsAsync<OrleansConfigurationException>(() => table.StartAsync(TestContext.Current.CancellationToken));
+
+        Assert.Contains("Restore the table", error.Message, StringComparison.Ordinal);
+        Assert.Equal(0, client.CreateCount);
+        Assert.Equal(0, client.WriteCount);
+        Assert.Equal(0, client.DeleteCount);
+    }
+
+    [Theory]
+    [InlineData("ServiceId")]
+    [InlineData("GrainReference")]
+    [InlineData("ReminderName")]
     public async Task V2PointReadRejectsConflictingStoredIdentity(string attribute)
     {
         var entry = Entry();
@@ -277,12 +354,7 @@ public sealed class DynamoDBReminderStateTests
             Read = (request, _) => Task.FromResult(new GetItemResponse
             {
                 Item = request.Key.ContainsKey("SortKey") && request.Key["SortKey"].S == "STATE" && state is not null
-                    ? new()
-                    {
-                        ["MigrationStatus"] = new(state),
-                        ["SourceCount"] = new() { N = "0" },
-                        ["TargetCount"] = new() { N = "0" },
-                    }
+                    ? StateItem(state)
                     : null,
             }),
         };
@@ -355,12 +427,13 @@ public sealed class DynamoDBReminderStateTests
 
     private static Dictionary<string, AttributeValue> StateItem(string state) => new()
     {
+        ["ServiceId"] = new("service"),
         ["MigrationStatus"] = new(state),
         ["SourceCount"] = new() { N = "0" },
         ["TargetCount"] = new() { N = "0" },
     };
 
-    private static DynamoDBReminderTable CreateTable(RequestClient client, DynamoDBReminderTableMode mode, string tableName = "reminders")
+    private static DynamoDBReminderTable CreateTable(RequestClient client, DynamoDBReminderTableMode mode, string tableName = "reminders", bool createIfNotExists = false)
         => new(
             NullLoggerFactory.Instance,
             Options.Create(new ClusterOptions { ClusterId = "cluster", ServiceId = "service" }),
@@ -369,7 +442,7 @@ public sealed class DynamoDBReminderStateTests
                 Service = "http://localhost",
                 TableName = tableName,
                 TableMode = mode,
-                CreateIfNotExists = false,
+                CreateIfNotExists = createIfNotExists,
                 UpdateIfExists = false,
             }),
             null, null, null,
@@ -398,15 +471,28 @@ public sealed class DynamoDBReminderStateTests
         public Func<QueryRequest, QueryResponse> Query { get; init; }
             = _ => throw new InvalidOperationException("Unexpected query.");
 
+        public Func<string, DescribeTableResponse> Describe { get; init; }
+            = tableName => new() { Table = new() { TableName = tableName, TableStatus = TableStatus.ACTIVE } };
+
         public int ReadCount { get; private set; }
         public int WriteCount { get; private set; }
         public int DeleteCount { get; private set; }
+        public int CreateCount { get; private set; }
 
         public override Task<GetItemResponse> GetItemAsync(GetItemRequest request, CancellationToken cancellationToken = default)
         {
             ReadCount++;
             Assert.True(request.ConsistentRead);
             return Read(request, cancellationToken);
+        }
+
+        public override Task<DescribeTableResponse> DescribeTableAsync(string tableName, CancellationToken cancellationToken = default)
+            => Task.FromResult(Describe(tableName));
+
+        public override Task<CreateTableResponse> CreateTableAsync(CreateTableRequest request, CancellationToken cancellationToken = default)
+        {
+            CreateCount++;
+            throw new InvalidOperationException("Unexpected table creation.");
         }
 
         public override Task<PutItemResponse> PutItemAsync(PutItemRequest request, CancellationToken cancellationToken = default)

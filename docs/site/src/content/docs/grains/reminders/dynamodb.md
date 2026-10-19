@@ -31,7 +31,7 @@ The example uses on-demand capacity and an infrastructure-managed table. Set <xr
 
 `TableMode=Legacy` retains the existing table and indexes while hardening reminder scheduling against GSI lag:
 
-- GSI range and grain results are discovery candidates. The provider strongly point-reads every candidate from the base table before returning it, so an obsolete index row cannot resurrect a deleted reminder or restore an old schedule.
+- GSI range and grain results are discovery candidates. The provider strongly point-reads every candidate from the base table and verifies its complete service, grain, and reminder identity before returning it. A conflicting stored identity fails the read.
 - Before a silo removes a known local reminder which a range query omitted, it strongly point-reads that identity. A still-present or newer row is reconciled instead of removed.
 - Reminder registration, update, and removal strongly point-read and reconcile before returning when the handling silo remains the owner. A stale handler sends a bounded, three-hop reconciliation notification through current ring views; the receiving owner strongly point-reads before applying it. Per-identity sequencing prevents out-of-order point reads from restoring an older schedule.
 - Legacy mode never uses a full-table scan during startup, topology changes, or periodic refresh. All discovery remains cost-bounded to GSI queries and base-table point reads.
@@ -73,9 +73,11 @@ The provider never deletes or disables the legacy table. After the rollback wind
 
 ### States, recovery, and operations
 
-Migration metadata is isolated by `ServiceId` in V2. `Backfilling` stores the last evaluated V1 key after each completed page; replay after a crash is harmless because the source ETag is checked transactionally. `Verifying` performs final reconciliation. `Ready` means exact source and target counts and contents matched. `Cutover` selects V2 reads. `RolledBack` selects V1 reads. `VerificationFailed` preserves V1 reads and prevents cutover. `Retired` selects V2-only reads and writes and is irreversible.
+Migration metadata is isolated by `ServiceId` in V2. State, lease, and compatibility-marker records store the complete service identity. Reads validate that identity, and conditional writes require a matching identity before replacing existing metadata. Migration also validates each enumerated V2 row's service identity before reconciliation or orphan removal; a conflict stops migration for operator investigation.
 
-Missing metadata in `V2`, `V2Only`, or `Rollback`, or after a running silo has observed cutover, fails the operation. Rollback startup requires existing metadata before initializing V1 or reconciling rows. V2-only operation requires the `Retired` state on every refresh. Restore the service's migration metadata from backup before resuming reminder traffic.
+`Backfilling` stores the last evaluated V1 key after each completed page; replay after a crash is harmless because the source ETag is checked transactionally. `Verifying` performs final reconciliation. `Ready` means exact source and target counts and contents matched. `Cutover` selects V2 reads. `RolledBack` selects V1 reads. `VerificationFailed` preserves V1 reads and prevents cutover. `Retired` selects V2-only reads and writes and is irreversible.
+
+Missing metadata in `V2`, `V2Only`, or `Rollback`, or after a running silo has observed cutover, fails the operation. Rollback startup requires existing metadata before initializing V1 or reconciling rows. Existing migration state requires the original V1 table at startup until `Retired`; if V1 is missing, restore it from backup before restarting the provider. V2-only operation requires the `Retired` state on every refresh. Restore the service's migration metadata from backup before resuming reminder traffic.
 
 Only one unexpired migration lease can advance a service. Each acquisition creates a fresh fencing token, and renewal requires the current lease to remain unexpired. Transactions from an earlier acquisition fail their token check after reacquisition. Other `Migrate` silos continue serving V1 and dual-writing. A stopped owner is recoverable after lease expiry; restarting any configured silo resumes from the checkpoint. Conditional conflicts caused by an old V1 writer replay the same page instead of advancing past the change. A V1 delete cannot resurrect a stale V2 row because copy and source-ETag validation are one transaction.
 
