@@ -966,6 +966,7 @@ public abstract class MessageSourceAndSinkFixture(string journalFormatKey) : IAs
             });
             silo.Services.AddSingleton<IJournalStorageCatalog>(
                 services => (IJournalStorageCatalog)services.GetRequiredService<IJournalStorageProvider>());
+            silo.Services.UseDocumentationPaymentGrain();
         });
         Cluster = builder.Build();
         await Cluster.DeployAsync(TestContext.Current.CancellationToken);

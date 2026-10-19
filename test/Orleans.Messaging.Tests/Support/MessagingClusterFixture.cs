@@ -115,6 +115,7 @@ public class MessagingClusterFixture : IAsyncLifetime
             });
             siloBuilder.Services.AddSingleton<IJournalStorageCatalog>(
                 serviceProvider => (IJournalStorageCatalog)serviceProvider.GetRequiredService<IJournalStorageProvider>());
+            siloBuilder.Services.UseDocumentationPaymentGrain();
             ConfigureServices(siloBuilder.Services);
         });
         return builder.Build();

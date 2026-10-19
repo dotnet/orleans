@@ -247,3 +247,8 @@ and `OutboxMessageRetired` when a message retires. Each event carries the activa
 `IGrainContext`. Tests use the events as barriers, and inject a delivery fault by throwing
 from an `InboxMessageReceiving` observer, which fails the attempt like a sink exception.
 
+## Learn more
+
+See the [messaging guide](https://dotnet.github.io/orleans/docs/grains/messaging/)
+for guarantees, recipes, idempotency, and operations. Compiled examples live in the
+[documentation snippets](../../docs/site/src/content/docs/snippets/compiled/Grains/).
