@@ -39,9 +39,11 @@ public abstract class DurableTaskRunnableWakeupTests(string journalFormatKey) : 
         var (workflow, partnerKey, partner) = await StartGatedStepAsync();
         Assert.True(_harness.Fixture.Cluster.TryGetGrainContext(partner.GetGrainId(), out var activation));
 
-        await partner.DeactivateAsync();
-        await activation.Deactivated.WaitAsync(DurableTaskFaultHarness.RunTimeout, CancellationToken);
+        // The step's segment holds the non-reentrant partner, as a grain method does, so deactivation starts on the
+        // activation itself and completes once the segment, whose result the stop discards, has ended.
+        activation.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "The test deactivates the partner."), CancellationToken);
         _harness.Gates.Open(partnerKey);
+        await activation.Deactivated.WaitAsync(DurableTaskFaultHarness.RunTimeout, CancellationToken);
 
         await AssertCompletesAsync(workflow, partner);
     }

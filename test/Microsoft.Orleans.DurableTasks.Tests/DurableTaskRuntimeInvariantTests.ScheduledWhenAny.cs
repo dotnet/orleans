@@ -18,7 +18,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     {
         var manager = new TestStateManager();
         var storage = new TestStorage(manager);
-        var (runtime, _, _, _) = CreateRuntime(storage, manager);
+        var (runtime, _, _, _) = CreateRuntime(storage, manager, reentrant: true);
         var rootId = TaskId.CreateRoot("root");
         var batchId = rootId.Child("batch");
         var releases = CreateReleases(2);
@@ -48,7 +48,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Both candidates are complete when the replacement activation replays the selection.
-        var (replacement, _, _, _) = CreateRuntime(storage, manager);
+        var (replacement, _, _, _) = CreateRuntime(storage, manager, reentrant: true);
         await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
         var response = await replacement.GetScheduledTaskHandle(rootId)
             .WaitAsync(TestContext.Current.CancellationToken)

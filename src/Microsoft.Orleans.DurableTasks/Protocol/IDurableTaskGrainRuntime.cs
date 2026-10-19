@@ -16,11 +16,16 @@ public interface IDurableTaskObserver : IGrainExtension
     ValueTask OnResponseAsync(TaskId taskId, DurableTaskResponse response, CancellationToken cancellationToken = default);
 }
 
+/// <remarks>
+/// The server's operations stage task state and commit it without running grain code, so they interleave with the grain's
+/// requests, including the segments of its durable executions: a cancellation reaches an execution whose segment awaits
+/// other work, and a schedule doesn't wait for the grain's running executions.
+/// </remarks>
 [Alias("IDurableTaskServerGrainExtension")]
 public interface IDurableTaskServer : IGrainExtension
 {
     // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
-    [Alias("ScheduleAsync")]
+    [Alias("ScheduleAsync"), AlwaysInterleave]
     ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, IDurableTaskRequest request, CancellationToken cancellationToken = default);
 
     // API used by ScheduledTask/<T> to check for a result for a task.
@@ -30,7 +35,7 @@ public interface IDurableTaskServer : IGrainExtension
     [Alias("SubscribeOrPollAsync"), AlwaysInterleave]
     ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options, CancellationToken cancellationToken = default);
 
-    [Alias("CancelAsync")]
+    [Alias("CancelAsync"), AlwaysInterleave]
     ValueTask CancelAsync(TaskId taskId, CancellationToken cancellationToken = default);
 
     /// <summary>Durably requests cancellation of a task of this grain, carrying <paramref name="reason"/>.</summary>
@@ -41,7 +46,7 @@ public interface IDurableTaskServer : IGrainExtension
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
     /// <remarks>The first cancellation request determines the reason.</remarks>
-    [Alias("CancelWithReasonAsync")]
+    [Alias("CancelWithReasonAsync"), AlwaysInterleave]
     ValueTask CancelAsync(TaskId taskId, string? reason, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -53,7 +58,7 @@ public interface IDurableTaskServer : IGrainExtension
     /// <param name="reason">The reason for the abort, recorded as the exception message.</param>
     /// <param name="cancellationToken">A token which abandons waiting for the abort to commit.</param>
     /// <remarks>A task which is terminal, or which this grain doesn't retain, is unchanged.</remarks>
-    [Alias("AbortAsync")]
+    [Alias("AbortAsync"), AlwaysInterleave]
     ValueTask AbortAsync(TaskId taskId, string reason, CancellationToken cancellationToken = default);
 }
 
@@ -68,10 +73,10 @@ public readonly struct SubscribeOrPollOptions
 [Alias("IDurableTaskGrainExtension")]
 public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer
 {
-    [Alias("GetTasksAsync")]
+    [Alias("GetTasksAsync"), AlwaysInterleave]
     IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> GetTasksAsync(CancellationToken cancellationToken = default);
 
-    [Alias("GetRunningTasksAsync")]
+    [Alias("GetRunningTasksAsync"), AlwaysInterleave]
     IAsyncEnumerable<TaskId> GetRunningTasksAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Delivers a signal to the invoked task <paramref name="taskId"/> of this grain.</summary>
@@ -84,7 +89,7 @@ public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServe
     /// <exception cref="InvalidOperationException">
     /// The task is terminal and has no value for the signal, or it holds a different value for the signal.
     /// </exception>
-    [Alias("SignalAsync")]
+    [Alias("SignalAsync"), AlwaysInterleave]
     ValueTask SignalAsync(TaskId taskId, string name, DurableTaskResponse value, CancellationToken cancellationToken = default);
 
     /// <summary>Delivers a signal to the invoked task <paramref name="taskId"/> of this grain, and returns how the task handled it.</summary>
@@ -96,7 +101,7 @@ public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServe
     /// <see cref="DurableSignalResult.Accepted"/> or <see cref="DurableSignalResult.Duplicate"/> once the task durably
     /// holds the value, or the reason the task rejected it, which changes nothing.
     /// </returns>
-    [Alias("TrySignalAsync")]
+    [Alias("TrySignalAsync"), AlwaysInterleave]
     ValueTask<DurableSignalResult> TrySignalAsync(TaskId taskId, string name, DurableTaskResponse value, CancellationToken cancellationToken = default);
 }
 
@@ -204,7 +209,15 @@ internal interface IDurableTaskGrainRuntime
 
     ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken);
     ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, string? reason, CancellationToken cancellationToken);
-    ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken);
+    /// <summary>
+    /// Returns the candidate which completed first, or records the first one which completes under
+    /// <paramref name="decisionId"/>, parking <paramref name="attempt"/> while it waits.
+    /// </summary>
+    ValueTask<TaskId> SelectCompletionAsync(
+        GrainDurableTaskContext attempt,
+        TaskId decisionId,
+        IReadOnlyList<TaskId> candidates,
+        CancellationToken cancellationToken);
     IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId);
 
     /// <summary>
@@ -282,43 +295,11 @@ internal interface IDurableTaskGrainRuntime
     }
 
     /// <summary>
-    /// Notes that an attempt waits for an event which a message delivers, such as a child's result, a signal, or a delay's
-    /// resume, until the matching <see cref="OnAttemptUnparked"/>.
-    /// </summary>
-    /// <remarks>An attempt which isn't parked is runnable, so its grain needs a wake-up to resume it after a deactivation.</remarks>
-    void OnAttemptParked()
-    {
-    }
-
-    /// <summary>Notes that an attempt which <see cref="OnAttemptParked"/> reported runs again.</summary>
-    void OnAttemptUnparked()
-    {
-    }
-
-    /// <summary>
-    /// Resumes <paramref name="wait"/> when the runtime completes <paramref name="awaited"/>, a task or a signal record,
-    /// until <see cref="UnregisterParkedWait"/>.
-    /// </summary>
-    void RegisterParkedWait(TaskId awaited, ParkedWait wait)
-    {
-    }
-
-    /// <summary>Removes a registration which <see cref="RegisterParkedWait"/> added.</summary>
-    void UnregisterParkedWait(TaskId awaited, ParkedWait wait)
-    {
-    }
-
-    /// <summary>
-    /// Returns the record of the signal <paramref name="name"/> of the invoked task whose execution tree contains
-    /// <paramref name="executionId"/>, or <see langword="null"/> when the runtime doesn't record signals.
-    /// </summary>
-    TaskId? GetSignalRecordId(TaskId executionId, string name) => null;
-
-    /// <summary>
     /// Waits for the signal <paramref name="name"/> of the invoked task whose execution tree contains
     /// <paramref name="executionId"/>, and returns its committed value and the time it was recorded.
     /// </summary>
     ValueTask<(DurableTaskResponse Value, DateTimeOffset RecordedAt)> WaitForSignalAsync(
+        GrainDurableTaskContext attempt,
         TaskId executionId,
         string name,
         CancellationToken cancellationToken) =>

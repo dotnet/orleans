@@ -109,8 +109,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         // The replacement replays the recorded step and delay; reaching the delay, the last recorded operation, ends the
         // replay without staging anything. The delay's attempt resumes waiting for its due time and ends.
         var (replacement, _, _, _) = CreateRuntime(storage, manager, initialize: false);
+        replacement.InitializeForActivation(CreateTestActivation());
         using var events = new RuntimeEventRecorder(replacement);
-        replacement.InitializeForActivation();
         await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
         await WaitUntilAsync(() => events.Events.Contains("ExecutionStopped root/delay"));
 

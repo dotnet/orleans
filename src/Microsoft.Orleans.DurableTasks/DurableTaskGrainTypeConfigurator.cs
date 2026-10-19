@@ -52,7 +52,7 @@ internal sealed class DurableTaskGrainTypeConfigurator(GrainClassMap grainClasse
                 GrainLifecycleStage.Activate + 1,
                 runtime.RecoverAsync,
                 runtime.StopAsync);
-            runtime.InitializeForActivation();
+            runtime.InitializeForActivation(context);
         });
     }
 }

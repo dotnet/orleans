@@ -565,7 +565,8 @@ public sealed class DurableTaskSubscriptionTests
                 var transport = new RecordingDurableTaskMessageTransport();
                 var runtime = new DurableTaskGrainRuntime(storage, logicalTimes, invocations, shared, [transport]);
                 manager.RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, runtime);
-                runtime.InitializeForActivation();
+                TestLocalRequestQueue.Attach(grainContext);
+                runtime.InitializeForActivation(grainContext);
                 await storage.ReadAsync(cancellationToken);
                 await runtime.RecoverAsync(cancellationToken);
                 runtime.StartRecoveredExecutions();

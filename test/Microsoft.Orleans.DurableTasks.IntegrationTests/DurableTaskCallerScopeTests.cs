@@ -1,3 +1,4 @@
+using Orleans.Concurrency;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableTasks;
@@ -123,6 +124,8 @@ public interface ISharedRootCallerGrain : IGrainWithGuidKey
     DurableTask<int> PlaceOrderAsync(Guid calleeKey, int value);
 }
 
+// Each caller's child waits for its release without a durable wait, so the callee runs both segments at once.
+[Reentrant]
 [GrainType("durable-task-shared-callee-test")]
 public sealed class SharedCalleeGrain(CallerScopeProbe probe) : DurableGrain, ISharedCalleeGrain
 {

@@ -3,7 +3,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using NSubstitute;
+using Orleans.DurableTasks;
 using Orleans.Runtime;
+using Orleans.Serialization.Invocation;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
 
@@ -65,4 +68,109 @@ internal sealed class TestGrainLifecycle : IGrainLifecycle
 internal sealed class TestGrainContextAccessor(IGrainContext context) : IGrainContextAccessor
 {
     public IGrainContext GrainContext { get; } = context;
+}
+
+/// <summary>
+/// Runs the local requests which a substitute grain context receives on the scheduler which queued them: one at a time, in
+/// arrival order, as a non-reentrant activation does, or as soon as they arrive, as a reentrant one does.
+/// </summary>
+internal sealed class TestLocalRequestQueue(bool reentrant)
+{
+    private readonly Queue<(ILocalRequest Request, TaskScheduler Scheduler)> _queue = new();
+    private readonly object _lock = new();
+    private bool _running;
+
+    /// <summary>Gets the number of requests which ran.</summary>
+    public int Completed { get; private set; }
+
+    /// <summary>Makes <paramref name="context"/>, a substitute, run its local requests through a new queue.</summary>
+    public static TestLocalRequestQueue Attach(IGrainContext context, bool reentrant = false)
+    {
+        var queue = new TestLocalRequestQueue(reentrant);
+        context
+            .When(static grainContext => grainContext.ReceiveLocalRequest(Arg.Any<ILocalRequest>(), Arg.Any<LocalRequestOptions>()))
+            .Do(call => queue.Enqueue(call.Arg<ILocalRequest>()));
+        return queue;
+    }
+
+    private void Enqueue(ILocalRequest request)
+    {
+        if (reentrant)
+        {
+            Run(request, TaskScheduler.Current, runNext: false);
+            return;
+        }
+
+        lock (_lock)
+        {
+            _queue.Enqueue((request, TaskScheduler.Current));
+            if (_running)
+            {
+                return;
+            }
+
+            _running = true;
+        }
+
+        RunNext();
+    }
+
+    private void RunNext()
+    {
+        (ILocalRequest Request, TaskScheduler Scheduler) next;
+        lock (_lock)
+        {
+            if (!_queue.TryDequeue(out next))
+            {
+                _running = false;
+                return;
+            }
+        }
+
+        Run(next.Request, next.Scheduler, runNext: true);
+    }
+
+    private void Run(ILocalRequest request, TaskScheduler scheduler, bool runNext)
+    {
+        _ = Task.Factory.StartNew(
+            async () =>
+            {
+                Response response;
+                try
+                {
+                    response = await request.Invoke();
+                }
+                catch (Exception exception)
+                {
+                    response = Response.FromException(exception);
+                }
+
+                request.Complete(response);
+                request.Dispose();
+                Completed++;
+                if (runNext)
+                {
+                    RunNext();
+                }
+            },
+            CancellationToken.None,
+            TaskCreationOptions.DenyChildAttach,
+            scheduler).Unwrap();
+    }
+}
+
+/// <summary>Runs runtime operations which an attempt calls, from a test which drives the runtime directly.</summary>
+internal static class DurableTaskGrainRuntimeTestExtensions
+{
+    /// <summary>Selects a completion as an attempt of the execution which owns <paramref name="decisionId"/> does.</summary>
+    public static ValueTask<TaskId> SelectCompletionAsync(
+        this global::Orleans.DurableTasks.Runtime.DurableTaskGrainRuntime runtime,
+        TaskId decisionId,
+        IReadOnlyList<TaskId> candidates,
+        CancellationToken cancellationToken) =>
+        runtime.SelectCompletionAsync(
+            new global::Orleans.DurableTasks.Runtime.GrainDurableTaskContext(decisionId.Parent(), runtime, runtime.GrainContext, TaskScheduler.Current),
+            decisionId,
+            candidates,
+            cancellationToken);
 }

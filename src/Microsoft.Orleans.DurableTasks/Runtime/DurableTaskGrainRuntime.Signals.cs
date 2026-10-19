@@ -37,6 +37,7 @@ internal sealed partial class DurableTaskGrainRuntime
     private readonly Dictionary<TaskId, List<TaskCompletionSource>> _signalWaits = [];
 
     public async ValueTask<(DurableTaskResponse Value, DateTimeOffset RecordedAt)> WaitForSignalAsync(
+        GrainDurableTaskContext attempt,
         TaskId executionId,
         string name,
         CancellationToken cancellationToken)
@@ -53,30 +54,23 @@ internal sealed partial class DurableTaskGrainRuntime
             }
 
             var waiter = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            List<TaskCompletionSource>? waiters;
-            lock (_signalWaits)
+            if (!_signalWaits.TryGetValue(recordId, out var waiters))
             {
-                if (!_signalWaits.TryGetValue(recordId, out waiters))
-                {
-                    _signalWaits[recordId] = waiters = [];
-                }
-
-                waiters.Add(waiter);
+                _signalWaits[recordId] = waiters = [];
             }
+
+            waiters.Add(waiter);
 
             DurableTaskEvents.EmitSignalWaitStarted(GrainContext, recordId);
             try
             {
-                await waiter.Task.WaitAsync(cancellationToken);
+                await attempt.ParkAsync(waiter.Task.WaitAsync(cancellationToken), [recordId]);
             }
             finally
             {
-                lock (_signalWaits)
+                if (waiters.Remove(waiter) && waiters.Count == 0)
                 {
-                    if (waiters.Remove(waiter) && waiters.Count == 0)
-                    {
-                        _signalWaits.Remove(recordId);
-                    }
+                    _signalWaits.Remove(recordId);
                 }
 
                 DurableTaskEvents.EmitSignalWaitEnded(GrainContext, recordId);
@@ -87,14 +81,9 @@ internal sealed partial class DurableTaskGrainRuntime
     /// <summary>Completes the waits for a signal record whose value has committed.</summary>
     private void CompleteSignalWaits(TaskId recordId)
     {
-        ResumeParkedWaits(recordId);
-        List<TaskCompletionSource>? waiters;
-        lock (_signalWaits)
+        if (_signalWaits.Count == 0 || !_signalWaits.Remove(recordId, out var waiters))
         {
-            if (_signalWaits.Count == 0 || !_signalWaits.Remove(recordId, out waiters))
-            {
-                return;
-            }
+            return;
         }
 
         foreach (var waiter in waiters)

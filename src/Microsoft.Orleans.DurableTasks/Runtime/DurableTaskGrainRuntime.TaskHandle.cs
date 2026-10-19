@@ -16,7 +16,6 @@ internal sealed partial class DurableTaskGrainRuntime
     {
         private readonly TaskCompletionSource<DurableTaskResponse> _responseTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly GrainId _remoteTarget = remoteTarget;
-        private int _isRunning;
 
         public Task<DurableTaskResponse> ResponseTask => _responseTcs.Task;
 
@@ -25,11 +24,7 @@ internal sealed partial class DurableTaskGrainRuntime
 
         // If this is false, the task was rehydrated from storage but has not started running yet.
         // This will happen if the task is non-serializable, like a local method invocation.
-        public bool IsRunning
-        {
-            get => Volatile.Read(ref _isRunning) != 0;
-            set => Volatile.Write(ref _isRunning, value ? 1 : 0);
-        }
+        public bool IsRunning { get; set; }
 
         public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
 
@@ -82,29 +77,16 @@ internal sealed partial class DurableTaskGrainRuntime
             return await ResponseTask.WaitAsync(cancellationToken);
         }
 
-        // Completing the handle resumes the attempts parked on it before their code continues.
-        public bool TrySetResponse(DurableTaskResponse response) => OnCompleted(_responseTcs.TrySetResult(response));
-
-        public bool TrySetException(Exception exception) => OnCompleted(_responseTcs.TrySetException(exception));
+        public bool TrySetResponse(DurableTaskResponse response) => _responseTcs.TrySetResult(response);
 
         /// <summary>Fails the handle's waiters because the activation stops, while the task continues in the next activation.</summary>
         /// <remarks>The handle may have no waiter, so the failure is marked observed.</remarks>
         public void SetStopping(DurableTaskAttemptCanceledException exception)
         {
-            if (OnCompleted(_responseTcs.TrySetException(exception)))
+            if (_responseTcs.TrySetException(exception))
             {
                 _ = _responseTcs.Task.Exception;
             }
-        }
-
-        private bool OnCompleted(bool completed)
-        {
-            if (completed)
-            {
-                runtime.ResumeParkedWaits(TaskId);
-            }
-
-            return completed;
         }
     }
 }

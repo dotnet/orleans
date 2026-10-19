@@ -389,7 +389,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     [Fact]
     public Task InboxBatchStagesCancellationsAndCompletionsWithoutWaitingForBatchWrite() => ActivationScheduler.RunAsync(async () =>
     {
-        var (runtime, storage, manager, transport) = CreateRuntime();
+        var (runtime, storage, manager, transport) = CreateRuntime(reentrant: true);
         var receiver = GrainId.Create("test", "one");
         var caller = GrainId.Create("caller", "one");
         var target = GrainId.Create("target", "one");
@@ -1540,7 +1540,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             return 1;
         })), TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        Assert.Equal(TimeSpan.FromSeconds(1), workSource.GetWakeupDelay());
+        Assert.Equal(new DurableTaskOptions().RunnableExecutionWakeupDelay, workSource.GetWakeupDelay());
         release.SetResult();
         await runtime.GetScheduledTaskHandle(stepId).WaitAsync(TestContext.Current.CancellationToken).AsTask()
             .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -1568,6 +1568,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var (runtime, _, manager, transport) = CreateRuntime();
+        await runtime.RecoverAsync(cancellationToken);
         var workSource = runtime;
         var rootId = TaskId.Parse("root");
         var resumed = false;
@@ -1592,7 +1593,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await manager.WriteStateAsync(cancellationToken);
         manager.AfterWriteCompleted = null;
 
-        Assert.Equal((false, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)), consults);
+        Assert.Equal((false, new DurableTaskOptions().RunnableExecutionWakeupDelay, new DurableTaskOptions().RunnableExecutionWakeupDelay), consults);
         Assert.Equal(3, (await WaitForResponseAsync(runtime, rootId)).GetResult<int>());
         await runtime.StopAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
     });
@@ -1825,7 +1826,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     {
         // The clock never advances, so only awaiting the candidates can select a winner.
         var time = new FakeTimeProvider(DateTimeOffset.UnixEpoch);
-        var (runtime, storage, _, _) = CreateRuntime(timeProvider: time);
+        var (runtime, storage, _, _) = CreateRuntime(timeProvider: time, reentrant: true);
         var rootId = TaskId.Parse("root");
         var first = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1929,6 +1930,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             () => new GrainDurableTaskContext(
                 TaskId.Parse("root"),
                 runtime,
+                Substitute.For<IGrainContext>(),
                 scheduler),
             CancellationToken.None,
             TaskCreationOptions.DenyChildAttach,
@@ -1951,6 +1953,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var context = new GrainDurableTaskContext(
             TaskId.Parse("root"),
             runtime,
+            Substitute.For<IGrainContext>(),
             TaskScheduler.Current);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -1965,6 +1968,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var context = new GrainDurableTaskContext(
             TaskId.Parse("root"),
             new SchedulerProbeRuntime(TaskScheduler.Current),
+            Substitute.For<IGrainContext>(),
             TaskScheduler.Current);
 
         var generated = InvokeCreateChildTaskId(context, null);
@@ -2047,6 +2051,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var context = new GrainDurableTaskContext(
             TaskId.Parse("root"),
             runtime,
+            Substitute.For<IGrainContext>(),
             TaskScheduler.Current);
         var invocation = DurableTaskRuntimeHelper.RunAsync(
             DurableTask.Delay(TimeSpan.FromDays(1)),
@@ -2080,6 +2085,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var context = new GrainDurableTaskContext(
             TaskId.Parse("root"),
             runtime,
+            Substitute.For<IGrainContext>(),
             TaskScheduler.Current);
         var invocation = DurableTaskRuntimeHelper.RunAsync(
             DurableTask.Delay(TimeSpan.FromDays(1)),
@@ -4221,7 +4227,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             TimeSpan? resultRetentionPeriod = null,
             bool initialize = true,
             TimeProvider? timeProvider = null,
-            TimeSpan? deduplicationWindow = null)
+            TimeSpan? deduplicationWindow = null,
+            bool reentrant = false)
     {
         var manager = new TestStateManager();
         var storage = new TestStorage(manager, timeProvider);
@@ -4231,7 +4238,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             resultRetentionPeriod,
             initialize,
             timeProvider,
-            deduplicationWindow);
+            deduplicationWindow,
+            reentrant);
     }
 
     /// <summary>
@@ -4248,10 +4256,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             TimeSpan? resultRetentionPeriod = null,
             bool initialize = true,
             TimeProvider? timeProvider = null,
-            TimeSpan? deduplicationWindow = null)
+            TimeSpan? deduplicationWindow = null,
+            bool reentrant = false)
     {
-        var context = Substitute.For<IGrainContext>();
-        context.GrainId.Returns(GrainId.Create("test", "one"));
+        var context = CreateTestActivation(reentrant);
         var accessor = Substitute.For<IGrainContextAccessor>();
         accessor.GrainContext.Returns(context);
         var shared = new DurableTaskGrainRuntimeShared(
@@ -4276,12 +4284,21 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             [transport]);
         if (initialize)
         {
-            runtime.InitializeForActivation();
+            runtime.InitializeForActivation(context);
         }
 
         manager.RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, runtime);
         return (runtime, storage, manager, transport);
     }
+    /// <summary>Creates a substitute activation which runs its local requests as a non-reentrant activation does.</summary>
+    private static IGrainContext CreateTestActivation(bool reentrant = false)
+    {
+        var context = Substitute.For<IGrainContext>();
+        context.GrainId.Returns(GrainId.Create("test", "one"));
+        TestLocalRequestQueue.Attach(context, reentrant);
+        return context;
+    }
+
     private static Serializer CreateSerializer()
     {
         var services = new ServiceCollection();
@@ -4346,6 +4363,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public void PostRoot(TaskId rootId, IDurableTaskRequest request) => throw new NotSupportedException();
 
         public ValueTask<TaskId> SelectCompletionAsync(
+            GrainDurableTaskContext attempt,
             TaskId decisionId,
             IReadOnlyList<TaskId> candidates,
             CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -4396,6 +4414,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         }
 
         public ValueTask<TaskId> SelectCompletionAsync(
+            GrainDurableTaskContext attempt,
             TaskId decisionId,
             IReadOnlyList<TaskId> candidates,
             CancellationToken cancellationToken)

@@ -76,7 +76,8 @@ internal sealed class DurableTaskReplayHarness(
             var probe = new WriteProbe(() => (counter.Value, log.Count, CompletedTasks(storage)));
             manager.RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, runtime);
             manager.RegisterStateMachine("write-probe", probe);
-            runtime.InitializeForActivation();
+            TestLocalRequestQueue.Attach(grainContext);
+            runtime.InitializeForActivation(grainContext);
             await storage.ReadAsync(cancellationToken);
             await runtime.RecoverAsync(cancellationToken);
             runtime.StartRecoveredExecutions();

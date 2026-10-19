@@ -26,4 +26,17 @@ public sealed class DurableTaskOptions
     /// with the code which the new activation runs. The interval is positive; the default is one minute.
     /// </remarks>
     public TimeSpan StalledExecutionRetryInterval { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Gets or sets how soon a grain which stopped while an execution was running wakes, so that a later activation
+    /// resumes the execution.
+    /// </summary>
+    /// <remarks>
+    /// While one of a grain's executions runs code, the grain keeps a Durable Jobs wake-up at this delay. A grain which
+    /// crashes or deactivates meanwhile reactivates and replays the execution once the delay has passed. While the grain
+    /// is active, each wake-up only reschedules itself, so the delay also sets how often that happens. A parked execution,
+    /// which waits for a message such as a call's result, needs no wake-up: the message reactivates its grain. The delay
+    /// is positive; the default is 30 seconds.
+    /// </remarks>
+    public TimeSpan RunnableExecutionWakeupDelay { get; set; } = TimeSpan.FromSeconds(30);
 }
