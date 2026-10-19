@@ -776,7 +776,7 @@ public partial class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_WriteStateAsync_DoesNotObserveActiveEntry()
+    public async Task StateManager_WriteStateAsync_WaitsForActiveEntryAndCapturesIt()
     {
         var storage = new CapturingStorage();
         var format = new TrackingJournalFormat(SessionPool);
@@ -786,38 +786,34 @@ public partial class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
-        Task writeTask = Task.CompletedTask;
-        using var writeStarted = new ManualResetEventSlim();
-        var entry = state.BeginEntry();
-        try
+        var writeTask = WriteWhileEntryIsOpen();
+        await writeTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.False(state.AppendEntriesObservedOpenEntry);
+        var append = Assert.Single(storage.Appends);
+        Assert.Contains(ReadBinaryEntries(append), entry => entry.StreamId.Value >= 8);
+
+        Task WriteWhileEntryIsOpen()
         {
-            entry.Writer.Write(new byte[] { 1, 2, 3 });
-            writeTask = Task.Run(async () =>
+            var entry = state.BeginEntry();
+            try
             {
-                writeStarted.Set();
-                await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
-            }, TestContext.Current.CancellationToken);
-            Assert.True(writeStarted.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+                entry.Writer.Write(new byte[] { 1, 2, 3 });
+                var task = Task.Run(() => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask(), TestContext.Current.CancellationToken);
 
-            Assert.True(SpinWait.SpinUntil(() => writeTask.IsCompleted, TimeSpan.FromSeconds(10)));
-            Assert.True(writeTask.IsCompletedSuccessfully, writeTask.Exception?.ToString());
-            Assert.False(state.AppendEntriesObservedOpenEntry);
-            var append = Assert.Single(storage.Appends);
-            Assert.DoesNotContain(ReadBinaryEntries(append), entry => entry.StreamId.Value >= 8);
+                // The write captures every state, so it waits for the entry which occupies the journal buffer.
+                Assert.False(SpinWait.SpinUntil(() => task.IsCompleted, TimeSpan.FromMilliseconds(100)));
+                Assert.Empty(storage.Appends);
 
-            state.MarkEntryClosing();
-            entry.Commit();
+                state.MarkEntryClosing();
+                entry.Commit();
+                return task;
+            }
+            finally
+            {
+                state.MarkEntryClosing();
+                entry.Dispose();
+            }
         }
-        finally
-        {
-            state.MarkEntryClosing();
-            entry.Dispose();
-        }
-
-        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        Assert.Equal(2, storage.Appends.Count);
-        Assert.Contains(ReadBinaryEntries(storage.Appends[1]), entry => entry.StreamId.Value >= 8);
     }
 
     [Fact]

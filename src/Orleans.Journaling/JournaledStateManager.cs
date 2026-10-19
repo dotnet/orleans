@@ -314,62 +314,32 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                     var hasCommittedBuffer = false;
                                     var hasBufferToConsume = false;
                                     var bufferToConsumeIsCommittedBuffer = false;
-                                    var capturedAllStates = isSnapshot;
                                     var writeVersion = 0L;
 
-                                    lock (_lock)
+                                    // Each write captures every state. An append waits for an entry which another thread has open,
+                                    // since the entry occupies the journal buffer which states write their pending entries into.
+                                    while (true)
                                     {
-                                        if (isSnapshot)
+                                        Task? activeEntryClosed = null;
+                                        lock (_lock)
                                         {
-                                            using var snapshotWriter = _shared.JournalFormat.CreateWriter();
-                                            if (_retirementTracker.Count > 0)
+                                            if (isSnapshot)
                                             {
-                                                RetireOrResurectStates();
-                                            }
-
-                                            if (_migrationSnapshotRequired)
-                                            {
-                                                ThrowIfMigrationBlockedByRetiredStates();
-                                            }
-
-                                            // The map of state ids is itself stored as a durable state with the id 0.
-                                            // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
-                                            // If we removed retired states, this snapshot will persist that change.
-                                            AppendUpdatesOrSnapshotState(snapshotWriter, isSnapshot: true, StateDirectory.Id, _journalStreamDirectory);
-                                            statesScanned++;
-
-                                            foreach (var (id, state) in _statesMap)
-                                            {
-                                                if (id is 0 || state is null)
+                                                using var snapshotWriter = _shared.JournalFormat.CreateWriter();
+                                                if (_retirementTracker.Count > 0)
                                                 {
-                                                    continue;
+                                                    RetireOrResurectStates();
                                                 }
 
-                                                AppendUpdatesOrSnapshotState(snapshotWriter, isSnapshot: true, id, state);
-                                                statesScanned++;
-                                            }
+                                                if (_migrationSnapshotRequired)
+                                                {
+                                                    ThrowIfMigrationBlockedByRetiredStates();
+                                                }
 
-                                            bufferToConsume = _journalWriter.GetCommittedBuffer();
-                                            if (bufferToConsume.Length > 0)
-                                            {
-                                                hasBufferToConsume = true;
-                                            }
-                                            else
-                                            {
-                                                bufferToConsume.Dispose();
-                                            }
-
-                                            committedBuffer = snapshotWriter.GetCommittedBuffer();
-                                        }
-                                        else
-                                        {
-                                            var flushCommittedOnly = _journalWriter.HasActiveEntry;
-                                            capturedAllStates = !flushCommittedOnly;
-                                            if (!flushCommittedOnly)
-                                            {
                                                 // The map of state ids is itself stored as a durable state with the id 0.
                                                 // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
-                                                AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot: false, StateDirectory.Id, _journalStreamDirectory);
+                                                // If we removed retired states, this snapshot will persist that change.
+                                                AppendUpdatesOrSnapshotState(snapshotWriter, isSnapshot: true, StateDirectory.Id, _journalStreamDirectory);
                                                 statesScanned++;
 
                                                 foreach (var (id, state) in _statesMap)
@@ -379,40 +349,79 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                                         continue;
                                                     }
 
-                                                    AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot: false, id, state);
+                                                    AppendUpdatesOrSnapshotState(snapshotWriter, isSnapshot: true, id, state);
                                                     statesScanned++;
+                                                }
+
+                                                bufferToConsume = _journalWriter.GetCommittedBuffer();
+                                                if (bufferToConsume.Length > 0)
+                                                {
+                                                    hasBufferToConsume = true;
+                                                }
+                                                else
+                                                {
+                                                    bufferToConsume.Dispose();
+                                                }
+
+                                                committedBuffer = snapshotWriter.GetCommittedBuffer();
+                                            }
+                                            else
+                                            {
+                                                activeEntryClosed = _journalWriter.GetActiveEntryClosedTask();
+                                                if (activeEntryClosed is null)
+                                                {
+                                                    // The map of state ids is itself stored as a durable state with the id 0.
+                                                    // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
+                                                    AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot: false, StateDirectory.Id, _journalStreamDirectory);
+                                                    statesScanned++;
+
+                                                    foreach (var (id, state) in _statesMap)
+                                                    {
+                                                        if (id is 0 || state is null)
+                                                        {
+                                                            continue;
+                                                        }
+
+                                                        AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot: false, id, state);
+                                                        statesScanned++;
+                                                    }
+
+                                                    committedBuffer = _journalWriter.GetCommittedBuffer();
+                                                    bufferToConsume = committedBuffer;
+                                                    bufferToConsumeIsCommittedBuffer = true;
                                                 }
                                             }
 
-                                            committedBuffer = _journalWriter.GetCommittedBuffer();
-                                            bufferToConsume = committedBuffer;
-                                            bufferToConsumeIsCommittedBuffer = true;
+                                            if (activeEntryClosed is null)
+                                            {
+                                                if (committedBuffer.Length == 0)
+                                                {
+                                                    // Nothing was staged, so the write captured nothing which awaits acknowledgement.
+                                                    committedBuffer.Dispose();
+                                                    if (bufferToConsumeIsCommittedBuffer)
+                                                    {
+                                                        bufferToConsume = default;
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    hasCommittedBuffer = true;
+                                                    if (!isSnapshot)
+                                                    {
+                                                        hasBufferToConsume = true;
+                                                    }
+
+                                                    writeVersion = OnWriteCaptured();
+                                                }
+                                            }
                                         }
 
-                                        if (committedBuffer.Length == 0)
+                                        if (activeEntryClosed is null)
                                         {
-                                            committedBuffer.Dispose();
-                                            if (bufferToConsumeIsCommittedBuffer)
-                                            {
-                                                bufferToConsume = default;
-                                            }
-
-                                            // A completed prefix can already be durable when the last open entry is aborted.
-                                            if (capturedAllStates && _hasDeferredWriteAcknowledgement)
-                                            {
-                                                writeVersion = OnWriteCaptured(capturedAllStates: true);
-                                            }
+                                            break;
                                         }
-                                        else
-                                        {
-                                            hasCommittedBuffer = true;
-                                            if (!isSnapshot)
-                                            {
-                                                hasBufferToConsume = true;
-                                            }
 
-                                            writeVersion = OnWriteCaptured(capturedAllStates);
-                                        }
+                                        await activeEntryClosed.WaitAsync(_shutdownCancellation.Token).ConfigureAwait(true);
                                     }
 
                                     _shared.Instruments.OnGather(
@@ -514,7 +523,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                             _journalStreamDirectory.Set(name, id);
                                         }
 
-                                        _hasDeferredWriteAcknowledgement = false;
                                         _deletionGeneration++;
                                     }
                                     break;
@@ -636,7 +644,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
         finally
         {
-            CompleteObservers(_shutdownCancellation.IsCancellationRequested ? null : exception);
+            // Watchers complete cleanly only when shutdown canceled the operation. Any other failure leaves staged changes uncertain.
+            CompleteObservers(exception is OperationCanceledException && _shutdownCancellation.IsCancellationRequested ? null : exception);
             lock (_lock)
             {
                 FaultQueuedWorkItemsUnderLock(exception);

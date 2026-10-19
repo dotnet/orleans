@@ -26,15 +26,26 @@ public class JsonDurableLogTests
         var codec = new JsonDurableLogCommandCodec<string>(Options);
         var handler = new DurableLogTests.RecordingLogHandler();
 
+        var draftId = new LogDraftId(Guid.Parse("0f8fad5b-d9cb-469f-a165-70867728950e"), 3);
+        Apply(codec, """["epoch",9]""", writer => codec.WriteEpoch(9, writer), handler);
         Apply(codec, """["append","a"]""", writer => codec.WriteAppend(["a"], writer), handler);
         Apply(codec, """["append","b","c"]""", writer => codec.WriteAppend(["b", "c"], writer), handler);
+        Apply(codec, """["commitDraft","0f8fad5bd9cb469fa16570867728950e.3",3,"f"]""", writer => codec.WriteDraftCommit(draftId, 3, ["f"], writer), handler);
+        Apply(codec, """["commitDraft","0f8fad5bd9cb469fa16570867728950e.3",4]""", writer => codec.WriteDraftCommit(draftId, 4, [], writer), handler);
         Apply(codec, """["trimBefore",3]""", writer => codec.WriteTrimBefore(3, writer), handler);
         Apply(codec, """["clear"]""", writer => codec.WriteClear(writer), handler);
         Apply(codec, """["seal"]""", writer => codec.WriteSeal(writer), handler);
-        Apply(codec, """["snapshot",4,4,true,["d","e"]]""", writer => codec.WriteSnapshot(4, 4, isSealed: true, ["d", "e"], writer), handler);
+        Apply(
+            codec,
+            """["snapshot",9,4,4,true,["d","e"],[["0f8fad5bd9cb469fa16570867728950e.3",5,1]]]""",
+            writer => codec.WriteSnapshot(9, 4, 4, isSealed: true, ["d", "e"], [new(draftId, 5, 1)], writer),
+            handler);
 
         Assert.Equal(
-            ["append a", "append b", "append c", "trim 3", "clear", "seal", "reset 4 4 True 2", "append d", "append e"],
+            [
+                "epoch 9", "append a", "append b", "append c", "append f", $"commit {draftId} 3 1", $"commit {draftId} 4 0", "trim 3", "clear",
+                "seal", "reset 9 4 4 2", "append d", "append e", $"commit {draftId} 5 1", "seal",
+            ],
             handler.Commands);
     }
 
@@ -48,11 +59,15 @@ public class JsonDurableLogTests
         Assert.ThrowsAny<JsonException>(() => codec.Apply(Read("""["append","a"] []"""), handler));
         Assert.Throws<JsonException>(() => codec.Apply(Read("""["trimBefore",-1]"""), handler));
         Assert.Throws<JsonException>(() => codec.Apply(Read("""["clear",1]"""), handler));
-        Assert.Throws<JsonException>(() => codec.Apply(Read("""["snapshot",0,0,1,[]]"""), handler));
-        Assert.Throws<JsonException>(() => codec.Apply(Read("""["snapshot",0,0,false,["a"],1]"""), handler));
+        Assert.Throws<JsonException>(() => codec.Apply(Read("""["snapshot",1,0,0,1,[],[]]"""), handler));
+        Assert.Throws<JsonException>(() => codec.Apply(Read("""["snapshot",1,0,0,false,["a"],1]"""), handler));
+        Assert.Throws<JsonException>(() => codec.Apply(Read("""["snapshot",1,0,0,false,[],[["x",0,0]]]"""), handler));
+        Assert.Throws<JsonException>(() => codec.Apply(Read("""["snapshot",1,0,0,false,[],[["0f8fad5bd9cb469fa16570867728950e.3",0,-1]]]"""), handler));
+        Assert.Throws<JsonException>(() => codec.Apply(Read("""["commitDraft","bad",0]"""), handler));
+        Assert.Throws<JsonException>(() => codec.Apply(Read("""["epoch",-1]"""), handler));
         Assert.Throws<NotSupportedException>(() => codec.Apply(Read("""["rewrite"]"""), handler));
         Assert.Throws<ArgumentOutOfRangeException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteTrimBefore(-1, writer)));
-        Assert.Throws<ArgumentOutOfRangeException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(1, 2, isSealed: false, [], writer)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(1, 1, 2, isSealed: false, [], [], writer)));
     }
 
     [Fact]
@@ -65,7 +80,7 @@ public class JsonDurableLogTests
         var value = new DurableValue<int>("value", manager, services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey));
         await manager.InitializeAsync(CancellationToken);
 
-        await using var read = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var read = log.ReadAsync(0, mode: DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         await using var watch = value.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(DurableChangeStatus.Committed, (await watch.NextAsync()).Status);
         Assert.Equal(LogEventKind.CaughtUp, (await read.NextAsync()).Kind);
@@ -81,7 +96,7 @@ public class JsonDurableLogTests
 
         Assert.Equal(new LogEvent<string> { Kind = LogEventKind.Watermark, Sequence = 1, Status = DurableChangeStatus.Committed }, await read.NextAsync());
         Assert.Equal(new ValueChange<int> { Value = 1, Status = DurableChangeStatus.Committed, Version = 1 }, await watch.NextAsync());
-        Assert.Contains("""["append","Hello"]""", Encoding.UTF8.GetString(storage.Segments.Single()));
+        Assert.Contains($"""["commitDraft","{draft.Id}",0,"Hello"]""", Encoding.UTF8.GetString(storage.Segments.Single()));
 
         log.TrimBefore(1);
         log.Append("World");

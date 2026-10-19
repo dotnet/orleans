@@ -260,11 +260,22 @@ public interface IDurableTaskCompletionSourceCommandHandler<T>
 /// </summary>
 public interface IDurableLogCommandCodec<T>
 {
+    /// <summary>Writes a command which begins a history identified by <paramref name="epoch"/>.</summary>
+    /// <remarks>The command precedes every other command of the history. <paramref name="epoch"/> is positive.</remarks>
+    void WriteEpoch(long epoch, JournalStreamWriter writer);
+
     /// <summary>Writes one command which appends <paramref name="items"/>, in order.</summary>
     /// <remarks>
     /// The command is one journal entry, so replay applies all of the items or none of them. <paramref name="items"/> is not empty.
     /// </remarks>
     void WriteAppend(ReadOnlySpan<T> items, JournalStreamWriter writer);
+
+    /// <summary>Writes one command which commits a draft by appending <paramref name="items"/>, in order, from <paramref name="sequence"/>.</summary>
+    /// <remarks>
+    /// The command is one journal entry, so replay applies all of the items and the draft's outcome, or none of them.
+    /// <paramref name="items"/> may be empty.
+    /// </remarks>
+    void WriteDraftCommit(LogDraftId draftId, long sequence, ReadOnlySpan<T> items, JournalStreamWriter writer);
 
     /// <summary>Writes a command which discards entries before <paramref name="sequence"/>.</summary>
     void WriteTrimBefore(long sequence, JournalStreamWriter writer);
@@ -276,12 +287,21 @@ public interface IDurableLogCommandCodec<T>
     void WriteSeal(JournalStreamWriter writer);
 
     /// <summary>Writes a snapshot command containing the log's state and its retained entries, which begin at <paramref name="firstSequence"/>.</summary>
+    /// <param name="epoch">The identifier of the log's history, or zero when the log has no history.</param>
     /// <param name="firstSequence">The sequence number of the first retained entry.</param>
     /// <param name="resetSequence">The first sequence number after the most recent clear, or zero.</param>
     /// <param name="isSealed">Whether the log is sealed.</param>
     /// <param name="items">The retained entries.</param>
+    /// <param name="draftCommits">The drafts whose committed entries begin at or after <paramref name="firstSequence"/>, in sequence order.</param>
     /// <param name="writer">The writer.</param>
-    void WriteSnapshot(long firstSequence, long resetSequence, bool isSealed, IReadOnlyCollection<T> items, JournalStreamWriter writer);
+    void WriteSnapshot(
+        long epoch,
+        long firstSequence,
+        long resetSequence,
+        bool isSealed,
+        IReadOnlyCollection<T> items,
+        IReadOnlyCollection<LogDraftCommit> draftCommits,
+        JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(JournalBufferReader input, IDurableLogCommandHandler<T> consumer);
@@ -290,10 +310,20 @@ public interface IDurableLogCommandCodec<T>
 /// <summary>
 /// Receives decoded durable log commands from a codec implementation.
 /// </summary>
+/// <remarks>
+/// A draft commit command applies its items with <see cref="ApplyAppend"/>, then its outcome with <see cref="ApplyDraftCommit"/>.
+/// A snapshot command applies <see cref="Reset"/>, its entries, its draft commits, and then <see cref="ApplySeal"/> if the log is sealed.
+/// </remarks>
 public interface IDurableLogCommandHandler<T>
 {
+    /// <summary>Applies a command which begins a history identified by <paramref name="epoch"/>.</summary>
+    void ApplyEpoch(long epoch);
+
     /// <summary>Applies one appended item. An append command applies each of its items in order.</summary>
     void ApplyAppend(T item);
+
+    /// <summary>Applies the outcome of a committed draft, whose entries have been applied.</summary>
+    void ApplyDraftCommit(LogDraftCommit commit);
 
     /// <summary>Applies a command which discards entries before <paramref name="sequence"/>.</summary>
     void ApplyTrimBefore(long sequence);
@@ -305,9 +335,9 @@ public interface IDurableLogCommandHandler<T>
     void ApplySeal();
 
     /// <summary>Resets the receiver to a snapshot's state before applying its entries, which begin at <paramref name="firstSequence"/>.</summary>
+    /// <param name="epoch">The identifier of the log's history, or zero when the log has no history.</param>
     /// <param name="firstSequence">The sequence number of the first retained entry.</param>
     /// <param name="resetSequence">The first sequence number after the most recent clear, or zero.</param>
-    /// <param name="isSealed">Whether the log is sealed.</param>
     /// <param name="capacityHint">The number of entries which follow.</param>
-    void Reset(long firstSequence, long resetSequence, bool isSealed, int capacityHint);
+    void Reset(long epoch, long firstSequence, long resetSequence, int capacityHint);
 }

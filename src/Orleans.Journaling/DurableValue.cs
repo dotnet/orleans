@@ -23,6 +23,9 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
     private T? _value;
     private bool _isDirty;
 
+    // Whether the write in flight captured the value. A completed write acknowledges only the value it captured.
+    private bool _isValueCaptured;
+
     public DurableValue(
         [ServiceKey] string key,
         IJournaledStateManager manager,
@@ -52,7 +55,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
             OnModified();
             if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
             {
-                topic.Publish(value);
+                topic.PublishStaged(value);
             }
         }
     }
@@ -77,12 +80,20 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
         PublishCurrentValue();
     }
 
-    void IStateMachine.OnWriteCompleted() => OnValuePersisted();
+    void IStateMachine.OnWriteCompleted()
+    {
+        if (_isValueCaptured)
+        {
+            _isValueCaptured = false;
+            OnValuePersisted();
+        }
+    }
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
         _value = default;
         _isDirty = false;
+        _isValueCaptured = false;
         PublishCurrentValue();
     }
 
@@ -90,7 +101,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
     {
         if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
         {
-            topic.Publish(_value, isDurable: true);
+            topic.PublishDurable(_value);
         }
     }
 
@@ -100,6 +111,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
         {
             WriteState(writer);
             _isDirty = false;
+            _isValueCaptured = true;
         }
     }
 
@@ -107,6 +119,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
     {
         WriteState(snapshotWriter);
         _isDirty = false;
+        _isValueCaptured = true;
     }
 
 
