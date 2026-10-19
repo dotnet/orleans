@@ -102,7 +102,7 @@ public class DurableTaskShieldedTests
     {
         var log = new ConcurrentDictionary<string, bool>();
         var context = new RecordingContext(TaskId.CreateRoot("root"), log);
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "buyer");
+        context.RequestTaskCancellation("buyer");
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
             DurableTask.Run(async cancellationToken =>
@@ -122,7 +122,7 @@ public class DurableTaskShieldedTests
     {
         var log = new ConcurrentDictionary<string, bool>();
         var context = new RecordingContext(TaskId.CreateRoot("root"), log);
-        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "buyer");
+        context.RequestTaskCancellation("buyer");
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
             DurableTask.Run(async _ =>
@@ -173,7 +173,6 @@ public class DurableTaskShieldedTests
             DateTimeOffset dueTime,
             CancellationToken cancellationToken) => new(DurableTaskResponse.Completed);
 
-        protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId) => throw new NotSupportedException();
 
         protected override ValueTask<TaskId> SelectCompletionAsync(
             TaskId decisionId,

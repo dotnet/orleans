@@ -43,7 +43,7 @@ public abstract partial class ScheduledTask
     {
         ArgumentNullException.ThrowIfNull(tasks);
         var candidates = tasks.ToArray();
-        return candidates[await RaceIndexAsync(candidates, cancellationToken).ConfigureAwait(false)];
+        return candidates[await RaceIndexAsync(candidates, cancellationToken)];
     }
 
     /// <inheritdoc cref="Race(IReadOnlyList{ScheduledTask}, CancellationToken)"/>
@@ -53,7 +53,7 @@ public abstract partial class ScheduledTask
     {
         ArgumentNullException.ThrowIfNull(tasks);
         var candidates = tasks.ToArray();
-        return candidates[await RaceIndexAsync(candidates, cancellationToken).ConfigureAwait(false)];
+        return candidates[await RaceIndexAsync(candidates, cancellationToken)];
     }
 
     /// <summary>
@@ -66,8 +66,8 @@ public abstract partial class ScheduledTask
     /// <remarks>
     /// <para>
     /// Within a durable execution, the task is a child of that execution, and the timeout is a durable delay which the
-    /// execution schedules when this method is first called, identified as <c>1</c> beneath an operation identifier which
-    /// this method generates in execution order. A replay keeps the delay's recorded due time, so the timeout counts from the
+    /// execution schedules when this method is first called, identified as <c>1</c> beneath the operation identifier
+    /// <c>{segment}$timeout-{n}</c>, which this task's segment and its count of timed waits determine. A replay keeps the delay's recorded due time, so the timeout counts from the
     /// first call. The host selects whichever of the task and the delay completed first, as
     /// <see cref="WhenAny(IReadOnlyList{ScheduledTask}, CancellationToken)"/> does, so every replay observes the same
     /// outcome. Outside a durable execution, the timeout elapses on the system clock, counted from the call.
@@ -91,7 +91,7 @@ public abstract partial class ScheduledTask
     /// </exception>
     /// <exception cref="TimeoutException">The timeout elapsed, and the task ended canceled.</exception>
     public async Task WaitAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
-        => (await WaitWithTimeoutAsync(timeout, cancellationToken).ConfigureAwait(false)).EnsureSuccessfulCompletion();
+        => (await WaitWithTimeoutAsync(timeout, cancellationToken)).EnsureSuccessfulCompletion();
 
     /// <summary>
     /// Waits for successful completion, and requests durable cancellation of the task once <paramref name="dueTime"/>
@@ -112,7 +112,7 @@ public abstract partial class ScheduledTask
     /// </exception>
     /// <exception cref="TimeoutException">The due time passed, and the task ended canceled.</exception>
     public async Task WaitUntilAsync(DateTimeOffset dueTime, CancellationToken cancellationToken = default)
-        => (await WaitWithDeadlineAsync(dueTime, cancellationToken).ConfigureAwait(false)).EnsureSuccessfulCompletion();
+        => (await WaitWithDeadlineAsync(dueTime, cancellationToken)).EnsureSuccessfulCompletion();
 
     /// <summary>
     /// Waits for the task's terminal response, requesting its cancellation once <paramref name="timeout"/> elapses, and
@@ -123,7 +123,7 @@ public abstract partial class ScheduledTask
         ArgumentOutOfRangeException.ThrowIfLessThan(timeout, TimeSpan.Zero);
         var reason = GetTimeoutReason(timeout);
         return DurableTaskContext.Ambient is { } context
-            ? WaitWithDurableTimeoutAsync(context, context.CreateOperationId(TimeoutOperation), DurableTask.Delay(timeout), reason, cancellationToken)
+            ? WaitWithDurableTimeoutAsync(context, context.CreateOperationId(TimeoutOperation, Id), DurableTask.Delay(timeout), reason, cancellationToken)
             : WaitWithSystemTimeoutAsync(timeout, reason, cancellationToken);
     }
 
@@ -136,7 +136,7 @@ public abstract partial class ScheduledTask
         var reason = GetDeadlineReason(dueTime);
         if (DurableTaskContext.Ambient is { } context)
         {
-            return WaitWithDurableTimeoutAsync(context, context.CreateOperationId(TimeoutOperation), DurableTask.DelayUntil(dueTime), reason, cancellationToken);
+            return WaitWithDurableTimeoutAsync(context, context.CreateOperationId(TimeoutOperation, Id), DurableTask.DelayUntil(dueTime), reason, cancellationToken);
         }
 
         var remaining = dueTime - TimeProvider.System.GetUtcNow();
@@ -164,11 +164,10 @@ public abstract partial class ScheduledTask
         var waitToken = linked?.Token ?? context.AttemptCancellationToken;
         try
         {
-            var delayHandle = await DurableTask.ScheduleChildAsync(delay, context, operationId.Child(TimeoutDelaySegment), waitToken)
-                .ConfigureAwait(false);
+            var delayHandle = await DurableTask.ScheduleChildAsync(delay, context, operationId.Child(TimeoutDelaySegment), waitToken);
             ScheduledTask[] tasks = [this, new ScheduledTaskHandle(delayHandle)];
-            var index = await SelectIndexAsync(context, operationId, tasks, waitToken).ConfigureAwait(false);
-            return await SettleTimeoutAsync(tasks, index, reason, waitToken).ConfigureAwait(false);
+            var index = await SelectIndexAsync(context, operationId, tasks, waitToken);
+            return await SettleTimeoutAsync(tasks, index, reason, waitToken);
         }
         catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
         {
@@ -183,7 +182,7 @@ public abstract partial class ScheduledTask
             timeoutCancellation.CancelAfter(timeout);
             try
             {
-                return await ObserveTerminalAsync(timeoutCancellation.Token).ConfigureAwait(false);
+                return await ObserveTerminalAsync(timeoutCancellation.Token);
             }
             catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
             {
@@ -195,8 +194,8 @@ public abstract partial class ScheduledTask
             }
         }
 
-        await CancelAsync(reason, cancellationToken).ConfigureAwait(false);
-        return ToTimeoutOutcome(await ObserveTerminalAsync(cancellationToken).ConfigureAwait(false), reason);
+        await CancelAsync(reason, cancellationToken);
+        return ToTimeoutOutcome(await ObserveTerminalAsync(cancellationToken), reason);
     }
 
     /// <summary>
@@ -211,8 +210,8 @@ public abstract partial class ScheduledTask
         CancellationToken cancellationToken)
     {
         var elapsed = winnerIndex == 1
-            && (await tasks[1].ObserveTerminalAsync(cancellationToken).ConfigureAwait(false)).Status is DurableTaskStatus.CompletedSuccessfully;
-        var responses = await SettleRaceAsync(tasks, winnerIndex, elapsed ? reason : null, cancellationToken).ConfigureAwait(false);
+            && (await tasks[1].ObserveTerminalAsync(cancellationToken)).Status is DurableTaskStatus.CompletedSuccessfully;
+        var responses = await SettleRaceAsync(tasks, winnerIndex, elapsed ? reason : null, cancellationToken);
         return elapsed ? ToTimeoutOutcome(responses[0], reason) : responses[winnerIndex];
     }
 
@@ -221,8 +220,9 @@ public abstract partial class ScheduledTask
     /// <paramref name="reason"/>, then waits until every task is terminal and returns their responses in input order.
     /// </summary>
     /// <remarks>
-    /// Every request is made before any wait, so the other tasks stop concurrently. A request which fails synchronously
-    /// fails only its own operation, so the other requests are still made.
+    /// Every request is made before any wait, so the other tasks stop concurrently. A request which fails fails only its
+    /// own operation: the other requests are still made, and the failure, the first in input order, is thrown once every
+    /// task is terminal, so no task outlives the race.
     /// </remarks>
     internal static async Task<DurableTaskResponse[]> SettleRaceAsync(
         ScheduledTask[] tasks,
@@ -230,7 +230,7 @@ public abstract partial class ScheduledTask
         string? reason,
         CancellationToken cancellationToken)
     {
-        var cancellations = new Task[tasks.Length - 1];
+        var cancellations = new Task[winnerIndex < 0 ? tasks.Length : tasks.Length - 1];
         for (int index = 0, next = 0; index < tasks.Length; index++)
         {
             if (index != winnerIndex)
@@ -239,17 +239,22 @@ public abstract partial class ScheduledTask
             }
         }
 
-        await Task.WhenAll(cancellations).ConfigureAwait(false);
+        await Task.WhenAll(cancellations).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
         var responses = new DurableTaskResponse[tasks.Length];
         for (var index = 0; index < responses.Length; index++)
         {
-            responses[index] = await tasks[index].ObserveTerminalAsync(cancellationToken).ConfigureAwait(false);
+            responses[index] = await tasks[index].ObserveTerminalAsync(cancellationToken);
+        }
+
+        foreach (var cancellation in cancellations)
+        {
+            await cancellation;
         }
 
         return responses;
 
         static async Task CancelLoserAsync(ScheduledTask task, string? reason, CancellationToken cancellationToken)
-            => await task.CancelAsync(reason, cancellationToken).ConfigureAwait(false);
+            => await task.CancelAsync(reason, cancellationToken);
     }
 
     /// <summary>
@@ -287,9 +292,9 @@ public abstract partial class ScheduledTask
         try
         {
             var index = context is null
-                ? await WaitForAnyIndexAsync(tasks, waitToken).ConfigureAwait(false)
-                : await SelectIndexAsync(context, operationId, tasks, waitToken).ConfigureAwait(false);
-            _ = await SettleRaceAsync(tasks, index, RaceLostReason, waitToken).ConfigureAwait(false);
+                ? await WaitForAnyIndexAsync(tasks, waitToken)
+                : await SelectIndexAsync(context, operationId, tasks, waitToken);
+            _ = await SettleRaceAsync(tasks, index, RaceLostReason, waitToken);
             return index;
         }
         catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
@@ -308,7 +313,7 @@ public abstract partial class ScheduledTask<TResult>
     /// <returns>The task's result, including a result which it returns after observing the timeout's cancellation request.</returns>
     /// <inheritdoc cref="ScheduledTask.WaitAsync(TimeSpan, CancellationToken)"/>
     public new async Task<TResult> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
-        => (await WaitWithTimeoutAsync(timeout, cancellationToken).ConfigureAwait(false)).GetResult<TResult>();
+        => (await WaitWithTimeoutAsync(timeout, cancellationToken)).GetResult<TResult>();
 
     /// <summary>
     /// Waits for and returns the successful result, and requests durable cancellation of the task once
@@ -317,5 +322,5 @@ public abstract partial class ScheduledTask<TResult>
     /// <returns>The task's result, including a result which it returns after observing the deadline's cancellation request.</returns>
     /// <inheritdoc cref="ScheduledTask.WaitUntilAsync(DateTimeOffset, CancellationToken)"/>
     public new async Task<TResult> WaitUntilAsync(DateTimeOffset dueTime, CancellationToken cancellationToken = default)
-        => (await WaitWithDeadlineAsync(dueTime, cancellationToken).ConfigureAwait(false)).GetResult<TResult>();
+        => (await WaitWithDeadlineAsync(dueTime, cancellationToken)).GetResult<TResult>();
 }

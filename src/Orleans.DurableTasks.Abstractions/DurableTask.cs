@@ -201,7 +201,7 @@ internal sealed class DelayDurableTask(TimeSpan duration) : DurableTask
 {
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
-        context.ThrowIfAttemptCanceled();
+        context.ThrowIfCannotRunOperation();
         return context.ObserveAttempt(context.ScheduleDelayAsync(context.Id, context.UtcNow + duration, context.CancellationToken));
     }
 }
@@ -210,7 +210,7 @@ internal sealed class DelayUntilDurableTask(DateTimeOffset dueTime) : DurableTas
 {
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
-        context.ThrowIfAttemptCanceled();
+        context.ThrowIfCannotRunOperation();
         return context.ObserveAttempt(context.ScheduleDelayAsync(context.Id, dueTime, context.CancellationToken));
     }
 }
@@ -352,16 +352,20 @@ internal sealed class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, 
 }
 
 /// <summary>
-/// An immutable durable task configuration: an identifier, and whether the task is detached or shielded. Handle
-/// operations are reachable only from configurations which carry an identifier.
+/// An immutable durable task configuration: a name or a root identifier, and whether the task is detached or shielded.
 /// </summary>
 /// <remarks>
-/// Within a durable execution, <see cref="WithId(string)"/> assigns an attached child's identifier when it's called, so
-/// handle operations on copies of the configuration address the same child. A detached task uses the name as its root
-/// identifier verbatim. Outside a durable execution, every task is a root, and the name is its root identifier.
+/// <para>
+/// Within a durable execution, the start allocates the operation's identifier, so the order of the configuration calls
+/// doesn't change identifiers: a name which <see cref="WithId(string)"/> assigns identifies the execution's operation, as a
+/// counted occurrence such as <c>reserve$2</c>, and an unnamed start takes the execution's next generated identifier. A
+/// detached task's root identifier derives from that operation's identifier, unless <see cref="Detached(string)"/> supplies
+/// the root identifier verbatim. Outside a durable execution, every task is a root, and the name is its root identifier.
+/// </para>
 /// </remarks>
 internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
 {
+    // An explicit identifier: a verbatim root identifier which Detached(string) supplies, or a combinator input's identifier.
     private readonly TaskId _taskId;
     private readonly string? _name;
     private readonly bool _detached;
@@ -397,13 +401,19 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
 
     internal DurableTaskContext? ParentContext { get; }
 
-    private bool IsDetachedFromParent => _detached && ParentContext is not null;
-
     internal ConfiguredDurableTaskCore<TTask> WithId(string name)
     {
         ThrowIfIdSpecified();
-        var taskId = ParentContext is { } parent && !_detached ? parent.CreateChildTaskId(name) : TaskId.CreateRoot(name);
-        return new(Task, ParentContext, taskId, name, _detached, _shielded);
+        if (ParentContext is not null)
+        {
+            DurableTaskContext.ValidateName(name, nameof(name));
+        }
+        else
+        {
+            ArgumentException.ThrowIfNullOrEmpty(name);
+        }
+
+        return new(Task, ParentContext, _taskId, name, _detached, _shielded);
     }
 
     internal ConfiguredDurableTaskCore<TTask> WithId(TaskId taskId)
@@ -418,46 +428,46 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
     }
 
     internal ConfiguredDurableTaskCore<TTask> Detached()
-    {
-        if (_detached || ParentContext is null)
-        {
-            // Outside a durable execution, every task is already a root.
-            return this;
-        }
+        // Outside a durable execution, every task is already a root.
+        => ParentContext is null ? this : new(Task, ParentContext, _taskId, _name, detached: true, _shielded);
 
-        Debug.Assert(_taskId.IsDefault || _name is not null, "Only named configurations carry a public identifier.");
-        var taskId = _name is { } name ? TaskId.CreateRoot(name) : default;
-        return new(Task, ParentContext, taskId, _name, detached: true, _shielded);
+    internal ConfiguredDurableTaskCore<TTask> Detached(string rootId)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(rootId);
+        ThrowIfIdSpecified();
+        return new(Task, ParentContext, TaskId.CreateRoot(rootId), name: null, detached: ParentContext is not null, _shielded);
     }
 
     internal ConfiguredDurableTaskCore<TTask> Shielded() => new(Task, ParentContext, _taskId, _name, _detached, shielded: true);
 
     private void ThrowIfIdSpecified()
     {
-        if (!_taskId.IsDefault)
+        if (!_taskId.IsDefault || _name is not null)
         {
             throw new InvalidOperationException("The durable task identifier has already been specified.");
         }
     }
 
-    private TaskId GetOrCreateId()
+    /// <summary>Allocates the identifier under which the task starts.</summary>
+    private TaskId CreateId()
     {
         if (!_taskId.IsDefault)
         {
             return _taskId;
         }
 
-        return ParentContext switch
+        if (ParentContext is not { } parent)
         {
-            null => TaskId.CreateRoot(Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture)),
-            { } parent when _detached => parent.CreateDetachedRootId(),
-            { } parent => parent.CreateChildTaskId(name: null),
-        };
+            return TaskId.CreateRoot(_name ?? Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture));
+        }
+
+        var operationId = parent.CreateChildTaskId(_name);
+        return _detached ? parent.CreateDetachedRootId(operationId) : operationId;
     }
 
     internal async Task<DurableTaskResponse> RunAsync(CancellationToken cancellationToken)
     {
-        ParentContext?.ThrowIfAttemptCanceled();
+        ParentContext?.ThrowIfCannotRunOperation();
         if (ParentContext is { } parent && !_detached)
         {
             // The shield follows this method's asynchronous flow, and ends when the method returns to its caller.
@@ -469,17 +479,17 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
             // An awaited combinator runs in the parent, and an identifier assigned with WithId names its operation.
             if (Task is IInlineOperation operation)
             {
-                return await operation.RunInlineAsync(parent, _taskId).ConfigureAwait(false);
+                return await operation.RunInlineAsync(parent, _name is { } name ? parent.CreateChildTaskId(name) : _taskId);
             }
 
-            if (_taskId.IsDefault && Task.RunsInlineInParent)
+            if (_name is null && _taskId.IsDefault && Task.RunsInlineInParent)
             {
-                return await Task.RunAsync(parent).ConfigureAwait(false);
+                return await Task.RunAsync(parent);
             }
         }
 
-        var started = await StartAsync(DurableTaskStartOptions.None, cancellationToken).ConfigureAwait(false);
-        return started.Response ?? await HostHandleOperations.WaitAsync(started.Handle!, cancellationToken).ConfigureAwait(false);
+        var started = await StartAsync(DurableTaskStartOptions.None, cancellationToken);
+        return started.Response ?? await HostHandleOperations.WaitAsync(started.Handle!, cancellationToken);
     }
 
     /// <summary>
@@ -491,22 +501,22 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
         CancellationToken cancellationToken)
     {
         ThrowIfInlineOnly();
-        var taskId = GetOrCreateId();
         if (ParentContext is { } parent)
         {
-            parent.ThrowIfAttemptCanceled();
+            parent.ThrowIfCannotRunOperation();
+            var childId = CreateId();
             if (_shielded)
             {
                 parent.EnterShield();
             }
 
-            var handle = await parent.ObserveAttempt(parent.StartTaskAsync(taskId, Task, options | GetDetachedOption(), cancellationToken))
-                .ConfigureAwait(false);
+            var handle = await parent.ObserveAttempt(parent.StartTaskAsync(childId, Task, options | GetDetachedOption(), cancellationToken));
             return (handle.TaskId, null, handle);
         }
 
+        var taskId = CreateId();
         var schedulable = GetSchedulableTask();
-        var response = await schedulable.ScheduleAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var response = await schedulable.ScheduleAsync(taskId, cancellationToken);
         return response.IsCompleted
             ? (taskId, response, null)
             : (taskId, null, schedulable.GetHandle(taskId));
@@ -515,13 +525,13 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
     internal IScheduledTaskHandle Post()
     {
         ThrowIfInlineOnly();
-        var taskId = GetOrCreateId();
         if (ParentContext is not { } parent)
         {
-            return GetSchedulableTask().Post(taskId);
+            return GetSchedulableTask().Post(CreateId());
         }
 
-        parent.ThrowIfAttemptCanceled();
+        parent.ThrowIfCannotRunOperation();
+        var taskId = CreateId();
         var previousShield = _shielded ? parent.EnterShield() : null;
         try
         {
@@ -534,28 +544,6 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
                 DurableTaskContext.RestoreShield(previousShield);
             }
         }
-    }
-
-    internal IScheduledTaskHandle GetHandle()
-    {
-        if (_taskId.IsDefault)
-        {
-            throw new InvalidOperationException("The durable task identifier has not been specified.");
-        }
-
-        if (IsDetachedFromParent)
-        {
-            throw new InvalidOperationException(
-                "Within a durable execution, a detached task is observed through the handle which ScheduleAsync or Post returns.");
-        }
-
-        if (ParentContext is { } parent)
-        {
-            parent.ThrowIfAttemptCanceled();
-            return parent.GetChildTaskHandle(_taskId);
-        }
-
-        return GetSchedulableTask().GetHandle(_taskId);
     }
 
     private DurableTaskStartOptions GetDetachedOption() => _detached ? DurableTaskStartOptions.Detached : DurableTaskStartOptions.None;
@@ -577,8 +565,8 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
 /// <remarks>
 /// <para>
 /// Each configuration method returns a new configuration and leaves this one unchanged. <see cref="WithId(string)"/>
-/// names the task, <see cref="Detached"/> makes it an independent root task, and <see cref="Shielded"/> keeps the
-/// starting execution's durable cancellation from reaching it.
+/// names the task, <see cref="Detached()"/> and <see cref="Detached(string)"/> make it an independent root task, and
+/// <see cref="Shielded"/> keeps the starting execution's durable cancellation from reaching it.
 /// </para>
 /// <para>
 /// Awaiting the configuration runs the task and returns once its result is durable. <see cref="ScheduleAsync"/> returns
@@ -593,8 +581,6 @@ public readonly struct ConfiguredDurableTask
 
     internal ConfiguredDurableTask(DurableTask task) => _core = new(task);
 
-    internal ConfiguredDurableTask(DurableTask task, TaskId taskId) => _core = new ConfiguredDurableTaskCore<DurableTask>(task).WithId(taskId);
-
     private ConfiguredDurableTask(ConfiguredDurableTaskCore<DurableTask> core) => _core = core;
 
     /// <summary>Gets an awaiter which runs or attaches to the task and returns once its result is durable.</summary>
@@ -606,6 +592,10 @@ public readonly struct ConfiguredDurableTask
 
     /// <inheritdoc cref="DurableTaskExtensions.Detached(DurableTask)"/>
     public ConfiguredDurableTask Detached() => new(_core.Detached());
+
+    /// <inheritdoc cref="DurableTaskExtensions.Detached(DurableTask, string)"/>
+    /// <exception cref="InvalidOperationException">This configuration already has an identifier.</exception>
+    public ConfiguredDurableTask Detached(string rootId) => new(_core.Detached(rootId));
 
     /// <inheritdoc cref="DurableTaskExtensions.Shielded(DurableTask)"/>
     public ConfiguredDurableTask Shielded() => new(_core.Shielded());
@@ -622,7 +612,7 @@ public readonly struct ConfiguredDurableTask
     /// </remarks>
     public async Task<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default)
     {
-        var started = await _core.StartAsync(DurableTaskStartOptions.WaitForAcceptance, cancellationToken).ConfigureAwait(false);
+        var started = await _core.StartAsync(DurableTaskStartOptions.WaitForAcceptance, cancellationToken);
         return started.Response is { } response
             ? new CompletedScheduledTask(started.TaskId, response)
             : new ScheduledTaskHandle(started.Handle!);
@@ -634,31 +624,15 @@ public readonly struct ConfiguredDurableTask
     /// <returns>The task's handle, which the caller can await later.</returns>
     /// <remarks>
     /// The start commits with the caller's next durable write, in the same write as the state changes which the calling
-    /// code made, and is then delivered exactly once. Within a durable execution, the start is recorded like
-    /// <see cref="DurableTask.RunInline{TResult}(Func{TResult})"/>, so a replay returns the same handle without starting the
-    /// task again. In an ordinary method of a grain which has a durable outbox, the task is a root task.
+    /// code made. The host then delivers the start to the task's host, retrying until it is accepted, and the task's host
+    /// deduplicates repeated deliveries by the task's identifier, so the task starts once. A start which the task's host
+    /// doesn't accept, for example because it arrives after the host's admission window, fails the returned handle. Within
+    /// a durable execution, the start is recorded like <see cref="DurableTask.RunInline{TResult}(Func{TResult})"/>, so a
+    /// replay returns the same handle without starting the task again. In an ordinary method of a grain which has a durable
+    /// outbox, the task is a root task.
     /// </remarks>
     /// <exception cref="InvalidOperationException">The caller has no durable outbox, for example because it's a client.</exception>
     public ScheduledTask Post() => new ScheduledTaskHandle(_core.Post());
-
-    /// <summary>Requests durable cancellation.</summary>
-    public ValueTask CancelAsync(CancellationToken cancellationToken = default)
-        => HostHandleOperations.CancelAsync(_core.GetHandle(), cancellationToken);
-
-    /// <summary>Requests durable cancellation carrying <paramref name="reason"/>.</summary>
-    /// <param name="reason">
-    /// The reason which the task's <see cref="DurableTaskContext.TaskCancellationReason"/> reports, or
-    /// <see langword="null"/> for none. The first request determines the reason.
-    /// </param>
-    /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
-    public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken = default)
-        => HostHandleOperations.CancelAsync(_core.GetHandle(), reason, cancellationToken);
-
-    /// <summary>Polls the task and returns its current status.</summary>
-    public async Task<DurableTaskStatus> PollAsync(
-        PollingOptions options = default,
-        CancellationToken cancellationToken = default)
-        => (await HostHandleOperations.PollAsync(_core.GetHandle(), options, cancellationToken).ConfigureAwait(false)).Status;
 }
 
 /// <summary>Configures and starts a durable task with a result.</summary>
@@ -669,9 +643,6 @@ public readonly struct ConfiguredDurableTask<TResult>
     private readonly ConfiguredDurableTaskCore<DurableTask<TResult>> _core;
 
     internal ConfiguredDurableTask(DurableTask<TResult> task) => _core = new(task);
-
-    internal ConfiguredDurableTask(DurableTask<TResult> task, TaskId taskId)
-        => _core = new ConfiguredDurableTaskCore<DurableTask<TResult>>(task).WithId(taskId);
 
     private ConfiguredDurableTask(ConfiguredDurableTaskCore<DurableTask<TResult>> core) => _core = core;
 
@@ -685,13 +656,17 @@ public readonly struct ConfiguredDurableTask<TResult>
     /// <inheritdoc cref="DurableTaskExtensions.Detached(DurableTask)"/>
     public ConfiguredDurableTask<TResult> Detached() => new(_core.Detached());
 
+    /// <inheritdoc cref="DurableTaskExtensions.Detached(DurableTask, string)"/>
+    /// <exception cref="InvalidOperationException">This configuration already has an identifier.</exception>
+    public ConfiguredDurableTask<TResult> Detached(string rootId) => new(_core.Detached(rootId));
+
     /// <inheritdoc cref="DurableTaskExtensions.Shielded(DurableTask)"/>
     public ConfiguredDurableTask<TResult> Shielded() => new(_core.Shielded());
 
     /// <inheritdoc cref="ConfiguredDurableTask.ScheduleAsync(CancellationToken)"/>
     public async Task<ScheduledTask<TResult>> ScheduleAsync(CancellationToken cancellationToken = default)
     {
-        var started = await _core.StartAsync(DurableTaskStartOptions.WaitForAcceptance, cancellationToken).ConfigureAwait(false);
+        var started = await _core.StartAsync(DurableTaskStartOptions.WaitForAcceptance, cancellationToken);
         return started.Response is { } response
             ? new CompletedScheduledTask<TResult>(started.TaskId, response)
             : new ScheduledTaskHandle<TResult>(started.Handle!);
@@ -699,23 +674,4 @@ public readonly struct ConfiguredDurableTask<TResult>
 
     /// <inheritdoc cref="ConfiguredDurableTask.Post"/>
     public ScheduledTask<TResult> Post() => new ScheduledTaskHandle<TResult>(_core.Post());
-
-    /// <summary>Requests durable cancellation.</summary>
-    public ValueTask CancelAsync(CancellationToken cancellationToken = default)
-        => HostHandleOperations.CancelAsync(_core.GetHandle(), cancellationToken);
-
-    /// <summary>Requests durable cancellation carrying <paramref name="reason"/>.</summary>
-    /// <param name="reason">
-    /// The reason which the task's <see cref="DurableTaskContext.TaskCancellationReason"/> reports, or
-    /// <see langword="null"/> for none. The first request determines the reason.
-    /// </param>
-    /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
-    public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken = default)
-        => HostHandleOperations.CancelAsync(_core.GetHandle(), reason, cancellationToken);
-
-    /// <summary>Polls the task and returns its current status.</summary>
-    public async Task<DurableTaskStatus> PollAsync(
-        PollingOptions options = default,
-        CancellationToken cancellationToken = default)
-        => (await HostHandleOperations.PollAsync(_core.GetHandle(), options, cancellationToken).ConfigureAwait(false)).Status;
 }
