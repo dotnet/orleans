@@ -318,21 +318,34 @@ public sealed class DurableTaskJournaledStateAccessTests
     });
 
     [Fact]
-    public Task RunInlineRecordsTheAccessesOfItsEffect() => ActivationScheduler.RunAsync(async () =>
+    public Task RunInlineRecordCoversTheAccessesOfItsEffect() => ActivationScheduler.RunAsync(async () =>
     {
         await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
-        await using var activation = await harness.ActivateAsync(TestCancellation);
-        await activation.ScheduleAsync(WorkflowId, TestCancellation);
-        await activation.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
-
-        Assert.Equal(1, activation.Grain.Counter.Value);
-        Assert.Empty(activation.Storage.GetAccessLog(WorkflowId));
-
-        static async DurableTask Workflow(ReplayGrain grain)
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
-            DurableTask.RunInline("increment", () => grain.Counter.Value++);
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await CommitAtGateAsync(activation);
+            Assert.Equal(1, activation.Grain.Counter.Value);
+        }
+
+        // The replay returns the effect's record without running the effect, and its increment applies once.
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        replay.Grain.OpenGate();
+        Assert.Equal(0, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<int>());
+        Assert.Equal(1, replay.Grain.Counter.Value);
+        Assert.Equal(1, harness.EffectRuns);
+
+        static async DurableTask<int> Workflow(ReplayGrain grain)
+        {
+            var before = DurableTask.RunInline("increment", () =>
+            {
+                grain.Harness.CountEffectRun();
+                return grain.Counter.Value++;
+            });
             await DurableTask.Run(static _ => { }).WithId("step");
             await grain.WaitAtGateAsync();
+            return before;
         }
     });
 
@@ -562,12 +575,19 @@ public sealed class DurableTaskJournaledStateAccessTests
         await activation.ScheduleAsync(WorkflowId, TestCancellation);
         await activation.GetResponseAsync(WorkflowId, TestCancellation);
 
-        // The body never replays once its result commits, so the work's change applies directly and isn't recorded.
+        // The body never replays once its result commits, so the work's change applies directly, as other grain code's
+        // does, and the next activation recovers it with the task's result.
         release.SetResult();
         var write = await outcome.Task.WaitAsync(Timeout, TestCancellation);
         Assert.Null(write);
         Assert.Equal(5, activation.Grain.Counter.Value);
-        Assert.Empty(activation.Storage.GetAccessLog(WorkflowId));
+        activation.Grain.RequestUnrelatedWrite();
+        await activation.Grain.UnrelatedWrites;
+        await activation.DisposeAsync();
+
+        await using var recovered = await harness.ActivateAsync(TestCancellation);
+        Assert.Equal(5, recovered.Grain.Counter.Value);
+        Assert.Equal(1, (await recovered.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<int>());
 
         static DurableTask<int> Workflow(ReplayGrain grain, Task release, TaskCompletionSource<Exception?> outcome)
         {
@@ -586,27 +606,58 @@ public sealed class DurableTaskJournaledStateAccessTests
     public Task BodyObservesStateLiveUnrecorded() => ActivationScheduler.RunAsync(async () =>
     {
         await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
-        await using var activation = await harness.ActivateAsync(TestCancellation);
-        await activation.ScheduleAsync(WorkflowId, TestCancellation);
-
-        // Live observations report the state's changes as they happen, which no record can hold.
-        Assert.Equal("observed", (await activation.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<string>());
-        Assert.Empty(activation.Storage.GetAccessLog(WorkflowId));
-
-        static DurableTask<string> Workflow(ReplayGrain grain)
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
-            try
+            activation.Grain.Log.Append(7);
+            activation.Grain.Counter.Value = 1;
+            activation.Grain.Completion.TrySetResult(3);
+            activation.Grain.RequestUnrelatedWrite();
+            await activation.Grain.UnrelatedWrites;
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await CommitAtGateAsync(activation);
+            Assert.Equal("7,1,3", activation.Grain.Observed);
+
+            // Other grain work changes the observed log and counter after the body observed them.
+            activation.Grain.Log.TrimBefore(1);
+            activation.Grain.Log.Append(8);
+            activation.Grain.Counter.Value = 2;
+            activation.Grain.RequestUnrelatedWrite();
+            await activation.Grain.UnrelatedWrites;
+        }
+
+        // Live observations report the state's changes as they happen, which no record holds, so the replay observes the
+        // current state without diverging.
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        replay.Grain.OpenGate();
+        Assert.Equal("8,2,3", (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<string>());
+
+        static async DurableTask<string> Workflow(ReplayGrain grain)
+        {
+            int entry = -1;
+            await foreach (var logEvent in grain.Log.ReadAsync(cancellationToken: DurableTask.Current.CancellationToken))
             {
-                _ = grain.Log.ReadAsync();
-                return DurableTask.FromResult("observed");
+                if (logEvent.Kind is LogEventKind.Entry)
+                {
+                    entry = logEvent.Item;
+                    break;
+                }
             }
-            catch (InvalidOperationException exception)
+
+            var counter = -1;
+            await foreach (var change in grain.Counter.WatchAsync(cancellationToken: DurableTask.Current.CancellationToken))
             {
-                return DurableTask.FromResult(exception.Message);
+                counter = change.Value;
+                break;
             }
+
+            var completion = await grain.Completion.Task;
+            grain.Observed = $"{entry},{counter},{completion}";
+            await DurableTask.Run(static _ => { }).WithId("step");
+            await grain.WaitAtGateAsync();
+            return grain.Observed;
         }
     });
-
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
         var deadline = DateTime.UtcNow + Timeout;
