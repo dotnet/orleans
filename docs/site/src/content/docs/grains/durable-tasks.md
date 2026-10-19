@@ -209,7 +209,13 @@ The order workflow changes its status this way:
   another operation, so a replay runs them at another point. The body's `catch` block is
   where compensation changes state.
 - The access log holds one record for each access in re-executed code and is deleted when
-  the execution completes. A workflow which loops indefinitely bounds its history as
+  the execution completes. A pure read of the grain's journaled state,
+  such as `TryGetValue`, `Count`, or a value's `Value`, records the journal's position
+  rather than its value. The journal keeps its history after a recorded position while
+  the execution runs, and a recovery replays that history to supply the value which the
+  read observed, before the execution replays. Every other read records its value, so a
+  replay returns what each read observed when it ran. A workflow which loops indefinitely
+  bounds its history as
   [Replay-safety rules](durable-tasks-replay-rules.md#rules-which-the-analyzers-dont-check)
   describes.
 - <xref:Orleans.Runtime.IPersistentState`1> holds a value which the grain changes in

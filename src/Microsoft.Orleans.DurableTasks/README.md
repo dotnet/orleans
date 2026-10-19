@@ -583,7 +583,13 @@ synchronously on the activation which makes them, when the runtime stages them: 
   position, or a recorded outcome which no longer decodes, stalls the attempt for
   `Diverged`, as an unsupported version does. Values and exceptions are recorded with the Orleans
   serializer in every journal format, and each journal write journals one entry per
-  execution whose log grew. Live observations, `IDurableTaskCompletionSource<T>.Task`,
+  execution whose log grew. A pure read of state in the activation's journal, such as `TryGetValue`, `Count` or a value's `Value`,
+  records the journal's position instead of its value; while an execution holds such
+  records, the journal keeps the history after them, and a recovery replays it to
+  replace each position with the value which the read observed before the execution
+  replays. A snapshot which storage requests waits for up to 16 writes, then resolves
+  the positions first. Every other read records its value, so a replay returns what each
+  read observed when it ran. Live observations, `IDurableTaskCompletionSource<T>.Task`,
   `IDurableLog<T>.ReadAsync`, and `WatchAsync`, run unrecorded. The runtime's own state
   and its durable messages run as the host's work, so a body's log holds only the body's
   accesses. Aborting or deleting the task, or completing its body, closes the access
