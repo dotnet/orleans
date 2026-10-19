@@ -220,7 +220,7 @@ public sealed class EnvelopeContractTests
         Assert.Equal(typeof(string), Assert.Single(typeof(IInboxHandlerContext).GetMethod("Fail")!.GetParameters()).ParameterType);
         Assert.Equal(new[] { "Accepted:1", "Backpressured:3", "DeadLettered:5", "Duplicate:2", "HandlerNotFound:4" },
             Enum.GetNames<DeliveryStatus>().Select(name => $"{name}:{(int)Enum.Parse<DeliveryStatus>(name)}").Order(StringComparer.Ordinal));
-        AssertIds(typeof(DeliveryResult), ("Status", 0u), ("Message", 1u));
+        AssertIds(typeof(DeliveryResult), ("Status", 0u), ("Message", 1u), ("Code", 2u));
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var outgoing = new OutboxMessage { Envelope = Create([7]), ReceiverId = Receiver };
         var other = outgoing with { ReceiverId = GrainId.Create("receiver", "other") };

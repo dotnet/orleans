@@ -58,11 +58,9 @@ public static class OutboxExtensions
     /// <param name="messageType">The subject and serializer binding.</param>
     /// <param name="messages">The application-defined identities, destinations, and bodies.</param>
     /// <remarks>
-    /// Enumerates once and sends each command using the ordinary typed send helper.
-    /// If enumeration, encoding, or staging fails, earlier messages remain staged
-    /// under their original identities with their encoded payload and headers.
-    /// Retry with the same identities and content; persistence follows the grain's
-    /// ordinary journal write.
+    /// Enumerates once and encodes every command before staging any, so an enumeration or encoding failure stages
+    /// nothing. If staging fails, earlier messages remain staged under their original identities with their encoded
+    /// payload and headers. Persistence follows the grain's ordinary journal write.
     /// </remarks>
     public static void Send<T>(
         this IOutbox outbox, MessageType<T> messageType,
@@ -71,9 +69,15 @@ public static class OutboxExtensions
         ArgumentNullException.ThrowIfNull(outbox);
         ArgumentNullException.ThrowIfNull(messageType);
         ArgumentNullException.ThrowIfNull(messages);
+        var encoded = new List<OutboxMessage>();
         foreach (var (messageId, destination, body) in messages)
         {
-            outbox.Send(messageType, messageId, destination, body);
+            encoded.Add(messageType.Create(messageId, destination, body, deliverAt: null));
+        }
+
+        foreach (var message in encoded)
+        {
+            outbox.Send(message);
         }
     }
 

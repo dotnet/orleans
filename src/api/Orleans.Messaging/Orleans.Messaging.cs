@@ -22,6 +22,9 @@ namespace Orleans.Messaging
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
+        [Id(2)]
+        public string? Code { get { throw null; } init { } }
+
         [Id(1)]
         public string? Message { get { throw null; } init { } }
 
@@ -32,7 +35,7 @@ namespace Orleans.Messaging
 
         public static DeliveryResult Backpressured() { throw null; }
 
-        public static DeliveryResult DeadLettered(string reason) { throw null; }
+        public static DeliveryResult DeadLettered(string reason, string? code = null) { throw null; }
 
         public static DeliveryResult Duplicate() { throw null; }
 
@@ -203,6 +206,7 @@ namespace Orleans.Messaging
         IOutbox Register(IOutboxMessageSource source);
         void Send(MessageId messageId);
         void Send(OutboxMessage message);
+        bool Withdraw(MessageId messageId);
     }
 
     public partial interface IOutboxMessageSource
@@ -301,10 +305,28 @@ namespace Orleans.Messaging
         public readonly InboxMessage ToInboxMessage() { throw null; }
     }
 
-    public enum OutboxMessageRetirement
+    public readonly partial struct OutboxMessageRetirement
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public string? Code { get { throw null; } init { } }
+
+        public string? Reason { get { throw null; } init { } }
+
+        public OutboxMessageRetirementStatus Status { get { throw null; } init { } }
+
+        public static OutboxMessageRetirement DeadLettered(string reason) { throw null; }
+
+        public static OutboxMessageRetirement Delivered() { throw null; }
+
+        public static OutboxMessageRetirement Rejected(string reason, string? code = null) { throw null; }
+    }
+
+    public enum OutboxMessageRetirementStatus
     {
         Delivered = 1,
-        DeadLettered = 2
+        DeadLettered = 2,
+        Rejected = 3
     }
 }
 
@@ -316,13 +338,9 @@ namespace Orleans.Messaging.Configuration
 
         public System.TimeSpan DeduplicationWindow { get { throw null; } set { } }
 
-        public Polly.ResiliencePipeline DeliveryResiliencePipeline { get { throw null; } set { } }
-
         public int InboxBatchSize { get { throw null; } set { } }
 
         public int MaxCapacity { get { throw null; } set { } }
-
-        public int MaxProcessingAttempts { get { throw null; } set { } }
 
         public int MaxRetainedDeadLetters { get { throw null; } set { } }
 

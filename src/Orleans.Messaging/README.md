@@ -17,7 +17,7 @@ typed message bindings, delivery results, and options.
 - `Headers`: optional named byte arrays with nonempty keys and non-null values.
 - `DeliverAt`: an optional time on the Durable Jobs clock. The receiver accepts the
   message immediately and processes it once that clock reaches `DeliverAt`. A message
-  with `DeliverAt` does not count toward `MaxCapacity`, including after it becomes due.
+  with `DeliverAt` counts toward `MaxCapacity` from its acceptance until it completes.
 
 `OutboxMessage` pairs an envelope with its receiver. `InboxMessage` carries the same
 envelope at the receiver. Keep published payload and header arrays unchanged.
@@ -77,20 +77,27 @@ construction or activation setup, before journal recovery.
 - `IOutbox.Register(IOutboxMessageSource)` adds a source, and
   `IOutbox.Send(messageId)` stages a reference entry with the message ID and delivery
   state. The first source whose `TryGetMessage` returns the message owns it, and
-  returns the same `OutboxMessage` while it provides the message. A source withdraws
-  a pending message by returning `false`. When the message retires, `OnRetired`
-  reports `OutboxMessageRetirement.Delivered` or `DeadLettered`. After the send, a
-  source that throws or returns an invalid message dead-letters that entry alone,
-  with `OnRetired(DeadLettered)` in the same journal write; an exception during
-  `Send` propagates without staging anything.
+  returns the same `OutboxMessage` while it provides the message. `TryGetMessage`
+  returns `false` for a message that isn't the source's. A source withdraws a pending
+  message with `IOutbox.Withdraw(messageId)`, staged in the same journal write that
+  releases its payload. When the message retires, `OnRetired` reports an
+  `OutboxMessageRetirement` whose `Status` is `Delivered`, `Rejected` (with the
+  receiver's reason and code), or `DeadLettered` (with the outbox's reason). After the
+  send, a source that throws, returns an invalid message, or no longer provides the
+  message dead-letters that entry alone, with `OnRetired` in the same journal write; an
+  exception during `Send` propagates without staging anything. A recovered entry that
+  no source provides is dead-lettered without an owner to notify.
 - `IInbox.Register(IInboxMessageSink)` adds a sink. The inbox offers each message,
   including self-sent and scheduled messages, to the sinks in order. The first sink
   whose `TryAccept` returns `true` reports the `DeliveryResult`:
   - `Accepted`: the sink staged the message in its own journaled state.
   - `Duplicate`: the sink already holds the message.
   - `Backpressured`: the sink is at capacity. A self-sent message fails its `Send`.
-  - `DeadLettered`: the sink rejects the message with a reason. A sink that throws
-    or reports another status dead-letters the message.
+  - `DeadLettered`: the sink rejects the message with a reason and an optional
+    application-defined `Code`. This is the only permanent rejection.
+
+  A sink that throws or reports another status leaves the outcome unknown: the inbox
+  stages nothing and fails the delivery, so the sender retries it.
 
   A sink that takes a scheduled message honors its `DeliverAt`. Sinks are idempotent.
 
@@ -100,11 +107,12 @@ Each receiver returns a `DeliveryResult`:
 
 - `Accepted`: the message is durable in the inbox, or, for a message an inbox sink
   accepted, in the sink's state together with its processed record.
-- `Duplicate`: the message ID is pending or completed within `DeduplicationWindow`.
-- `Backpressured`: the inbox holds `MaxCapacity` pending messages without `DeliverAt`.
-  The inbox admits scheduled messages regardless of `MaxCapacity`.
+- `Duplicate`: the message ID is pending or completed within `DeduplicationWindow`. A
+  duplicate of a message that a sink rejected receives that rejection instead.
+- `Backpressured`: the inbox holds `MaxCapacity` pending messages.
 - `HandlerNotFound`: the receiver has no registered handlers.
-- `DeadLettered`: the message moved to the receiver's dead letters.
+- `DeadLettered`: the receiver rejected the message permanently and moved it to its
+  dead letters, with a reason and an optional `Code`.
 
 `DurableMessagingOptions` configures capacity, batch sizes, retries, deduplication,
 and dead-letter retention.

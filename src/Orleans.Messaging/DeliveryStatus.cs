@@ -12,8 +12,12 @@ public enum DeliveryStatus
     Accepted = 1,
 
     /// <summary>
-    /// Message was a duplicate (already processed or in inbox).
+    /// The inbox already holds the message, or processed it within the deduplication window.
     /// </summary>
+    /// <remarks>
+    /// A duplicate of a message which an inbox message sink rejected receives that rejection instead: the original
+    /// <see cref="DeadLettered"/> result, with its reason and <see cref="DeliveryResult.Code"/>.
+    /// </remarks>
     Duplicate = 2,
 
     /// <summary>
@@ -27,7 +31,10 @@ public enum DeliveryStatus
     HandlerNotFound = 4,
 
     /// <summary>
-    /// The message was moved to the receiver's dead-letter store.
+    /// The receiver rejected the message permanently and moved it to its dead-letter store.
     /// </summary>
+    /// <remarks>
+    /// A redelivery of the message within the deduplication window receives the same result.
+    /// </remarks>
     DeadLettered = 5
 }
