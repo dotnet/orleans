@@ -1202,6 +1202,16 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
     internal ValueTask ReadHistoryAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken) =>
         ReadStorageAsync(consumer, cancellationToken);
 
+    /// <summary>
+    /// Gets whether the journal's codecs reproduce values exactly as the Orleans serializer encodes them, so a value which a
+    /// replica decodes from the journal and encodes again is the encoding of the value which was journaled.
+    /// </summary>
+    /// <remarks>
+    /// The built-in binary format's codecs encode values with the serializer's field codecs. Other formats, such as JSON,
+    /// can lose runtime types, non-public members, date kinds and exception details.
+    /// </remarks>
+    internal bool HasExactCodecs => _shared.JournalFormat is OrleansBinaryJournalFormat;
+
     private async ValueTask AppendStorageAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
