@@ -32,7 +32,7 @@ Store ordinary serializable objects in an owning grain's state when they form a 
 
 ## Keep bounded catalogs in one grain
 
-An owning grain or registry grain is a direct model for a collection with a known operational bound. A non-reentrant owner processes one request at a time. An awaited state write persists the updated catalog as one record, and the configured provider applies its record-level concurrency checks.
+An owning grain or registry grain is a direct model for a collection with a known operational bound. A non-reentrant owner processes one request at a time. An awaited state write persists the updated catalog as one record. Providers apply record-level optimistic concurrency where the backend supports it.
 
 Return pages or streamed results so each response stays within the caller's size and timeout budget. Set the collection's operational bound using:
 
@@ -55,7 +55,7 @@ Each membership entry has one owning shard. Keep the shard count and hash algori
 
 For a query spanning known shards, use a coordinator service or grain to issue calls with bounded concurrency and merge the results. Apply limits for shard fan-out, returned items, elapsed time, and per-call concurrency so every query has a bounded execution budget.
 
-Treat a bulk operation as a set of shard operations. Include an operation identifier, collect per-shard outcomes, and retry incomplete shards. Use Orleans transactions when the participant count and contention fit the transaction limits and the operation requires one atomic outcome.
+Treat a bulk operation as a set of shard operations. Make each shard operation idempotent or durably deduplicate it by an operation identifier recorded atomically with the shard's state changes. Collect per-shard outcomes and retry incomplete shards with the same identifier so retries after timeouts preserve committed outcomes. Use Orleans transactions when the participant count and contention fit the transaction limits and the operation requires one atomic outcome.
 
 ## Define the consistency boundary
 
