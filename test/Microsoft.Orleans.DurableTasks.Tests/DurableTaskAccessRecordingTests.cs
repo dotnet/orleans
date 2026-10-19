@@ -26,18 +26,24 @@ public sealed class DurableTaskAccessRecordingTests
 
     private static TimeSpan Timeout => TimeSpan.FromSeconds(10);
 
-    public static TheoryData<string> RuntimeOperations => new()
+    public static TheoryData<string, string> RuntimeOperations()
     {
-        "post", "schedule", "await-child", "child-accesses", "delay", "handle-cancel", "handle-abort", "manager-cancel",
-        "manager-abort", "signal-wait", "when-all", "when-any", "get-version", "run-inline",
-    };
+        var data = new TheoryData<string, string>();
+        foreach (var operation in new[] { "post", "schedule", "await-child", "child-accesses", "delay", "handle-cancel", "handle-abort", "manager-cancel", "manager-abort", "signal-wait", "when-all", "when-any", "get-version", "run-inline" })
+        {
+            data.Add(operation, DurableTaskJournalHarness.Json);
+            data.Add(operation, DurableTaskJournalHarness.OrleansBinary);
+        }
+
+        return data;
+    }
 
     [Theory]
     [MemberData(nameof(RuntimeOperations))]
-    public Task RuntimeOperationFromABodyRecordsOnlyTheBodysAccesses(string operation) => ActivationScheduler.RunAsync(async () =>
+    public Task RuntimeOperationFromABodyRecordsOnlyTheBodysAccesses(string operation, string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
     {
         IDurableTaskManager? manager = null;
-        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, manager!, operation));
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, manager!, operation), journalFormatKey);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
             manager = activation.Runtime;
@@ -134,10 +140,11 @@ public sealed class DurableTaskAccessRecordingTests
         }
     }
 
-    [Fact]
-    public Task EffectWithinAStateOperationRunsAsPartOfItAndShiftsNoIdentifier() => ActivationScheduler.RunAsync(async () =>
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public Task EffectWithinAStateOperationRunsAsPartOfItAndShiftsNoIdentifier(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
     {
-        await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
+        await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain), journalFormatKey);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
             await activation.ScheduleAsync(WorkflowId, TestCancellation);
@@ -169,12 +176,14 @@ public sealed class DurableTaskAccessRecordingTests
     });
 
     [Theory]
-    [InlineData("state-operation")]
-    [InlineData("effect")]
-    public Task DurableOperationWithinACoveredRegionThrowsAndReplaysTheSameOutcome(string region) => ActivationScheduler.RunAsync(async () =>
+    [InlineData("state-operation", DurableTaskJournalHarness.Json)]
+    [InlineData("state-operation", DurableTaskJournalHarness.OrleansBinary)]
+    [InlineData("effect", DurableTaskJournalHarness.Json)]
+    [InlineData("effect", DurableTaskJournalHarness.OrleansBinary)]
+    public Task DurableOperationWithinACoveredRegionThrowsAndReplaysTheSameOutcome(string region, string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
     {
         string? firstOutcome = null;
-        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, region, outcome => firstOutcome ??= outcome));
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, region, outcome => firstOutcome ??= outcome), journalFormatKey);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
             await activation.ScheduleAsync(WorkflowId, TestCancellation);
@@ -222,10 +231,11 @@ public sealed class DurableTaskAccessRecordingTests
         }
     });
 
-    [Fact]
-    public Task CoveredFlowRunsItsAwaitsUnrecordedAndRejectsDurableOperations() => ActivationScheduler.RunAsync(async () =>
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public Task CoveredFlowRunsItsAwaitsUnrecordedAndRejectsDurableOperations(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
     {
-        await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
+        await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain), journalFormatKey);
         await using var activation = await harness.ActivateAsync(TestCancellation);
         await activation.ScheduleAsync(WorkflowId, TestCancellation);
         await activation.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
@@ -263,8 +273,9 @@ public sealed class DurableTaskAccessRecordingTests
         await activation.Grain.UnrelatedWrites;
     }
 
-    [Fact]
-    public Task ReplayWhichPassesOtherArgumentsDiverges() => ActivationScheduler.RunAsync(async () =>
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public Task ReplayWhichPassesOtherArgumentsDiverges(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
     {
         var key = "apple";
         var stalled = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -276,7 +287,7 @@ public sealed class DurableTaskAccessRecordingTests
             }
         }));
 
-        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, key));
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, key), journalFormatKey);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
             await activation.ScheduleAsync(WorkflowId, TestCancellation);
@@ -335,10 +346,11 @@ public sealed class DurableTaskAccessRecordingTests
         }
     }
 
-    [Fact]
-    public Task ReadCommitsWithTheWriteWhichMakesItsConsequenceDurable() => ActivationScheduler.RunAsync(async () =>
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public Task ReadCommitsWithTheWriteWhichMakesItsConsequenceDurable(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
     {
-        await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
+        await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain), journalFormatKey);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
             await activation.ScheduleAsync(WorkflowId, TestCancellation);
@@ -366,11 +378,12 @@ public sealed class DurableTaskAccessRecordingTests
         }
     });
 
-    [Fact]
-    public Task ReplayAfterAPartlyReplayedAttemptReturnsAllOutcomes() => ActivationScheduler.RunAsync(async () =>
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public Task ReplayAfterAPartlyReplayedAttemptReturnsAllOutcomes(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
     {
         var controls = new Controls();
-        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, controls));
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, controls), journalFormatKey);
 
         // The first attempt commits its first segment's records, and its activation ends.
         await using (var first = await harness.ActivateAsync(TestCancellation))
@@ -412,13 +425,14 @@ public sealed class DurableTaskAccessRecordingTests
         }
     });
 
-    [Fact]
-    public Task InterleavedBodiesReplayTheirOwnRecordsInAnotherOrder() => ActivationScheduler.RunAsync(async () =>
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public Task InterleavedBodiesReplayTheirOwnRecordsInAnotherOrder(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
     {
         var bodyA = TaskId.CreateRoot("a");
         var bodyB = TaskId.CreateRoot("b");
         var probes = new InterleavingProbes();
-        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, probes));
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, probes), journalFormatKey);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
             // Bodies interleave where a durable wait parks one: A reads the counter and parks, B writes it, then A reads
