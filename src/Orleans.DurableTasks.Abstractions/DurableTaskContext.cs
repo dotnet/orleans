@@ -449,6 +449,11 @@ public abstract class DurableTaskContext
     /// execution, ends only that subscription.
     /// </para>
     /// <para>
+    /// A start under an identifier which this execution recorded reattaches to the recorded task when the definition
+    /// is the same request, and returns its handle. Another request under a recorded identifier is a divergence: the
+    /// host cancels the attempt with <see cref="DurableTaskAttemptCancellationReason.Diverged"/> without starting it.
+    /// </para>
+    /// <para>
     /// The returned operation completes once the start is durable. With
     /// <see cref="DurableTaskStartOptions.WaitForAcceptance"/>, it completes once the task's host has also accepted and
     /// durably stored the task, or the task's result is known, so the task's identifier can be handed to other parties
@@ -544,6 +549,12 @@ public abstract class DurableTaskContext
     /// <see cref="ScheduledTask.WhenEach(IReadOnlyList{ScheduledTask})"/> selects each next task with one call over the
     /// remaining candidates, under a distinct decision identifier. The host reads <paramref name="candidates"/> only during
     /// the call.
+    /// </para>
+    /// <para>
+    /// A host returns a selection which it recorded even when the replay's candidates no longer contain it, because the
+    /// code changed. The calling operation then cancels the attempt with
+    /// <see cref="DurableTaskAttemptCancellationReason.Diverged"/>, so the task stays pending until code which matches
+    /// the record replays it.
     /// </para>
     /// </remarks>
     protected internal abstract ValueTask<TaskId> SelectCompletionAsync(
