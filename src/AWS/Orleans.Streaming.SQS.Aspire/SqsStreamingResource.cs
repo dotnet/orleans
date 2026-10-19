@@ -42,7 +42,7 @@ public sealed class SqsStreamingResource : IProviderConfiguration
     public SqsStreamingOptions Options => _options;
 
     /// <summary>
-    /// Gets the AWS SDK configuration associated with the provider.
+    /// Gets the immutable AWS SDK configuration snapshot used by the provider and its CDK stack.
     /// </summary>
     public IAWSSDKConfig AwsSdkConfig { get; }
 

@@ -500,6 +500,99 @@ public sealed class SqsStreamingResourceTests
         Assert.Equal(2, builder.Resources.OfType<IStackResource>().Count());
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task AddSqsStreaming_MutatedAwsConfiguration_PreservesStackAndRuntimeSnapshot(
+        bool clearRegion,
+        bool mutateAfterReferences)
+    {
+        var builder = CreateBuilder();
+        var aws = builder.AddAWSSDKConfig()
+            .WithProfile("integration-profile")
+            .WithRegion(RegionEndpoint.USEast1)
+            .WithSdkValidation(false);
+        var orleans = builder.AddOrleans("cluster").WithDevelopmentClustering();
+        var streaming = orleans.AddSqsStreaming(
+            ProviderName, aws, new SqsStreamingOptions { ServiceId = ServiceId, PartitionCount = 1 });
+
+        void MutateConfiguration()
+        {
+            aws.Region = clearRegion ? null : RegionEndpoint.USWest2;
+            aws.Profile = "changed-profile";
+            aws.SDKValidationEnabled = true;
+        }
+
+        if (!mutateAfterReferences)
+        {
+            MutateConfiguration();
+        }
+
+        var silo = builder.AddContainer("silo", "unused").WithReference(orleans);
+        var client = builder.AddContainer("client", "unused").WithReference(orleans.AsClient());
+        if (mutateAfterReferences)
+        {
+            MutateConfiguration();
+        }
+
+        await using var application = builder.Build();
+        Assert.NotSame(aws, streaming.AwsSdkConfig);
+        Assert.Same(streaming.AwsSdkConfig, streaming.Stack.Resource.AWSSDKConfig);
+        Assert.Equal("us-east-1", streaming.AwsSdkConfig.Region?.SystemName);
+        Assert.Equal("integration-profile", streaming.AwsSdkConfig.Profile);
+        Assert.False(streaming.AwsSdkConfig.SDKValidationEnabled);
+        foreach (var resource in new[] { silo.Resource, client.Resource })
+        {
+            var environment = await GetEnvironmentAsync(application.Services, resource);
+            Assert.Equal("us-east-1", environment["AWS_REGION"]);
+            Assert.Equal("integration-profile", environment["AWS_PROFILE"]);
+            Assert.Equal("us-east-1", environment[$"Orleans__Streaming__{ProviderName}__Region"]);
+        }
+    }
+
+    [Fact]
+    public void AddSqsStreaming_ExposedAwsSnapshot_RejectsMutation()
+    {
+        var builder = CreateBuilder();
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var streaming = builder.AddOrleans("cluster").AddSqsStreaming(
+            ProviderName, aws, new SqsStreamingOptions { ServiceId = ServiceId, PartitionCount = 1 });
+
+        Assert.Throws<InvalidOperationException>(() => streaming.AwsSdkConfig.Region = RegionEndpoint.USWest2);
+        Assert.Throws<InvalidOperationException>(() => streaming.AwsSdkConfig.Region = null);
+        Assert.Throws<InvalidOperationException>(() => streaming.AwsSdkConfig.Profile = "changed-profile");
+        Assert.Throws<InvalidOperationException>(() => streaming.AwsSdkConfig.SDKValidationEnabled = false);
+        Assert.Equal("us-east-1", streaming.AwsSdkConfig.Region?.SystemName);
+        Assert.Null(streaming.AwsSdkConfig.Profile);
+        Assert.True(streaming.AwsSdkConfig.SDKValidationEnabled);
+    }
+
+    [Fact]
+    public void AddSqsStreaming_MutatedAwsRegion_PreservesOriginalQueueOwnership()
+    {
+        var builder = CreateBuilder();
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var options = new SqsStreamingOptions { ServiceId = ServiceId, PartitionCount = 1 };
+        var first = builder.AddOrleans("first").AddSqsStreaming(ProviderName, aws, options);
+        aws.WithRegion(RegionEndpoint.USWest2);
+        var second = builder.AddOrleans("second").AddSqsStreaming(ProviderName, aws, options);
+        var third = builder.AddOrleans("third");
+        var resources = builder.Resources.ToArray();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => third.AddSqsStreaming(
+                ProviderName, builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1), options));
+
+        Assert.Equal("us-east-1", first.Stack.Resource.AWSSDKConfig?.Region?.SystemName);
+        Assert.Equal("us-west-2", second.Stack.Resource.AWSSDKConfig?.Region?.SystemName);
+        Assert.Contains("us-east-1", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("first-orders-sqs", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(resources, builder.Resources);
+        Assert.Empty(third.Streaming);
+    }
+
     [Fact]
     public void AddSqsStreaming_SameProviderInDifferentServices_CreatesSeparateTopologies()
     {

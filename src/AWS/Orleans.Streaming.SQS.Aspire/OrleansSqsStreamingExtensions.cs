@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using Amazon;
 using Amazon.CDK;
 using Amazon.CDK.AWS.SQS;
 using Aspire.Hosting.ApplicationModel;
@@ -22,7 +23,7 @@ public static partial class OrleansSqsStreamingExtensions
     /// </summary>
     /// <param name="orleansService">The Orleans service.</param>
     /// <param name="name">The stream provider name.</param>
-    /// <param name="awsSdkConfig">The AWS SDK profile and region configuration.</param>
+    /// <param name="awsSdkConfig">The AWS SDK configuration to snapshot for this provider.</param>
     /// <param name="options">The SQS topology and runtime options.</param>
     /// <returns>The Orleans service.</returns>
     /// <exception cref="InvalidOperationException">
@@ -45,7 +46,7 @@ public static partial class OrleansSqsStreamingExtensions
     /// </summary>
     /// <param name="orleansService">The Orleans service.</param>
     /// <param name="name">The stream provider name.</param>
-    /// <param name="awsSdkConfig">The AWS SDK profile and region configuration.</param>
+    /// <param name="awsSdkConfig">The AWS SDK configuration to snapshot for this provider.</param>
     /// <param name="options">The SQS topology and runtime options.</param>
     /// <returns>The SQS stream provider resource.</returns>
     /// <exception cref="InvalidOperationException">
@@ -70,10 +71,15 @@ public static partial class OrleansSqsStreamingExtensions
                 nameof(name));
         }
 
-        var validatedOptions = ValidateAndCopy(name, awsSdkConfig, options);
+        var region = awsSdkConfig.Region
+            ?? throw new ArgumentException("SQS streaming requires a concrete AWS region.", nameof(awsSdkConfig));
+        var awsSdkSnapshot = new AwsSdkConfigSnapshot(
+            awsSdkConfig.Profile,
+            region,
+            awsSdkConfig.SDKValidationEnabled);
+        var validatedOptions = ValidateAndCopy(name, options);
         var queueNames = GetPhysicalQueueNames(name, validatedOptions);
-        var region = awsSdkConfig.Region!.SystemName;
-        ValidateIdentities(orleansService, name, region, queueNames);
+        ValidateIdentities(orleansService, name, region.SystemName, queueNames);
         ValidateServiceId(orleansService, validatedOptions.ServiceId, allowUnset: true);
 
         var resourceName = CreateResourceName($"{orleansService.Name}-{name}-sqs");
@@ -81,14 +87,14 @@ public static partial class OrleansSqsStreamingExtensions
             .Select(partition => $"{resourceName}-{partition}")
             .ToArray();
         ValidateResourceNames(orleansService.Builder, resourceName, queueResourceNames);
-        var stack = orleansService.Builder.AddAWSCDKStack(resourceName).WithReference(awsSdkConfig);
+        var stack = orleansService.Builder.AddAWSCDKStack(resourceName).WithReference(awsSdkSnapshot);
         var queues = CreateQueues(stack, validatedOptions, queueNames, queueResourceNames);
-        stack.WithAnnotation(new SqsTopologyAnnotation(name, region, queueNames));
+        stack.WithAnnotation(new SqsTopologyAnnotation(name, region.SystemName, queueNames));
         var resource = new SqsStreamingResource(
             orleansService,
             name,
             validatedOptions,
-            awsSdkConfig,
+            awsSdkSnapshot,
             stack,
             queues);
 
@@ -96,6 +102,32 @@ public static partial class OrleansSqsStreamingExtensions
             .WithServiceId(validatedOptions.ServiceId)
             .WithStreaming(name, resource);
         return resource;
+    }
+
+    private sealed class AwsSdkConfigSnapshot(
+        string? profile,
+        RegionEndpoint region,
+        bool sdkValidationEnabled) : IAWSSDKConfig
+    {
+        private const string ImmutableConfigurationMessage = "SQS streaming AWS SDK configuration is an immutable snapshot.";
+
+        public string? Profile
+        {
+            get => profile;
+            set => throw new InvalidOperationException(ImmutableConfigurationMessage);
+        }
+
+        public RegionEndpoint? Region
+        {
+            get => region;
+            set => throw new InvalidOperationException(ImmutableConfigurationMessage);
+        }
+
+        public bool SDKValidationEnabled
+        {
+            get => sdkValidationEnabled;
+            set => throw new InvalidOperationException(ImmutableConfigurationMessage);
+        }
     }
 
     private static void ValidateIdentities(
@@ -162,15 +194,9 @@ public static partial class OrleansSqsStreamingExtensions
 
     private static SqsStreamingOptions ValidateAndCopy(
         string providerName,
-        IAWSSDKConfig awsSdkConfig,
         SqsStreamingOptions options)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(options.ServiceId);
-        if (awsSdkConfig.Region is null)
-        {
-            throw new ArgumentException("SQS streaming requires a concrete AWS region.", nameof(awsSdkConfig));
-        }
-
         if (options.PartitionCount <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(options), "PartitionCount must be greater than zero.");

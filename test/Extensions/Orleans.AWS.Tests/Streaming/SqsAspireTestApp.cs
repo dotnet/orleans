@@ -228,7 +228,7 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
             {
                 resourceBuilder.WithEnvironment(
                     $"{prefix}__Gateways__0",
-                    "gwy.tcp://127.0.0.1:30000/0");
+                    "127.0.0.1:30000");
             }
         }
     }

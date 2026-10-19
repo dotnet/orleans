@@ -122,7 +122,10 @@ public sealed class SQSAspireIntegrationTests
     public async Task AspireGeneratedConfiguration_ActivatesSqsProviderOnClient()
     {
         await using var app = await CreateEndpointAppAsync();
+        var environment = await app.GetClientEnvironmentAsync();
+        Assert.Equal("127.0.0.1:30000", environment["Orleans__Clustering__Gateways__0"]);
         using var host = await app.BuildClientHostAsync();
+        var gateways = host.Services.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>().Value.Gateways;
         var sqsOptions = GetOptions<SqsOptions>(host.Services, app.ProviderName);
         var partitionOptions = GetOptions<HashRingStreamQueueMapperOptions>(host.Services, app.ProviderName);
         var cacheOptions = GetOptions<SimpleQueueCacheOptions>(host.Services, app.ProviderName);
@@ -133,6 +136,7 @@ public sealed class SQSAspireIntegrationTests
         Assert.True(sqsOptions.FifoQueue);
         Assert.Equal(3, partitionOptions.TotalQueueCount);
         Assert.Equal(SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE, cacheOptions.CacheSize);
+        Assert.Equal(new Uri("gwy.tcp://127.0.0.1:30000/0"), Assert.Single(gateways));
         Assert.IsType<SQSAdapterFactory>(adapterFactory);
         Assert.Equal(app.ProviderName, streamProvider.Name);
     }
