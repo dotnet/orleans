@@ -21,9 +21,14 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         // The body's final code stages its result, and a write which another operation requests commits it before the
         // attempt commits the result again. That write captured every change, so the attempt's write carries none.
+        // Events are process-wide, so other tests' tasks named 'root' complete concurrently; a foreign completion, emitted
+        // here deterministically, must not trigger this test's write.
         using var subscription = DurableTaskEvents.AllEvents.Subscribe(new EventObserver(evt =>
         {
-            if (evt is DurableTaskEvents.TaskCompleted { TaskId: var taskId } && taskId == rootId && interleavedWrite is null)
+            if (evt is DurableTaskEvents.TaskCompleted { TaskId: var taskId } completed
+                && taskId == rootId
+                && ReferenceEquals(completed.GrainContext, runtime.GrainContext)
+                && interleavedWrite is null)
             {
                 interleavedWrite = Task.Factory.StartNew(
                     async () =>
@@ -36,6 +41,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                     scheduler).Unwrap();
             }
         }));
+        DurableTaskEvents.EmitTaskCompleted(CreateTestActivation(), rootId, DurableTaskResponse.FromResult(0));
         runtime.ScheduleFromInbox(rootId, CreateRequest(1, () => DurableTask.Run(static async _ =>
         {
             await Task.Yield();
