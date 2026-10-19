@@ -357,8 +357,17 @@ internal sealed partial class DynamoDBReminderTable
 
     private async Task<bool> CopyLegacyRecord(LegacyReminderRecord record)
     {
+        ValidateStoredServiceIdentity(record.Item);
         var entry = Resolve(record.Item);
-        var values = new Dictionary<string, AttributeValue> { [":sourceETag"] = Clone(record.Item[ETAG_PROPERTY_NAME]) };
+        var source = CreateIdentitySafeLegacyDelete(entry.GrainId, entry.ReminderName, entry.ETag!);
+        if (record.Item[REMINDER_ID_PROPERTY_NAME].S != source.Key[REMINDER_ID_PROPERTY_NAME].S
+            || uint.Parse(record.Item[GRAIN_HASH_PROPERTY_NAME].N, CultureInfo.InvariantCulture) != entry.GrainId.GetUniformHashCode())
+        {
+            throw new InvalidOperationException(
+                $"DynamoDB legacy reminder '{entry.ReminderName}' for grain '{entry.GrainId}' in '{options.TableName}' has a stored key which conflicts with its complete identity.");
+        }
+
+        source.ExpressionAttributeValues[CURRENT_ETAG_ALIAS] = Clone(record.Item[ETAG_PROPERTY_NAME]);
         try
         {
             await storage.WriteTxAsync(
@@ -368,10 +377,10 @@ internal sealed partial class DynamoDBReminderTable
                 {
                     ConditionCheck = new()
                     {
-                        TableName = options.TableName,
-                        Key = GetLegacyKey(entry.GrainId, entry.ReminderName),
-                        ConditionExpression = $"{ETAG_PROPERTY_NAME} = :sourceETag",
-                        ExpressionAttributeValues = values,
+                        TableName = source.TableName,
+                        Key = source.Key,
+                        ConditionExpression = source.ConditionExpression,
+                        ExpressionAttributeValues = source.ExpressionAttributeValues,
                     },
                 },
                 new()

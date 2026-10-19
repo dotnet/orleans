@@ -254,6 +254,78 @@ public sealed class DynamoDBReminderStateTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MigrationCopyFencesCompleteSourceIdentityAndPreservesEtagType(bool stringEtag)
+    {
+        var entry = Entry();
+        var item = LegacyItem(entry);
+        if (stringEtag)
+        {
+            item["ETag"] = new("legacy-etag");
+        }
+
+        using var client = new RequestClient
+        {
+            Transact = request =>
+            {
+                Assert.Equal(3, request.TransactItems.Count);
+                var source = request.TransactItems[1].ConditionCheck;
+                Assert.Equal("reminders", source.TableName);
+                Assert.Equal(item["ReminderId"].S, source.Key["ReminderId"].S);
+                Assert.Equal(item["GrainHash"].N, source.Key["GrainHash"].N);
+                Assert.Equal(
+                    "ServiceId = :service AND GrainReference = :grain AND ReminderName = :reminder AND ETag = :currentETag",
+                    source.ConditionExpression);
+                Assert.Equal("service", source.ExpressionAttributeValues[":service"].S);
+                Assert.Equal(entry.GrainId.ToString(), source.ExpressionAttributeValues[":grain"].S);
+                Assert.Equal(entry.ReminderName, source.ExpressionAttributeValues[":reminder"].S);
+                Assert.Equal(item["ETag"].S, source.ExpressionAttributeValues[":currentETag"].S);
+                Assert.Equal(item["ETag"].N, source.ExpressionAttributeValues[":currentETag"].N);
+                var target = request.TransactItems[2].Put.Item;
+                Assert.Equal(item["ETag"].S, target["ETag"].S);
+                Assert.Equal(item["ETag"].N, target["ETag"].N);
+                return new();
+            },
+        };
+        var table = CreateTable(client, DynamoDBReminderTableMode.Migrate);
+        AttachStorage(table, client);
+        typeof(DynamoDBReminderTable).GetField("leaseToken", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(table, "lease");
+
+        Assert.True(await CopyLegacyRecord(table, item));
+
+        Assert.Equal(1, client.WriteCount);
+    }
+
+    [Theory]
+    [InlineData("ServiceId")]
+    [InlineData("ReminderId")]
+    [InlineData("GrainHash")]
+    [InlineData("GrainReference")]
+    [InlineData("ReminderName")]
+    public async Task MigrationCopyRejectsConflictingSourceKeyOrServiceBeforeTransaction(string attribute)
+    {
+        var entry = Entry();
+        var item = LegacyItem(entry);
+        item[attribute] = attribute switch
+        {
+            "GrainHash" => new() { N = unchecked(entry.GrainId.GetUniformHashCode() + 1).ToString(CultureInfo.InvariantCulture) },
+            "GrainReference" => new(GrainId.Create("state-test", "another-grain").ToString()),
+            _ => new("conflicting-identity"),
+        };
+        using var client = new RequestClient();
+        var table = CreateTable(client, DynamoDBReminderTableMode.Migrate);
+        AttachStorage(table, client);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => CopyLegacyRecord(table, item));
+
+        Assert.Contains(attribute == "ServiceId" ? "stored service identity" : "stored key", error.Message, StringComparison.Ordinal);
+        Assert.Equal(0, client.WriteCount);
+        Assert.Equal(0, client.ReadCount);
+        Assert.Equal(0, client.DeleteCount);
+    }
+
+    [Theory]
     [InlineData(DynamoDBReminderTableMode.Legacy)]
     [InlineData(DynamoDBReminderTableMode.Migrate)]
     public async Task LegacyAndDualPutsConditionOnCompleteIdentity(DynamoDBReminderTableMode mode)
@@ -680,6 +752,21 @@ public sealed class DynamoDBReminderStateTests
         ["Period"] = new(entry.Period.ToString()),
         ["StartTime"] = new(entry.StartAt.ToString("O", CultureInfo.InvariantCulture)),
     };
+
+    private static Dictionary<string, AttributeValue> LegacyItem(ReminderEntry entry)
+    {
+        var item = RowItem(entry);
+        item["ReminderId"] = new($"service_{entry.GrainId}_{entry.ReminderName}");
+        item["GrainHash"] = new() { N = entry.GrainId.GetUniformHashCode().ToString(CultureInfo.InvariantCulture) };
+        return item;
+    }
+
+    private static Task<bool> CopyLegacyRecord(DynamoDBReminderTable table, Dictionary<string, AttributeValue> item)
+    {
+        var recordType = typeof(DynamoDBReminderTable).GetNestedType("LegacyReminderRecord", BindingFlags.NonPublic)!;
+        var record = Activator.CreateInstance(recordType, [item]);
+        return (Task<bool>)typeof(DynamoDBReminderTable).GetMethod("CopyLegacyRecord", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(table, [record])!;
+    }
 
     private static Dictionary<string, AttributeValue> StateItem(string state) => new()
     {

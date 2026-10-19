@@ -310,6 +310,83 @@ public sealed class DynamoDBReminderMigrationTests
         }
     }
 
+    [Theory]
+    [InlineData("ServiceId", false)]
+    [InlineData("GrainReference", false)]
+    [InlineData("ReminderName", false)]
+    [InlineData("ServiceId", true)]
+    [InlineData("GrainReference", true)]
+    [InlineData("ReminderName", true)]
+    public async Task MigrationCopyRejectsIdentityChangesWithoutWritingV2(string attribute, bool changeAfterRead)
+    {
+        EnsureDynamoDb();
+        var tableName = NewTableName();
+        const string serviceId = "copy-source-identity";
+        using var client = CreateClient();
+        var table = CreateTable(tableName, serviceId, DynamoDBReminderTableMode.Migrate);
+        Task InvokeLeaseOperation(string name)
+            => (Task)typeof(DynamoDBReminderTable).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(table, null)!;
+        try
+        {
+            await table.StartAsync(TestContext.Current.CancellationToken);
+            var entry = Entry(1);
+            var etag = await table.UpsertRow(entry);
+            var key = new Dictionary<string, AttributeValue>
+            {
+                ["ReminderId"] = new($"{serviceId}_{entry.GrainId}_{entry.ReminderName}"),
+                ["GrainHash"] = new() { N = entry.GrainId.GetUniformHashCode().ToString(CultureInfo.InvariantCulture) },
+            };
+            var snapshot = await client.GetItemAsync(
+                new() { TableName = tableName, Key = key, ConsistentRead = true },
+                TestContext.Current.CancellationToken);
+            await client.DeleteItemAsync(
+                new() { TableName = $"{tableName}-v2", Key = V2Key(serviceId, entry) },
+                TestContext.Current.CancellationToken);
+            var changedIdentity = attribute == "GrainReference" ? Entry(2).GrainId.ToString() : "foreign-identity";
+            await client.UpdateItemAsync(
+                new()
+                {
+                    TableName = tableName,
+                    Key = key,
+                    UpdateExpression = "SET #identity = :value",
+                    ExpressionAttributeNames = new() { ["#identity"] = attribute },
+                    ExpressionAttributeValues = new() { [":value"] = new(changedIdentity) },
+                },
+                TestContext.Current.CancellationToken);
+            var current = await client.GetItemAsync(
+                new() { TableName = tableName, Key = key, ConsistentRead = true },
+                TestContext.Current.CancellationToken);
+            Assert.Equal(etag, current.Item["ETag"].N);
+            Assert.True(await (Task<bool>)InvokeLeaseOperation("TryAcquireMigrationLease"));
+            var recordType = typeof(DynamoDBReminderTable).GetNestedType("LegacyReminderRecord", BindingFlags.NonPublic)!;
+            var record = Activator.CreateInstance(recordType, [changeAfterRead ? snapshot.Item : current.Item]);
+            var copy = (Task<bool>)typeof(DynamoDBReminderTable).GetMethod("CopyLegacyRecord", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(table, [record])!;
+
+            if (changeAfterRead)
+            {
+                Assert.False(await copy);
+            }
+            else
+            {
+                var error = await Assert.ThrowsAsync<InvalidOperationException>(() => copy);
+                Assert.Contains(attribute == "ServiceId" ? "stored service identity" : "stored key", error.Message, StringComparison.Ordinal);
+            }
+
+            Assert.Empty(await ReadV2Items(client, tableName, serviceId));
+            Assert.Equal("Ready", (await ReadState(client, tableName, serviceId))["MigrationStatus"].S);
+            var retained = await client.GetItemAsync(
+                new() { TableName = tableName, Key = key, ConsistentRead = true },
+                TestContext.Current.CancellationToken);
+            Assert.Equal(changedIdentity, retained.Item[attribute].S);
+            Assert.Equal(etag, retained.Item["ETag"].N);
+        }
+        finally
+        {
+            await InvokeLeaseOperation("ReleaseMigrationLease");
+            await StopAndDelete(client, tableName, table);
+        }
+    }
+
     [Fact]
     public async Task Migration_LeaseContentionHasOneOwnerAndContenderRemainsDualWriteCapable()
     {
