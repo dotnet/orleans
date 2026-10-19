@@ -357,12 +357,17 @@ internal class Program
                 typeof(DurableListJournalBenchmarks),
                 typeof(DurableCommandReaderBenchmarks),
                 typeof(JournaledStateContextBenchmarks),
-                typeof(AccessRecordingBenchmarks)
+                typeof(AccessRecordingBenchmarks),
+                typeof(JournalTransactionBenchmarks)
             ]).Run(args);
         },
         ["Journaling.AccessBytes"] = _ =>
         {
             AccessRecordingBytes.Run();
+        },
+        ["Journaling.TransactionBytes"] = _ =>
+        {
+            JournalTransactionBenchmarks.ReportBytes();
         },
         ["Journaling.PositionResolution"] = args =>
         {
