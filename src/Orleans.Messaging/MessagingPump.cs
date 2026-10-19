@@ -319,9 +319,17 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         }
     }
 
+    /// <summary>Gets whether messaging failed, so the activation's uncommitted changes must not commit.</summary>
+    internal bool IsFailed { get; private set; }
+
     /// <summary>Stops messaging and deactivates the grain after an unrecoverable failure.</summary>
+    /// <remarks>
+    /// In-memory state may no longer match what the activation may commit, so every later journal write fails and the
+    /// next activation recovers from the journal.
+    /// </remarks>
     internal void Fail(Exception exception, string description)
     {
+        IsFailed = true;
         if (_shutdown.IsCancellationRequested) return;
         Stop();
         try
