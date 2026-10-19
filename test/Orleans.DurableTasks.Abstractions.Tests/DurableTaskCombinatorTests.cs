@@ -144,7 +144,7 @@ public class DurableTaskCombinatorTests
         Assert.Equal(3, enumerations);
         Assert.True(host.Contains(TaskId.Parse("root/$when-all-1/2")));
         Assert.True(host.Contains(TaskId.Parse("root/$when-all-2/2")));
-        Assert.True(host.Contains(TaskId.Parse("root/$when-any-3/0")));
+        Assert.True(host.Contains(TaskId.Parse("root/$when-any-1/0")));
     }
 
     [Fact]

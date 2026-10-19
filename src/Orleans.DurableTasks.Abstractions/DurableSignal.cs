@@ -87,7 +87,7 @@ public sealed class DurableSignal<T>
             [WaitAsync(), DurableTask.DelayUntil(deadline)],
             static async (inputs, context, operationId) =>
             {
-                var (index, response) = await DurableTask.RaceAsync(inputs, context, operationId).ConfigureAwait(false);
+                var (index, response) = await DurableTask.RaceAsync(inputs, context, operationId);
                 if (index == 0)
                 {
                     return (true, response.GetResult<T>());
@@ -105,7 +105,7 @@ internal sealed class SignalWaitDurableTask<T>(string name) : DurableTask<T>
 {
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
-        context.ThrowIfAttemptCanceled();
+        context.ThrowIfCannotRunOperation();
         return context.ObserveAttempt(context.WaitForSignalAsync(name, context.InlineOperationCancellationToken));
     }
 

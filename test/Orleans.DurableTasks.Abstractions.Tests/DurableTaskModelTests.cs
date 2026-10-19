@@ -874,10 +874,10 @@ public class DurableTaskModelTests
         }
 
         public Task<CancellationObservation> RequestTaskCancellationAsync(TaskCancellationCommand command)
-            => RunAndObserveAsync(() => DurableTaskRuntimeHelper.RequestTaskCancellation(context, command.Reason));
+            => RunAndObserveAsync(() => context.RequestTaskCancellation(command.Reason));
 
         public Task<CancellationObservation> CancelAttemptAsync(AttemptCancellationCommand command)
-            => RunAndObserveAsync(() => DurableTaskRuntimeHelper.CancelAttempt(context, command.Reason));
+            => RunAndObserveAsync(() => context.CancelAttempt(command.Reason));
 
         public Task<CancellationObservation> RegisterObserversAsync()
             => RunAndObserveAsync(() =>

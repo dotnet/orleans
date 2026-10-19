@@ -64,7 +64,7 @@ public sealed class DurableVersion
     /// The host can't record the version from the calling code, for example after <c>ConfigureAwait(false)</c>.
     /// </exception>
     public int Get() => DurableTaskContext.Ambient is { } context
-        ? context.GetVersion(Name, MinSupported, MaxSupported)
+        ? context.DecideVersion(Name, MinSupported, MaxSupported)
         : MaxSupported;
 
     /// <summary>Returns whether the running durable task follows <paramref name="version"/> of this change or a newer one.</summary>

@@ -62,7 +62,6 @@ public sealed class DurableTaskContextReplayTests
             DateTimeOffset dueTime,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId) => throw new NotSupportedException();
 
         protected override ValueTask<TaskId> SelectCompletionAsync(
             TaskId decisionId,

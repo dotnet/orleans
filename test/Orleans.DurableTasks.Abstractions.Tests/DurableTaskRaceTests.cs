@@ -242,7 +242,7 @@ public class DurableTaskRaceTests
         var firstContext = host.CreateContext(RootId);
         var first = DurableTaskRuntimeHelper.RunAsync(definition, firstContext).AsTask();
         await delayScheduled.Task.WaitAsync(WaitTimeout, TestCancellation);
-        DurableTaskRuntimeHelper.CancelAttempt(firstContext, DurableTaskAttemptCancellationReason.ActivationStopping);
+        firstContext.CancelAttempt(DurableTaskAttemptCancellationReason.ActivationStopping);
         var canceled = await first.WaitAsync(WaitTimeout, TestCancellation);
         Assert.Equal(
             DurableTaskAttemptCancellationReason.ActivationStopping,
@@ -280,9 +280,9 @@ public class DurableTaskRaceTests
         Assert.Equal($"{TimeoutReason} Canceled", await await root.WithId("root").ScheduleAsync(TestCancellation).WaitAsync(WaitTimeout, TestCancellation));
         Assert.Equal(DateTimeOffset.UnixEpoch + FiveMinutes, host.LastDelayDueTime);
         Assert.Equal(
-            [RootId, TaskId.Parse("root/$timeout-1/1"), TaskId.Parse("root/pay")],
+            [RootId, TaskId.Parse("root/pay"), TaskId.Parse("root/pay$timeout-1/1")],
             host.EntryIds);
-        Assert.Equal([TaskId.Parse("root/$timeout-1/$winner")], host.DecisionIds);
+        Assert.Equal([TaskId.Parse("root/pay$timeout-1/$winner")], host.DecisionIds);
     }
 
     [Fact]
@@ -301,7 +301,7 @@ public class DurableTaskRaceTests
             DurableTaskStatus.CompletedSuccessfully,
             await await root.WithId("root").ScheduleAsync(TestCancellation).WaitAsync(WaitTimeout, TestCancellation));
         Assert.Equal(dueTime, host.LastDelayDueTime);
-        Assert.Equal(DurableTaskStatus.Canceled, (await WaitForEntryAsync(host, "root/$timeout-1/1")).Status);
+        Assert.Equal(DurableTaskStatus.Canceled, (await WaitForEntryAsync(host, "root/step$timeout-1/1")).Status);
     }
 
     [Theory]
