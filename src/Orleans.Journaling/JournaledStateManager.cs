@@ -8,7 +8,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal partial class JournaledStateManager : IJournaledStateManager, IJournaledStateContextHost, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal partial class JournaledStateManager : IJournaledStateManager, IJournaledStateContextHost, IJournalStorageConsumer, IJournalReplayTarget, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const uint MinApplicationJournalStreamId = 8u;
 #if NET9_0_OR_GREATER
@@ -30,6 +30,26 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
     private readonly CancellationTokenSource _shutdownCancellation = new();
     private readonly StateDirectory _journalStreamDirectory;
     private readonly RetiredStateTracker _retirementTracker;
+    private readonly JournalPositionState _positions;
+    private readonly IDurableDictionaryCommandCodec<string, uint> _directoryCodec;
+
+    // The states whose accesses run through a context, by their names' stable ids; null marks ids which two names share.
+    private readonly Dictionary<int, JournaledStateAccessTarget?> _accessTargets = [];
+
+    // The logical position of the next committed entry is _positionOffset plus the journal writer's committed entry count.
+    // Storage holds the entries up to _storedEntryCount of that count.
+    private long _positionOffset;
+    private long _storedEntryCount;
+    private long _replayedEntryCount;
+
+    // The number of consecutive snapshots which barriers deferred.
+    private int _deferredSnapshots;
+
+    // Whether a deletion of the journal is replacing its history, so positions aren't offered.
+    private bool _positionsSuspended;
+
+    /// <summary>The number of consecutive snapshots which barriers defer, after which the next one resolves their reads.</summary>
+    internal const int MaxDeferredSnapshots = 16;
 
     /// <summary>
     /// Gets or sets the provider of the context in which code accesses this manager's states, which a host installs, or
@@ -64,6 +84,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         if (_accessTargetNames.TryAdd(target.Id, target.Name)
             || string.Equals(_accessTargetNames[target.Id], target.Name, StringComparison.Ordinal))
         {
+            if (target.History is not null || !_accessTargets.ContainsKey(target.Id))
+            {
+                _accessTargets[target.Id] = target;
+            }
+
             return;
         }
 
@@ -111,6 +136,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         var journalStreamIdsCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, uint>>(serviceProvider, WriteJournalFormatKey);
         var retirementTrackerCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, DateTime>>(serviceProvider, WriteJournalFormatKey);
         _journalWriter = _shared.JournalFormat.CreateWriter();
+        _directoryCodec = journalStreamIdsCodec;
 
         // The list of known states is itself stored as a durable state with the implicit id 0.
         // This allows us to recover the list of states ids without having to store it separately.
@@ -121,6 +147,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         // It is not stored in _journalStreamDirectory and does not participate in the general name->id mapping.
         _retirementTracker = new RetiredStateTracker(this, retirementTrackerCodec);
         _statesMap[RetiredStateTracker.Id] = _retirementTracker;
+
+        // The journal's compaction barriers are another internal state with a fixed id.
+        _positions = new JournalPositionState(
+            () => JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, string>>(ServiceProvider, WriteJournalFormatKey));
+        _statesMap[JournalPositionState.Id] = _positions;
     }
 
     private static JournalId CreateJournalId(IGrainContext grainContext)
@@ -327,8 +358,36 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                 "The journaled state operation was queued before deletion reset its state.");
                         }
 
+                        var isSnapshot = false;
+                        JournalHistoryReplay? positionHistory = null;
                         if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem)
                         {
+                            // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current journal length.
+                            //       If the current journal length is greater than the snapshot size, then take a snapshot instead of appending more journal entries.
+                            isSnapshot = workItem is WriteSnapshotWorkItem
+                                || _migrationSnapshotRequired
+                                || _storage.IsCompactionRequested;
+                            if (isSnapshot && _positions.HasBarriers && !HoldsPositionalReads())
+                            {
+                                // Holders keep their barriers while idle, so executions which come and go journal none.
+                                _positions.RemoveAll();
+                            }
+
+                            if (isSnapshot && _positions.HasBarriers)
+                            {
+                                // A snapshot replaces the history which positional reads refer to. Barriers defer it, and
+                                // eventually it resolves their reads first. A migration can't wait.
+                                if (!_migrationSnapshotRequired && _deferredSnapshots < MaxDeferredSnapshots)
+                                {
+                                    _deferredSnapshots++;
+                                    isSnapshot = false;
+                                }
+                                else
+                                {
+                                    positionHistory = await ReadPositionHistoryAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                }
+                            }
+
                             try
                             {
                                 for (var prepared = false; !prepared;)
@@ -359,11 +418,14 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                             case AppendJournalWorkItem:
                             case WriteSnapshotWorkItem:
                                 {
-                                    // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current journal length.
-                                    //       If the current journal length is greater than the snapshot size, then take a snapshot instead of appending more journal entries.
-                                    var isSnapshot = workItem is WriteSnapshotWorkItem
-                                        || _migrationSnapshotRequired
-                                        || _storage.IsCompactionRequested;
+                                    if (isSnapshot && _positions.HasBarriers && positionHistory is not { HasReadStorage: true } && !_migrationSnapshotRequired)
+                                    {
+                                        // Reads which took positions while the states prepared need the history which the
+                                        // snapshot would replace: append now, and let a later snapshot resolve them.
+                                        isSnapshot = false;
+                                        positionHistory = null;
+                                    }
+
                                     var operationLabel = isSnapshot
                                         ? JournalingInstruments.OperationSnapshot
                                         : JournalingInstruments.OperationAppend;
@@ -385,6 +447,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                     var hasBufferToConsume = false;
                                     var bufferToConsumeIsCommittedBuffer = false;
                                     var writeVersion = 0L;
+                                    var capturedEntryCount = 0L;
 
                                     // Each write captures every state, including a change which another thread is writing into an entry
                                     // which it opened before the write. The write waits for that entry to close, whether it appends or
@@ -399,6 +462,14 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                             activeEntryClosed = _journalWriter.GetActiveEntryClosedTask();
                                             if (activeEntryClosed is null && isSnapshot)
                                             {
+                                                if (positionHistory is not null)
+                                                {
+                                                    // Resolves in the same synchronous capture as the snapshot, so no read can
+                                                    // take a position which the snapshot replaces.
+                                                    ResolvePositions(positionHistory);
+                                                }
+
+                                                _deferredSnapshots = 0;
                                                 using var snapshotWriter = _shared.JournalFormat.CreateWriter();
                                                 if (_retirementTracker.Count > 0)
                                                 {
@@ -426,6 +497,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                                     AppendUpdatesOrSnapshotState(snapshotWriter, isSnapshot: true, id, state);
                                                     statesScanned++;
                                                 }
+
+                                                // Positions continue from the snapshot's entries, which replace storage's content.
+                                                capturedEntryCount = _journalWriter.CommittedEntryCount;
+                                                _positionOffset = snapshotWriter.CommittedEntryCount - capturedEntryCount;
 
                                                 bufferToConsume = _journalWriter.GetCommittedBuffer();
                                                 if (bufferToConsume.Length > 0)
@@ -458,6 +533,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                                 }
 
                                                 committedBuffer = _journalWriter.GetCommittedBuffer();
+                                                capturedEntryCount = _journalWriter.CommittedEntryCount;
                                                 bufferToConsume = committedBuffer;
                                                 bufferToConsumeIsCommittedBuffer = true;
                                             }
@@ -540,6 +616,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                                 {
                                                     _journalWriter.Consume(bufferToConsume);
                                                 }
+
+                                                _storedEntryCount = capturedEntryCount;
                                             }
                                         }
                                         finally
@@ -579,6 +657,18 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
 
                             case DeleteStateWorkItem:
                                 {
+                                    // Deletion replaces the history which positional reads refer to: reads record values
+                                    // until it completes, and those already recorded resolve first.
+                                    _positionsSuspended = true;
+                                    if (_positions.HasBarriers && HoldsPositionalReads())
+                                    {
+                                        var history = await ReadPositionHistoryAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                        lock (_lock)
+                                        {
+                                            ResolvePositions(history);
+                                        }
+                                    }
+
                                     // Clear storage.
                                     await DeleteStorageAsync(_shutdownCancellation.Token).ConfigureAwait(true);
 
@@ -596,6 +686,12 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                         }
 
                                         _deletionGeneration++;
+
+                                        // Storage is empty: entries which the writer holds start its new content.
+                                        _positions.ResetVolatileState();
+                                        _positionOffset = -_storedEntryCount;
+                                        _deferredSnapshots = 0;
+                                        _positionsSuspended = false;
                                     }
                                     break;
                                 }
@@ -867,6 +963,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
 
         lock (_lock)
         {
+            // Positions count storage's entries; the writer holds none yet.
+            _positionOffset = _replayedEntryCount;
+            _storedEntryCount = 0;
+            _deferredSnapshots = 0;
             foreach (var (name, state) in _states)
             {
                 if (state is not RetiredStateMachine && !_journalStreamDirectory.ContainsKey(name))
@@ -895,6 +995,17 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                 }
             }
         }
+
+        // Recovered positional reads need history which the next snapshot could replace, and their executions are about to
+        // replay them: resolve them now, from a second read of the same history.
+        if (_positions.HasBarriers)
+        {
+            var history = await ReadPositionHistoryAsync(cancellationToken).ConfigureAwait(true);
+            lock (_lock)
+            {
+                ResolvePositions(history);
+            }
+        }
     }
 
     private void ResetForRecovery()
@@ -904,6 +1015,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         _statesMap.Clear();
         _statesMap[StateDirectory.Id] = _journalStreamDirectory;
         _statesMap[RetiredStateTracker.Id] = _retirementTracker;
+        _statesMap[JournalPositionState.Id] = _positions;
+        _replayedEntryCount = 0;
 
         List<string>? retiredNames = null;
         foreach (var (name, state) in _states)
@@ -924,6 +1037,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
 
         _journalStreamDirectory.ResetVolatileState();
         _retirementTracker.ResetVolatileState();
+        _positions.ResetVolatileState();
     }
 
     internal void BindStateForReplay(JournalStreamId streamId, IStateMachine state)
@@ -938,6 +1052,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
 
     internal IStateMachine ResolveStateMachine(JournalStreamId streamId)
     {
+        _replayedEntryCount++;
         if (!_statesMap.TryGetValue(streamId.Value, out var state))
         {
             state = new RetiredStateMachine(streamId);
@@ -947,7 +1062,149 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         return state;
     }
 
-    private IJournalFormat GetJournalFormat(string journalFormatKey)
+    string IJournalReplayTarget.WriteJournalFormatKey => WriteJournalFormatKey;
+
+    IServiceProvider IJournalReplayTarget.ServiceProvider => ServiceProvider;
+
+    IStateMachine IJournalReplayTarget.ResolveStateMachine(JournalStreamId streamId) => ResolveStateMachine(streamId);
+
+    /// <summary>
+    /// Gets the logical position of the journal's next entry, which a positional read records, when the manager offers
+    /// positions: it's ready, and no format migration is pending and no deletion is in progress.
+    /// </summary>
+    /// <remarks>
+    /// A read observes the entries before the position. Callers run on the activation's scheduler, as every access to its
+    /// states does.
+    /// </remarks>
+    internal bool TryGetPosition(out long position)
+    {
+        if (_state is ManagerState.Ready && !_migrationSnapshotRequired && !_positionsSuspended)
+        {
+            position = _positionOffset + _journalWriter.CommittedEntryCount;
+            return true;
+        }
+
+        position = 0;
+        return false;
+    }
+
+    /// <summary>
+    /// Holds a compaction barrier for <paramref name="owner"/> from <paramref name="position"/>, unless it holds one: no
+    /// snapshot replaces the history after it until the owner releases it or the manager resolves the owner's reads.
+    /// </summary>
+    /// <remarks>
+    /// The barrier is journaled with the next write. The manager releases it when it resolves the owner's reads, or, before
+    /// a snapshot or at recovery, when no holder holds positional reads.
+    /// </remarks>
+    internal void SetBarrier(string owner, long position) => _positions.Set(owner, position);
+
+    /// <summary>Gets whether any owner holds a compaction barrier.</summary>
+    internal bool HasBarriers => _positions.HasBarriers;
+
+
+    internal IReadOnlyDictionary<int, JournaledStateAccessTarget?> AccessTargets => _accessTargets;
+
+    private bool HoldsPositionalReads()
+    {
+        foreach (var state in _states.Values)
+        {
+            if (state is IJournalPositionHolder { HoldsPositionalReads: true })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Collects the holders' positional reads and replays storage's history into replicas, resolving every read which
+    // storage's content reaches. The history must end where this manager last wrote: otherwise another writer changed
+    // the journal.
+    private async ValueTask<JournalHistoryReplay> ReadPositionHistoryAsync(CancellationToken cancellationToken)
+    {
+        JournalHistoryReplay history;
+        long storedPosition;
+        lock (_lock)
+        {
+            history = new JournalHistoryReplay(this, _shared.JournalFormat, _directoryCodec);
+            foreach (var state in _states.Values)
+            {
+                if (state is IJournalPositionHolder holder && holder.CollectPositionalReads(long.MinValue) is { } reads)
+                {
+                    history.Add(holder, reads);
+                }
+            }
+
+            storedPosition = _positionOffset + _storedEntryCount;
+        }
+
+        // A barrier which no read needs any longer releases without reading history.
+        if (history.Batches.Count == 0)
+        {
+            return history;
+        }
+
+        await ReadStorageAsync(history, cancellationToken).ConfigureAwait(true);
+        history.HasReadStorage = true;
+        history.ResolveCurrent();
+        if (history.Position != storedPosition)
+        {
+            throw new InvalidOperationException(
+                $"The journal's history ends at position {history.Position}, and this activation last wrote it at position {storedPosition}: another writer changed the journal.");
+        }
+
+        return history;
+    }
+
+    // Applies the resolved reads, then resolves the reads which grain turns made after the history was read, which follow
+    // storage's content, from the entries which the manager committed but hasn't written; then releases the barriers.
+    private void ResolvePositions(JournalHistoryReplay history)
+    {
+        var storedPosition = _positionOffset + _storedEntryCount;
+        foreach (var state in _states.Values)
+        {
+            if (state is not IJournalPositionHolder holder)
+            {
+                continue;
+            }
+
+            if (history.Batches.TryGetValue(holder, out var resolved))
+            {
+                holder.ApplyResolvedReads(resolved);
+            }
+
+            history.Batches.Remove(holder);
+            if (holder.CollectPositionalReads(storedPosition) is { } later)
+            {
+                history.Add(holder, later);
+            }
+        }
+
+        if (history.Batches.Count > 0 && _journalWriter.CommittedEntryCount > _storedEntryCount)
+        {
+            using var committed = _journalWriter.GetCommittedBuffer();
+            history.ReplayBuffered(committed);
+        }
+
+        history.ResolveCurrent();
+        foreach (var state in _states.Values)
+        {
+            if (state is IJournalPositionHolder holder)
+            {
+                if (history.Batches.TryGetValue(holder, out var later))
+                {
+                    holder.ApplyResolvedReads(later);
+                }
+
+                holder.ReleasePositions();
+            }
+        }
+
+        // Every holder's reads are resolved, or can't be: no history needs to stay, including for owners which no longer exist.
+        _positions.RemoveAll();
+    }
+
+    internal IJournalFormat GetJournalFormat(string journalFormatKey)
     {
         if (string.Equals(journalFormatKey, _shared.JournalFormatKey, StringComparison.Ordinal))
         {

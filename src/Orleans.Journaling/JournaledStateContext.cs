@@ -205,13 +205,22 @@ internal sealed class JournaledStateAccessTarget
     private long _stamp;
 
     /// <exception cref="InvalidOperationException">Another state of <paramref name="manager"/> has the same identifier.</exception>
-    public JournaledStateAccessTarget(string name, IJournaledStateManager manager)
+    public JournaledStateAccessTarget(string name, IJournaledStateManager manager, IJournaledStateHistory? history = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         Name = name;
         Id = ComputeId(name);
         Manager = manager as JournaledStateManager;
+        History = history;
         Manager?.RegisterAccessTarget(this);
+    }
+
+    /// <summary>Creates the target of a replica of a state, which no manager registers and no context records.</summary>
+    internal JournaledStateAccessTarget(string name)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        Name = name;
+        Id = ComputeId(name);
     }
 
     /// <summary>Gets the state's journal name.</summary>
@@ -225,6 +234,12 @@ internal sealed class JournaledStateAccessTarget
 
     /// <summary>Gets the manager whose provider supplies the state's context, or <see langword="null"/>.</summary>
     public JournaledStateManager? Manager { get; }
+
+    /// <summary>
+    /// Gets the state's support for positional reads, which a context can record as positions of
+    /// <see cref="Manager"/>'s journal instead of values, or <see langword="null"/> when its reads record values.
+    /// </summary>
+    public IJournaledStateHistory? History { get; }
 
     /// <summary>
     /// Gets the state's change stamp, which strictly increases with every change of the content which the state's reads
@@ -301,6 +316,27 @@ internal static class JournaledStateOperations
         or JournaledStateOperation.ListSnapshot
         or JournaledStateOperation.QueueSnapshot
         or JournaledStateOperation.SetSnapshot
+        or JournaledStateOperation.LogSnapshot;
+
+    /// <summary>
+    /// Gets whether <paramref name="operation"/> is a positional read: a read whose result depends only on its state's
+    /// journaled content and on an argument which the serializer can encode, so the result can be evaluated again as of a
+    /// position of the journal.
+    /// </summary>
+    /// <remarks>
+    /// Writes, reads of what storage acknowledged (<see cref="JournaledStateOperation.LogCommittedSequence"/>), reads whose
+    /// argument is an arbitrary sequence (the set comparisons), and enumerations of hash-based collections, whose order
+    /// depends on the history of the collection's memory layout rather than on its journaled content, aren't positional.
+    /// </remarks>
+    public static bool IsPositional(JournaledStateOperation operation) => operation is
+        JournaledStateOperation.ValueGet
+        or JournaledStateOperation.CompletionSourceState
+        or >= JournaledStateOperation.DictionaryGet and <= JournaledStateOperation.DictionaryCount
+        or >= JournaledStateOperation.ListGet and <= JournaledStateOperation.ListSnapshot
+        or >= JournaledStateOperation.QueueCount and <= JournaledStateOperation.QueueSnapshot
+        or JournaledStateOperation.SetCount or JournaledStateOperation.SetContains
+        or JournaledStateOperation.LogCount or JournaledStateOperation.LogFirstSequence or JournaledStateOperation.LogNextSequence
+        or JournaledStateOperation.LogIsSealed or JournaledStateOperation.LogGet or JournaledStateOperation.LogTryGet
         or JournaledStateOperation.LogSnapshot;
 }
 
