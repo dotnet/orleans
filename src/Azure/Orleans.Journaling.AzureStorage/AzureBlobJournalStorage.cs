@@ -167,7 +167,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage, IJourna
                 var metadata = CopyMetadata(properties.Metadata);
                 if (!ApplyCallerMetadataUpdate(metadata, setValues, removeValues))
                 {
-                    RefreshWalETag(walState.ETag, walState.ProviderState);
+                    RefreshWalETag(walState.ETag, walState.ETag, walState.ProviderState);
                     succeeded = true;
                     return CreateJournalMetadata(properties.ETag, metadata);
                 }
@@ -180,7 +180,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage, IJourna
                 try
                 {
                     var response = await _walClient.SetMetadataAsync(metadata, conditions, cancellationToken).ConfigureAwait(false);
-                    RefreshWalETag(response.Value.ETag, walState.ProviderState);
+                    RefreshWalETag(walState.ETag, response.Value.ETag, walState.ProviderState);
                     succeeded = true;
                     return CreateJournalMetadata(response.Value.ETag, metadata);
                 }
@@ -762,11 +762,13 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage, IJourna
 
     // Metadata operations never move an established content precondition: they refresh only the ETag of the WAL content version
     // this instance holds, and establish the precondition only for an instance which has none.
-    private void RefreshWalETag(ETag eTag, WalProviderState providerState)
+    private void RefreshWalETag(ETag observedETag, ETag updatedETag, WalProviderState providerState)
     {
-        if (!_isWalKnown || (WalExists && providerState == _walProviderState))
+        if (!_isWalKnown || (WalExists
+            && providerState == _walProviderState
+            && (providerState.Generation is not null || observedETag == _walETag)))
         {
-            SetWal(eTag, providerState);
+            SetWal(updatedETag, providerState);
         }
     }
 

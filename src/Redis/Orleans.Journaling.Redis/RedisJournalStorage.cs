@@ -645,13 +645,13 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
         var status = GetStatus(result, nameof(DeleteAsync));
         if (status == AppearedStatus)
         {
-            // The journal was created after this instance observed it absent. An instance which never observed the journal
-            // leaves the newly created journal, and its own unknown precondition, in place.
+            // A fresh instance's no-op delete takes effect at the absence observation, before the competing creation.
             if (_isStateKnown)
             {
                 ThrowForStatus(ConflictStatus, nameof(DeleteAsync), expectedContentETag);
             }
 
+            ClearState();
             return;
         }
         else

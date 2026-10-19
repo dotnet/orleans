@@ -723,6 +723,134 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     public sealed class S3JournalStorageRequestTests
     {
         [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task MetadataRefresh_GenerationlessWalRetainsContentOwnership(bool recreated, bool changeMetadata)
+        {
+            var token = TestContext.Current.CancellationToken;
+            var client = Substitute.For<IAmazonS3>();
+            var eTag = "original";
+            byte[] content = [1];
+            var metadata = new Dictionary<string, string>();
+            var exists = true;
+            client.GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    var request = call.Arg<GetObjectMetadataRequest>();
+                    if (request.EtagToMatch is { } expected && expected != eTag)
+                    {
+                        throw CreateS3Exception(HttpStatusCode.PreconditionFailed);
+                    }
+
+                    var response = new GetObjectMetadataResponse { ETag = eTag, ContentLength = content.Length, PartsCount = 1 };
+                    foreach (var (key, value) in metadata)
+                    {
+                        response.Metadata.Add(key, value);
+                    }
+
+                    return Task.FromResult(response);
+                });
+            client.GetObjectAsync(Arg.Any<GetObjectRequest>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    Assert.Equal(eTag, call.Arg<GetObjectRequest>().EtagToMatch);
+                    return Task.FromResult(new GetObjectResponse
+                    {
+                        ETag = eTag,
+                        ContentLength = content.Length,
+                        ResponseStream = new MemoryStream(content, writable: false),
+                    });
+                });
+            client.PutObjectAsync(Arg.Any<PutObjectRequest>(), Arg.Any<CancellationToken>())
+                .Returns(async call =>
+                {
+                    var request = call.Arg<PutObjectRequest>();
+                    Assert.Equal(eTag, request.IfMatch);
+                    using var buffer = new MemoryStream();
+                    await request.InputStream.CopyToAsync(buffer, token);
+                    content = buffer.ToArray();
+                    metadata = request.Metadata.Keys.ToDictionary(key => key, key => request.Metadata[key]);
+                    eTag = "metadata-update";
+                    return new PutObjectResponse { ETag = eTag };
+                });
+            client.DeleteObjectAsync(Arg.Any<DeleteObjectRequest>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    Assert.Equal(eTag, call.Arg<DeleteObjectRequest>().IfMatch);
+                    exists = false;
+                    return Task.FromResult(new DeleteObjectResponse());
+                });
+            var storage = CreateStorage(client, new() { BucketName = BucketName, MetadataOnlyConflictInitialBackoff = TimeSpan.Zero });
+            await storage.ReadAsync(new CapturingJournalStorageConsumer(), token);
+            var history = (IJournalHistoryStorage)storage;
+            var version = history.WriteVersion;
+            if (recreated)
+            {
+                eTag = "recreated";
+                content = [9];
+            }
+
+            Assert.NotNull(await storage.UpdateMetadataAsync(
+                set: changeMetadata ? new Dictionary<string, string> { ["owner"] = "test" } : null,
+                cancellationToken: token));
+
+            if (recreated)
+            {
+                Assert.Equal(version, history.WriteVersion);
+                await Assert.ThrowsAsync<InconsistentStateException>(() => storage.DeleteAsync(token).AsTask());
+                Assert.True(exists);
+                Assert.Equal(9, content[^1]);
+            }
+            else
+            {
+                Assert.Equal(JournalStorageVersion.Create($"etag:{eTag}"), history.WriteVersion);
+                await storage.DeleteAsync(token);
+                Assert.False(exists);
+                Assert.Equal(JournalStorageVersion.Absent, history.WriteVersion);
+            }
+        }
+
+        [Fact]
+        public async Task HistoryReadPreservesCompactionAndStaleWrite()
+        {
+            var token = TestContext.Current.CancellationToken;
+            var client = Substitute.For<IAmazonS3>();
+            var eTag = "original";
+            var parts = 9_801;
+            client.GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    var expected = call.Arg<GetObjectMetadataRequest>().EtagToMatch;
+                    if (expected is not null && expected != eTag)
+                    {
+                        throw CreateS3Exception(HttpStatusCode.PreconditionFailed);
+                    }
+
+                    return Task.FromResult(new GetObjectMetadataResponse { ETag = eTag, ContentLength = 1, PartsCount = parts });
+                });
+            client.GetObjectAsync(Arg.Any<GetObjectRequest>(), Arg.Any<CancellationToken>())
+                .Returns(_ => Task.FromResult(new GetObjectResponse
+                {
+                    ETag = eTag, ContentLength = 1, ResponseStream = new MemoryStream([1], writable: false),
+                }));
+            var storage = CreateStorage(client, new() { BucketName = BucketName, MetadataOnlyConflictInitialBackoff = TimeSpan.Zero });
+            await storage.ReadAsync(new CapturingJournalStorageConsumer(), token);
+            var history = (IJournalHistoryStorage)storage;
+            var version = history.WriteVersion;
+            Assert.True(storage.IsCompactionRequested);
+            eTag = "recreated";
+            parts = 1;
+
+            Assert.Equal(JournalStorageVersion.Create("etag:recreated"),
+                await history.ReadHistoryAsync(new CapturingJournalStorageConsumer(), token));
+            Assert.Equal(version, history.WriteVersion);
+            Assert.True(storage.IsCompactionRequested);
+            await Assert.ThrowsAsync<InconsistentStateException>(() => storage.DeleteAsync(token).AsTask());
+        }
+
+        [Theory]
         [InlineData(false)]
         [InlineData(true)]
         public async Task ReplaceAsync_SeparatesWalAndCheckpointNamespaces(bool customMapping)
@@ -2011,6 +2139,39 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         }
 
         Assert.Equal(["journals/alpha", "journals/zeta"], listed.Select(static entry => entry.Id.Value).Order(StringComparer.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task ObservedAbsenceFencesCompetingCreation(string operation)
+    {
+        EnsureDockerAvailable();
+        return JournalStorageContractTests.ObservedAbsenceFencesCompetingCreation(
+            () => CreateStorage("journals/absence"), operation);
+    }
+
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task MetadataPreservesStalePrecondition(string operation)
+    {
+        EnsureDockerAvailable();
+        return JournalStorageContractTests.MetadataPreservesStalePrecondition(
+            () => CreateStorage("journals/stale-metadata"), operation);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task HistoryPreservesWriteState(string change)
+    {
+        EnsureDockerAvailable();
+        return JournalStorageContractTests.HistoryPreservesWriteState(
+            () => CreateStorage("journals/history"), change);
     }
 
     [Fact]

@@ -160,7 +160,9 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
 
                 // Metadata operations never move an established content precondition: they follow the WAL only from the version this
                 // instance holds, and establish the precondition only for an instance which has none.
-                var holdsWalVersion = !_isWalKnown || (WalExists && IsSameLogicalWal(walState.ProviderState, _walProviderState));
+                var holdsWalVersion = !_isWalKnown || (WalExists
+                    && IsSameLogicalWal(walState.ProviderState, _walProviderState)
+                    && (walState.ProviderState.Generation is not null || string.Equals(walState.ETag, _walETag, StringComparison.Ordinal)));
                 var metadata = CopyMetadata(properties.Metadata);
                 if (expectedETag is not null
                     && !string.Equals(expectedETag, CreateMetadataETag(properties.ETag, metadata), StringComparison.Ordinal))

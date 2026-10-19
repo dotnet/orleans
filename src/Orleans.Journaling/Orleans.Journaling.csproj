@@ -28,6 +28,7 @@
     <InternalsVisibleTo Include="Benchmarks" />
     <InternalsVisibleTo Include="Orleans.Journaling.Tests" />
     <InternalsVisibleTo Include="Orleans.Journaling.Json.Tests" />
+    <InternalsVisibleTo Include="Orleans.Redis.Tests" />
     <InternalsVisibleTo Include="Orleans.Journaling.AzureStorage" />
     <InternalsVisibleTo Include="Orleans.Journaling.S3" />
     <InternalsVisibleTo Include="Orleans.Journaling.Redis" />

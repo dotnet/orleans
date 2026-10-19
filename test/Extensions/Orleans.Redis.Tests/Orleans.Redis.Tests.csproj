@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\Orleans.Journaling.Tests\JournalStorageContractTests.cs" Link="Journaling\JournalStorageContractTests.cs" />
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" />
     <PackageReference Include="Verify.XunitV3" />

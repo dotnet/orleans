@@ -19,6 +19,58 @@ public sealed class AzureTableJournalStorageTests
     private static readonly JournalId TestJournalId = JournalId.FromGrainId(GrainId.Create("test-grain", "0"));
     private static readonly string TestPartitionKey = AzureTableJournalStorageOptions.GetDefaultPartitionKey(TestJournalId);
 
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task ObservedAbsenceFencesCompetingCreation(string operation)
+    {
+        var store = new FakeTableStore();
+        return JournalStorageContractTests.ObservedAbsenceFencesCompetingCreation(
+            () => CreateStorage(store), operation);
+    }
+
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task MetadataPreservesStalePrecondition(string operation)
+    {
+        var store = new FakeTableStore();
+        return JournalStorageContractTests.MetadataPreservesStalePrecondition(
+            () => CreateStorage(store), operation);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task HistoryPreservesWriteState(string change)
+    {
+        var store = new FakeTableStore();
+        return JournalStorageContractTests.HistoryPreservesWriteState(
+            () => CreateStorage(store), change);
+    }
+
+    [Fact]
+    public async Task HistoryReadPreservesCompactionAndStaleWrite()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var store = new FakeTableStore();
+        var storage = CreateStorage(store, compactionRowCountThreshold: 1);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), token);
+        var history = (IJournalHistoryStorage)storage;
+        var version = history.WriteVersion;
+        Assert.True(storage.IsCompactionRequested);
+        await CreateStorage(store).ReplaceAsync(new ReadOnlySequence<byte>([9]), token);
+
+        Assert.NotEqual(version, await history.ReadHistoryAsync(new CapturingJournalStorageConsumer(), token));
+        Assert.Equal(version, history.WriteVersion);
+        Assert.True(storage.IsCompactionRequested);
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([2]), token).AsTask());
+    }
+
     [Fact]
     public async Task Telemetry_MetadataConflictRecordsOnlyActualProviderRetries()
     {

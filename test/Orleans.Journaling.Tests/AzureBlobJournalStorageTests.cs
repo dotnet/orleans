@@ -20,6 +20,104 @@ public sealed class AzureBlobJournalStorageTests
 {
     private static readonly JournalId TestJournalId = JournalId.FromGrainId(GrainId.Create("test-grain", "0"));
 
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task ObservedAbsenceFencesCompetingCreation(string operation)
+    {
+        var store = new FakeAppendBlobStore();
+        var checkpoints = new FakeBlockBlobStore();
+        return JournalStorageContractTests.ObservedAbsenceFencesCompetingCreation(
+            () => CreateStorage(store, checkpoints), operation);
+    }
+
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task MetadataPreservesStalePrecondition(string operation)
+    {
+        var store = new FakeAppendBlobStore();
+        var checkpoints = new FakeBlockBlobStore();
+        return JournalStorageContractTests.MetadataPreservesStalePrecondition(
+            () => CreateStorage(store, checkpoints), operation);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task HistoryPreservesWriteState(string change)
+    {
+        var store = new FakeAppendBlobStore();
+        var checkpoints = new FakeBlockBlobStore();
+        return JournalStorageContractTests.HistoryPreservesWriteState(
+            () => CreateStorage(store, checkpoints), change);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MetadataUpdate_GenerationlessWalPreservesRecreatedContentFence(bool changeMetadata)
+    {
+        var store = new FakeAppendBlobStore();
+        store.Add("blob/wal", [1], WalMetadata(), isSealed: false);
+        var storage = CreateStorage(store);
+        await storage.ReadAsync(new CapturingJournalStorageConsumer(), TestContext.Current.CancellationToken);
+        var history = (IJournalHistoryStorage)storage;
+        var version = history.WriteVersion;
+        await CreateStorage(store).DeleteAsync(TestContext.Current.CancellationToken);
+        store.Add("blob/wal", [9], WalMetadata(), isSealed: false);
+
+        Assert.NotNull(await storage.UpdateMetadataAsync(
+            set: changeMetadata ? new Dictionary<string, string> { ["owner"] = "test" } : null,
+            cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(version, history.WriteVersion);
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken).AsTask());
+        Assert.Equal([9], store.GetContent("blob/wal"));
+    }
+
+    [Fact]
+    public async Task MetadataUpdate_GenerationlessWalFollowsOwnUpdatedETag()
+    {
+        var store = new FakeAppendBlobStore();
+        store.Add("blob/wal", [1], WalMetadata(), isSealed: false);
+        var storage = CreateStorage(store);
+        await storage.ReadAsync(new CapturingJournalStorageConsumer(), TestContext.Current.CancellationToken);
+
+        Assert.NotNull(await storage.UpdateMetadataAsync(
+            new Dictionary<string, string> { ["owner"] = "test" },
+            cancellationToken: TestContext.Current.CancellationToken));
+        await storage.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
+
+        Assert.Equal(new ETag("\"metadata-1\""), store.AppendCalls.Last().IfMatch);
+        Assert.Equal([1, 2], store.GetContent("blob/wal"));
+    }
+
+    [Fact]
+    public async Task HistoryReadPreservesCompactionAndStaleWrite()
+    {
+        var store = new FakeAppendBlobStore();
+        store.Add("blob/wal", [1], WalMetadata(generation: "initial"), isSealed: false, committedBlockCount: 49_001);
+        var storage = CreateStorage(store);
+        await storage.ReadAsync(new CapturingJournalStorageConsumer(), TestContext.Current.CancellationToken);
+        var history = (IJournalHistoryStorage)storage;
+        var version = history.WriteVersion;
+        Assert.True(storage.IsCompactionRequested);
+        store.Add("blob/wal", [9], WalMetadata(generation: "recreated"), isSealed: false);
+
+        Assert.NotEqual(version, await history.ReadHistoryAsync(
+            new CapturingJournalStorageConsumer(), TestContext.Current.CancellationToken));
+        Assert.Equal(version, history.WriteVersion);
+        Assert.True(storage.IsCompactionRequested);
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken).AsTask());
+        Assert.Equal([9], store.GetContent("blob/wal"));
+    }
+
     [Fact]
     public async Task Telemetry_MetadataConflictRecordsOnlyActualProviderRetries()
     {
@@ -907,6 +1005,7 @@ public sealed class AzureBlobJournalStorageTests
         private int _appendCount;
         private int _sealCount;
         private int _metadataCount;
+        private int _addCount;
 
         public bool FailNextAppend { get; set; }
 
@@ -943,7 +1042,7 @@ public sealed class AzureBlobJournalStorageTests
         public bool Exists(string name) => _blobs.ContainsKey(name);
 
         public void Add(string name, byte[] content, IDictionary<string, string> metadata, bool isSealed, int? committedBlockCount = null)
-            => _blobs[name] = new StoredAppendBlob(content, new ETag($"\"{name}-etag\""), new Dictionary<string, string>(metadata), ContentType: null, committedBlockCount ?? (content.Length == 0 ? 0 : 1), isSealed);
+            => _blobs[name] = new StoredAppendBlob(content, new ETag($"\"{name}-etag-{++_addCount}\""), new Dictionary<string, string>(metadata), ContentType: null, committedBlockCount ?? (content.Length == 0 ? 0 : 1), isSealed);
 
         public void Seal(string name)
         {

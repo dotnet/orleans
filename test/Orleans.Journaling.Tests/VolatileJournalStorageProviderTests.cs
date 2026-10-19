@@ -10,6 +10,59 @@ namespace Orleans.Journaling.Tests;
 [TestCategory("BVT")]
 public sealed class VolatileJournalStorageProviderTests
 {
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task ObservedAbsenceFencesCompetingCreation(string operation)
+    {
+        var provider = new VolatileJournalStorageProvider();
+        return JournalStorageContractTests.ObservedAbsenceFencesCompetingCreation(
+            () => provider.CreateStorage(new("absence")), operation);
+    }
+
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public async Task MetadataPreservesStalePrecondition(string operation)
+    {
+        var provider = new VolatileJournalStorageProvider(
+            Options.Create(new JournaledStateManagerOptions()),
+            Options.Create(new VolatileJournalStorageOptions { MaxAppendsBeforeSnapshot = 2 }), null);
+        await JournalStorageContractTests.MetadataPreservesStalePrecondition(
+            () => provider.CreateStorage(new("stale")), operation);
+        Assert.True(provider.CreateStorage(new("stale")).IsCompactionRequested);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task HistoryPreservesWriteState(string change)
+    {
+        var provider = new VolatileJournalStorageProvider();
+        return JournalStorageContractTests.HistoryPreservesWriteState(
+            () => provider.CreateStorage(new("history")), change);
+    }
+
+    [Fact]
+    public async Task HistoryReadPreservesCompactionRequest()
+    {
+        var storage = new VolatileJournalStorage(null, new() { MaxAppendsBeforeSnapshot = 1 });
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        var history = (IJournalHistoryStorage)storage;
+        var version = history.WriteVersion;
+        Assert.True(storage.IsCompactionRequested);
+
+        Assert.Equal(version, await history.ReadHistoryAsync(new DiscardingConsumer(), TestContext.Current.CancellationToken));
+        Assert.Equal(version, history.WriteVersion);
+        Assert.True(storage.IsCompactionRequested);
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
+        Assert.False(storage.IsCompactionRequested);
+        Assert.Equal([2], Assert.Single(storage.Segments));
+    }
+
     [Fact]
     public async Task Compaction_ByteThresholdExcludesSnapshotAndResetsAfterReplacement()
     {
