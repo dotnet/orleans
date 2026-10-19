@@ -357,6 +357,117 @@ public sealed class DynamoDBReminderMigrationTests
         }
     }
 
+    [Fact]
+    public async Task DelimiterCollidingLegacyIdentitiesPreserveRollbackCopy()
+    {
+        EnsureDynamoDb();
+        var tableName = NewTableName();
+        var first = Entry(1);
+        first.ReminderName = $"{first.GrainId}_tail";
+        var second = Clone(first);
+        second.ReminderName = "tail";
+        const string firstService = "collision";
+        var secondService = $"{firstService}_{first.GrainId}";
+        Assert.Equal(
+            $"{firstService}_{first.GrainId}_{first.ReminderName}",
+            $"{secondService}_{second.GrainId}_{second.ReminderName}");
+        using var client = CreateClient();
+        var firstTable = CreateTable(tableName, firstService, DynamoDBReminderTableMode.Migrate);
+        var secondTable = CreateTable(tableName, secondService, DynamoDBReminderTableMode.Migrate);
+        try
+        {
+            await firstTable.StartAsync(TestContext.Current.CancellationToken);
+            await secondTable.StartAsync(TestContext.Current.CancellationToken);
+            var etag = await firstTable.UpsertRow(first);
+
+            var error = await Assert.ThrowsAsync<TransactionCanceledException>(() => secondTable.UpsertRow(second));
+
+            Assert.Equal("ConditionalCheckFailed", error.CancellationReasons[1].Code);
+            Assert.Null(second.ETag);
+            var pointError = await Assert.ThrowsAsync<InvalidOperationException>(() => secondTable.ReadRow(second.GrainId, second.ReminderName));
+            Assert.Contains("conflicting stored identity", pointError.Message, StringComparison.Ordinal);
+            Assert.False(await secondTable.RemoveRow(second.GrainId, second.ReminderName, etag!));
+            var retained = Assert.IsType<ReminderEntry>(await firstTable.ReadRow(first.GrainId, first.ReminderName));
+            Assert.Equal(first.ReminderName, retained.ReminderName);
+            Assert.Equal(etag, retained.ETag);
+            Assert.Equal(etag, Assert.Single(await ReadV2Items(client, tableName, firstService))["ETag"].N);
+            Assert.Empty(await ReadV2Items(client, tableName, secondService));
+        }
+        finally
+        {
+            await StopAndDelete(client, tableName, firstTable, secondTable);
+        }
+    }
+
+    [Theory]
+    [InlineData(DynamoDBReminderTableMode.Legacy, "ServiceId")]
+    [InlineData(DynamoDBReminderTableMode.Legacy, "GrainReference")]
+    [InlineData(DynamoDBReminderTableMode.Legacy, "ReminderName")]
+    [InlineData(DynamoDBReminderTableMode.Migrate, "ServiceId")]
+    [InlineData(DynamoDBReminderTableMode.Migrate, "GrainReference")]
+    [InlineData(DynamoDBReminderTableMode.Migrate, "ReminderName")]
+    public async Task LegacyIdentityConflictsRejectWritesAndDeletesWithoutChangingEitherSchema(DynamoDBReminderTableMode mode, string attribute)
+    {
+        EnsureDynamoDb();
+        var tableName = NewTableName();
+        const string serviceId = "legacy-write-identity";
+        using var client = CreateClient();
+        var table = CreateTable(tableName, serviceId, mode);
+        try
+        {
+            await table.StartAsync(TestContext.Current.CancellationToken);
+            var entry = Entry(1);
+            await table.UpsertRow(entry);
+            entry.Period = TimeSpan.FromMinutes(5);
+            var etag = await table.UpsertRow(entry);
+            var key = new Dictionary<string, AttributeValue>
+            {
+                ["ReminderId"] = new($"{serviceId}_{entry.GrainId}_{entry.ReminderName}"),
+                ["GrainHash"] = new() { N = entry.GrainId.GetUniformHashCode().ToString(CultureInfo.InvariantCulture) },
+            };
+            await client.UpdateItemAsync(
+                new()
+                {
+                    TableName = tableName,
+                    Key = key,
+                    UpdateExpression = "SET #identity = :value",
+                    ExpressionAttributeNames = new() { ["#identity"] = attribute },
+                    ExpressionAttributeValues = new() { [":value"] = new("foreign-identity") },
+                },
+                TestContext.Current.CancellationToken);
+            entry.Period = TimeSpan.FromMinutes(10);
+
+            if (mode == DynamoDBReminderTableMode.Legacy)
+            {
+                await Assert.ThrowsAsync<ConditionalCheckFailedException>(() => table.UpsertRow(entry));
+            }
+            else
+            {
+                var error = await Assert.ThrowsAsync<TransactionCanceledException>(() => table.UpsertRow(entry));
+                Assert.Equal("ConditionalCheckFailed", error.CancellationReasons[1].Code);
+            }
+
+            Assert.Equal(etag, entry.ETag);
+            Assert.False(await table.RemoveRow(entry.GrainId, entry.ReminderName, etag!));
+            var retained = await client.GetItemAsync(
+                new() { TableName = tableName, Key = key, ConsistentRead = true },
+                TestContext.Current.CancellationToken);
+            Assert.Equal("foreign-identity", retained.Item[attribute].S);
+            Assert.Equal(etag, retained.Item["ETag"].N);
+            Assert.Equal(TimeSpan.FromMinutes(5), TimeSpan.Parse(retained.Item["Period"].S, CultureInfo.InvariantCulture));
+            if (mode == DynamoDBReminderTableMode.Migrate)
+            {
+                var target = Assert.Single(await ReadV2Items(client, tableName, serviceId));
+                Assert.Equal(etag, target["ETag"].N);
+                Assert.Equal(TimeSpan.FromMinutes(5), TimeSpan.Parse(target["Period"].S, CultureInfo.InvariantCulture));
+            }
+        }
+        finally
+        {
+            await StopAndDelete(client, tableName, table);
+        }
+    }
+
     [Theory]
     [InlineData("ServiceId")]
     [InlineData("GrainReference")]

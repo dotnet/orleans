@@ -254,6 +254,170 @@ public sealed class DynamoDBReminderStateTests
     }
 
     [Theory]
+    [InlineData(DynamoDBReminderTableMode.Legacy)]
+    [InlineData(DynamoDBReminderTableMode.Migrate)]
+    public async Task LegacyAndDualPutsConditionOnCompleteIdentity(DynamoDBReminderTableMode mode)
+    {
+        var entry = Entry();
+        void AssertPut(Put put)
+        {
+            Assert.Equal(
+                $"attribute_not_exists({(put.TableName == "reminders" ? "ReminderId" : "PartitionKey")}) OR (ServiceId = :service AND GrainReference = :grain AND ReminderName = :reminder)",
+                put.ConditionExpression);
+            Assert.Equal("service", put.ExpressionAttributeValues[":service"].S);
+            Assert.Equal(entry.GrainId.ToString(), put.ExpressionAttributeValues[":grain"].S);
+            Assert.Equal(entry.ReminderName, put.ExpressionAttributeValues[":reminder"].S);
+        }
+
+        using var client = new RequestClient
+        {
+            Read = (_, _) => Task.FromResult(new GetItemResponse { Item = StateItem("Ready") }),
+            Put = request =>
+            {
+                AssertPut(new() { TableName = request.TableName, Item = request.Item, ConditionExpression = request.ConditionExpression, ExpressionAttributeValues = request.ExpressionAttributeValues });
+                return new();
+            },
+            Transact = request =>
+            {
+                Assert.Equal(3, request.TransactItems.Count);
+                Assert.NotNull(request.TransactItems[0].ConditionCheck);
+                AssertPut(request.TransactItems[1].Put);
+                AssertPut(request.TransactItems[2].Put);
+                return new();
+            },
+        };
+        var table = CreateTable(client, mode);
+        AttachStorage(table, client);
+
+        var etag = await table.UpsertRow(entry);
+
+        Assert.False(string.IsNullOrEmpty(etag));
+        Assert.Equal(etag, entry.ETag);
+        Assert.Equal(1, client.WriteCount);
+    }
+
+    [Theory]
+    [InlineData(DynamoDBReminderTableMode.Legacy, "ServiceId")]
+    [InlineData(DynamoDBReminderTableMode.Legacy, "GrainReference")]
+    [InlineData(DynamoDBReminderTableMode.Legacy, "ReminderName")]
+    [InlineData(DynamoDBReminderTableMode.Migrate, "ServiceId")]
+    [InlineData(DynamoDBReminderTableMode.Migrate, "GrainReference")]
+    [InlineData(DynamoDBReminderTableMode.Migrate, "ReminderName")]
+    [InlineData(DynamoDBReminderTableMode.Rollback, "ServiceId")]
+    [InlineData(DynamoDBReminderTableMode.Rollback, "GrainReference")]
+    [InlineData(DynamoDBReminderTableMode.Rollback, "ReminderName")]
+    public async Task LegacyPointReadsValidateIdentityAndPreserveMissingRowSemantics(DynamoDBReminderTableMode mode, string attribute)
+    {
+        var entry = Entry();
+        Dictionary<string, AttributeValue>? stored = RowItem(entry);
+        using var client = new RequestClient
+        {
+            Read = (request, _) => Task.FromResult(new GetItemResponse
+            {
+                Item = request.TableName == "reminders-v2"
+                    ? StateItem(mode == DynamoDBReminderTableMode.Rollback ? "RolledBack" : "Ready")
+                    : stored,
+            }),
+        };
+        var table = CreateTable(client, mode);
+        AttachStorage(table, client);
+        var actual = Assert.IsType<ReminderEntry>(await table.ReadRow(entry.GrainId, entry.ReminderName));
+        Assert.Equal(entry.GrainId, actual.GrainId);
+        Assert.Equal(entry.ReminderName, actual.ReminderName);
+        Assert.Equal(entry.StartAt, actual.StartAt);
+
+        stored[attribute] = new("conflicting-identity");
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => table.ReadRow(entry.GrainId, entry.ReminderName));
+        Assert.Contains("conflicting stored identity", error.Message, StringComparison.Ordinal);
+
+        stored = null;
+        Assert.Null(await table.ReadRow(entry.GrainId, entry.ReminderName));
+        Assert.Equal(0, client.WriteCount);
+        Assert.Equal(0, client.DeleteCount);
+    }
+
+    [Theory]
+    [InlineData(DynamoDBReminderTableMode.V2Only, "service")]
+    [InlineData(DynamoDBReminderTableMode.V2Only, "foreign-service")]
+    [InlineData(DynamoDBReminderTableMode.V2Only, null)]
+    [InlineData(DynamoDBReminderTableMode.Migrate, "foreign-service")]
+    [InlineData(DynamoDBReminderTableMode.Migrate, null)]
+    public async Task V2CleanupValidatesAllPagesBeforeDeletingAnyRows(DynamoDBReminderTableMode mode, string? finalService)
+    {
+        var firstPartition = DynamoDBReminderTable.GetV2PartitionKey("service", 0);
+        var lastPartition = DynamoDBReminderTable.GetV2PartitionKey("service", DynamoDBReminderTable.V2BucketCount - 1);
+        Dictionary<string, AttributeValue> Item(string partition, string sort) => new()
+        {
+            ["PartitionKey"] = new(partition),
+            ["SortKey"] = new(sort),
+            ["ServiceId"] = new("service"),
+        };
+        var final = Item(lastPartition, "final");
+        if (finalService is null)
+        {
+            final.Remove("ServiceId");
+        }
+        else
+        {
+            final["ServiceId"] = new(finalService);
+        }
+
+        var queryCount = 0;
+        using var client = new RequestClient
+        {
+            Read = (_, _) => Task.FromResult(new GetItemResponse { Item = StateItem(mode == DynamoDBReminderTableMode.V2Only ? "Retired" : "Ready") }),
+            Query = request =>
+            {
+                Assert.Equal("reminders-v2", request.TableName);
+                Assert.True(request.ConsistentRead);
+                queryCount++;
+                var partition = request.ExpressionAttributeValues[":partition"].S;
+                if (partition == firstPartition)
+                {
+                    return new() { Items = [Item(partition, "first")] };
+                }
+
+                if (partition != lastPartition)
+                {
+                    return new() { Items = [] };
+                }
+
+                if (request.ExclusiveStartKey is null or { Count: 0 })
+                {
+                    return new()
+                    {
+                        Items = Enumerable.Range(0, 25).Select(index => Item(partition, $"row-{index}")).ToList(),
+                        LastEvaluatedKey = new() { ["PartitionKey"] = new(partition), ["SortKey"] = new("next-page") },
+                    };
+                }
+
+                Assert.Equal("next-page", request.ExclusiveStartKey["SortKey"].S);
+                return new() { Items = [final] };
+            },
+        };
+        var table = CreateTable(client, mode);
+        AttachStorage(table, client);
+
+        if (finalService == "service")
+        {
+            await table.TestOnlyClearTable();
+            Assert.Equal([25, 2], client.BatchWrites.Select(request => Assert.Single(request.RequestItems).Value.Count));
+            Assert.All(client.BatchWrites, request => Assert.Equal("reminders-v2", Assert.Single(request.RequestItems).Key));
+        }
+        else
+        {
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => table.TestOnlyClearTable());
+            Assert.Contains("stored service identity", error.Message, StringComparison.Ordinal);
+            Assert.Empty(client.BatchWrites);
+        }
+
+        Assert.Equal(DynamoDBReminderTable.V2BucketCount + 1, queryCount);
+        Assert.Equal(0, client.WriteCount);
+        Assert.Equal(0, client.DeleteCount);
+        Assert.Equal(0, client.ScanCount);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task MigrationStateRejectsMissingOrForeignServiceBeforeWrites(bool missing)
@@ -476,6 +640,7 @@ public sealed class DynamoDBReminderStateTests
                 {
                     Item = request.TableName == "reminders-v2" ? null : new()
                     {
+                        ["ServiceId"] = new("service"),
                         ["ETag"] = new() { N = "1" },
                         ["GrainReference"] = new(entry.GrainId.ToString()),
                         ["ReminderName"] = new(entry.ReminderName),
@@ -601,10 +766,16 @@ public sealed class DynamoDBReminderStateTests
         public Func<string, DescribeTableResponse> Describe { get; init; }
             = tableName => new() { Table = new() { TableName = tableName, TableStatus = TableStatus.ACTIVE } };
 
+        public Func<PutItemRequest, PutItemResponse> Put { get; init; } = _ => new();
+        public Func<TransactWriteItemsRequest, TransactWriteItemsResponse> Transact { get; init; }
+            = _ => throw new InvalidOperationException("Unexpected transaction.");
+        public List<BatchWriteItemRequest> BatchWrites { get; } = [];
+
         public int ReadCount { get; private set; }
         public int WriteCount { get; private set; }
         public int DeleteCount { get; private set; }
         public int CreateCount { get; private set; }
+        public int ScanCount { get; private set; }
 
         public override Task<GetItemResponse> GetItemAsync(GetItemRequest request, CancellationToken cancellationToken = default)
         {
@@ -625,7 +796,7 @@ public sealed class DynamoDBReminderStateTests
         public override Task<PutItemResponse> PutItemAsync(PutItemRequest request, CancellationToken cancellationToken = default)
         {
             WriteCount++;
-            return Task.FromResult(new PutItemResponse());
+            return Task.FromResult(Put(request));
         }
 
         public override Task<QueryResponse> QueryAsync(QueryRequest request, CancellationToken cancellationToken = default)
@@ -640,7 +811,19 @@ public sealed class DynamoDBReminderStateTests
         public override Task<TransactWriteItemsResponse> TransactWriteItemsAsync(TransactWriteItemsRequest request, CancellationToken cancellationToken = default)
         {
             WriteCount++;
-            throw new InvalidOperationException("Unexpected transaction.");
+            return Task.FromResult(Transact(request));
+        }
+
+        public override Task<BatchWriteItemResponse> BatchWriteItemAsync(BatchWriteItemRequest request, CancellationToken cancellationToken = default)
+        {
+            BatchWrites.Add(request);
+            return Task.FromResult(new BatchWriteItemResponse());
+        }
+
+        public override Task<ScanResponse> ScanAsync(ScanRequest request, CancellationToken cancellationToken = default)
+        {
+            ScanCount++;
+            throw new InvalidOperationException("Unexpected Legacy scan.");
         }
     }
 }

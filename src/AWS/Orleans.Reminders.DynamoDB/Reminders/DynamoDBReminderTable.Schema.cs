@@ -199,7 +199,7 @@ internal sealed partial class DynamoDBReminderTable
                 new() { ConditionCheck = CreateDualWriteFence() },
                 new()
                 {
-                    Put = new() { TableName = options.TableName, Item = legacy },
+                    Put = CreateIdentitySafeLegacyPut(legacy, entry),
                 },
                 new()
                 {
@@ -247,11 +247,17 @@ internal sealed partial class DynamoDBReminderTable
     }
 
     private Put CreateIdentitySafeV2Put(Dictionary<string, AttributeValue> item, ReminderEntry entry)
+        => CreateIdentitySafePut(v2TableName, V2PartitionKeyName, item, entry);
+
+    private Put CreateIdentitySafeLegacyPut(Dictionary<string, AttributeValue> item, ReminderEntry entry)
+        => CreateIdentitySafePut(options.TableName, REMINDER_ID_PROPERTY_NAME, item, entry);
+
+    private Put CreateIdentitySafePut(string tableName, string partitionKeyName, Dictionary<string, AttributeValue> item, ReminderEntry entry)
         => new()
         {
-            TableName = v2TableName,
+            TableName = tableName,
             Item = item,
-            ConditionExpression = $"attribute_not_exists({V2PartitionKeyName}) OR ({SERVICE_ID_PROPERTY_NAME} = :service AND {GRAIN_REFERENCE_PROPERTY_NAME} = :grain AND {REMINDER_NAME_PROPERTY_NAME} = :reminder)",
+            ConditionExpression = $"attribute_not_exists({partitionKeyName}) OR ({SERVICE_ID_PROPERTY_NAME} = :service AND {GRAIN_REFERENCE_PROPERTY_NAME} = :grain AND {REMINDER_NAME_PROPERTY_NAME} = :reminder)",
             ExpressionAttributeValues = new()
             {
                 [":service"] = new(serviceId),
@@ -262,7 +268,6 @@ internal sealed partial class DynamoDBReminderTable
 
     private async Task<bool> RemoveDualRow(GrainId grainId, string reminderName, string etag)
     {
-        var values = new Dictionary<string, AttributeValue> { [CURRENT_ETAG_ALIAS] = new() { N = etag } };
         try
         {
             await storage.WriteTxAsync(
@@ -270,13 +275,7 @@ internal sealed partial class DynamoDBReminderTable
                 new() { ConditionCheck = CreateDualWriteFence() },
                 new()
                 {
-                    Delete = new()
-                    {
-                        TableName = options.TableName,
-                        Key = GetLegacyKey(grainId, reminderName),
-                        ConditionExpression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}",
-                        ExpressionAttributeValues = values,
-                    },
+                    Delete = CreateIdentitySafeLegacyDelete(grainId, reminderName, etag),
                 },
                 new()
                 {
@@ -322,6 +321,21 @@ internal sealed partial class DynamoDBReminderTable
             return false;
         }
     }
+
+    private Delete CreateIdentitySafeLegacyDelete(GrainId grainId, string reminderName, string etag)
+        => new()
+        {
+            TableName = options.TableName,
+            Key = GetLegacyKey(grainId, reminderName),
+            ConditionExpression = $"{SERVICE_ID_PROPERTY_NAME} = :service AND {GRAIN_REFERENCE_PROPERTY_NAME} = :grain AND {REMINDER_NAME_PROPERTY_NAME} = :reminder AND {ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}",
+            ExpressionAttributeValues = new()
+            {
+                [":service"] = new(serviceId),
+                [":grain"] = new(grainId.ToString()),
+                [":reminder"] = new(reminderName),
+                [CURRENT_ETAG_ALIAS] = new() { N = etag },
+            },
+        };
 
     private async Task<bool> RemoveV2OnlyRow(GrainId grainId, string reminderName, string etag)
     {
@@ -380,10 +394,14 @@ internal sealed partial class DynamoDBReminderTable
                 v2TableName,
                 values,
                 $"{V2PartitionKeyName} = :partition",
-                static item => new Dictionary<string, AttributeValue>
+                item =>
                 {
-                    [V2PartitionKeyName] = item[V2PartitionKeyName],
-                    [V2SortKeyName] = item[V2SortKeyName],
+                    ValidateStoredServiceIdentity(item);
+                    return new Dictionary<string, AttributeValue>
+                    {
+                        [V2PartitionKeyName] = item[V2PartitionKeyName],
+                        [V2SortKeyName] = item[V2SortKeyName],
+                    };
                 }));
         }
 

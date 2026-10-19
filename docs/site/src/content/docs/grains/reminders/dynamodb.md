@@ -32,6 +32,7 @@ The example uses on-demand capacity and an infrastructure-managed table. Set <xr
 `TableMode=Legacy` retains the existing table and indexes while hardening reminder scheduling against GSI lag:
 
 - GSI range and grain results are discovery candidates. The provider strongly point-reads every candidate from the base table and verifies its complete service, grain, and reminder identity before returning it. A conflicting stored identity fails the read.
+- Point reads validate the same complete identity. Legacy and dual-write mutations condition replacement on that identity, and removals also require the current ETag, preserving another reminder when delimiter-concatenated V1 keys collide.
 - Before a silo removes a known local reminder which a range query omitted, it strongly point-reads that identity. A still-present or newer row is reconciled instead of removed.
 - Reminder registration, update, and removal strongly point-read and reconcile before returning when the handling silo remains the owner. A stale handler sends a bounded, three-hop reconciliation notification through current ring views; the receiving owner strongly point-reads before applying it. Per-identity sequencing prevents out-of-order point reads from restoring an older schedule.
 - Legacy mode never uses a full-table scan during startup, topology changes, or periodic refresh. All discovery remains cost-bounded to GSI queries and base-table point reads.

@@ -209,21 +209,13 @@ namespace Orleans.Reminders.DynamoDB
                 return await ReadV2Row(grainId, reminderName);
             }
 
-            var reminderId = ConstructReminderId(this.serviceId, grainId, reminderName);
-
-            var keys = new Dictionary<string, AttributeValue>
-                {
-                    { $"{REMINDER_ID_PROPERTY_NAME}", new AttributeValue(reminderId) },
-                    { $"{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = grainId.GetUniformHashCode().ToString() } }
-                };
-
             try
             {
-                return await this.storage.ReadSingleEntryAsync(this.options.TableName, keys, this.Resolve).ConfigureAwait(false);
+                return await ReadLegacyRow(grainId, reminderName).ConfigureAwait(false);
             }
             catch (Exception exc)
             {
-                LogWarningReadReminderEntry(logger, exc, new(keys), this.options.TableName);
+                LogWarningReadReminderEntry(logger, exc, new(GetLegacyKey(grainId, reminderName)), this.options.TableName);
                 throw;
             }
         }
@@ -358,20 +350,10 @@ namespace Orleans.Reminders.DynamoDB
                 return await RemoveDualRow(grainId, reminderName, eTag);
             }
 
-            var reminderId = ConstructReminderId(this.serviceId, grainId, reminderName);
-
-            var keys = new Dictionary<string, AttributeValue>
-                {
-                    { $"{REMINDER_ID_PROPERTY_NAME}", new AttributeValue(reminderId) },
-                    { $"{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = grainId.GetUniformHashCode().ToString() } }
-                };
-
             try
             {
-                var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = eTag } } };
-                var expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
-
-                await this.storage.DeleteEntryAsync(this.options.TableName, keys, expression, conditionalValues).ConfigureAwait(false);
+                var delete = CreateIdentitySafeLegacyDelete(grainId, reminderName, eTag);
+                await storage.DeleteEntryAsync(delete.TableName, delete.Key, delete.ConditionExpression, delete.ExpressionAttributeValues).ConfigureAwait(false);
                 return true;
             }
             catch (ConditionalCheckFailedException)
@@ -381,7 +363,8 @@ namespace Orleans.Reminders.DynamoDB
         }
 
         /// <summary>
-        /// Test hook to clear reminder table data.
+        /// Test hook to clear reminder table data. V2 cleanup validates every discovered service identity
+        /// before deleting any rows.
         /// </summary>
         /// <returns></returns>
         public async Task TestOnlyClearTable()
@@ -469,7 +452,8 @@ namespace Orleans.Reminders.DynamoDB
             {
                 LogDebugUpsertRow(logger, entry, entry.ETag);
 
-                await this.storage.PutEntryAsync(this.options.TableName, fields);
+                var put = CreateIdentitySafeLegacyPut(fields, entry);
+                await storage.PutEntryAsync(put.TableName, put.Item, put.ConditionExpression, put.ExpressionAttributeValues);
 
                 entry.ETag = fields[ETAG_PROPERTY_NAME].N;
                 return entry.ETag;
