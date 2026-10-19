@@ -574,21 +574,25 @@ synchronously on the activation which makes them, when the runtime stages them: 
   pending, and the grain keeps a one-minute wake-up so that a later activation replays it.
 - A body's accesses to journaled state, such as `IDurableValue<T>` and the durable
   collections, and its sends through the outbox, are recorded in the execution's
-  access log, in order. A write's record is staged in the same work item as the
-  write, and a read's record with the execution's next write or durable operation.
+  access log, in order, with a hash of each access's arguments. A write's record is
+  staged in the same work item as the write, and a read's record with the grain's next
+  journal write.
   A replay returns each recorded outcome, a read's value, a write's result, or an
   access's exception, without running the access, and runs live once it has
-  consumed the log. An access of other state at a recorded position, or a recorded
-  outcome which no longer decodes, stalls the attempt for `Diverged`, as an
-  unsupported version does. Values and exceptions are recorded with the Orleans
+  consumed the log. An access of other state or with other arguments at a recorded
+  position, or a recorded outcome which no longer decodes, stalls the attempt for
+  `Diverged`, as an unsupported version does. Values and exceptions are recorded with the Orleans
   serializer in every journal format, and each journal write journals one entry per
   execution whose log grew. Live observations, `IDurableTaskCompletionSource<T>.Task`,
-  `IDurableLog<T>.ReadAsync`, and `WatchAsync`, run unrecorded. The runtime's own work
-  on behalf of a body, such as starting a child or sending a durable message, isn't
-  recorded as the body's. Canceling an attempt, or completing its body, closes its
-  access log, so the attempt's later code, such as cleanup or work which outlives it,
-  accesses state directly and unrecorded. Storing the execution's result removes its
-  access log.
+  `IDurableLog<T>.ReadAsync`, and `WatchAsync`, run unrecorded. The runtime's own state
+  and its durable messages run as the host's work, so a body's log holds only the body's
+  accesses. Aborting or deleting the task, or completing its body, closes the access
+  log: the attempt's later code, such as cleanup or work which outlives it, returns its
+  remaining records and then accesses state directly. Stopping the activation, or a
+  stall, discards the attempt, whose later writes throw its cancellation, because a later
+  attempt reruns that code. Storing the execution's result removes its access log. The
+  runtime fails to bind to an activation whose task storage or journaled state manager
+  can't record these accesses.
 - A durable task publishes progress to an `IDurableLog<T>` of its grain. It
   appends an entry with `log.Append(item)`, whose entry commits with its access
   record. A step which streams content writes it to a

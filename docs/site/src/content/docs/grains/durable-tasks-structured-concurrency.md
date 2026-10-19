@@ -144,7 +144,7 @@ Durable tasks distinguish two kinds of cancellation:
 | --- | --- | --- |
 | What it stops | The task: its outcome becomes canceled once the cancellation escapes its body | The current in-memory run of the body, its *attempt* |
 | Caused by | `CancelAsync`, an owner's cancellation, `Race`, or a timeout | The grain activation stopping, an [abort](durable-tasks-operations.md), or the deletion of the task's tree |
-| Recorded | Yes: the request, its reason, the point at which the body first observes it, where every replay observes it again, and the cleanup which the body runs | No: the attempt's later durable operations throw, and its journaled state changes, such as cleanup, commit |
+| Recorded | Yes: the request, its reason, the point at which the body first observes it, where every replay observes it again, and the cleanup which the body runs | No: the attempt's later durable operations throw; an aborted or deleted task's journaled state changes, such as cleanup, commit, and a stopping activation's throw |
 | What follows | The body runs its compensation, which commits | A stopping activation's task replays in a new attempt; an aborted or deleted task already has its outcome |
 | `IsTaskCancellationRequested` | `true` | Unchanged |
 | `CancellationToken` | Canceled | Canceled |
@@ -156,9 +156,11 @@ Once an attempt is canceled, every durable operation of its code throws
 including shielded and detached ones, `Post`, `ScheduleAsync`, signal sends and waits,
 delays, subscriptions, and combinators. The exception derives from
 `OperationCanceledException`, so the attempt's code unwinds like any canceled .NET code.
-Changes which that code makes to the grain's journaled state on the way out, such as
-cleanup, commit with the grain's next journal write. A stopping activation's task replays from its records in the next activation, which runs any
-compensation again.
+When the task is aborted or deleted, changes which that code makes to the grain's journaled
+state on the way out, such as cleanup, commit with the grain's next journal write. A stopping
+activation's task replays from its records in the next activation, which runs that code again,
+so the stopping attempt's changes to journaled state throw its cancellation and leave the state
+unchanged, and its reads observe the state directly.
 
 The canonical pattern passes `CancellationToken` to the calls which the body makes, runs
 durable cleanup in a `catch` filtered on `IsTaskCancellationRequested`, passes

@@ -59,8 +59,10 @@ on this abstractions assembly.
   delays, handle operations, and combinators. A wait which the attempt's cancellation ends throws it
   too. The host discards the attempt's response; a stopping activation's task replays in a new
   attempt, and a task whose attempt can't replay its record stays pending until code which can
-  replay it runs. Changes which the attempt's code makes to journaled grain state, such as cleanup,
-  commit with the grain's next journal write.
+  replay it runs. The Orleans grain host commits the changes which an aborted or deleted task's
+  code makes to journaled grain state, such as cleanup, with the grain's next journal write; the
+  writes of an attempt which a later attempt reruns, after its activation stops or it stalls, throw
+  its cancellation and leave the state unchanged.
 - `DurableTask.Current.CancellationToken` is canceled by task cancellation and by attempt
   cancellation, so the calls which ordinary task code makes end promptly in both cases.
   `DurableTask.Current.AttemptCancellationToken` is canceled only by attempt cancellation. Code which
@@ -392,12 +394,15 @@ method body runs again from the start, and every recorded operation returns its 
 workflow resumes correctly when each replay schedules the same operations, with the same
 identifiers and arguments, in the same order.
 
-Replay doesn't rebuild the grain's journaled state, which holds the latest committed changes,
-including changes which later operations made. A durable body therefore has three kinds of code:
+A grain's persistent state, `IPersistentState<T>`, holds the latest committed value, including
+changes which later operations made, and a replay observes that value. The Orleans grain host
+records a body's accesses to journaled state, so a replay returns their recorded outcomes. A durable
+body therefore has three kinds of code:
 
 - **Recorded operations** run once per execution, and a replay returns their recorded outcomes:
   children such as durable grain calls, `async DurableTask` methods, `DurableTask.Run` delegates,
-  and delays, as well as signal waits, detached and posted starts, and `DurableTask.RunInline` effects.
+  and delays, as well as signal waits, detached and posted starts, `DurableTask.RunInline` effects,
+  and, on the Orleans grain host, accesses to journaled state.
 - **Re-executed code** precedes the body's last recorded operation and runs again in every replay.
   It computes values from the method's arguments, recorded results, `DurableTask.Current.UtcNow`,
   the cancellation state, and configuration which stays the same while executions are pending.

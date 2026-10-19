@@ -314,10 +314,12 @@ caller's token or the wait's timeout ends it.
 - A recorded effect, `DurableTask.RunInline`, adds no journal write: its record and the state
   it changed commit with the task's next durable write. Each effect retains one record,
   holding its result, until the task's tree is deleted.
-- An access to journaled state adds no journal write either. Each write records about
-  6 bytes plus its serialized result, if any, and each read records its serialized value,
-  staged with the execution's next write or durable operation; reads in the synchronous
-  tail aren't recorded. Each journal write appends one access-log entry per execution
+- An access to journaled state adds no journal write either. Each record holds a 6-byte
+  header, 4 bytes which identify the access's arguments when it has any, such as a key
+  or an index, and, for an access with a result, a 4-byte length and its serialized
+  value: a dictionary's `Remove(key)` records 14 bytes plus its serialized `bool`. A
+  read's record commits with the grain's next journal write; reads which the body makes
+  after that write and before it completes are dropped with its log. Each journal write appends one access-log entry per execution
   which accessed state, and the log is deleted when the execution completes. Accesses on an
   activation without a running durable task pay a few field reads.
 - A local step costs one journal write: its record commits with its first durable
