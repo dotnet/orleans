@@ -18,9 +18,12 @@ configures each provider independently. Both values must be positive.
 Providers capture the configured limits when constructed.
 
 Reaching either threshold requests a snapshot before the next journal write.
-While a durable task execution holds reads recorded as journal positions, the
-manager defers a requested snapshot for up to 16 writes, then replays the journal
-to resolve those reads into values and writes the snapshot.
+While the journal holds a compaction barrier, which protects the history that
+reads recorded as journal positions refer to, the manager defers each snapshot,
+whether storage or the application requests it, up to 16 times. The next snapshot
+replays the journal's history to resolve those reads into values, then writes the
+snapshot. A format migration's snapshot resolves them without waiting. A read which
+can't be resolved keeps its barrier, and the manager logs an error.
 Successful replacement resets both counters; the snapshot itself is excluded
 from append history. Deletion and recreation reset the history too. A single
 append can exceed the byte threshold. Larger limits amortize snapshot copies
