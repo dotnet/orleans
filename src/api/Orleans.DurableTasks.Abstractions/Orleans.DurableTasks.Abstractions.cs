@@ -308,6 +308,8 @@ namespace Orleans.DurableTasks
 
         public TaskId Id { get { throw null; } }
 
+        public abstract System.Guid Incarnation { get; }
+
         protected internal bool IsAttemptCanceled { get { throw null; } }
 
         public virtual bool IsReplaying { get { throw null; } }
