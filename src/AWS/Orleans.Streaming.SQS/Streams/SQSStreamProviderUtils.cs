@@ -21,13 +21,28 @@ namespace OrleansAWSUtils.Streams
             => DeleteAllUsedQueues(providerName, clusterId, storageConnectionString, loggerFactory, fifoQueue: false);
 
         /// <summary>
-        /// Deletes all queues used by a provider and cluster.
+        /// Deletes the default number of queues used by a provider and cluster.
         /// </summary>
-        public static async Task DeleteAllUsedQueues(string providerName, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory, bool fifoQueue)
+        public static Task DeleteAllUsedQueues(string providerName, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory, bool fifoQueue)
+            => DeleteAllUsedQueues(providerName, clusterId, storageConnectionString, loggerFactory, HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES, fifoQueue);
+
+        /// <summary>
+        /// Deletes the configured number of queues used by a provider and service.
+        /// </summary>
+        /// <param name="providerName">The stream provider name.</param>
+        /// <param name="clusterId">The service ID used to prefix the provider's physical queue names.</param>
+        /// <param name="storageConnectionString">The SQS connection string.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
+        /// <param name="partitionCount">The provider's configured total queue count.</param>
+        /// <param name="fifoQueue">Whether the provider uses FIFO queues.</param>
+        /// <returns>A task which completes when the configured queues have been deleted.</returns>
+        public static async Task DeleteAllUsedQueues(string providerName, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory, int partitionCount, bool fifoQueue)
         {
             if (clusterId != null)
             {
-                var queueMapper = new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), providerName);
+                var queueMapper = new HashRingBasedStreamQueueMapper(
+                    new HashRingStreamQueueMapperOptions { TotalQueueCount = partitionCount },
+                    providerName);
                 List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
 
                 var sqsOptions = new SqsOptions

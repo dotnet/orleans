@@ -1,6 +1,9 @@
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Persistence.FileStorage;
 using Orleans.TestingHost;
@@ -89,12 +92,18 @@ public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
             if (HostedCluster is not null)
             {
                 var serviceId = HostedCluster.Options.ServiceId;
+                var services = HostedCluster.GetSiloServiceProvider();
+                var partitionCount = services.GetRequiredService<IOptionsMonitor<HashRingStreamQueueMapperOptions>>()
+                    .Get(ProviderName).TotalQueueCount;
+                var sqsOptions = services.GetRequiredService<IOptionsMonitor<SqsOptions>>().Get(ProviderName);
                 await base.DisposeAsync();
                 await SQSStreamProviderUtils.DeleteAllUsedQueues(
                     ProviderName,
                     serviceId,
-                    AWSTestConstants.SqsConnectionString,
-                    NullLoggerFactory.Instance);
+                    sqsOptions.ConnectionString,
+                    NullLoggerFactory.Instance,
+                    partitionCount,
+                    sqsOptions.FifoQueue);
             }
         }
         finally
