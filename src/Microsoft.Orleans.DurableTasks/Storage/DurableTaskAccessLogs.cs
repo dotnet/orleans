@@ -240,6 +240,13 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IReportsStagedChang
 
     void IJournalPositionHolder.ApplyResolvedReads(JournalPositionalReads reads)
     {
+        // An attempt which outlives a resolution would likely meet the next one too: it records values from now on, which
+        // bounds the cost of a long-lived execution to one resolution.
+        foreach (var recorder in _recorders)
+        {
+            recorder.StopRecordingPositions();
+        }
+
         // A read's outcome depends only on its position, state, operation, and argument, so records are matched by those,
         // wherever attempts moved them since they were collected.
         var resolved = new Dictionary<ReadKey, int>(reads.Count);

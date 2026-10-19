@@ -122,6 +122,9 @@ internal sealed class DurableTaskAccessLog(
     private readonly Storage.DurableTaskAccessLogs? _positionHolder = storage.PositionHolder;
     private bool _holdsPositions;
 
+    // Whether the attempt's reads can record positions: until the journal resolves positional reads while it runs.
+    private bool _recordsPositions = storage.PositionHolder is not null;
+
     // The size of the table of states when the pending records began.
     private int _pendingStateBase;
 
@@ -950,7 +953,8 @@ internal sealed class DurableTaskAccessLog(
     private bool TryRecordPosition<TArgument, TResult>(in JournaledStateAccess access, int? argumentHash, TArgument argument)
     {
         var target = access.Target;
-        if (_positionHolder?.Journal is not { } journal
+        if (!_recordsPositions
+            || _positionHolder!.Journal is not { } journal
             || !ReferenceEquals(target.Manager, journal)
             || !JournaledStateOperations.IsPositional(access.Operation)
             || !PositionalTypes<TArgument, TResult>.IsSupported(_serializer)
@@ -1030,6 +1034,12 @@ internal sealed class DurableTaskAccessLog(
 
         private sealed record Entry(Serializer Serializer, bool IsSupported);
     }
+
+    /// <summary>
+    /// Makes the attempt's later reads record values: the journal resolved positional reads while it ran, which a
+    /// long-lived attempt would otherwise make it repeat at every compaction.
+    /// </summary>
+    internal void StopRecordingPositions() => _recordsPositions = false;
 
     /// <summary>Gets the records which this attempt made and hasn't staged.</summary>
     internal ReadOnlyMemory<byte> PendingRecords => _pending is { } pending ? pending.WrittenMemory : default;
