@@ -14,7 +14,8 @@ namespace Orleans.DurableTasks;
 /// An execution's code runs on one scheduler, the one which was current when the host created the context, such as its
 /// grain activation's scheduler, so the context's state needs no synchronization. The host creates the context, requests
 /// task cancellation, and cancels the attempt on that scheduler, and the execution's code allocates identifiers and runs
-/// effects there. Debug builds assert it. The cancellation tokens and the handles which the execution observes remain safe
+/// effects there: an operation which code runs elsewhere, for example after `ConfigureAwait(false)`, throws
+/// <see cref="InvalidOperationException"/>. The cancellation tokens and the handles which the execution observes remain safe
 /// to use from any thread.
 /// </para>
 /// </remarks>
@@ -28,9 +29,12 @@ public abstract class DurableTaskContext
 
     private static readonly AsyncLocal<DurableTaskContext?> AmbientContext = new();
     private static readonly AsyncLocal<DurableTaskContext?> ShieldedContext = new();
-#if DEBUG
+private const string OffSchedulerMessage =
+        "Durable task code ran off the scheduler which runs its execution, such as its grain activation's scheduler, for "
+        + "example after ConfigureAwait(false). The execution orders and records its operations on that scheduler. Await "
+        + "without ConfigureAwait(false) in durable task bodies and steps (ORLEANS0226).";
+
     private readonly TaskScheduler _scheduler = TaskScheduler.Current;
-#endif
 
     // Canceled by task cancellation and by attempt cancellation: the source of CancellationToken.
     private readonly CancellationTokenSource _cancellationSource = new();
@@ -239,11 +243,12 @@ public abstract class DurableTaskContext
 
     /// <summary>
     /// Throws when the calling code can't run a durable operation of this execution: <see cref="InvalidOperationException"/>
-    /// inside a <see cref="DurableTask.RunInline{TResult}(string, Func{TResult})"/> effect, and
-    /// <see cref="DurableTaskAttemptCanceledException"/> when the attempt was canceled.
+    /// off the execution's scheduler or inside a <see cref="DurableTask.RunInline{TResult}(string, Func{TResult})"/>
+    /// effect, and <see cref="DurableTaskAttemptCanceledException"/> when the attempt was canceled.
     /// </summary>
     internal void ThrowIfCannotRunOperation()
     {
+        ThrowIfOffScheduler();
         ThrowIfRunningEffect();
         if (IsAttemptCanceled)
         {
@@ -431,15 +436,22 @@ public abstract class DurableTaskContext
         }
     }
 
-    /// <summary>Asserts that the calling code runs on the scheduler which runs this execution, and which owns its state.</summary>
-    [Conditional("DEBUG")]
+    /// <summary>Asserts that the host calls this on the scheduler which runs this execution, and which owns its state.</summary>
     private void AssertOnScheduler()
-    {
-#if DEBUG
-        Debug.Assert(
+        => Debug.Assert(
             TaskScheduler.Current == _scheduler,
             "A durable execution's state is confined to the scheduler which was current when its host created its context.");
-#endif
+
+    /// <summary>
+    /// Throws <see cref="InvalidOperationException"/> when task code runs off the scheduler which runs this execution,
+    /// where its operations can't be ordered or recorded.
+    /// </summary>
+    private void ThrowIfOffScheduler()
+    {
+        if (TaskScheduler.Current != _scheduler)
+        {
+            throw new InvalidOperationException(OffSchedulerMessage);
+        }
     }
 
     /// <summary>
@@ -595,7 +607,7 @@ public abstract class DurableTaskContext
     /// otherwise begin in deterministic order.
     /// </remarks>
     /// <exception cref="ArgumentException"><paramref name="name"/> is empty or contains <c>$</c>.</exception>
-    /// <exception cref="InvalidOperationException">The calling code runs in an effect.</exception>
+    /// <exception cref="InvalidOperationException">The calling code runs in an effect, or off the execution's scheduler.</exception>
     internal TaskId CreateChildTaskId(string? name)
     {
         if (name is not null)
@@ -604,8 +616,8 @@ public abstract class DurableTaskContext
             return CreateNamedChildId(name);
         }
 
+        ThrowIfOffScheduler();
         ThrowIfRunningEffect();
-        AssertOnScheduler();
         return Id.Child($"$child-{(++_nextChildId).ToString(CultureInfo.InvariantCulture)}");
     }
 
@@ -668,8 +680,8 @@ public abstract class DurableTaskContext
     /// <summary>Counts an occurrence of <paramref name="key"/> in this attempt, and returns its ordinal, from 1.</summary>
     private int NextOccurrence(string key)
     {
+        ThrowIfOffScheduler();
         ThrowIfRunningEffect();
-        AssertOnScheduler();
         _nameOccurrences ??= new(StringComparer.Ordinal);
         _nameOccurrences.TryGetValue(key, out var occurrence);
         _nameOccurrences[key] = ++occurrence;
@@ -698,6 +710,7 @@ public abstract class DurableTaskContext
     /// </summary>
     internal TResult RunAsEffect<TState, TResult>(TState state, Func<TState, TResult> body)
     {
+        // DurableTask.RunInline allocates the effect's identifier first, which rejects code off the scheduler.
         Debug.Assert(!_runningEffect, "A nested effect runs as part of its enclosing effect.");
         AssertOnScheduler();
         _runningEffect = true;
