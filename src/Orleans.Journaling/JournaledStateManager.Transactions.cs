@@ -300,17 +300,10 @@ internal partial class JournaledStateManager
             throw;
         }
 
-        Task durable;
-        try
-        {
-            durable = appended ? EnqueueCommitWrite() : Task.CompletedTask;
-        }
-        finally
-        {
-            EndTransaction(transaction);
-        }
-
-        return (result, durable);
+        // The states rejoin captures and acknowledgements before the write is queued, so the write which holds the commit
+        // acknowledges them, whichever thread runs the work loop.
+        EndTransaction(transaction);
+        return (result, appended ? EnqueueCommitWrite() : Task.CompletedTask);
     }
 
     private JournalTransaction BeginTransaction()
