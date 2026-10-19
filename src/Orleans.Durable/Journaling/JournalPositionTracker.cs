@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Buffers;
 
@@ -48,8 +49,9 @@ internal sealed partial class JournalPositionTracker
     // Whether a deletion of the journal is replacing its history, so positions aren't offered.
     private bool _suspended;
 
-    // Whether positions can be offered at all: the journal's codecs reproduce values exactly.
-    private readonly bool _offersPositions;
+    // Whether positions can be offered at all: the journal's codecs reproduce values exactly, and the write format has a
+    // codec for barriers. Looked up when positions are first requested.
+    private bool? _offersPositions;
 
     // The entries which recovery read, while it retains them for resolving recovered positional reads.
     private List<(ArcBuffer Data, string FormatKey)>? _recoveredHistory;
@@ -59,8 +61,7 @@ internal sealed partial class JournalPositionTracker
         _manager = manager;
         _writer = writer;
         _directoryCodec = directoryCodec;
-        _offersPositions = manager.HasExactCodecs;
-        Barriers = new(() => JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, string>>(manager.ServiceProvider, manager.WriteJournalFormatKey));
+        Barriers = new(() => manager.ServiceProvider.GetKeyedService<IDurableDictionaryCommandCodec<string, string>>(manager.WriteJournalFormatKey));
     }
 
     /// <summary>Gets the state which journals the barriers, on its reserved stream.</summary>
@@ -80,7 +81,7 @@ internal sealed partial class JournalPositionTracker
     /// <remarks>A read observes the entries before the position.</remarks>
     public bool TryGetPosition(out long position)
     {
-        if (_offersPositions && _manager.AcceptsPositions && !_suspended)
+        if ((_offersPositions ??= _manager.HasExactCodecs && Barriers.CanHoldBarriers) && _manager.AcceptsPositions && !_suspended)
         {
             position = _offset + _writer.CommittedEntryCount;
             return true;
