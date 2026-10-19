@@ -40,7 +40,7 @@ namespace Orleans.Runtime
             // TODO: Remove expensive interface type check
             if (this.filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
-                SetGrainCancellationTokensTarget(reference, request);
+                SetGrainCancellationTokensTarget(this.cancellationTokenRuntime, reference, request);
                 var responseCompletionSource = ResponseCompletionSourcePool.Get<TResult>();
                 this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
                 return responseCompletionSource.AsValueTask();
@@ -56,7 +56,7 @@ namespace Orleans.Runtime
             // TODO: Remove expensive interface type check
             if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
-                SetGrainCancellationTokensTarget(reference, request);
+                SetGrainCancellationTokensTarget(this.cancellationTokenRuntime, reference, request);
                 var responseCompletionSource = ResponseCompletionSourcePool.Get();
                 this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
                 return responseCompletionSource.AsVoidValueTask();
@@ -74,7 +74,7 @@ namespace Orleans.Runtime
             // TODO: Remove expensive interface type check
             if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
-                SetGrainCancellationTokensTarget(reference, request);
+                SetGrainCancellationTokensTarget(this.cancellationTokenRuntime, reference, request);
                 this.RuntimeClient.SendRequest(reference, request, context: null, options);
             }
             else
@@ -85,7 +85,7 @@ namespace Orleans.Runtime
 
         private async ValueTask<TResult?> InvokeMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
-            SetGrainCancellationTokensTarget(reference, request);
+            SetGrainCancellationTokensTarget(this.cancellationTokenRuntime, reference, request);
             var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, this.sendRequest, this.filters);
             await invoker.Invoke();
             return invoker.TypedResult;
@@ -93,7 +93,7 @@ namespace Orleans.Runtime
 
         private async ValueTask InvokeMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
-            SetGrainCancellationTokensTarget(reference, request);
+            SetGrainCancellationTokensTarget(this.cancellationTokenRuntime, reference, request);
             var invoker = new OutgoingCallInvoker<object>(reference, request, options, this.sendRequest, this.filters);
             await invoker.Invoke();
         }
@@ -113,7 +113,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Sets target grain to the found instances of type GrainCancellationToken
         /// </summary>
-        private void SetGrainCancellationTokensTarget(GrainReference target, IInvokable request)
+        internal static void SetGrainCancellationTokensTarget(IGrainCancellationTokenRuntime cancellationTokenRuntime, GrainReference target, IInvokable request)
         {
             if (request is RequestBase { MayHaveGrainCancellationToken: false })
             {
@@ -129,7 +129,7 @@ namespace Orleans.Runtime
                     continue;
                 }
 
-                grainToken.AddGrainReference(this.cancellationTokenRuntime, target);
+                grainToken.AddGrainReference(cancellationTokenRuntime, target);
             }
         }
     }

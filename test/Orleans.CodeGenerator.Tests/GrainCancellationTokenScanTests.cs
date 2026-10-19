@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Orleans.CodeGenerator.Tests;
 
@@ -46,9 +47,19 @@ public sealed class GrainCancellationTokenScanTests
         var requestBase = outputCompilation.GetTypeByMetadataName("Orleans.Runtime.RequestBase");
         Assert.NotNull(requestBase);
         var invokable = Assert.Single(GetTypes(outputCompilation.Assembly.GlobalNamespace), type => DerivesFrom(type, requestBase));
-        var isOverridden = invokable.GetMembers("MayHaveGrainCancellationToken").Any();
+        var property = invokable.GetMembers("MayHaveGrainCancellationToken").OfType<IPropertySymbol>().SingleOrDefault();
+        var actual = property is null || GetConstantValue(outputCompilation, property);
 
-        Assert.Equal(expected, !isOverridden);
+        Assert.Equal(expected, actual);
+    }
+
+    private static bool GetConstantValue(Compilation compilation, IPropertySymbol property)
+    {
+        var declaration = (PropertyDeclarationSyntax)Assert.Single(property.DeclaringSyntaxReferences).GetSyntax(TestContext.Current.CancellationToken);
+        var expression = Assert.IsType<ArrowExpressionClauseSyntax>(declaration.ExpressionBody).Expression;
+        var value = compilation.GetSemanticModel(declaration.SyntaxTree).GetConstantValue(expression, TestContext.Current.CancellationToken);
+        Assert.True(value.HasValue);
+        return Assert.IsType<bool>(value.Value);
     }
 
     private static IEnumerable<INamedTypeSymbol> GetTypes(INamespaceOrTypeSymbol container)

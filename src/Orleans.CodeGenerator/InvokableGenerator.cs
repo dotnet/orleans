@@ -412,7 +412,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         if (LibraryTypes.GrainCancellationTokenOrDefault is not { } grainCancellationToken
             || LibraryTypes.RequestBaseOrDefault is not { } requestBase
             || method.Method.Parameters.Length == 0
-            || !DerivesFrom(baseClassType, requestBase)
+            || !baseClassType.HasBaseType(requestBase)
             || method.Method.Parameters.Any(parameter => CanHoldGrainCancellationToken(parameter.Type)))
         {
             return null;
@@ -429,19 +429,6 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         bool CanHoldGrainCancellationToken(ITypeSymbol type)
             => type is ITypeParameterSymbol
                 || LibraryTypes.Compilation.HasImplicitConversion(grainCancellationToken, type);
-
-        static bool DerivesFrom(INamedTypeSymbol? type, INamedTypeSymbol baseType)
-        {
-            for (; type is not null; type = type.BaseType)
-            {
-                if (SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, baseType))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
     }
 
     private static MemberDeclarationSyntax? GenerateTryCancelMethod(InvokableMethodDescription method, List<InvokerFieldDescription> fields)

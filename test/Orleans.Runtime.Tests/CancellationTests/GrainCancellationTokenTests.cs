@@ -57,6 +57,21 @@ namespace UnitTests.CancellationTests
 
         [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
         [InlineData(0)]
+        [InlineData(300)]
+        public async Task GrainTaskCancellationWithTokenPassedAsObject(int delay)
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+            using var cts = new GrainCancellationTokenSource();
+            var callId = Guid.NewGuid();
+            var grainTask = grain.LongWaitGrainCancellationAsObject(cts.Token, TimeSpan.FromSeconds(10), callId);
+            await Task.Delay(TimeSpan.FromMilliseconds(delay), TestContext.Current.CancellationToken);
+            await cts.Cancel();
+            await Assert.ThrowsAsync<TaskCanceledException>(() => grainTask);
+            await WaitForCallCancellation(grain, callId);
+        }
+
+        [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
+        [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
         public async Task MultipleGrainsTaskCancellation(int delay)

@@ -14,23 +14,51 @@ namespace UnitTests.CancellationTests
     [TestArea("Runtime")]
     public class GrainCancellationTokenScanTests
     {
-        [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
-        [InlineData(true, 2)]
-        [InlineData(false, 0)]
-        public void RegisterCancellationTokensReadsArgumentsOnlyWhenRequestMayHaveToken(bool mayHaveToken, int expectedReads)
-        {
-            var request = new CountingRequest(mayHaveToken);
+        public enum ScanDirection { Incoming, Outgoing }
 
-            CancellationSourcesExtension.RegisterCancellationTokens(target: null!, request);
+        public enum RequestKind { OptedOut, InheritsDefault, NotRequestBase }
+
+        [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
+        [InlineData(ScanDirection.Incoming, RequestKind.OptedOut, 0)]
+        [InlineData(ScanDirection.Incoming, RequestKind.InheritsDefault, 2)]
+        [InlineData(ScanDirection.Incoming, RequestKind.NotRequestBase, 2)]
+        [InlineData(ScanDirection.Outgoing, RequestKind.OptedOut, 0)]
+        [InlineData(ScanDirection.Outgoing, RequestKind.InheritsDefault, 2)]
+        [InlineData(ScanDirection.Outgoing, RequestKind.NotRequestBase, 2)]
+        public void ArgumentsAreReadOnlyWhenRequestMayHaveToken(ScanDirection direction, RequestKind kind, int expectedReads)
+        {
+            ICountingRequest request = kind switch
+            {
+                RequestKind.OptedOut => new OptedOutRequest(),
+                RequestKind.InheritsDefault => new DefaultRequest(),
+                _ => new NonRequestBaseInvokable(),
+            };
+
+            if (direction == ScanDirection.Incoming)
+            {
+                CancellationSourcesExtension.RegisterCancellationTokens(target: null!, request);
+            }
+            else
+            {
+                GrainReferenceRuntime.SetGrainCancellationTokensTarget(cancellationTokenRuntime: null!, target: null!, request);
+            }
 
             Assert.Equal(expectedReads, request.ArgumentReads);
         }
 
-        private sealed class CountingRequest(bool mayHaveToken) : RequestBase
+        private interface ICountingRequest : IInvokable
+        {
+            int ArgumentReads { get; }
+        }
+
+        private sealed class OptedOutRequest : DefaultRequest
+        {
+            public override bool MayHaveGrainCancellationToken => false;
+        }
+
+        private class DefaultRequest : RequestBase, ICountingRequest
         {
             public int ArgumentReads { get; private set; }
-
-            public override bool MayHaveGrainCancellationToken => mayHaveToken;
 
             public override int GetArgumentCount() => 2;
 
@@ -49,6 +77,30 @@ namespace UnitTests.CancellationTests
             public override string GetActivityName() => "I/M";
             public override Type GetInterfaceType() => typeof(object);
             public override MethodInfo GetMethod() => throw new NotSupportedException();
+        }
+
+        private sealed class NonRequestBaseInvokable : ICountingRequest
+        {
+            public int ArgumentReads { get; private set; }
+
+            public int GetArgumentCount() => 2;
+
+            public object GetArgument(int index)
+            {
+                ArgumentReads++;
+                return index;
+            }
+
+            public void SetArgument(int index, object value) => throw new NotSupportedException();
+            public ValueTask<Response> Invoke() => throw new NotSupportedException();
+            public object GetTarget() => throw new NotSupportedException();
+            public void SetTarget(ITargetHolder holder) => throw new NotSupportedException();
+            public void Dispose() { }
+            public string GetMethodName() => "M";
+            public string GetInterfaceName() => "I";
+            public string GetActivityName() => "I/M";
+            public Type GetInterfaceType() => typeof(object);
+            public MethodInfo GetMethod() => throw new NotSupportedException();
         }
     }
 }
