@@ -124,8 +124,8 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal(1, pool.Freed);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public void EvictionStrategyLeavesBuffersWhenPurgedMessageUsesUnknownStorage()
+        [Theory, InlineData(false), InlineData(true), TestCategory("BVT"), TestCategory("Streaming")]
+        public void EvictionStrategyLeavesBuffersWhenPurgedMessageUsesUnknownStorage(bool remainingMessageHasNullArray)
         {
             var pool = new MyTestPooled();
             var buffer = pool.Allocate();
@@ -140,7 +140,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 },
                 new CachedMessage
                 {
-                    Segment = new(new byte[1]),
+                    Segment = remainingMessageHasNullArray ? default : new(new byte[1]),
                     DequeueTimeUtc = now,
                     EnqueueTimeUtc = now,
                 },

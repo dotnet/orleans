@@ -189,6 +189,123 @@ public sealed class CacheMemoryTests : IDisposable
         Assert.Equal(0, controller.ActiveCacheMemory);
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    [TestCategory("BVT")]
+    public void MemoryPressurePreservesUntrackedAdapterStorage(
+        bool nullArray, bool hasActiveSubscriptions, bool trackedTail)
+    {
+        var controller = new EventHubCacheMemoryController(1);
+        var pool = new EventHubCacheBufferPool(controller, 0, null, TimeSpan.FromMinutes(1));
+        var checkpointer = new TestCheckpointer();
+        var adapter = new UntrackedStorageEventHubDataAdapter(serializer, nullArray);
+        using var cache = CreateCache("0", pool, controller, checkpointer: checkpointer, adapter: adapter);
+        var messages = new List<EventData> { MakeSerializedEventData(0, 2 * 1024) };
+        if (trackedTail)
+        {
+            messages.Add(MakeSerializedEventData(1, 80 * 1024));
+        }
+
+        var positions = cache.Add(messages, DateTime.UtcNow);
+        cache.UpdatePurgeProtection(hasActiveSubscriptions);
+        var retainedMemory = controller.ActiveCacheMemory;
+        var expectedBufferMemory = trackedTail ? 128 * 1024 : 0;
+        Assert.True(controller.IsUnderPressure);
+        Assert.Equal(expectedBufferMemory, pool.ActiveMemory);
+
+        cache.SignalPurge();
+        if (hasActiveSubscriptions)
+        {
+            cache.UpdateDeliveryProgress(positions[0].SequenceToken, DateTime.UtcNow);
+        }
+
+        Assert.Equal(retainedMemory, controller.ActiveCacheMemory);
+        Assert.Equal(expectedBufferMemory, pool.ActiveMemory);
+        Assert.Null(checkpointer.LastOffset);
+        Assert.Equal(0, cache.GetMaxAddCount());
+        var cursor = GetCursor(cache, positions[0].StreamId, positions[0].SequenceToken);
+        foreach (var position in positions)
+        {
+            var message = GetNextMessage(cache, cursor);
+            Assert.Equal(position.SequenceToken, message.SequenceToken);
+            Assert.All(Assert.Single(message.GetEvents<byte[]>()).Item1,
+                value => Assert.Equal((byte)position.SequenceToken.SequenceNumber, value));
+        }
+
+        AssertNoNextMessage(cache, cursor);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [TestCategory("BVT")]
+    public void MemoryPressureStopsAtUntrackedStorageAfterTrackedPrefix(bool nullArray, bool sharedBuffer)
+    {
+        var controller = new EventHubCacheMemoryController(100 * 1024);
+        var pool = new EventHubCacheBufferPool(controller, 0, null, TimeSpan.FromMinutes(1));
+        var checkpointer = new TestCheckpointer();
+        using var cache = CreateCache("0", pool, controller, checkpointer: checkpointer,
+            adapter: new UntrackedStorageEventHubDataAdapter(serializer, nullArray, untrackedSequence: 1));
+        var positions = cache.Add(
+            [MakeSerializedEventData(0, 80 * 1024), MakeSerializedEventData(1, 2 * 1024),
+                MakeSerializedEventData(2, (sharedBuffer ? 2 : 160) * 1024)],
+            DateTime.UtcNow);
+        cache.UpdatePurgeProtection(hasActiveSubscriptions: false);
+        var expectedBufferMemory = (sharedBuffer ? 128 : 128 + 256) * 1024;
+        Assert.Equal(expectedBufferMemory, pool.ActiveMemory);
+
+        cache.SignalPurge();
+
+        Assert.Equal("0", checkpointer.LastOffset);
+        Assert.Equal(expectedBufferMemory, pool.ActiveMemory);
+        var retainedMemory = controller.ActiveCacheMemory;
+        Assert.Equal(0, cache.GetMaxAddCount());
+        Assert.Equal(retainedMemory, controller.ActiveCacheMemory);
+        Assert.Equal("0", checkpointer.LastOffset);
+        var cursor = GetCursor(cache, positions[1].StreamId, positions[1].SequenceToken);
+        foreach (var position in positions.Skip(1))
+        {
+            var message = GetNextMessage(cache, cursor);
+            Assert.Equal(position.SequenceToken, message.SequenceToken);
+            Assert.All(Assert.Single(message.GetEvents<byte[]>()).Item1,
+                value => Assert.Equal((byte)position.SequenceToken.SequenceNumber, value));
+        }
+
+        AssertNoNextMessage(cache, cursor);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [TestCategory("BVT")]
+    public void TimeBasedPurgeRetainsCustomAdapterEvictionPolicy(bool nullArray)
+    {
+        var controller = new EventHubCacheMemoryController(1024 * 1024);
+        var pool = new EventHubCacheBufferPool(controller, 0, null, TimeSpan.FromMinutes(1));
+        var checkpointer = new TestCheckpointer();
+        var evictionStrategy = new EventHubQueueCacheFactory.EventHubCacheEvictionStrategy(
+            NullLogger.Instance, new AlwaysPurgePredicate(), null, null);
+        using var cache = CreateCache("0", pool, controller, evictionStrategy, checkpointer,
+            new UntrackedStorageEventHubDataAdapter(serializer, nullArray));
+        cache.Add([MakeSerializedEventData(0, 2 * 1024)], DateTime.UtcNow);
+        cache.UpdatePurgeProtection(hasActiveSubscriptions: true);
+        Assert.False(controller.IsUnderPressure);
+
+        cache.SignalPurge();
+
+        Assert.Equal("0", checkpointer.LastOffset);
+        Assert.Equal(0, controller.ActiveCacheMemory);
+    }
+
     [Fact, TestCategory("BVT")]
     public void MemoryPressurePreservesSharedTailAtPartialDeliveryBoundary()
     {
@@ -529,6 +646,46 @@ public sealed class CacheMemoryTests : IDisposable
         Assert.True(cache.GetMaxAddCount() > 0);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [TestCategory("BVT")]
+    public void CustomBufferPoolHonorsCachePressureMonitor(bool hasActiveSubscriptions)
+    {
+        var factory = new CustomBufferPoolFactory(
+            new TestEventHubDataAdapter(serializer),
+            serviceProvider.GetRequiredService<OrleansInstruments>());
+        using var cache = factory.CreateCache("0", NoOpCheckpointer.Instance, NullLoggerFactory.Instance);
+        Assert.IsType<EventHubQueueCache>(cache).UpdatePurgeProtection(hasActiveSubscriptions);
+        var monitor = Substitute.For<ICachePressureMonitor>();
+        var underPressure = false;
+        monitor.IsUnderPressure(Arg.Any<DateTime>()).Returns(_ => underPressure);
+        cache.AddCachePressureMonitor(monitor);
+
+        Assert.Equal(EventHubAdapterReceiver.MaxMessagesPerRead, cache.GetMaxAddCount());
+        underPressure = true;
+        Assert.Equal(0, cache.GetMaxAddCount());
+        underPressure = false;
+        Assert.Equal(EventHubAdapterReceiver.MaxMessagesPerRead, cache.GetMaxAddCount());
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void AdaptiveIdleCacheReclaimsMemoryDespiteStalePressureMonitor()
+    {
+        var controller = new EventHubCacheMemoryController(100 * 1024);
+        var pool = new EventHubCacheBufferPool(controller, 0, null, TimeSpan.FromMinutes(1));
+        var checkpointer = new TestCheckpointer();
+        using var cache = CreateCache("0", pool, controller, checkpointer: checkpointer);
+        var position = Assert.Single(cache.Add([MakeSerializedEventData(0, 80 * 1024)], DateTime.UtcNow));
+        cache.AddCachePressureMonitor(new AlwaysPressureMonitor());
+        cache.UpdatePurgeProtection(hasActiveSubscriptions: false);
+        Assert.True(controller.IsUnderPressure);
+
+        Assert.Equal(EventHubAdapterReceiver.MaxMessagesPerRead, cache.GetMaxAddCount());
+        Assert.Equal(((IEventHubPartitionLocation)position.SequenceToken).EventHubOffset, checkpointer.LastOffset);
+        Assert.Equal(0, controller.ActiveCacheMemory);
+    }
+
     [Fact, TestCategory("BVT")]
     public void CustomBufferPoolReleasesFinalBufferAndAllocatesFreshAfterPurge()
     {
@@ -861,6 +1018,44 @@ public sealed class CacheMemoryTests : IDisposable
 
             return base.FromQueueMessage(streamPosition, queueMessage, dequeueTime, getSegment);
         }
+    }
+
+    private sealed class UntrackedStorageEventHubDataAdapter(
+        Serializer serializer, bool nullArray, long untrackedSequence = 0)
+        : TestEventHubDataAdapter(serializer)
+    {
+        private CachedMessage untrackedMessage;
+
+        public override CachedMessage FromQueueMessage(
+            StreamPosition streamPosition,
+            EventData queueMessage,
+            DateTime dequeueTime,
+            Func<int, ArraySegment<byte>> getSegment)
+        {
+            if (queueMessage.SequenceNumber != untrackedSequence)
+            {
+                return base.FromQueueMessage(streamPosition, queueMessage, dequeueTime, getSegment);
+            }
+
+            untrackedMessage = base.FromQueueMessage(
+                streamPosition, queueMessage, dequeueTime, size => new byte[size]);
+            var result = untrackedMessage;
+            if (nullArray)
+            {
+                result.Segment = default;
+            }
+
+            return result;
+        }
+
+        public override IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
+        {
+            var message = cachedMessage.SequenceNumber == untrackedSequence ? untrackedMessage : cachedMessage;
+            return base.GetBatchContainer(ref message);
+        }
+
+        public override string GetOffset(CachedMessage cachedMessage)
+            => cachedMessage.SequenceNumber.ToString(CultureInfo.InvariantCulture);
     }
 
     private sealed class AlwaysPurgePredicate : TimePurgePredicate

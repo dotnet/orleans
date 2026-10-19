@@ -251,6 +251,12 @@ namespace Orleans.Streaming.EventHubs
                     if (!oldestBufferInitialized)
                     {
                         oldestBuffer = cachedMessage.Segment.Array;
+                        if (oldestBuffer is null
+                            || !inUseBuffers.Any(buffer => ReferenceEquals(buffer.Id, oldestBuffer)))
+                        {
+                            return false;
+                        }
+
                         oldestBufferInitialized = true;
                     }
 

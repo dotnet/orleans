@@ -210,7 +210,7 @@ namespace Orleans.Streaming.EventHubs
         /// <returns>The maximum number of items which can currently be added.</returns>
         public int GetMaxAddCount()
         {
-            if (!hasActiveSubscriptions)
+            if (!hasActiveSubscriptions && memoryController is not null)
             {
                 if (memoryController?.IsUnderPressure == true)
                 {

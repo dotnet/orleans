@@ -130,9 +130,9 @@ namespace Orleans.Providers.Streams.Common
                 return;
             int memoryReleasedInByte = 0;
             object? IdOfLastPurgedBufferId = lastMessagePurged?.Segment.Array;
-            // IdOfLastBufferInCache will be null if cache is empty after purge
+            // Custom adapters can retain messages with no payload segment.
             object? IdOfLastBufferInCacheId = oldestMessageInCache?.Segment.Array;
-            if (IdOfLastBufferInCacheId is null)
+            if (!oldestMessageInCache.HasValue)
             {
                 while (this.inUseBuffers.Count > 0)
                 {
@@ -144,7 +144,8 @@ namespace Orleans.Providers.Streams.Common
             else
             {
                 if (IdOfLastPurgedBufferId is null
-                    || !this.inUseBuffers.Any(buffer => buffer.Id == IdOfLastPurgedBufferId))
+                    || !this.inUseBuffers.Any(buffer => buffer.Id == IdOfLastPurgedBufferId)
+                    || !this.inUseBuffers.Any(buffer => buffer.Id == IdOfLastBufferInCacheId))
                 {
                     return;
                 }
