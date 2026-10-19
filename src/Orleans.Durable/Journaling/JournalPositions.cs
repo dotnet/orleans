@@ -61,30 +61,30 @@ internal static class JournaledStateReplicaEncoding
 }
 
 /// <summary>
-/// Holds records of positional reads, which refer to positions of its manager's journal, and holds a compaction barrier
-/// while any exists.
+/// Holds records of positional reads, which refer to positions of its manager's journal.
 /// </summary>
 /// <remarks>
-/// The manager resolves a holder's reads when the history which they need would otherwise become unavailable: at recovery,
-/// and before a snapshot which passes the holder's barrier. A state machine registered with the manager implements this.
+/// The manager holds a compaction barrier while any holder holds a positional read, and resolves the reads when the history
+/// which they need would otherwise become unavailable: at recovery, and before a snapshot which passes the barrier. A state
+/// machine registered with the manager implements this.
 /// </remarks>
 internal interface IJournalPositionHolder
 {
-    /// <summary>Gets whether the holder holds positional reads which aren't resolved.</summary>
-    /// <remarks>A holder keeps its barrier while it holds none; the manager releases it before a snapshot.</remarks>
+    /// <summary>Gets whether any record which the holder holds is a positional read which isn't resolved.</summary>
+    /// <remarks>
+    /// This derives from the records themselves, staged or not, so the manager releases its barrier exactly when no record
+    /// needs the history.
+    /// </remarks>
     bool HoldsPositionalReads { get; }
 
     /// <summary>Returns the holder's unresolved positional reads at or after <paramref name="fromPosition"/>, or <see langword="null"/>.</summary>
     JournalPositionalReads? CollectPositionalReads(long fromPosition);
 
-    /// <summary>Replaces each read of <paramref name="reads"/> which the manager resolved with its value.</summary>
-    void ApplyResolvedReads(JournalPositionalReads reads);
-
     /// <summary>
-    /// Notes that the manager resolved the holder's reads and released its barrier: every read which it held was resolved,
-    /// or can't be resolved and stays unresolved.
+    /// Replaces each read of <paramref name="reads"/> which the manager resolved with its value. Reads which it couldn't
+    /// resolve stay positional.
     /// </summary>
-    void OnPositionsResolved();
+    void ApplyResolvedReads(JournalPositionalReads reads);
 }
 
 /// <summary>A batch of positional reads, which the manager resolves by replaying its journal's history.</summary>

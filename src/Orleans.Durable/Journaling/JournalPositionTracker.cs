@@ -166,12 +166,6 @@ internal sealed class JournalPositionTracker
     /// </returns>
     public (bool IsSnapshot, Resolution? Resolution) PlanSnapshot(bool isMigration)
     {
-        if (HasBarriers && !HoldsPositionalReads())
-        {
-            // Holders keep their barriers while idle, so executions which come and go journal none.
-            Barriers.RemoveAll();
-        }
-
         if (!HasBarriers)
         {
             return (true, null);
@@ -179,32 +173,47 @@ internal sealed class JournalPositionTracker
 
         if (!isMigration && _deferredSnapshots < MaxDeferredSnapshots)
         {
+            if (!HoldsPositionalReads())
+            {
+                // Holders keep their barriers while idle, so executions which come and go journal none; the capture
+                // releases it.
+                return (true, null);
+            }
+
             _deferredSnapshots++;
             return (false, null);
         }
 
-        return (true, Collect() ?? CreateResolution());
+        // Resolution starts a new window of deferrals, whether or not it resolves every read.
+        _deferredSnapshots = 0;
+        return (true, Collect());
     }
 
     /// <summary>
     /// Decides, under the manager's lock, in the synchronous capture of a planned snapshot, whether the snapshot passes the
     /// barriers: it resolves the reads of <paramref name="resolution"/>, and those which grain turns made since, and
-    /// releases the barriers. Otherwise the write appends.
+    /// releases the barriers when no record needs their history. Otherwise the write appends.
     /// </summary>
-    public bool SnapshotPassesBarriers(Resolution? resolution, bool isMigration)
+    /// <remarks>
+    /// A read which took a position while the states prepared, after the plan, holds a barrier which no history read can
+    /// resolve now: the write appends, and a later snapshot resolves it.
+    /// </remarks>
+    public bool SnapshotPassesBarriers(Resolution? resolution)
     {
-        if (HasBarriers && resolution is not { HasReadStorage: true } && !isMigration)
-        {
-            // Reads which took positions while the states prepared need the history which the snapshot would replace:
-            // append now, and let a later snapshot resolve them.
-            return false;
-        }
-
         if (resolution is not null)
         {
             // Resolves in the same synchronous capture as the snapshot, so no read can take a position which the snapshot
             // replaces.
             Resolve(resolution);
+        }
+        else if (HasBarriers && !HoldsPositionalReads())
+        {
+            Barriers.RemoveAll();
+        }
+
+        if (HasBarriers)
+        {
+            return false;
         }
 
         _deferredSnapshots = 0;
@@ -228,7 +237,8 @@ internal sealed class JournalPositionTracker
             return resolution;
         }
 
-        Resolve(CreateResolution());
+        // No record needs the history.
+        Barriers.RemoveAll();
         return null;
     }
 
@@ -303,23 +313,24 @@ internal sealed class JournalPositionTracker
     /// <summary>
     /// Completes <paramref name="resolution"/>, under the manager's lock: applies its resolved reads, then resolves the reads
     /// which grain turns made after the history was read, which follow storage's content, from the entries which the
-    /// manager committed but hasn't written; then releases the barriers.
+    /// manager committed but hasn't written; then releases the barriers when no record needs their history.
     /// </summary>
     public void Resolve(Resolution resolution)
     {
+        Debug.Assert(resolution.HasReadStorage, "Reads resolve against storage's history, then the entries which follow it.");
         var history = resolution.History;
+        foreach (var (holder, batch) in resolution.Batches)
+        {
+            holder.ApplyResolvedReads(batch);
+        }
+
+        // Reads which storage's history didn't reach follow it; they're collected again with the reads made since.
+        history.DropPending();
         var storedPosition = StoredPosition;
+        Debug.Assert(storedPosition == resolution.StoredPosition, "No write completes between a resolution's history read and its capture.");
         List<(IJournalPositionHolder Holder, JournalPositionalReads Reads)>? later = null;
         foreach (var holder in Holders)
         {
-            foreach (var (batchHolder, batch) in resolution.Batches)
-            {
-                if (ReferenceEquals(batchHolder, holder))
-                {
-                    holder.ApplyResolvedReads(batch);
-                }
-            }
-
             if (holder.CollectPositionalReads(storedPosition) is { } reads)
             {
                 (later ??= []).Add((holder, reads));
@@ -334,21 +345,17 @@ internal sealed class JournalPositionTracker
         }
 
         history.ResolveCurrent();
-        foreach (var holder in Holders)
+        foreach (var (holder, batch) in later ?? [])
         {
-            foreach (var (batchHolder, batch) in later ?? [])
-            {
-                if (ReferenceEquals(batchHolder, holder))
-                {
-                    holder.ApplyResolvedReads(batch);
-                }
-            }
-
-            holder.OnPositionsResolved();
+            holder.ApplyResolvedReads(batch);
         }
 
-        // Every holder's reads are resolved, or can't be: no history needs to stay, including for owners which no longer exist.
-        Barriers.RemoveAll();
+        _deferredSnapshots = 0;
+        if (!HoldsPositionalReads())
+        {
+            // Every owner's barrier goes, including those of owners which no longer exist.
+            Barriers.RemoveAll();
+        }
     }
 
     private IJournalPositionHolder[] Holders => _holders ??= [.. _manager.States.Values.OfType<IJournalPositionHolder>()];
