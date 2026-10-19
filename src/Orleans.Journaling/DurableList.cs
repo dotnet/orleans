@@ -1,8 +1,10 @@
+using System.Buffers;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace Orleans.Journaling;
 
@@ -30,7 +32,7 @@ public interface IDurableList<T> : IList<T>
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IReportsStagedChanges, IDurableListCommandHandler<T>, IResyncSource<ListChange<T>>
+internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IReportsStagedChanges, IDurableListCommandHandler<T>, IResyncSource<ListChange<T>>, IJournaledStateHistory, IJournaledStateReplica
 {
     private readonly IDurableListCommandCodec<T> _codec;
     private readonly List<T> _items = [];
@@ -48,7 +50,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IReportsS
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableListCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _manager = manager as JournaledStateManager;
-        _accessTarget = new(key, manager);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -57,10 +59,45 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IReportsS
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
         _manager = manager as JournaledStateManager;
-        _accessTarget = new(key, manager);
+        _accessTarget = new(key, manager, this);
         manager.RegisterStateMachine(key, this);
     }
 
+    // A replica, which has no manager, so its reads run directly.
+    private DurableList(IDurableListCommandCodec<T> codec)
+    {
+        _codec = codec;
+        _accessTarget = new(nameof(DurableList<T>));
+    }
+
+    // The collection journals each change as it makes it.
+    void IJournaledStateHistory.StagePendingChanges() { }
+
+    IJournaledStateReplica IJournaledStateHistory.CreateReplica() => new DurableList<T>(_codec);
+
+    void IJournaledStateReplica.Evaluate(JournaledStateOperation operation, ReadOnlyMemory<byte> argument, Serializer serializer, IBufferWriter<byte> result)
+    {
+        switch (operation)
+        {
+            case JournaledStateOperation.ListGet:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items[JournaledStateReplicaEncoding.ReadArgument<int>(serializer, argument)], result);
+                break;
+            case JournaledStateOperation.ListCount:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Count, result);
+                break;
+            case JournaledStateOperation.ListContains:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.Contains(JournaledStateReplicaEncoding.ReadArgument<T>(serializer, argument)), result);
+                break;
+            case JournaledStateOperation.ListIndexOf:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.IndexOf(JournaledStateReplicaEncoding.ReadArgument<T>(serializer, argument)), result);
+                break;
+            case JournaledStateOperation.ListSnapshot:
+                JournaledStateReplicaEncoding.WriteResult(serializer, _items.ToArray(), result);
+                break;
+            default:
+                throw JournaledStateReplicaEncoding.NotPositional(operation, nameof(DurableList<T>));
+        }
+    }
     public T this[int index]
     {
         get => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
