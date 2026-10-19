@@ -85,10 +85,10 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
         _items.Clear();
         _writer = writer;
         _hasStagedEntries = false;
-        PublishResync();
+        DurableStateObservation.PublishDurableResync<DurableList<T>, ListChange<T>>(_manager, this);
     }
 
-    void IStateMachine.OnRecoveryCompleted() => PublishResync();
+    void IStateMachine.OnRecoveryCompleted() => DurableStateObservation.PublishDurableResync<DurableList<T>, ListChange<T>>(_manager, this);
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
@@ -172,15 +172,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     {
         if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
         {
-            topic.Publish(new ListChange<T> { Kind = kind, Index = index, Item = item });
-        }
-    }
-
-    private void PublishResync()
-    {
-        if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
-        {
-            topic.Publish(((IResyncSource<ListChange<T>>)this).CreateResync(), isDurable: true);
+            topic.PublishStaged(new ListChange<T> { Kind = kind, Index = index, Item = item });
         }
     }
 

@@ -88,6 +88,54 @@ internal ref struct JsonCommandReader
 
     public T? DeserializeCurrent<T>(JsonTypeInfo<T> typeInfo) => JsonSerializer.Deserialize(ref _reader, typeInfo);
 
+    /// <summary>
+    /// Reads the current array element as a <c>[draftId, sequence, count]</c> durable log draft commit.
+    /// </summary>
+    public LogDraftCommit ReadCurrentDraftCommit()
+    {
+        if (_reader.TokenType is not JsonTokenType.StartArray)
+        {
+            throw new JsonException("JSON durable log draft commits must be [draftId, sequence, count] arrays.");
+        }
+
+        ReadNestedElement(JsonJournalEntryFields.DraftId);
+        var draftId = ParseDraftId(_reader.TokenType is JsonTokenType.String ? _reader.GetString() : null);
+        ReadNestedElement(JsonJournalEntryFields.Sequence);
+        if (!_reader.TryGetInt64(out var sequence) || sequence < 0)
+        {
+            throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.Sequence}' must be a non-negative integer.");
+        }
+
+        ReadNestedElement(JsonJournalEntryFields.Count);
+        if (!_reader.TryGetInt32(out var count) || count < 0)
+        {
+            throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.Count}' must be a non-negative 32-bit integer.");
+        }
+
+        if (!_reader.Read() || _reader.TokenType is not JsonTokenType.EndArray)
+        {
+            throw new JsonException("JSON durable log draft commits must be [draftId, sequence, count] arrays.");
+        }
+
+        return new(draftId, sequence, count);
+    }
+
+    /// <summary>
+    /// Parses a durable log draft identifier formatted by <see cref="LogDraftId.ToString"/>.
+    /// </summary>
+    public static LogDraftId ParseDraftId(string? value) =>
+        value is not null && LogDraftId.TryParse(value, out var draftId)
+            ? draftId
+            : throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.DraftId}' must be a draft identifier.");
+
+    private void ReadNestedElement(string operandName)
+    {
+        if (!_reader.Read() || _reader.TokenType is JsonTokenType.EndArray)
+        {
+            throw new JsonException($"JSON journal command is missing operand '{operandName}'.");
+        }
+    }
+
     public T? DeserializeCurrentAllowNull<T>(string operandName, JsonTypeInfo<T> typeInfo)
     {
         if (_reader.TokenType is JsonTokenType.Null && default(T) is not null)

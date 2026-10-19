@@ -35,6 +35,15 @@ internal static class ObservationTestHelpers
         return enumerator.Current;
     }
 
+    /// <summary>
+    /// Reads the next log event without its epoch. Tests which assert the epoch read <see cref="IAsyncEnumerator{T}.Current"/>.
+    /// </summary>
+    public static async Task<LogEvent<T>> NextAsync<T>(this IAsyncEnumerator<LogEvent<T>> enumerator)
+    {
+        Assert.True(await enumerator.MoveNextAsync(), "The stream ended before producing the expected item.");
+        return enumerator.Current with { Epoch = 0 };
+    }
+
     public static JournaledStateManager AsJournaledStateManager(this IJournaledStateManager manager) =>
         Assert.IsType<JournaledStateManager>(manager, exactMatch: false);
 }
