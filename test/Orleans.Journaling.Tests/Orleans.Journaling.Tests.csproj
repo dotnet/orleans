@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <PackageReference Include="CsCheck" />
+    <PackageReference Include="Microsoft.Accordant" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="Testcontainers" />

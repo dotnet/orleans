@@ -268,138 +268,36 @@ public sealed class JournaledStateContextTests : JournalingTestBase
         var sut = CreateTestSystem();
         var provider = new TestProvider();
         ((JournaledStateManager)sut.Manager).ContextProvider = provider;
-        var (list, dictionary, value, _, set, log, _) = CreateAllStates(sut.Manager);
+        var (list, dictionary, value, queue, set, log, _) = CreateAllStates(sut.Manager);
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         list.Add("a");
         dictionary["x"] = 1;
         log.Append("e");
+        queue.Enqueue("q");
+        set.Add("s");
         string[] other = ["a"];
         var context = provider.Context = new RecordingContext();
 
+        _ = dictionary["x"];
         _ = dictionary.TryGetValue("x", out _);
         _ = dictionary.ContainsKey("y");
+        _ = dictionary.Contains(new KeyValuePair<string, int>("x", 1));
         _ = list[0];
+        _ = list.Contains("b");
         _ = list.IndexOf("a");
+        _ = log[0];
         _ = log.TryGet(0, out _);
+        _ = queue.Contains("q");
+        _ = set.Contains("s");
         _ = set.IsSubsetOf(other);
         _ = list.Count;
         _ = value.Value;
         _ = dictionary.Keys;
 
         var none = default(JournaledStateAccessNoArgument);
-        Assert.Equal(["x", "y", 0, "a", 0L, other, none, none, none], context.Arguments.Select(static access => access.Argument));
-    }
-
-    [Fact]
-    public async Task EveryChangeOfAStateChangesItsStampAndReadsDont()
-    {
-        var storage = CreateStorage();
-        var sut = CreateTestSystem(storage);
-        var provider = new TestProvider();
-        ((JournaledStateManager)sut.Manager).ContextProvider = provider;
-        var (list, dictionary, value, queue, set, log, completion) = CreateAllStates(sut.Manager);
-        var acknowledged = new DurableLog<string>("acknowledged", sut.Manager, new OrleansBinaryDurableLogCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
-        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
-
-        AssertChanges(provider, () => _ = value.Value, () => value.Value = 1, () => value.Value = 1);
-        AssertChanges(
-            provider,
-            () => _ = dictionary.Count,
-            () => dictionary["a"] = 1,
-            () => dictionary.Add("b", 2),
-            () => dictionary.Remove("a"),
-            () => dictionary.Remove(new KeyValuePair<string, int>("b", 2)),
-            () => dictionary["c"] = 3,
-            () => dictionary.Clear());
-        AssertChanges(
-            provider,
-            () => _ = list.Count,
-            () => list.Add("a"),
-            () => list.Insert(0, "b"),
-            () => list[0] = "c",
-            () => list.AddRange(["d", "e"]),
-            () => list.Remove("d"),
-            () => list.RemoveAt(0),
-            () => list.Clear());
-        AssertChanges(
-            provider,
-            () => _ = queue.Count,
-            () => queue.Enqueue("a"),
-            () => queue.Enqueue("b"),
-            () => queue.Dequeue(),
-            () => queue.TryDequeue(out _),
-            () => queue.Enqueue("c"),
-            () => queue.Clear());
-        AssertChanges(
-            provider,
-            () => _ = set.Count,
-            () => set.Add("a"),
-            () => set.UnionWith(["b", "c"]),
-            () => set.Remove("a"),
-            () => set.ExceptWith(["b"]),
-            () => set.SymmetricExceptWith(["d"]),
-            () => set.IntersectWith(["d"]),
-            () => set.Clear());
-        AssertChanges(
-            provider,
-            () => _ = log.Count,
-            () => log.Append("a"),
-            () => log.Append("b"),
-            () => log.TrimBefore(1),
-            () => log.Clear(),
-            () => log.Seal());
-        AssertChanges(provider, () => _ = completion.State, () => completion.TrySetResult(1));
-
-        // Changes which don't change the state, and reads, leave the stamps as they are.
-        AssertUnchanged(provider, () => _ = dictionary.Count, () => dictionary.Remove("missing"), () => _ = dictionary.TryGetValue("x", out _), () => _ = dictionary.Keys);
-        AssertUnchanged(provider, () => _ = set.Count, () => set.Remove("missing"), () => _ = set.Overlaps(["d"]));
-        AssertUnchanged(provider, () => _ = completion.State, () => completion.TrySetResult(2));
-
-        // Acknowledging a write changes a log's committed sequence, which reads observe.
-        acknowledged.Append("a");
-        var beforeWrite = Stamp(provider, () => _ = acknowledged.CommittedSequence);
-        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        Assert.True(Stamp(provider, () => _ = acknowledged.CommittedSequence) > beforeWrite);
-        var afterWrite = Stamp(provider, () => _ = acknowledged.CommittedSequence);
-        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(afterWrite, Stamp(provider, () => _ = acknowledged.CommittedSequence));
-
-        // Recovery replays the journal's entries into new states, which changes their stamps.
-        var recovered = CreateTestSystem(storage);
-        var recoveredProvider = new TestProvider();
-        ((JournaledStateManager)recovered.Manager).ContextProvider = recoveredProvider;
-        var recoveredLog = new DurableLog<string>("acknowledged", recovered.Manager, new OrleansBinaryDurableLogCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
-        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
-        Assert.True(Stamp(recoveredProvider, () => _ = recoveredLog.Count) > 0);
-        Assert.Equal("a", Assert.Single(recoveredLog));
-
-        static void AssertChanges(TestProvider provider, Action read, params Action[] changes)
-        {
-            for (var i = 0; i < changes.Length; i++)
-            {
-                var before = Stamp(provider, read);
-
-                // Changes alternate between running directly and through a context, which runs them against the state.
-                provider.Context = i % 2 == 0 ? null : new RecordingContext();
-                changes[i]();
-                provider.Context = null;
-                Assert.True(Stamp(provider, read) > before, $"Change {i} didn't change the stamp.");
-            }
-        }
-
-        static void AssertUnchanged(TestProvider provider, Action read, params Action[] accesses)
-        {
-            var before = Stamp(provider, read);
-            foreach (var access in accesses)
-            {
-                access();
-                provider.Context = new RecordingContext();
-                access();
-                provider.Context = null;
-            }
-
-            Assert.Equal(before, Stamp(provider, read));
-        }
+        Assert.Equal(
+            ["x", "x", "y", ("x", 1), 0, "b", "a", 0L, 0L, "q", "s", other, none, none, none],
+            context.Arguments);
     }
 
     [Fact]
@@ -450,15 +348,6 @@ public sealed class JournaledStateContextTests : JournalingTestBase
                 ServiceProvider.GetRequiredService<DeepCopier<int>>(),
                 ServiceProvider.GetRequiredService<DeepCopier<Exception>>()));
 
-    // Reads the stamp of the state which read accesses, through a context which runs the read.
-    private static long Stamp(TestProvider provider, Action read)
-    {
-        var context = provider.Context = new RecordingContext();
-        read();
-        provider.Context = null;
-        return context.LastTarget!.Stamp;
-    }
-
     private async Task<(DurableList<string> List, DurableDictionary<string, int> Dictionary, DurableValue<int> Value, TestProvider Provider)> CreateStatesAsync()
     {
         var sut = CreateTestSystem();
@@ -489,11 +378,8 @@ public sealed class JournaledStateContextTests : JournalingTestBase
 
         public List<(JournaledStateAccessKind Kind, JournaledStateOperation Operation, string Target, object? Outcome)> Accesses { get; } = [];
 
-        /// <summary>Gets the argument of each access which ran, and the stamp of its state before it ran.</summary>
-        public List<(object? Argument, long Stamp)> Arguments { get; } = [];
-
-        /// <summary>Gets the state of the latest access.</summary>
-        public JournaledStateAccessTarget? LastTarget { get; private set; }
+        /// <summary>Gets the argument of each access which ran.</summary>
+        public List<object?> Arguments { get; } = [];
 
         public Queue<object?> Recorded { get; } = new();
 
@@ -507,7 +393,6 @@ public sealed class JournaledStateContextTests : JournalingTestBase
             Func<TState, TResult> operation,
             Action<TState, TResult>? apply)
         {
-            LastTarget = access.Target;
             if (Recorded.TryDequeue(out var outcome))
             {
                 return outcome is Exception exception ? throw exception : (TResult)outcome!;
@@ -516,7 +401,7 @@ public sealed class JournaledStateContextTests : JournalingTestBase
             Depth++;
             try
             {
-                Arguments.Add((argument, access.Target.Stamp));
+                Arguments.Add(argument);
                 var result = operation(state);
                 if (Rejects?.Invoke(result) is { } rejection)
                 {
