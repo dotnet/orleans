@@ -168,6 +168,7 @@ public sealed class EnvelopeContractTests
     [InlineData("InboxMessage")]
     [InlineData("OutboxMessage")]
     [InlineData("InboxDeadLetter")]
+    [InlineData("OutboxDeadLetter")]
     public void MessageAndDeadLetterCopyPreservesMetadataAndIsolation(string kind)
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
@@ -211,7 +212,8 @@ public sealed class EnvelopeContractTests
             Message = new InboxMessage { Envelope = Create([1, 2]) with { Subject = "subject.v1" } },
             DeadLetteredAt = DateTimeOffset.UnixEpoch,
             Reason = "failure",
-            AttemptCount = 3
+            AttemptCount = 3,
+            Code = "orders/invalid"
         };
         var serializer = services.GetRequiredService<Serializer<DeadLetter<InboxMessage>>>();
 
@@ -223,6 +225,7 @@ public sealed class EnvelopeContractTests
         Assert.Equal(DateTimeOffset.UnixEpoch, result.DeadLetteredAt);
         Assert.Equal("failure", result.Reason);
         Assert.Equal(3, result.AttemptCount);
+        Assert.Equal("orders/invalid", result.Code);
     }
 
     [Fact]
