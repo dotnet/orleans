@@ -24,6 +24,8 @@ whether storage or the application requests it, up to 16 times. The next snapsho
 replays the journal's history to resolve those reads into values, then writes the
 snapshot. A format migration's snapshot resolves them without waiting. A read which
 can't be resolved keeps its barrier, and the manager logs an error.
+While a transaction over the journaled state is open, a requested snapshot is
+written as an append; the next write after the transaction ends writes it.
 Successful replacement resets both counters; the snapshot itself is excluded
 from append history. Deletion and recreation reset the history too. A single
 append can exceed the byte threshold. Larger limits amortize snapshot copies
