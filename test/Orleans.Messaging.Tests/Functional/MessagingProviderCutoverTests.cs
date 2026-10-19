@@ -45,6 +45,7 @@ public sealed class MessagingProviderCutoverTests
             silo.UseJournaledDurableJobs(options => options.ActiveProviderName = "jobs");
             silo.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = JournalFormatKey);
             silo.AddMessaging();
+            silo.Services.UseDocumentationPaymentGrain();
             silo.Services.AddSingleton(snapshots);
             silo.Services.AddScoped<IJournaledStateManager>(services =>
             {
