@@ -624,20 +624,23 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
     public async ValueTask DeleteAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        bool expectedExists;
-        string? expectedContentETag;
-        if (_isStateKnown)
+        var wasStateKnown = _isStateKnown;
+        if (!wasStateKnown)
         {
-            expectedExists = _contentETag is not null;
-            expectedContentETag = _contentETag;
-        }
-        else
-        {
-            // An instance which has neither read nor written the journal deletes the version it finds.
-            expectedContentETag = (await GetStorageStateAsync(cancellationToken).ConfigureAwait(false))?.ContentETag;
-            expectedExists = expectedContentETag is not null;
+            // An instance which has neither read nor written the journal establishes its precondition from the version it finds,
+            // so a rejected delete leaves that precondition in place.
+            if (await GetStorageStateAsync(cancellationToken).ConfigureAwait(false) is { } state)
+            {
+                SetState(state);
+            }
+            else
+            {
+                ClearState();
+            }
         }
 
+        var expectedContentETag = _contentETag;
+        var expectedExists = expectedContentETag is not null;
         var result = await EvaluateArrayAsync(
             DeleteScript,
             _journalKeys,
@@ -646,12 +649,11 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
         if (status == AppearedStatus)
         {
             // A fresh instance's no-op delete takes effect at the absence observation, before the competing creation.
-            if (_isStateKnown)
+            if (wasStateKnown)
             {
                 ThrowForStatus(ConflictStatus, nameof(DeleteAsync), expectedContentETag);
             }
 
-            ClearState();
             return;
         }
         else
