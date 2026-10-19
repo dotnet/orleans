@@ -36,12 +36,13 @@ public readonly struct Envelope
     /// <para>
     /// The outbox delivers the message immediately. The receiving inbox accepts, deduplicates, and persists it
     /// as usual, then holds it until this time is reached on the Durable Jobs clock, and one durable wake-up
-    /// resumes the grain when the message becomes due. <see langword="null"/> processes the message as soon as
+    /// resumes the grain when the message becomes due. A message a grain sends to itself is accepted by its own
+    /// inbox in the sending journal write. <see langword="null"/> processes the message as soon as
     /// its acceptance is durable.
     /// </para>
     /// <para>
     /// The time is part of the command: reusing a pending message ID with a different value is a conflicting command.
-    /// A message with a value does not count toward the inbox <c>MaxCapacity</c>, including after it becomes due.
+    /// The message counts toward the inbox <c>MaxCapacity</c> from its acceptance until it completes.
     /// </para>
     /// </remarks>
     [Id(4)]

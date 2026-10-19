@@ -57,12 +57,16 @@ public interface IInboxMessageSink
     /// </description></item>
     /// <item><description>
     /// <see cref="DeliveryStatus.DeadLettered"/>: the sink rejects the message and stages nothing. The inbox
-    /// dead-letters it with its payload and the result's reason, and records it as processed.
+    /// dead-letters it with its payload and the result's reason and <see cref="DeliveryResult.Code"/>, records it as
+    /// processed, and returns the reason and code to the sender. The processed record keeps the reason and code, so a
+    /// duplicate of the message, such as a retry whose first answer was lost, receives the same rejection.
     /// </description></item>
     /// </list>
     /// <para>
-    /// A sink which throws or reports another status must leave no staged change, and the inbox dead-letters the message
-    /// with the failure as its reason.
+    /// A sink exception, or any other status, means the outcome is unknown, so the inbox stages nothing and fails the
+    /// delivery: the sender's outbox retries it with backoff until <c>OutboxRetryTimeout</c>, and a send to the grain
+    /// itself throws to its caller. A sink which throws must leave no staged change. Return
+    /// <see cref="DeliveryStatus.DeadLettered"/> to reject a message permanently.
     /// </para>
     /// </remarks>
     bool TryAccept(InboxMessage message, out DeliveryResult result);
