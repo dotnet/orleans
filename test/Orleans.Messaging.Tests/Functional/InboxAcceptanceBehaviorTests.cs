@@ -75,6 +75,30 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
     }
 
     [Fact]
+    public async Task Delivery_IsAdmittedWhileANonReentrantRequestIsRunning()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+        var journal = JournalId.FromGrainId(receiver.GetGrainId());
+        var inbox = Fixture.GetInbox(receiver);
+
+        // The request holds the grain while its journal write waits.
+        await receiver.StageEffectAsync(new MessageEffect(MessageId.Create("request", "effect"), 1, 0, "request"));
+        using var write = Fixture.Storage.BlockWrite(journal);
+        var request = receiver.RetryWriteStateAsync();
+        await write.WaitUntilEnteredAsync();
+
+        var envelope = CreateEnvelope(receiver, NewMessage(14, "interleaved"));
+        var delivery = DeliverAsync(receiver, envelope);
+        await Fixture.WaitUntilAsync(receiver, () => inbox.Count == 1);
+        Assert.False(request.IsCompleted);
+
+        write.Release();
+        await request;
+        Assert.Equal(DeliveryStatus.Accepted, (await delivery).Status);
+        Assert.Equal("interleaved", Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 2)).Effects, static effect => effect.Value == "interleaved").Value);
+    }
+    [Fact]
     public async Task DuplicateOfCompletedMessage_WaitsUntilCompletionIsDurable()
     {
         var receiver = NewGrain();
