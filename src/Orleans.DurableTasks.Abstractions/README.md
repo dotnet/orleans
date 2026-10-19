@@ -561,8 +561,9 @@ response, and cancellation state. The host returns the recorded response when an
 ID is scheduled again, returns the same `SelectCompletionAsync` selection for a decision ID on every call, by recording
 the selection or by deriving it from a durable completion order, and supplies
 replay-consistent `UtcNow` values. It runs and replays the body of a canceled task with the durable
-request and its recorded reason applied, and terminalizes canceled leaves as canceled. Hosts which record
-cancellation reasons implement `IScheduledTaskHandle.CancelAsync(reason, cancellationToken)`. Hosts start
+request and its recorded reason applied, and terminalizes canceled leaves as canceled. Hosts implement
+`IScheduledTaskHandle.CancelAsync(reason, cancellationToken)`, which records the first request's reason with the task's
+cancellation; a request without a reason passes `null`. Hosts start
 tasks in `DurableTaskContext.StartTaskAsync`, which receives `DurableTaskStartOptions`: `Detached` for an
 independent root task which names the execution as a subscriber, and `WaitForAcceptance` for a start which
 completes once the task's host has accepted the task. They read `DurableTaskContext.SchedulesShieldedChildren`
