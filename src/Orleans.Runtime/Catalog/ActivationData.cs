@@ -1788,18 +1788,30 @@ internal sealed partial class ActivationData :
     /// Requests are forwarded if this was a duplicate activation or it was at some point successfully activated, and rejected otherwise.
     /// Local requests never leave the activation, so they are rejected.
     /// </remarks>
-    private void RejectOrForwardRequests(List<Message> requests)
+    private void RejectOrForwardRequests(List<Message>? requests, ActivationMigration? migration = null)
     {
-        foreach (var message in requests)
+        if (requests is not null)
         {
-            if (message.IsLocalOnly)
+            foreach (var message in requests)
             {
-                RejectRequest(message, new OrleansMessageRejectionException($"Activation {this} is no longer valid."));
+                if (message.IsLocalOnly)
+                {
+                    RejectRequest(message, new OrleansMessageRejectionException($"Activation {this} is no longer valid."));
+                }
             }
+
+            requests.RemoveAll(static message => message.IsLocalOnly);
         }
 
-        requests.RemoveAll(static message => message.IsLocalOnly);
-        if (requests.Count == 0)
+        if (migration is not null)
+        {
+            // The migration owns the requests which were queued when it started, and forwards these after them, once its outcome is known.
+            _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
+            migration.SourceDeactivated(requests);
+            return;
+        }
+
+        if (requests is not { Count: > 0 })
         {
             return;
         }
@@ -2151,6 +2163,7 @@ internal sealed partial class ActivationData :
 
         var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start(_shared.CatalogInstruments, _shared.GrainTypeMetricName);
         var migrating = false;
+        ActivationMigration? migration = null;
         var encounteredError = false;
         try
         {
@@ -2321,9 +2334,9 @@ internal sealed partial class ActivationData :
                     }
                 }
 
-                if (queued is not null)
+                if (queued is not null || migration is not null)
                 {
-                    RejectOrForwardRequests(queued);
+                    RejectOrForwardRequests(queued, migration);
                 }
             }
             finally
@@ -2340,8 +2353,6 @@ internal sealed partial class ActivationData :
 
         async ValueTask<bool> StartMigrationAsync(DehydrationContextHolder context, IActivationMigrationManager migrationManager, CancellationToken cancellationToken)
         {
-            List<Message>? requests = null;
-            var requestsOutcome = MigratedRequestsOutcome.Retained;
             try
             {
                 if (ForwardingAddress is null)
@@ -2363,37 +2374,10 @@ internal sealed partial class ActivationData :
 
                 OnDehydrate(context.MigrationContext);
 
-                // Send the dehydration context to the target host, together with the queued requests, which the new activation runs before any other request.
-                requests = TakeRequestsForMigration();
-                var migration = migrationManager.MigrateAsync(ForwardingAddress, GrainId, context.MigrationContext, requests, out var carriedRequests);
-                if (carriedRequests is null)
-                {
-                    // The requests stay queued and are forwarded.
-                    EndRequestMigration(requests, MigratedRequestsOutcome.Retained);
-                    requests = null;
-                }
-                else
-                {
-                    // Until the target answers, it may own the requests.
-                    requestsOutcome = MigratedRequestsOutcome.Unknown;
-                }
-
-                // If this stops waiting, the outcome stays unknown and the requests are released, and a later outcome does not affect them,
-                // since this activation is their only owner.
-                var result = await migration.AsTask().WaitAsync(cancellationToken);
-                requestsOutcome = result.Requests;
-                if (requestsOutcome is MigratedRequestsOutcome.Retained && carriedRequests is not null)
-                {
-                    // Serializing the requests can release the storage of their values, so they are delivered as copies read back from their serialized form.
-                    migrationManager.ReplaceWithCopies(requests!, carriedRequests);
-                }
-
-                if (!result.Migrated)
-                {
-                    LogFailedToMigrateActivation(_shared.Logger, result.Exception!, this);
-                    return false;
-                }
-
+                // Send the dehydration context to the target host. The migration takes ownership of the queued requests, which the new activation runs before any other request,
+                // and of any which arrive later. It delivers the requests which the new activation does not take.
+                migration = migrationManager.StartMigration(ForwardingAddress, Address, context.MigrationContext, TakeRequestsForMigration(), cancellationToken);
+                await migration.Completion;
                 _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, ForwardingAddress);
                 return true;
             }
@@ -2401,10 +2385,6 @@ internal sealed partial class ActivationData :
             {
                 LogFailedToMigrateActivation(_shared.Logger, exception, this);
                 return false;
-            }
-            finally
-            {
-                EndRequestMigration(requests, requestsOutcome);
             }
         }
     }

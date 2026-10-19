@@ -55,42 +55,6 @@ internal sealed partial class ActivationData
     }
 
     /// <summary>
-    /// Disposes of the requests which were taken for migration, according to the migration's outcome.
-    /// </summary>
-    private void EndRequestMigration(List<Message>? requests, MigratedRequestsOutcome outcome)
-    {
-        if (requests is null)
-        {
-            return;
-        }
-
-        if (outcome is MigratedRequestsOutcome.Retained)
-        {
-            // The requests return to the front of the queue, from which deactivation forwards them.
-            lock (_lock)
-            {
-                var queuedTime = CoarseStopwatch.StartNew();
-                var retained = new List<(Message, CoarseStopwatch)>(requests.Count);
-                foreach (var request in requests)
-                {
-                    retained.Add((request, queuedTime));
-                }
-
-                _waitingRequests.InsertRange(0, retained);
-            }
-
-            return;
-        }
-
-        // The target owns the requests, or may own them. Requests which this silo received still hold their serialized bodies, which the migration copied.
-        // Requests from callers on this silo share their body with the caller's pending call, so they are left intact.
-        foreach (var request in requests)
-        {
-            request.ReleaseBodyBuffer();
-        }
-    }
-
-    /// <summary>
     /// Adds an update to <paramref name="message"/> which replaces the grain's previous address with this activation's address in callers' caches.
     /// </summary>
     /// <remarks>
