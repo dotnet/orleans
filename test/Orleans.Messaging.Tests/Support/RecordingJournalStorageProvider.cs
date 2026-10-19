@@ -10,12 +10,16 @@ namespace Orleans.Messaging.Tests.Support;
 public sealed class RecordingJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
 {
     private readonly ConcurrentDictionary<JournalId, ConcurrentQueue<byte[]>> _writes = new();
+    private readonly ConcurrentDictionary<JournalId, byte> _snapshots = new();
     private VolatileJournalStorageProvider? _inner;
 
     public void Configure(IOptions<JournaledStateManagerOptions> options) => _inner ??= new VolatileJournalStorageProvider(options);
 
+    /// <summary>Requests that the journal's next write replaces it with a snapshot.</summary>
+    public void RequestSnapshot(JournalId journalId) => _snapshots[journalId] = 0;
+
     public IJournalStorage CreateStorage(JournalId journalId) =>
-        new RecordingJournalStorage(_writes.GetOrAdd(journalId, static _ => new()), Inner.CreateStorage(journalId));
+        new RecordingJournalStorage(this, journalId, _writes.GetOrAdd(journalId, static _ => new()), Inner.CreateStorage(journalId));
 
     public IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         JournalCatalogListOptions? options = null,
@@ -61,9 +65,13 @@ public sealed class RecordingJournalStorageProvider : IJournalStorageProvider, I
     private VolatileJournalStorageProvider Inner =>
         _inner ?? throw new InvalidOperationException("The recording journal storage provider has not been configured.");
 
-    private sealed class RecordingJournalStorage(ConcurrentQueue<byte[]> writes, IJournalStorage inner) : IJournalStorage
+    private sealed class RecordingJournalStorage(
+        RecordingJournalStorageProvider owner,
+        JournalId journalId,
+        ConcurrentQueue<byte[]> writes,
+        IJournalStorage inner) : IJournalStorage
     {
-        public bool IsCompactionRequested => inner.IsCompactionRequested;
+        public bool IsCompactionRequested => owner._snapshots.ContainsKey(journalId) || inner.IsCompactionRequested;
 
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken) =>
             inner.ReadAsync(consumer, cancellationToken);
@@ -87,6 +95,7 @@ public sealed class RecordingJournalStorageProvider : IJournalStorageProvider, I
         {
             var bytes = value.ToArray();
             await inner.ReplaceAsync(value, cancellationToken).ConfigureAwait(false);
+            owner._snapshots.TryRemove(journalId, out _);
             writes.Enqueue(bytes);
         }
 

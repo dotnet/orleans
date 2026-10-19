@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.DurableJobs;
+using NSubstitute;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Messaging.Configuration;
@@ -45,7 +46,7 @@ public sealed class PublicMessagingRegistrationTests
         Assert.Equal(ServiceLifetime.Singleton, configurator.Lifetime);
         foreach (var contract in new[]
         {
-            typeof(MessagingPump), typeof(Inbox), typeof(IInbox), typeof(IMessagingDiagnostics)
+            typeof(MessagingPump), typeof(Inbox), typeof(Outbox), typeof(IInbox), typeof(IOutbox), typeof(IMessagingDiagnostics)
         })
         {
             var descriptor = Assert.Single(services, descriptor => descriptor.ServiceType == contract && !descriptor.IsKeyedService);
@@ -148,6 +149,22 @@ public sealed class PublicMessagingRegistrationTests
 
         Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IInbox));
         Assert.Same(scope.ServiceProvider.GetRequiredService<Inbox>(), scope.ServiceProvider.GetRequiredService<IInbox>());
+    }
+
+    [Fact]
+    public async Task AddMessaging_BindsOutboxContractToDeliveredOutboxOverEarlierRegistration()
+    {
+        var services = new ServiceCollection();
+        services.AddScoped(static _ => Substitute.For<IOutbox>());
+        services.AddMessaging();
+
+        // Outbox construction needs an activation, so substitute an uninitialized scoped instance to observe the binding.
+        services.Replace(ServiceDescriptor.Scoped(static _ => (Outbox)RuntimeHelpers.GetUninitializedObject(typeof(Outbox))));
+        await using var provider = services.BuildServiceProvider();
+        await using var scope = provider.CreateAsyncScope();
+
+        Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IOutbox));
+        Assert.Same(scope.ServiceProvider.GetRequiredService<Outbox>(), scope.ServiceProvider.GetRequiredService<IOutbox>());
     }
 
     [Fact]
