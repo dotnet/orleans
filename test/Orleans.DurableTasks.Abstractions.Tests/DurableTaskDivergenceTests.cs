@@ -223,7 +223,7 @@ public class DurableTaskDivergenceTests
         public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken)
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
         {
             context.OnCanceled(taskId);
             Complete(DurableTaskResponse.Canceled);

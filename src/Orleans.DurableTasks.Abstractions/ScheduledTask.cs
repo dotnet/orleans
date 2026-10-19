@@ -172,7 +172,7 @@ public abstract partial class ScheduledTask
     /// The task's body observes the request and decides its outcome: the task is canceled when the cancellation escapes
     /// its body, and otherwise completes with the body's result or failure. Await the task to observe the outcome.
     /// </remarks>
-    public abstract ValueTask CancelAsync(CancellationToken cancellationToken = default);
+    public ValueTask CancelAsync(CancellationToken cancellationToken = default) => CancelAsyncCore(reason: null, cancellationToken);
 
     /// <summary>Durably requests cancellation carrying <paramref name="reason"/>.</summary>
     /// <param name="reason">
@@ -187,13 +187,8 @@ public abstract partial class ScheduledTask
     public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken = default)
         => CancelAsyncCore(reason, cancellationToken);
 
-    /// <summary>Asks the host to cancel the task carrying <paramref name="reason"/>.</summary>
-    /// <remarks>
-    /// Hosts which record reasons override this default implementation, which requests cancellation through
-    /// <see cref="CancelAsync(CancellationToken)"/> without the reason.
-    /// </remarks>
-    protected virtual ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken)
-        => CancelAsync(cancellationToken);
+    /// <summary>Asks the host to cancel the task carrying <paramref name="reason"/>, or no reason when it is <see langword="null"/>.</summary>
+    protected abstract ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken);
 
     /// <summary>
     /// Administratively aborts the task: the host terminalizes it and its attached descendants as failed with a
@@ -699,8 +694,6 @@ internal sealed class ScheduledTaskHandle(IScheduledTaskHandle handle) : Schedul
     public override TFeature? GetFeature<TFeature>()
         where TFeature : class => handle.GetFeature<TFeature>();
 
-    public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => HostHandleOperations.CancelAsync(handle, cancellationToken);
-
     protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken)
         => HostHandleOperations.CancelAsync(handle, reason, cancellationToken);
 
@@ -722,8 +715,6 @@ internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) 
 
     public override TFeature? GetFeature<TFeature>()
         where TFeature : class => handle.GetFeature<TFeature>();
-
-    public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => HostHandleOperations.CancelAsync(handle, cancellationToken);
 
     protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken)
         => HostHandleOperations.CancelAsync(handle, reason, cancellationToken);
@@ -779,16 +770,6 @@ internal static class HostHandleOperations
         }
     }
 
-    public static ValueTask CancelAsync(IScheduledTaskHandle handle, CancellationToken cancellationToken)
-    {
-        if (DurableTaskContext.Ambient is not { } context)
-        {
-            return handle.CancelAsync(cancellationToken);
-        }
-
-        context.ThrowIfCannotRunOperation();
-        return context.ObserveAttempt(handle.CancelAsync(cancellationToken));
-    }
 
     public static ValueTask CancelAsync(IScheduledTaskHandle handle, string? reason, CancellationToken cancellationToken)
     {
@@ -826,7 +807,7 @@ internal sealed class CompletedScheduledTask : ScheduledTask
 
     public override TaskId Id => _id;
 
-    public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+    protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
     protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
@@ -848,7 +829,7 @@ internal sealed class CompletedScheduledTask<TResult> : ScheduledTask<TResult>
 
     public override TaskId Id => _id;
 
-    public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+    protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
     protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 

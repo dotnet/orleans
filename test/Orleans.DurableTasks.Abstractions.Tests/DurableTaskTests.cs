@@ -4218,7 +4218,7 @@ internal sealed class ControlledScheduledTaskHandle(TaskId id, ControlledSchedul
     public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
         => new(DurableTaskResponse.Pending);
 
-    public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
 internal sealed class RecordingRootDefinition<TResult>(RecordingScheduledTaskHandle handle) : DurableTask<TResult>, ISchedulableTask
@@ -4288,7 +4288,7 @@ internal sealed class RecordingScheduledTaskHandle(TaskId id) : IScheduledTaskHa
         return new(DurableTaskResponse.Pending);
     }
 
-    public ValueTask CancelAsync(CancellationToken cancellationToken)
+    public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
     {
         CancelCallCount++;
         LastCancelCancellationToken = cancellationToken;
@@ -4503,7 +4503,7 @@ internal sealed class DirectScheduledTaskHandle(TaskId id, DirectScheduledTaskSt
         CancellationToken cancellationToken)
         => new(DurableTaskResponse.Pending);
 
-    public ValueTask CancelAsync(CancellationToken cancellationToken) => state.CancelAsync();
+    public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => state.CancelAsync();
 }
 
 internal sealed class ControlledSafeReferenceAwaitable<TResult>(TResult result)

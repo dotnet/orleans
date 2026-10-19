@@ -116,7 +116,7 @@ public class DurableTaskAbortTests
         public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
             => new(DurableTaskResponse.Pending);
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken)
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
         {
             CancelCount++;
             return ValueTask.CompletedTask;

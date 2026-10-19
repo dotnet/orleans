@@ -701,7 +701,7 @@ public class DurableTaskAttemptCancellationTests
         public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
             => new(DurableTaskResponse.Pending);
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 
     /// <summary>A host whose child handle's wait returns the response which the test supplies, whatever the attempt's state.</summary>
@@ -748,6 +748,6 @@ public class DurableTaskAttemptCancellationTests
         public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
             => new(DurableTaskResponse.Pending);
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 }
