@@ -18,7 +18,7 @@ namespace DurableOrderProcessing;
 public static class OrderProcessingApplication
 {
     // The scope of order operations, which POST /api/orders starts and the Nexus service orders.v1 shares, so an order's
-    // operation key is orders/{orderId} through either protocol.
+    // operation key, orders/@/{orderId} for the playground's anonymous callers, is equal through either protocol.
     public const string OrdersScope = "orders";
 
     // A request with this header is handled normally, then its connection is reset instead of sending the response, as
@@ -57,9 +57,6 @@ public static class OrderProcessingApplication
 
     public static void ConfigureOperations(DurableHttpOptions options)
     {
-        // Every order start names its order, so a retry reaches the order which the first attempt placed.
-        options.RequireIdempotencyKey = true;
-
         // A workflow which rejects its request, such as an order of an empty basket, describes why.
         options.CreateError = static exception => exception is InvalidOperationException
             ? new("Rejected", exception.Message)

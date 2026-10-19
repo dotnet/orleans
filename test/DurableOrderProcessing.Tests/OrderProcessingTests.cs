@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using DurableOrderProcessing.Grains;
 using Orleans.DurableTasks.Http;
+using Orleans.Core.Internal;
+using Orleans.Runtime;
 using Xunit;
 
 namespace DurableOrderProcessing.Tests;
@@ -182,6 +184,52 @@ public sealed class OrderProcessingTests(OrderProcessingFixture fixture)
         {
             using var response = await Http.PostAsJsonAsync($"/api/orders/operations/{orderId}/signals/shipped", value, cancellationToken);
             return response.StatusCode;
+        }
+    }
+
+    [Fact]
+    public async Task OrderReplayedAfterDeactivationsAppendsEachSnapshotOnceAndAuthorizesOnce()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var buyerId = NewBuyer();
+        var orderId = Guid.NewGuid();
+        await fixture.FillBasketAsync(buyerId, 7);
+        using var started = await fixture.CheckoutAsync(buyerId, orderId);
+
+        // Deactivates the order within its grace period, so its next activation replays the workflow from its start.
+        await fixture.WaitForStatusAsync(orderId, OrderStatus.Submitted);
+        await DeactivateOrderAsync();
+        await fixture.WaitForStatusAsync(orderId, OrderStatus.Paid);
+
+        // Deactivates the paid order and its operation's host, so the shipped signal reaches both through recovery.
+        await DeactivateOrderAsync();
+        await fixture.Client.GetGrain(GrainId.Create("orleans-durable-operation", $"orders/@/{orderId}"))
+            .AsReference<IGrainManagementExtension>()
+            .DeactivateOnIdle(cancellationToken);
+        using (var ship = await Http.PostAsJsonAsync($"/api/orders/operations/{orderId}/signals/shipped", new Shipment(Guid.NewGuid()), cancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, ship.StatusCode);
+        }
+
+        var operation = await fixture.WaitForOperationAsync(orderId);
+        Assert.Equal("Shipped", operation.GetProperty("result").GetProperty("status").GetString());
+
+        // Each transition appended its snapshot once, and the gateway received one authorization request.
+        var statuses = new List<OrderStatus>();
+        await foreach (var snapshot in fixture.Client.GetGrain<IOrderGrain>(orderId).WatchAsync(cancellationToken))
+        {
+            statuses.Add(snapshot.Order.Status);
+        }
+
+        Assert.Equal([OrderStatus.Submitted, OrderStatus.AwaitingValidation, OrderStatus.StockConfirmed, OrderStatus.Paid, OrderStatus.Shipped], statuses);
+        var authorization = Assert.Single(fixture.Gateway.List(), entry => entry.OrderId == orderId);
+        Assert.Equal(1, authorization.Requests);
+        Assert.Equal("Succeeded", authorization.Status);
+
+        async Task DeactivateOrderAsync()
+        {
+            using var response = await Http.PostAsync($"/api/orders/{orderId}/deactivate", content: null, cancellationToken);
+            Assert.True(response.IsSuccessStatusCode);
         }
     }
 
