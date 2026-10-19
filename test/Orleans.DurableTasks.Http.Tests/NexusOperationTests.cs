@@ -126,16 +126,22 @@ public sealed class NexusOperationTests(DurableHttpFixture fixture)
         Assert.Equal("Running", (await ReadJsonAsync(status, cancellationToken)).GetProperty("status").GetString());
     }
 
-    [Theory]
-    [InlineData("rejected")]
-    [InlineData("undelivered")]
-    public async Task StartWhichTheOperationHostDoesNotAcceptIsUnavailable(string failure)
+    [Fact]
+    public async Task StartWhoseWorkItsGrainRejectsFailsAsNotStarted()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        var orderId = Guid.NewGuid().ToString("N");
+        var requestId = Guid.NewGuid().ToString();
 
-        using var response = await StartAsync(new NexusApprovalInput(Guid.NewGuid().ToString("N"), "widget"), $"{failure}-{Guid.NewGuid():N}", cancellationToken);
+        // The order's grain already holds other work under the root which the operation's work would use.
+        var workRootId = TaskId.CreateRoot(DurableHttpFixture.ApprovalsScope).Child("@").Child(requestId).ToString();
+        await fixture.Client.GetGrain<IDurableHttpTestGrain>(orderId).EchoAsync("other").WithId(workRootId).ScheduleAsync(cancellationToken);
 
-        await AssertHandlerErrorAsync(response, HttpStatusCode.ServiceUnavailable, "UNAVAILABLE", cancellationToken);
+        using var response = await StartAsync(new NexusApprovalInput(orderId, "widget"), requestId, cancellationToken);
+        Assert.Equal(HttpStatusCode.FailedDependency, response.StatusCode);
+        var failure = await ReadJsonAsync(response, cancellationToken);
+        Assert.Equal("failed", failure.GetProperty("details").GetProperty("state").GetString());
+        Assert.Equal(DurableOperationError.NotStartedCode, failure.GetProperty("details").GetProperty("code").GetString());
     }
 
     [Theory]

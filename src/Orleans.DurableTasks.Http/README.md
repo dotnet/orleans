@@ -21,7 +21,7 @@ builder.Services.AddDurableHttp();
 var app = builder.Build();
 
 var orders = app.MapGroup("/orders/{orderId}")
-    .WithDurableOperations()
+    .WithDurableOperations("orders")
     .RequireAuthorization("orders");
 
 orders.MapPost("/place", (string orderId, PlaceOrder order, IGrainFactory grains) =>
@@ -38,15 +38,21 @@ endpoint filters on the group cover its starts and the routes which serve its
 operations.
 
 The request's `Idempotency-Key` names the operation, so each retry of the request
-reaches the operation which its first attempt started. An operation identifier has
-1 to 255 printable ASCII characters other than `/`. The operation's key is the path
-of its group, with the request's route values, and its identifier, such as
-`orders/42/{id}`, so each order has its own operations. A scope, such as
-`WithDurableOperations("orders")`, replaces the path: groups and Nexus services of
-one scope and equal route values address the same operations.
-`DurableHttpOptions.MapOperationId` maps identifiers on every request, so the
-application scopes them by what is relevant to its business, such as an account, as
-Stripe scopes keys to accounts.
+reaches the operation which its first attempt started. A start requires the key, and
+a request without one receives `400 Bad Request` unless
+`DurableHttpOptions.RequireIdempotencyKey` is `false`. An operation identifier has
+1 to 255 printable ASCII characters other than `/`, and isn't `.` or `..`.
+
+The operation's key is the group's scope, the request's values for the group's route
+parameters, the caller's scope, and the identifier, each a segment of its own, such
+as `orders/42/@ada/{id}`. The scope is a stable name, so renaming the group's routes
+keeps its operations; groups and Nexus services of one scope and equal route values
+address the same operations. `DurableHttpOptions.GetCallerScope` returns the caller's
+authorization scope, by default the authenticated user's `NameIdentifier` or `sub`
+claim, so a caller reaches only its own operations: an identifier which another caller
+learns names nothing for that caller. An application whose authorization grants
+access by account returns the account, as Stripe scopes keys to accounts. Anonymous
+callers share one scope, and an authenticated caller without a scope is rejected.
 
 An operation host grain, which the operation's key addresses, starts the call as a
 root task on its grain, named by the operation's key, and completes with its outcome,
@@ -54,7 +60,8 @@ so requests which observe, cancel, or signal the operation reach it by its ident
 alone. A handler which returns a
 reference to an existing task, such as `grain.GetDurableTask<Receipt>(id)`, starts an
 operation which subscribes to that task: the operation reports the task's outcome,
-and its cancellation and signals reach the task:
+and its signals reach the task. Cancelling the operation ends its subscription, and
+the task, which other parties own, continues:
 
 ```csharp
 orders.MapPost("/fulfillment", (string orderId, IGrainFactory grains) =>
@@ -67,10 +74,10 @@ A start responds:
 | --- | --- |
 | `200 OK` with the result, or `204 No Content` | The operation succeeded, including within the wait which `Prefer: wait=N` requests. |
 | `202 Accepted` with the status monitor | The operation is running, including for a retry which arrives before it completes, as Azure repeatable requests and Stripe's v2 idempotency resume work. |
-| `424 Failed Dependency` with the status monitor | The operation failed or was canceled, including when its grain rejected the call. |
-| `400 Bad Request` | The `Idempotency-Key` is invalid, or missing when `RequireIdempotencyKey` is set. |
+| `424 Failed Dependency` with the status monitor | The operation failed or was canceled. When the call's grain didn't accept it, such as a call which arrived after the grain's admission window, the call never ran and the error's code is `NotStarted`; a new key starts it again. |
+| `400 Bad Request` | The `Idempotency-Key` is invalid, or missing. |
 | `422 Unprocessable Content` | Another request used the key to start other work. |
-| `502 Bad Gateway` | The operation's host didn't accept it, so the request can be sent again. |
+| `503 Service Unavailable` with `Retry-After` | The request didn't reach the operation, which it left unchanged, so the client sends it again with the same key. |
 
 Responses which identify an operation carry an `Operation-Location` header, the URL
 of its status monitor:
@@ -101,13 +108,21 @@ serves its operations:
   reconnects.
 - `POST {group}/operations/{id}:cancel` durably requests cancellation, with an
   optional `{"reason": "..."}` body which the task reads from
-  `DurableTask.Current.TaskCancellationReason`, and returns `202 Accepted`. The task's
-  body decides its outcome, which the status monitor reports.
+  `DurableTask.Current.TaskCancellationReason`, and returns `202 Accepted`; a terminal
+  operation returns `200 OK` unchanged. The task's body decides its outcome, which the
+  status monitor reports.
 - `POST {group}/operations/{id}/signals/{name}` delivers a signal which
   `MapDurableSignal` maps, with the JSON body as its value, and returns
   `204 No Content` once the task durably holds it, including for a repeated signal
-  with an equal value. A different value, or a signal to an operation which
-  completed without it, returns `409 Conflict`.
+  with an equal value. A request without a body returns `400 Bad Request`. A
+  different value, or a signal to an operation which completed without it, returns
+  `409 Conflict`.
+
+The operation's host records the task which performs its work in its journal once
+that task's grain holds it, and requests which cancel or signal the operation read
+the task from there, whichever activation serves them. A start which returns
+`202 Accepted` follows the record, and a request which arrives before it receives
+`503 Service Unavailable` with `Retry-After`.
 
 The host retains a completed operation, and so deduplicates its key and serves its
 status monitor, for `DurableTaskOptions.ResultRetentionPeriod`.
@@ -140,8 +155,8 @@ app.MapGroup("/nexus").WithDurableOperations("payments").MapDurableSignal(Paymen
   operation which its `Nexus-Operation-Token` header or `token` query value names,
   and returns `202 Accepted`.
 - Invalid, conflicting, and unknown requests receive Nexus handler errors:
-  `400 BAD_REQUEST`, `409 CONFLICT`, and `404 NOT_FOUND`. A start which the
-  operation's host doesn't accept receives `503 UNAVAILABLE`, which the caller retries.
+  `400 BAD_REQUEST`, `409 CONFLICT`, and `404 NOT_FOUND`. A request which didn't
+  reach the operation receives `503 UNAVAILABLE`, which the caller retries.
 
 `MapNexusOperation` binds its handler's parameters by reflection, as Minimal APIs bind
 a `MapPost` handler which the request delegate generator doesn't intercept.
@@ -173,14 +188,28 @@ siloBuilder.Services.AddSingleton<IDurableWebhookSigner, MyWebhookSigner>();
 
 `DurableHttpOptions.AllowCallback` decides which URLs the application accepts; by
 default it accepts none, and a request with another URL receives `400 Bad Request`.
+Deliveries connect only to addresses which `DurableCallbackOptions.AllowAddress`
+accepts, by default public ones, when they connect, so a host name which resolves to
+an internal address, including after the application accepted it, isn't reached.
+Deliveries don't follow redirects. The callback client's primary handler is a
+`SocketsHttpHandler` which applies the check, and a client whose primary handler the
+package can't constrain fails to build.
+
 Each callback is a durable task on a relay grain in the silos, which subscribes to
-the operation and delivers its outcome, retrying with backoff and `Retry-After` until
-the receiver answers `2xx`, or `410 Gone`, or `DurableCallbackOptions.RetryTimeout`
-elapses. A retried start registers the same callback, which delivers once.
-Deliveries are at least once: a webhook's `webhook-id` is equal for each attempt, and
-an `IDurableWebhookSigner`, which holds the application's keys, adds
-`webhook-signature`. `AddDurableHttpCallbacks` returns the builder of the
-`HttpClient` which delivers callbacks, to configure its handlers.
+the operation and delivers its outcome, until the receiver answers `2xx` or
+`410 Gone`, or `DurableCallbackOptions.RetryTimeout` elapses. Each retry waits for the
+longer of a doubling backoff and the receiver's `Retry-After`, at most
+`DurableCallbackOptions.MaxRetryInterval`, plus up to a quarter more. A retried start
+reaches the same relay, which keeps the first registration's headers. Deliveries are
+at least once: a webhook's `webhook-id` is equal for each attempt, and an
+`IDurableWebhookSigner`, which holds the application's keys, adds
+`webhook-signature`. The relay logs failed attempts, and a delivery which it gives
+up on. `AddDurableHttpCallbacks` returns the builder of the `HttpClient` which
+delivers callbacks, to configure its handlers.
+
+The hosts protect the values of callback headers, which can be credentials, with
+ASP.NET Core Data Protection before the silos store them, so hosts and silos share a
+Data Protection key ring and application name.
 
 ## Calling HTTP APIs from durable tasks
 
@@ -191,6 +220,8 @@ siloBuilder.Services.AddDurableHttpClient("payments")
 
 public sealed class OrderGrain([FromKeyedServices("payments")] IDurableHttpClient payments) : DurableGrain, IOrderGrain
 {
+    public static readonly DurableSignal<string> Approval = new("approval");
+
     public async DurableTask<Receipt> PlaceAsync(PlaceOrder order)
     {
         var payment = await payments.StartOperationAsync(() => new HttpRequestMessage(HttpMethod.Post, "authorizations")
@@ -237,12 +268,21 @@ a failed or canceled operation. Any other response which locates the operation r
 it: an `Operation-Location` or `Azure-AsyncOperation` status monitor, such as this
 package's operations and Azure long-running operations serve, including on an Azure
 `201 Created` response, or a `Location` on a `202 Accepted` response, which answers
-`202 Accepted` until it returns the result. `DurableHttpWaitMode.Poll` polls after the interval which
-`Retry-After` advertises, or `DurableHttpOperationOptions.PollInterval`, with durable
-delays between polls; `DurableHttpWaitMode.Events` reads the status monitor's events
-within one step, which learns the outcome as soon as the server reports it. A failed
-or canceled operation throws `DurableHttpOperationException` with its status, code,
-and message.
+`202 Accepted` until it returns the result. The client follows locations of the start
+request's origin, which `DurableHttpClientOptions.FollowOperationLocation` decides, so
+a server can't direct the client's credentials at another one.
+
+`DurableHttpWaitMode.Poll` polls with durable delays between polls: the interval which
+`Retry-After` advertises, at least `DurableHttpOperationOptions.PollInterval` and at
+most `MaxPollInterval`, and none after a server which applied the poll's
+`Prefer: wait`. A poll which receives `408`, `429`, `502`, `503`, or `504` polls again.
+`DurableHttpWaitMode.Events` reads the status monitor's events within one step, which
+learns the outcome as soon as the server reports it. A failed or canceled operation
+throws `DurableHttpOperationException` with its status, code, and message.
+
+Recorded responses omit `Set-Cookie` headers, and their content is at most
+`DurableHttpClientOptions.MaxResponseContentLength`, one mebibyte by default; a larger
+response fails its step.
 
 `DurableHttpClientOptions.SerializerOptions` serializes request values and results,
 with the Minimal API JSON defaults unless configured. A trimmed or NativeAOT
@@ -253,4 +293,4 @@ which send requests from their own steps with `DurableTask.Run`.
 
 The [DurableOrderProcessing playground](../../playground/DurableOrderProcessing) runs these
 pieces together, from a browser which persists each checkout's key to a payment gateway which
-deduplicates by the key that each payment step derives.
+deduplicates authorizations by their keys.

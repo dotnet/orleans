@@ -49,7 +49,7 @@ internal static class NexusProtocol
     public const string RequestId = "Nexus-Request-Id";
     public const string OperationToken = "Nexus-Operation-Token";
     public const string OperationState = "Nexus-Operation-State";
-    public const string RequestTimeout = "Request-Timeout";
+    public const string OperationCloseTime = "Nexus-Operation-Close-Time";
     public const string TokenQuery = "token";
     public const string CallbackQuery = "callback";
     public const string CallbackHeaderPrefix = "Nexus-Callback-";
@@ -94,6 +94,7 @@ internal sealed record NexusServiceMetadata(string Scope)
         ?? throw new InvalidOperationException(
             $"Nexus operation endpoints belong to a group which MapNexusService maps, but '{context.GetEndpoint()?.DisplayName}' doesn't.");
 
-    /// <summary>Returns the key of the operation which <paramref name="mappedId"/> maps for the request.</summary>
-    public string GetKey(string mappedId) => TaskId.CreateRoot(Scope).Child(mappedId).ToString();
+    /// <summary>Returns the key of the operation <paramref name="operationId"/> of the request's caller.</summary>
+    public string GetKey(HttpContext context, DurableHttpOptions options, string operationId) =>
+        DurableOperationKeys.Complete(TaskId.CreateRoot(Scope), context, options, operationId);
 }

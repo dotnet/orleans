@@ -113,7 +113,85 @@ public enum DurableOperationStatus
 [Alias("Orleans.DurableTasks.Http.DurableOperationError")]
 public sealed record DurableOperationError(
     [property: JsonPropertyName("code")] string Code,
-    [property: JsonPropertyName("message")] string Message);
+    [property: JsonPropertyName("message")] string Message)
+{
+    /// <summary>
+    /// The code of a failed operation whose work never ran, because the grain which runs it didn't accept it, such as
+    /// when the work arrived after the grain's admission window. A client starts the work again with a new
+    /// <c>Idempotency-Key</c>.
+    /// </summary>
+    public const string NotStartedCode = "NotStarted";
+}
+
+/// <summary>
+/// Represents an operation whose work never ran, because the grain which runs it didn't accept it.
+/// </summary>
+/// <remarks>
+/// The operation's host fails with this exception when scheduling its work fails, so clients distinguish work which never
+/// ran from work which ran and failed.
+/// </remarks>
+[GenerateSerializer]
+[Alias("Orleans.DurableTasks.Http.DurableOperationNotStartedException")]
+internal sealed class DurableOperationNotStartedException : Exception
+{
+    private DurableOperationNotStartedException()
+    {
+    }
+
+    public DurableOperationNotStartedException(string? code, Exception innerException)
+        : base(code is null ? "The operation's work wasn't started." : $"The operation's work wasn't started ({code}).", innerException)
+    {
+        Code = code;
+    }
+
+    /// <summary>Gets the rejection code which the work's grain reported, or <see langword="null"/> for none.</summary>
+    [Id(0)]
+    public string? Code { get; private set; }
+}
+
+/// <summary>Describes durable task responses as operations, for every protocol which serves them.</summary>
+internal static class DurableOperationResponses
+{
+    /// <summary>Returns the error which describes a failed or canceled response to clients.</summary>
+    public static DurableOperationError GetError(DurableTaskResponse response, DurableHttpOptions options) => response.Exception switch
+    {
+        DurableOperationNotStartedException notStarted => new(DurableOperationError.NotStartedCode, notStarted.Message),
+        { } exception => options.CreateError(exception),
+        null => throw new InvalidOperationException($"A {response.Status} response carries its exception."),
+    };
+
+    /// <summary>Returns the status monitor of the operation <paramref name="operationId"/>, whose response is <paramref name="response"/>.</summary>
+    public static DurableOperation ToOperation(string operationId, DurableTaskResponse response, JsonSerializerOptions json, DurableHttpOptions options) =>
+        response.Status switch
+        {
+            DurableTaskStatus.CompletedSuccessfully => new(
+                operationId,
+                DurableOperationStatus.Succeeded,
+                Result: response.ResultType is { } resultType ? JsonSerializer.SerializeToElement(response.Result, json.GetTypeInfo(resultType)) : null),
+            DurableTaskStatus.Failed => new(operationId, DurableOperationStatus.Failed, Error: GetError(response, options)),
+            DurableTaskStatus.Canceled => new(operationId, DurableOperationStatus.Canceled, Error: GetError(response, options)),
+            _ => new(operationId, DurableOperationStatus.Running),
+        };
+
+    /// <summary>Returns the Nexus state of a terminal response.</summary>
+    public static string GetNexusState(DurableTaskResponse response) => response.Status switch
+    {
+        DurableTaskStatus.CompletedSuccessfully => NexusProtocol.Succeeded,
+        DurableTaskStatus.Failed => NexusProtocol.Failed,
+        DurableTaskStatus.Canceled => NexusProtocol.Canceled,
+        var status => throw new InvalidOperationException($"A Nexus state describes a terminal response, not a {status} one."),
+    };
+
+    /// <summary>Returns the Nexus <c>Failure</c> which reports a failed or canceled response.</summary>
+    public static NexusFailure ToNexusFailure(DurableTaskResponse response, DurableHttpOptions options)
+    {
+        var error = GetError(response, options);
+        return new(
+            error.Message,
+            new() { ["type"] = NexusProtocol.OperationErrorType },
+            new() { ["state"] = GetNexusState(response), ["code"] = error.Code });
+    }
+}
 
 /// <summary>Requests cancellation of an operation.</summary>
 /// <param name="Reason">
