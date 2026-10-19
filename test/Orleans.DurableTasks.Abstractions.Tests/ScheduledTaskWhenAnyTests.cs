@@ -68,7 +68,7 @@ public class ScheduledTaskWhenAnyTests
         });
 
         Assert.True(await await root.WithId("root").ScheduleAsync(TestCancellation));
-        Assert.Equal([TaskId.Parse("root/$when-any-2/$winner")], host.DecisionIds);
+        Assert.Equal([TaskId.Parse("root/$when-any-1/$winner")], host.DecisionIds);
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public class ScheduledTaskWhenAnyTests
             async () => await await root.WithId("root").ScheduleAsync(TestCancellation));
 
         Assert.Equal("The durable task has not completed.", exception.Message);
-        Assert.Equal([TaskId.Parse("root/$when-any-2/$winner")], host.DecisionIds);
+        Assert.Equal([TaskId.Parse("root/$when-any-1/$winner")], host.DecisionIds);
     }
 
     [Fact]

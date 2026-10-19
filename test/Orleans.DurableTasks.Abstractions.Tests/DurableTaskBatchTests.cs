@@ -59,9 +59,9 @@ public class DurableTaskBatchTests
                 .WithId("canceled")
                 .ScheduleAsync();
 
-            // A wait which returns the response, or a poll which observes it, caches it in the handle.
+            // A wait which returns the response caches it in the handle.
             Assert.Equal(DurableTaskStatus.Failed, (await failed.GetResponseAsync()).Status);
-            Assert.True(await canceled.IsCompletedAsync(new PollingOptions { PollTimeout = TimeSpan.FromSeconds(10) }));
+            Assert.Equal(DurableTaskStatus.Canceled, (await canceled.GetResponseAsync()).Status);
 
             Assert.Equal(DurableTaskStatus.Failed, failed.Status);
             Assert.Equal("failed", Assert.IsType<InvalidOperationException>(failed.Exception).Message);

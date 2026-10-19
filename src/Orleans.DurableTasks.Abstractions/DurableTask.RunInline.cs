@@ -46,7 +46,11 @@ public abstract partial class DurableTask
     /// </para>
     /// <para>
     /// The effect passes data to the body through its result: assignments to the body's variables happen only in the run
-    /// which runs the effect. It doesn't await, schedule durable operations, or block on tasks.
+    /// which runs the effect. It doesn't await or block on tasks. A <c>RunInline</c> call within the effect runs as part of
+    /// it, and the effect's record holds its outcome. Every other durable operation within the effect, such as starting a
+    /// step or a child, a combinator, or <see cref="GetVersion(string, int, int)"/>, throws
+    /// <see cref="InvalidOperationException"/>, which the effect records as its outcome: a replay doesn't run the effect,
+    /// so the operation would be missing from it.
     /// </para>
     /// <para>
     /// The effect runs immediately, in the calling work item, where <see cref="DurableTask.Run{TResult}(Func{Task{TResult}})"/>
@@ -91,7 +95,7 @@ public abstract partial class DurableTask
         }
 
         return GetEffectContext(name) is { } context
-            ? RunEffect(context, context.CreateNamedChildId(name), effect, static effect => DurableTaskResponse.FromResult(effect())).GetResult<TResult>()
+            ? RunEffect(context, name, effect, static effect => DurableTaskResponse.FromResult(effect())).GetResult<TResult>()
             : effect();
     }
 
@@ -130,7 +134,7 @@ public abstract partial class DurableTask
 
         RunEffect(
             context,
-            context.CreateNamedChildId(name),
+            name,
             effect,
             static effect =>
             {
@@ -187,7 +191,7 @@ public abstract partial class DurableTask
     /// </para>
     /// <para>
     /// Unnamed effects and unnamed children share one count of generated identifiers, in the order in which a run of the
-    /// body creates them, as <see cref="DurableTaskContext.CreateChildTaskId(string)"/> describes. A replay therefore
+    /// body creates them. A replay therefore
     /// finds each recorded outcome when the body creates its unnamed operations in the same order. Name an effect when
     /// the body's unnamed operations can change order or number between runs, for example across deployments.
     /// </para>
@@ -218,7 +222,7 @@ public abstract partial class DurableTask
         }
 
         return DurableTaskContext.Ambient is { } context
-            ? RunEffect(context, context.CreateChildTaskId(null), effect, static effect => DurableTaskResponse.FromResult(effect())).GetResult<TResult>()
+            ? RunEffect(context, name: null, effect, static effect => DurableTaskResponse.FromResult(effect())).GetResult<TResult>()
             : effect();
     }
 
@@ -253,7 +257,7 @@ public abstract partial class DurableTask
 
         RunEffect(
             context,
-            context.CreateChildTaskId(null),
+            name: null,
             effect,
             static effect =>
             {
@@ -303,23 +307,38 @@ public abstract partial class DurableTask
         return DurableTaskContext.Ambient;
     }
 
+    /// <summary>
+    /// Records <paramref name="effect"/>'s outcome under its identifier, or runs it as part of the enclosing effect when the
+    /// calling code already runs in one.
+    /// </summary>
+    /// <remarks>
+    /// The enclosing effect's record holds the nested effect's outcome, so the nested effect takes no identifier: a replay
+    /// returns the enclosing effect's outcome without running either, and the body's later operations keep their
+    /// identifiers.
+    /// </remarks>
     private static DurableTaskResponse RunEffect<TEffect>(
         DurableTaskContext context,
-        TaskId effectId,
+        string? name,
         TEffect effect,
         Func<TEffect, DurableTaskResponse> run)
     {
-        context.ThrowIfAttemptCanceled();
-        return context.RunEffect(effectId, (effect, run), static state => Invoke(state));
+        if (context.IsRunningEffect)
+        {
+            return run(effect);
+        }
+
+        context.ThrowIfCannotRunOperation();
+        var effectId = context.CreateChildTaskId(name);
+        return context.RunEffect(effectId, (Context: context, Effect: effect, Run: run), static state => Invoke(state));
     }
 
     // A canceled attempt records no effects, so its cancellation propagates instead of becoming the effect's outcome.
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "The effect's failure is recorded as its outcome.")]
-    private static DurableTaskResponse Invoke<TEffect>((TEffect Effect, Func<TEffect, DurableTaskResponse> Run) state)
+    private static DurableTaskResponse Invoke<TEffect>((DurableTaskContext Context, TEffect Effect, Func<TEffect, DurableTaskResponse> Run) state)
     {
         try
         {
-            return state.Run(state.Effect);
+            return state.Context.RunAsEffect(state, static state => state.Run(state.Effect));
         }
         catch (Exception exception) when (exception is not DurableTaskAttemptCanceledException)
         {

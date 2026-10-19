@@ -55,7 +55,7 @@ public abstract partial class DurableTask
             ScheduledTask.TimeoutOperation,
             [task, delay],
             async (inputs, context, operationId) =>
-                (await WaitWithTimeoutAsync(inputs, context, operationId, reason).ConfigureAwait(false)).EnsureSuccessfulCompletion());
+                (await WaitWithTimeoutAsync(inputs, context, operationId, reason)).EnsureSuccessfulCompletion());
 
     /// <inheritdoc cref="WithTimeout(DurableTask, DurableTask, string)"/>
     internal static DurableTask<TResult> WithTimeout<TResult>(DurableTask<TResult> task, DurableTask delay, string reason)
@@ -63,11 +63,11 @@ public abstract partial class DurableTask
             ScheduledTask.TimeoutOperation,
             [task, delay],
             async (inputs, context, operationId) =>
-                (await WaitWithTimeoutAsync(inputs, context, operationId, reason).ConfigureAwait(false)).GetResult<TResult>());
+                (await WaitWithTimeoutAsync(inputs, context, operationId, reason)).GetResult<TResult>());
 
     private static async Task<int> RaceCoreAsync(DurableTask[] inputs, DurableTaskContext context, TaskId operationId)
     {
-        var (index, response) = await RaceAsync(inputs, context, operationId).ConfigureAwait(false);
+        var (index, response) = await RaceAsync(inputs, context, operationId);
         response.EnsureSuccessfulCompletion();
         return index;
     }
@@ -77,7 +77,7 @@ public abstract partial class DurableTask
         DurableTaskContext context,
         TaskId operationId)
     {
-        var (index, response) = await RaceAsync(inputs, context, operationId).ConfigureAwait(false);
+        var (index, response) = await RaceAsync(inputs, context, operationId);
         return (index, response.GetResult<TResult>());
     }
 
@@ -89,9 +89,8 @@ public abstract partial class DurableTask
         TaskId operationId)
     {
         var cancellationToken = context.AttemptCancellationToken;
-        var (tasks, index) = await SelectAsync(inputs, context, operationId, cancellationToken).ConfigureAwait(false);
-        var responses = await ScheduledTask.SettleRaceAsync(tasks, index, ScheduledTask.RaceLostReason, cancellationToken)
-            .ConfigureAwait(false);
+        var (tasks, index) = await SelectAsync(inputs, context, operationId, cancellationToken);
+        var responses = await ScheduledTask.SettleRaceAsync(tasks, index, ScheduledTask.RaceLostReason, cancellationToken);
         return (index, responses[index]);
     }
 
@@ -102,7 +101,7 @@ public abstract partial class DurableTask
         string reason)
     {
         var cancellationToken = context.AttemptCancellationToken;
-        var (tasks, index) = await SelectAsync(inputs, context, operationId, cancellationToken).ConfigureAwait(false);
-        return await ScheduledTask.SettleTimeoutAsync(tasks, index, reason, cancellationToken).ConfigureAwait(false);
+        var (tasks, index) = await SelectAsync(inputs, context, operationId, cancellationToken);
+        return await ScheduledTask.SettleTimeoutAsync(tasks, index, reason, cancellationToken);
     }
 }

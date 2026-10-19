@@ -389,6 +389,70 @@ public class DurableTaskRunInlineTests
         Assert.Equal(0, runs);
     }
 
+    [Fact]
+    public async Task NestedEffectsRunAsPartOfTheEnclosingEffectAndTakeNoIdentifier()
+    {
+        var host = new TestHost(Now);
+        var taskId = TaskId.CreateRoot("root");
+        var runs = 0;
+
+        // The enclosing effect's record holds the nested effect's outcome, so a replay, which runs neither, assigns the
+        // body's later effect the same identifier and returns its own recorded value.
+        (Guid Audit, int Charge, int Next) Body()
+        {
+            var pay = DurableTask.RunInline("pay", () => (Audit: DurableTask.RunInline(Guid.NewGuid), Charge: ++runs));
+            var next = DurableTask.RunInline(() => 100 + ++runs);
+            return (pay.Audit, pay.Charge, next);
+        }
+
+        var first = await RunAsync(host, taskId, Body);
+        var replayed = await RunAsync(host, taskId, Body);
+
+        Assert.Equal((1, 102), (first.Charge, first.Next));
+        Assert.Equal(first, replayed);
+        Assert.Equal(2, runs);
+        Assert.Equal(
+            ["root/$child-1", "root/pay"],
+            host.Effects.Keys.Select(id => id.ToString()).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task DurableOperationsWithinAnEffectFailTheEffectWithoutTakingIdentifiers()
+    {
+        var host = new TestHost(Now);
+        var taskId = TaskId.CreateRoot("root");
+        var runs = 0;
+
+        (string[] Failures, int Next) Body()
+        {
+            var failures = new[]
+            {
+                Capture(() => DurableTask.RunInline("post", () => DurableTask.Run(static _ => 1).WithId("child").Post())),
+                Capture(() => DurableTask.RunInline("unnamed-post", () => DurableTask.Run(static _ => 1).Post())),
+                Capture(() => DurableTask.RunInline("version", () => DurableTask.GetVersion("change", 0, 1))),
+            };
+            var next = DurableTask.RunInline(() => ++runs);
+            return (failures, next);
+        }
+
+        var first = await RunAsync(host, taskId, Body);
+        var replayed = await RunAsync(host, taskId, Body);
+
+        // Each failure is the effect's recorded outcome, so a replay observes it without running the effect, and the
+        // failed operations took no identifiers: the unnamed effect which follows them is the first.
+        Assert.All(first.Failures, static failure => Assert.Contains("RunInline effect runs once", failure, StringComparison.Ordinal));
+        Assert.Equal(first.Failures, replayed.Failures);
+        Assert.Equal((1, 1), (first.Next, replayed.Next));
+        Assert.Equal(1, runs);
+        Assert.DoesNotContain(host.EntryIds, static id => id != TaskId.CreateRoot("root"));
+        Assert.Equal(
+            ["root/$child-1", "root/post", "root/unnamed-post", "root/version"],
+            host.Effects.Keys.Select(id => id.ToString()).Order(StringComparer.Ordinal));
+
+        static string Capture(Action operation)
+            => Assert.Throws<InvalidOperationException>(operation).Message;
+    }
+
     private static async Task<T> RunAsync<T>(TestHost host, TaskId taskId, Func<T> body)
     {
         var response = await DurableTaskRuntimeHelper.RunAsync(DurableTask.Run(_ => body()), host.CreateContext(taskId));
@@ -418,7 +482,6 @@ public class DurableTaskRunInlineTests
         protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
-        protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId) => throw new NotSupportedException();
 
         protected override ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken)
             => throw new NotSupportedException();
