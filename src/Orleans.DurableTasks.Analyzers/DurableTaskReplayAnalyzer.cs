@@ -70,7 +70,11 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             {
                 foreach (var operation in block.OperationBlocks)
                 {
-                    if (operation is IMethodBodyBaseOperation or IBlockOperation { Parent: null or IMethodBodyBaseOperation } && block.OwningSymbol is IMethodSymbol method)
+                    // Building a control flow graph is the analyzer's main cost, so methods which use no durable task API
+                    // skip it: they contain no body, effect, or helper which the rules inspect.
+                    if (operation is IMethodBodyBaseOperation or IBlockOperation { Parent: null or IMethodBodyBaseOperation }
+                        && block.OwningSymbol is IMethodSymbol method
+                        && (symbols.IsDurableBody(method) || UsesDurableTasks(symbols, operation)))
                     {
                         var graph = block.GetControlFlowGraph(operation);
                         new BodyAnalysis(block, symbols, helpers).AnalyzeGraph(graph, ClassifyMethod(symbols, helpers, method, graph));
@@ -78,6 +82,27 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                 }
             });
         });
+    }
+
+    /// <summary>
+    /// Returns whether an operation tree uses the durable task API: it calls or awaits a member of the durable task
+    /// namespace, or contains a durable task body.
+    /// </summary>
+    private static bool UsesDurableTasks(DurableTaskSymbols symbols, IOperation root)
+    {
+        foreach (var operation in root.DescendantsAndSelf())
+        {
+            switch (operation)
+            {
+                case IInvocationOperation invocation when symbols.IsInDurableTasksNamespace(invocation.TargetMethod.ContainingType):
+                case IAwaitOperation await when symbols.IsInDurableTasksNamespace(await.Operation.Type):
+                case IAnonymousFunctionOperation function when symbols.IsDurableBody(function.Symbol):
+                case ILocalFunctionOperation localFunction when symbols.IsDurableBody(localFunction.Symbol):
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private enum FunctionKind
