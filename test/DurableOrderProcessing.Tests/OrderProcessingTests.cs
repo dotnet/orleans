@@ -2,8 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using DurableOrderProcessing.Grains;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.DurableJobs;
 using Orleans.DurableTasks.Http;
-using Orleans.Core.Internal;
 using Orleans.Runtime;
 using Xunit;
 
@@ -191,45 +192,60 @@ public sealed class OrderProcessingTests(OrderProcessingFixture fixture)
     public async Task OrderReplayedAfterDeactivationsAppendsEachSnapshotOnceAndAuthorizesOnce()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        var gracePeriod = TimeSpan.FromMinutes(1);
+        var clock = new ReplayClock(gracePeriod);
+        // The clock belongs to this test, and the silo owns the volatile journals used by every replacement activation.
+        await using var replay = new OrderProcessingFixture(silo =>
+        {
+            silo.Services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs, clock);
+            silo.Services.Configure<OrderingOptions>(options => options.GracePeriod = gracePeriod);
+        }, initialSilosCount: 1);
+        await replay.InitializeAsync();
         var buyerId = NewBuyer();
         var orderId = Guid.NewGuid();
-        await fixture.FillBasketAsync(buyerId, 7);
-        using var started = await fixture.CheckoutAsync(buyerId, orderId);
+        var order = replay.Client.GetGrain<IOrderGrain>(orderId);
+        await replay.FillBasketAsync(buyerId, 7);
+        using var started = await replay.CheckoutAsync(buyerId, orderId);
 
         // Deactivates the order within its grace period, so its next activation replays the workflow from its start.
-        await fixture.WaitForStatusAsync(orderId, OrderStatus.Submitted);
+        await replay.WaitForStatusAsync(orderId, OrderStatus.Submitted);
+        Assert.Empty(replay.Gateway.List());
         await DeactivateOrderAsync();
-        await fixture.WaitForStatusAsync(orderId, OrderStatus.Paid);
+        Assert.Equal(OrderStatus.Submitted, (await order.GetAsync())!.Order.Status);
+        Assert.Empty(replay.Gateway.List());
+        clock.Resume();
+        await replay.WaitForStatusAsync(orderId, OrderStatus.Paid);
 
         // Deactivates the paid order and its operation's host, so the shipped signal reaches both through recovery.
         await DeactivateOrderAsync();
-        await fixture.Client.GetGrain(GrainId.Create("orleans-durable-operation", $"orders/@/{orderId}"))
-            .AsReference<IGrainManagementExtension>()
-            .DeactivateOnIdle(cancellationToken);
-        using (var ship = await Http.PostAsJsonAsync($"/api/orders/operations/{orderId}/signals/shipped", new Shipment(Guid.NewGuid()), cancellationToken))
+        await replay.Cluster.DeactivateAsync(GrainId.Create("orleans-durable-operation", $"orders/@/{orderId}"));
+        using (var ship = await replay.Http.PostAsJsonAsync($"/api/orders/operations/{orderId}/signals/shipped", new Shipment(Guid.NewGuid()), cancellationToken))
         {
             Assert.Equal(HttpStatusCode.NoContent, ship.StatusCode);
         }
 
-        var operation = await fixture.WaitForOperationAsync(orderId);
+        var operation = await replay.WaitForOperationAsync(orderId);
         Assert.Equal("Shipped", operation.GetProperty("result").GetProperty("status").GetString());
 
         // Each transition appended its snapshot once, and the gateway received one authorization request.
         var statuses = new List<OrderStatus>();
-        await foreach (var snapshot in fixture.Client.GetGrain<IOrderGrain>(orderId).WatchAsync(cancellationToken))
+        await foreach (var snapshot in order.WatchAsync(cancellationToken))
         {
             statuses.Add(snapshot.Order.Status);
         }
 
         Assert.Equal([OrderStatus.Submitted, OrderStatus.AwaitingValidation, OrderStatus.StockConfirmed, OrderStatus.Paid, OrderStatus.Shipped], statuses);
-        var authorization = Assert.Single(fixture.Gateway.List(), entry => entry.OrderId == orderId);
+        var authorization = Assert.Single(replay.Gateway.List(), entry => entry.OrderId == orderId);
         Assert.Equal(1, authorization.Requests);
         Assert.Equal("Succeeded", authorization.Status);
 
         async Task DeactivateOrderAsync()
         {
-            using var response = await Http.PostAsync($"/api/orders/{orderId}/deactivate", content: null, cancellationToken);
+            Assert.True(replay.Cluster.TryGetGrainContext(order.GetGrainId(), out var activation));
+            var deactivated = activation.Deactivated;
+            using var response = await replay.Http.PostAsync($"/api/orders/{orderId}/deactivate", content: null, cancellationToken);
             Assert.True(response.IsSuccessStatusCode);
+            await deactivated.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         }
     }
 
@@ -345,4 +361,18 @@ public sealed class OrderProcessingTests(OrderProcessingFixture fixture)
     }
 
     private static string NewBuyer() => $"buyer-{Guid.NewGuid():N}";
+
+    private sealed class ReplayClock(TimeSpan gracePeriod) : TimeProvider
+    {
+        private readonly DateTimeOffset _start = TimeProvider.System.GetUtcNow();
+        private long _resumedAt;
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            var resumedAt = Interlocked.Read(ref _resumedAt);
+            return resumedAt == 0 ? _start : _start + gracePeriod + GetElapsedTime(resumedAt);
+        }
+
+        public void Resume() => Interlocked.Exchange(ref _resumedAt, GetTimestamp());
+    }
 }
