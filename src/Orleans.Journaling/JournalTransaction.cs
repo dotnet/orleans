@@ -29,7 +29,14 @@ internal interface IJournalEntryRedirect
 /// </para>
 /// <para>
 /// Other code sees a guard over its own context while the transaction is open. It reads the transaction's uncommitted
-/// changes, as an interleaving request sees any request's intermediate state, and its writes to held states throw.
+/// changes, as an interleaving request sees any request's intermediate state, and its writes to held states throw
+/// <see cref="JournaledStateConflictException"/>. Through a context which records accesses, such as a durable task body's,
+/// reads of held states throw too, because a record of an uncommitted value would outlive the transaction's abort. The guard
+/// checks within the access which the context runs, so a context which returns a recorded outcome instead of running the
+/// access, as a replay does, never meets the guard, and a context which records the access's outcome sees the conflict
+/// thrown from the access. The host's own work, such as the outbox's deliveries or a runtime's bookkeeping, writes held
+/// states directly into the journal, outside the segment: its changes commute with the transaction's, and an abort's rebuild
+/// replays them.
 /// </para>
 /// <para>
 /// The manager leaves held states out of journal captures and write acknowledgements until the transaction ends, so
@@ -308,6 +315,27 @@ internal sealed class JournalTransaction : JournaledStateContext, IJournalEntryR
         return false;
     }
 
+    // Whether the transaction holds the state of target, including one which it holds because another state's operation
+    // journaled the state's entries.
+    private bool HoldsTarget(JournaledStateAccessTarget target)
+    {
+        var untargeted = false;
+        foreach (var held in _held)
+        {
+            if (ReferenceEquals(held.Target, target))
+            {
+                return true;
+            }
+
+            untargeted |= held.Target is null;
+        }
+
+        return untargeted && Holds(_manager.GetTransactionalState(target).State);
+    }
+
+    private JournaledStateConflictException CreateConflict(JournaledStateAccessTarget target) =>
+        new(_manager, _manager.GetTransactionalState(target).State, target.Name);
+
     private void ThrowIfEnded()
     {
         if (_ended)
@@ -332,7 +360,8 @@ internal sealed class JournalTransaction : JournaledStateContext, IJournalEntryR
         public void Dispose() => _writer.Redirect = _previous;
     }
 
-    // The context of code outside the transaction while it is open: writes to the transaction's states throw.
+    // The context of code outside the transaction while it is open: writes to the transaction's states, and reads of them
+    // which an inner context records, throw JournaledStateConflictException.
     private sealed class Guard(JournalTransaction transaction, JournaledStateContext? inner) : JournaledStateContext
     {
         protected override TResult Access<TArgument, TState, TResult>(
@@ -342,13 +371,28 @@ internal sealed class JournalTransaction : JournaledStateContext, IJournalEntryR
             Func<TState, TResult> operation,
             Action<TState, TResult>? apply)
         {
-            if (access.Kind is JournaledStateAccessKind.Write && transaction.IsHolding(access.Target))
+            if (!transaction.HoldsTarget(access.Target))
             {
-                throw new InvalidOperationException(
-                    $"Journaled state '{access.Target.Name}' is held by an open transaction: only the transaction's code can change it until the transaction ends.");
+                return inner is null ? Run(state, operation, apply) : inner.AccessThrough(access, argument, state, operation, apply);
             }
 
-            return inner is null ? Run(state, operation, apply) : inner.AccessThrough(access, argument, state, operation, apply);
+            var isWrite = access.Kind is JournaledStateAccessKind.Write;
+            if (inner is null)
+            {
+                return isWrite ? throw transaction.CreateConflict(access.Target) : Run(state, operation, apply);
+            }
+
+            // The check runs within the access, so a replayed outcome doesn't meet it, and a recording context sees the
+            // conflict as the access's failure rather than its outcome.
+            var target = access.Target;
+            return inner.AccessThrough(
+                access,
+                argument,
+                (State: state, Operation: operation, Transaction: transaction, Inner: inner, Target: target, IsWrite: isWrite),
+                static held => held.IsWrite || held.Inner.RecordsAccesses
+                    ? throw held.Transaction.CreateConflict(held.Target)
+                    : held.Operation(held.State),
+                apply is null ? null : (held, result) => apply(held.State, result));
         }
     }
 }
