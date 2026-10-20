@@ -32,17 +32,20 @@ internal sealed class DurableOperationService(IGrainFactory grainFactory, TimePr
     /// <param name="wait">How long to wait for the operation to complete.</param>
     /// <param name="cancellationToken">A token which abandons the start's wait.</param>
     /// <remarks>
-    /// The start returns once the operation's host holds it. A running operation's response follows the host's record of
-    /// its work, within <see cref="MaxPollInterval"/>, so requests which then signal or cancel the operation reach its task.
+    /// The start returns once the operation's host holds it and has recorded its work, within <see cref="MaxPollInterval"/>,
+    /// so requests which then signal or cancel the operation reach its task. A start reaches an existing operation when it
+    /// performs the same work: a call of the same method on the same grain, whatever its arguments, or a subscription to
+    /// the same task, as the durable task runtime identifies operations.
     /// </remarks>
     /// <exception cref="DurableTaskConflictException">The operation <paramref name="key"/> performs other work.</exception>
     /// <exception cref="DurableOperationUnavailableException">The operation's host didn't answer within the request's time.</exception>
     public async Task<DurableTaskResponse> StartAsync(string key, DurableTask work, TimeSpan wait, CancellationToken cancellationToken)
     {
         var host = GetHost(key);
-        var definition = work is IDurableTaskReference reference
-            ? host.SubscribeAsync(new(reference.Target, reference.Id))
-            : host.RunAsync(ValidateCall(work));
+        var requested = DurableOperationWork.Describe(work);
+        var definition = requested.IsSubscription
+            ? host.SubscribeAsync(requested.Address!.Value)
+            : host.RunAsync(work);
 
         var started = timeProvider.GetTimestamp();
         ScheduledTask<DurableTaskResponse> scheduled;
@@ -55,12 +58,26 @@ internal sealed class DurableOperationService(IGrainFactory grainFactory, TimePr
             throw new DurableOperationUnavailableException(exception);
         }
 
+        // The host's journal records the work which the operation performs, which identifies the operation. A host which
+        // ended before it recorded its work, such as one which was aborted, reports its own failure.
+        var recorded = await WaitForWorkAsync(host, MaxPollInterval);
+        if (recorded is not null && !requested.IsSameWorkAs(recorded))
+        {
+            throw new DurableTaskConflictException(
+                TaskId.CreateRoot(DurableOperationGrain.RootId),
+                $"The operation '{key}' performs other work than the request: {recorded.Method} on {recorded.Target}.");
+        }
+
         if (scheduled.IsCompleted)
         {
             return Unwrap(await scheduled.GetResponseAsync(cancellationToken));
         }
 
-        await WaitForWorkAsync(host, MaxPollInterval);
+        if (recorded is null)
+        {
+            throw new DurableOperationUnavailableException();
+        }
+
         var remaining = wait - timeProvider.GetElapsedTime(started);
         return await PollAsync(key, remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero, cancellationToken);
     }
@@ -207,12 +224,6 @@ internal sealed class DurableOperationService(IGrainFactory grainFactory, TimePr
             return null;
         }
     }
-
-    /// <summary>Returns <paramref name="work"/> when it is a durable grain call, which an operation runs.</summary>
-    private static DurableTask ValidateCall(DurableTask work) => work.TryGetTarget(out _)
-        ? work
-        : throw new InvalidOperationException(
-            $"A durable operation runs a durable grain call, such as 'grain.MethodAsync(...)', or subscribes to an existing task, which 'grain.GetDurableTask<T>(id)' references, not '{work.GetType()}'.");
 
     private IDurableOperationGrain GetHost(string key) => grainFactory.GetGrain<IDurableOperationGrain>(key);
 }

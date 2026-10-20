@@ -76,7 +76,7 @@ A start responds:
 | `202 Accepted` with the status monitor | The operation is running, including for a retry which arrives before it completes, as Azure repeatable requests and Stripe's v2 idempotency resume work. |
 | `424 Failed Dependency` with the status monitor | The operation failed or was canceled. When the call's grain didn't accept it, such as a call which arrived after the grain's admission window, the call never ran and the error's code is `NotStarted`; a new key starts it again. |
 | `400 Bad Request` | The `Idempotency-Key` is invalid, or missing. |
-| `422 Unprocessable Content` | Another request used the key to start other work. |
+| `422 Unprocessable Content` | Another request used the key to start other work: a call of another method or on another grain, or a subscription to another task. A retry whose arguments differ calls the same method on the same grain, so it reaches the operation, as the durable task runtime identifies operations. |
 | `503 Service Unavailable` with `Retry-After` | The request didn't reach the operation, which it left unchanged, so the client sends it again with the same key. |
 
 Responses which identify an operation carry an `Operation-Location` header, the URL
