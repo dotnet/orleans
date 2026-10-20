@@ -24,6 +24,16 @@ operations and outcomes, and the grain's journaled state, in the journal format 
 recorded them. Capture one from the journal storage of a test cluster, or of a
 deployment, at a point where the workflow waits, and keep it with the tests:
 
+The example uses a workflow with a controlled approval wait. `FulfillmentCode` selects
+the earlier warehouse implementation for capture and the versioned carrier change for
+replay. Its progress service reports when the workflow has observed the committed
+shipping result:
+
+:::code source="../snippets/compiled/Grains/DurableTaskTestingSnippets.cs" id="durable_tasks_testing_workflow" language="csharp":::
+
+Configure the recording cluster with `ConfigureCaptureSilo`, then await that progress
+before capturing its journal:
+
 :::code source="../snippets/compiled/Grains/DurableTaskTestingSnippets.cs" id="durable_tasks_testing_capture" language="csharp":::
 
 - The capture reads what the journal has committed. Operations whose results the
@@ -48,12 +58,11 @@ The replay reads the recorded history only:
 - An execution which reaches an operation that the history doesn't record, such as a
   child, an effect, a delay, a detached start, or a signal's send, stops before starting
   it.
-- The silo holds every outgoing message, so no other grain or service observes the
-  replay and no reply arrives, and its Durable Jobs clock stands still, so no scheduled
-  message, such as a delay's resume, becomes due.
-- The clock stands at the time the replayer started. The replay evaluates recorded due
-  times, such as outbox expiries, inbox retry deadlines, and `DeliverAt`, against that
-  time.
+- The silo holds messaging work: its Durable Jobs clock stands before every recorded
+  time, and it holds wake-ups and outgoing deliveries, keeping both incoming messages
+  and outgoing deliveries at their recorded state. Pending delays and delivery retries
+  stay pending, including histories whose due times or retry deadlines have already
+  passed.
 - Version decisions and completion selections, which the replay derives from recorded
   outcomes, are made as in a live run and reported.
 - A body's result is reported without being recorded. Each replay starts from its history,

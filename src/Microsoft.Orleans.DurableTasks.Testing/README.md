@@ -20,8 +20,9 @@ Assert.Equal(0, result[TaskId.CreateRoot("order-42")].Versions["carrier-booking"
   grain's journaled state, in the journal format which recorded them. It is stored as a JSON document.
 - `DurableTaskReplayer` hosts a dedicated in-process silo which replays one history at a time. Each pending execution
   replays until it completes, waits for a recorded operation, reaches an operation which the history doesn't record,
-  or stalls. The silo runs no new work: it stops each execution before an operation which the history doesn't record,
-  holds outgoing messages, and applies no incoming ones.
+  or stalls. The silo's Durable Jobs clock stands before every recorded time, and it holds messaging wake-ups and
+  deliveries, preserving pending inbox messages and outbox retries at their recorded state, including delays and
+  delivery deadlines which have already passed.
 - `DurableTaskReplayResult` reports, for each execution, its outcome, the recorded operations which it reached and
   skipped, the operation at which it stopped, what it waits for, and the versions which it follows.
   `EnsureSucceeded` throws with that report unless every execution replays consistently.
