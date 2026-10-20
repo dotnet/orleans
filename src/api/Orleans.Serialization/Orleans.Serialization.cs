@@ -804,8 +804,6 @@ namespace Orleans.Serialization.Buffers
         public const int MinimumPageSize = 16384;
         public int Length { get { throw null; } }
 
-        public static int MaxRetainedPoolBytes { get { throw null; } set { } }
-
         public ArcBufferReader Reader { get { throw null; } }
 
         public int UnconsumedLength { get { throw null; } }

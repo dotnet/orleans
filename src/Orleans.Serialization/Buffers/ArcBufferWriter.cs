@@ -23,6 +23,8 @@ namespace Orleans.Serialization.Buffers;
 /// <remarks>
 /// Backing buffers can contain data from earlier uses. Callers must initialize every byte before
 /// advancing the writer and read only the written region of a buffer.
+/// Fixed-size pinned pages are reused and evicted every 10 seconds according to recent pool activity.
+/// Larger arrays return to <see cref="ArrayPool{T}.Shared"/> when their last owner releases them.
 /// </remarks>
 [StructLayout(LayoutKind.Auto)]
 [Immutable]
@@ -51,26 +53,6 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// Gets the minimum page size.
     /// </summary>
     public const int MinimumPageSize = ArcBufferPagePool.MinimumPageSize;
-
-    /// <summary>
-    /// Gets or sets the maximum aggregate size, in bytes, of free pinned pages retained by the process-wide page pool.
-    /// </summary>
-    /// <remarks>
-    /// The default is 128 MiB. Setting this value to zero releases free pages and disables free-page retention.
-    /// Reducing the limit releases excess already-free pages immediately. Writers and pinned readers retain
-    /// ownership of their active pages. Concurrent returns can temporarily exceed the limit and trim after
-    /// publishing their pages, keeping the settled pool within the current budget.
-    /// Every 10 seconds, the pool releases unused pages according to recent rent and return activity,
-    /// retaining fewer pages after demand falls or becomes idle. The limit is a ceiling, not a retention target.
-    /// Only fixed-size <see cref="MinimumPageSize"/> pages are retained here. Larger backing arrays return
-    /// directly to the separately managed <see cref="ArrayPool{T}.Shared"/> when their last owner releases them.
-    /// </remarks>
-    /// <exception cref="ArgumentOutOfRangeException">The value is negative.</exception>
-    public static int MaxRetainedPoolBytes
-    {
-        get => ArcBufferPagePool.Shared.MaxRetainedBytes;
-        set => ArcBufferPagePool.Shared.MaxRetainedBytes = value;
-    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ArcBufferWriter"/> struct.
@@ -607,52 +589,14 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
 internal sealed class ArcBufferPagePool
 {
-    internal const int DefaultMaximumRetainedBytes = 128 * 1024 * 1024;
     public static ArcBufferPagePool Shared { get; } = new();
     public const int MinimumPageSize = 16 * 1024;
     private static readonly Timer _evictionTimer = CreateEvictionTimer();
-    private readonly object _trimLock = new();
+    private readonly object _evictionLock = new();
     private readonly ConcurrentQueue<ArcBufferPage> _pages = new();
-    private int _maximumRetainedBytes;
-    private int _maximumRetainedPages;
     private long _rentCount;
     private long _returnCount;
 
-    internal ArcBufferPagePool(int maximumRetainedBytes = DefaultMaximumRetainedBytes)
-    {
-        if (maximumRetainedBytes < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(maximumRetainedBytes));
-        }
-
-        _maximumRetainedBytes = maximumRetainedBytes;
-        _maximumRetainedPages = maximumRetainedBytes / MinimumPageSize;
-    }
-
-    internal int MaxRetainedBytes
-    {
-        get => Volatile.Read(ref _maximumRetainedBytes);
-        set
-        {
-            if (value < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(value));
-            }
-
-            lock (_trimLock)
-            {
-                var previous = _maximumRetainedBytes;
-                Volatile.Write(ref _maximumRetainedPages, value / MinimumPageSize);
-                Volatile.Write(ref _maximumRetainedBytes, value);
-                if (value < previous)
-                {
-                    TrimCore();
-                }
-            }
-        }
-    }
-
-    internal long RetainedBytes => (long)_pages.Count * MinimumPageSize;
     internal int RetainedPages => _pages.Count;
 
     public ArcBufferPage Rent(int size = -1)
@@ -680,38 +624,17 @@ internal sealed class ArcBufferPagePool
         if (block.IsMinimumSize)
         {
             Interlocked.Increment(ref _returnCount);
-            if (_pages.Count < Volatile.Read(ref _maximumRetainedPages))
-            {
-                Publish(block);
-                return;
-            }
+            _pages.Enqueue(block);
         }
-
-        block.ReleaseArray();
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void Publish(ArcBufferPage block)
-    {
-        Debug.Assert(block.IsMinimumSize);
-        _pages.Enqueue(block);
-        if (_pages.Count > Volatile.Read(ref _maximumRetainedPages))
+        else
         {
-            Trim();
-        }
-    }
-
-    internal void Trim()
-    {
-        lock (_trimLock)
-        {
-            TrimCore();
+            block.ReleaseArray();
         }
     }
 
     internal void Evict()
     {
-        lock (_trimLock)
+        lock (_evictionLock)
         {
             var rents = Interlocked.Exchange(ref _rentCount, 0);
             var returns = Interlocked.Exchange(ref _returnCount, 0);
@@ -734,18 +657,6 @@ internal sealed class ArcBufferPagePool
 
             while (releaseCount-- > 0 && TryReleasePage())
             {
-            }
-        }
-    }
-
-    private void TrimCore()
-    {
-        while (_pages.Count > _maximumRetainedPages)
-        {
-            if (!TryReleasePage())
-            {
-                // Concurrent renters took the remaining pages; later returns check the current limit.
-                break;
             }
         }
     }
