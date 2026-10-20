@@ -177,7 +177,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         if (completed)
         {
             await OnTurnAsync(context, () =>
-                InboxTestAccess.SetProcessedAt(context.ActivationServices.GetRequiredService<Inbox>(), key, Fixture.Clock.GetUtcNow()));
+                InboxTestAccess.AddProcessed(context.ActivationServices.GetRequiredService<Inbox>(), key));
         }
         message = message with
         {

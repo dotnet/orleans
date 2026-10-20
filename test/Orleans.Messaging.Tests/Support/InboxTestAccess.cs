@@ -23,30 +23,10 @@ internal static class InboxTestAccess
 
     public static HashSet<MessageId> GetProcessedKeys(Inbox inbox) => [.. GetProcessed(inbox).Keys];
 
-    public static bool TryGetProcessedAt(Inbox inbox, MessageId messageId, out DateTimeOffset processedAt)
-    {
-        var found = GetProcessed(inbox).TryGetValue(messageId, out var entry);
-        processedAt = entry?.ProcessedAt ?? default;
-        return found;
-    }
-
-    public static void SetProcessedAt(Inbox inbox, MessageId messageId, DateTimeOffset processedAt)
-    {
-        GetProcessed(inbox).TryGetValue(messageId, out var previous);
-        GetProcessed(inbox)[messageId] = new()
-        {
-            MessageId = messageId,
-            ProcessedAt = processedAt,
-            RedeliveryDeadline = previous?.RedeliveryDeadline,
-            Rejection = previous?.Rejection,
-            Sequence = previous?.Sequence ?? 0
-        };
-    }
+    public static void AddProcessed(Inbox inbox, MessageId messageId) =>
+        GetProcessed(inbox).Add(messageId, new() { MessageId = messageId });
 
     public static IReadOnlyDictionary<MessageId, InboxEntry> GetPendingMessages(Inbox inbox) => inbox.MessageState;
-
-    public static IReadOnlyDictionary<MessageId, DateTimeOffset> GetProcessedMessages(Inbox inbox) =>
-        GetProcessed(inbox).ToDictionary(static pair => pair.Key, static pair => pair.Value.ProcessedAt);
 
     public static DateTimeOffset? GetProcessedCutoff(Inbox inbox, MessageId messageId) =>
         GetProcessed(inbox)[messageId].RedeliveryDeadline;

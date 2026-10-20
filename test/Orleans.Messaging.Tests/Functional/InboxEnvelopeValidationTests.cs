@@ -25,7 +25,7 @@ public sealed class InboxEnvelopeValidationTests : MessagingBehaviorTestBase
         if (existingKey)
         {
             var processedInbox = Fixture.GetInbox(receiver);
-            await OnTurnAsync(context, () => InboxTestAccess.SetProcessedAt(processedInbox, malformed.Envelope.MessageId, Fixture.Clock.GetUtcNow()));
+            await OnTurnAsync(context, () => InboxTestAccess.AddProcessed(processedInbox, malformed.Envelope.MessageId));
         }
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);

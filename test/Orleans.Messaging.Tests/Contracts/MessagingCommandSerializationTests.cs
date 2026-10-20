@@ -27,6 +27,7 @@ public sealed class MessagingCommandSerializationTests
         var fromBinary = serializer.Deserialize(serializer.SerializeToArray(command));
 
         Assert.Equal(command.Kind, fromJson.Kind);
+        Assert.DoesNotContain("\"ProcessedAt\"", json, StringComparison.Ordinal);
         Assert.Equal(json, JsonSerializer.Serialize(fromJson, InboxJsonContext.Default.InboxCommand));
         Assert.Equal(json, JsonSerializer.Serialize(fromBinary!, InboxJsonContext.Default.InboxCommand));
     }
@@ -75,8 +76,8 @@ public sealed class MessagingCommandSerializationTests
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("accept"), State = new() },
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("scheduled", Now), State = new() },
             new() { Kind = InboxCommandKind.Retry, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom" } },
-            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), ProcessedAt = Now, DeadLetter = deadLetter },
-            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "dead"), ProcessedAt = Now, DeadLetter = deadLetter, Rejection = rejection },
+            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), DeadLetter = deadLetter },
+            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "dead"), DeadLetter = deadLetter, Rejection = rejection },
             new() { Kind = InboxCommandKind.RemoveDeadLetters, RemovedKeys = [MessageId.Create("orders", "dead")] },
             new()
             {
@@ -86,8 +87,8 @@ public sealed class MessagingCommandSerializationTests
                     Messages = [new() { Message = InboxMessage("pending"), State = new() { AttemptCount = 1 } }, new() { Message = InboxMessage("scheduled", Now), State = new() }],
                     Processed =
                     [
-                        new() { MessageId = MessageId.Create("orders", "done"), ProcessedAt = Now },
-                        new() { MessageId = MessageId.Create("orders", "dead"), ProcessedAt = Now, Rejection = rejection }
+                        new() { MessageId = MessageId.Create("orders", "done") },
+                        new() { MessageId = MessageId.Create("orders", "dead"), Rejection = rejection }
                     ],
                     DeadLetters = [deadLetter]
                 }
