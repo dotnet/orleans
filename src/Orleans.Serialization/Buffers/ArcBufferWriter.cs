@@ -1122,6 +1122,8 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
 /// <remarks>
 /// An owned slice must be disposed when no longer needed. Copying this struct creates a borrowed view
 /// whose lifetime is bounded by the owner. Use <see cref="Slice(int)"/> to obtain an independent owner.
+/// Acquire independent ownership before handing a buffer to another concurrent owner.
+/// Each owner keeps its own struct copy and disposes it exactly once; the pages remain pinned until all owners release them.
 /// Referenced bytes must remain unchanged while a slice is in use.
 /// The default value is a valid, owner-free empty buffer.
 /// </remarks>
@@ -1411,6 +1413,10 @@ public struct ArcBuffer : IDisposable
     /// <summary>
     /// Pins this slice, preventing the referenced pages from being returned to the pool.
     /// </summary>
+    /// <remarks>
+    /// Each call acquires an additional owner pin. Give each owner its own struct copy before handoff
+    /// and balance each acquired pin with one <see cref="Unpin"/> or <see cref="Dispose"/>.
+    /// </remarks>
     public readonly void Pin()
     {
         CheckValidity();
