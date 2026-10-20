@@ -67,6 +67,8 @@ Each journal occupies one table partition:
 
 A single append batch is limited to 2 MiB, which keeps its rows and header update within one entity group transaction of at most 100 entities and 4 MiB. The provider rejects a larger batch before sending any request. Snapshot replacements can exceed that size because rows are written before the header publishes the generation, and readers see only published generations.
 
+After a failed publication attempt, staged rows are retained so a delayed header update can still publish a complete generation. Deleting the journal reclaims the partition's retained rows.
+
 Compaction is requested at either <xref:Orleans.Journaling.AzureTableJournalStorageOptions.CompactionRowCountThreshold> (10,000 rows by default) or <xref:Orleans.Journaling.AzureTableJournalStorageOptions.CompactionSizeThreshold> (32 MiB by default).
 
 The default partition mapping accepts printable ASCII journal ids (`0x20` through `0x7E`) and encodes each byte as two uppercase hexadecimal digits. It preserves ordinal ordering and prefixes for indexed catalog queries and supports journal ids up to 512 characters. Storage creation validates the id before accessing Azure. This restriction is specific to the default Table mapping.

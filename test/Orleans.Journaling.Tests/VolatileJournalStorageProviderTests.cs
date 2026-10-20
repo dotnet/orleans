@@ -35,34 +35,6 @@ public sealed class VolatileJournalStorageProviderTests
         Assert.True(provider.CreateStorage(new("stale")).IsCompactionRequested);
     }
 
-    [Theory]
-    [InlineData("none")]
-    [InlineData("replace")]
-    [InlineData("delete")]
-    public Task HistoryPreservesWriteState(string change)
-    {
-        var provider = new VolatileJournalStorageProvider();
-        return JournalStorageContractTests.HistoryPreservesWriteState(
-            () => provider.CreateStorage(new("history")), change);
-    }
-
-    [Fact]
-    public async Task HistoryReadPreservesCompactionRequest()
-    {
-        var storage = await new VolatileJournalStorage(null, new() { MaxAppendsBeforeSnapshot = 1 }).ReadForWriteAsync();
-        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
-        var history = (IJournalHistoryStorage)storage;
-        var version = history.WriteVersion;
-        Assert.True(storage.IsCompactionRequested);
-
-        Assert.Equal(version, await history.ReadHistoryAsync(new DiscardingConsumer(), TestContext.Current.CancellationToken));
-        Assert.Equal(version, history.WriteVersion);
-        Assert.True(storage.IsCompactionRequested);
-        await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
-        Assert.False(storage.IsCompactionRequested);
-        Assert.Equal([2], Assert.Single(storage.Segments));
-    }
-
     [Fact]
     public async Task Compaction_ByteThresholdExcludesSnapshotAndResetsAfterReplacement()
     {
@@ -214,7 +186,7 @@ public sealed class VolatileJournalStorageProviderTests
         await second.ReplaceAsync(new ReadOnlySequence<byte>(new byte[100]), token);
         Assert.False(first.IsCompactionRequested);
         Assert.False(other.IsCompactionRequested);
-        await first.ReadForWriteAsync();
+        first = await provider.CreateStorage(firstId).ReadForWriteAsync();
         await first.AppendAsync(new ReadOnlySequence<byte>([4]), token);
         Assert.False(second.IsCompactionRequested);
         await other.AppendAsync(new ReadOnlySequence<byte>([5]), token);
@@ -252,9 +224,13 @@ public sealed class VolatileJournalStorageProviderTests
         snapshot[0] = 99;
         Assert.Equal([5, 6, 7, 8], Assert.Single(storage.Segments));
         Assert.False(storage.IsCompactionRequested);
-        await storage.AppendAsync(ReadOnlySequence<byte>.Empty, TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => storage.AppendAsync(ReadOnlySequence<byte>.Empty, TestContext.Current.CancellationToken).AsTask());
         Assert.False(storage.IsCompactionRequested);
-        await storage.AppendAsync(ReadOnlySequence<byte>.Empty, TestContext.Current.CancellationToken);
+        Assert.Single(storage.Segments);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        Assert.False(storage.IsCompactionRequested);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
         Assert.True(storage.IsCompactionRequested);
         Assert.Equal(3, storage.Segments.Count);
     }
@@ -282,6 +258,7 @@ public sealed class VolatileJournalStorageProviderTests
         Assert.All(handles, static handle => Assert.True(handle.IsCompactionRequested));
         Assert.False(other.IsCompactionRequested);
 
+        handles[^1] = provider.CreateStorage(id);
         await handles[^1].ReadForWriteAsync();
         await handles[^1].ReplaceAsync(new ReadOnlySequence<byte>([99]), token);
         Assert.Equal([99], Assert.Single(storage.Segments));
@@ -291,6 +268,7 @@ public sealed class VolatileJournalStorageProviderTests
         Assert.Equal(Enumerable.Range(0, 7).Select(static index => (byte)index),
             storage.Segments.Skip(1).SelectMany(static segment => segment).Order());
         Assert.All(handles, static handle => Assert.False(handle.IsCompactionRequested));
+        handles[^1] = provider.CreateStorage(id);
         await handles[^1].ReadForWriteAsync();
         await handles[^1].AppendAsync(new ReadOnlySequence<byte>([7]), token);
         Assert.All(handles, static handle => Assert.True(handle.IsCompactionRequested));
@@ -301,6 +279,7 @@ public sealed class VolatileJournalStorageProviderTests
         {
             for (var index = 0; index < count; index++)
             {
+                handles[index] = provider.CreateStorage(id);
                 await handles[index].ReadForWriteAsync();
                 await handles[index].AppendAsync(new ReadOnlySequence<byte>([(byte)index]), token);
             }

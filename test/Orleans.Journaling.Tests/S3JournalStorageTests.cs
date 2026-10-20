@@ -784,8 +784,6 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 });
             var storage = CreateStorage(client, new() { BucketName = BucketName, MetadataOnlyConflictInitialBackoff = TimeSpan.Zero });
             await storage.ReadAsync(new CapturingJournalStorageConsumer(), token);
-            var history = (IJournalHistoryStorage)storage;
-            var version = history.WriteVersion;
             if (recreated)
             {
                 eTag = "recreated";
@@ -798,58 +796,15 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
 
             if (recreated)
             {
-                Assert.Equal(version, history.WriteVersion);
                 await Assert.ThrowsAsync<InconsistentStateException>(() => storage.DeleteAsync(token).AsTask());
                 Assert.True(exists);
                 Assert.Equal(9, content[^1]);
             }
             else
             {
-                Assert.Equal(JournalStorageVersion.Create($"etag:{eTag}"), history.WriteVersion);
                 await storage.DeleteAsync(token);
                 Assert.False(exists);
-                Assert.Equal(JournalStorageVersion.Absent, history.WriteVersion);
             }
-        }
-
-        [Fact]
-        public async Task HistoryReadPreservesCompactionAndStaleWrite()
-        {
-            var token = TestContext.Current.CancellationToken;
-            var client = Substitute.For<IAmazonS3>();
-            var eTag = "original";
-            var parts = 9_801;
-            client.GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>())
-                .Returns(call =>
-                {
-                    var expected = call.Arg<GetObjectMetadataRequest>().EtagToMatch;
-                    if (expected is not null && expected != eTag)
-                    {
-                        throw CreateS3Exception(HttpStatusCode.PreconditionFailed);
-                    }
-
-                    return Task.FromResult(new GetObjectMetadataResponse { ETag = eTag, ContentLength = 1, PartsCount = parts });
-                });
-            client.GetObjectAsync(Arg.Any<GetObjectRequest>(), Arg.Any<CancellationToken>())
-                .Returns(_ => Task.FromResult(new GetObjectResponse
-                {
-                    ETag = eTag,
-                    ContentLength = 1,
-                    ResponseStream = new MemoryStream([1], writable: false),
-                }));
-            var storage = CreateStorage(client, new() { BucketName = BucketName, MetadataOnlyConflictInitialBackoff = TimeSpan.Zero });
-            await storage.ReadAsync(new CapturingJournalStorageConsumer(), token);
-            var history = (IJournalHistoryStorage)storage;
-            var version = history.WriteVersion;
-            Assert.True(storage.IsCompactionRequested);
-            eTag = "recreated";
-            parts = 1;
-
-            Assert.Equal(JournalStorageVersion.Create("etag:recreated"),
-                await history.ReadHistoryAsync(new CapturingJournalStorageConsumer(), token));
-            Assert.Equal(version, history.WriteVersion);
-            Assert.True(storage.IsCompactionRequested);
-            await Assert.ThrowsAsync<InconsistentStateException>(() => storage.DeleteAsync(token).AsTask());
         }
 
         [Theory]
@@ -1148,12 +1103,16 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 Arg.Any<CancellationToken>());
         }
 
-        [Fact]
-        public async Task AppendAsync_WhenConditionalRewriteExceedsSinglePutLimit_ThrowsBeforeDownload()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task AppendAsync_WhenConditionalRewriteExceedsSinglePutLimit_ThrowsBeforeStorageMutation(bool exists)
         {
             var client = Substitute.For<IAmazonS3>();
             client.PutObjectAsync(Arg.Any<PutObjectRequest>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new PutObjectResponse { ETag = "etag-1" }));
+            client.GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>())
+                .Returns<GetObjectMetadataResponse>(_ => throw CreateS3Exception(HttpStatusCode.NotFound));
             var storage = CreateStorage(
                 client,
                 new S3JournalStorageOptions
@@ -1161,8 +1120,16 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     BucketName = BucketName,
                     UseS3ExpressAppend = false,
                 });
-            // Creating the journal establishes the write precondition, as recovering an absent journal does.
-            Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken.None));
+            if (exists)
+            {
+                Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken.None));
+            }
+            else
+            {
+                await storage.ReadForWriteAsync();
+            }
+
+            client.ClearReceivedCalls();
             var first = new SparseSequenceSegment(new byte[] { 0 }, runningIndex: 0);
             var last = first.Append(new byte[] { 0 }, nextRunningIndex: 4_999_999_984);
             var oversizedCombinedValue = new ReadOnlySequence<byte>(first, 0, last, 1);
@@ -1174,6 +1141,13 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             await client.DidNotReceive().GetObjectAsync(
                 Arg.Any<GetObjectRequest>(),
                 Arg.Any<CancellationToken>());
+            await client.DidNotReceive().PutObjectAsync(
+                Arg.Any<PutObjectRequest>(),
+                Arg.Any<CancellationToken>());
+            if (!exists)
+            {
+                Assert.Null(await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
+            }
         }
 
         [Fact]
@@ -2161,17 +2135,6 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         EnsureDockerAvailable();
         return JournalStorageContractTests.MetadataPreservesStalePrecondition(
             () => CreateStorage("journals/stale-metadata"), operation);
-    }
-
-    [Theory]
-    [InlineData("none")]
-    [InlineData("replace")]
-    [InlineData("delete")]
-    public Task HistoryPreservesWriteState(string change)
-    {
-        EnsureDockerAvailable();
-        return JournalStorageContractTests.HistoryPreservesWriteState(
-            () => CreateStorage("journals/history"), change);
     }
 
     [Fact]

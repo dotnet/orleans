@@ -72,7 +72,7 @@ staged mutations from other calls.
 
 Orleans grain placement normally supplies a single active writer for a grain identity. Journal storage providers also use optimistic concurrency to protect the journal when a stale or competing writer reaches storage.
 
-Each storage instance writes only on top of the journal version it last read or wrote. That version includes an absent journal: a writer which recovered an empty journal can create it, and fails if another writer created it first.
+Each storage instance establishes its write precondition with its first successful read or creation, then advances it through its own writes. That precondition includes an absent journal: a writer which recovered an empty journal can create it, and fails if another writer created it first.
 
 An append, replacement, or delete with stale storage metadata throws <xref:Orleans.Storage.InconsistentStateException>. The state manager permanently fences further operations, faults queued work, and requests grain deactivation. The failed operation reports its original exception. A new activation replays the stored journal to determine the durable outcome.
 
@@ -84,9 +84,15 @@ The journal is the source of truth for durable state, so every <xref:Orleans.Jou
 
 - **All-or-nothing writes.** An append makes its whole segment visible after every earlier segment, or none of it. A replacement makes its whole value the journal's only segment, or the journal keeps its earlier content. This holds across process and storage crashes, timeouts, conflicts, and retries inside the provider.
 - **Whole-call limit failures.** A segment which exceeds a provider limit fails the call with an exception, and nothing of it becomes visible.
-- **Unchanged storage after a rejected write.** A write which the provider rejects leaves the earlier content in place. A write with an indeterminate outcome, such as a timeout after the request was sent, applied its whole segment or none of it; the next read shows which.
-- **Whole, ordered reads.** A read returns one version of the journal: every segment written up to that version, whole and in write order.
-- **Write preconditions.** A storage instance writes after it reads or creates the journal, and a write through an instance which has done neither throws <xref:System.InvalidOperationException>. A write succeeds only if the journal is still at the version the storage instance last read or wrote; after an observed absence, the journal must still be absent. Metadata operations never establish or move that precondition.
+- **Failure outcomes.** A definitively rejected write leaves the earlier content in place. A write with an indeterminate outcome, such as a timeout after the request was sent, applied its whole segment or none of it. A retry can report a precondition conflict after the original request committed; recovery determines the outcome.
+- **Whole, ordered reads.** A successful read returns one version of the journal: every segment written up to that version, whole and in write order. Callers discard data from a failed read and recover from the beginning.
+- **Write preconditions.** A storage instance writes after it reads or creates the journal, and a write through an instance which has done neither throws <xref:System.InvalidOperationException>. Writes and subsequent reads succeed only if the journal still matches that precondition; after an observed absence, the journal must still be absent. Metadata operations preserve the content precondition.
+
+Direct storage callers await each operation before starting another through the same instance. Separate instances coordinate through storage preconditions.
+
+Subsequent reads provide history for an active writer while validating its precondition. A content change by another writer produces <xref:Orleans.Storage.InconsistentStateException>. Recovery after a conflict uses a fresh storage instance.
+
+Appends contain at least one byte. An empty append throws <xref:System.ArgumentOutOfRangeException> before touching storage. A replacement accepts an empty value to publish an empty journal.
 
 Each provider documents its limits:
 

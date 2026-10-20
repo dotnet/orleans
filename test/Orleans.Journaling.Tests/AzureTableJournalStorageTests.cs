@@ -41,37 +41,6 @@ public sealed class AzureTableJournalStorageTests
             () => CreateStorage(store), operation);
     }
 
-    [Theory]
-    [InlineData("none")]
-    [InlineData("replace")]
-    [InlineData("delete")]
-    public Task HistoryPreservesWriteState(string change)
-    {
-        var store = new FakeTableStore();
-        return JournalStorageContractTests.HistoryPreservesWriteState(
-            () => CreateStorage(store), change);
-    }
-
-    [Fact]
-    public async Task HistoryReadPreservesCompactionAndStaleWrite()
-    {
-        var token = TestContext.Current.CancellationToken;
-        var store = new FakeTableStore();
-        var storage = CreateStorage(store, compactionRowCountThreshold: 1);
-        await storage.ReadForWriteAsync();
-        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), token);
-        var history = (IJournalHistoryStorage)storage;
-        var version = history.WriteVersion;
-        Assert.True(storage.IsCompactionRequested);
-        await (await CreateStorage(store).ReadForWriteAsync()).ReplaceAsync(new ReadOnlySequence<byte>([9]), token);
-
-        Assert.NotEqual(version, await history.ReadHistoryAsync(new CapturingJournalStorageConsumer(), token));
-        Assert.Equal(version, history.WriteVersion);
-        Assert.True(storage.IsCompactionRequested);
-        await Assert.ThrowsAsync<InconsistentStateException>(
-            () => storage.AppendAsync(new ReadOnlySequence<byte>([2]), token).AsTask());
-    }
-
     [Fact]
     public async Task Telemetry_MetadataConflictRecordsOnlyActualProviderRetries()
     {
@@ -592,7 +561,7 @@ public sealed class AzureTableJournalStorageTests
     }
 
     [Fact]
-    public async Task ReplaceAsync_WhenHeaderETagConflictsAtFlip_RequiresRecoveryAndDeletesUnpublishedRows()
+    public async Task ReplaceAsync_WhenHeaderETagConflictsAtFlip_RequiresRecoveryAndRetainsStagedRows()
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
@@ -632,7 +601,7 @@ public sealed class AzureTableJournalStorageTests
         var requestFailed = Assert.IsType<RequestFailedException>(exception.InnerException);
         Assert.Equal(412, requestFailed.Status);
 
-        Assert.Equal(3, store.DataRowCount(TestPartitionKey));
+        Assert.Equal(4, store.DataRowCount(TestPartitionKey));
         var consumer = new CapturingJournalStorageConsumer();
         await CreateStorage(store).ReadAsync(consumer, CancellationToken.None);
         Assert.Equal([1, 2, 8], consumer.Bytes.ToArray());
@@ -646,7 +615,58 @@ public sealed class AzureTableJournalStorageTests
 
         // Deleting the journal removes the header and current generation.
         await freshStorage.DeleteAsync(CancellationToken.None);
+        Assert.Null(await CreateStorage(store).GetMetadataAsync(TestContext.Current.CancellationToken));
         Assert.True(store.IsEmpty);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReplaceAsync_WhenPublicationOutcomeIsUnknown_PreservesStagedRows(bool commitBeforeFailure)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var store = new FakeTableStore();
+        var storage = await CreateStorage(store).ReadForWriteAsync();
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2]), token);
+        var replacement = Enumerable.Range(0, (int)AzureTableJournalStorage.MaxAppendBytes + 1)
+            .Select(static index => (byte)index).ToArray();
+        Action? publish = null;
+        store.UpdateFault = commit =>
+        {
+            publish = commit;
+            if (commitBeforeFailure)
+            {
+                commit();
+            }
+
+            throw new TimeoutException("Publication response was not received.");
+        };
+
+        await Assert.ThrowsAsync<TimeoutException>(
+            () => storage.ReplaceAsync(new ReadOnlySequence<byte>(replacement), token).AsTask());
+
+        Assert.Equal(4, store.DataRowCount(TestPartitionKey));
+        var before = new CapturingJournalStorageConsumer();
+        await CreateStorage(store).ReadAsync(before, token);
+        Assert.Equal(commitBeforeFailure ? replacement : [1, 2], before.Bytes.ToArray());
+        Assert.True(before.IsCompleted);
+        if (!commitBeforeFailure)
+        {
+            // Complete the outstanding conditional request after the client has finished failure handling.
+            Assert.NotNull(publish);
+            publish();
+        }
+
+        store.UpdateFault = null;
+        var recovered = CreateStorage(store);
+        var after = new CapturingJournalStorageConsumer();
+        await recovered.ReadAsync(after, token);
+        Assert.Equal(replacement, after.Bytes.ToArray());
+        Assert.True(after.IsCompleted);
+        await recovered.AppendAsync(new ReadOnlySequence<byte>([3]), token);
+        var appended = new CapturingJournalStorageConsumer();
+        await CreateStorage(store).ReadAsync(appended, token);
+        Assert.Equal([.. replacement, 3], appended.Bytes.ToArray());
     }
 
     [Fact]
@@ -1044,6 +1064,8 @@ public sealed class AzureTableJournalStorageTests
 
         public Action<string, string>? BeforeUpdate { get; set; }
 
+        public Action<Action>? UpdateFault { get; set; }
+
         public List<AddCall> AddCalls { get; } = [];
 
         public List<UpdateCall> UpdateCalls { get; } = [];
@@ -1113,7 +1135,17 @@ public sealed class AzureTableJournalStorageTests
             var properties = ExtractProperties(entity);
             UpdateCalls.Add(new(entity.PartitionKey, entity.RowKey, ifMatch, mode, properties));
             BeforeUpdate?.Invoke(entity.PartitionKey, entity.RowKey);
-            var eTag = ApplyUpdate(entity.PartitionKey, entity.RowKey, properties, ifMatch, mode, new ETag($"update-{++_updateCount}"));
+            var eTag = new ETag($"update-{++_updateCount}");
+            void Commit() => ApplyUpdate(entity.PartitionKey, entity.RowKey, properties, ifMatch, mode, eTag);
+            if (UpdateFault is { } fault)
+            {
+                fault(Commit);
+            }
+            else
+            {
+                Commit();
+            }
+
             return Task.FromResult<Response>(new FakeResponse(eTag));
         }
 
@@ -1483,20 +1515,17 @@ public sealed class AzureTableJournalStorageTests
     }
 
     [Fact]
-    public async Task AppendAsync_EmptySequence_UpdatesOnlyHeaderAndRemainsAppendable()
+    public async Task AppendAsync_EmptySequence_ThrowsBeforeCreatingHeader()
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store, journalFormatKey: "binary");
         await storage.ReadForWriteAsync();
 
-        await storage.AppendAsync(ReadOnlySequence<byte>.Empty, CancellationToken.None);
-
-        var transaction = Assert.Single(store.TransactionCalls);
-        var headerUpdate = Assert.Single(transaction);
-        Assert.Equal(TableTransactionActionType.UpdateMerge, headerUpdate.ActionType);
-        Assert.Equal(0L, headerUpdate.Properties[AzureTableJournalStorage.RowCountPropertyName]);
-        Assert.Equal(0L, headerUpdate.Properties[AzureTableJournalStorage.LengthPropertyName]);
-        Assert.Equal(0, store.DataRowCount(TestPartitionKey));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => storage.AppendAsync(ReadOnlySequence<byte>.Empty, CancellationToken.None).AsTask());
+        Assert.Empty(store.AddCalls);
+        Assert.Empty(store.TransactionCalls);
+        Assert.True(store.IsEmpty);
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([7, 8]), CancellationToken.None);
         var consumer = new CapturingJournalStorageConsumer();

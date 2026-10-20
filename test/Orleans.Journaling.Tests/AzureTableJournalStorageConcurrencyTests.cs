@@ -421,7 +421,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     }
 
     [Fact]
-    public async Task ReplaceAsync_WhenAppendCommitsBeforeManifestFlip_PreservesAppendAndDeletesUnpublishedRows()
+    public async Task ReplaceAsync_WhenAppendCommitsBeforeManifestFlip_PreservesAppendAndStagedRows()
     {
         var store = new CoordinatedTableStore();
         var replacement = CreateStorage(store, maxRetries: 3);
@@ -449,16 +449,16 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(() => replaceTask);
 
         Assert.Equal(412, Assert.IsType<RequestFailedException>(exception.InnerException).Status);
-        Assert.Equal(3, store.TransactionAttempts - baselineTransactions);
-        Assert.Equal(4, store.SuccessfulTransactions);
+        Assert.Equal(2, store.TransactionAttempts - baselineTransactions);
+        Assert.Equal(3, store.SuccessfulTransactions);
         Assert.Equal(1, store.UpdateAttempts);
         Assert.Equal(0, store.SuccessfulUpdates);
         Assert.Equal(originalGeneration, store.HeaderGeneration);
         Assert.Equal(2L, store.HeaderRowCount);
         Assert.Equal(2L, store.HeaderLength);
-        Assert.Equal(2, store.DataRowCount);
+        Assert.Equal(3, store.DataRowCount);
         Assert.Equal(2, store.DataRowKeys.Count(key => key.StartsWith(originalGeneration + "-", StringComparison.Ordinal)));
-        Assert.DoesNotContain(store.DataRowKeys, key => !key.StartsWith(originalGeneration + "-", StringComparison.Ordinal));
+        Assert.Single(store.DataRowKeys, key => !key.StartsWith(originalGeneration + "-", StringComparison.Ordinal));
         Assert.Equal([1, 3], await ReadBytesAsync(store, TestContext.Current.CancellationToken));
     }
 

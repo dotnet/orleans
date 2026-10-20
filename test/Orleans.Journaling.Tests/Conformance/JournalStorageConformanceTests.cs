@@ -7,7 +7,7 @@ using Xunit;
 namespace Orleans.Journaling.Tests;
 
 /// <summary>
-/// Verifies the <see cref="IJournalStorage"/> contract and <see cref="IJournalHistoryStorage"/>. Every journal storage
+/// Verifies the <see cref="IJournalStorage"/> contract. Every journal storage
 /// provider in this repository runs this suite.
 /// </summary>
 /// <remarks>
@@ -144,13 +144,11 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
         var journalId = CreateJournalId();
         var writer = await CreateWriterAsync(journalId);
         await writer.AppendAsync(Sequence(16, 1), CancellationToken);
-        var versionBefore = History(writer).WriteVersion;
 
         await Assert.ThrowsAnyAsync<Exception>(
             () => writer.AppendAsync(LargeSequence(MaxAppendBytes!.Value + 1, 2), CancellationToken).AsTask());
 
         Assert.Equal(Bytes(16, 1), await ReadContentAsync(CreateStorage(journalId)));
-        Assert.Equal(versionBefore, History(writer).WriteVersion);
         await writer.AppendAsync(Sequence(8, 3), CancellationToken);
         Assert.Equal(Concat([Bytes(16, 1), Bytes(8, 3)]), await ReadContentAsync(CreateStorage(journalId)));
     }
@@ -178,7 +176,6 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
         var journalId = CreateJournalId();
         var writer = await CreateWriterAsync(journalId);
         await writer.AppendAsync(Sequence(4, 1), CancellationToken);
-        var writeVersion = History(writer).WriteVersion;
         var other = CreateStorage(journalId);
         await ReadContentAsync(other);
         await other.DeleteAsync(CancellationToken);
@@ -188,7 +185,6 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
         await Assert.ThrowsAsync<InconsistentStateException>(() => writer.ReplaceAsync(Sequence(5, 2), CancellationToken).AsTask());
         await Assert.ThrowsAsync<InconsistentStateException>(() => writer.AppendAsync(Sequence(6, 3), CancellationToken).AsTask());
 
-        Assert.Equal(writeVersion, History(writer).WriteVersion);
         Assert.Empty(await ReadContentAsync(CreateStorage(journalId)));
     }
 
@@ -218,7 +214,6 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
         var writer = await CreateWriterAsync(journalId);
         await writer.AppendAsync(Sequence(5, 1), CancellationToken);
         await writer.DeleteAsync(CancellationToken);
-        Assert.Equal(JournalStorageVersion.Absent, History(writer).WriteVersion);
         await (await CreateWriterAsync(journalId)).AppendAsync(Sequence(6, 2), CancellationToken);
 
         await Assert.ThrowsAsync<InconsistentStateException>(() => writer.AppendAsync(Sequence(7, 3), CancellationToken).AsTask());
@@ -251,7 +246,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
         await Assert.ThrowsAsync<InvalidOperationException>(() => absent.AppendAsync(Sequence(4, 1), CancellationToken).AsTask());
         await Assert.ThrowsAsync<InvalidOperationException>(() => absent.ReplaceAsync(Sequence(4, 1), CancellationToken).AsTask());
         await Assert.ThrowsAsync<InvalidOperationException>(() => absent.DeleteAsync(CancellationToken).AsTask());
-        Assert.Equal(JournalStorageVersion.Absent, (await ReadHistoryAsync(CreateStorage(journalId))).Version);
+        Assert.Null(await CreateStorage(journalId).GetMetadataAsync(CancellationToken));
 
         await (await CreateWriterAsync(journalId)).AppendAsync(Sequence(5, 1), CancellationToken);
         var writer = CreateStorage(journalId);
@@ -259,7 +254,6 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
         await Assert.ThrowsAsync<InvalidOperationException>(() => writer.ReplaceAsync(Sequence(6, 2), CancellationToken).AsTask());
         await Assert.ThrowsAsync<InvalidOperationException>(() => writer.DeleteAsync(CancellationToken).AsTask());
 
-        Assert.Equal(JournalStorageVersion.Unknown, History(writer).WriteVersion);
         Assert.Equal(Bytes(5, 1), await ReadContentAsync(CreateStorage(journalId)));
     }
 
@@ -274,7 +268,6 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
         Assert.NotNull(await storage.GetMetadataAsync(CancellationToken));
         Assert.NotNull(await storage.UpdateMetadataAsync(new Dictionary<string, string> { ["conformance"] = "1" }, cancellationToken: CancellationToken));
 
-        Assert.Equal(JournalStorageVersion.Unknown, History(storage).WriteVersion);
         await Assert.ThrowsAsync<InvalidOperationException>(() => storage.AppendAsync(Sequence(6, 2), CancellationToken).AsTask());
         Assert.Equal(Bytes(5, 1), await ReadContentAsync(CreateStorage(journalId)));
     }
@@ -293,7 +286,22 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
         }
 
         var segments = Enumerable.Range(0, WriterCount).Select(static i => Bytes(10_000 + i, (byte)(10 + i))).ToArray();
-        var results = await Task.WhenAll(writers.Select((writer, i) => CaptureAsync(() => writer.AppendAsync(new ReadOnlySequence<byte>(segments[i]), CancellationToken))));
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var readyCount = 0;
+        var tasks = writers.Select((writer, i) => Task.Run(async () =>
+        {
+            if (Interlocked.Increment(ref readyCount) == WriterCount)
+            {
+                ready.SetResult();
+            }
+
+            await start.Task.WaitAsync(CancellationToken);
+            return await CaptureAsync(() => writer.AppendAsync(new ReadOnlySequence<byte>(segments[i]), CancellationToken));
+        }, CancellationToken)).ToArray();
+        await ready.Task.WaitAsync(CancellationToken);
+        start.SetResult();
+        var results = await Task.WhenAll(tasks);
 
         var winner = Assert.Single(Enumerable.Range(0, WriterCount), i => results[i] is null);
         Assert.All(results.Where(static exception => exception is not null), static exception => Assert.IsType<InconsistentStateException>(exception));
@@ -332,77 +340,118 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task WriteVersion_IsUnknownUntilReadOrWrite()
+    public async Task Read_WhenInitialConsumerFails_LeavesPreconditionUninitialized()
     {
         var journalId = CreateJournalId();
         var storage = CreateStorage(journalId);
-        Assert.Equal(JournalStorageVersion.Unknown, History(storage).WriteVersion);
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => storage.ReadAsync(new RejectingConsumer(), CancellationToken).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.AppendAsync(Sequence(5, 1), CancellationToken).AsTask());
 
-        Assert.Equal(JournalStorageVersion.Absent, (await ReadHistoryAsync(storage)).Version);
-        Assert.Equal(JournalStorageVersion.Unknown, History(storage).WriteVersion);
-
-        await ReadContentAsync(storage);
-        Assert.Equal(JournalStorageVersion.Absent, History(storage).WriteVersion);
-    }
-
-    [Fact]
-    public async Task ReadHistory_AfterOwnWrites_ReturnsWriteVersion()
-    {
-        var journalId = CreateJournalId();
-        var writer = await CreateWriterAsync(journalId);
-        await ReadContentAsync(writer);
-        await writer.AppendAsync(Sequence(5, 1), CancellationToken);
-        await writer.AppendAsync(Sequence(6, 2), CancellationToken);
-
-        var history = await ReadHistoryAsync(writer);
-        Assert.Equal(Concat([Bytes(5, 1), Bytes(6, 2)]), history.Content);
-        Assert.False(history.Version.IsAbsent);
-        Assert.Equal(History(writer).WriteVersion, history.Version);
-
-        await writer.ReplaceAsync(Sequence(7, 3), CancellationToken);
-        history = await ReadHistoryAsync(writer);
-        Assert.Equal(Bytes(7, 3), history.Content);
-        Assert.Equal(History(writer).WriteVersion, history.Version);
-
-        var reader = CreateStorage(journalId);
-        await ReadContentAsync(reader);
-        Assert.Equal(history.Version, History(reader).WriteVersion);
-        Assert.Equal(history.Version, (await ReadHistoryAsync(reader)).Version);
-    }
-
-    [Fact]
-    public async Task ReadHistory_AfterAnotherWriter_ReturnsNewContentAndKeepsPrecondition()
-    {
-        var journalId = CreateJournalId();
-        var writer = await CreateWriterAsync(journalId);
-        await writer.AppendAsync(Sequence(5, 1), CancellationToken);
-        var writeVersion = History(writer).WriteVersion;
-        var other = CreateStorage(journalId);
-        await ReadContentAsync(other);
+        var other = await CreateWriterAsync(journalId);
         await other.AppendAsync(Sequence(6, 2), CancellationToken);
-
-        var history = await ReadHistoryAsync(writer);
-
-        Assert.Equal(Concat([Bytes(5, 1), Bytes(6, 2)]), history.Content);
-        Assert.NotEqual(writeVersion, history.Version);
-        Assert.Equal(History(other).WriteVersion, history.Version);
-        Assert.Equal(writeVersion, History(writer).WriteVersion);
-        await Assert.ThrowsAsync<InconsistentStateException>(() => writer.AppendAsync(Sequence(7, 3), CancellationToken).AsTask());
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => storage.ReadAsync(new RejectingConsumer(), CancellationToken).AsTask());
+        await other.AppendAsync(Sequence(7, 3), CancellationToken);
+        Assert.Equal(Concat([Bytes(6, 2), Bytes(7, 3)]), await ReadContentAsync(storage));
+        await storage.AppendAsync(Sequence(8, 4), CancellationToken);
+        Assert.Equal(Concat([Bytes(6, 2), Bytes(7, 3), Bytes(8, 4)]), await ReadContentAsync(CreateStorage(journalId)));
     }
 
     [Fact]
-    public async Task ReadHistory_AfterAnotherWriterCreatedObservedAbsentJournal_ReturnsNewVersion()
+    public async Task Read_AfterOwnWritesAndMetadataUpdates_PreservesWritableContent()
     {
         var journalId = CreateJournalId();
-        var writer = CreateStorage(journalId);
-        await ReadContentAsync(writer);
+        var writer = await CreateWriterAsync(journalId);
+        Assert.Empty(await ReadContentAsync(writer));
+        await writer.AppendAsync(Sequence(5, 1), CancellationToken);
+        Assert.Equal(Bytes(5, 1), await ReadContentAsync(writer));
+        await CreateStorage(journalId).UpdateMetadataAsync(
+            new Dictionary<string, string> { ["owner"] = "reader" }, cancellationToken: CancellationToken);
+        Assert.Equal(Bytes(5, 1), await ReadContentAsync(writer));
+        await writer.ReplaceAsync(Sequence(6, 2), CancellationToken);
+        Assert.Equal(Bytes(6, 2), await ReadContentAsync(writer));
+        await writer.DeleteAsync(CancellationToken);
+        Assert.Empty(await ReadContentAsync(writer));
+        await writer.AppendAsync(Sequence(7, 3), CancellationToken);
+        Assert.Equal(Bytes(7, 3), await ReadContentAsync(writer));
+    }
+
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public async Task Read_AfterAnotherWriterChangedContent_ThrowsAndKeepsPrecondition(string change)
+    {
+        var journalId = CreateJournalId();
+        var writer = await CreateWriterAsync(journalId);
+        await writer.AppendAsync(Sequence(5, 1), CancellationToken);
+        var other = await CreateWriterAsync(journalId);
+        var expected = Bytes(5, 1);
+        switch (change)
+        {
+            case "append":
+                await other.AppendAsync(Sequence(6, 2), CancellationToken);
+                expected = Concat([expected, Bytes(6, 2)]);
+                break;
+            case "replace":
+                // Equal bytes still represent a different publication.
+                await other.ReplaceAsync(new ReadOnlySequence<byte>(expected), CancellationToken);
+                break;
+            case "delete":
+                await other.DeleteAsync(CancellationToken);
+                expected = [];
+                break;
+        }
+
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var consumer = new CollectingConsumer();
+            await Assert.ThrowsAsync<InconsistentStateException>(() => writer.ReadAsync(consumer, CancellationToken).AsTask());
+            Assert.Empty(consumer.Content);
+            Assert.False(consumer.IsCompleted);
+        }
+
+        await Assert.ThrowsAsync<InconsistentStateException>(() => writer.AppendAsync(Sequence(7, 3), CancellationToken).AsTask());
+        var recovered = await CreateWriterAsync(journalId);
+        Assert.Equal(expected, await ReadContentAsync(recovered));
+        await recovered.AppendAsync(Sequence(8, 4), CancellationToken);
+        Assert.Equal(Concat([expected, Bytes(8, 4)]), await ReadContentAsync(CreateStorage(journalId)));
+    }
+
+    [Fact]
+    public async Task Read_AfterObservedAbsenceAndCompetingCreation_ThrowsAndKeepsPrecondition()
+    {
+        var journalId = CreateJournalId();
+        var writer = await CreateWriterAsync(journalId);
         await (await CreateWriterAsync(journalId)).AppendAsync(Sequence(5, 1), CancellationToken);
 
-        var history = await ReadHistoryAsync(writer);
+        await Assert.ThrowsAsync<InconsistentStateException>(() => ReadContentAsync(writer));
+        await Assert.ThrowsAsync<InconsistentStateException>(() => ReadContentAsync(writer));
+        await Assert.ThrowsAsync<InconsistentStateException>(() => writer.AppendAsync(Sequence(6, 2), CancellationToken).AsTask());
+        Assert.Equal(Bytes(5, 1), await ReadContentAsync(CreateStorage(journalId)));
+    }
 
-        Assert.Equal(Bytes(5, 1), history.Content);
-        Assert.False(history.Version.IsAbsent);
-        Assert.Equal(JournalStorageVersion.Absent, History(writer).WriteVersion);
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Append_EmptySegment_ThrowsAndLeavesStorageUnchanged(bool exists)
+    {
+        var journalId = CreateJournalId();
+        var writer = await CreateWriterAsync(journalId);
+        if (exists)
+        {
+            await writer.AppendAsync(Sequence(5, 1), CancellationToken);
+        }
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => writer.AppendAsync(ReadOnlySequence<byte>.Empty, CancellationToken).AsTask());
+        Assert.Equal(exists, await CreateStorage(journalId).GetMetadataAsync(CancellationToken) is not null);
+        var expected = exists ? Bytes(5, 1) : [];
+        Assert.Equal(expected, await ReadContentAsync(CreateStorage(journalId)));
+        await writer.AppendAsync(Sequence(6, 2), CancellationToken);
+        Assert.Equal(Concat([expected, Bytes(6, 2)]), await ReadContentAsync(CreateStorage(journalId)));
     }
 
     [Fact]
@@ -554,15 +603,19 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
                     }
 
                 case ModelOperationKind.Read:
+                    if (model.IsWriterStale)
+                    {
+                        await Assert.ThrowsAsync<InconsistentStateException>(() => ReadContentAsync(writer));
+                        writer = CreateWriter();
+                    }
+
                     Assert.Equal(model.Content, await ReadContentAsync(writer));
-                    model.Read(exists: !History(writer).WriteVersion.IsAbsent);
+                    model.Read(exists: await writer.GetMetadataAsync(CancellationToken) is not null);
                     break;
                 case ModelOperationKind.OversizedAppend when MaxAppendBytes is { } maxAppendBytes:
                     {
-                        var versionBefore = History(writer).WriteVersion;
                         var oversized = LargeSequence(maxAppendBytes + 1, operation.Data[0]);
                         await Assert.ThrowsAnyAsync<Exception>(() => writer.AppendAsync(oversized, CancellationToken).AsTask());
-                        Assert.Equal(versionBefore, History(writer).WriteVersion);
                         break;
                     }
 
@@ -642,7 +695,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
         {
             writer = CreateWriter();
             Assert.Equal(model.Content, await ReadContentAsync(writer));
-            model.Read(exists: !History(writer).WriteVersion.IsAbsent);
+            model.Read(exists: await writer.GetMetadataAsync(CancellationToken) is not null);
         }
     }
 
@@ -679,18 +732,6 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
         Assert.True(consumer.IsCompleted);
         return consumer.Content.ToArray();
     }
-
-    private static async Task<(byte[] Content, JournalStorageVersion Version)> ReadHistoryAsync(IJournalStorage storage)
-    {
-        var consumer = new CollectingConsumer();
-        var version = await History(storage).ReadHistoryAsync(consumer, CancellationToken);
-        Assert.True(consumer.IsCompleted);
-        Assert.NotEqual(JournalStorageVersion.Unknown, version);
-        return (consumer.Content.ToArray(), version);
-    }
-
-    private static IJournalHistoryStorage History(IJournalStorage storage)
-        => Assert.IsAssignableFrom<IJournalHistoryStorage>(storage);
 
     private static async Task<Exception?> CaptureAsync(Func<ValueTask> operation)
     {
@@ -793,6 +834,12 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
             _exists = exists;
             _version++;
         }
+    }
+
+    private sealed class RejectingConsumer : IJournalStorageConsumer
+    {
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata)
+            => throw new InvalidDataException("Injected recovery failure.");
     }
 
     private sealed class CollectingConsumer : IJournalStorageConsumer

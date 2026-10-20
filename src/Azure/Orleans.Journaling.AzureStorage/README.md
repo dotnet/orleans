@@ -31,6 +31,8 @@ siloBuilder.AddAzureBlobJournalStorage(options =>
 
 The package also provides an Azure Table implementation, `AddAzureTableJournalStorage`. Each journal is stored as one table partition: a header row carries the journal manifest and is the optimistic concurrency fence, and journal bytes are stored in data rows whose keys order the current generation by sequence. Every append commits its rows together with the header update in a single entity group transaction, and recovery replays the whole journal with a single partition range query, avoiding the per-block pacing which append blob replay is subject to. Because an append is limited by entity group transaction limits (100 entities and 4 MiB), a single journal batch must not exceed 2 MiB, and a larger batch fails before any request is sent; replace operations may be any size, and their rows become visible only when the header update publishes them.
 
+After a failed publication attempt, staged rows are retained so a delayed header update can still publish a complete generation. Deleting the journal reclaims the partition's retained rows.
+
 ```csharp
 siloBuilder.AddAzureTableJournalStorage(options =>
 {

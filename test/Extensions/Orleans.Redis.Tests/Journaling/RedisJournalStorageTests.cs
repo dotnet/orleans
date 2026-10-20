@@ -45,18 +45,6 @@ public sealed class RedisJournalStorageTests
     }
 
     [Theory]
-    [InlineData("none")]
-    [InlineData("replace")]
-    [InlineData("delete")]
-    public async Task HistoryPreservesWriteState(string change)
-    {
-        TestUtils.CheckForRedis();
-        await using var context = await RedisJournalStorageTestContext.CreateAsync(TestContext.Current.CancellationToken);
-        await JournalStorageContractTests.HistoryPreservesWriteState(
-            () => context.Provider.CreateStorage(new("history")), change);
-    }
-
-    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task DeleteAsync_CompetingCreationAfterObservedAbsenceFencesWrites(bool replace)
@@ -83,69 +71,16 @@ public sealed class RedisJournalStorageTests
                 }
             });
         var storage = new RedisJournalStorage(database, "test", "journal", "json", new(), new("journal"));
-        var history = (IJournalHistoryStorage)storage;
-        Assert.Equal(JournalStorageVersion.Unknown, history.WriteVersion);
         await Assert.ThrowsAsync<InvalidOperationException>(() => storage.DeleteAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.Equal(0, callCount);
         await storage.ReadAsync(new CapturingJournalStorageConsumer(), TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<InconsistentStateException>(() => storage.DeleteAsync(TestContext.Current.CancellationToken).AsTask());
 
-        Assert.Equal(JournalStorageVersion.Absent, history.WriteVersion);
         await Assert.ThrowsAsync<InconsistentStateException>(() => (replace
             ? storage.ReplaceAsync(new ReadOnlySequence<byte>([9]), TestContext.Current.CancellationToken)
             : storage.AppendAsync(new ReadOnlySequence<byte>([9]), TestContext.Current.CancellationToken)).AsTask());
         Assert.Equal(3, callCount);
-    }
-
-    [Fact]
-    public async Task HistoryReadPreservesCompactionAndStaleWrite()
-    {
-        var token = TestContext.Current.CancellationToken;
-        var database = Substitute.For<IDatabase>();
-        var responses = new Queue<RedisResult>(
-        [
-            ReadResponse("original", 2, [1, 2]),
-            ReadResponse("replaced", 0, [9]),
-            RedisResult.Create(new RedisValue[] { -1 }),
-        ]);
-        database.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>())
-            .Returns(call =>
-            {
-                if (responses.Count == 1)
-                {
-                    Assert.Equal("original", call.Arg<RedisValue[]>()[0].ToString());
-                }
-
-                return responses.Dequeue();
-            });
-        var storage = new RedisJournalStorage(
-            database, "test", "journal", "json", new() { CompactionThresholdBytes = 2 }, new("journal"));
-        await storage.ReadAsync(new CapturingJournalStorageConsumer(), token);
-        var history = (IJournalHistoryStorage)storage;
-        var version = history.WriteVersion;
-        Assert.True(storage.IsCompactionRequested);
-        var consumer = new CapturingJournalStorageConsumer();
-
-        Assert.Equal(JournalStorageVersion.Create("replaced"), await history.ReadHistoryAsync(consumer, token));
-        Assert.Equal([9], consumer.Bytes);
-        Assert.True(consumer.IsCompleted);
-        Assert.Equal(version, history.WriteVersion);
-        Assert.True(storage.IsCompactionRequested);
-        await Assert.ThrowsAsync<InconsistentStateException>(
-            () => storage.AppendAsync(new ReadOnlySequence<byte>([3]), token).AsTask());
-        Assert.Empty(responses);
-
-        static RedisResult ReadResponse(string contentETag, long appendLength, byte[] bytes) => RedisResult.Create((RedisValue[])
-        [
-            1, bytes,
-            RedisJournalStorage.ETagMetadataKey, contentETag,
-            RedisJournalStorage.ContentETagMetadataKey, contentETag,
-            RedisJournalStorage.AppendLengthMetadataKey, appendLength,
-            RedisJournalStorage.FormatMetadataKey, "json",
-            RedisJournalStorage.JournalIdMetadataKey, "journal",
-            RedisJournalStorage.SchemaVersionMetadataKey, RedisJournalStorage.CurrentSchemaVersion,
-        ]);
     }
 
     [Theory]

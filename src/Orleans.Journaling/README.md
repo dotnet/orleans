@@ -304,11 +304,17 @@ acknowledgement or a fresh activation before deciding whether to retry an applic
 
 The journal is the source of truth for durable state. Every `IJournalStorage` implementation provides these guarantees:
 
-- `AppendAsync` makes its whole segment visible after every earlier segment, or none of it, and `ReplaceAsync` makes its whole value the journal's only segment, or the journal keeps its earlier content. A segment stored across several records or requests becomes visible through one atomic publication step, so no reader observes part of a segment after a crash, timeout, conflict, or retry inside the provider.
+- `AppendAsync` makes its whole segment visible after every earlier segment, or none of it, and `ReplaceAsync` makes its whole value the journal's only segment, or the journal keeps its earlier content. A segment stored across several records or requests becomes visible through one atomic publication step, so successful reads observe whole segments after a crash, timeout, conflict, or retry inside the provider.
 - A segment which exceeds a provider limit fails the whole call with an exception, and nothing of it becomes visible.
-- A write which the provider rejects leaves the earlier content in place. A write with an indeterminate outcome, such as a timeout after the request was sent, applied its whole segment or none of it; the next read shows which.
-- `ReadAsync` returns one version of the journal: every segment written up to that version, whole and in write order.
-- Each storage instance holds a write precondition: the version it last read or wrote, including an observed absence. `AppendAsync`, `ReplaceAsync`, and `DeleteAsync` succeed only at that version and otherwise throw `InconsistentStateException`. An instance writes after it reads the journal or creates it with `CreateIfNotExistsAsync`; a write through an instance which has done neither throws `InvalidOperationException`. Metadata operations never establish or move the precondition.
+- A definitively rejected write leaves the earlier content in place. A write with an indeterminate outcome, such as a timeout after the request was sent, applied its whole segment or none of it. A retry can report a precondition conflict after the original request committed; recovery determines the outcome.
+- A successful `ReadAsync` returns one version of the journal: every segment written up to that version, whole and in write order. Callers discard data from a failed read and recover from the beginning.
+- Each storage instance holds a write precondition established by its first successful read or creation, including an observed absence, and advanced by its own writes. `AppendAsync`, `ReplaceAsync`, and `DeleteAsync` succeed only at that version and otherwise throw `InconsistentStateException`. An instance writes after it reads the journal or creates it with `CreateIfNotExistsAsync`; a write through an instance which has done neither throws `InvalidOperationException`. Metadata operations never establish or move the precondition.
+
+Callers await each operation before starting another through the same storage instance. Separate instances coordinate through storage preconditions. Direct storage callers initialize their precondition with `ReadAsync` or a successful `CreateIfNotExistsAsync` before writing.
+
+Subsequent `ReadAsync` calls validate the established precondition and throw `InconsistentStateException` if another writer changed the content. This provides history reads through the same interface while preserving the active writer's precondition. Recovery after a conflict uses a fresh storage instance.
+
+Appends contain at least one byte. An empty append throws `ArgumentOutOfRangeException` before touching storage; `ReplaceAsync` accepts an empty value to publish an empty journal.
 
 The provider conformance suite (`JournalStorageConformanceTests` in `test/Orleans.Journaling.Tests/Conformance`) verifies these guarantees with limit, concurrency, fault-injection, and model-based tests. Each provider in this repository runs it.
 

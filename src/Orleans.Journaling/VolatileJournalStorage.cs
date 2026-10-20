@@ -171,10 +171,11 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 /// <summary>
 /// An in-memory, volatile implementation of <see cref="IJournalStorage"/> for non-durable use cases, such as development and testing.
 /// </summary>
-public sealed class VolatileJournalStorage : IJournalStorage, IJournalHistoryStorage
+public sealed class VolatileJournalStorage : IJournalStorage
 {
     private readonly Store _store;
-    private JournalStorageVersion _writeVersion;
+    // Null until read or creation, zero for an absent journal.
+    private long? _writeVersion;
     private readonly int _maxAppendsBeforeSnapshot;
     private readonly long _maxBytesBeforeSnapshot;
     private string? _configuredJournalFormatKey;
@@ -308,37 +309,27 @@ public sealed class VolatileJournalStorage : IJournalStorage, IJournalHistorySto
     /// <inheritdoc/>
     public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
     {
-        ReadCore(consumer, adoptVersion: true, cancellationToken);
-        return default;
-    }
-
-    /// <inheritdoc/>
-    JournalStorageVersion IJournalHistoryStorage.WriteVersion => _writeVersion;
-
-    /// <inheritdoc/>
-    ValueTask<JournalStorageVersion> IJournalHistoryStorage.ReadHistoryAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
-        => new(ReadCore(consumer, adoptVersion: false, cancellationToken));
-
-    private JournalStorageVersion ReadCore(IJournalStorageConsumer consumer, bool adoptVersion, CancellationToken cancellationToken)
-    {
         ArgumentNullException.ThrowIfNull(consumer);
+        cancellationToken.ThrowIfCancellationRequested();
 
         byte[][] segments;
         IJournalMetadata metadata;
-        JournalStorageVersion version;
+        long version;
         lock (_store.SyncRoot)
         {
+            if (_writeVersion is not null)
+            {
+                ThrowIfVersionChanged(nameof(ReadAsync));
+            }
+
             metadata = _store.Exists ? _store.GetMetadata() : JournalMetadata.Empty;
             segments = _store.Segments.ToArray();
             version = _store.ContentVersion;
-            if (adoptVersion)
-            {
-                _writeVersion = version;
-            }
         }
 
         consumer.Read(GetSegments(segments, cancellationToken), metadata, complete: true);
-        return version;
+        _writeVersion = version;
+        return default;
     }
 
     private static IEnumerable<ReadOnlyMemory<byte>> GetSegments(IEnumerable<byte[]> segments, CancellationToken cancellationToken)
@@ -354,6 +345,7 @@ public sealed class VolatileJournalStorage : IJournalStorage, IJournalHistorySto
     public ValueTask AppendAsync(ReadOnlySequence<byte> segment, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ArgumentOutOfRangeException.ThrowIfZero(segment.Length, nameof(segment));
         lock (_store.SyncRoot)
         {
             ThrowIfVersionChanged(nameof(AppendAsync));
@@ -399,7 +391,7 @@ public sealed class VolatileJournalStorage : IJournalStorage, IJournalHistorySto
         {
             ThrowIfVersionChanged(nameof(DeleteAsync));
             _store.Delete();
-            _writeVersion = JournalStorageVersion.Absent;
+            _writeVersion = 0;
         }
 
         return default;
@@ -408,9 +400,9 @@ public sealed class VolatileJournalStorage : IJournalStorage, IJournalHistorySto
     // Callers hold the store lock.
     private void ThrowIfVersionChanged(string operation)
     {
-        if (_writeVersion == JournalStorageVersion.Unknown)
+        if (_writeVersion is null)
         {
-            throw JournalStorageVersion.CreateWriteBeforeReadException(operation);
+            throw new InvalidOperationException($"{operation} requires reading or creating the journal first.");
         }
 
         var current = _store.ContentVersion;
@@ -418,8 +410,8 @@ public sealed class VolatileJournalStorage : IJournalStorage, IJournalHistorySto
         {
             throw new InconsistentStateException(
                 $"Version conflict ({operation}): the volatile journal '{_store}' changed since this storage instance last read or wrote it.",
-                _writeVersion.ToString(),
-                current.ToString());
+                _writeVersion.Value.ToString(CultureInfo.InvariantCulture),
+                current.ToString(CultureInfo.InvariantCulture));
         }
     }
 
@@ -447,8 +439,7 @@ public sealed class VolatileJournalStorage : IJournalStorage, IJournalHistorySto
         // Counts content changes (creation, writes, and deletion) so content versions are never reused; metadata updates leave it unchanged.
         private long _contentChangeCount;
 
-        public JournalStorageVersion ContentVersion
-            => Exists ? JournalStorageVersion.Create(_contentChangeCount.ToString("D", CultureInfo.InvariantCulture)) : JournalStorageVersion.Absent;
+        public long ContentVersion => Exists ? _contentChangeCount : 0;
 
         public string? ETag { get; private set; }
 

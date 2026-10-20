@@ -45,18 +45,6 @@ public sealed class AzureBlobJournalStorageTests
     }
 
     [Theory]
-    [InlineData("none")]
-    [InlineData("replace")]
-    [InlineData("delete")]
-    public Task HistoryPreservesWriteState(string change)
-    {
-        var store = new FakeAppendBlobStore();
-        var checkpoints = new FakeBlockBlobStore();
-        return JournalStorageContractTests.HistoryPreservesWriteState(
-            () => CreateStorage(store, checkpoints), change);
-    }
-
-    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task MetadataUpdate_GenerationlessWalPreservesRecreatedContentFence(bool changeMetadata)
@@ -65,8 +53,6 @@ public sealed class AzureBlobJournalStorageTests
         store.Add("blob/wal", [1], WalMetadata(), isSealed: false);
         var storage = CreateStorage(store);
         await storage.ReadAsync(new CapturingJournalStorageConsumer(), TestContext.Current.CancellationToken);
-        var history = (IJournalHistoryStorage)storage;
-        var version = history.WriteVersion;
         await (await CreateStorage(store).ReadForWriteAsync()).DeleteAsync(TestContext.Current.CancellationToken);
         store.Add("blob/wal", [9], WalMetadata(), isSealed: false);
 
@@ -74,7 +60,6 @@ public sealed class AzureBlobJournalStorageTests
             set: changeMetadata ? new Dictionary<string, string> { ["owner"] = "test" } : null,
             cancellationToken: TestContext.Current.CancellationToken));
 
-        Assert.Equal(version, history.WriteVersion);
         await Assert.ThrowsAsync<InconsistentStateException>(
             () => storage.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken).AsTask());
         Assert.Equal([9], store.GetContent("blob/wal"));
@@ -95,27 +80,6 @@ public sealed class AzureBlobJournalStorageTests
 
         Assert.Equal(new ETag("\"metadata-1\""), store.AppendCalls.Last().IfMatch);
         Assert.Equal([1, 2], store.GetContent("blob/wal"));
-    }
-
-    [Fact]
-    public async Task HistoryReadPreservesCompactionAndStaleWrite()
-    {
-        var store = new FakeAppendBlobStore();
-        store.Add("blob/wal", [1], WalMetadata(generation: "initial"), isSealed: false, committedBlockCount: 49_001);
-        var storage = CreateStorage(store);
-        await storage.ReadAsync(new CapturingJournalStorageConsumer(), TestContext.Current.CancellationToken);
-        var history = (IJournalHistoryStorage)storage;
-        var version = history.WriteVersion;
-        Assert.True(storage.IsCompactionRequested);
-        store.Add("blob/wal", [9], WalMetadata(generation: "recreated"), isSealed: false);
-
-        Assert.NotEqual(version, await history.ReadHistoryAsync(
-            new CapturingJournalStorageConsumer(), TestContext.Current.CancellationToken));
-        Assert.Equal(version, history.WriteVersion);
-        Assert.True(storage.IsCompactionRequested);
-        await Assert.ThrowsAsync<InconsistentStateException>(
-            () => storage.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken).AsTask());
-        Assert.Equal([9], store.GetContent("blob/wal"));
     }
 
     [Fact]
