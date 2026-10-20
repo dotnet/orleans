@@ -27,7 +27,7 @@ Enumerating the `Select` in this example invokes each lambda in input order, and
 
 Durable combinators identify each input by its index beneath the combinator's name, such as `reserve/0` and `reserve/1`, schedule the inputs in one batch which one journal write commits, and record which input completed first, so every replay observes the same outcome.
 
-For combinators, see [Combinators](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#combinators).
+For combinators, see [Combinators](../grains/durable-tasks.md#combinators).
 
 ## How to fix violations
 

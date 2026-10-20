@@ -29,7 +29,7 @@ An `async void` delegate returns to its caller at its first incomplete `await`. 
 
 In the example, the step completes before the email is sent, and a failed send leaves the step's record successful.
 
-For steps and effects, see [Recorded effects](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#recorded-effects).
+For steps and effects, see [Recorded effects](../grains/durable-tasks.md#recorded-effects).
 
 ## How to fix violations
 

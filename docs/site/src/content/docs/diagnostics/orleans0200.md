@@ -32,7 +32,7 @@ Three places access grain state once:
 - A local step, an `async DurableTask` method of the same grain, commits the state changes of its final code with its recorded result.
 - The body's synchronous tail, the code after its last durable operation, commits its state changes with the task's result.
 
-For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
+For the replay model, see [Writing replay-safe workflows](../grains/durable-tasks.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 
@@ -48,7 +48,7 @@ For the replay model, see [Writing replay-safe workflows](https://github.com/dot
 
 :::code source="snippets/durable-tasks/Orleans0200.cs" id="orleans0200_fix_step" language="csharp":::
 
-For recorded effects, see [Recorded effects](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#recorded-effects).
+For recorded effects, see [Recorded effects](../grains/durable-tasks.md#recorded-effects).
 
 ## When to suppress
 

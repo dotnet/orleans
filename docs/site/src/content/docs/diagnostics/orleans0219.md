@@ -25,7 +25,7 @@ In a durable task body, `ScheduleAsync` starts an attached child and returns its
 
 In the example, the body completes while the notice can still be running. A notice which fails leaves the order dispatched with no record of the failure in the workflow, and a notice which is still running when the execution's tree is deleted is canceled.
 
-For attached and detached starts, see [Starting and observing tasks](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#starting-and-observing-tasks).
+For attached and detached starts, see [Starting and observing tasks](../grains/durable-tasks.md#starting-and-observing-tasks).
 
 ## How to fix violations
 

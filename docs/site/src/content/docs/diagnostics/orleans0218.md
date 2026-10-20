@@ -27,7 +27,7 @@ A name built from data names one change per value. When the data differs between
 
 The range states which versions the deployed code supports: `maxSupported` is the newest version which the code implements, and `minSupported` is the oldest version which it still replays. Both belong to the code which branches on the version. A range which callers pass can admit a version for which the code has no branch, or retire a version which pending executions recorded, which stalls them.
 
-For versioning, see [Versioned changes](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#versioned-changes).
+For versioning, see [Versioned changes](../grains/durable-tasks.md#versioned-changes).
 
 ## How to fix violations
 

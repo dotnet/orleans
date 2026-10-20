@@ -27,7 +27,7 @@ A durable task body awaits a `DurableTask.Run` step where it defines it, optiona
 
 A step and an effect at the same call site use the same identifier, and the execution records which kind ran. A replay which finds a step recorded where the body now runs an effect diverges, so a deployment with pending executions branches the change on `DurableTask.GetVersion`.
 
-For effects and steps, see [Recorded effects](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#recorded-effects).
+For effects and steps, see [Recorded effects](../grains/durable-tasks.md#recorded-effects).
 
 ## How to fix violations
 
