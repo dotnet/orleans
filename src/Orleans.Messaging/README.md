@@ -86,7 +86,12 @@ construction or activation setup, before journal recovery.
   send, a source that throws, returns an invalid message, or no longer provides the
   message dead-letters that entry alone, with `OnRetired` in the same journal write; an
   exception during `Send` propagates without staging anything. A recovered entry that
-  no source provides is dead-lettered without an owner to notify.
+  no source provides is dead-lettered without an owner to notify. `OnRetired` runs
+  once per entry in the current activation. If the activation fails before the
+  retirement write commits, recovery restores the pending entry and the source's
+  prior journaled state, and retiring the recovered entry invokes the callback
+  again. Stage durable callback effects in the same journal write as retirement;
+  make effects outside that write idempotent across repeated calls.
 - `IInbox.Register(IInboxMessageSink)` adds a sink. The inbox offers each message,
   including self-sent and scheduled messages, to the sinks in order. The first sink
   whose `TryAccept` returns `true` reports the `DeliveryResult`:
