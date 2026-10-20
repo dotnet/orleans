@@ -22,7 +22,6 @@ namespace Orleans.Messaging
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        public const string DeduplicationWindowExceededCode = "DeduplicationWindowExceeded";
         [Id(2)]
         public string? Code { get { throw null; } init { } }
 
@@ -40,6 +39,8 @@ namespace Orleans.Messaging
 
         public static DeliveryResult Duplicate() { throw null; }
 
+        public static DeliveryResult Expired() { throw null; }
+
         public static DeliveryResult HandlerNotFound() { throw null; }
     }
 
@@ -49,7 +50,8 @@ namespace Orleans.Messaging
         Duplicate = 2,
         Backpressured = 3,
         HandlerNotFound = 4,
-        DeadLettered = 5
+        DeadLettered = 5,
+        Expired = 6
     }
 
     [GenerateSerializer]

@@ -11,9 +11,8 @@ namespace Orleans.Messaging.Configuration;
 /// dead-letter behavior, and pump batch sizes.
 /// </para>
 /// <para>
-/// Transport is at-least-once. Deduplication provides effectively-once handler effects only
-/// while the processed-message record is retained. Configuration values affect memory usage,
-/// throughput, and recovery characteristics.
+/// Transport is at-least-once. Retained processed records and a durable admission floor deduplicate logical sends.
+/// Configuration values affect delivery availability, memory usage, throughput, and recovery characteristics.
 /// </para>
 /// </remarks>
 public class DurableMessagingOptions
@@ -56,32 +55,31 @@ public class DurableMessagingOptions
     public int MaxCapacity { get; set; } = 1000;
 
     /// <summary>
-    /// Gets or sets the time window for tracking processed messages to prevent duplicates.
-    /// A message processed within this window is answered with <c>DeliveryResult.Duplicate()</c>, or, when an inbox
+    /// Gets or sets the retention interval used to advance the receiving inbox's durable admission floor.
+    /// A tracked processed message is answered with <c>DeliveryResult.Duplicate()</c>, or, when an inbox
     /// sink rejected it on delivery, with the same <c>DeliveryResult.DeadLettered</c> reason and code.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// A longer window (e.g., 30 days) provides stronger deduplication guarantees but increases
-    /// memory usage and storage I/O. A shorter window (e.g., 1 hour) reduces overhead but may
-    /// allow duplicate processing if retries are delayed.
+    /// A longer interval (e.g., 30 days) retains more processed records and admits older sends, increasing
+    /// memory usage and storage I/O. A shorter interval (e.g., 1 hour) fences older sends sooner.
     /// </para>
     /// <para>
-    /// Processed message tracking uses the exact message ID within the receiving inbox, with timestamps.
-    /// Expired entries are removed atomically when a replay is accepted and are compacted when the
-    /// inbox writes a snapshot.
+    /// The receiver proposes an admission floor from its current clock minus this interval. The floor only advances,
+    /// is journaled, and survives recovery and migration. A processed record becomes eligible for compaction once its
+    /// immutable <see cref="InboxMessage.RedeliveryDeadline"/> is at or below that floor. Every subsequent untracked
+    /// delivery with that cutoff is fenced, including after a backward clock jump. Null-cutoff records are retained
+    /// permanently.
     /// </para>
     /// <para>
-    /// Every outbox delivery attempt starts within <see cref="OutboxRetryTimeout"/> of the time the message was sent or
-    /// last backpressured, and carries the time its redeliveries end as <see cref="InboxMessage.RedeliveryDeadline"/>.
-    /// An inbox first accepting a message whose deadline is later than this window covers answers
-    /// <see cref="DeliveryResult.DeduplicationWindowExceededCode"/>, so every redelivery it accepts is deduplicated.
-    /// Configure both values uniformly across the cluster. Senders which resubmit outside the outbox need a window
-    /// which covers their own retry horizon.
+    /// Clock jumps and skew can cause early fencing or extended retention. Deduplication safety follows the journaled
+    /// floor and fixed per-send cutoffs, independently of clock synchronization and of
+    /// <see cref="OutboxRetryTimeout"/>. Size this interval for the delivery delays and clock variation the application
+    /// expects to tolerate.
     /// </para>
     /// </remarks>
     /// <value>
-    /// The deduplication window. Must be greater than zero. Defaults to 7 days.
+    /// The retention interval. Must be greater than zero. Defaults to 7 days.
     /// </value>
     public TimeSpan DeduplicationWindow { get; set; } = TimeSpan.FromDays(7);
 
@@ -111,22 +109,22 @@ public class DurableMessagingOptions
 
 
     /// <summary>
-    /// Gets or sets how long the outbox retries a message whose delivery attempts fail, such as during an
-    /// infrastructure outage or while the receiver reports no inbox handler, before the message is dead-lettered.
+    /// Gets or sets the absolute delivery-attempt budget from the original send before the outbox dead-letters
+    /// the message, including while the receiver is backpressured or reports no inbox handler.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The timeout starts when the message is sent and restarts whenever the receiver answers with
-    /// <c>DeliveryResult.Backpressured()</c>, so the outbox retries a backpressured message until the receiver takes it.
-    /// A receiver checks its deduplication records before answering, so only attempts since the timeout started can have
-    /// been accepted. No attempt starts after the timeout elapses, so redeliveries of an accepted message stay within
-    /// <see cref="DeduplicationWindow"/> of its acceptance. The timeout follows the Durable Jobs clock.
+    /// The outbox journals the expiration and immutable admission cutoff when it stages the send. Backpressure and
+    /// recovery preserve that budget. The timeout follows the Durable Jobs clock; a jump can end retries early or
+    /// prolong them. A timeout or <see cref="DeliveryStatus.Expired"/> leaves the receiver's earlier delivery outcome
+    /// unknown. A source's <see cref="IOutboxMessageSource.OnRetired"/> stages application responses atomically with
+    /// retirement; see <see cref="OutboxMessageRetirementStatus.DeadLettered"/>.
     /// </para>
     /// <para>
     /// The outbox logs each <c>DeliveryResult.HandlerNotFound()</c> answer as an error.
     /// </para>
     /// </remarks>
-    /// <value>Must be greater than zero and less than <see cref="DeduplicationWindow"/>. Defaults to 6 hours.</value>
+    /// <value>Must be greater than zero. Defaults to 6 hours.</value>
     public TimeSpan OutboxRetryTimeout { get; set; } = TimeSpan.FromHours(6);
 
     /// <summary>
@@ -196,15 +194,6 @@ public class DurableMessagingOptions
         {
             throw new ArgumentOutOfRangeException(nameof(OutboxRetryTimeout), OutboxRetryTimeout, "OutboxRetryTimeout must be greater than TimeSpan.Zero.");
         }
-
-        if (OutboxRetryTimeout >= DeduplicationWindow)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(OutboxRetryTimeout),
-                OutboxRetryTimeout,
-                "OutboxRetryTimeout must be less than DeduplicationWindow.");
-        }
-
 
         if (DeadLetterRetentionPeriod <= TimeSpan.Zero)
         {
