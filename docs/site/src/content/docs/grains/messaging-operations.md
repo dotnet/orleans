@@ -166,7 +166,7 @@ callback; recovery after commit resumes the follow-up through the inbox's durabl
 wake-up. The follow-up handler can query participants, reconcile unknown effects,
 and commit the application's next decision.
 
-`DeadLettered` retirements cover retry exhaustion, admission fencing, and source
+`DeadLettered` retirements cover retry exhaustion, `Expired` answers, and source
 failure. Earlier acceptance remains unknown; `Rejected` identifies a durable
 receiver rejection. Keep source ownership registered through recovery. A callback
 exception fails the activation and preserves the last committed pending entry.
@@ -233,7 +233,7 @@ synchronously on the activation which makes them, with its `IGrainContext`:
 
 | Event | Raised |
 | --- | --- |
-| `InboxMessageReceiving` | A new delivery passed deduplication and the admission fence, before the inbox stages message effects. An observer's exception fails the attempt like a sink exception, so the sender retries it. |
+| `InboxMessageReceiving` | A new delivery's send time is above the admission floor, before the inbox stages message effects. An observer's exception fails the attempt like a sink exception, so the sender retries it. |
 | `OutboxRetryScheduled` | A failed delivery attempt was rescheduled, with its attempt count, error, and next attempt time. |
 | `OutboxMessageRetired` | A message retired as delivered, rejected, or dead-lettered, with its retirement. |
 
