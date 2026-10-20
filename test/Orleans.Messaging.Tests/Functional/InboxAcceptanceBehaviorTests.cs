@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
+using Orleans.Messaging.Configuration;
 using Orleans.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
@@ -137,6 +139,35 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         Assert.NotEqual(before.ActivationId, after.ActivationId);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
+    }
+
+    [Fact]
+    public async Task RedeliveryDeadlineBeyondDeduplicationWindow_IsRejectedWithoutStagingAnything()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+        var services = Fixture.GetGrainContext(receiver).ActivationServices;
+        var window = services.GetRequiredService<IOptions<DurableMessagingOptions>>().Value.DeduplicationWindow;
+        var jobClock = services.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs);
+        var envelope = CreateEnvelope(receiver, NewMessage(31, "beyond-window"));
+        var late = envelope with { RedeliveryDeadline = jobClock.GetUtcNow() + window + TimeSpan.FromHours(1) };
+
+        var first = await DeliverAsync(receiver, late);
+        var redelivery = await DeliverAsync(receiver, late);
+
+        Assert.Equal(DeliveryStatus.DeadLettered, first.Status);
+        Assert.Equal(DeliveryResult.DeduplicationWindowExceededCode, first.Code);
+        Assert.Equal((first.Status, first.Code), (redelivery.Status, redelivery.Code));
+        var rejected = await receiver.GetSnapshotAsync();
+        Assert.Equal((0, 0), (rejected.InboxCount, rejected.ProcessedMessageCount));
+        Assert.Empty(rejected.InboxDeadLetters);
+
+        // Nothing recorded the ID, so a deadline the window covers is a first acceptance, and later deliveries are
+        // duplicates whatever their deadline.
+        var covered = envelope with { RedeliveryDeadline = jobClock.GetUtcNow() + window - TimeSpan.FromMinutes(1) };
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, covered)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, late)).Status);
+        Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
     }
 
     [Fact]
