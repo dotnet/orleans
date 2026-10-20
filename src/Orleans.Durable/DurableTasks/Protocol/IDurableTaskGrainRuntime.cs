@@ -335,7 +335,9 @@ internal interface IDurableTaskGrainRuntime
     /// <summary>
     /// Cancels the attempt which <paramref name="context"/> runs for <paramref name="reason"/>,
     /// <see cref="DurableTaskAttemptCancellationReason.UnsupportedVersion"/> or
-    /// <see cref="DurableTaskAttemptCancellationReason.Diverged"/>, keeping its task pending for a later activation to replay.
+    /// <see cref="DurableTaskAttemptCancellationReason.Diverged"/>, keeping its task pending for a later activation to replay;
+    /// or for <see cref="DurableTaskAttemptCancellationReason.TransactionConflict"/>, whose
+    /// <paramref name="exception"/> is the conflict, starting its task again once the transaction ends.
     /// </summary>
     void StallAttempt(GrainDurableTaskContext context, DurableTaskAttemptCancellationReason reason, Exception exception) =>
         throw new NotSupportedException("The durable task runtime does not support stalled executions.");
