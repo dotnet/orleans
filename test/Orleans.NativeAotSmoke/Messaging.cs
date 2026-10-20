@@ -15,6 +15,7 @@ var strings = services.GetRequiredKeyedService<MessageType<string>>("aot.text.v1
 var sender = GrainId.Create("aot", "sender");
 var receiver = GrainId.Create("aot", "receiver");
 var key = MessageId.Create("aot", "command", "1");
+var sentAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 var outbox = new SmokeOutbox();
 var state = new SmokeState(outbox, strings, sender);
 var inbox = new SmokeInbox();
@@ -37,7 +38,7 @@ inbox
     });
 
 var input = integers.Create(key, receiver, 42);
-var context = new SmokeContext(input.ToInboxMessage());
+var context = new SmokeContext(input.ToInboxMessage(sentAt));
 await inbox.HandleAsync(context, CancellationToken.None);
 if (!context.Completed || state.Value != 42 || outbox.Count != 1)
 {
@@ -53,11 +54,11 @@ if (reply.Envelope.MessageId != new MessageId(key.Key.CreateChildKey("result"))
 var headerSerializer = services.GetRequiredService<Serializer>().GetSerializer<Dictionary<string, byte[]>>();
 
 var text = strings.Create(new MessageId(key.Key.CreateChildKey("text")), receiver, "abc");
-var textContext = new SmokeContext(text.ToInboxMessage());
+var textContext = new SmokeContext(text.ToInboxMessage(sentAt));
 await inbox.HandleAsync(textContext, CancellationToken.None);
 if (!textContext.Completed) throw new InvalidOperationException("Typed struct-argument handler did not complete.");
 var invalid = strings.Create(new MessageId(key.Key.CreateChildKey("invalid")), receiver, "");
-var rejected = new SmokeContext(invalid.ToInboxMessage());
+var rejected = new SmokeContext(invalid.ToInboxMessage(sentAt));
 await inbox.HandleAsync(rejected, CancellationToken.None);
 if (!rejected.Completed || rejected.DeadLetterReason != "Text is required." || outbox.Count != 1)
 {
