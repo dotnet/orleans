@@ -60,7 +60,7 @@ public sealed class DurableTaskAccessRecordingTests
                     (JournaledStateAccessKind.Read, JournaledStateOperation.ValueGet, counter),
                     (JournaledStateAccessKind.Write, JournaledStateOperation.ValueSet, counter),
                 ],
-                ParseHeaders(activation.Storage.GetAccessLog(WorkflowId)));
+                ParseHeaders(activation.Storage.GetAccessLog(WorkflowId).Span));
             Assert.Equal(1, activation.Grain.Counter.Value);
         }
 
@@ -243,7 +243,7 @@ public sealed class DurableTaskAccessRecordingTests
         // The covered body's increment and effect ran directly: the attempt's log holds only the body's own read after it.
         var counter = new JournaledStateAccessTarget("counter", Substitute.For<IJournaledStateManager>()).Id;
         Assert.Equal(1, activation.Grain.Counter.Value);
-        Assert.Equal([(JournaledStateAccessKind.Read, JournaledStateOperation.ValueGet, counter)], ParseHeaders(activation.Storage.GetAccessLog(WorkflowId)));
+        Assert.Equal([(JournaledStateAccessKind.Read, JournaledStateOperation.ValueGet, counter)], ParseHeaders(activation.Storage.GetAccessLog(WorkflowId).Span));
         activation.Grain.OpenGate();
         Assert.Equal("1 7 rejected", (await activation.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<string>());
 
@@ -626,31 +626,62 @@ public sealed class DurableTaskAccessRecordingTests
 
     /// <summary>Reads the kind, operation, and state of each record of an access log.</summary>
     /// <remarks>
-    /// A record is <c>[kind | flags][operation][state:4]</c>, followed by <c>[hash:4]</c> when it carries an argument
-    /// hash and by <c>[length:4][outcome]</c> when it has an outcome.
+    /// A record is <c>[kind | flags][operation][state index]</c>, where an index which equals the count of states named so
+    /// far is followed by the state's <c>[id:4]</c>; then <c>[hash:4]</c> when it carries an argument hash, and
+    /// <c>[length][outcome]</c> when it has an outcome or <c>[count]</c> when it refers to an earlier read, as varints.
     /// </remarks>
     internal static List<(JournaledStateAccessKind Kind, JournaledStateOperation Operation, int Target)> ParseHeaders(ReadOnlySpan<byte> log)
     {
         const byte KindMask = 0x03;
         const byte HasValue = 0x04;
         const byte HasArgumentHash = 0x10;
+        const byte IsReference = 0x20;
+        var states = new List<int>();
         var records = new List<(JournaledStateAccessKind, JournaledStateOperation, int)>();
-        while (!log.IsEmpty)
+        var position = 0;
+        while (position < log.Length)
         {
-            var flags = log[0];
-            records.Add(((JournaledStateAccessKind)(flags & KindMask), (JournaledStateOperation)log[1], System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(log[2..])));
-            log = log[6..];
+            var flags = log[position];
+            var operation = (JournaledStateOperation)log[position + 1];
+            position += 2;
+            var index = ReadVarUInt32(log, ref position);
+            if (index == states.Count)
+            {
+                states.Add(System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(log[position..]));
+                position += 4;
+            }
+
+            records.Add(((JournaledStateAccessKind)(flags & KindMask), operation, states[index]));
             if ((flags & HasArgumentHash) != 0)
             {
-                log = log[4..];
+                position += 4;
             }
 
             if ((flags & HasValue) != 0)
             {
-                log = log[(4 + System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(log))..];
+                var length = ReadVarUInt32(log, ref position);
+                position += length;
+            }
+            else if ((flags & IsReference) != 0)
+            {
+                _ = ReadVarUInt32(log, ref position);
             }
         }
 
         return records;
+
+        static int ReadVarUInt32(ReadOnlySpan<byte> input, ref int position)
+        {
+            var value = 0;
+            for (var shift = 0; ; shift += 7)
+            {
+                var next = input[position++];
+                value |= (next & 0x7F) << shift;
+                if (next < 0x80)
+                {
+                    return value;
+                }
+            }
+        }
     }
 }

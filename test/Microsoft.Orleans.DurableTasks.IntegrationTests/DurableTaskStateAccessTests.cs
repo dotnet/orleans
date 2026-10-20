@@ -93,11 +93,36 @@ public abstract class DurableTaskStateAccessTests : IAsyncLifetime
             }
         }
     }
+
+    [Fact]
+    public async Task ReplayAfterDeactivationReturnsRepeatedReadsOfUnchangedState()
+    {
+        const string rootId = "sum-repeated-reads";
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var probe = _probe;
+        var grain = _fixture.Client.GetGrain<IDurableTaskStateAccessTestGrain>(Guid.NewGuid());
+        var grainId = grain.GetGrainId();
+        await grain.SetStockAsync(2);
+
+        _ = await grain.SumRepeatedReadsAsync().WithId(rootId).ScheduleAsync(cancellationToken);
+        await probe.WaitAsync(() => probe.GetAttempts(grainId) == 1, cancellationToken);
+
+        // Ordinary grain work changes the level and commits the body's records; the next activation replays the body.
+        await grain.SetStockAsync(7);
+        await grain.RequestDeactivationAsync();
+        await probe.WaitAsync(() => probe.GetAttempts(grainId) > 1, cancellationToken, () => grain.GetStockAsync());
+
+        // The replay's 1,000 reads return the level which the first run read.
+        Assert.Equal([2_000, 2_000], probe.GetObservedLevels(grainId));
+        Assert.Equal(7, await grain.GetStockAsync());
+        await grain.GetDurableTask<int>(rootId).CancelAsync(cancellationToken);
+    }
 }
 
 public interface IDurableTaskStateAccessTestGrain : IGrainWithGuidKey
 {
     DurableTask<int> ReserveAndNotifyAsync();
+    DurableTask<int> SumRepeatedReadsAsync();
     Task SetStockAsync(int level);
     Task<int> GetStockAsync();
     Task<bool> IsWithinDurableTaskAsync();
@@ -198,6 +223,19 @@ public sealed class DurableTaskStateAccessTestGrain : DurableGrain, IDurableTask
         _probe.RecordAttempt(this.GetGrainId(), level);
         await DurableTask.Delay(TimeSpan.FromHours(1)).WithId("hold");
         return level;
+    }
+
+    public async DurableTask<int> SumRepeatedReadsAsync()
+    {
+        var sum = 0;
+        for (var i = 0; i < 1_000; i++)
+        {
+            sum += _stock.Value;
+        }
+
+        _probe.RecordAttempt(this.GetGrainId(), sum);
+        await DurableTask.Delay(TimeSpan.FromHours(1)).WithId("hold");
+        return sum;
     }
 
     public async Task SetStockAsync(int level)
