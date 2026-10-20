@@ -792,9 +792,17 @@ public sealed class RetirementHandoffTests
     [Fact]
     public async Task MigratedRequestsForAGrainWhichIsAlreadyActive_ReachItsActivation()
     {
-        await using var cluster = await DeployAsync();
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
+        {
+            silo.Services.AddSingleton<OneWayCacheUpdateObserver>();
+            silo.Services.AddSingleton<IMessageStatisticsSink>(services => services.GetRequiredService<OneWayCacheUpdateObserver>());
+        }));
+        var caller = cluster.Silos[0];
+        var previous = cluster.Silos[2];
         var silo = cluster.Silos[1];
-        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
+        var locator = caller.ServiceProvider.GetRequiredService<Orleans.Runtime.GrainDirectory.GrainLocator>();
+        var cacheUpdates = silo.ServiceProvider.GetRequiredService<OneWayCacheUpdateObserver>();
         var migrationManager = silo.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
         var key = Guid.NewGuid();
         var state = RetirementHandoffState.Create(key);
@@ -804,18 +812,31 @@ public sealed class RetirementHandoffTests
         var running = grain.Block().AsTask();
         await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
 
+        // The caller's cache holds the migrating activation's address, which the migration replaces.
+        var previousAddress = new GrainAddress { GrainId = grain.GetGrainId(), SiloAddress = previous.SiloAddress, ActivationId = ActivationId.NewId() };
+        locator.UpdateCache(grain.GetGrainId(), previous.SiloAddress);
+        cacheUpdates.GrainId = grain.GetGrainId();
+
         // The migration arrives too late to create the activation, so the existing activation receives the request as it receives a forwarded request.
         var request = CreateOneWayRequest(grain.GetGrainId(), 1);
+        request.SendingSilo = caller.SiloAddress;
+        var context = new MigrationContext(silo.ServiceProvider.GetRequiredService<SerializerSessionPool>());
+        context.TryAddValue(ActivationData.GrainAddressMigrationContextKey, previousAddress);
         GrainMigrationPackage package = new()
         {
             GrainId = grain.GetGrainId(),
-            MigrationContext = new MigrationContext(silo.ServiceProvider.GetRequiredService<SerializerSessionPool>()),
+            MigrationContext = context,
             Requests = [request],
         };
         await migrationManager.AcceptMigratingGrainsWithRequests([package], Cancellation);
         Assert.Same(activation, FindActivation(silo, grain.GetGrainId()));
         Assert.Equal(1, activation.WaitingCount);
         Assert.Equal(1, request.ForwardCount);
+
+        // As for a forwarded one-way request, the silo sends the cache update to the request's caller, which receives no response.
+        await cacheUpdates.Received.Task.WaitAsync(Timeout, Cancellation);
+        await WaitUntilAsync(() => locator.TryLookupInCache(grain.GetGrainId(), out var cached) && silo.SiloAddress.Equals(cached.SiloAddress));
+
         state.ReleaseBlock.TrySetResult();
         await running.WaitAsync(Timeout, Cancellation);
     }
@@ -829,20 +850,34 @@ public sealed class RetirementHandoffTests
         var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
         var migrationManager = silo.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
         var key = Guid.NewGuid();
-        RetirementHandoffState.Create(key);
+        var state = RetirementHandoffState.Create(key);
         var grainId = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName).GetGrainId();
 
-        // Ordinary delivery admits two requests to an idle activation with a hard limit of one, so the new activation does not queue a batch of three ahead of others,
-        // and receives them as it receives forwarded requests, rejecting those which overload it.
+        // The new activation is held while activating, so the requests which it admits stay queued.
+        state.HoldActivationOn = silo.SiloAddress;
         GrainMigrationPackage package = new()
         {
             GrainId = grainId,
             MigrationContext = new MigrationContext(silo.ServiceProvider.GetRequiredService<SerializerSessionPool>()),
             Requests = [CreateOneWayRequest(grainId, 1), CreateOneWayRequest(grainId, 2), CreateOneWayRequest(grainId, 3)],
         };
-        await migrationManager.AcceptMigratingGrainsWithRequests([package], Cancellation);
-        var activation = Assert.IsType<ActivationData>(FindActivation(silo, grainId));
-        await WaitUntilAsync(() => activation.GetRequestCount() == 0);
+        var accepting = migrationManager.AcceptMigratingGrainsWithRequests([package], Cancellation).AsTask();
+        try
+        {
+            // Ordinary delivery admits two requests to an activation with a hard limit of one, so the new activation does not queue the batch of three ahead of others.
+            // It receives them as it receives forwarded requests, admitting two and rejecting the one which overloads it.
+            await state.ActivationHeld.Task.WaitAsync(Timeout, Cancellation);
+            var activation = Assert.IsType<ActivationData>(FindActivation(silo, grainId));
+            await WaitUntilAsync(() => activation.WaitingCount == 2);
+            await Task.Delay(TimeSpan.FromMilliseconds(200), Cancellation);
+            Assert.Equal(2, activation.WaitingCount);
+        }
+        finally
+        {
+            state.ReleaseActivation.TrySetResult();
+        }
+
+        await accepting.WaitAsync(Timeout, Cancellation);
     }
 
     [Fact]

@@ -385,6 +385,12 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                     if (previousAddress is not null && context is not null)
                     {
                         request.AddToCacheInvalidationHeader(previousAddress, context.Address);
+
+                        // As when a one-way request is forwarded, its caller receives the cache update, since it receives no response.
+                        if (request.Direction is Message.Directions.OneWay)
+                        {
+                            MessageCenter.SendRejectionResponse(request, Message.RejectionTypes.CacheInvalidation, "One-way request migrated to an existing activation", exception: null);
+                        }
                     }
 
                     MessageCenter.ReceiveMessage(request);

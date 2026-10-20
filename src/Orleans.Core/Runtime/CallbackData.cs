@@ -15,6 +15,10 @@ namespace Orleans.Runtime
 
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
+
+        // The request's invocation describes its cancellation and response timeout. The message's body can change after it is sent:
+        // a retried message holds its serialized body, which is released once the retry is sent.
+        private readonly IInvokable? _invokable;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private readonly long _startTimestamp;
         private int _state;
@@ -30,6 +34,7 @@ namespace Orleans.Runtime
             this.shared = shared;
             this.context = ctx;
             this.Message = msg;
+            _invokable = msg.BodyObject as IInvokable;
             _applicationRequestInstruments = applicationRequestInstruments;
             _startTimestamp = shared.TimeProvider.GetTimestamp();
         }
@@ -91,7 +96,7 @@ namespace Orleans.Runtime
             // Only cancel requests which honor cancellation token.
             // Not all targets support IGrainCallCancellationExtension, so sending a cancellation in those cases could result in an error.
             // There are opportunities to cancel requests at the infrastructure layer which this will not exploit if the target method does not support cancellation.
-            if (Message.BodyObject is IInvokable invokable && invokable.IsCancellable)
+            if (_invokable is { IsCancellable: true })
             {
                 shared.CancellationManager?.SignalCancellation(Message.TargetSilo, Message.TargetGrain, Message.SendingGrain, Message.Id);
             }
@@ -151,7 +156,7 @@ namespace Orleans.Runtime
 
         private long GetResponseTimeoutTimestampTicks()
         {
-            var defaultResponseTimeout = (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
+            var defaultResponseTimeout = _invokable?.GetDefaultResponseTimeout();
             if (defaultResponseTimeout.HasValue)
             {
                 return shared.GetTimestampTicks(defaultResponseTimeout.Value);
@@ -160,7 +165,7 @@ namespace Orleans.Runtime
             return shared.ResponseTimeoutTimestampTicks;
         }
 
-        private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
+        private TimeSpan GetResponseTimeout() => _invokable?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
 
         private string GetTargetGrainType()
         {

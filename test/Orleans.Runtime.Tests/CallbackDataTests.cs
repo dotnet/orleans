@@ -337,6 +337,36 @@ public class CallbackDataTests
         Assert.False(callback.IsCompleted);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void CallKeepsItsInvocationsTimeoutAndCancellationAfterItsMessageBodyIsReleased()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        using var cancellation = new CancellationTokenSource();
+        var timeProvider = new FakeTimeProvider();
+        var callback = CreateRequestCallback(
+            new TestResponseCompletionSource(),
+            CreateInstruments(serviceProvider),
+            out var cancellationManager,
+            waitForCancellationAcknowledgement: true,
+            timeProvider: timeProvider);
+        callback.SubscribeForCancellation(cancellation.Token);
+
+        // A message which a connection retries holds its serialized body, which is released once the retry is sent.
+        callback.Message.BodyObject = null;
+
+        // The call's own response timeout, which is longer than the default, still applies.
+        timeProvider.Advance(TimeSpan.FromMinutes(2));
+        Assert.False(callback.IsExpired(timeProvider.GetTimestamp()));
+        timeProvider.Advance(CancellableInvokable.ResponseTimeout);
+        Assert.True(callback.IsExpired(timeProvider.GetTimestamp()));
+
+        // The call is still cancellable, so its cancellation is signaled to its target.
+        cancellation.Cancel();
+        Assert.Equal([callback.Message.TargetSilo], cancellationManager.Targets);
+    }
+
     private static readonly Func<SiloAddress, bool> NotDead = _ => false;
 
     private static CallbackData CreateRequestCallback(
@@ -344,13 +374,14 @@ public class CallbackDataTests
         ApplicationRequestInstruments instruments,
         out RecordingCancellationManager cancellationManager,
         bool waitForCancellationAcknowledgement = false,
-        bool cancelOnTimeout = false)
+        bool cancelOnTimeout = false,
+        TimeProvider? timeProvider = null)
     {
         cancellationManager = new RecordingCancellationManager();
         var shared = new SharedCallbackData(
             _ => { },
             logger: NullLogger<CallbackData>.Instance,
-            TimeProvider.System,
+            timeProvider ?? TimeProvider.System,
             TimeSpan.FromMinutes(1),
             cancelOnTimeout,
             waitForCancellationAcknowledgement,
@@ -435,7 +466,9 @@ public class CallbackDataTests
 
     private sealed class CancellableInvokable : IInvokable
     {
+        public static readonly TimeSpan ResponseTimeout = TimeSpan.FromMinutes(3);
         public bool IsCancellable => true;
+        public TimeSpan? GetDefaultResponseTimeout() => ResponseTimeout;
         public object? GetTarget() => null;
         public void SetTarget(ITargetHolder holder) { }
         public System.Threading.Tasks.ValueTask<Response> Invoke() => throw new NotSupportedException();
