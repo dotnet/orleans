@@ -20,6 +20,10 @@ namespace Orleans.Serialization.Buffers;
 /// <summary>
 /// A <see cref="IBufferWriter{T}"/> implementation implemented using pooled arrays which is specialized for creating <see cref="ReadOnlySequence{T}"/> instances.
 /// </summary>
+/// <remarks>
+/// Backing buffers can contain data from earlier uses. Callers must initialize every byte before
+/// advancing the writer and read only the written region of a buffer.
+/// </remarks>
 [StructLayout(LayoutKind.Auto)]
 [Immutable]
 public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
