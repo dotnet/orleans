@@ -329,6 +329,10 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         _ = await Fixture.RunPumpAsync(receiver);
         Assert.Equal(0, (await Fixture.WaitForEffectCountAsync(receiver, 2)).InboxCount);
 
+        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, laterScheduled)).Status);
+        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, unscheduled)).Status);
+        laterScheduled = laterScheduled with { SentAt = JobClock.GetUtcNow() };
+        unscheduled = unscheduled with { SentAt = JobClock.GetUtcNow() };
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, laterScheduled)).Status);
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, unscheduled)).Status);
         var all = await Fixture.WaitForEffectCountAsync(receiver, 4);
@@ -392,7 +396,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
     }
 
     private static InboxMessage Schedule(InboxMessage message, DateTimeOffset? deliverAt) =>
-        new() { Envelope = message.Envelope with { DeliverAt = deliverAt } };
+        message with { Envelope = message.Envelope with { DeliverAt = deliverAt } };
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
