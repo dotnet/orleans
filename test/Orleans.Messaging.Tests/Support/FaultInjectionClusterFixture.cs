@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableJobs;
+using Orleans.Journaling;
+using Orleans.Journaling.Json;
 using Orleans.Messaging.Configuration;
 using Orleans.Runtime;
 using Xunit;
@@ -27,7 +29,7 @@ namespace Orleans.Messaging.Tests.Support;
 /// deactivation which were wrongly counted as a failure would dead-letter at once.
 /// </para>
 /// </remarks>
-public class FaultInjectionClusterFixture() : MessagingClusterFixture(1, receiverOnly: false)
+public class FaultInjectionClusterFixture(string journalFormatKey = "orleans-binary") : MessagingClusterFixture(1, receiverOnly: false)
 {
     /// <summary>The first outbox retry backoff, which doubles with each further attempt.</summary>
     public static readonly TimeSpan RetryInterval = TimeSpan.FromMinutes(10);
@@ -78,6 +80,8 @@ public class FaultInjectionClusterFixture() : MessagingClusterFixture(1, receive
     {
         services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs, JobClock);
         services.AddSingleton(SourceSinkProbe);
+        services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
+        services.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(Functional.SourceSinkJsonContext.Default));
         services.AddSingleton<IOutboxTransport>(sp => Deliveries.Wrap(new GrainOutboxTransport(sp.GetRequiredService<IGrainFactory>())));
     }
 
