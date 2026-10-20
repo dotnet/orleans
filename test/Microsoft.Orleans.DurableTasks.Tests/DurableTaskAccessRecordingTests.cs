@@ -527,6 +527,65 @@ public sealed class DurableTaskAccessRecordingTests
         }
     }
 
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public Task CleanupAfterTaskCancellationIsRecordedAndAppliesOnceAcrossACrash(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
+    {
+        var gates = new CleanupGates();
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, gates), journalFormatKey);
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await activation.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+
+            // Task cancellation is recorded, and the body's cleanup writes the counter and then awaits a durable child.
+            await ((IDurableTaskManager)activation.Runtime).CancelAsync(WorkflowId, "buyer", TestCancellation);
+            await gates.ChildWaiting.Task.WaitAsync(Timeout, TestCancellation);
+            await activation.Grain.UnrelatedWrites.WaitAsync(Timeout, TestCancellation);
+            Assert.Equal(1, activation.Grain.Counter.Value);
+
+            // The cleanup's write has committed, and the activation crashes while the cleanup awaits the child.
+        }
+
+        // The replay observes the recorded cancellation, runs the cleanup again from its records, and the cleanup's write
+        // returns its record instead of applying a second time.
+        gates = new CleanupGates();
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await gates.ChildWaiting.Task.WaitAsync(Timeout, TestCancellation);
+        Assert.Equal(1, replay.Grain.Counter.Value);
+        gates.ReleaseChild.SetResult();
+        Assert.Equal(DurableTaskStatus.Canceled, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).Status);
+        Assert.Equal(1, replay.Grain.Counter.Value);
+
+        static async DurableTask Workflow(ReplayGrain grain, CleanupGates gates)
+        {
+            try
+            {
+                await grain.WaitAtGateAsync();
+            }
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
+            {
+                grain.Counter.Value++;
+                grain.RequestUnrelatedWrite();
+
+                // A canceled task's children end canceled unless shielded; the child waits until the test releases it.
+                await DurableTask.Run(async _ =>
+                {
+                    gates.ChildWaiting.TrySetResult();
+                    await gates.ReleaseChild.Task.WaitAsync(DurableTask.Current.AttemptCancellationToken);
+                }).WithId("compensate").Shielded();
+                throw;
+            }
+        }
+    });
+
+    private sealed class CleanupGates
+    {
+        public TaskCompletionSource ChildWaiting { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ReleaseChild { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
     [Fact]
     public void TransportSendsThroughTheOutboxAsTheJournaledStateHostsWork()
     {
