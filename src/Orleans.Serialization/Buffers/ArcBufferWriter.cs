@@ -1047,9 +1047,13 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
 /// whose lifetime is bounded by the owner. Use <see cref="Slice(int)"/> to obtain an independent owner.
 /// Referenced bytes must remain unchanged while a slice is in use.
 /// The default value is a valid, owner-free empty buffer.
+/// Codec-acquired ownership is provisional until its enclosing returned-value deserialization or copy operation succeeds.
 /// </remarks>
 public struct ArcBuffer : IDisposable
 {
+    // Raw slices use page tokens directly; codec owners share release state with operation rollback.
+    private readonly ArcBufferLease? _lease;
+
     /// <summary>
     /// Creates a borrowed view over a valid, pinned page chain.
     /// </summary>
@@ -1103,6 +1107,16 @@ public struct ArcBuffer : IDisposable
         _firstPageToken = first.Version;
         Offset = offset;
         Length = length;
+    }
+
+    internal ArcBuffer(ArcBuffer buffer, ArcBufferLease lease)
+    {
+        Debug.Assert(buffer._lease is null);
+        First = buffer.First;
+        _firstPageToken = buffer._firstPageToken;
+        Offset = buffer.Offset;
+        Length = buffer.Length;
+        _lease = lease;
     }
 
     /// <summary>
@@ -1266,6 +1280,7 @@ public struct ArcBuffer : IDisposable
         if (First is not null)
         {
             First.CheckValidity(_firstPageToken);
+            _lease?.CheckValidity();
         }
         else if (Length != 0 || Offset != 0)
         {
@@ -1338,6 +1353,12 @@ public struct ArcBuffer : IDisposable
     {
         CheckValidity();
         if (First is null) return;
+        if (_lease is { } lease)
+        {
+            lease.Pin();
+            return;
+        }
+
         if (IsEmpty)
         {
             First.Pin(_firstPageToken);
@@ -1365,6 +1386,13 @@ public struct ArcBuffer : IDisposable
     {
         if (First is null) return;
         CheckValidity();
+        if (_lease is { } lease)
+        {
+            lease.Unpin();
+            _firstPageToken = -1;
+            return;
+        }
+
         if (IsEmpty)
         {
             First.Unpin(_firstPageToken);

@@ -8,6 +8,7 @@ using System.Net;
 using System.Reflection;
 using System.Threading;
 using Microsoft.Extensions.ObjectPool;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Utilities;
@@ -202,11 +203,15 @@ namespace Orleans.Serialization.Cloning
     /// <seealso cref="System.IDisposable" />
     /// <remarks>
     /// Initializes a new instance of the <see cref="CopyContext"/> class.
+    /// Call <see cref="Reset"/> before reusing a context after a failed copy.
+    /// Reset preserves independently owned values returned by earlier successful operations.
     /// </remarks>
     /// <param name="codecProvider">The codec provider.</param>
     /// <param name="onDisposed">The action to call when this context is disposed.</param>
     public sealed class CopyContext(CodecProvider codecProvider, Action<CopyContext> onDisposed) : IDisposable
     {
+        internal ArcBufferLeaseTracker ArcBuffers;
+
         private readonly Dictionary<object, object> _copies = new(ReferenceEqualsComparer.Default);
         private readonly CodecProvider _copierProvider = codecProvider;
         private readonly Action<CopyContext> _onDisposed = onDisposed;
@@ -279,7 +284,35 @@ namespace Orleans.Serialization.Cloning
             }
 
             var copier = _copierProvider.GetDeepCopier(value!.GetType());
-            return (T?)copier.DeepCopy(value, this)!;
+            var position = ArcBuffers.Begin();
+            var success = false;
+            try
+            {
+                var result = (T?)copier.DeepCopy(value, this)!;
+                success = true;
+                return result;
+            }
+            finally
+            {
+                ArcBuffers.End(position, success);
+            }
+        }
+
+        [return: NotNullIfNotNull(nameof(value))]
+        internal T? DeepCopy<T>(T? value, IDeepCopier<T> copier)
+        {
+            var position = ArcBuffers.Begin();
+            var success = false;
+            try
+            {
+                var result = copier.DeepCopy(value, this);
+                success = true;
+                return result;
+            }
+            finally
+            {
+                ArcBuffers.End(position, success);
+            }
         }
 
         /// <inheritdoc/>

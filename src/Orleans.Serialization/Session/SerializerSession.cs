@@ -1,3 +1,4 @@
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
 using System;
@@ -7,8 +8,14 @@ namespace Orleans.Serialization.Session
     /// <summary>
     /// Contextual information for a serializer operation.
     /// </summary>
+    /// <remarks>
+    /// Call <see cref="Reset"/> before reusing a session after a failed operation.
+    /// Reset preserves independently owned values returned by earlier successful operations.
+    /// </remarks>
     public sealed class SerializerSession : IDisposable
     {
+        internal ArcBufferLeaseTracker ArcBuffers;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="SerializerSession"/> class.
         /// </summary>
