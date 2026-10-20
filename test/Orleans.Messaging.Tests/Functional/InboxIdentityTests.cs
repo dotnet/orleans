@@ -432,7 +432,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         MessagingTestGrain Grain, IdentityHandler Handler, IJournaledStateManager Manager, Inbox Inbox)
     {
         public IReadOnlyDictionary<MessageId, InboxEntry> Pending => InboxTestAccess.GetPendingMessages(Inbox);
-        public IReadOnlyDictionary<MessageId, DateTimeOffset> Processed => InboxTestAccess.GetProcessedMessages(Inbox);
+        public IReadOnlySet<MessageId> Processed => InboxTestAccess.GetProcessedKeys(Inbox);
     }
 
     private sealed class IdentityHandler : IInboxHandler, IDisposable
