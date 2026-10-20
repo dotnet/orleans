@@ -28,10 +28,16 @@ public readonly struct InboxMessage
     /// floor.
     /// </para>
     /// <para>
-    /// The floor survives recovery and migration, so a delayed retry of a removed message stays fenced even after a
+    /// The floor survives recovery and migration, so a delayed retry of a removed message stays expired even after a
     /// clock moves backward. Clock jumps and skew change when messages expire and how long records are retained.
     /// Once a record is removed, sending its command again with a later send time is admitted as a new delivery, so
     /// applications reconcile an uncertain outcome before doing so.
+    /// </para>
+    /// <para>
+    /// The inbox rejects a delivery whose send time is later than its own clock plus <c>DeduplicationWindow</c> with an
+    /// <see cref="ArgumentOutOfRangeException"/>, before deduplication and without staging anything, so the sender
+    /// retries it within its retry budget. Every record therefore becomes eligible for removal within twice the window
+    /// of the receiver's clock.
     /// </para>
     /// </remarks>
     [Id(1)]
