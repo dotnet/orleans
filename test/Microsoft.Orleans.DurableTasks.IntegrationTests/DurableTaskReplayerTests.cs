@@ -1,13 +1,20 @@
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.Metrics;
+using Documentation.Grains.DurableTasks.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Durable.Journaling;
+using Orleans.Durable.Messaging;
+using Orleans.Durable.Messaging.Configuration;
+using Orleans.Durable.Messaging.Diagnostics;
 using Orleans.Durable.Tasks;
 using Orleans.Durable.Tasks.Runtime;
 using Orleans.Durable.Tasks.Testing;
 using Orleans.Runtime;
 using Orleans.Serialization.Activators;
+using Orleans.TestingHost.Diagnostics;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
@@ -130,17 +137,45 @@ public sealed class DurableTaskReplayerTests(DurableTaskReplayFixture fixture) :
     }
 
     [Fact]
-    public async Task RecordedDelayKeepsTheReplayWaiting()
+    public async Task PastDueRecordedDelayKeepsTheReplayWaiting()
     {
         var (history, root) = await CaptureAsync("delay", ReplayWorkflowVersion.Paused);
 
         var result = await ReplayAsync(history, ReplayWorkflowVersion.Paused);
 
-        // The delay is recorded and pending, so the replay waits for it.
+        Assert.True(fixture.CaptureTime.GetUtcNow() + TimeSpan.FromMinutes(30) < history.CapturedAt);
         result.EnsureSucceeded();
         AssertOutcome(DurableTaskReplayOutcome.Waiting, result, root);
         Assert.Equal([root.Child("pause")], result[root].WaitingOn);
     }
+
+    [Fact]
+    public async Task ExpiredPendingInvocationKeepsTheReplayWaiting()
+    {
+        const string key = "expired-invocation";
+        fixture.CaptureCode.Version = ReplayWorkflowVersion.Unapproved;
+        var grain = fixture.Capture.Client.GetGrain<IReplayOrderGrain>(key);
+        var shipping = fixture.Capture.Client.GetGrain<IReplayShippingGrain>("main").GetGrainId();
+        var root = TaskId.CreateRoot(key);
+        using var failures = new DeliveryFaultInjector(receiving => receiving.GrainContext.GrainId == shipping, "Shipping is unavailable.");
+        using var events = new DiagnosticEventCollector(MessagingEvents.ListenerName);
+        await grain.FulfillAsync(key).WithId(key).ScheduleAsync(TestCancellation);
+        var retry = (MessagingEvents.OutboxRetryScheduled)(await events.WaitForEventAsync(
+            nameof(MessagingEvents.OutboxRetryScheduled),
+            evt => evt.Payload is MessagingEvents.OutboxRetryScheduled retry && retry.GrainContext.GrainId == grain.GetGrainId(),
+            TimeSpan.FromSeconds(30),
+            TestCancellation)).Payload!;
+        await grain.FlushAsync();
+        var history = await DurableTaskHistory.CaptureAsync(fixture.Capture.Storage, grain.GetGrainId(), cancellationToken: TestCancellation);
+        Assert.True(retry.NextAttemptAt + TimeSpan.FromHours(6) < history.CapturedAt);
+
+        var result = await ReplayAsync(history, ReplayWorkflowVersion.Unapproved);
+
+        result.EnsureSucceeded();
+        AssertOutcome(DurableTaskReplayOutcome.Waiting, result, root);
+        Assert.Equal([root.Child("ship")], result[root].WaitingOn);
+    }
+
     [Fact]
     public async Task HistoryReplaysInTheJournalFormatWhichRecordedIt()
     {
@@ -220,6 +255,58 @@ public sealed class DurableTaskReplayerTests(DurableTaskReplayFixture fixture) :
         Assert.Contains(ReplayOrderActivator.Error, divergence.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task DueInboxMessagesStayPendingInTheReplay()
+    {
+        // One history ends while a handler attempt runs; the other ends with the clean stop of its activation.
+        var interrupted = await CaptureHeldInboxMessageAsync("inbox-interrupted", stopCleanly: false);
+        var stopped = await CaptureHeldInboxMessageAsync("inbox-stopped", stopCleanly: true);
+        using var processed = new InboxProcessedCounter(ReplayInboxGrain.GrainTypeName);
+
+        var interruptedResult = await fixture.Replayer.ReplayAsync(interrupted, TestCancellation);
+        var stoppedResult = await fixture.Replayer.ReplayAsync(stopped, TestCancellation);
+
+        // Recovery charges no interrupted attempt, and the pump dispatches neither message.
+        interruptedResult.EnsureSucceeded();
+        stoppedResult.EnsureSucceeded();
+        Assert.Equal(0, fixture.ReplayInboxProbe.Handled);
+        Assert.Equal(0, processed.Count);
+    }
+
+    [Fact]
+    public async Task DocumentationCaptureReplaysVersionZeroAtTheApprovalWait()
+    {
+        var path = Path.GetTempFileName();
+        var cluster = new DurableTaskRecoveryFixture(
+            DurableTaskRecoveryFixture.Json,
+            DurableTaskTestingSnippets.ConfigureCaptureSilo);
+        try
+        {
+            await cluster.InitializeAsync();
+            const string orderId = "documentation";
+            await DurableTaskTestingSnippets.CaptureAsync(cluster.Cluster, orderId, path);
+            await using var replayer = await DurableTaskReplayer.StartAsync(
+                silo => silo.Services.AddSingleton<FulfillmentCode>().AddSingleton<FulfillmentProgress>(),
+                TestCancellation);
+            var history = await DurableTaskHistory.LoadAsync(path, TestCancellation);
+
+            var result = await replayer.ReplayAsync(history, TestCancellation);
+
+            result.EnsureSucceeded();
+            var root = TaskId.CreateRoot($"fulfill-{orderId}");
+            AssertOutcome(DurableTaskReplayOutcome.Waiting, result, root);
+            Assert.Equal([root.Child("ship")], result[root].Reached);
+            Assert.Equal(0, result[root].Versions["carrier-booking"]);
+            Assert.Equal([root.Child("$signal:approved")], result[root].WaitingOn);
+            await DurableTaskTestingSnippets.ReplayVersionedChangeAsync(replayer, path, orderId);
+        }
+        finally
+        {
+            await cluster.DisposeAsync();
+            File.Delete(path);
+        }
+    }
+
     private Task<(DurableTaskHistory History, TaskId Root)> CaptureAsync(string key, ReplayWorkflowVersion version) =>
         CaptureAsync(fixture.Capture, fixture.CaptureCode, fixture.CaptureProbe, key, version);
 
@@ -255,6 +342,128 @@ public sealed class DurableTaskReplayerTests(DurableTaskReplayFixture fixture) :
         return (history, root);
     }
 
+    [Fact]
+    public async Task UndeliveredOutboxEntryStaysAtItsRecordedState()
+    {
+        const string key = "outbox-pending";
+        fixture.CaptureCode.Version = ReplayWorkflowVersion.Unapproved;
+        var grain = fixture.Capture.Client.GetGrain<IReplayOrderGrain>(key);
+        var root = TaskId.CreateRoot(key);
+        var hold = fixture.CaptureProbe.HoldDeliveriesFrom(grain.GetGrainId());
+        try
+        {
+            // The outbox committed the call, whose first delivery waits at its receiver, so the history holds the entry
+            // before any attempt: due at once, with no retry time.
+            await grain.FulfillAsync(key).WithId(key).ScheduleAsync(TestCancellation);
+            await hold.Arrived.Task.WaitAsync(TimeSpan.FromSeconds(30), TestCancellation);
+            var history = await DurableTaskHistory.CaptureAsync(fixture.Capture.Storage, grain.GetGrainId(), cancellationToken: TestCancellation);
+            using var events = new DiagnosticEventCollector(MessagingEvents.ListenerName);
+
+            var result = await ReplayAsync(history, ReplayWorkflowVersion.Unapproved);
+
+            // The replay silo's outbox makes no attempt, so it stages no retry or dead letter for the entry.
+            result.EnsureSucceeded();
+            AssertOutcome(DurableTaskReplayOutcome.Waiting, result, root);
+            Assert.Equal([root.Child("ship")], result[root].WaitingOn);
+            Assert.DoesNotContain(events.Events, evt => evt.Payload is MessagingEvents.OutboxRetryScheduled or MessagingEvents.OutboxMessageRetired
+                && ((MessagingEvents.MessagingEvent)evt.Payload).GrainContext.GrainId == grain.GetGrainId());
+        }
+        finally
+        {
+            hold.Release();
+        }
+    }
+
+    [Fact]
+    public async Task OrdinaryGrainCallFromReplayedCodeDoesNotReachItsTarget()
+    {
+        var (history, root) = await CaptureAsync("ordinary-call", ReplayWorkflowVersion.Original);
+        var pings = fixture.ReplayProbe.Pings;
+
+        var result = await ReplayAsync(history, ReplayWorkflowVersion.Pinged);
+
+        // The replay silo rejects the call without activating its target, and the body fails with the rejection.
+        Assert.Equal(pings, fixture.ReplayProbe.Pings);
+        AssertOutcome(DurableTaskReplayOutcome.Faulted, result, root);
+        Assert.Contains("was rejected", result[root].Response!.Exception!.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FailedCleanupDoesNotReplaceTheReplaysOutcome()
+    {
+        const string key = "blocked";
+        var (history, root) = await CaptureAsync(key, ReplayWorkflowVersion.Original);
+        var code = new ReplayWorkflowCode { Version = ReplayWorkflowVersion.Blocked };
+        var probe = new ReplayWorkflowProbe();
+        await using var replayer = await DurableTaskReplayer.StartAsync(
+            silo => silo.Services.AddSingleton(code).AddSingleton(probe).AddSingleton(new ReplayInboxProbe()),
+            TestCancellation);
+        replayer.DeactivationTimeout = TimeSpan.FromSeconds(1);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestCancellation);
+        var replay = replayer.ReplayAsync(history, cancellation.Token);
+        await probe.WaitForArrivalAsync(key).WaitAsync(TimeSpan.FromSeconds(30), TestCancellation);
+
+        // The body awaits work which ignores its attempt's cancellation, so the grain doesn't deactivate; the replay reports
+        // the caller's cancellation all the same, and later replays wait for the activation to stop.
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => replay);
+        var overlap = await Assert.ThrowsAsync<InvalidOperationException>(() => replayer.ReplayAsync(history, TestCancellation));
+        Assert.Contains("hasn't stopped", overlap.Message, StringComparison.Ordinal);
+
+        // Once the body's work completes, the activation stops, and the replayer replays the history again.
+        probe.ReleaseBlocked();
+        code.Version = ReplayWorkflowVersion.Original;
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        DurableTaskReplayResult result;
+        while (true)
+        {
+            try
+            {
+                result = await replayer.ReplayAsync(history, TestCancellation);
+                break;
+            }
+            catch (InvalidOperationException exception) when (exception.Message.Contains("hasn't stopped", StringComparison.Ordinal) && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(50), TestCancellation);
+            }
+        }
+
+        result.EnsureSucceeded();
+        AssertOutcome(DurableTaskReplayOutcome.Waiting, result, root);
+    }
+
+    /// <summary>
+    /// Captures the history of a grain whose inbox holds a message with neither a delivery time nor a retry time, whose
+    /// handler attempt the capture interrupts or the grain's clean stop ends.
+    /// </summary>
+    private async Task<DurableTaskHistory> CaptureHeldInboxMessageAsync(string key, bool stopCleanly)
+    {
+        var grain = fixture.Capture.Client.GetGrain<IReplayInboxGrain>(key);
+        var delivery = await grain.AsReference<IMessagingExtension>().DeliverAsync(
+            new InboxMessage
+            {
+                Envelope = new() { MessageId = MessageId.Create(key), Subject = ReplayInboxGrain.Subject, Payload = [] },
+                SentAt = fixture.CaptureTime.GetUtcNow(),
+            },
+            TestCancellation);
+        Assert.IsType<DeliveryResult.Accepted>(delivery.Value);
+        await fixture.CaptureInboxProbe.WaitForAttemptAsync(key).WaitAsync(TimeSpan.FromSeconds(30), TestCancellation);
+        if (stopCleanly)
+        {
+            // Deactivation cancels the attempt and journals the clean stop; the message's wake-up can't reactivate the
+            // grain before the capture.
+            fixture.CaptureInboxProbe.BlockActivation = true;
+            await grain.RequestDeactivationAsync();
+            var management = fixture.Capture.Client.GetGrain<IManagementGrain>(0);
+            while (await management.GetActivationAddress(grain) is not null)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(10), TestCancellation);
+            }
+        }
+
+        return await DurableTaskHistory.CaptureAsync(fixture.Capture.Storage, grain.GetGrainId(), cancellationToken: TestCancellation);
+    }
+
     /// <summary>Asserts the outcome of <paramref name="root"/>'s replay, and reports the replay when it differs.</summary>
     private static void AssertOutcome(DurableTaskReplayOutcome expected, DurableTaskReplayResult result, TaskId root) =>
         Assert.True(result[root].Outcome == expected, $"Expected {expected}.{Environment.NewLine}{result}");
@@ -271,13 +480,18 @@ public sealed class DurableTaskReplayFixture : IAsyncLifetime
 {
     public DurableTaskReplayFixture()
     {
+        CaptureTime.Advance(-TimeSpan.FromDays(30));
         Capture = new(DurableTaskRecoveryFixture.Json, silo =>
         {
-            silo.Services.AddSingleton(CaptureCode).AddSingleton(CaptureProbe);
+            silo.Services.AddSingleton(CaptureCode).AddSingleton(CaptureProbe).AddSingleton<TimeProvider>(CaptureTime);
+            silo.Services.AddSingleton(CaptureInboxProbe);
+            silo.Services.AddSingleton<IIncomingGrainCallFilter, HeldDeliveryFilter>();
+            silo.Services.Configure<DurableMessagingOptions>(options => options.RetryInitialInterval = TimeSpan.FromHours(1));
             silo.Services.AddKeyedSingleton<IJournalStorageProvider>(
                 NamedStorageReplayGrain.StorageName,
                 static (services, _) => services.GetRequiredService<VolatileJournalStorageProvider>());
         });
+        Capture.JobClock.Advance(-TimeSpan.FromDays(30));
     }
 
     internal DurableTaskRecoveryFixture Capture { get; }
@@ -285,6 +499,12 @@ public sealed class DurableTaskReplayFixture : IAsyncLifetime
     internal ReplayWorkflowCode CaptureCode { get; } = new();
 
     internal ReplayWorkflowProbe CaptureProbe { get; } = new();
+
+    internal ReplayInboxProbe CaptureInboxProbe { get; } = new() { HoldsAttempts = true };
+
+    internal ReplayInboxProbe ReplayInboxProbe { get; } = new();
+
+    internal AdvanceableTimeProvider CaptureTime { get; } = new();
 
     internal ReplayWorkflowCode ReplayCode { get; } = new();
 
@@ -298,7 +518,7 @@ public sealed class DurableTaskReplayFixture : IAsyncLifetime
         Replayer = await DurableTaskReplayer.StartAsync(
             silo =>
             {
-                silo.Services.AddSingleton(ReplayCode).AddSingleton(ReplayProbe);
+                silo.Services.AddSingleton(ReplayCode).AddSingleton(ReplayProbe).AddSingleton(ReplayInboxProbe);
                 silo.AddJournalStorage(NamedStorageReplayGrain.StorageName, static _ => new VolatileJournalStorageProvider());
             },
             TestContext.Current.CancellationToken);
@@ -337,6 +557,12 @@ public enum ReplayWorkflowVersion
 
     /// <summary>Changes <see cref="ReplayOrder"/> so that its recorded form no longer decodes.</summary>
     UndecodableOrder,
+
+    /// <summary>Ships the order, then awaits work which ignores cancellation and completes only when the test releases it.</summary>
+    Blocked,
+
+    /// <summary>Ships the order, then makes an ordinary grain call to the shipping grain.</summary>
+    Pinged,
 }
 
 /// <summary>The version of the workflow which a silo deploys.</summary>
@@ -349,9 +575,26 @@ public sealed class ReplayWorkflowCode
 public sealed class ReplayWorkflowProbe
 {
     private readonly ConcurrentDictionary<string, TaskCompletionSource> _arrivals = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<GrainId, DeliveryHold> _deliveryHolds = new();
+    private readonly TaskCompletionSource _blocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _audits;
+    private int _pings;
 
     public int Audits => Volatile.Read(ref _audits);
+
+    public int Pings => Volatile.Read(ref _pings);
+
+    public void Ping() => Interlocked.Increment(ref _pings);
+
+    /// <summary>Returns work which ignores cancellation and completes once <see cref="ReleaseBlocked"/> is called.</summary>
+    public Task BlockAsync() => _blocked.Task;
+
+    public void ReleaseBlocked() => _blocked.TrySetResult();
+
+    /// <summary>Holds the deliveries which <paramref name="sender"/>'s outbox makes, at their receivers, until released.</summary>
+    public DeliveryHold HoldDeliveriesFrom(GrainId sender) => _deliveryHolds.GetOrAdd(sender, static _ => new());
+
+    public bool TryGetDeliveryHold(GrainId sender, [NotNullWhen(true)] out DeliveryHold? hold) => _deliveryHolds.TryGetValue(sender, out hold);
 
     public void Arrive(string key) => GetArrival(key).TrySetResult();
 
@@ -361,6 +604,35 @@ public sealed class ReplayWorkflowProbe
 
     private TaskCompletionSource GetArrival(string key) =>
         _arrivals.GetOrAdd(key, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously));
+
+    public sealed class DeliveryHold
+    {
+        private readonly TaskCompletionSource _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>Completes once a held delivery reaches its receiver.</summary>
+        public TaskCompletionSource Arrived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Released => _released.Task;
+
+        public void Release() => _released.TrySetResult();
+    }
+}
+
+/// <summary>Holds the deliveries which <see cref="ReplayWorkflowProbe.HoldDeliveriesFrom"/> selects at their receivers.</summary>
+public sealed class HeldDeliveryFilter(ReplayWorkflowProbe probe) : IIncomingGrainCallFilter
+{
+    public async Task Invoke(IIncomingGrainCallContext context)
+    {
+        if (context.MethodName == nameof(IMessagingExtension.DeliverAsync)
+            && context.SourceId is { } sender
+            && probe.TryGetDeliveryHold(sender, out var hold))
+        {
+            hold.Arrived.TrySetResult();
+            await hold.Released;
+        }
+
+        await context.Invoke();
+    }
 }
 
 public interface IReplayOrderGrain : IGrainWithStringKey
@@ -368,6 +640,8 @@ public interface IReplayOrderGrain : IGrainWithStringKey
     DurableTask<string> FulfillAsync(string orderId);
 
     DurableTask<string> HoldAsync(ReplayOrder order);
+
+    Task FlushAsync();
 }
 
 public interface IReplayShippingGrain : IGrainWithStringKey
@@ -375,6 +649,8 @@ public interface IReplayShippingGrain : IGrainWithStringKey
     DurableTask<string> ShipAsync(string orderId);
 
     DurableTask<string> BookAsync(string orderId);
+
+    Task PingAsync();
 }
 
 public sealed class ReplayOrderGrain(ReplayWorkflowCode code, ReplayWorkflowProbe probe) : DurableGrain, IReplayOrderGrain
@@ -382,6 +658,8 @@ public sealed class ReplayOrderGrain(ReplayWorkflowCode code, ReplayWorkflowProb
     public static readonly DurableSignal<string> Approved = new("approved");
 
     private IReplayShippingGrain Shipping => GrainFactory.GetGrain<IReplayShippingGrain>("main");
+
+    public Task FlushAsync() => StateManager.WriteStateAsync().AsTask();
 
     public async DurableTask<string> HoldAsync(ReplayOrder order)
     {
@@ -416,6 +694,15 @@ public sealed class ReplayOrderGrain(ReplayWorkflowCode code, ReplayWorkflowProb
                 break;
             case ReplayWorkflowVersion.Unapproved:
                 return await Shipping.ShipAsync(orderId).WithId("ship");
+            case ReplayWorkflowVersion.Blocked:
+                shipment = await Shipping.ShipAsync(orderId).WithId("ship");
+                probe.Arrive(orderId);
+                await probe.BlockAsync();
+                break;
+            case ReplayWorkflowVersion.Pinged:
+                shipment = await Shipping.ShipAsync(orderId).WithId("ship");
+                await Shipping.PingAsync();
+                break;
             case ReplayWorkflowVersion.Paused:
                 var pause = await DurableTask.Delay(TimeSpan.FromMinutes(30)).WithId("pause").ScheduleAsync();
                 probe.Arrive(orderId);
@@ -430,8 +717,14 @@ public sealed class ReplayOrderGrain(ReplayWorkflowCode code, ReplayWorkflowProb
     }
 }
 
-public sealed class ReplayShippingGrain : DurableGrain, IReplayShippingGrain
+public sealed class ReplayShippingGrain(ReplayWorkflowProbe probe) : DurableGrain, IReplayShippingGrain
 {
+    public Task PingAsync()
+    {
+        probe.Ping();
+        return Task.CompletedTask;
+    }
+
     public DurableTask<string> ShipAsync(string orderId) => DurableTask.FromResult($"shipped {orderId}");
 
     public DurableTask<string> BookAsync(string orderId) => DurableTask.FromResult($"booked {orderId}");
@@ -498,4 +791,104 @@ internal sealed class FormatlessJournalStorageProvider(IJournalStorageProvider i
     {
         public void Read(JournalBufferReader buffer, IJournalMetadata? metadata) => inner.Read(buffer, metadata: null);
     }
+}
+
+public interface IReplayInboxGrain : IGrainWithStringKey
+{
+    Task RequestDeactivationAsync();
+}
+
+/// <summary>A durable grain which also handles inbox messages of its own.</summary>
+[GrainType(GrainTypeName)]
+public sealed class ReplayInboxGrain : DurableGrain, IReplayInboxGrain, IInboxHandler
+{
+    public const string GrainTypeName = "durable-task-replay-inbox-test";
+    public const string Subject = "replay-test.note";
+    private readonly ReplayInboxProbe _probe;
+
+    public ReplayInboxGrain(IInbox inbox, ReplayInboxProbe probe)
+    {
+        if (probe.BlockActivation)
+        {
+            throw new InvalidOperationException("The grain is unavailable while its history is captured.");
+        }
+
+        _probe = probe;
+        inbox.Register(this);
+    }
+
+    public Task RequestDeactivationAsync()
+    {
+        DeactivateOnIdle();
+        return Task.CompletedTask;
+    }
+
+    public bool CanHandle(InboxMessage message) => message.Envelope.Subject == Subject;
+
+    public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    {
+        await _probe.AttemptAsync(this.GetPrimaryKeyString(), cancellationToken);
+        context.Complete();
+    }
+}
+
+/// <summary>Counts <see cref="ReplayInboxGrain"/>'s handler attempts, and holds them until they are canceled.</summary>
+public sealed class ReplayInboxProbe
+{
+    private readonly ConcurrentDictionary<string, TaskCompletionSource> _attempts = new(StringComparer.Ordinal);
+    private int _handled;
+
+    public bool HoldsAttempts { get; init; }
+
+    public volatile bool BlockActivation;
+
+    public int Handled => Volatile.Read(ref _handled);
+
+    public Task WaitForAttemptAsync(string key) => GetAttempt(key).Task;
+
+    public async Task AttemptAsync(string key, CancellationToken cancellationToken)
+    {
+        Interlocked.Increment(ref _handled);
+        GetAttempt(key).TrySetResult();
+        if (HoldsAttempts)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+    }
+
+    private TaskCompletionSource GetAttempt(string key) =>
+        _attempts.GetOrAdd(key, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously));
+}
+
+/// <summary>Counts the inbox messages which grains of one type process, including attempts which recovery charges.</summary>
+internal sealed class InboxProcessedCounter : IDisposable
+{
+    private readonly MeterListener _listener = new();
+    private long _count;
+
+    public InboxProcessedCounter(string grainType)
+    {
+        _listener.InstrumentPublished = static (instrument, listener) =>
+        {
+            if (instrument.Meter.Name == "Microsoft.Orleans" && instrument.Name == "orleans-messaging-inbox-messages-processed")
+            {
+                listener.EnableMeasurementEvents(instrument);
+            }
+        };
+        _listener.SetMeasurementEventCallback<long>((_, measurement, tags, _) =>
+        {
+            foreach (var tag in tags)
+            {
+                if (tag.Key == "grain_type" && Equals(tag.Value, grainType))
+                {
+                    Interlocked.Add(ref _count, measurement);
+                }
+            }
+        });
+        _listener.Start();
+    }
+
+    public long Count => Interlocked.Read(ref _count);
+
+    public void Dispose() => _listener.Dispose();
 }

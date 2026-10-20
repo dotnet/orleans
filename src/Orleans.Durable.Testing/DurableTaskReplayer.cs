@@ -26,8 +26,13 @@ namespace Orleans.Durable.Tasks.Testing;
 /// <para>
 /// The replay reads the recorded history only. An execution which reaches an operation that the history doesn't record,
 /// such as a child, a <c>DurableTask.RunInline</c> effect, a delay, a detached start, or a signal's send, stops before
-/// starting it. The silo holds every outgoing message, so no other grain or service observes the replay and no reply
-/// arrives, and its Durable Jobs clock doesn't advance, so no scheduled message, such as a delay's resume, becomes due.
+/// starting it. The silo's outboxes deliver nothing, and the silo rejects every grain call from a grain to another grain,
+/// such as an ordinary call from replayed code or from an activation callback, so no other grain observes the replay and
+/// no reply arrives. Services which <c>configureSilo</c> registers run as registered, so replace those which reach outside
+/// the test, such as clients of external systems, with test doubles. The silo's Durable Jobs clock stands before every
+/// recorded time, its wake-ups are held, and its inboxes and outboxes start no attempt, so pending inbox messages and
+/// outbox deliveries stay at their recorded state, including delays, delivery deadlines, and messages which were already
+/// due.
 /// Decisions which the replay derives from recorded outcomes, such as
 /// <see cref="DurableTask.GetVersion(string, int, int)"/>'s, are made as in a live run and reported.
 /// </para>
@@ -93,13 +98,18 @@ public sealed class DurableTaskReplayer : IAsyncDisposable
             silo.Services.AddKeyedSingleton<IJournalStorageProvider>(KeyedService.AnyKey, static (services, _) => services.GetRequiredService<ReplayJournalStorageProvider>());
             silo.Services.AddKeyedSingleton<IJournalStorageCatalog>(KeyedService.AnyKey, static (services, _) => services.GetRequiredService<ReplayJournalStorageProvider>());
             silo.Services.AddSingleton<IDurableTaskReplayObserver>(recorder);
-            silo.Services.AddSingleton<IOutgoingGrainCallFilter, HeldDelivery>();
 
-            // Durable Jobs wakes grains whose messages are due. The replay silo's clock stands still, so no scheduled message,
-            // such as a delay's resume or a held message's retry, becomes due, and nothing reactivates a replayed grain once
-            // the replayer has deactivated it.
+            // Messaging starts its pump once the activation completes and performs the work which is due on the Durable
+            // Jobs clock: inbox messages, such as a delay's resume, outbox deliveries and retries, and expirations. The
+            // replay silo's clock stands before every recorded time, wake-ups are held, and the messaging hold keeps inboxes
+            // and outboxes at their recorded state, including messages which are already due, such as those with no
+            // delivery time and outbox entries which no attempt has delivered yet.
+            silo.Services.AddSingleton<MessagingReplayHold>();
+            silo.Services.RemoveAll<ILocalDurableJobManager>();
+            silo.Services.AddSingleton<ILocalDurableJobManager>(new HeldJobs());
             silo.Services.RemoveAllKeyed<TimeProvider>(DurableJobTimeProviderNames.DurableJobs);
-            silo.Services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs, FrozenTimeProvider.Instance);
+            silo.Services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs, HeldClock.Instance);
+            silo.Services.AddSingleton<IOutgoingGrainCallFilter, IsolatingCallFilter>();
         });
 
         var cluster = builder.Build();
@@ -273,29 +283,59 @@ public sealed class DurableTaskReplayer : IAsyncDisposable
         return result.Task;
     }
 
-    /// <summary>A clock which stands at the time of its creation.</summary>
-    private sealed class FrozenTimeProvider : TimeProvider
+    /// <summary>Acknowledges scheduled wake-ups and holds them for the lifetime of the replay silo.</summary>
+    private sealed class HeldJobs : ILocalDurableJobManager
     {
-        public static FrozenTimeProvider Instance { get; } = new();
+        public Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(new DurableJob
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Name = request.JobName,
+                ShardId = "replay",
+                TargetGrainId = request.Target,
+                DueTime = request.DueTime,
+                Metadata = request.Metadata,
+                TraceParent = request.TraceParent,
+                TraceState = request.TraceState
+            });
+        }
 
-        private readonly DateTimeOffset _now = System.GetUtcNow();
-
-        public override DateTimeOffset GetUtcNow() => _now;
+        public Task<bool> CancelAsync(DurableJob job, CancellationToken requestCancellationToken)
+        {
+            requestCancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(true);
+        }
     }
 
-    /// <summary>Holds every message which the replay silo's outbox delivers, as an inbox at capacity does.</summary>
-    private sealed class HeldDelivery : IOutgoingGrainCallFilter
+    /// <summary>A Durable Jobs clock which stands before every recorded time, so no recorded message or deadline is due.</summary>
+    private sealed class HeldClock : TimeProvider
+    {
+        public static HeldClock Instance { get; } = new();
+
+        public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch;
+    }
+
+    /// <summary>Rejects grain calls from the replay silo to grains other than the caller, so a replay reaches no other grain.</summary>
+    /// <remarks>
+    /// The runtime's calls to system targets, such as membership and the grain directory, and a grain's calls to itself
+    /// proceed. A call to another grain, such as an ordinary grain call from replayed code or an activation callback,
+    /// fails without activating its target.
+    /// </remarks>
+    private sealed class IsolatingCallFilter : IOutgoingGrainCallFilter
     {
         public Task Invoke(IOutgoingGrainCallContext context)
         {
-            if (context.InterfaceMethod.DeclaringType != typeof(IMessagingExtension)
-                || context.MethodName != nameof(IMessagingExtension.DeliverAsync))
+            if (context.TargetId.IsSystemTarget() || context.SourceId == context.TargetId)
             {
                 return context.Invoke();
             }
 
-            context.Result = (DeliveryResult)DeliveryResult.Backpressured.Instance;
-            return Task.CompletedTask;
+            throw new InvalidOperationException(
+                $"The replay silo delivers no grain call to another grain, so a replay reaches nothing outside its history: "
+                + $"'{context.InterfaceName}.{context.MethodName}' from '{context.SourceId}' to '{context.TargetId}' was rejected. "
+                + "Replace the dependency which makes the call with a test double in the replayer's silo configuration.");
         }
     }
 }
