@@ -109,20 +109,27 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _requests[taskId] = typedState.RequestPayload!;
     }
 
-    public void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint)
+    public void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint, string? method = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
         var typedState = GetState(taskId, state);
         typedState.RequestFingerprint = fingerprint;
+        if (method is not null)
+        {
+            typedState.Method = method;
+        }
+
         _items[taskId] = typedState;
     }
 
-    public void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string fingerprint)
+    public void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string method, string fingerprint)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(target, default);
+        ArgumentException.ThrowIfNullOrWhiteSpace(method);
         ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
         var typedState = GetState(taskId, state);
         typedState.RemoteTarget = target;
+        typedState.Method = method;
         typedState.RemoteRequestFingerprint = fingerprint;
         _items[taskId] = typedState;
     }

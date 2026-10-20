@@ -30,8 +30,8 @@ replay finds the record and doesn't apply the effect again:
 Messages between grains carry identities derived from the sender, the receiver, the
 task, and the subject, so a redelivered or replayed invocation, result, cancellation, or
 signal reaches the record which it already created. A task ID deduplicates starts: a
-start with the same request under an existing task ID reattaches to that task, and a
-start with a different request fails with `DurableTaskConflictException`.
+start of the same method under an existing task ID reattaches to that task, whatever its
+arguments, and a start of a different method fails with `DurableTaskConflictException`.
 
 Reads are recorded too. A step's result, an effect's result, a signal's value, and the
 logical time `DurableTask.Current.UtcNow` are the same in every replay, so the decisions

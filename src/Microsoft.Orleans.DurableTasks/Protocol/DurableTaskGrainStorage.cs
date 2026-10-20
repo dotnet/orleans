@@ -26,8 +26,18 @@ internal interface IDurableTaskGrainStorage
     /// <remarks>A stored task keeps its kind and request.</remarks>
     IDurableTaskState GetOrCreateTask(TaskId taskId, DurableTaskRecordKind kind, IDurableTaskRequest? request);
     void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request);
-    void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint);
-    void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string fingerprint);
+
+    /// <summary>
+    /// Records the task's <see cref="IDurableTaskState.RequestFingerprint"/> and, for a record which invokes a method,
+    /// its <see cref="IDurableTaskState.Method"/>.
+    /// </summary>
+    void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint, string? method = null);
+
+    /// <summary>
+    /// Records the task's call to <paramref name="target"/>: the invoked <paramref name="method"/>, and the diagnostic
+    /// <paramref name="fingerprint"/> of the call's request.
+    /// </summary>
+    void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string method, string fingerprint);
     void SetCallerId(TaskId taskId, IDurableTaskState state, GrainId callerId);
 
     /// <summary>

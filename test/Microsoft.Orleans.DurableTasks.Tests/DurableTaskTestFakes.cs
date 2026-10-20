@@ -30,7 +30,7 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 /// </summary>
 [GenerateSerializer]
 [Alias("Microsoft.Orleans.DurableTasks.Tests.TestDurableTaskRequest")]
-internal sealed class TestDurableTaskRequest : IDurableTaskRequest
+internal class TestDurableTaskRequest : IDurableTaskRequest
 {
     [Id(0)]
     public DurableTaskRequestContext? Context { get; set; }
@@ -70,6 +70,14 @@ internal sealed class TestDurableTaskRequest : IDurableTaskRequest
 
     public DurableTask CreateTask() => DurableTask.Run(static _ => { });
 }
+
+/// <summary>
+/// A serializable request for another interface method than <see cref="TestDurableTaskRequest"/>'s: the runtime identifies
+/// a request's method by its invokable type.
+/// </summary>
+[GenerateSerializer]
+[Alias("Microsoft.Orleans.DurableTasks.Tests.TestOtherMethodDurableTaskRequest")]
+internal sealed class TestOtherMethodDurableTaskRequest : TestDurableTaskRequest;
 
 /// <summary>A server whose polls return or throw each scripted outcome in turn, repeating the last.</summary>
 internal sealed class ScriptedDurableTaskServer(params object[] outcomes) : IDurableTaskServer

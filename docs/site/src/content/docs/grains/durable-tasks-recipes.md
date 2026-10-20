@@ -290,7 +290,7 @@ the receipt by its name:
 
 Pitfalls:
 
-- Name detached tasks after stable values. Starting a different request under an existing
+- Name detached tasks after stable values. Starting a different method under an existing
   root ID fails like other task ID reuse.
 - A workflow which hands the receipt's ID to another party before its own result commits
   starts it with `ScheduleAsync`, which returns once the notification grain holds it.

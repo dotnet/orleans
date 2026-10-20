@@ -46,7 +46,13 @@ internal sealed partial class DurableTaskGrainRuntime
     private StagedChild StageSubscription(TaskId taskId, IDurableTaskSubscription subscription, bool shielded)
     {
         var fingerprint = FormatIdentity(SubscriptionFingerprintPrefix, subscription.Target, subscription.Id);
-        if (TryGetRecordedSubscription(taskId, fingerprint, DescribeSubscription(subscription.Target, subscription.Id)) is { } recorded)
+        if (TryGetRecordedSubscription(
+                taskId,
+                DurableTaskRecordKind.Subscription,
+                subscription.Target,
+                subscription.Id,
+                method: null,
+                DescribeSubscription(subscription.Target, subscription.Id)) is { } recorded)
         {
             return recorded;
         }
@@ -78,15 +84,29 @@ internal sealed partial class DurableTaskGrainRuntime
     /// Returns the handle of the subscription child recorded under <paramref name="taskId"/>, or <see langword="null"/>
     /// when there's no record.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The record holds another operation.</exception>
-    private StagedChild? TryGetRecordedSubscription(TaskId taskId, string fingerprint, string requested)
+    /// <remarks>
+    /// The record is the same operation when it has <paramref name="kind"/>, subscribes to <paramref name="subscribedId"/>
+    /// on <paramref name="target"/>, and, for a detached start, starts <paramref name="method"/>, whatever its arguments.
+    /// </remarks>
+    /// <exception cref="DurableTaskDivergenceException">The record holds another operation.</exception>
+    private StagedChild? TryGetRecordedSubscription(
+        TaskId taskId,
+        DurableTaskRecordKind kind,
+        GrainId target,
+        TaskId subscribedId,
+        string? method,
+        string requested)
     {
         if (!_storage.TryGetTask(taskId, out var state))
         {
             return null;
         }
 
-        if (!string.Equals(state.RequestFingerprint, fingerprint, StringComparison.Ordinal))
+        if (state.Kind != kind
+            || !TryGetSubscription(state, out var recordedTarget, out var recordedId)
+            || recordedTarget != target
+            || recordedId != subscribedId
+            || !string.Equals(state.Method, method, StringComparison.Ordinal))
         {
             throw CreateDivergenceException(
                 $"Durable child task '{taskId}' is already associated with a different operation.",
@@ -125,10 +145,16 @@ internal sealed partial class DurableTaskGrainRuntime
     /// Stages the record of a subscription child, completing it with <paramref name="response"/> when the subscribed task
     /// is of this grain and has a result, and returns its handle.
     /// </summary>
-    private IScheduledTaskHandle StageSubscriptionRecord(TaskId taskId, DurableTaskRecordKind kind, string fingerprint, bool shielded, DurableTaskResponse? response)
+    private IScheduledTaskHandle StageSubscriptionRecord(
+        TaskId taskId,
+        DurableTaskRecordKind kind,
+        string fingerprint,
+        bool shielded,
+        DurableTaskResponse? response,
+        string? method = null)
     {
         var state = GetOrCreateTask(taskId, kind, request: null);
-        _storage.SetRequestFingerprint(taskId, state, fingerprint);
+        _storage.SetRequestFingerprint(taskId, state, fingerprint, method);
         MarkShielded(taskId, state, shielded);
         var handle = GetOrCreateRunningTaskHandle(taskId);
         if (response is not null)

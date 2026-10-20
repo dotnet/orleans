@@ -118,12 +118,12 @@ internal sealed partial class DurableTaskGrainRuntime
         ThrowIfStopping();
         cancellationToken.ThrowIfCancellationRequested();
         ValidateSignal(taskId, name, value);
-        var payloadFingerprint = GetSignalFingerprint(value);
-        var markerFingerprint = GetSignalSendFingerprint(target, taskId, name, payloadFingerprint);
         DurableSignalResult result;
         if (_storage.TryGetTask(markerId, out var recorded))
         {
-            if (!string.Equals(recorded.RequestFingerprint, markerFingerprint, StringComparison.Ordinal))
+            // The marker's identifier names the target, task, and signal, so a marker of a send is the same operation
+            // whatever value the replay sends: a replay whose value serializes differently reads the recorded result.
+            if (recorded.Kind != DurableTaskRecordKind.SignalSend)
             {
                 throw CreateDivergenceException(
                     $"Durable task '{markerId}' is already associated with another operation.",
@@ -143,6 +143,7 @@ internal sealed partial class DurableTaskGrainRuntime
         }
 
         result = DurableSignalResult.Accepted;
+        var payloadFingerprint = GetSignalFingerprint(value);
         if (target == GrainId)
         {
             result = StageSignal(taskId, name, value, payloadFingerprint);
@@ -157,7 +158,7 @@ internal sealed partial class DurableTaskGrainRuntime
         }
 
         var marker = GetOrCreateTask(markerId, DurableTaskRecordKind.SignalSend, request: null);
-        _storage.SetRequestFingerprint(markerId, marker, markerFingerprint);
+        _storage.SetRequestFingerprint(markerId, marker, GetSignalSendFingerprint(target, taskId, name, payloadFingerprint));
         SetResponse(
             markerId,
             marker,

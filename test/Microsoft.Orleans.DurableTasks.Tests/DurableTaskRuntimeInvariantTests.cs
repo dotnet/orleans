@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Collections.Concurrent;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Diagnostics;
@@ -132,7 +132,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         runtime.ScheduleFromInbox(taskId, CreateRequest(1));
 
         var exception = Assert.Throws<DurableTaskConflictException>(
-            () => runtime.ScheduleFromInbox(taskId, CreateRequest(2)));
+            () => runtime.ScheduleFromInbox(taskId, CreateOtherMethodRequest(1)));
 
         Assert.Contains("different request", exception.Message, StringComparison.Ordinal);
         Assert.Equal(taskId, exception.TaskId);
@@ -261,7 +261,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         storage.AddInvoked(rootId);
         var child = storage.GetOrCreate(childId);
         var target = GrainId.Create("target", "one");
-        storage.SetRemoteRequest(childId, child, target, "fingerprint");
+        storage.SetRemoteRequest(childId, child, target, "method", "fingerprint");
         var handler = CreateHandler(runtime);
 
         Accept(handler, CancellationMessage(caller, receiver, rootId));
@@ -417,7 +417,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var remoteHandles = new List<IScheduledTaskHandle>();
         foreach (var remoteId in remoteIds)
         {
-            storage.SetRemoteRequest(remoteId, storage.GetOrCreate(remoteId), target, $"fingerprint-{remoteId}");
+            storage.SetRemoteRequest(remoteId, storage.GetOrCreate(remoteId), target, "method", $"fingerprint-{remoteId}");
             remoteHandles.Add(runtime.GetScheduledTaskHandle(remoteId));
         }
 
@@ -492,7 +492,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var request = CreateRequest(1);
         var state = storage.GetOrCreate(taskId);
         storage.SetRequest(taskId, state, request);
-        storage.SetRequestFingerprint(taskId, state, IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
+        storage.SetRequestFingerprint(taskId, state, IDurableTaskRequest.GetFingerprint(request, CreateSerializer()), IDurableTaskRequest.GetMethod(request));
         storage.AddCompletionDestination(taskId, state, new(request.Context!.CallerId, taskId));
         storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
 
@@ -512,7 +512,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var caller = request.Context!.CallerId;
         var state = storage.GetOrCreate(taskId);
         storage.SetRequest(taskId, state, request);
-        storage.SetRequestFingerprint(taskId, state, IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
+        storage.SetRequestFingerprint(taskId, state, IDurableTaskRequest.GetFingerprint(request, CreateSerializer()), IDurableTaskRequest.GetMethod(request));
         storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
 
         var response = runtime.ScheduleFromInbox(taskId, request);
@@ -575,6 +575,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             taskId,
             state,
             request.Context!.TargetId,
+            IDurableTaskRequest.GetMethod(request),
             IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
         storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
 
@@ -610,7 +611,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var target = GrainId.Create("target", "one");
         storage.AddInvoked(TaskId.Parse("root"));
         var state = storage.GetOrCreate(taskId);
-        storage.SetRemoteRequest(taskId, state, target, "fingerprint");
+        storage.SetRemoteRequest(taskId, state, target, "method", "fingerprint");
         var handle = runtime.GetScheduledTaskHandle(taskId);
 
         runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(42), target);
@@ -733,7 +734,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var target = GrainId.Create("target", "one");
         storage.AddInvoked(TaskId.Parse("root"));
         var state = storage.GetOrCreate(taskId);
-        storage.SetRemoteRequest(taskId, state, target, "fingerprint");
+        storage.SetRemoteRequest(taskId, state, target, "method", "fingerprint");
 
         runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(42), target);
         var handle = runtime.GetScheduledTaskHandle(taskId);
@@ -1079,7 +1080,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Stage("root/canceled", (id, state) => storage.SetResponse(id, state, DurableTaskResponse.Canceled));
         Stage("root/canceling", (id, state) => storage.RequestCancellation(id, state));
         Stage("root/delayed", (id, state) => storage.SetDelay(id, state, dueTime, generation: 1));
-        Stage("root/remote", (id, state) => storage.SetRemoteRequest(id, state, target, "fingerprint"));
+        Stage("root/remote", (id, state) => storage.SetRemoteRequest(id, state, target, "method", "fingerprint"));
 
         var diagnostics = new Dictionary<string, DurableTaskDiagnosticState>();
         await foreach (var (taskId, state) in ((IDurableTaskGrainExtension)runtime).GetTasksAsync(TestContext.Current.CancellationToken))
@@ -1230,7 +1231,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var taskId = TaskId.Parse("root/remote");
         var target = GrainId.Create("target", "one");
         var state = storage.GetOrCreate(taskId);
-        storage.SetRemoteRequest(taskId, state, target, "fingerprint");
+        storage.SetRemoteRequest(taskId, state, target, "method", "fingerprint");
         transport.BeforeSendCancellation = (_, sentTarget, sentTaskId) =>
         {
             Assert.Equal(target, sentTarget);
@@ -1281,7 +1282,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var childId = TaskId.Parse("root/remote");
         var target = GrainId.Create("target", "one");
         var child = storage.GetOrCreate(childId);
-        storage.SetRemoteRequest(childId, child, target, "fingerprint");
+        storage.SetRemoteRequest(childId, child, target, "method", "fingerprint");
         storage.RequestCancellation(childId, child);
         var (recovered, _, _, transport) = CreateRuntime(storage, manager);
 
@@ -1618,7 +1619,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         storage.SetRequestFingerprint(
             taskId,
             state,
-            IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
+            IDurableTaskRequest.GetFingerprint(request, CreateSerializer()), IDurableTaskRequest.GetMethod(request));
         stateMachine.OnRecoveryCompleted();
 
         Assert.False(started.Task.IsCompleted);
@@ -1655,7 +1656,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         storage.SetRequestFingerprint(
             taskId,
             state,
-            IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
+            IDurableTaskRequest.GetFingerprint(request, CreateSerializer()), IDurableTaskRequest.GetMethod(request));
         stateMachine.OnRecoveryCompleted();
         await runtime.RecoverAsync(TestContext.Current.CancellationToken);
 
@@ -1733,7 +1734,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             storage.SetRequestFingerprint(
                 taskId,
                 state,
-                IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
+                IDurableTaskRequest.GetFingerprint(request, CreateSerializer()), IDurableTaskRequest.GetMethod(request));
         }
     });
 
@@ -1753,7 +1754,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         storage.SetRequestFingerprint(
             taskId,
             state,
-            IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
+            IDurableTaskRequest.GetFingerprint(request, CreateSerializer()), IDurableTaskRequest.GetMethod(request));
 
         await runtime.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
         await WaitUntilAsync(() => observations.Count == 1);
@@ -1782,7 +1783,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var root = storage.AddInvoked(rootId);
         var child = storage.GetOrCreate(childId);
         var grandchild = storage.GetOrCreate(grandchildId);
-        storage.SetRemoteRequest(grandchildId, grandchild, target, "fingerprint");
+        storage.SetRemoteRequest(grandchildId, grandchild, target, "method", "fingerprint");
         var grandchildWireId = runtime.GetWireId(grandchildId);
         var unrelated = storage.GetOrCreate(unrelatedId);
         var rootHandle = runtime.GetScheduledTaskHandle(rootId);
@@ -2020,7 +2021,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             () => runtime.SelectCompletionAsync(decisionId, [TaskId.Parse("root/two")], TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal(
-            $"Durable completion decision '{decisionId}' is already associated with another operation. It records a selection of the first task to complete, and this attempt requested a selection of the first task to complete among 1 candidate. A replay schedules the same operation, with the same arguments, under each identifier; new workflow steps use new identifiers.",
+            $"Durable completion decision '{decisionId}' is already associated with another operation. It records a selection of the first task to complete, and this attempt requested a selection of the first task to complete among 1 candidate. A replay schedules the same operation under each identifier: a call or request invokes the same method on the same target, whatever its arguments; new workflow steps use new identifiers.",
             exception.Message);
     });
 
@@ -2040,7 +2041,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal(
-            $"Durable completion decision '{decisionId}' is already associated with another operation. It records a delay due at {dueTime:O}, and this attempt requested a selection of the first task to complete among 2 candidates. A replay schedules the same operation, with the same arguments, under each identifier; new workflow steps use new identifiers.",
+            $"Durable completion decision '{decisionId}' is already associated with another operation. It records a delay due at {dueTime:O}, and this attempt requested a selection of the first task to complete among 2 candidates. A replay schedules the same operation under each identifier: a call or request invokes the same method on the same target, whatever its arguments; new workflow steps use new identifiers.",
             exception.Message);
     });
 
@@ -2167,7 +2168,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var taskId = TaskId.Parse("root/remote");
         var target = GrainId.Create("target", "one");
         var state = storage.GetOrCreate(taskId);
-        storage.SetRemoteRequest(taskId, state, target, "fingerprint");
+        storage.SetRemoteRequest(taskId, state, target, "method", "fingerprint");
         var handle = runtime.GetScheduledTaskHandle(taskId);
         runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(42), target);
 
@@ -2242,7 +2243,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var waiter = GrainId.Create("caller", "one");
         var other = GrainId.Create("caller", "two");
         var state = storage.GetOrCreate(taskId);
-        storage.SetRemoteRequest(taskId, state, target, "fingerprint");
+        storage.SetRemoteRequest(taskId, state, target, "method", "fingerprint");
         state.RequestFingerprint = "invocation";
         state.Incarnation = Guid.NewGuid();
         state.CompletionDestinations.Add(new(waiter, taskId));
@@ -2704,7 +2705,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var caller = request.Context!.CallerId;
         runtime.ScheduleFromInbox(taskId, request);
         storage.SetResponse(childId, storage.GetOrCreate(childId), DurableTaskResponse.Completed);
-        storage.SetRemoteRequest(loserId, storage.GetOrCreate(loserId), target, "loser");
+        storage.SetRemoteRequest(loserId, storage.GetOrCreate(loserId), target, "method", "loser");
         var decision = storage.GetOrCreate(decisionId);
         decision.RequestFingerprint = "$completion-decision:winner";
         storage.SetResponse(decisionId, decision, DurableTaskResponse.FromResult(childId));
@@ -3114,6 +3115,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             childId,
             child,
             request.Context!.TargetId,
+            IDurableTaskRequest.GetMethod(childTask),
             IDurableTaskRequest.GetFingerprint(childTask, CreateSerializer()));
         child.Result = DurableTaskResponse.FromResult(42);
         child.CompletedAt = DateTimeOffset.UtcNow;
@@ -3141,20 +3143,23 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             childId,
             child,
             originalRequest.Context!.TargetId,
+            IDurableTaskRequest.GetMethod(originalTask),
             IDurableTaskRequest.GetFingerprint(originalTask, CreateSerializer()));
         storage.RequestCancellation(rootId, storage.GetOrCreate(rootId));
 
+        var otherTarget = CreateRemoteRequest(17);
+        otherTarget.Context!.TargetId = GrainId.Create("target", "two");
         var exception = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
             () => runtime.ScheduleChildAsync(
                 childId,
-                new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(18)),
+                new TestStateManager.TestRemoteDurableTask(otherTarget),
                 TestContext.Current.CancellationToken).AsTask());
 
         // The error names the recorded and the requested operations, so a diverging replay is diagnosable.
         Assert.StartsWith(
-            $"Durable child task '{childId}' is already associated with a different request. It records a call to grain '{originalRequest.Context!.TargetId}' (fingerprint ",
+            $"Durable child task '{childId}' is already associated with a different request. It records a call to method '{IDurableTaskRequest.GetMethod(originalTask)}' on grain '{originalRequest.Context!.TargetId}' (fingerprint ",
             exception.Message);
-        Assert.Contains("and this attempt requested a call to grain", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("and this attempt requested a call to method", exception.Message, StringComparison.Ordinal);
         Assert.Empty(transport.Invocations);
     });
 
@@ -3164,7 +3169,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var (runtime, storage, _, transport) = CreateRuntime();
         var childId = TaskId.Parse("root/step");
         var target = GrainId.Create("target", "one");
-        storage.SetRemoteRequest(childId, storage.GetOrCreate(childId, DurableTaskRecordKind.RemoteCall), target, "0123456789ABCDEF0123");
+        storage.SetRemoteRequest(childId, storage.GetOrCreate(childId, DurableTaskRecordKind.RemoteCall), target, "method", "0123456789ABCDEF0123");
 
         // The workflow changed: a replay schedules a local step where the first execution recorded a grain call.
         var exception = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
@@ -3174,7 +3179,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal(
-            $"Durable child task '{childId}' is already associated with a different request. It records a call to grain '{target}' (fingerprint 0123456789AB), and this attempt requested a local child task. A replay schedules the same operation, with the same arguments, under each identifier; new workflow steps use new identifiers.",
+            $"Durable child task '{childId}' is already associated with a different request. It records a call to method 'method' on grain '{target}' (fingerprint 0123456789AB), and this attempt requested a local child task. A replay schedules the same operation under each identifier: a call or request invokes the same method on the same target, whatever its arguments; new workflow steps use new identifiers.",
             exception.Message);
         Assert.Empty(transport.Invocations);
     });
@@ -3607,7 +3612,12 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Assert.Equal(1, first.CreateTaskCallCount);
         Assert.Equal(0, again.CreateTaskCallCount);
-        var exception = Assert.Throws<DurableTaskConflictException>(() => runtime.PostRoot(rootId, CreateRequest(2)));
+
+        // A post of the same method whose arguments differ reaches the stored task; another method conflicts.
+        var differentArguments = CreateRequest(2);
+        runtime.PostRoot(rootId, differentArguments);
+        Assert.Equal(0, differentArguments.CreateTaskCallCount);
+        var exception = Assert.Throws<DurableTaskConflictException>(() => runtime.PostRoot(rootId, CreateOtherMethodRequest(1)));
         Assert.Contains("different request", exception.Message, StringComparison.Ordinal);
         Assert.Equal(rootId, exception.TaskId);
     });
@@ -3971,11 +3981,15 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var (runtime, storage, _, transport) = CreateRuntime();
         var rootId = TaskId.CreateRoot("posted");
 
-        // A posted root task keeps its identifier, so its invocation's identity is the same for every post.
+        // A posted root task keeps its identifier, so its invocation's identity is the same for every post. A post of the
+        // same method coalesces with the pending invocation, whatever its arguments.
         runtime.PostRoot(rootId, CreateRemoteRequest(17));
         var messageId = Assert.Single(transport.SentInvocations);
+        runtime.PostRoot(rootId, CreateRemoteRequest(18));
+        Assert.Single(transport.SentInvocations);
 
-        var exception = Assert.Throws<InvalidOperationException>(() => runtime.PostRoot(rootId, CreateRemoteRequest(18)));
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => runtime.PostRoot(rootId, CreateOtherMethodRequest(17, GrainId.Create("target", "one"))));
 
         Assert.Contains(messageId.ToString(), exception.Message);
         Assert.Single(transport.SentInvocations);
@@ -4576,12 +4590,16 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request) =>
             ((TestTaskState)state).Request = request;
 
-        public void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint) =>
+        public void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint, string? method = null)
+        {
             ((TestTaskState)state).RequestFingerprint = fingerprint;
+            ((TestTaskState)state).Method = method ?? ((TestTaskState)state).Method;
+        }
 
-        public void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string fingerprint)
+        public void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string method, string fingerprint)
         {
             ((TestTaskState)state).RemoteTarget = target;
+            ((TestTaskState)state).Method = method;
             ((TestTaskState)state).RemoteRequestFingerprint = fingerprint;
         }
 
@@ -4679,6 +4697,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public DateTimeOffset? DueTime { get; set; }
         public long ResumeGeneration { get; set; }
         public string? RequestFingerprint { get; set; }
+        public string? Method { get; set; }
         public DateTimeOffset? RetainedSince { get; set; }
         public GrainId RemoteTarget { get; set; }
         public string? RemoteRequestFingerprint { get; set; }

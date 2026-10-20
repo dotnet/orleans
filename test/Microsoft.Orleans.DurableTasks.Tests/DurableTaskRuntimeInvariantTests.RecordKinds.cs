@@ -71,12 +71,12 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var callId = taskId.Child("wait");
         var target = GrainId.Create("target", "one");
         storage.AddInvoked(TaskId.Parse("root"));
-        storage.SetRemoteRequest(callId, storage.GetOrCreate(callId, DurableTaskRecordKind.RemoteCall), target, "0123456789ABCDEF0123");
+        storage.SetRemoteRequest(callId, storage.GetOrCreate(callId, DurableTaskRecordKind.RemoteCall), target, "method", "0123456789ABCDEF0123");
 
         // A delay which an execution schedules under its child's identifier finds the call's record and changes nothing.
         var direct = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
             () => runtime.ScheduleDelayAsync(callId, TimeSpan.FromDays(1), TestContext.Current.CancellationToken).AsTask());
-        Assert.Contains($"It records a call to grain '{target}' (fingerprint 0123456789AB), and this attempt requested a delay due at", direct.Message, StringComparison.Ordinal);
+        Assert.Contains($"It records a call to method 'method' on grain '{target}' (fingerprint 0123456789AB), and this attempt requested a delay due at", direct.Message, StringComparison.Ordinal);
 
         // A replay which awaits a delay under the call's identifier stalls.
         using var stalls = new StallRecorder(taskId);

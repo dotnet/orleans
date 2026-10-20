@@ -134,13 +134,20 @@ internal class DurableTaskState : IDurableTaskState
     [Id(8)]
     public long ResumeGeneration { get; set; }
 
+    /// <inheritdoc cref="IDurableTaskState.RequestFingerprint"/>
     [Id(9)]
     public string? RequestFingerprint { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.Method"/>
+    [Id(24)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Method { get; set; }
 
     [Id(11)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public GrainId RemoteTarget { get; set; }
 
+    /// <inheritdoc cref="IDurableTaskState.RemoteRequestFingerprint"/>
     [Id(12)]
     public string? RemoteRequestFingerprint { get; set; }
 

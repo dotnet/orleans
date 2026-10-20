@@ -64,8 +64,9 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
     }
 
     /// <summary>
-    /// Creates an invocation with the transport's identity and a payload which identifies its request by fingerprint, so a
-    /// test request without a codec can be sent.
+    /// Creates an invocation with the transport's identity and a payload which identifies its request by method, so a
+    /// test request without a codec can be sent, and invocations of one method under one identity coalesce whatever their
+    /// arguments, as the runtime coalesces them.
     /// </summary>
     private OutboxMessage CreateInvocationMessage(
         GrainId sender,
@@ -77,7 +78,7 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
         Encoder.CreateInvocation(
             GetInvocationMessageId(sender, target, taskId, subscriberId),
             target,
-            Encoding.UTF8.GetBytes($"{detached}:{IDurableTaskRequest.GetFingerprint(request, MessagingTestHelpers.Serializer)}"),
+            Encoding.UTF8.GetBytes($"{detached}:{IDurableTaskRequest.GetMethod(request)}"),
             sentAt: default);
 
     public OutboxMessage CreateInvocation(MessageId messageId, GrainId target, byte[] payload, DateTimeOffset sentAt) =>
@@ -174,7 +175,7 @@ internal sealed record RecordedCompletion(GrainId Sender, GrainId Target, TaskId
 /// <see cref="RuntimeTestDurableTaskRequestCopier"/> below avoids that problem entirely while still letting tests fully control
 /// and observe request behavior.
 /// </remarks>
-internal sealed class RuntimeTestDurableTaskRequest(
+internal class RuntimeTestDurableTaskRequest(
     Func<DurableTask>? createTask = null,
     string interfaceName = "ITestInterface",
     string methodName = "TestMethod",
@@ -227,6 +228,13 @@ internal sealed class RuntimeTestDurableTaskRequest(
 
     public void AddInvokeMethodOptions(InvokeMethodOptions options) => Options |= options;
 }
+
+/// <summary>
+/// A <see cref="RuntimeTestDurableTaskRequest"/> for another interface method: the runtime identifies a request's method by
+/// its invokable type, as it does for the invokables which the code generator emits once per method.
+/// </summary>
+internal sealed class RuntimeTestOtherMethodRequest(Func<DurableTask>? createTask = null, params object?[] arguments)
+    : RuntimeTestDurableTaskRequest(createTask, "ITestGrain", "OtherMethod", arguments);
 
 /// <summary>
 /// Trivial reference-preserving copier for <see cref="RuntimeTestDurableTaskRequest"/>, registered so that a real Orleans
