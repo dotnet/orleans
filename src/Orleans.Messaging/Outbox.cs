@@ -80,8 +80,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         if (message.ReceiverId == GrainId)
         {
             // The grain's own inbox accepts the message in the caller's journal write, so the outbox never holds it.
-            _pump.Inbox.StageLocal(message.ToInboxMessage());
-            Shared.Instruments.OnOutboxMessageSent(Shared.GrainType);
+            _inbox.StageLocal(message.ToInboxMessage(JobTimeProvider.GetUtcNow()));
+            Shared.Instruments.OnOutboxMessageSent(_pump.GrainTypeTag);
             return;
         }
 
@@ -151,9 +151,12 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         return true;
     }
 
-    // The sending write fixes both the absolute retry budget and the admission cutoff for every attempt and recovery.
+    // The sending write fixes the logical send time for every attempt and recovery.
     private OutboxMessageState CreateState() =>
-        new() { ExpirationTime = MessagingTime.AddClamped(JobTimeProvider.GetUtcNow(), Options.OutboxRetryTimeout) };
+        new() { SentAt = JobTimeProvider.GetUtcNow() };
+
+    private DateTimeOffset GetExpirationTime(OutboxMessageState state) =>
+        MessagingTime.AddClamped(state.SentAt!.Value, Options.OutboxRetryTimeout);
 
     /// <summary>Returns the first registered source which provides the message, and its validated message.</summary>
     private IOutboxMessageSource? FindSource(MessageId messageId, out OutboxMessage message)
@@ -325,8 +328,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             }
 
             // Backpressure and failed attempts share the absolute retry budget established by the sending write.
-            if (entry.State.ExpirationTime <= now) (unavailable ??= []).Add(new(entry, UnavailableKind.Expired, message, error));
-            else if (error is not null) (unavailable ??= []).Add(new(entry, UnavailableKind.Failed, null, error));
+            if (GetExpirationTime(entry.State) <= now) (unavailable ??= []).Add((entry, new Unavailable.Expired(message)));
+            else if (error is not null) (unavailable ??= []).Add((entry, new Unavailable.Failed(error)));
             else if (message is { } candidate) (candidates ??= []).Add((entry, candidate));
             else (unavailable ??= []).Add((entry, Unavailable.Unclaimed.Instance));
         }
@@ -341,12 +344,11 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         var start = Stopwatch.GetTimestamp();
         try
         {
-            // A receiver fences forgotten sends using this immutable cutoff, even if a delayed attempt arrives after
-            // sender expiry or either clock moves backward. Transport timing is not part of the safety contract.
+            // Retention and admission use the original send time, including for delayed attempts and recovered entries.
             var delivery = new InboxMessage
             {
                 Envelope = message.Envelope,
-                RedeliveryDeadline = entry.State.ExpirationTime!.Value
+                SentAt = entry.State.SentAt!.Value
             };
             var result = await Shared.Transport.DeliverAsync(message.ReceiverId, delivery, cancellationToken).ConfigureAwait(true);
             return new(entry, message, new DeliveryAnswer.Answered(result), Stopwatch.GetElapsedTime(start));
@@ -435,7 +437,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 if (status == DeliveryStatus.Expired)
                 {
                     // Fencing proves no new admission, not that an earlier attempt was never accepted.
-                    var reason = outcome.Result!.Value.Message ?? "The receiver fenced the message's admission cutoff; its earlier delivery outcome is unknown.";
+                    var reason = outcome.Result!.Value.Message ?? "The message was sent before the receiver's deduplication window; its earlier delivery outcome is unknown.";
                     StageDeadLetter(
                         current,
                         current.Reference is null ? outcome.Message : CopySourceMessage(outcome.Message),
@@ -514,7 +516,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     private OutboxMessageState? PrepareRetry(DeliveryOutcome outcome, int attemptCount, string error)
     {
         var now = JobTimeProvider.GetUtcNow();
-        var expirationTime = outcome.Entry.State.ExpirationTime!.Value;
+        var expirationTime = GetExpirationTime(outcome.Entry.State);
         if (expirationTime <= now) return null;
 
         // The next attempt runs no later than the timeout, when the outbox dead-letters the message instead.
@@ -523,7 +525,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         {
             AttemptCount = attemptCount,
             LastError = error,
-            ExpirationTime = expirationTime,
+            SentAt = outcome.Entry.State.SentAt,
             NextAttemptAt = retryAt < expirationTime ? retryAt : expirationTime
         };
     }

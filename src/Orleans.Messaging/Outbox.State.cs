@@ -62,12 +62,14 @@ internal sealed partial class Outbox
     {
         switch (command)
         {
-            case OutboxCommandKind.Enqueue:
-                var state = command.State ?? throw new InvalidOperationException("An enqueue command requires its delivery state.");
-                if (state.ExpirationTime is null) throw new InvalidOperationException("An enqueue command requires its retry expiration time.");
-                var entry = new OutboxEntry { Message = command.Message, Reference = command.Reference, State = state, Sequence = ++_lastSequence };
-                _messages.Add(entry.MessageId, entry);
-                ReportDepth(1);
+            case OutboxCommand.Enqueue { Message: var message, State: var state }:
+                Add(new OutboxEntry { Message = message, State = state, Sequence = ++_lastSequence });
+                break;
+            case OutboxCommand.EnqueueReference { Reference: var reference, State: var state }:
+                Add(new OutboxEntry { Reference = reference, State = state, Sequence = ++_lastSequence });
+                break;
+            case OutboxCommand.Retry { MessageId: var key, State: var state }:
+                _messages[key].State = state;
                 break;
             case OutboxCommand.Retire { MessageId: var key, DeadLetter: var deadLetter }:
                 if (_messages.Remove(key)) ReportDepth(-1);
