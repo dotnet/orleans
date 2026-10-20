@@ -64,6 +64,12 @@ Buyers can cancel orders until their stock is confirmed, and ship paid orders.
   period. The order's inbox accepts it in the same journal write that records the order, and its
   handler advances only a `Submitted` order, so a cancelled order ignores it.
 - A stock confirmation which arrives after cancellation releases its reservation.
+- The catalog retains each order's reservation outcome across release, commit, and reactivation.
+  A release which arrives first records a rejection, so a later reserve preserves available stock.
+- A submission carries its order date, keeping status and scheduled-message contents stable across
+  handler retries. Order transitions prepare and stage outgoing messages before applying their state.
+  For legacy submissions, the order journals a private submission timestamp once and reuses it after
+  failed sends and reactivation, keeping the public order status unchanged until its messages stage.
 
 ## Configuration
 

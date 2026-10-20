@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="CsCheck" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="NSubstitute" />
   </ItemGroup>
@@ -15,6 +16,10 @@
   <ItemGroup>
     <Compile Include="$(SourceRoot)docs\site\src\content\docs\snippets\compiled\Grains\MessagingSnippets.cs" Link="Documentation\MessagingSnippets.cs" />
     <Compile Include="$(SourceRoot)docs\site\src\content\docs\snippets\compiled\Grains\MessagingRecipes.cs" Link="Documentation\MessagingRecipes.cs" />
+    <Compile Include="$(SourceRoot)playground\OrderProcessing\Contracts.cs" Link="Playground\Contracts.cs" />
+    <Compile Include="$(SourceRoot)playground\OrderProcessing\CatalogData.cs" Link="Playground\CatalogData.cs" />
+    <Compile Include="$(SourceRoot)playground\OrderProcessing\Grains\*.cs" Link="Playground\Grains\%(Filename)%(Extension)" />
+    <Compile Include="$(SourceRoot)samples\Messaging\Protocol.cs" Link="Samples\MessagingProtocol.cs" />
   </ItemGroup>
 
   <ItemGroup>

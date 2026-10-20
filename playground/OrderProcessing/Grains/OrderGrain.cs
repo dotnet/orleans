@@ -1,5 +1,6 @@
-using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Messaging;
 
@@ -23,19 +24,24 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
     private readonly IOutbox _outbox;
     private readonly OrderingOptions _options;
     private readonly OrderMessages _messages;
+    private readonly TimeProvider _timeProvider;
     private readonly IDurableValue<OrderState> _order;
+    private readonly IDurableValue<DateTimeOffset?> _submissionDate;
     private readonly IDurableDictionary<int, StockLineStatus> _stock;
 
     public OrderGrain(
         IInbox inbox,
         IOutbox outbox,
         IOptions<OrderingOptions> options,
-        OrderMessages messages)
+        OrderMessages messages,
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider)
     {
         _outbox = outbox;
         _options = options.Value;
         _messages = messages;
+        _timeProvider = timeProvider;
         _order = StateManager.GetOrAddValue<OrderState>("order");
+        _submissionDate = StateManager.GetOrAddValue<DateTimeOffset?>("submission-date");
         _stock = StateManager.GetOrAddDictionary<int, StockLineStatus>("stock");
         inbox.Register(messages.SubmitOrder, HandleSubmit)
             .Register(messages.GracePeriodElapsed, HandleGracePeriodElapsed)
@@ -64,8 +70,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         }
 
         // Pending reservations are released when their confirmations arrive.
-        ReleaseConfirmedStock();
-        SetStatus(OrderStatus.Cancelled, "Cancelled by the buyer.");
+        Cancel("Cancelled by the buyer.");
         await WriteStateAsync();
         return true;
     }
@@ -90,8 +95,20 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             return;
         }
 
-        var orderDate = DateTimeOffset.UtcNow;
-        _order.Value = new OrderState(
+        var orderDate = request.OrderDate;
+        if (orderDate == default)
+        {
+            // Legacy submissions carry no date. Its private intent survives a failed send and journal recovery.
+            if (_submissionDate.Value is not { } captured)
+            {
+                captured = _timeProvider.GetUtcNow();
+                _submissionDate.Value = captured;
+            }
+
+            orderDate = captured;
+        }
+
+        var order = new OrderState(
             OrderId,
             request.BuyerId,
             Version: 0,
@@ -101,16 +118,18 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             request.Address,
             request.CardLast4,
             Description: null);
-        PublishStatus();
 
-        // The inbox accepts this self-addressed message in the order's submission write
-        // and processes it once the grace period ends.
-        _outbox.Send(
-            _messages.GracePeriodElapsed,
+        // The inbox accepts this self-addressed message in the order's submission write and processes it once the grace
+        // period ends. The order date is on the Durable Jobs clock, which DeliverAt uses, and stays fixed across retries.
+        var status = CreateStatus(order);
+        var gracePeriod = _messages.GracePeriodElapsed.Create(
             new MessageId(OrderKey.CreateChildKey("grace-period")),
-            this,
+            this.GetGrainId(),
             new GracePeriodElapsed(),
-            orderDate + _options.GracePeriod);
+            order.OrderDate + _options.GracePeriod);
+        _outbox.Send(status);
+        _outbox.Send(gracePeriod);
+        _order.Value = order;
         context.Complete();
     }
 
@@ -120,17 +139,18 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         var order = _order.Value!;
         if (order.Status is OrderStatus.Submitted)
         {
-            foreach (var line in order.Lines)
+            var next = NextStatus(OrderStatus.AwaitingValidation);
+            var messages = order.Lines.Select(line => _messages.ReserveStock.Create(
+                new MessageId(StockKey(line.ProductId)),
+                GrainFactory.GetGrain<ICatalogItemGrain>(line.ProductId).GetGrainId(),
+                new ReserveStock(OrderId, line.Units, this.GetGrainId()))).Append(CreateStatus(next)).ToArray();
+            foreach (var outgoing in messages)
             {
-                _stock[line.ProductId] = StockLineStatus.Pending;
-                _outbox.Send(
-                    _messages.ReserveStock,
-                    new MessageId(StockKey(line.ProductId)),
-                    GrainFactory.GetGrain<ICatalogItemGrain>(line.ProductId),
-                    new ReserveStock(OrderId, line.Units, this.GetGrainId()));
+                _outbox.Send(outgoing);
             }
 
-            SetStatus(OrderStatus.AwaitingValidation);
+            foreach (var line in order.Lines) _stock[line.ProductId] = StockLineStatus.Pending;
+            _order.Value = next;
         }
 
         context.Complete();
@@ -141,27 +161,35 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         var order = _order.Value!;
         if (order.Status is OrderStatus.AwaitingValidation)
         {
-            _stock[result.ProductId] = result.Confirmed ? StockLineStatus.Confirmed : StockLineStatus.Rejected;
             if (!result.Confirmed)
             {
-                ReleaseConfirmedStock();
                 var productName = order.Lines.First(line => line.ProductId == result.ProductId).ProductName;
-                SetStatus(OrderStatus.Cancelled, $"'{productName}' is out of stock.");
+                Cancel($"'{productName}' is out of stock.");
+                _stock[result.ProductId] = StockLineStatus.Rejected;
             }
-            else if (_stock.Values.All(status => status is StockLineStatus.Confirmed))
+            else if (_stock.All(line => line.Key == result.ProductId || line.Value is StockLineStatus.Confirmed))
             {
-                SetStatus(OrderStatus.StockConfirmed);
-                _outbox.Send(
-                    _messages.AuthorizePayment,
+                var next = NextStatus(OrderStatus.StockConfirmed);
+                var payment = _messages.AuthorizePayment.Create(
                     new MessageId(OrderKey.CreateChildKey("payment")),
-                    GrainFactory.GetGrain<IPaymentGrain>(OrderId),
+                    GrainFactory.GetGrain<IPaymentGrain>(OrderId).GetGrainId(),
                     new AuthorizePayment(order.Total, order.CardLast4, this.GetGrainId()));
+                var status = CreateStatus(next);
+                _outbox.Send(payment);
+                _outbox.Send(status);
+                _stock[result.ProductId] = StockLineStatus.Confirmed;
+                _order.Value = next;
+            }
+            else
+            {
+                _stock[result.ProductId] = StockLineStatus.Confirmed;
             }
         }
         else if (order.Status is OrderStatus.Cancelled && result.Confirmed)
         {
             // This confirmation arrived after cancellation.
-            Release(result.ProductId);
+            _outbox.Send(CreateRelease(result.ProductId));
+            _stock[result.ProductId] = StockLineStatus.Released;
         }
 
         context.Complete();
@@ -169,69 +197,77 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
 
     private void HandlePaymentResult(PaymentResult result, IInboxHandlerContext context)
     {
-        // Buyers cannot cancel once stock is confirmed, so the order awaits this result.
-        Debug.Assert(_order.Value!.Status is OrderStatus.StockConfirmed);
+        // Buyers cannot cancel once stock is confirmed, so only a confirmed order awaits this result. A redelivery after
+        // the deduplication window finds the order already past it.
+        if (_order.Value?.Status is not OrderStatus.StockConfirmed)
+        {
+            context.Complete();
+            return;
+        }
+
         if (result.Succeeded)
         {
-            foreach (var productId in _stock.Keys.ToArray())
+            var next = NextStatus(OrderStatus.Paid);
+            var products = _stock.Keys.ToArray();
+            var messages = products.Select(productId => _messages.CommitStock.Create(
+                new MessageId(StockKey(productId).CreateChildKey("commit")),
+                GrainFactory.GetGrain<ICatalogItemGrain>(productId).GetGrainId(),
+                new CommitStock(OrderId))).Append(CreateStatus(next)).ToArray();
+            foreach (var outgoing in messages)
             {
-                _stock[productId] = StockLineStatus.Committed;
-                _outbox.Send(
-                    _messages.CommitStock,
-                    new MessageId(StockKey(productId).CreateChildKey("commit")),
-                    GrainFactory.GetGrain<ICatalogItemGrain>(productId),
-                    new CommitStock(OrderId));
+                _outbox.Send(outgoing);
             }
 
-            SetStatus(OrderStatus.Paid);
+            foreach (var productId in products) _stock[productId] = StockLineStatus.Committed;
+            _order.Value = next;
         }
         else
         {
-            ReleaseConfirmedStock();
-            SetStatus(OrderStatus.Cancelled, result.Reason);
+            Cancel(result.Reason);
         }
 
         context.Complete();
     }
 
-    private void ReleaseConfirmedStock()
+    private void Cancel(string? description)
     {
-        foreach (var (productId, status) in _stock.ToArray())
+        var next = NextStatus(OrderStatus.Cancelled, description);
+        var products = _stock.Where(line => line.Value is StockLineStatus.Confirmed).Select(line => line.Key).ToArray();
+        var messages = products.Select(CreateRelease).Append(CreateStatus(next)).ToArray();
+        foreach (var outgoing in messages)
         {
-            if (status is StockLineStatus.Confirmed)
-            {
-                Release(productId);
-            }
+            _outbox.Send(outgoing);
         }
+
+        foreach (var productId in products) _stock[productId] = StockLineStatus.Released;
+        _order.Value = next;
     }
 
-    private void Release(int productId)
-    {
-        _stock[productId] = StockLineStatus.Released;
-        _outbox.Send(
-            _messages.ReleaseStock,
+    private OutboxMessage CreateRelease(int productId) =>
+        _messages.ReleaseStock.Create(
             new MessageId(StockKey(productId).CreateChildKey("release")),
-            GrainFactory.GetGrain<ICatalogItemGrain>(productId),
+            GrainFactory.GetGrain<ICatalogItemGrain>(productId).GetGrainId(),
             new ReleaseStock(OrderId));
+
+    private void SetStatus(OrderStatus status)
+    {
+        var next = NextStatus(status);
+        _outbox.Send(CreateStatus(next));
+        _order.Value = next;
     }
 
-    private void SetStatus(OrderStatus status, string? description = null)
+    private OrderState NextStatus(OrderStatus status, string? description = null)
     {
         var order = _order.Value!;
-        _order.Value = order with { Status = status, Version = order.Version + 1, Description = description };
-        PublishStatus();
+        return order with { Status = status, Version = order.Version + 1, Description = description };
     }
 
     // Delivery order is unspecified; the buyer keeps the summary with the highest version.
-    private void PublishStatus()
-    {
-        var order = _order.Value!;
-        _outbox.Send(
-            _messages.StatusChanged,
+    private OutboxMessage CreateStatus(OrderState order) =>
+        _messages.StatusChanged.Create(
             new MessageId(OrderKey.CreateChildKey("status").CreateChildKey(order.Version.ToString())),
-            GrainFactory.GetGrain<IBuyerGrain>(order.BuyerId),
+            GrainFactory.GetGrain<IBuyerGrain>(order.BuyerId).GetGrainId(),
             order.ToSummary());
-    }
 
     private HierarchicalKey StockKey(int productId) =>
         OrderKey.CreateChildKey("stock").CreateChildKey(productId.ToString());

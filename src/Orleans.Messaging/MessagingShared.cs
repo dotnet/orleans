@@ -25,7 +25,7 @@ internal sealed class MessagingShared
         TimeProvider = services.GetRequiredService<TimeProvider>();
         JobTimeProvider = services.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs);
         JobManager = services.GetRequiredService<ILocalDurableJobManager>();
-        GrainFactory = services.GetRequiredService<IGrainFactory>();
+        Transport = services.GetRequiredService<IOutboxTransport>();
         Instruments = services.GetRequiredService<MessagingInstruments>();
         var loggers = services.GetRequiredService<ILoggerFactory>();
         InboxLogger = loggers.CreateLogger<Inbox>();
@@ -48,7 +48,7 @@ internal sealed class MessagingShared
 
     public ILocalDurableJobManager JobManager { get; }
 
-    public IGrainFactory GrainFactory { get; }
+    public IOutboxTransport Transport { get; }
 
     public MessagingInstruments Instruments { get; }
 

@@ -62,6 +62,29 @@ public partial class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StagedChangeCount_AdvancesWhenStatesStageChangesAndNotWhenWritesCaptureThem()
+    {
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
+        var codec = CodecProvider.GetCodec<int>();
+        var dictionary = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(CodecProvider.GetCodec<string>(), codec, SessionPool));
+        var value = new DurableValue<int>("value1", manager, new OrleansBinaryDurableValueCommandCodec<int>(codec, SessionPool));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        var start = manager.StagedChangeCount;
+        Assert.True(start >= 0);
+
+        // A collection journals at mutation time; a value journals when a write captures it, so it counts at mutation.
+        dictionary.Add("key1", 1);
+        var afterDictionary = manager.StagedChangeCount;
+        Assert.True(afterDictionary > start);
+        value.Value = 7;
+        var afterValue = manager.StagedChangeCount;
+        Assert.True(afterValue > afterDictionary);
+
+        await manager.WriteStateAsync(CancellationToken.None);
+        Assert.Equal(afterValue, manager.StagedChangeCount);
+    }
+    [Fact]
     public async Task StateManager_Initialize_UsesStreamingStorageRead()
     {
         var storage = new StreamingOnlyStorage();

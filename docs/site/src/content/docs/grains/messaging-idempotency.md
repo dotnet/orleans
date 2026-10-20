@@ -51,13 +51,17 @@ command contract; the completion fact acknowledges the original execution.
 A handler stages its business changes and outgoing messages, then calls
 <xref:Orleans.Messaging.IInboxHandlerContext.Complete*>, which stages the inbox
 removal and completion record. One journal write persists them together, and replay
-restores the business effects and completion record together. This gives one local
-effect per command while the completion record is retained.
+restores the business effects and completion record together. Effects therefore
+apply once per message ID within the deduplication window. A handler can execute
+more than once for the same ID, for example after a failed attempt or activation
+loss, so its preparation must tolerate repetition.
 
 After the record expires, the same key can be admitted and handled again. Retain
 completion facts for the complete supported resubmission horizon, including outage
-recovery and operator replay delays. Configuration requires
-`OutboxRetryTimeout < DeduplicationWindow`; producer fleets coordinate their policies.
+recovery and operator replay delays. The outbox starts no delivery attempt later than
+`OutboxRetryTimeout` after the send or the last `Backpressured` answer, and
+configuration requires `OutboxRetryTimeout < DeduplicationWindow`, so outbox
+redeliveries stay within the window. Producer fleets configure both values uniformly.
 Permanent idempotency requires permanent or appropriately retained completion facts
 and an explicit storage budget. Application result-query retention serves the
 business's query and audit needs.
@@ -200,6 +204,7 @@ and recovery path across independently committed grain journals.
 | Replace a projection with a complete snapshot | Apply only a newer domain version; complete older snapshots as superseded. |
 | Apply every incremental event | Persist the expected sequence and buffer gaps before applying contiguous events. |
 | Intentionally reprocess with corrected logic | Authorize a new revision key and record its relationship to the original outcome. |
+| Replay an inbox dead letter | Reconcile effects keyed by the original ID, then resubmit under a new revision key, such as a child of the original; the original ID answers `Duplicate` within the deduplication window. |
 
 Message identity recognizes completed commands; a domain version or sequence
 establishes order. The

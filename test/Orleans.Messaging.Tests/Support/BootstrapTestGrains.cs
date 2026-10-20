@@ -297,7 +297,6 @@ public sealed class BootstrapClusterFixture : MessagingClusterFixture
         services.AddKeyedSingleton<PlacementStrategy>(OrdinaryPlacementAlias, new RandomPlacement());
         services.AddSingleton(Probe);
         services.AddSingleton(Delivery);
-        services.AddSingleton<ILoggerProvider>(Delivery);
         services.AddSingleton<IOutgoingGrainCallFilter>(Delivery);
         services.AddScoped<BootstrapObservation>();
         services.AddScoped<BootstrapState>();

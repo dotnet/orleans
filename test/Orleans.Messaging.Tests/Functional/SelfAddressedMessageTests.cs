@@ -299,7 +299,7 @@ public sealed class SelfAddressedMessageTests() : MessagingBehaviorTestBase(new 
             {
                 Kind = OutboxCommandKind.Enqueue,
                 Message = message,
-                State = new()
+                State = new() { ExpirationTime = DateTimeOffset.MaxValue }
             });
             ((IStateMachine)outbox).OnRecoveryCompleted();
         }));

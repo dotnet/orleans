@@ -140,6 +140,31 @@ public partial class StateManagerTests
         Assert.Empty(snapshot ? storage.Appends : storage.Replaces);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Preparation_RunsForEveryStateIncludingThoseWithoutPendingChanges(bool snapshot)
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = snapshot };
+        await using var manager = CreateTestSystem(storage).Manager;
+        var changed = new PreparingValue("changed", manager, CreateValueCodec<int>());
+        var clean = new PreparingValue("clean", manager, CreateValueCodec<int>());
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        changed["intent"] = 5;
+
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, clean.PrepareCalls);
+
+        // A state without pending changes can still veto a write whose other pending changes must not commit.
+        var veto = new InvalidOperationException("The pending changes are abandoned.");
+        clean.Preparation = _ => ValueTask.FromException(veto);
+        changed["intent"] = 6;
+        var caught = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() =>
+            manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.Same(veto, caught.InnerException);
+        Assert.Equal(5, changed.CapturedValue);
+        Assert.Single(snapshot ? storage.Replaces : storage.Appends);
+    }
     [Fact]
     public async Task Preparation_CallerCancellationLeavesOwnedPreparationAndWriteRunning()
     {

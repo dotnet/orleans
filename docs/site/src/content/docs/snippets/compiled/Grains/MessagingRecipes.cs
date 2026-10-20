@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.DurableJobs;
 using Orleans.Messaging;
 using Orleans.Journaling;
 using Orleans.Runtime;
@@ -194,12 +195,13 @@ public sealed class PaymentGrain(
     private async ValueTask HandleChargeAsync(
         ChargePayment request, IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Amount);
-        ArgumentException.ThrowIfNullOrWhiteSpace(request.Currency);
-        if (request.ResponseDestination.IsDefault)
+        if (Validate(request) is { } invalid)
         {
-            throw new ArgumentException("A payment requires a response destination.");
+            // An immutable command which can never become valid is dead-lettered once, without a provider call.
+            context.Fail(invalid);
+            return;
         }
+
         cancellationToken.ThrowIfCancellationRequested();
         var commandId = context.Message.Envelope.MessageId;
         var outcome = await gateway.ChargeAsync(commandId.ToString(), request, cancellationToken);
@@ -214,6 +216,14 @@ public sealed class PaymentGrain(
         results[commandId] = outcome;
         context.Complete();
     }
+
+    private static string? Validate(ChargePayment request) => request switch
+    {
+        { Amount: <= 0 } => "A payment amount must be positive.",
+        { Currency: var currency } when string.IsNullOrWhiteSpace(currency) => "A payment requires a currency.",
+        { ResponseDestination.IsDefault: true } => "A payment requires a response destination.",
+        _ => null
+    };
 }
 // </messaging_payment>
 
@@ -245,13 +255,19 @@ public sealed class StockProjectionGrain(
 
     private void HandleSnapshot(StockSnapshot update, IInboxHandlerContext context)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(update.Version);
-        ArgumentOutOfRangeException.ThrowIfNegative(update.Available);
+        if (update.Version <= 0 || update.Available < 0)
+        {
+            context.Fail("A snapshot requires a positive version and nonnegative stock.");
+            return;
+        }
+
         var current = snapshot.Value;
         if (current is not null && update.Version == current.Version && update != current)
         {
-            throw new ArgumentException("A snapshot version must retain its original value.");
+            context.Fail("A snapshot version must retain its original value.");
+            return;
         }
+
         if (current is null || update.Version > current.Version)
         {
             snapshot.Value = update;
@@ -379,6 +395,7 @@ public sealed class CheckoutGrain(
     IDurableStateManager state,
     Messages messages,
     [FromKeyedServices("checkout-status")] IDurableValue<CheckoutStatus> status,
+    [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider jobClock,
     IGrainContext grainContext) : Grain(grainContext), ICheckoutGrain
 {
     public static readonly TimeSpan GracePeriod = TimeSpan.FromMinutes(1);
@@ -408,7 +425,7 @@ public sealed class CheckoutGrain(
         {
             var timerId = context.Message.Envelope.MessageId.Key.CreateChildKey("grace-period");
             outbox.Send(messages.GracePeriodElapsed, new MessageId(timerId), this,
-                new GracePeriodElapsed(), DateTimeOffset.UtcNow + GracePeriod);
+                new GracePeriodElapsed(), jobClock.GetUtcNow() + GracePeriod);
             status.Value = CheckoutStatus.Submitted;
         }
         context.Complete();

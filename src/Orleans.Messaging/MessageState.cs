@@ -35,7 +35,11 @@ internal sealed class OutboxMessageState
     [Id(2)]
     public string? LastError { get; set; }
 
-    /// <summary>Gets or sets when the outbox stops retrying and dead-letters the message; a backpressured attempt clears it.</summary>
+    /// <summary>
+    /// Gets or sets when the outbox stops attempting the message and dead-letters it, on the Durable Jobs clock:
+    /// <c>OutboxRetryTimeout</c> after the send, or after the start of the latest attempt which the receiver answered with
+    /// <see cref="DeliveryStatus.Backpressured"/>.
+    /// </summary>
     [Id(3)]
     public DateTimeOffset? ExpirationTime { get; set; }
 }

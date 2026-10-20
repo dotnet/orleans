@@ -75,7 +75,12 @@ public sealed class NotificationGrain(
 
     private void HandleNotification(Notify message, IInboxHandlerContext context)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(message.Text);
+        if (string.IsNullOrWhiteSpace(message.Text))
+        {
+            context.Fail("A notification requires text.");
+            return;
+        }
+
         var nextCount = checked(count.Value + 1);
         if (message.ResponseDestination is { } recipient)
         {
@@ -130,15 +135,12 @@ public interface INotificationSenderGrain : IGrainWithStringKey, IMessagingGrain
 public sealed class NotificationSenderGrain(
     IOutbox outbox,
     IDurableStateManager stateManager,
-    Messages messages,
-    [FromKeyedServices("sent-count")] IDurableValue<int> sentCount) : Grain, INotificationSenderGrain
+    Messages messages) : Grain, INotificationSenderGrain
 {
     public async Task SendAsync(MessageId commandId, GrainId receiver, string message)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        var nextCount = checked(sentCount.Value + 1);
         outbox.Send(messages.Notify, commandId, receiver, new Notify(message));
-        sentCount.Value = nextCount;
         await stateManager.WriteStateAsync();
     }
 }

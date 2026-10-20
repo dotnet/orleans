@@ -42,7 +42,7 @@ public readonly struct Envelope
     /// </para>
     /// <para>
     /// The time is part of the command: reusing a pending message ID with a different value is a conflicting command.
-    /// A message with a value does not count toward the inbox <c>MaxCapacity</c>, including after it becomes due.
+    /// The message counts toward the inbox <c>MaxCapacity</c> from its acceptance until it completes.
     /// </para>
     /// </remarks>
     [Id(4)]

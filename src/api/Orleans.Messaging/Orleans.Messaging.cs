@@ -222,6 +222,7 @@ namespace Orleans.Messaging
     public partial interface IMessagingExtension : Runtime.IGrainExtension, Runtime.IAddressable
     {
         [Alias("DeliverAsync")]
+        [Concurrency.AlwaysInterleave]
         System.Threading.Tasks.ValueTask<DeliveryResult> DeliverAsync(InboxMessage message, System.Threading.CancellationToken cancellationToken = default);
     }
 
@@ -253,6 +254,7 @@ namespace Orleans.Messaging
         IOutbox Register(IOutboxMessageSource source);
         void Send(MessageId messageId);
         void Send(OutboxMessage message);
+        bool Withdraw(MessageId messageId);
     }
 
     public partial interface IOutboxMessageSource
@@ -383,8 +385,6 @@ namespace Orleans.Messaging.Configuration
         public System.TimeSpan DeadLetterRetentionPeriod { get { throw null; } set { } }
 
         public System.TimeSpan DeduplicationWindow { get { throw null; } set { } }
-
-        public Polly.ResiliencePipeline DeliveryResiliencePipeline { get { throw null; } set { } }
 
         public int InboxBatchSize { get { throw null; } set { } }
 

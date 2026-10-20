@@ -64,6 +64,24 @@ public interface IOutbox
     /// </exception>
     void Send(MessageId messageId);
 
+    /// <summary>
+    /// Synchronously stages, for the grain's next journal write, the removal of a pending message which a registered
+    /// <see cref="IOutboxMessageSource"/> provides.
+    /// </summary>
+    /// <param name="messageId">The ID of a message sent through <see cref="Send(MessageId)"/>.</param>
+    /// <returns>
+    /// <see langword="true"/> when the outbox staged the removal; <see langword="false"/> when no such message is pending.
+    /// </returns>
+    /// <remarks>
+    /// Stage the source's release of the payload in the same journal write. The outbox makes no further delivery attempt
+    /// and doesn't call <see cref="IOutboxMessageSource.OnRetired"/>. An attempt already in flight can still deliver the
+    /// message.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The ID is pending as an ordinary message, or the outbox is unavailable.
+    /// </exception>
+    bool Withdraw(MessageId messageId);
+
     /// <summary>Registers a source which provides messages sent through <see cref="Send(MessageId)"/>.</summary>
     /// <param name="source">The source.</param>
     /// <returns>This outbox.</returns>

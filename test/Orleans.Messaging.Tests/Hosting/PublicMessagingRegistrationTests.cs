@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Orleans.DurableJobs;
 using NSubstitute;
 using Orleans.Hosting;
 using Orleans.Journaling;
@@ -92,6 +93,34 @@ public sealed class PublicMessagingRegistrationTests
         Assert.Equal(format, provider.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value.JournalFormatKey);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(5)]
+    [InlineData(50)]
+    public void AddMessaging_RetriesThePumpJobIndefinitelyOnTheDurableJobsClockAndKeepsOtherJobsPolicy(int dequeueCount)
+    {
+        var clock = new ManualJobClock(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var services = new ServiceCollection();
+        services.AddMessaging(options => options.RetryInitialInterval = TimeSpan.FromSeconds(2));
+        services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs, clock);
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<DurableJobsOptions>>().Value;
+        var error = new IOException("The journal is unavailable.");
+
+        var retryAt = options.ShouldRetry(new RunContext(MessagingPump.JobName, dequeueCount), error);
+
+        var multiplier = 1L << Math.Min(dequeueCount - 1, DurableMessagingOptions.MaximumBackoffExponent);
+        Assert.Equal(clock.GetUtcNow() + TimeSpan.FromSeconds(2 * multiplier), retryAt);
+        var defaultPolicy = new DurableJobsOptions().ShouldRetry(new RunContext("other", dequeueCount), error);
+        Assert.Equal(defaultPolicy is null, options.ShouldRetry(new RunContext("other", dequeueCount), error) is null);
+    }
+
+    private sealed class RunContext(string name, int dequeueCount) : IJobRunContext
+    {
+        public DurableJob Job { get; } = new() { Id = "job", Name = name, ShardId = "shard", TargetGrainId = GrainId.Create("test", "1"), DueTime = DateTimeOffset.UnixEpoch };
+        public string RunId => "run";
+        public int DequeueCount => dequeueCount;
+    }
     [Fact]
     public void AddMessaging_InvalidOptionsFailThroughOptionsContract()
     {
@@ -105,18 +134,6 @@ public sealed class PublicMessagingRegistrationTests
         Assert.Contains("DurableMessagingOptions validation failed", exception.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void AddMessaging_NullDeliveryResiliencePipelineFailsThroughOptionsContract()
-    {
-        var services = new ServiceCollection();
-        services.AddMessaging(options => options.DeliveryResiliencePipeline = null!);
-        using var provider = services.BuildServiceProvider();
-
-        var exception = Assert.Throws<OptionsValidationException>(
-            () => provider.GetRequiredService<IOptions<DurableMessagingOptions>>().Value);
-
-        Assert.Contains("DurableMessagingOptions validation failed", exception.Message, StringComparison.Ordinal);
-    }
 
     [Fact]
     public async Task AddMessaging_BindsInboxContractToDeliveredInboxOverEarlierRegistration()

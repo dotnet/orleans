@@ -313,11 +313,12 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
 
         await sender.StageFromSourceAsync(receiver.GetGrainId(), messageId, NewPayload(), write: false);
         await sender.WithdrawAsync(messageId);
-        Assert.Equal(1, await sender.GetOutboxCountAsync());
+        Assert.Equal(0, await sender.GetOutboxCountAsync());
+        Assert.False(await OnGrainAsync(sender, context => Outbox(context).Withdraw(messageId)));
         await sender.WriteAsync();
 
-        // The removal commits in its own write, after the write which staged the entry.
-        await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Writes(sender).Length == 2);
+        // The withdrawal and the source's release commit in the write which stages them.
+        await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Writes(sender).Length == 1);
         var state = await OnGrainAsync(sender, context => Grain(context).GetState());
         Assert.Empty(state.Outgoing);
         Assert.Empty(state.Retired);
@@ -327,34 +328,6 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.True(Cluster.TryGetGrainContext(sender.GetGrainId(), out var senderContext));
         await sender.DeactivateAsync();
         await senderContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Token);
-        Assert.Equal(0, await sender.GetOutboxCountAsync());
-    }
-
-    [Fact]
-    public async Task SourceMessages_WithdrawnBeyondTheBatchSize_AreRemovedOneBatchPerWrite()
-    {
-        var sender = NewGrain();
-        var receiver = NewGrain();
-        Assert.Equal(0, await sender.GetOutboxCountAsync());
-        var batchSize = await OnGrainAsync(
-            sender,
-            context => context.ActivationServices.GetRequiredService<IOptions<DurableMessagingOptions>>().Value.OutboxBatchSize);
-        var messageIds = Enumerable.Range(0, 2 * batchSize + 3).Select(_ => NewMessageId("withdrawn")).ToArray();
-        foreach (var messageId in messageIds)
-        {
-            await sender.StageFromSourceAsync(receiver.GetGrainId(), messageId, NewPayload(), write: false);
-            await sender.WithdrawAsync(messageId);
-        }
-
-        await sender.WriteAsync();
-
-        // Each removal write removes at most one batch of entries, and later passes remove the rest.
-        await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Writes(sender).Length == 4);
-        var removals = Writes(sender)[1..]
-            .Select(write => messageIds.Count(messageId => write.AsSpan().IndexOf(Encoding.UTF8.GetBytes(messageId.ToString())) >= 0))
-            .ToArray();
-        Assert.Equal(new[] { batchSize, batchSize, 3 }, removals);
-        Assert.Equal(0, Probe.For(receiver).SinkOffers);
         Assert.Equal(0, await sender.GetOutboxCountAsync());
     }
 
@@ -390,19 +363,21 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         var received = (await OnGrainAsync(receiver, context => Grain(context).GetState())).Received;
         Assert.Equal(new[] { first.ToString(), second.ToString() }.Order(), received.Keys.Order());
         AssertSourceFailureDeadLetter(Assert.Single(deadLetters), failing, fault);
+        Assert.Equal(fixture.Clock.GetUtcNow(), Assert.Single(deadLetters).DeadLetteredAt);
         Assert.Equal(
             Assert.Single(deadLetters).Reason,
             Assert.Single(await OnGrainAsync(sender, context => Grain(context).GetRetirementReasons())).Value);
 
-        // The dead letter and its retirement commit in one write, before the write which retires the delivered siblings.
+        // The dead letter and its retirement commit in one write, before the writes which retire the delivered siblings
+        // as their attempts complete.
         var writes = Writes(sender);
-        Assert.Equal(3, writes.Length);
+        Assert.InRange(writes.Length, 3, 4);
         var deadLettered = Encoding.UTF8.GetBytes(nameof(OutboxMessageRetirementStatus.DeadLettered));
         var delivered = Encoding.UTF8.GetBytes(nameof(OutboxMessageRetirementStatus.Delivered));
         Assert.True(writes[1].AsSpan().IndexOf(deadLettered) >= 0);
         Assert.True(writes[1].AsSpan().IndexOf(delivered) < 0);
-        Assert.True(writes[2].AsSpan().IndexOf(deadLettered) < 0);
-        Assert.True(writes[2].AsSpan().IndexOf(delivered) >= 0);
+        Assert.All(writes[2..], write => Assert.True(write.AsSpan().IndexOf(deadLettered) < 0));
+        Assert.All(writes[2..], write => Assert.True(write.AsSpan().IndexOf(delivered) >= 0));
 
         var grainType = sender.GetGrainId().Type.ToString();
         var outcomes = metrics.Read("outbox-messages-delivered");
@@ -427,6 +402,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         var recovered = await OnGrainAsync(sender, context =>
             context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters);
         AssertSourceFailureDeadLetter(Assert.Single(recovered), failing, fault);
+        Assert.Equal(fixture.Clock.GetUtcNow(), Assert.Single(recovered).DeadLetteredAt);
         Assert.Equal(2, Probe.For(sender).Activations);
         Assert.Equal(8, Probe.For(sender).Materializations);
     }
@@ -536,7 +512,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     }
 
     [Fact]
-    public async Task RecoveredReferenceEntry_IsWithdrawnWhenNoSourceProvidesItAndFailsWithoutSources()
+    public async Task RecoveredReferenceEntry_IsDeadLetteredWhenNoSourceProvidesItAndFailsWithoutSources()
     {
         var grain = NewGrain();
         var withoutSources = Cluster.Client.GetGrain<INoHandlerGrain>(Guid.NewGuid());
@@ -555,8 +531,14 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
             pump.Signal();
             return true;
         });
+        // Withdrawal is explicit, so an entry which no source provides is lost data: it is dead-lettered with no owner to
+        // notify.
         await WaitUntilAsync(grain, context => Outbox(context).Count == 0);
         Assert.Empty((await OnGrainAsync(grain, context => Grain(context).GetState())).Retired);
+        var letter = Assert.Single(await OnGrainAsync(grain, context =>
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters));
+        Assert.Equal(unprovided, letter.Message.Envelope.MessageId);
+        Assert.Equal("No registered outbox message source provides the message.", letter.Reason);
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => OnGrainAsync(withoutSources, context =>
         {
@@ -573,7 +555,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         {
             Kind = OutboxCommandKind.Enqueue,
             Reference = new() { MessageId = messageId },
-            State = new()
+            State = new() { ExpirationTime = DateTimeOffset.MaxValue }
         });
 
     private static void AssertSourceFailureDeadLetter(DeadLetter<OutboxMessage> letter, MessageId messageId, SourceFault fault)
@@ -668,6 +650,12 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(message, Token)).Status);
         Assert.Equal(2, Probe.For(receiver).SinkOffers);
         Assert.Equal(1, Probe.For(receiver).SinkAcceptances);
+
+        // The new completion replaces the old rejection, so a lost-answer retry learns that the message was processed.
+        Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(message, Token)).Status);
+        await receiver.DeactivateAsync();
+        Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(message, Token)).Status);
+        Assert.Equal(2, Probe.For(receiver).SinkOffers);
 
         static void AssertRejected(DeliveryResult duplicate)
         {
@@ -978,6 +966,7 @@ public abstract class MessageSourceAndSinkFixture(string journalFormatKey) : IAs
             });
             silo.Services.AddSingleton<IJournalStorageCatalog>(
                 services => (IJournalStorageCatalog)services.GetRequiredService<IJournalStorageProvider>());
+            silo.Services.UseDocumentationPaymentGrain();
         });
         Cluster = builder.Build();
         await Cluster.DeployAsync(TestContext.Current.CancellationToken);
@@ -1147,6 +1136,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
     {
         Assert.True(_outgoing.Remove(messageId.ToString()));
         Assert.True(_receivers.Remove(messageId.ToString()));
+        Assert.True(_outbox.Withdraw(messageId));
         return Task.CompletedTask;
     }
 

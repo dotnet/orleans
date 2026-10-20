@@ -1,5 +1,6 @@
 using Documentation.Grains.Messaging;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.Journaling;
 using Orleans.Messaging.Tests.Support;
@@ -342,6 +343,31 @@ public sealed class MessagingRecipeTests : IDisposable
     }
 
     [Theory]
+    [InlineData(0d, "USD", true, "A payment amount must be positive.")]
+    [InlineData(-1d, "USD", true, "A payment amount must be positive.")]
+    [InlineData(12.5d, " ", true, "A payment requires a currency.")]
+    [InlineData(12.5d, "USD", false, "A payment requires a response destination.")]
+    public async Task Payment_InvalidCommandDeadLettersWithoutProviderCallOrResult(
+        double amount, string currency, bool hasDestination, string reason)
+    {
+        var results = new TestDictionary<MessageId, PaymentResult>();
+        var gateway = Substitute.For<IIdempotentPaymentGateway>();
+        var (_, handler) = await RegisterAsync(inbox => new PaymentGrain(inbox, _outbox, _messages, gateway, results));
+        var attempt = CreateContext(new ChargePayment((decimal)amount, currency, hasDestination ? Sender : default), Command);
+
+        var handling = handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+
+        Assert.True(handling.IsCompletedSuccessfully);
+        await handling;
+        Assert.Empty(results);
+        Assert.Empty(attempt.Output);
+        Assert.Equal(new[] { "dead-letter" }, attempt.Events);
+        attempt.Context.Received(1).Fail(reason);
+        attempt.Context.DidNotReceive().Complete();
+        _ = gateway.DidNotReceiveWithAnyArgs().ChargeAsync(default!, default!, TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
     [InlineData(9, 99, 10, 7)]
     [InlineData(10, 7, 10, 7)]
     [InlineData(12, 4, 12, 4)]
@@ -362,17 +388,40 @@ public sealed class MessagingRecipeTests : IDisposable
     }
 
     [Fact]
-    public async Task Projection_ConflictingVersionPreservesOriginalSnapshot()
+    public async Task Projection_ConflictingVersionDeadLettersAndPreservesOriginalSnapshot()
     {
         var snapshot = new TestValue<StockSnapshot> { Value = new StockSnapshot(10, 7) };
         var (_, handler) = await RegisterAsync(inbox => new StockProjectionGrain(inbox, _messages, snapshot));
         var attempt = CreateContext(new StockSnapshot(10, 99), Command);
 
-        await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
+        var handling = handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
 
+        Assert.True(handling.IsCompletedSuccessfully);
+        await handling;
         Assert.Equal(new StockSnapshot(10, 7), snapshot.Value);
-        Assert.Empty(attempt.Events);
+        Assert.Equal(new[] { "dead-letter" }, attempt.Events);
+        attempt.Context.Received(1).Fail("A snapshot version must retain its original value.");
+        attempt.Context.DidNotReceive().Complete();
+    }
+
+    [Theory]
+    [InlineData(0, 7)]
+    [InlineData(-1, 7)]
+    [InlineData(11, -1)]
+    public async Task Projection_InvalidSnapshotDeadLettersWithoutChangingProjection(long version, int available)
+    {
+        var snapshot = new TestValue<StockSnapshot> { Value = new StockSnapshot(10, 7) };
+        var (_, handler) = await RegisterAsync(inbox => new StockProjectionGrain(inbox, _messages, snapshot));
+        var attempt = CreateContext(new StockSnapshot(version, available), Command);
+
+        var handling = handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+
+        Assert.True(handling.IsCompletedSuccessfully);
+        await handling;
+        Assert.Equal(new StockSnapshot(10, 7), snapshot.Value);
+        Assert.Equal(new[] { "dead-letter" }, attempt.Events);
+        attempt.Context.Received(1).Fail("A snapshot requires a positive version and nonnegative stock.");
+        attempt.Context.DidNotReceive().Complete();
     }
 
     [Fact]
@@ -417,12 +466,14 @@ public sealed class MessagingRecipeTests : IDisposable
         var outputs = new List<OutboxMessage>();
         outbox.When(value => value.Send(Arg.Any<OutboxMessage>())).Do(call => outputs.Add(call.Arg<OutboxMessage>()));
         var inbox = new TestInbox();
-        var grain = new CheckoutGrain(inbox, outbox, state, _messages, status, grainContext);
+        var jobClock = new FakeTimeProvider(DateTimeOffset.Parse("2026-10-19T12:00:00Z"));
+        var grain = new CheckoutGrain(inbox, outbox, state, _messages, status, jobClock, grainContext);
         await grain.OnActivateAsync(TestContext.Current.CancellationToken);
-        var before = DateTimeOffset.UtcNow;
+        var submittedAt = jobClock.GetUtcNow();
 
         var submit = CreateContext(new SubmitCheckout(12.5m), Command);
         await inbox.HandleAsync(submit.Context, TestContext.Current.CancellationToken);
+        jobClock.Advance(TimeSpan.FromSeconds(5));
         await inbox.HandleAsync(CreateContext(new SubmitCheckout(12.5m), Command).Context, TestContext.Current.CancellationToken);
 
         Assert.Equal(CheckoutStatus.Submitted, await grain.GetStatusAsync());
@@ -431,7 +482,7 @@ public sealed class MessagingRecipeTests : IDisposable
         Assert.Equal(Receiver, scheduled.ReceiverId);
         Assert.Equal(new MessageId(Command.Key.CreateChildKey("grace-period")), scheduled.Envelope.MessageId);
         Assert.Equal("checkout.grace-period-elapsed.v1", scheduled.Envelope.Subject);
-        Assert.InRange(scheduled.Envelope.DeliverAt!.Value, before + CheckoutGrain.GracePeriod, DateTimeOffset.UtcNow + CheckoutGrain.GracePeriod);
+        Assert.Equal(submittedAt + CheckoutGrain.GracePeriod, scheduled.Envelope.DeliverAt);
 
         var elapsed = CreateContext(new GracePeriodElapsed(), scheduled.Envelope.MessageId);
         await inbox.HandleAsync(elapsed.Context, TestContext.Current.CancellationToken);
@@ -445,7 +496,7 @@ public sealed class MessagingRecipeTests : IDisposable
         var status = new TestValue<CheckoutStatus> { Value = CheckoutStatus.Submitted };
         var state = Substitute.For<IDurableStateManager>();
         var inbox = new TestInbox();
-        var grain = new CheckoutGrain(inbox, Substitute.For<IOutbox>(), state, _messages, status, Substitute.For<IGrainContext>());
+        var grain = new CheckoutGrain(inbox, Substitute.For<IOutbox>(), state, _messages, status, new FakeTimeProvider(), Substitute.For<IGrainContext>());
         await grain.OnActivateAsync(TestContext.Current.CancellationToken);
 
         await grain.CancelAsync();
@@ -534,16 +585,13 @@ public sealed class MessagingRecipeTests : IDisposable
     }
 
     [Fact]
-    public async Task Campaign_InvalidLaterCommandPreservesEarlierStagedIntent()
+    public async Task Campaign_InvalidLaterCommandStagesNoIntent()
     {
         var campaigns = new TestDictionary<Guid, NotificationCampaign>();
         var outbox = Substitute.For<IOutbox>();
         var state = Substitute.For<IDurableStateManager>();
         var context = Substitute.For<IGrainContext>();
         var grain = new CampaignGrain(outbox, state, campaigns, _messages, context);
-        var output = new List<OutboxMessage>();
-        outbox.When(value => value.Send(Arg.Any<OutboxMessage>())).Do(call =>
-            output.Add(call.Arg<OutboxMessage>()));
         var id = Guid.NewGuid();
         GrainId[] recipients =
         [
@@ -555,12 +603,7 @@ public sealed class MessagingRecipeTests : IDisposable
             grain.PublishAsync(id, "campaign text", recipients));
 
         Assert.Empty(campaigns);
-        var earlier = Assert.Single(output);
-        Assert.Equal(recipients[0], earlier.ReceiverId);
-        Assert.Equal(new MessageId(HierarchicalKey.Create("campaigns", id.ToString("N")).CreateChildKey(recipients[0].ToString())),
-            earlier.Envelope.MessageId);
-        Assert.Equal(new Notify("campaign text"), ReadBody<Notify>(earlier));
-        outbox.Received(1).Send(Arg.Any<OutboxMessage>());
+        outbox.DidNotReceive().Send(Arg.Any<OutboxMessage>());
         await state.DidNotReceive().WriteStateAsync(Arg.Any<CancellationToken>());
     }
 

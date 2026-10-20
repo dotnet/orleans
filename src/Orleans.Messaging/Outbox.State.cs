@@ -70,6 +70,7 @@ internal sealed partial class Outbox
         {
             case OutboxCommandKind.Enqueue:
                 var state = command.State ?? throw new InvalidOperationException("An enqueue command requires its delivery state.");
+                if (state.ExpirationTime is null) throw new InvalidOperationException("An enqueue command requires its retry expiration time.");
                 var entry = new OutboxEntry { Message = command.Message, Reference = command.Reference, State = state, Sequence = ++_lastSequence };
                 _messages.Add(entry.MessageId, entry);
                 ReportDepth(1);
@@ -78,10 +79,6 @@ internal sealed partial class Outbox
                 if (command.State is { } retry) _messages[command.MessageId].State = retry;
                 else if (_messages.Remove(command.MessageId)) ReportDepth(-1);
                 if (command.DeadLetter is { } letter) _deadLetters[command.MessageId] = letter;
-                if (command.RemovedDeadLetters is { } removed)
-                {
-                    foreach (var key in removed) _deadLetters.Remove(key);
-                }
                 break;
             case OutboxCommandKind.RemoveDeadLetters:
                 foreach (var key in command.RemovedDeadLetters!) _deadLetters.Remove(key);
@@ -165,7 +162,10 @@ internal sealed class OutboxEntry
     [field: NonSerialized]
     [JsonIgnore] public long Sequence { get; init; }
 
-    /// <summary>Gets the source which owns a reference entry's message, resolved when it is sent or first materialized after recovery.</summary>
+    /// <summary>
+    /// Gets the source which owns a reference entry's message, resolved when it is sent or first materialized after
+    /// recovery; <see langword="null"/> for an ordinary entry or a recovered reference which no source provides.
+    /// </summary>
     [field: NonSerialized]
     [JsonIgnore] public IOutboxMessageSource? Source { get; set; }
 

@@ -115,8 +115,9 @@ supported polymorphism in the serialization contract.
 ID, a destination, and a body. The destination is a <xref:Orleans.Runtime.GrainId>
 or an <xref:Orleans.Runtime.IAddressable> grain reference. The helper encodes the
 body and stages the outgoing message. Serialization completes before staging, so a
-serialization error leaves the outbox unchanged. A batch overload stages several
-messages in order; when one fails, the messages before it remain staged.
+serialization error leaves the outbox unchanged. A batch overload encodes every
+message before staging any, so an encoding failure stages nothing, then stages the
+messages in order.
 
 <xref:Orleans.Messaging.OutboxExtensions.SendReply*> takes a binding, the handler
 context, a destination, and a result body. It derives the reply ID by appending the
@@ -175,11 +176,14 @@ Set <xref:Orleans.Messaging.Envelope.DeliverAt> to hold a message in the receivi
 inbox until a time on the Durable Jobs clock. The single-message typed
 <xref:Orleans.Messaging.OutboxExtensions.Send*> helpers and
 <xref:Orleans.Messaging.MessageType`1.Create*> accept an optional `deliverAt`
-argument. The outbox delivers the message immediately; the receiver accepts, deduplicates, and
-journals it, and its handler runs once the message is due. A grain that schedules a
-message for itself commits its acceptance in the sending journal write. Scheduled messages stay
-in the receiver's journal and snapshots until they are processed, and don't count
-toward `MaxCapacity`.
+argument. Compute `deliverAt` from the Durable Jobs clock, which a grain injects as
+the keyed <xref:System.TimeProvider> service named
+`DurableJobTimeProviderNames.DurableJobs`. The outbox delivers the message
+immediately; the receiver accepts, deduplicates, and journals it, and its handler
+runs once the message is due. A grain that schedules a message for itself commits
+its acceptance in the sending journal write. Scheduled messages stay in the
+receiver's journal and snapshots until they are processed, and count toward
+`MaxCapacity` from their acceptance until they complete.
 
 ### Keep payloads in application state
 
@@ -194,48 +198,60 @@ source or an inbox sink keeps that state as the only journaled copy:
   materializes the message with
   <xref:Orleans.Messaging.IOutboxMessageSource.TryGetMessage*> to validate the send and
   before each delivery attempt; the source returns the same message while it provides
-  it. A source withdraws a pending message, for example one the application timed out,
-  by returning `false`: the outbox removes the entry before its next attempt without
-  delivering it, and an attempt already in flight completes. When
-  the message retires, the outbox calls
-  <xref:Orleans.Messaging.IOutboxMessageSource.OnRetired*> while it stages the
-  removal, so the source's release commits in the same journal write. The
-  <xref:Orleans.Messaging.OutboxMessageRetirement>'s status is `Delivered` when the
-  receiver durably accepted the message, `Rejected` when the receiver dead-lettered it,
-  and `DeadLettered` when the outbox dead-lettered it, and its reason is the dead
-  letter's reason, such as the rejection which the receiver reported. A `Rejected`
-  retirement also carries the application-defined code which the receiver's sink
-  reported, if any.
-  An outbox dead letter receives its own copy of the materialized message first, so the
-  source can release its payload when the message retires. After the send, a
-  source that throws or returns an invalid message, for example because its stored
-  payload no longer decodes, dead-letters only that entry and retires it as
-  `DeadLettered` in the same journal write; the grain keeps processing its other
-  messages. Because no valid message exists, that dead letter carries only the message
-  ID, with an empty payload and a default receiver, and its reason records the
-  failure. During `Send`, the same failures propagate to the caller and nothing is
-  staged. Sending a pending ID
-  again coalesces; an ID pending as an ordinary message throws
-  <xref:System.InvalidOperationException>. A source-provided message can't be addressed
-  to the sending grain.
+  it, and returns `false` for a message that isn't its own. The first source that
+  returns the message owns it.
+  - **Withdraw.** <xref:Orleans.Messaging.IOutbox.Withdraw*> removes a pending message,
+    for example one the application timed out. Stage it in the same journal write in
+    which the source releases its payload. The outbox makes no further attempt and
+    doesn't call `OnRetired`; an attempt already in flight can still deliver the
+    message.
+  - **Retire.** When the message retires, the outbox calls
+    <xref:Orleans.Messaging.IOutboxMessageSource.OnRetired*> while it stages the
+    removal, so the source's release commits in the same journal write. The
+    <xref:Orleans.Messaging.OutboxMessageRetirement> struct carries a `Status`, a
+    `Reason`, and a `Code`. Its status is `Delivered` when the receiver accepted the
+    message or reported it as a duplicate, `Rejected` when the receiver dead-lettered
+    it, and `DeadLettered` when the outbox dead-lettered it after its retry timeout or
+    a source failure. `Reason` is the dead letter's reason, and `Code` is the
+    application-defined code that the receiver reported with a rejection. An outbox
+    dead letter receives its own copy of the materialized message first, so the
+    source can release its payload in `OnRetired`.
+  - **Fail.** After the send, when the owning source throws, returns an invalid
+    message, or returns `false` for its message, the outbox dead-letters only that
+    entry and retires it as `DeadLettered` in the same journal write; the grain keeps
+    processing its other messages. That dead letter carries only the message ID, with
+    an empty payload and a default receiver, and its reason records the failure. A
+    recovered entry which no registered source provides is dead-lettered the same
+    way, without an owner to notify.
+
+  During `Send`, a source exception or an invalid message propagates to the caller
+  and nothing is staged. Sending a pending ID again coalesces; an ID pending as an
+  ordinary message throws <xref:System.InvalidOperationException>. A source-provided
+  message can't be addressed to the sending grain.
 - An <xref:Orleans.Messaging.IInboxMessageSink>, registered with
   <xref:Orleans.Messaging.IInbox.Register*>, receives each deduplicated message before
   the inbox accepts it, including scheduled messages and messages a grain sends to
   itself. A sink that takes the message returns `true` from
   <xref:Orleans.Messaging.IInboxMessageSink.TryAccept*> with the delivery result:
-  `Accepted` when it has staged the message's effects, `Duplicate` when it already
-  holds the message, `Backpressured` when it's at capacity, or `DeadLettered` with a
-  reason and an optional application-defined code, such as `orders/duplicate-order`,
-  which identifies the rejection to the sender. For `Accepted`, the inbox journals
-  only the processed record in the same
-  write and returns the result once the write completes. A sink-owned message never
-  occupies inbox capacity, and the sink honors its `DeliverAt` time. A sink that
-  reports `DeadLettered` leaves the message in the inbox dead letters. A sink
-  exception, or any other status, leaves the outcome unknown: the inbox stages
+  - `Accepted`: the sink staged the message's effects. The inbox journals only the
+    processed record in the same write and returns the result once the write
+    completes.
+  - `Duplicate`: the sink already holds the message.
+  - `Backpressured`: the sink is at capacity, so the sender retries later.
+  - `DeadLettered`: created with `DeliveryResult.DeadLettered(reason, code)`, the only
+    permanent rejection. The inbox moves the message to its dead letters with the
+    reason and the optional application-defined
+    <xref:Orleans.Messaging.DeliveryResult.Code>, such as `orders/duplicate-order`,
+    which appears as `DeadLetter<T>.Code` and as the sender's
+    `OutboxMessageRetirement.Code`. The processed record keeps the reason and code,
+    so a duplicate of the message receives the same rejection.
+
+  A sink exception, or any other status, leaves the outcome unknown: the inbox stages
   nothing and fails the delivery, so the sender's outbox retries it until
   `OutboxRetryTimeout`. A message a grain sends to itself fails its `Send` when a
-  sink throws or reports `Backpressured`. Messages that every sink declines follow
-  the ordinary inbox path.
+  sink throws or reports `Backpressured`. A sink-owned message occupies no inbox
+  capacity, and the sink honors its `DeliverAt` time. Messages that every sink
+  declines follow the ordinary inbox path.
 - An <xref:Orleans.Messaging.IInboxWorkSource>, registered with
   <xref:Orleans.Messaging.IInbox.Register*>, reports durable work that a component
   such as a sink holds in the grain's journal.
@@ -245,8 +261,8 @@ source or an inbox sink keeps that state as the only journaled copy:
   source's owner resumes its work on activation.
 
 Register sources, sinks, and work sources during construction or activation setup, before journal
-recovery. A recovered source-provided message which no registered source provides
-fails the activation. A sink is offered a message again once its processed record
+recovery. A recovered source-provided message fails the activation when no source is
+registered. A sink is offered a message again once its processed record
 leaves the deduplication window, so sinks must be idempotent.
 
 ## Commit and delivery guarantees
@@ -258,8 +274,11 @@ leaves the deduplication window, so sinks must be idempotent.
 - A message addressed to the sending grain never enters the outbox. `Send` stages its
   acceptance in the grain's own inbox, so the same journal write persists the
   acceptance with the grain's other staged changes, and the inbox processes the
-  message only after that write completes. A failed write discards it with the rest
-  of the staged changes.
+  message only after that write completes. When the write fails before it captures
+  the staged changes, such as when scheduling its wake-up fails, the acceptance stays
+  staged with them and a retried write persists it. A failed storage write discards
+  it with the rest of the staged changes, and the next activation recovers the
+  committed state.
 - Repeating a send with the same ID and an equivalent message (same destination,
   subject, payload, and `DeliverAt` time) keeps the original message. Reusing the
   ID with different content throws <xref:System.InvalidOperationException>.
@@ -271,13 +290,16 @@ leaves the deduplication window, so sinks must be idempotent.
   together and persist in one journal write.
 - Transport is **at-least-once**. If the sender loses its activation after the
   receiver accepts a message and before the outbox records the delivery, the outbox
-  sends the message again.
+  sends the message again. Effects apply once per message ID within
+  <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>;
+  a handler can execute more than once for the same message, so its preparation must
+  tolerate repetition.
 - The receiver deduplicates by exact `MessageId`. A repeat of a pending message
   returns <xref:Orleans.Messaging.DeliveryStatus.Duplicate> when its subject,
   payload, and `DeliverAt` time match, and fails when they differ. A repeat of a
   completed message returns `Duplicate` while the completion record is within
-  <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>, or the
-  original `DeadLettered` reason and code when an inbox sink rejected it. After the
+  `DeduplicationWindow`, or the original `DeadLettered` reason and code when an
+  inbox sink rejected it and no later completion of that ID is recorded. After the
   window ends, the same ID is accepted and processed again.
 - A message with <xref:Orleans.Messaging.Envelope.DeliverAt> is delivered and
   accepted immediately, then processed once its acceptance is durable and the
@@ -289,32 +311,45 @@ leaves the deduplication window, so sinks must be idempotent.
 
 ## Execution model
 
-Each activation runs one messaging pump. The pump processes ready inbox messages,
-then delivers ready outbox messages, and repeats while work remains. All pump work,
-including handler code, runs on the activation's single-threaded scheduler.
+Each activation runs one messaging pump, which starts when activation completes. The
+pump processes ready inbox messages, then delivers ready outbox messages, and
+repeats while work remains. All pump work, including handler code, runs on the
+activation's single-threaded scheduler. A live activation processes due work as soon
+as it is durable: journal write completions and finished deliveries signal the pump
+directly.
 
 The inbox processes up to
 <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.InboxBatchSize> durable, due
 messages per pass, one at a time, then writes the journal once for the batch. The
-outbox sends up to <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.OutboxBatchSize>
-durable, due messages per pass concurrently. Messages that an outbox message source
-withdrew or could not provide count toward the same limit. The outbox never holds messages
-addressed to the grain itself; a handler that sends one stages its acceptance with
-the batch's write, and a later pass processes it.
+outbox keeps up to
+<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.OutboxBatchSize> delivery
+attempts in flight for the grain. Each attempt completes on its own and frees its slot
+for the next due message, so a slow or unresponsive receiver holds one slot and
+messages to other receivers continue. The outbox never holds messages addressed to
+the grain itself; a handler that sends one stages its acceptance with the batch's
+write, and a later pass processes it.
 
-One durable job, named `orleans.messaging.pump`, wakes the grain while either queue
-or a registered work source holds work. Before a journal write captures new inbox or
-outbox entries, or while a work source reports pending work, messaging schedules the
-job so that committed work always has a wake-up. Each job execution starts the pump,
-waits for one pass, and either completes when both queues are empty and no work
-source reports work, or reschedules itself for the next retry time, the earliest
-`DeliverAt` time, or the shortest work-source delay. Activation also schedules the
-job when recovered state contains work.
+Deliveries to the grain, through
+<xref:Orleans.Messaging.IMessagingExtension.DeliverAsync*>, interleave with the
+grain's other requests. A delivery validates, deduplicates, and stages the message's
+acceptance synchronously, then waits for that journal write; concurrent deliveries
+share journal writes. Inbox message sinks run synchronously within the delivery, so a
+sink can run while a request is suspended at an `await`, as handlers can.
 
-Grain state is authoritative. Durable Jobs provides at-least-once wake-ups, and each
-pass derives its work from the journaled messages, their retry times, and their
-`DeliverAt` times, so early, late, and duplicate wake-ups are harmless. While the pump is running, journal
-write completions and finished delivery batches signal it directly.
+One durable job per grain, named `orleans.messaging.pump`, is crash insurance for
+work the live pump performs. It wakes the grain while either queue or a registered
+work source holds work which the activation can perform, at the earliest retry time,
+`DeliverAt` time, or work-source delay. Work which is already due resumes within about
+a second of recovery. A journal write schedules a job only when no tracked job is due
+within that slack, so a busy grain performs no Durable Jobs operation per write. When
+activation fails, Durable Jobs retries the pump job indefinitely with capped backoff
+on its clock; `AddMessaging` configures this retry policy for the pump job only.
+Every activation re-arms the wake-up at the real due time from recovered state, so
+committed work always keeps a wake-up.
+
+Grain state is authoritative. Each pass derives its work from the journaled
+messages, their retry times, and their `DeliverAt` times, so early, late, and
+duplicate wake-ups are harmless.
 
 The pump keeps the activation alive while a pass processes queued messages and while
 outbox deliveries are in flight. Messages that become due later, at their `DeliverAt`
@@ -324,9 +359,10 @@ when they are due.
 ### Interleaving
 
 Handlers run as activation work outside grain requests, so handler code interleaves
-with grain calls at each `await`, on reentrant and non-reentrant grains alike. Design
-handlers and grain methods to stay correct under that interleaving. Stateless worker
-grains are rejected at activation.
+with grain calls at each `await`, on reentrant and non-reentrant grains alike.
+Deliveries and inbox message sinks interleave the same way. Design handlers, sinks,
+and grain methods to stay correct under that interleaving. Stateless worker grains
+are rejected at activation.
 
 To apply a handler's commit phase exclusively on a non-reentrant grain, run it as a grain
 request with <xref:Orleans.GrainBaseExtensions.RunRequestAsync*>. The request waits for
@@ -354,35 +390,44 @@ activation can capture them. Structure each handler in two phases:
 
 1. **Prepare.** Perform asynchronous I/O, validation, decoding, and fallible
    computation using local values. Observe cancellation before the final phase.
-2. **Commit.** Without awaiting, send typed outgoing messages, apply the business
-   update, call `Complete()` or `Fail(reason)`, and return.
+2. **Commit.** In one synchronous block, with no `await` after the first change,
+   send typed outgoing messages, apply the business update, call `Complete()` or
+   `Fail(reason)`, and return.
 
 This ordering keeps business changes, outgoing messages, and completion in the same
 journal write. The inbox persists the batch after its handlers return.
 
-Model business rejection as a completed outcome: send a typed rejection reply and
-call `Complete()`. Use `Fail(reason)` for a permanent processing failure that needs
-operator attention.
+Route each failure by whether it can ever succeed:
+
+- **Business rejection.** Send a typed rejection reply and call `Complete()`.
+- **Permanently invalid input**, such as a command which can never become valid.
+  Call `Fail(reason)`, or send a typed rejection reply and call `Complete()` when the
+  protocol has a reply. The message leaves the inbox at once and frees its capacity
+  slot.
+- **Transient fault**, such as an unavailable dependency. Throw. The message retries
+  with backoff until `InboxRetryTimeout` and keeps its capacity slot meanwhile.
 
 The following outcomes cover the remaining cases:
 
 | Handler outcome | Result |
 | --- | --- |
-| Exception before a terminal operation | The attempt counts as a failure and follows the retry and dead-letter policy. |
+| Exception, or return without a terminal operation | The outcome is unknown: the message retries with backoff until `InboxRetryTimeout`, then moves to the dead letters. |
+| Exception or return without a terminal operation after staging journaled changes | The grain deactivates, recovery from the journal discards the staged changes, and the message runs again. That attempt doesn't count toward the retry policy. |
 | Exception after a terminal operation | The exception is logged and the staged outcome persists. |
-| Successful return with no terminal operation | Contract error: messaging stops and the grain deactivates. |
 | Conflicting terminal operations | Contract error: messaging stops and the grain deactivates. |
+
+The inbox detects staged changes through the journal's staged change count.
 
 ## Backpressure, retries, and dead letters
 
 When the inbox holds
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.MaxCapacity> messages, it answers
-new messages with `Backpressured`, and the sender retries them later. Messages with
-a `DeliverAt` time don't count toward this limit, including after they become due,
-and are always admitted. Messages a grain sends to itself are also always admitted,
-because `Send` is synchronous; those without a `DeliverAt` time count toward the
-limit until they complete. Likewise, the grain's inbox accepts them before a handler
-is registered and processes them once one is.
+<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.MaxCapacity> pending
+messages, it answers new messages with `Backpressured`, and the sender retries them
+later. Every pending message, including a scheduled message waiting for its
+`DeliverAt` time, counts toward this limit from its acceptance until it completes.
+Messages a grain sends to itself are admitted regardless of the limit, because `Send`
+is synchronous, and count toward it until they complete. Likewise, the grain's inbox
+accepts them before a handler is registered and processes them once one is.
 
 A failed handler attempt schedules a retry after
 <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.RetryInitialInterval> multiplied
@@ -394,22 +439,25 @@ the message moves to the inbox dead letters and its ID is recorded as processed.
 `Fail(reason)` to dead-letter a message at once.
 
 The outbox removes a message when the receiver reports `Accepted`, `Duplicate`, or
-`DeadLettered`. Any other outcome schedules a durable retry with the same backoff, and
-later batches deliver other messages meanwhile:
+`DeadLettered`. Any other outcome, including a status the sender can't interpret, such
+as one from a newer receiver, leaves the outcome unknown and schedules a durable retry
+with the same backoff while other messages continue:
 
 - `Backpressured` retries until the receiver takes the message.
 - `HandlerNotFound` logs an error, and retries give a deployment time to register the handler.
 - Other failures, such as calls which fail without an answer during an infrastructure outage,
   retry like `HandlerNotFound`.
 
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.OutboxRetryTimeout> moves a
-message to the outbox dead letters once this timeout elapses after its first failed attempt.
-Each `Backpressured` answer restarts the timeout. A receiver checks its deduplication records
-before answering, so the timeout stays within the deduplication window.
-
-Each attempt runs through
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeliveryResiliencePipeline>, a
-Polly pipeline which can add timeouts, in-attempt retries, or a circuit breaker.
+<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.OutboxRetryTimeout> starts
+when the message is sent, with its expiration journaled together with the send, and
+restarts at the start of each attempt which the receiver answers with `Backpressured`.
+No attempt starts after the timeout elapses; the outbox then moves the message to its
+dead letters with a reason stating that the retry timeout elapsed. A receiver checks its
+deduplication records before answering, so every redelivery stays within the
+receiver's `DeduplicationWindow` of any acceptance, including when a sender fails to
+record a delivery and recovers late. Configure `OutboxRetryTimeout` shorter than
+`DeduplicationWindow`, uniformly across the cluster, with margin for the longest grain
+call and clock skew. The Durable Jobs clock governs retry times and timeouts.
 
 Inspect dead letters through <xref:Orleans.Messaging.IMessagingDiagnostics> and remove
 handled records with <xref:Orleans.Messaging.IMessagingDiagnostics.RemoveInboxDeadLetter*>
@@ -428,9 +476,10 @@ grain's configured journal format; both the JSON and the Orleans binary formats 
 supported.
 
 A fresh activation replays the journal and resumes pending work from the recorded
-attempt counts and retry times. When a journal write or outbox staging fails,
-messaging stops and the grain deactivates; the next activation replays the committed
-outcome.
+attempt counts and retry times. When messaging fails, for example because staging or
+persistence fails, it vetoes every later journal write of that activation and the
+grain deactivates; the next activation recovers the committed outcome from the
+journal.
 
 After the grain deletes its journal with `DeleteStateAsync`, the inbox and outbox
 start empty and continue to accept and send messages.
@@ -456,13 +505,16 @@ as its delivery extension, and journal recovery restores messaging state with th
 grain's other journaled state.
 
 The following grain registers a typed handler during activation. The handler
-computes an optional reply, sends it, updates its count, and completes the message
-before returning:
+dead-letters a notification without text with `Fail(reason)`, because that input can
+never become valid. For a valid notification, it computes an optional reply, sends
+it, updates its count, and completes the message before returning:
 
 :::code source="../snippets/compiled/Grains/MessagingSnippets.cs" id="messaging_grain" language="csharp":::
 
-An ordinary grain method stages a typed send with a stable command ID, updates its
-state, and persists both with one journal write:
+An ordinary grain method stages a typed send with a stable command ID and persists it
+with one journal write. A client retry with the same command ID stages the same
+message: the outbox keeps one entry while the message is pending, and the receiver
+recognizes it as a duplicate after delivery:
 
 :::code source="../snippets/compiled/Grains/MessagingSnippets.cs" id="messaging_send" language="csharp":::
 

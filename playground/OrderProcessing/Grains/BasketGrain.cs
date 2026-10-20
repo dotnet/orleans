@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Messaging;
 
@@ -21,14 +23,20 @@ public sealed class BasketGrain : DurableGrain, IBasketGrain
     private readonly IOutbox _outbox;
     private readonly OrderMessages _messages;
     private readonly TimeProvider _timeProvider;
+    private readonly TimeProvider _jobClock;
     private readonly IDurableDictionary<int, BasketItem> _items;
     private readonly IDurableDictionary<Guid, DateTimeOffset> _checkouts;
 
-    public BasketGrain(IOutbox outbox, OrderMessages messages, TimeProvider timeProvider)
+    public BasketGrain(
+        IOutbox outbox,
+        OrderMessages messages,
+        TimeProvider timeProvider,
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider jobClock)
     {
         _outbox = outbox;
         _messages = messages;
         _timeProvider = timeProvider;
+        _jobClock = jobClock;
         _items = StateManager.GetOrAddDictionary<int, BasketItem>("items");
         _checkouts = StateManager.GetOrAddDictionary<Guid, DateTimeOffset>("checkouts");
     }
@@ -72,13 +80,13 @@ public sealed class BasketGrain : DurableGrain, IBasketGrain
         var lines = _items.Values
             .Select(item => new OrderLine(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity))
             .ToArray();
+        var now = _timeProvider.GetUtcNow();
         _outbox.Send(
             _messages.SubmitOrder,
             MessageId.Create("orders", orderId.ToString("N"), "submit"),
             GrainFactory.GetGrain<IOrderGrain>(orderId),
-            new SubmitOrder(this.GetPrimaryKeyString(), lines, request.Address, request.CardNumber[^4..]));
+            new SubmitOrder(this.GetPrimaryKeyString(), lines, request.Address, request.CardNumber[^4..], _jobClock.GetUtcNow()));
         _items.Clear();
-        var now = _timeProvider.GetUtcNow();
         foreach (var id in _checkouts.Where(pair => now - pair.Value >= CheckoutRetention).Select(pair => pair.Key).ToArray())
         {
             _checkouts.Remove(id);

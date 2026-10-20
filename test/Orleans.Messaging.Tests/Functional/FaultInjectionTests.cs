@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Security.Cryptography;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
@@ -38,9 +39,105 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
 
     private DeliveryFaultInjector Deliveries => _cluster.Deliveries;
 
+    [Fact]
+    public async Task OutboxWakeup_BareStagingWaitsForCommitAfterPriorDeliveryDrains()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        _ = await sender.GetSnapshotAsync();
+        Fixture.JobManagerProbe.SkipNext(MessagingPump.JobName);
+        await sender.SendAsync(receiver.GetGrainId(), Route, NewMessage(20, "committed"));
+        await Fixture.OnGrainAsync(sender, () => Fixture.GetPump(sender).EnsureStarted());
+        await WaitForDrainedOutboxAsync(sender);
+        var pump = Fixture.GetPump(sender);
+        Assert.NotNull(await Fixture.OnGrainAsync(sender, () => InboxTestAccess.WakeupJobId(pump)));
+        var attempts = Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, sender.GetGrainId());
+        await sender.StageWithoutCommitAsync(receiver.GetGrainId(), Route, NewMessage(21, "staged"));
+
+        Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(sender)).Status);
+        Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(sender)).Status);
+        Assert.Equal(attempts, Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, sender.GetGrainId()));
+        Assert.Equal(1, (await sender.GetSnapshotAsync()).OutboxCount);
+        Assert.Equal(1, Deliveries.ReceiverCalls);
+
+        Fixture.JobManagerProbe.SkipNext(MessagingPump.JobName);
+        await sender.RetryWriteStateAsync();
+        Assert.Equal(attempts + 1, Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, sender.GetGrainId()));
+        await WaitForDrainedOutboxAsync(sender);
+        var completed = await Fixture.WaitForEffectCountAsync(receiver, 2);
+        Assert.Equal(new[] { "committed", "staged" }, completed.Effects.Select(effect => effect.Value));
+        Assert.All(completed.Effects, effect => Assert.Equal(1, effect.Count));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OutboxWakeup_CapturedWriteRetainsCoverageUntilAcknowledgedAndRecovered(bool snapshot)
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        var before = await sender.GetSnapshotAsync();
+        var previous = Fixture.GetGrainContext(sender);
+        var journal = JournalId.FromGrainId(sender.GetGrainId());
+        if (snapshot) Fixture.Storage.RequestSnapshot(journal);
+        using var acknowledgement = Fixture.Storage.BlockAcknowledgement(journal);
+        var message = NewMessage(22, "captured");
+        var sending = sender.SendAsync(receiver.GetGrainId(), Route, message);
+        await acknowledgement.WaitUntilEnteredAsync();
+        Assert.False(sending.IsCompleted);
+        Assert.Equal(0, Deliveries.ReceiverCalls);
+
+        // Captured entries retain a wake-up while delivery awaits the write acknowledgement.
+        var wakeup = await Fixture.RunPumpAsync(sender);
+        Assert.Equal(DurableJobRunStatus.RescheduleRequested, wakeup.Status);
+        Assert.Equal(_cluster.JobClock.GetUtcNow() + TimeSpan.FromSeconds(1), wakeup.RescheduleTime);
+        Assert.Equal(0, Deliveries.ReceiverCalls);
+
+        acknowledgement.Fail();
+        await Assert.ThrowsAsync<IOException>(() => sending);
+        await previous.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var recovered = await sender.GetSnapshotAsync();
+        Assert.NotEqual(before.ActivationId, recovered.ActivationId);
+        await WaitForDrainedOutboxAsync(sender);
+        await AssertProcessedOnceAsync(receiver, message);
+        Assert.Equal(1, Deliveries.ReceiverCalls);
+        Assert.Equal([DeliveryStatus.Accepted], Deliveries.Answers);
+    }
+
+    [Fact]
+    public async Task OutboxWakeup_CompletedJobDuringPreparationIsReplacedBeforeCapture()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        _ = await sender.GetSnapshotAsync();
+        var journal = JournalId.FromGrainId(sender.GetGrainId());
+        using var write = Fixture.Storage.BlockWrite(journal);
+        Fixture.JobManagerProbe.SkipNext(MessagingPump.JobName);
+        using var scheduling = Fixture.JobManagerProbe.BlockNext(MessagingPump.JobName);
+        var message = NewMessage(23, "prepared");
+        var sending = sender.SendAsync(receiver.GetGrainId(), Route, message);
+        await scheduling.WaitUntilEnteredAsync();
+
+        Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(sender)).Status);
+        Assert.False(sending.IsCompleted);
+        Assert.Equal(0, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        scheduling.Continue();
+        await write.WaitUntilEnteredAsync();
+        Assert.Equal(2, Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, sender.GetGrainId()));
+        Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, sender.GetGrainId()));
+        Assert.Equal(0, Deliveries.ReceiverCalls);
+        Assert.Equal(DurableJobRunStatus.RescheduleRequested, (await Fixture.RunPumpAsync(sender)).Status);
+
+        write.Release();
+        await sending;
+        await WaitForDrainedOutboxAsync(sender);
+        await AssertProcessedOnceAsync(receiver, message);
+        Assert.Equal(1, Deliveries.ReceiverCalls);
+    }
+
     [Theory]
     [InlineData(DeliveryFaultKind.Throw, "Injected transient delivery failure.")]
-    [InlineData(DeliveryFaultKind.TimeOut, "TimeoutRejectedException")]
+    [InlineData(DeliveryFaultKind.TimeOut, "TimeoutException")]
     public async Task TransientDeliveryFault_DelaysTheMessageThenDeliversItOnce(DeliveryFaultKind kind, string error)
     {
         var sender = NewGrain();
@@ -237,20 +334,24 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         var id = NewSourceMessageId("backpressure");
         var payload = RandomNumberGenerator.GetBytes(32);
 
+        var sentAt = _cluster.JobClock.GetUtcNow();
         await sender.StageFromSourceAsync(receiver.GetGrainId(), id, payload, write: true);
 
         var first = await WaitForFailedAttemptAsync(sender, id, 1);
-        Assert.Null(first.ExpirationTime);
+        Assert.Equal(sentAt + RetryTimeout, first.ExpirationTime);
         Assert.Equal("The receiver is backpressured.", first.LastError);
 
-        // Backpressure proves the receiver took no earlier attempt, so it never starts the retry timeout.
-        await _cluster.AdvanceAndRunPumpAsync(sender, 2 * RetryTimeout);
+        // Backpressure proves the receiver took no attempt before it, so each answer restarts the retry timeout from its
+        // attempt, and retries continue beyond the timeout which started at the send.
+        var step = RetryTimeout * 3 / 4;
+        await _cluster.AdvanceAndRunPumpAsync(sender, step);
         var second = await WaitForFailedAttemptAsync(sender, id, 2);
-        Assert.Null(second.ExpirationTime);
+        Assert.Equal(_cluster.JobClock.GetUtcNow() + RetryTimeout, second.ExpirationTime);
         Assert.Empty(await Fixture.OnGrainAsync(sender, () => _cluster.GetOutboxState(sender).DeadLetterKeys.ToArray()));
 
         probe.Mode = SinkMode.Accept;
-        await _cluster.AdvanceAndRunPumpAsync(sender, 2 * RetryInterval);
+        await _cluster.AdvanceAndRunPumpAsync(sender, step);
+        Assert.True(_cluster.JobClock.GetUtcNow() > sentAt + RetryTimeout);
 
         await Fixture.WaitUntilAsync(sender, () => Sink(sender).GetState().Retired.Count == 1);
         Assert.Equal(nameof(OutboxMessageRetirementStatus.Delivered), (await OnSinkAsync(sender, static grain => grain.GetState())).Retired[id.ToString()]);
@@ -359,6 +460,101 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
     }
 
     [Fact]
+    public async Task SenderRemovalWriteFailure_RecoveredAfterTheRetryTimeout_DeadLettersWithoutRedelivery()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        var hold = DeliveryFault.HoldAfterCall();
+        Deliveries.Enqueue(hold);
+        var message = NewMessage(7, "late-recovery");
+        _ = await sender.SendAsync(receiver.GetGrainId(), Route, message);
+        await hold.WaitUntilEnteredAsync();
+        Assert.Equal(DeliveryStatus.Accepted, (await hold.ReceiverAnswer).Status);
+        ArmSenderWriteFailure(sender, ambiguous: false);
+        var previous = Fixture.GetGrainContext(sender);
+        hold.Release();
+        await previous.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+        // The recovered entry's retry timeout runs from its send, so an attempt now could reach the receiver after its
+        // deduplication window. The outbox dead-letters it instead of redelivering it.
+        _cluster.JobClock.Advance(RetryTimeout);
+        var snapshot = await Fixture.WaitForDeadLetterCountAsync(sender, 1);
+
+        var deadLetter = Assert.Single(snapshot.OutboxDeadLetters);
+        Assert.Contains("retry timeout elapsed", deadLetter.Reason, StringComparison.Ordinal);
+        Assert.Equal(0, snapshot.OutboxCount);
+        Assert.Equal([DeliveryStatus.Accepted], Deliveries.Answers);
+        await AssertProcessedOnceAsync(receiver, message);
+    }
+
+    [Fact]
+    public async Task HeldReceiver_DelaysOnlyItsOwnMessage()
+    {
+        var sender = NewGrain();
+        var slow = NewGrain();
+        var fast = NewGrain();
+        var held = DeliveryFault.HoldBeforeCall();
+        Deliveries.Enqueue(held);
+        var slowMessage = NewMessage(20, "slow");
+        var fastMessage = NewMessage(21, "fast");
+
+        _ = await sender.SendAsync(slow.GetGrainId(), Route, slowMessage);
+        await held.WaitUntilEnteredAsync();
+        _ = await sender.SendAsync(fast.GetGrainId(), Route, fastMessage);
+
+        // Attempts complete independently, so the message to the other receiver is delivered while the first is held.
+        await AssertProcessedOnceAsync(fast, fastMessage);
+        Assert.Equal(1, (await sender.GetSnapshotAsync()).OutboxCount);
+
+        held.Release();
+        await WaitForDrainedOutboxAsync(sender);
+        await AssertProcessedOnceAsync(slow, slowMessage);
+        Assert.Equal(2, Deliveries.Executions);
+    }
+
+    [Fact]
+    public async Task UnknownDeliveryStatus_IsRetriedAsAnUnknownOutcome()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        Deliveries.Enqueue(DeliveryFault.Answer(new DeliveryResult { Status = (DeliveryStatus)99 }));
+        var message = NewMessage(22, "unknown-status");
+
+        var id = await sender.SendAsync(receiver.GetGrainId(), Route, message);
+
+        // A newer receiver's status which this sender can't interpret may hide an acceptance, so it retries.
+        Assert.Contains("Unexpected delivery status '99'", (await WaitForFailedAttemptAsync(sender, id, 1)).LastError);
+        await _cluster.AdvanceAndRunPumpAsync(sender, RetryInterval);
+        await WaitForDrainedOutboxAsync(sender);
+        await AssertProcessedOnceAsync(receiver, message);
+        Assert.Empty((await sender.GetSnapshotAsync()).OutboxDeadLetters);
+    }
+
+    [Fact]
+    public async Task Withdrawal_DuringAnAttempt_IgnoresTheAttemptsOutcome()
+    {
+        var sender = NewSinkGrain();
+        var receiver = NewSinkGrain();
+        var hold = DeliveryFault.HoldAfterCall();
+        Deliveries.Enqueue(hold);
+        var id = NewSourceMessageId("withdrawn-in-flight");
+
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), id, RandomNumberGenerator.GetBytes(32), write: true);
+        await hold.WaitUntilEnteredAsync();
+        await sender.WithdrawAsync(id);
+        await sender.WriteAsync();
+
+        // The attempt already reached the receiver, but the withdrawn entry neither retires nor delivers again.
+        hold.Release();
+        var outbox = Fixture.GetGrainContext(sender).ActivationServices.GetRequiredService<Outbox>();
+        await Fixture.WaitUntilAsync(sender, () => !outbox.IsDelivering);
+        Assert.Empty((await OnSinkAsync(sender, static grain => grain.GetState())).Retired);
+        Assert.Equal(0, await Fixture.OnGrainAsync(sender, () => outbox.Count));
+        Assert.Empty(await Fixture.OnGrainAsync(sender, () => _cluster.GetOutboxState(sender).DeadLetterKeys.ToArray()));
+        Assert.Equal([DeliveryStatus.Accepted], Deliveries.Answers);
+        Assert.Equal(1, Deliveries.Executions);
+    }
+    [Fact]
     public async Task SenderCrash_AfterTheReceiverCommitted_RedeliversAsADuplicate()
     {
         var sender = NewGrain();
@@ -369,6 +565,11 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         _ = await sender.SendAsync(receiver.GetGrainId(), Route, message);
         await hold.WaitUntilEnteredAsync();
         Assert.Equal(DeliveryStatus.Accepted, (await hold.ReceiverAnswer).Status);
+
+        var wakeup = await Fixture.RunPumpAsync(sender);
+        Assert.Equal(DurableJobRunStatus.RescheduleRequested, wakeup.Status);
+        Assert.Equal(_cluster.JobClock.GetUtcNow() + TimeSpan.FromSeconds(1), wakeup.RescheduleTime);
+        Assert.Equal(1, Deliveries.ReceiverCalls);
 
         // Deactivation cancels the in-flight delivery, whose outcome is never applied or counted as an attempt.
         await _cluster.CrashAsync(sender);
@@ -411,7 +612,7 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task CanceledPumpRun_WhoseWakeupRepairFails_RecoversAfterReactivation()
+    public async Task CanceledPumpRun_KeepsItsJobAndTheActivationKeepsProcessing()
     {
         var receiver = NewGrain();
         var before = await receiver.GetSnapshotAsync();
@@ -419,24 +620,20 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         var message = NewMessage(10, "canceled-run");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, CreateEnvelope(receiver, message, HeldRoute))).Status);
         await WaitForBarrierAsync(receiver, barrier);
-        var previous = Fixture.GetGrainContext(receiver);
+        var attempts = Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, receiver.GetGrainId());
 
-        // Durable Jobs cancels a run while the handler is still working, and re-establishing the wake-up fails.
-        Fixture.JobManagerProbe.FailNext(MessagingPump.JobName);
+        // Durable Jobs cancels a run only when its shard moves, and the job stays stored for the next owner, so the
+        // activation schedules nothing and keeps working.
         using var cancellation = new CancellationTokenSource();
         var run = Fixture.RunCancelablePumpAsync(receiver, cancellation.Token);
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+        Assert.Equal(attempts, Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, receiver.GetGrainId()));
 
-        // Without a wake-up the activation can't guarantee progress, so it deactivates and recovery takes over.
-        await previous.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         barrier.Dispose();
-        _ = await receiver.GetSnapshotAsync();
-
         var processed = await AssertProcessedOnceAsync(receiver, message);
-        Assert.NotEqual(before.ActivationId, processed.ActivationId);
+        Assert.Equal(before.ActivationId, processed.ActivationId);
     }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

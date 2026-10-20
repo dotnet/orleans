@@ -1,40 +1,35 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Orleans.Journaling;
+using Orleans.Messaging.Diagnostics;
 using Orleans.Runtime;
 
 namespace Orleans.Messaging.Tests.Support;
 
-public sealed class BootstrapDeliveryProbe : IOutgoingGrainCallFilter, ILoggerProvider
+public sealed class BootstrapDeliveryProbe : IOutgoingGrainCallFilter, IObserver<MessagingEvents.MessagingEvent>
 {
     private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly ConcurrentDictionary<GrainId, TaskCompletionSource<(MessageId MessageId, int Value)>> _outputs = new();
 
     private readonly ConcurrentDictionary<GrainId, TaskCompletionSource> _drains = new();
 
+    public BootstrapDeliveryProbe() => MessagingEvents.AllEvents.Subscribe(this);
+
+    /// <summary>Waits until the sender's outbox retires a delivered message.</summary>
     public Task WaitForDrainAsync(GrainId sender) =>
         _drains.GetOrAdd(sender, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously)).Task.WaitAsync(TimeSpan.FromSeconds(30));
 
-    public ILogger CreateLogger(string categoryName) => new CompletionLogger(this, categoryName);
-    public void Dispose() { }
-
-    private sealed class CompletionLogger(BootstrapDeliveryProbe owner, string category) : ILogger
+    void IObserver<MessagingEvents.MessagingEvent>.OnNext(MessagingEvents.MessagingEvent value)
     {
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-        public bool IsEnabled(LogLevel logLevel) => category == "Orleans.Messaging.Outbox";
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        if (value is MessagingEvents.OutboxMessageRetired { Retirement.Status: OutboxMessageRetirementStatus.Delivered } retired)
         {
-            if (IsEnabled(logLevel) && eventId.Name == "LogDeliveryComplete"
-                && state is IEnumerable<KeyValuePair<string, object?>> fields
-                && fields.Any(field => field.Key == "RemainingCount" && field.Value is 0)
-                && ReceiverTestServices.CurrentGrainContext is { } context)
-            {
-                owner._drains.GetOrAdd(context.GrainId, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
-            }
+            _drains.GetOrAdd(retired.GrainContext.GrainId, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
         }
     }
 
+    void IObserver<MessagingEvents.MessagingEvent>.OnCompleted() { }
+
+    void IObserver<MessagingEvents.MessagingEvent>.OnError(Exception error) { }
     public async Task Invoke(IOutgoingGrainCallContext context)
     {
         if (context.TargetId == BootstrapState.OutputTarget && context.MethodName == nameof(IMessagingExtension.DeliverAsync))

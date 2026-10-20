@@ -78,6 +78,7 @@ public class FaultInjectionClusterFixture() : MessagingClusterFixture(1, receive
     {
         services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs, JobClock);
         services.AddSingleton(SourceSinkProbe);
+        services.AddSingleton<IOutboxTransport>(sp => Deliveries.Wrap(new GrainOutboxTransport(sp.GetRequiredService<IGrainFactory>())));
     }
 
     protected override void ConfigureOptions(DurableMessagingOptions options)
@@ -87,6 +88,5 @@ public class FaultInjectionClusterFixture() : MessagingClusterFixture(1, receive
         options.DeduplicationWindow = TimeSpan.FromDays(1);
         options.OutboxRetryTimeout = OutboxRetryTimeout;
         options.RetryInitialInterval = RetryInterval;
-        options.DeliveryResiliencePipeline = Deliveries.CreatePipeline();
     }
 }

@@ -1,5 +1,4 @@
 using System;
-using Polly;
 
 namespace Orleans.Messaging.Configuration;
 
@@ -30,9 +29,8 @@ public class DurableMessagingOptions
             / MaximumBackoffMultiplier);
 
     /// <summary>
-    /// Gets or sets the maximum number of pending inbox messages without <see cref="Envelope.DeliverAt"/>.
-    /// When this limit is reached, new deliveries without <see cref="Envelope.DeliverAt"/> return <c>DeliveryResult.Backpressured()</c>.
-    /// The inbox admits scheduled messages regardless of this limit.
+    /// Gets or sets the maximum number of pending inbox messages.
+    /// When this limit is reached, new deliveries return <c>DeliveryResult.Backpressured()</c>.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -44,13 +42,12 @@ public class DurableMessagingOptions
     /// storage, so capacity limits affect both in-memory state and storage I/O during recovery.
     /// </para>
     /// <para>
-    /// Messages with an <see cref="Envelope.DeliverAt"/> time do not count toward this limit, including after they
-    /// become due, and are accepted regardless of it.
+    /// A message with an <see cref="Envelope.DeliverAt"/> time counts toward this limit from its acceptance until it
+    /// completes, so size the limit for the messages a grain holds scheduled as well as those it is processing.
     /// </para>
     /// <para>
-    /// Messages a grain sends to itself are accepted regardless of this limit, because sending is synchronous.
-    /// Those without an <see cref="Envelope.DeliverAt"/> time count toward it until they complete, so they can cause
-    /// deliveries from other grains to be backpressured.
+    /// Messages a grain sends to itself are accepted regardless of this limit, because sending is synchronous. They count
+    /// toward it until they complete, so they can cause deliveries from other grains to be backpressured.
     /// </para>
     /// </remarks>
     /// <value>
@@ -75,8 +72,10 @@ public class DurableMessagingOptions
     /// inbox writes a snapshot.
     /// </para>
     /// <para>
-    /// Consider your retry policies when setting this value. For example, if senders retry for
-    /// up to 24 hours, set the window to at least 48 hours to ensure deduplication coverage.
+    /// Every outbox delivery attempt starts within <see cref="OutboxRetryTimeout"/> of the time the message was sent or
+    /// last backpressured, so a window which exceeds that timeout plus the longest grain call duration and clock skew
+    /// deduplicates every redelivery. Configure both values uniformly across the cluster. Senders which resubmit outside
+    /// the outbox need a window which covers their own retry horizon.
     /// </para>
     /// </remarks>
     /// <value>
@@ -131,10 +130,11 @@ public class DurableMessagingOptions
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The timeout starts with the first failed attempt and restarts whenever the receiver answers with
+    /// The timeout starts when the message is sent and restarts whenever the receiver answers with
     /// <c>DeliveryResult.Backpressured()</c>, so the outbox retries a backpressured message until the receiver takes it.
     /// A receiver checks its deduplication records before answering, so only attempts since the timeout started can have
-    /// been accepted, and the timeout stays within <see cref="DeduplicationWindow"/> to keep their retries deduplicated.
+    /// been accepted. No attempt starts after the timeout elapses, so redeliveries of an accepted message stay within
+    /// <see cref="DeduplicationWindow"/> of its acceptance. The timeout follows the Durable Jobs clock.
     /// </para>
     /// <para>
     /// The outbox logs each <c>DeliveryResult.HandlerNotFound()</c> answer as an error.
@@ -159,31 +159,13 @@ public class DurableMessagingOptions
     public int InboxBatchSize { get; set; } = 32;
 
     /// <summary>
-    /// Gets or sets the maximum number of outbox messages processed by one messaging pump pass.
+    /// Gets or sets the maximum number of outbox delivery attempts in flight for one grain.
     /// </summary>
     /// <remarks>
-    /// Each pass delivers, removes, or dead-letters at most this many messages. Messages which their outbox message sources
-    /// withdrew or failed to provide count toward the limit, and later passes process the remaining messages.
+    /// The pump starts another attempt as soon as one completes, so a slow receiver holds one slot without delaying
+    /// messages to other receivers.
     /// </remarks>
     public int OutboxBatchSize { get; set; } = 32;
-
-    /// <summary>
-    /// Gets or sets the resilience pipeline which runs each outbox delivery attempt.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// The outbox calls each receiver through this pipeline, so its strategies, such as timeouts, retries, and circuit
-    /// breakers, act within one delivery attempt. When an attempt fails, the outbox schedules the next attempt with
-    /// <see cref="RetryInitialInterval"/> backoff and continues delivering other messages. Receiving inboxes
-    /// deduplicate by message ID, so retrying a delivery whose outcome is unknown is safe.
-    /// </para>
-    /// <para>
-    /// The outbox treats a receiver's answer as proof that no earlier call for the message is still in flight, so the
-    /// pipeline makes one receiver call at a time. One pipeline instance serves every outbox delivery in the silo.
-    /// </para>
-    /// </remarks>
-    /// <value>Defaults to <see cref="ResiliencePipeline.Empty"/>, which calls the receiver directly.</value>
-    public ResiliencePipeline DeliveryResiliencePipeline { get; set; } = ResiliencePipeline.Empty;
 
     /// <summary>
     /// Validates the configuration values and throws if any are invalid.
@@ -193,7 +175,7 @@ public class DurableMessagingOptions
     /// or if <see cref="DeduplicationWindow"/> is less than or equal to <see cref="TimeSpan.Zero"/>,
     /// or if a retry, retention, or batch option is outside its supported range.
     /// </exception>
-    /// <exception cref="ArgumentNullException">Thrown if <see cref="DeliveryResiliencePipeline"/> is <see langword="null"/>.</exception>
+
     /// <remarks>
     /// This method is typically called by the dependency injection container during service registration
     /// to ensure configuration values are valid before the system starts.
@@ -241,10 +223,6 @@ public class DurableMessagingOptions
                 "OutboxRetryTimeout must be less than DeduplicationWindow.");
         }
 
-        if (DeliveryResiliencePipeline is null)
-        {
-            throw new ArgumentNullException(nameof(DeliveryResiliencePipeline));
-        }
 
         if (DeadLetterRetentionPeriod <= TimeSpan.Zero)
         {

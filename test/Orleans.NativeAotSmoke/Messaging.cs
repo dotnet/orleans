@@ -17,8 +17,8 @@ var receiver = GrainId.Create("aot", "receiver");
 var key = MessageId.Create("aot", "command", "1");
 var outbox = new SmokeOutbox();
 var state = new SmokeState(outbox, strings, sender);
-var dispatcher = new InboxDispatcher([]);
-new SmokeInbox(dispatcher)
+var inbox = new SmokeInbox();
+inbox
     .Register(integers, state, static (value, target, context) =>
     {
         target.Outbox.SendReply(target.ReplyType, context, target.ReplyDestination, value.ToString());
@@ -38,7 +38,7 @@ new SmokeInbox(dispatcher)
 
 var input = integers.Create(key, receiver, 42);
 var context = new SmokeContext(input.ToInboxMessage());
-await dispatcher.HandleAsync(context, CancellationToken.None);
+await inbox.HandleAsync(context, CancellationToken.None);
 if (!context.Completed || state.Value != 42 || outbox.Count != 1)
 {
     throw new InvalidOperationException("Typed stateful handler did not complete its effect and reply.");
@@ -54,11 +54,11 @@ var headerSerializer = services.GetRequiredService<Serializer>().GetSerializer<D
 
 var text = strings.Create(new MessageId(key.Key.CreateChildKey("text")), receiver, "abc");
 var textContext = new SmokeContext(text.ToInboxMessage());
-await dispatcher.HandleAsync(textContext, CancellationToken.None);
+await inbox.HandleAsync(textContext, CancellationToken.None);
 if (!textContext.Completed) throw new InvalidOperationException("Typed struct-argument handler did not complete.");
 var invalid = strings.Create(new MessageId(key.Key.CreateChildKey("invalid")), receiver, "");
 var rejected = new SmokeContext(invalid.ToInboxMessage());
-await dispatcher.HandleAsync(rejected, CancellationToken.None);
+await inbox.HandleAsync(rejected, CancellationToken.None);
 if (!rejected.Completed || rejected.DeadLetterReason != "Text is required." || outbox.Count != 1)
 {
     throw new InvalidOperationException("Typed handler did not preserve its explicit permanent failure.");
@@ -117,13 +117,19 @@ internal sealed class SmokeState(SmokeOutbox outbox, MessageType<string> replyTy
     public int Value { get; set; }
 }
 
-internal sealed class SmokeInbox(InboxDispatcher dispatcher) : IInbox
+// Dispatches each message to the first registered handler which accepts it, as the runtime inbox does.
+internal sealed class SmokeInbox : IInbox
 {
+    private readonly List<IInboxHandler> _handlers = [];
+
     public IInbox Register(IInboxHandler handler)
     {
-        dispatcher.Add(handler);
+        _handlers.Add(handler);
         return this;
     }
+
+    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken) =>
+        _handlers.First(handler => handler.CanHandle(context.Message)).HandleAsync(context, cancellationToken);
 
     public IInbox Register(IInboxMessageSink sink) => throw new NotSupportedException();
 
@@ -150,5 +156,6 @@ internal sealed class SmokeOutbox : IOutbox
     public IEnumerable<OutboxMessage> Messages => _messages;
     public void Send(OutboxMessage envelope) => _messages.Add(envelope);
     public void Send(MessageId messageId) => throw new NotSupportedException();
+    public bool Withdraw(MessageId messageId) => throw new NotSupportedException();
     public IOutbox Register(IOutboxMessageSource source) => throw new NotSupportedException();
 }

@@ -11,7 +11,6 @@ using Orleans.Messaging.Configuration;
 using Orleans.Messaging.Diagnostics;
 using Orleans.Journaling;
 using Orleans.Runtime;
-using Polly;
 
 namespace Orleans.Messaging;
 
@@ -25,7 +24,13 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     private readonly Dictionary<MessageId, OutboxEntry> _messages = [];
     private readonly Dictionary<MessageId, OutboxDeadLetter> _deadLetters = [];
     private readonly List<IOutboxMessageSource> _sources = [];
-    private Task<DeliveryOutcome[]>? _deliveries;
+
+    // Entries whose delivery attempt's outcome is not applied yet, the outcomes of completed attempts, and the number of
+    // attempts still running. An entry stays in flight until its outcome is applied, so it never has two attempts.
+    private readonly HashSet<OutboxEntry> _inFlight = new(ReferenceEqualityComparer.Instance);
+    private readonly List<DeliveryOutcome> _outcomes = [];
+    private int _running;
+    private TaskCompletionSource? _drained;
 
     public Outbox(MessagingPump pump)
     {
@@ -37,8 +42,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     private MessagingShared Shared => _pump.Shared;
     private DurableMessagingOptions Options => _pump.Shared.Options;
     private ILogger Logger => _pump.Shared.OutboxLogger;
-    // Delivery retries, expiry, and retention follow the durable jobs clock which schedules outbox wake-ups.
-    private TimeProvider TimeProvider => _pump.Shared.JobTimeProvider;
+    private TimeProvider TimeProvider => Shared.TimeProvider;
+    private TimeProvider JobTimeProvider => Shared.JobTimeProvider;
     private GrainId GrainId => _pump.GrainContext.GrainId;
 
     internal IReadOnlyDictionary<MessageId, OutboxEntry> MessageState => _messages;
@@ -46,7 +51,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     internal int Count => _messages.Count;
 
     /// <summary>Gets whether delivery attempts are in flight or awaiting application by the pump.</summary>
-    internal bool IsDelivering => _deliveries is not null;
+    internal bool IsDelivering => _inFlight.Count > 0;
 
     public IOutbox Register(IOutboxMessageSource source)
     {
@@ -79,7 +84,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
         try
         {
-            Emit(new() { Kind = OutboxCommandKind.Enqueue, Message = message, State = new() });
+            Emit(new() { Kind = OutboxCommandKind.Enqueue, Message = message, State = CreateState() });
             Shared.Instruments.OnOutboxMessageSent(Shared.GrainType);
         }
         catch (Exception exception)
@@ -114,7 +119,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             {
                 Kind = OutboxCommandKind.Enqueue,
                 Reference = new() { MessageId = messageId },
-                State = new()
+                State = CreateState()
             });
             _messages[messageId].Source = source;
             Shared.Instruments.OnOutboxMessageSent(Shared.GrainType);
@@ -124,6 +129,34 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             FailStaging(exception);
         }
     }
+
+    public bool Withdraw(MessageId messageId)
+    {
+        _pump.ShutdownToken.ThrowIfCancellationRequested();
+        if (!_messages.TryGetValue(messageId, out var entry)) return false;
+        if (entry.Reference is null)
+        {
+            throw new InvalidOperationException($"Message '{messageId}' is pending as an ordinary outbox message, which can't be withdrawn.");
+        }
+
+        try
+        {
+            Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = messageId });
+        }
+        catch (Exception exception)
+        {
+            FailStaging(exception);
+        }
+
+        Shared.Instruments.OnOutboxMessageDelivered(Shared.GrainType, "withdrawn");
+        LogMessageWithdrawn(Logger, messageId);
+        return true;
+    }
+
+    // Retries end OutboxRetryTimeout after the send on the Durable Jobs clock, so every attempt starts within the
+    // timeout of any acceptance by the receiver.
+    private OutboxMessageState CreateState() =>
+        new() { ExpirationTime = MessagingTime.AddClamped(JobTimeProvider.GetUtcNow(), Options.OutboxRetryTimeout) };
 
     /// <summary>Returns the first registered source which provides the message, and its validated message.</summary>
     private IOutboxMessageSource? FindSource(MessageId messageId, out OutboxMessage message)
@@ -139,8 +172,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
     /// <summary>
     /// Returns the entry's message, materializing a reference entry's message from its owning source, or returns
-    /// <see langword="false"/> when the source has withdrawn the message. Throws when the source throws or returns an
-    /// invalid message.
+    /// <see langword="false"/> for a recovered entry which no registered source provides. Throws when the owning source
+    /// throws, returns an invalid message, or no longer provides the message.
     /// </summary>
     private bool TryGetMessage(OutboxEntry entry, out OutboxMessage message)
     {
@@ -150,7 +183,14 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             return true;
         }
 
-        if (entry.Source is { } owner) return TryGetSourceMessage(owner, entry.MessageId, out message);
+        if (entry.Source is { } owner)
+        {
+            if (TryGetSourceMessage(owner, entry.MessageId, out message)) return true;
+
+            // The owner provided the message when it was sent, and withdrawal goes through IOutbox.Withdraw.
+            throw new InvalidOperationException(
+                $"The outbox message source which owns message '{entry.MessageId}' no longer provides it; withdraw a message with IOutbox.Withdraw.");
+        }
 
         // A recovered entry's owner is the first source which doesn't decline it, including one which fails to provide
         // it, so that source is notified when the entry is dead-lettered.
@@ -188,7 +228,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     /// <summary>Notifies the source of a retired reference entry, so its release commits with the entry's removal.</summary>
     private void Retire(OutboxEntry entry, OutboxMessageRetirement retirement)
     {
-        if (entry.Reference is not null) entry.Source!.OnRetired(entry.MessageId, retirement);
+        // A recovered reference which no source provides has no owner to notify.
+        entry.Source?.OnRetired(entry.MessageId, retirement);
         MessagingEvents.EmitOutboxMessageRetired(_pump.GrainContext, entry.MessageId, retirement);
     }
 
@@ -302,87 +343,59 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         }
     }
 
-    private List<(OutboxEntry Entry, OutboxMessage Message)>? SelectMessages(
-        ref List<OutboxEntry>? withdrawn,
-        ref List<(OutboxEntry Entry, Exception Error)>? failed)
+    /// <summary>
+    /// Selects up to <paramref name="capacity"/> durable entries which are due and have no attempt in flight: the
+    /// messages to attempt, and the entries to dead-letter without an attempt.
+    /// </summary>
+    private (List<(OutboxEntry Entry, OutboxMessage Message)>? Candidates, List<Unavailable>? Unavailable) SelectMessages(int capacity)
     {
-        var now = TimeProvider.GetUtcNow();
+        var now = JobTimeProvider.GetUtcNow();
         List<(OutboxEntry Entry, OutboxMessage Message)>? candidates = null;
-        var examined = 0;
+        List<Unavailable>? unavailable = null;
+        var selected = 0;
         foreach (var entry in _messages.Values)
         {
-            if (entry.Sequence <= _durableSequence && IsReadyForAttempt(entry.State, now))
-            {
-                try
-                {
-                    if (TryGetMessage(entry, out var message))
-                    {
-                        (candidates ??= []).Add((entry, message));
-                    }
-                    else
-                    {
-                        (withdrawn ??= []).Add(entry);
-                    }
-                }
-                catch (Exception exception)
-                {
-                    // The entry is durable, so a source which can't provide a valid message dead-letters only that entry.
-                    (failed ??= []).Add((entry, exception));
-                }
+            if (entry.Sequence > _durableSequence || _inFlight.Contains(entry) || entry.State.NextAttemptAt > now) continue;
 
-                // Withdrawn and failed entries count toward the batch, so a pass removes at most a batch of entries.
-                if (++examined == Options.OutboxBatchSize) break;
+            // Entries which are only removed count toward the capacity too, so a pass removes at most a batch of entries.
+            if (++selected > capacity) break;
+            OutboxMessage? message = null;
+            Exception? error = null;
+            try
+            {
+                if (TryGetMessage(entry, out var provided)) message = provided;
             }
+            catch (Exception exception)
+            {
+                // The entry is durable, so a source which can't provide a valid message dead-letters only that entry.
+                error = exception;
+            }
+
+            // No attempt starts once the retry timeout elapses, which keeps redeliveries within the receiver's
+            // deduplication window of any acceptance.
+            if (entry.State.ExpirationTime <= now) (unavailable ??= []).Add(new(entry, UnavailableKind.Expired, message, error));
+            else if (error is not null) (unavailable ??= []).Add(new(entry, UnavailableKind.Failed, null, error));
+            else if (message is { } candidate) (candidates ??= []).Add((entry, candidate));
+            else (unavailable ??= []).Add(new(entry, UnavailableKind.Unclaimed, null, null));
         }
-        if (candidates is null)
-        {
-            LogNoMessages(Logger, Count);
-            return null;
-        }
-        LogDeliveringMessages(Logger, candidates.Count);
-        return candidates;
+
+        if (candidates is null) LogNoMessages(Logger, Count);
+        else LogDeliveringMessages(Logger, candidates.Count);
+        return (candidates, unavailable);
     }
 
     private async Task<DeliveryOutcome> DeliverAsync(OutboxEntry entry, OutboxMessage message, CancellationToken cancellationToken)
     {
-        var startedAt = TimeProvider.GetUtcNow();
-        if (IsRetryExpired(entry.State, startedAt))
-        {
-            return new(entry, message, null, entry.State.LastError, TimeSpan.Zero, startedAt, true);
-        }
+        var startedAt = JobTimeProvider.GetUtcNow();
         var start = Stopwatch.GetTimestamp();
         try
         {
-            var target = Shared.GrainFactory.GetGrain<IMessagingExtension>(message.ReceiverId);
-            var inboxMessage = message.ToInboxMessage();
-            var pipeline = Options.DeliveryResiliencePipeline;
-            DeliveryResult result;
-            if (ReferenceEquals(pipeline, ResiliencePipeline.Empty))
-            {
-                result = await target.DeliverAsync(inboxMessage, cancellationToken).ConfigureAwait(true);
-            }
-            else
-            {
-                // Continue on the activation's scheduler so each try calls the receiver from this grain.
-                var context = ResilienceContextPool.Shared.Get(continueOnCapturedContext: true, cancellationToken);
-                try
-                {
-                    result = await pipeline.ExecuteAsync(
-                        static (context, state) => state.target.DeliverAsync(state.inboxMessage, context.CancellationToken),
-                        context,
-                        (target, inboxMessage)).ConfigureAwait(true);
-                }
-                finally
-                {
-                    ResilienceContextPool.Shared.Return(context);
-                }
-            }
-
-            return new(entry, message, result, null, Stopwatch.GetElapsedTime(start), startedAt, false);
+            var result = await Shared.Transport.DeliverAsync(message.ReceiverId, message.ToInboxMessage(), cancellationToken).ConfigureAwait(true);
+            return new(entry, message, result, null, Stopwatch.GetElapsedTime(start), startedAt);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return new(entry, message, null, "Delivery was canceled.", Stopwatch.GetElapsedTime(start), startedAt, false);
+            return new(entry, message, null, "Delivery was canceled.", Stopwatch.GetElapsedTime(start), startedAt);
         }
         catch (Exception exception)
         {
@@ -390,63 +403,73 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             {
                 LogDeliveryError(Logger, exception, message.Envelope.MessageId, message.ReceiverId);
             }
-            return new(entry, message, null, exception.ToString(), Stopwatch.GetElapsedTime(start), startedAt, false);
+            return new(entry, message, null, exception.ToString(), Stopwatch.GetElapsedTime(start), startedAt);
         }
     }
 
-    /// <summary>Advances outbox delivery and returns whether delivery outcomes were applied.</summary>
+    /// <summary>
+    /// Applies completed delivery attempts and starts attempts for due messages, keeping up to
+    /// <see cref="DurableMessagingOptions.OutboxBatchSize"/> attempts in flight, and returns whether it changed state.
+    /// </summary>
+    /// <remarks>
+    /// Each attempt completes on its own, so a slow receiver holds one slot without delaying messages to other receivers.
+    /// </remarks>
     internal async ValueTask<bool> AdvanceAsync(CancellationToken cancellationToken)
     {
-        if (_deliveries is { } pending)
+        var progress = false;
+        if (_outcomes.Count > 0)
         {
-            if (!pending.IsCompleted) return false;
-            _deliveries = null;
             cancellationToken.ThrowIfCancellationRequested();
-            await ApplyDeliveriesAsync(pending.Result).ConfigureAwait(true);
-            return true;
+            var outcomes = _outcomes.ToArray();
+            _outcomes.Clear();
+            foreach (var outcome in outcomes) _inFlight.Remove(outcome.Entry);
+            await ApplyDeliveriesAsync(outcomes).ConfigureAwait(true);
+            progress = true;
         }
 
-        List<OutboxEntry>? withdrawn = null;
-        List<(OutboxEntry Entry, Exception Error)>? failed = null;
-        var candidates = SelectMessages(ref withdrawn, ref failed);
-        var removed = withdrawn is not null || failed is not null;
-        if (removed) await RemoveUnavailableAsync(withdrawn, failed).ConfigureAwait(true);
-        if (candidates is null) return removed;
-        var attempts = new Task<DeliveryOutcome>[candidates.Count];
-        for (var index = 0; index < attempts.Length; index++)
+        var capacity = Options.OutboxBatchSize - _inFlight.Count;
+        if (capacity <= 0) return progress;
+        var (candidates, unavailable) = SelectMessages(capacity);
+
+        // Attempts start before any await, so no withdrawal or source change interleaves between materializing a message
+        // and calling its receiver.
+        if (candidates is not null)
         {
-            var (entry, message) = candidates[index];
-            attempts[index] = DeliverAsync(entry, message, _pump.ShutdownToken);
+            foreach (var (entry, message) in candidates) RunAttemptAsync(entry, message).Ignore();
         }
 
-        var deliveries = Task.WhenAll(attempts);
-        if (!deliveries.IsCompleted)
+        if (unavailable is not null)
         {
-            _deliveries = deliveries;
-            SignalOnCompletionAsync(deliveries).Ignore();
-            return false;
+            await DeadLetterUnavailableAsync(unavailable).ConfigureAwait(true);
+            progress = true;
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        await ApplyDeliveriesAsync(deliveries.Result).ConfigureAwait(true);
-        return true;
+        return progress;
     }
 
-    private async Task SignalOnCompletionAsync(Task deliveries)
+    private async Task RunAttemptAsync(OutboxEntry entry, OutboxMessage message)
     {
-        await deliveries.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+        _inFlight.Add(entry);
+        _running++;
+        var outcome = await DeliverAsync(entry, message, _pump.ShutdownToken).ConfigureAwait(true);
+        _outcomes.Add(outcome);
+        if (--_running == 0 && _drained is { } drained)
+        {
+            _drained = null;
+            drained.TrySetResult();
+        }
+
         _pump.Signal();
     }
 
     private async ValueTask ApplyDeliveriesAsync(DeliveryOutcome[] outcomes)
     {
-        Dictionary<MessageId, OutboxDeadLetter>? deadLetters = null;
         int applied = 0, delivered = 0, backpressured = 0;
         try
         {
             foreach (var outcome in outcomes)
             {
-                // Outcomes for entries which were replaced or removed since the attempt started are stale.
+                // An entry which was withdrawn, or removed and sent again, since its attempt started has a stale outcome.
                 var id = outcome.Entry.MessageId;
                 if (!_messages.TryGetValue(id, out var current) || !ReferenceEquals(current, outcome.Entry)) continue;
 
@@ -462,60 +485,103 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 else
                 {
                     if (status == DeliveryStatus.Backpressured) backpressured++;
-                    var (retry, deadLetter) = PrepareRetry(outcome, ref deadLetters);
-                    Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = id, State = retry, DeadLetter = deadLetter });
-                    if (deadLetter is not null) Retire(current, OutboxMessageRetirement.DeadLettered(deadLetter.Reason));
+                    var attemptCount = checked(current.State.AttemptCount + 1);
+                    var error = outcome.Error ?? status switch
+                    {
+                        DeliveryStatus.Backpressured => "The receiver is backpressured.",
+                        DeliveryStatus.HandlerNotFound => outcome.Result?.Message ?? "The receiver has no registered inbox handler.",
+                        _ => $"Unexpected delivery status '{status}'."
+                    };
+                    if (PrepareRetry(outcome, attemptCount, error) is { } retry)
+                    {
+                        Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = id, State = retry });
+                        MessagingEvents.EmitOutboxRetryScheduled(
+                            _pump.GrainContext, id, outcome.Message.ReceiverId, attemptCount, retry.NextAttemptAt!.Value, error);
+                    }
                     else
                     {
-                        MessagingEvents.EmitOutboxRetryScheduled(
-                            _pump.GrainContext,
-                            id,
-                            outcome.Message.ReceiverId,
-                            retry!.AttemptCount,
-                            retry.NextAttemptAt!.Value,
-                            retry.LastError!);
+                        // The source may release a reference entry's payload and headers when it retires, so the dead letter keeps a copy.
+                        StageDeadLetter(current, current.Reference is null ? outcome.Message : CopySourceMessage(outcome.Message), error, attemptCount);
                     }
                 }
+
                 RecordDeliveryMetrics(outcome);
                 applied++;
             }
-            if (deadLetters is not null) ApplyDeadLetters(deadLetters);
         }
         catch (Exception exception)
         {
             FailStaging(exception);
         }
+
         if (applied == 0) return;
         await PersistAsync().ConfigureAwait(true);
         LogDeliveryComplete(Logger, delivered, backpressured, applied - delivered - backpressured, Count);
     }
 
     /// <summary>
-    /// Removes reference entries whose sources withdrew their messages, without delivering or retiring them, and
-    /// dead-letters entries whose sources failed to provide a valid message.
+    /// Returns the retry state after a failed attempt, or <see langword="null"/> when the retry timeout has elapsed.
     /// </summary>
-    private async ValueTask RemoveUnavailableAsync(List<OutboxEntry>? withdrawn, List<(OutboxEntry Entry, Exception Error)>? failed)
+    private OutboxMessageState? PrepareRetry(DeliveryOutcome outcome, int attemptCount, string error)
+    {
+        // A receiver checks its deduplication records before it answers, so a Backpressured answer proves that it had not
+        // accepted the message when the attempt started. Only later attempts can be accepted, so the timeout restarts
+        // then; otherwise it runs from the send.
+        var now = JobTimeProvider.GetUtcNow();
+        var expirationTime = outcome.Result?.Status is DeliveryStatus.Backpressured
+            ? MessagingTime.AddClamped(outcome.StartedAt, Options.OutboxRetryTimeout)
+            : outcome.Entry.State.ExpirationTime!.Value;
+        if (expirationTime <= now) return null;
+
+        // The next attempt runs no later than the timeout, when the outbox dead-letters the message instead.
+        var retryAt = MessagingTime.AddClamped(now, MessagingTime.GetBackoff(Options.RetryInitialInterval, attemptCount));
+        return new OutboxMessageState
+        {
+            AttemptCount = attemptCount,
+            LastError = error,
+            ExpirationTime = expirationTime,
+            NextAttemptAt = retryAt < expirationTime ? retryAt : expirationTime
+        };
+    }
+
+    /// <summary>
+    /// Dead-letters entries without an attempt: those whose retry timeout elapsed, those whose owning sources failed to
+    /// provide a valid message, and recovered references which no registered source provides.
+    /// </summary>
+    private async ValueTask DeadLetterUnavailableAsync(List<Unavailable> unavailable)
     {
         try
         {
-            if (withdrawn is not null)
+            foreach (var (entry, kind, message, error) in unavailable)
             {
-                foreach (var entry in withdrawn)
+                var id = entry.MessageId;
+                switch (kind)
                 {
-                    Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = entry.MessageId });
-                    Shared.Instruments.OnOutboxMessageDelivered(Shared.GrainType, "withdrawn");
-                    if (entry.Source is null)
-                    {
-                        LogMessageUnprovided(Logger, entry.MessageId);
-                    }
-                    else
-                    {
-                        LogMessageWithdrawn(Logger, entry.MessageId);
-                    }
+                    case UnavailableKind.Expired:
+                        LogMessageExpired(Logger, id);
+                        StageDeadLetter(
+                            entry,
+                            message is not { } expired ? CreateUnmaterializedMessage(id) : entry.Reference is null ? expired : CopySourceMessage(expired),
+                            entry.State.LastError is { } last
+                                ? $"The outbox retry timeout elapsed after the last attempt failed: {last}"
+                                : "The outbox retry timeout elapsed before the message was delivered.",
+                            entry.State.AttemptCount);
+                        Shared.Instruments.OnOutboxMessageDelivered(Shared.GrainType, "expired");
+                        break;
+                    case UnavailableKind.Failed:
+                        LogSourceFailed(Logger, error!, id);
+                        StageDeadLetter(entry, CreateUnmaterializedMessage(id),
+                            $"The outbox message source failed to provide the message: {error}", checked(entry.State.AttemptCount + 1));
+                        Shared.Instruments.OnOutboxMessageDelivered(Shared.GrainType, "source_error");
+                        break;
+                    default:
+                        LogMessageUnprovided(Logger, id);
+                        StageDeadLetter(entry, CreateUnmaterializedMessage(id),
+                            "No registered outbox message source provides the message.", entry.State.AttemptCount);
+                        Shared.Instruments.OnOutboxMessageDelivered(Shared.GrainType, "unprovided");
+                        break;
                 }
             }
-
-            if (failed is not null) DeadLetterSourceFailures(failed);
         }
         catch (Exception exception)
         {
@@ -526,111 +592,40 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     }
 
     /// <summary>
-    /// Dead-letters reference entries whose owning sources threw or returned an invalid message, and retires them with
-    /// their sources in the same journal write.
+    /// Stages the removal of <paramref name="entry"/> with its dead letter, and retires it with its owning source, if any,
+    /// in the same journal write.
     /// </summary>
-    /// <remarks>
-    /// No valid message exists, so each dead letter carries only the message ID; see <see cref="CreateUnmaterializedMessage"/>.
-    /// The failed materialization counts as a delivery attempt.
-    /// </remarks>
-    private void DeadLetterSourceFailures(List<(OutboxEntry Entry, Exception Error)> failed)
+    private void StageDeadLetter(OutboxEntry entry, OutboxMessage message, string reason, int attemptCount)
     {
         var now = TimeProvider.GetUtcNow();
-        Dictionary<MessageId, OutboxDeadLetter>? deadLetters = null;
-        foreach (var (entry, error) in failed)
+        var id = entry.MessageId;
+        CompactDeadLetters(now, reservedCapacity: _deadLetters.ContainsKey(id) ? 0 : 1);
+        Emit(new()
         {
-            var id = entry.MessageId;
-            LogSourceFailed(Logger, error, id);
-            var letter = new OutboxDeadLetter
-            {
-                Message = CreateUnmaterializedMessage(id),
-                DeadLetteredAt = now,
-                Reason = $"The outbox message source failed to provide the message: {error}",
-                AttemptCount = checked(entry.State.AttemptCount + 1)
-            };
-            AddDeadLetter(ref deadLetters, letter);
-            Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = id, DeadLetter = letter });
-            Retire(entry, OutboxMessageRetirement.DeadLettered(letter.Reason));
-            Shared.Instruments.OnOutboxMessageDelivered(Shared.GrainType, "source_error");
-        }
-
-        ApplyDeadLetters(deadLetters!);
+            Kind = OutboxCommandKind.Delivery,
+            MessageId = id,
+            DeadLetter = new() { Message = message, DeadLetteredAt = now, Reason = reason, AttemptCount = attemptCount }
+        });
+        Retire(entry, OutboxMessageRetirement.DeadLettered(reason));
     }
 
-    /// <summary>Adds a dead letter to the retained dead letters, compacting them to make room.</summary>
-    private void AddDeadLetter(ref Dictionary<MessageId, OutboxDeadLetter>? deadLetters, OutboxDeadLetter letter)
+    private bool CompactDeadLetters(DateTimeOffset now, int reservedCapacity = 0)
     {
-        var key = letter.Message.Envelope.MessageId;
-        deadLetters ??= _deadLetters.ToDictionary(static pair => pair.Key, static pair => pair.Value);
-        DeadLetterRetention.Compact(deadLetters, letter.DeadLetteredAt, Options.DeadLetterRetentionPeriod,
-            Options.MaxRetainedDeadLetters, static entry => entry.DeadLetteredAt,
-            reservedCapacity: deadLetters.ContainsKey(key) ? 0 : 1);
-        deadLetters[key] = letter;
-    }
-
-    private void ApplyDeadLetters(Dictionary<MessageId, OutboxDeadLetter> entries)
-    {
-        foreach (var key in _deadLetters.Keys.Where(key => !entries.ContainsKey(key)).ToArray())
+        if (_deadLetters.Count == 0) return false;
+        var retained = new Dictionary<MessageId, OutboxDeadLetter>(_deadLetters);
+        if (!DeadLetterRetention.Compact(retained, now, Options.DeadLetterRetentionPeriod, Options.MaxRetainedDeadLetters,
+            static entry => entry.DeadLetteredAt, reservedCapacity))
         {
-            Emit(new() { Kind = OutboxCommandKind.RemoveDeadLetters, RemovedDeadLetters = [key] });
-        }
-        foreach (var entry in entries)
-        {
-            if (!_deadLetters.TryGetValue(entry.Key, out var existing) || !ReferenceEquals(existing, entry.Value))
-            {
-                Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = entry.Key, DeadLetter = entry.Value });
-            }
-        }
-    }
-
-    private (OutboxMessageState? Retry, OutboxDeadLetter? DeadLetter) PrepareRetry(
-        DeliveryOutcome outcome,
-        ref Dictionary<MessageId, OutboxDeadLetter>? deadLetters)
-    {
-        var previous = outcome.Entry.State;
-        var status = outcome.Result?.Status;
-        var now = TimeProvider.GetUtcNow();
-        var attemptCount = outcome.Expired ? previous.AttemptCount : checked(previous.AttemptCount + 1);
-
-        // A receiver checks its deduplication records before it answers, so a Backpressured answer proves that no earlier
-        // attempt was accepted. Only attempts since then can have been accepted, so retries expire OutboxRetryTimeout after
-        // the first of them, within the receiver's deduplication window.
-        var expirationTime = status is DeliveryStatus.Backpressured
-            ? (DateTimeOffset?)null
-            : previous.ExpirationTime ?? MessagingTime.AddClamped(outcome.StartedAt, Options.OutboxRetryTimeout);
-        var error = outcome.Error ?? status switch
-        {
-            DeliveryStatus.Backpressured => "The receiver is backpressured.",
-            DeliveryStatus.HandlerNotFound => outcome.Result?.Message ?? "The receiver has no registered inbox handler.",
-            _ => $"Unexpected delivery status '{status}'."
-        };
-        if (outcome.Expired
-            || status is not (null or DeliveryStatus.Backpressured or DeliveryStatus.HandlerNotFound)
-            || expirationTime <= now)
-        {
-            var letter = new OutboxDeadLetter
-            {
-                // The source may release a reference entry's payload and headers when it retires, so the dead letter keeps a copy.
-                Message = outcome.Entry.Reference is null ? outcome.Message : CopySourceMessage(outcome.Message),
-                DeadLetteredAt = now,
-                Reason = error,
-                AttemptCount = attemptCount
-            };
-            AddDeadLetter(ref deadLetters, letter);
-            return (null, letter);
+            return false;
         }
 
-        // Failed attempts return to the outbox with a durable backoff, so later batches deliver other messages meanwhile.
-        var exponent = Math.Min(attemptCount - 1, DurableMessagingOptions.MaximumBackoffExponent);
-        return (new OutboxMessageState
+        Emit(new()
         {
-            AttemptCount = attemptCount,
-            LastError = error,
-            ExpirationTime = expirationTime,
-            NextAttemptAt = MessagingTime.AddClamped(now, TimeSpan.FromTicks(Options.RetryInitialInterval.Ticks * (1L << exponent)))
-        }, null);
+            Kind = OutboxCommandKind.RemoveDeadLetters,
+            RemovedDeadLetters = _deadLetters.Keys.Where(key => !retained.ContainsKey(key)).ToArray()
+        });
+        return true;
     }
-
     private void RecordDeliveryMetrics(DeliveryOutcome outcome)
     {
         var message = outcome.Message;
@@ -675,56 +670,42 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         }
     }
 
-    private static bool IsRetryExpired(OutboxMessageState state, DateTimeOffset now) => state.ExpirationTime <= now;
-
-    private bool IsReadyForAttempt(OutboxMessageState state, DateTimeOffset now) =>
-        IsRetryExpired(state, now) || state.NextAttemptAt is null || state.NextAttemptAt <= now;
-
-    private DateTimeOffset GetNextAttemptAt(OutboxMessageState state, DateTimeOffset now)
-    {
-        var retryAt = state.NextAttemptAt ?? now;
-        return state.ExpirationTime < retryAt ? state.ExpirationTime.Value : retryAt;
-    }
-
     /// <summary>
-    /// Returns the delay until the next delivery attempt is due, or <see langword="null"/> when the outbox is empty.
+    /// Returns the delay until the next captured delivery attempt is due, or <see langword="null"/> when none remain.
     /// </summary>
     /// <param name="now">The current Durable Jobs time.</param>
     internal TimeSpan? GetNextWakeupDelay(DateTimeOffset now)
     {
-        if (Count == 0) return null;
-        var next = DateTimeOffset.MaxValue;
+        TimeSpan? next = null;
         foreach (var entry in _messages.Values)
         {
-            var at = GetNextAttemptAt(entry.State, now);
-            if (at < next) next = at;
+            // Capture follows synchronous preparation; its wake-up covers the write until acknowledgement.
+            if (entry.Sequence > _capturedSequence) continue;
+            var at = entry.State.NextAttemptAt ?? now;
+            var delay = at > now ? at - now : TimeSpan.Zero;
+            if (delay == TimeSpan.Zero) return delay;
+            if (next is null || delay < next) next = delay;
         }
-        return next > now ? next - now : TimeSpan.Zero;
+        return next;
     }
 
     internal async Task StartAsync(CancellationToken cancellationToken)
     {
-        if (_deadLetters.Count > Options.MaxRetainedDeadLetters || _deadLetters.Values.Any(entry =>
-            MessagingTime.IsExpired(TimeProvider.GetUtcNow(), entry.DeadLetteredAt, Options.DeadLetterRetentionPeriod)))
+        cancellationToken.ThrowIfCancellationRequested();
+        try
         {
-            var retained = _deadLetters.ToDictionary(static pair => pair.Key, static pair => pair.Value);
-            DeadLetterRetention.Compact(retained, TimeProvider.GetUtcNow(),
-                Options.DeadLetterRetentionPeriod, Options.MaxRetainedDeadLetters, static entry => entry.DeadLetteredAt);
-            try
-            {
-                ApplyDeadLetters(retained);
-            }
-            catch (Exception exception)
-            {
-                FailStaging(exception);
-            }
-            await PersistAsync().ConfigureAwait(true);
+            if (!CompactDeadLetters(TimeProvider.GetUtcNow())) return;
         }
+        catch (Exception exception)
+        {
+            FailStaging(exception);
+        }
+
+        await PersistAsync().ConfigureAwait(true);
     }
 
     /// <summary>Waits for in-flight deliveries, which observe the pump's shutdown token.</summary>
-    internal Task StopAsync() => (Task?)_deliveries ?? Task.CompletedTask;
-
+    internal Task StopAsync() => _running == 0 ? Task.CompletedTask : (_drained ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
     /// <summary>Releases the reported depth once the activation's messaging state is discarded.</summary>
     internal void ReleaseDepth() => ReportDepth(-_messages.Count);
 
@@ -757,13 +738,16 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     [LoggerMessage(Level = LogLevel.Information, Message = "Removed outbox message {MessageId}, which its source withdrew")]
     private static partial void LogMessageWithdrawn(ILogger logger, MessageId messageId);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Removed outbox message {MessageId}, which no registered outbox message source provides")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Dead-lettered recovered outbox message {MessageId}, which no registered outbox message source provides")]
     private static partial void LogMessageUnprovided(ILogger logger, MessageId messageId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Dead-lettered outbox message {MessageId}, whose retry timeout elapsed")]
+    private static partial void LogMessageExpired(ILogger logger, MessageId messageId);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "The outbox message source failed to provide message {MessageId}; the message is dead-lettered")]
     private static partial void LogSourceFailed(ILogger logger, Exception exception, MessageId messageId);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Outbox delivery complete: {DeliveredCount} delivered, {BackpressuredCount} backpressured, {FailedCount} failed, {RemainingCount} remaining")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Outbox delivery complete: {DeliveredCount} delivered, {BackpressuredCount} backpressured, {FailedCount} failed, {RemainingCount} remaining")]
     private static partial void LogDeliveryComplete(ILogger logger, int deliveredCount, int backpressuredCount, int failedCount, int remainingCount);
 
     private readonly record struct DeliveryOutcome(
@@ -772,6 +756,9 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         DeliveryResult? Result,
         string? Error,
         TimeSpan Duration,
-        DateTimeOffset StartedAt,
-        bool Expired);
+        DateTimeOffset StartedAt);
+
+    private enum UnavailableKind { Expired, Failed, Unclaimed }
+
+    private readonly record struct Unavailable(OutboxEntry Entry, UnavailableKind Kind, OutboxMessage? Message, Exception? Error);
 }

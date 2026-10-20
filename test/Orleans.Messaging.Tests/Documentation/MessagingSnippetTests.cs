@@ -118,17 +118,18 @@ public sealed class MessagingSnippetTests : IDisposable
     [InlineData(null)]
     [InlineData("")]
     [InlineData(" ")]
-    public async Task NotificationHandling_InvalidBodyLeavesBusinessAndCompletionUnchanged(string? body)
+    public async Task NotificationHandling_InvalidBodyDeadLettersWithoutBusinessChange(string? body)
     {
-        var attempt = await CreateAsync(new Notify(body));
-        var exception = await Assert.ThrowsAnyAsync<ArgumentException>(async () =>
-            await attempt.Handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
+        var attempt = await CreateAsync(new Notify(body, Sender));
+        var handling = attempt.Handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
 
-        Assert.IsType(body is null ? typeof(ArgumentNullException) : typeof(ArgumentException), exception);
-        Assert.Equal("message.Text", exception.ParamName);
+        Assert.True(handling.IsCompletedSuccessfully);
+        await handling;
         Assert.Equal(7, attempt.Count.Value);
         Assert.Empty(attempt.Output);
-        Assert.Empty(attempt.Events);
+        Assert.Equal(new[] { "dead-letter" }, attempt.Events);
+        attempt.Context.Received(1).Fail("A notification requires text.");
+        attempt.Context.DidNotReceive().Complete();
     }
 
     [Fact]
@@ -498,6 +499,40 @@ public sealed class MessagingSnippetTests : IDisposable
         Assert.Equal(7, count.Value);
     }
 
+    [Fact]
+    public async Task NotificationSender_RepeatedCommandIdStagesAnIdenticalMessage()
+    {
+        var outbox = Substitute.For<IOutbox>();
+        var state = Substitute.For<IDurableStateManager>();
+        var grain = new NotificationSenderGrain(outbox, state, _messages);
+        var output = new List<OutboxMessage>();
+        outbox.When(value => value.Send(Arg.Any<OutboxMessage>())).Do(call => output.Add(call.Arg<OutboxMessage>()));
+
+        await grain.SendAsync(Command, Receiver, "hello");
+        await grain.SendAsync(Command, Receiver, "hello");
+
+        // The outbox and the receiver deduplicate equivalent messages by ID.
+        Assert.Equal(2, output.Count);
+        Assert.All(output, message => Assert.Equal(Command, message.Envelope.MessageId));
+        Assert.Equal(output[0].Envelope.Payload, output[1].Envelope.Payload);
+        Assert.Equal(new Notify("hello"), Type<Notify>().Decode(output[0].Envelope));
+        Assert.Equal(Receiver, output[0].ReceiverId);
+        await state.Received(2).WriteStateAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task NotificationSender_StagingFailureWritesNothing()
+    {
+        var outbox = Substitute.For<IOutbox>();
+        var state = Substitute.For<IDurableStateManager>();
+        var grain = new NotificationSenderGrain(outbox, state, _messages);
+        outbox.When(value => value.Send(Arg.Any<OutboxMessage>())).Do(_ => throw new IOException("staging failed"));
+
+        await Assert.ThrowsAsync<IOException>(() => grain.SendAsync(Command, Receiver, "hello"));
+
+        await state.DidNotReceive().WriteStateAsync(Arg.Any<CancellationToken>());
+    }
+
     private async Task<Attempt> CreateAsync(Notify message)
     {
         var outbox = Substitute.For<IOutbox>();
@@ -513,6 +548,7 @@ public sealed class MessagingSnippetTests : IDisposable
             events.Add("send");
         });
         context.When(value => value.Complete()).Do(_ => events.Add("complete"));
+        context.When(value => value.Fail(Arg.Any<string>())).Do(_ => events.Add("dead-letter"));
         var handler = new TestInbox();
         var grain = new NotificationGrain(handler, outbox, _messages, count);
         await grain.OnActivateAsync(TestContext.Current.CancellationToken);

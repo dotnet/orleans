@@ -20,14 +20,15 @@ public interface IMessagingExtension : IGrainExtension
     /// <param name="message">The received command with a required identity and payload; its receiver is this grain.</param>
     /// <param name="cancellationToken">Cancels the caller's wait for delivery.</param>
     /// <remarks>
-    /// <para>
     /// Direct admission shares the payload array, header dictionary, and header value arrays under the immutable-publication contract.
     /// RPC copying and deserialization isolate payload arrays, header dictionaries, and header value arrays using ordinary Orleans serialization.
     /// A successful result means the inbox durably accepted the message, or already processed it.
-    /// </para>
     /// <para>
-    /// Delivery admits the message into the inbox and commits it without running grain code, so it interleaves with the
-    /// grain's requests: a message, such as a cancellation, reaches a grain whose running request awaits other work.
+    /// Deliveries interleave with the grain's other requests. A delivery runs no handler: it validates, deduplicates,
+    /// and stages the message's acceptance synchronously, then waits for that journal write, and the messaging pump runs
+    /// handlers later. An inbox message sink runs synchronously within the delivery, so it can run while a request is
+    /// suspended at an await, as handlers can. Interleaving lets concurrent deliveries share journal writes, and lets a
+    /// message reach a grain whose running request waits for it.
     /// </para>
     /// </remarks>
     /// <returns>Result indicating delivery/processing status.</returns>
@@ -35,6 +36,7 @@ public interface IMessagingExtension : IGrainExtension
     /// <paramref name="message"/> has an unset message ID, exceeds identity admission limits, or has invalid payload or headers.
     /// Optional standard metadata is validated where its contract is consumed.
     /// </exception>
-    [Alias("DeliverAsync"), AlwaysInterleave]
+    [Alias("DeliverAsync")]
+    [AlwaysInterleave]
     ValueTask<DeliveryResult> DeliverAsync(InboxMessage message, CancellationToken cancellationToken = default);
 }

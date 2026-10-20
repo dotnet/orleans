@@ -18,9 +18,6 @@ internal sealed partial class Inbox
     private readonly Dictionary<MessageId, InboxDeadLetter> _deadLetters = [];
     private JournalStreamWriter _writer;
 
-    // Pending messages with a delivery time, which do not count toward MaxCapacity.
-    private int _scheduledCount;
-
     // Acceptances and completions are durable once a completed write captured their sequence number.
     private long _lastSequence;
     private long _capturedSequence;
@@ -35,10 +32,20 @@ internal sealed partial class Inbox
     // Whether every processed record which deduplication relies on is durable.
     private bool AreCompletionsDurable => _lastCompletionSequence <= _durableSequence;
 
+    // The handler attempt in progress, whose staged changes the inbox discards if it fails.
+    private HandlerExecution? _execution;
+
     // Every journal write prepares every state, so a write which makes a message or a work source's work pending ensures
-    // its wake-up before it can become durable.
+    // its wake-up before it can become durable. After messaging fails, in-memory state may hold changes which must not
+    // commit, such as a failed handler's, so every later write fails and recovery starts from the journal.
     ValueTask IStateMachine.PrepareWriteAsync(CancellationToken cancellationToken)
     {
+        if (_pump.IsFailed)
+        {
+            return ValueTask.FromException(new InvalidOperationException(
+                "Messaging failed for this activation, so its uncommitted changes are discarded by recovery from the journal."));
+        }
+
         var dueTime = _stagedWakeup;
         if (GetWorkSourceDelay() is { } delay)
         {
@@ -82,7 +89,6 @@ internal sealed partial class Inbox
         _processed.Clear();
         _rejections.Clear();
         _deadLetters.Clear();
-        _scheduledCount = 0;
         _stagedWakeup = null;
         _lastSequence = _capturedSequence = _durableSequence = _lastCompletionSequence = 0;
     }
@@ -157,22 +163,19 @@ internal sealed partial class Inbox
                 _messages.Add(message.Envelope.MessageId, new InboxEntry { Message = message, State = new(), Sequence = ++_lastSequence });
                 _processed.Remove(message.Envelope.MessageId);
                 _rejections.Remove(message.Envelope.MessageId);
-                if (message.Envelope.DeliverAt is not null) _scheduledCount++;
                 ReportDepth(1);
                 break;
             case InboxCommandKind.Retry:
                 _messages[command.MessageId].State = command.State ?? throw new InvalidOperationException("A retry command requires its state.");
                 break;
             case InboxCommandKind.Complete:
-                if (_messages.Remove(command.MessageId, out var completed))
-                {
-                    if (completed.Message.Envelope.DeliverAt is not null) _scheduledCount--;
-                    ReportDepth(-1);
-                }
+                if (_messages.Remove(command.MessageId)) ReportDepth(-1);
 
                 _processed[command.MessageId] = command.ProcessedAt;
                 _lastCompletionSequence = ++_lastSequence;
+                // A completion replaces any earlier rejection of the ID, so a duplicate learns the latest outcome.
                 if (command.Rejection is { } rejection) _rejections[command.MessageId] = rejection;
+                else _rejections.Remove(command.MessageId);
                 if (command.DeadLetter is { } letter) _deadLetters[command.MessageId] = letter;
                 break;
             case InboxCommandKind.RemoveDeadLetters:
@@ -185,12 +188,7 @@ internal sealed partial class Inbox
                 _processed.Clear();
                 _rejections.Clear();
                 _deadLetters.Clear();
-                _scheduledCount = 0;
-                foreach (var restored in snapshot.Messages)
-                {
-                    _messages.Add(restored.Message.Envelope.MessageId, restored);
-                    if (restored.Message.Envelope.DeliverAt is not null) _scheduledCount++;
-                }
+                foreach (var restored in snapshot.Messages) _messages.Add(restored.Message.Envelope.MessageId, restored);
 
                 ReportDepth(_messages.Count - previousCount);
 

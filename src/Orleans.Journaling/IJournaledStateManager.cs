@@ -83,4 +83,15 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// concurrent writers and should not be used for correctness decisions.
     /// </remarks>
     long PendingWriteByteCount => -1;
+
+    /// <summary>
+    /// Gets a count which advances whenever a registered state stages a change and never decreases, or a negative value
+    /// when the manager doesn't track staged changes.
+    /// </summary>
+    /// <remarks>
+    /// The built-in durable states advance it when they are modified, and any state advances it when it commits a
+    /// journal entry outside a write. A write captures changes without advancing it. Comparing two readings taken on the
+    /// activation's scheduler shows whether any state staged a change between them.
+    /// </remarks>
+    long StagedChangeCount => -1;
 }

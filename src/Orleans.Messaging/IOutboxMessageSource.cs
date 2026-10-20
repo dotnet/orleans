@@ -13,24 +13,24 @@ namespace Orleans.Messaging;
 /// <para>
 /// The outbox calls <see cref="TryGetMessage"/> when the message is sent and before every delivery attempt. The first
 /// registered source which returns the message owns it for the activation's lifetime; for an entry recovered from the
-/// journal, the first source which doesn't return <see langword="false"/>, including one which throws, owns it. When the
-/// entry retires, the outbox calls the owner's <see cref="OnRetired"/> exactly once, synchronously, while it stages the
-/// entry's removal, so changes the source stages in its journaled state commit in the same journal write as that
-/// removal.
+/// journal, the first source which returns the message or throws owns it. When the entry retires, the outbox calls the
+/// owner's <see cref="OnRetired"/> exactly once, synchronously, while it stages the entry's removal, so changes the
+/// source stages in its journaled state commit in the same journal write as that removal.
 /// </para>
 /// <para>
-/// A source withdraws a pending message by returning <see langword="false"/> from <see cref="TryGetMessage"/>, for
-/// example after the application times it out or an administrator removes it. Before its next delivery attempt, the
-/// outbox removes the withdrawn entry without delivering it or calling <see cref="OnRetired"/>. An attempt already in
-/// flight still completes, so a source can receive <see cref="OnRetired"/> for a message it withdrew.
+/// A source withdraws a pending message through <see cref="IOutbox.Withdraw"/>, for example after the application times
+/// it out or an administrator removes it, and releases its payload in the same journal write. The outbox removes the
+/// entry without calling <see cref="OnRetired"/> and makes no further delivery attempt. An attempt already in flight can
+/// still deliver the message.
 /// </para>
 /// <para>
 /// A source which can't provide a pending message after its send, for example because its stored payload no longer
 /// decodes, throws from <see cref="TryGetMessage"/>; an invalid message is handled the same way. The outbox then
 /// dead-letters that entry alone, without delivering it, and calls <see cref="OnRetired"/> with
-/// <see cref="OutboxMessageRetirementStatus.DeadLettered"/>; the grain's messaging and its other messages are unaffected. Because no valid message exists, the dead letter's message carries only its
-/// <see cref="Envelope.MessageId"/>, with an empty payload and a default <see cref="OutboxMessage.ReceiverId"/>, and its
-/// reason records the failure.
+/// <see cref="OutboxMessageRetirementStatus.DeadLettered"/>; the grain's messaging and its other messages are
+/// unaffected. A recovered entry which no registered source provides is dead-lettered the same way, without an owner to
+/// notify. Because no valid message exists, the dead letter's message carries only its <see cref="Envelope.MessageId"/>,
+/// with an empty payload and a default <see cref="OutboxMessage.ReceiverId"/>, and its reason records the failure.
 /// </para>
 /// <para>
 /// All calls run on the activation scheduler. Register sources during activation setup, before journal recovery: a
@@ -47,15 +47,16 @@ public interface IOutboxMessageSource
     /// is <paramref name="messageId"/> and whose receiver is another grain.
     /// </param>
     /// <returns>
-    /// <see langword="true"/> when this source provides the message; <see langword="false"/> when it doesn't provide the
-    /// message or has withdrawn it.
+    /// <see langword="true"/> when this source provides the message; <see langword="false"/> when the message isn't
+    /// this source's.
     /// </returns>
     /// <remarks>
     /// The outbox validates the message. During <see cref="IOutbox.Send(MessageId)"/>, an exception or an invalid
-    /// message fails the send, and nothing is staged. Afterwards, the entry is durable: an exception or an invalid message,
-    /// including one with a different <see cref="Envelope.MessageId"/> or addressed to the sending grain, dead-letters the
-    /// entry with its failure as the reason, counting the failed materialization as a delivery attempt, and the outbox
-    /// then calls <see cref="OnRetired"/> with <see cref="OutboxMessageRetirementStatus.DeadLettered"/>.
+    /// message fails the send, and nothing is staged. Afterwards, the entry is durable: an exception, an invalid message,
+    /// including one with a different <see cref="Envelope.MessageId"/> or addressed to the sending grain, or
+    /// <see langword="false"/> from the source which owns the entry dead-letters the entry with its failure as the
+    /// reason, counting the failed materialization as a delivery attempt, and the outbox then calls
+    /// <see cref="OnRetired"/> with <see cref="OutboxMessageRetirementStatus.DeadLettered"/>.
     /// </remarks>
     bool TryGetMessage(MessageId messageId, out OutboxMessage message);
 
@@ -96,6 +97,7 @@ public readonly struct OutboxMessageRetirement
     public static OutboxMessageRetirement Delivered() => new() { Status = OutboxMessageRetirementStatus.Delivered };
 
     /// <summary>Creates a retirement of a message which the outbox dead-lettered for <paramref name="reason"/>.</summary>
+    /// <param name="reason">The dead letter's reason.</param>
     public static OutboxMessageRetirement DeadLettered(string reason) => new()
     {
         Status = OutboxMessageRetirementStatus.DeadLettered,

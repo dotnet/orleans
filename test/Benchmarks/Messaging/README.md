@@ -19,16 +19,14 @@ single-chain throughput with low-latency local storage. Persistent provider late
 cross-silo networking, and concurrent independent chains are separate comparison
 axes.
 
-Acknowledged intents and completed remote deliveries wake local, non-interleaving
-pump turns immediately. Durable Jobs supplies recovery, retry deadlines, and
-empty-owner retirement. The benchmark uses volatile storage's default snapshot
-limits: **100 appends or 1 MiB**, whichever is reached first.
-
-The outbox retains an idle recovery handle for the default 100 ms grace, amortizing
-job-provider work over a burst. Local delivery wakes remain immediate. Activation
-pumps reuse timer/state infrastructure and one-message delivery uses scalar
-accounting. Journal storage manages its own buffering independently of message
-payload and header arrays. Record the grace and storage settings when comparing earlier builds.
+Acknowledged intents and completed remote deliveries wake the activation's pump
+immediately. Durable Jobs supplies recovery and retry deadlines: a write schedules a
+wake-up only when the grain has none due within the pump's one-second recheck delay,
+so a busy chain performs about one Durable Jobs operation per idle-to-busy transition
+rather than one per message. In-memory job storage makes those operations cheap, so
+compare against persistent job storage to measure their cost. The benchmark uses
+volatile storage's default snapshot limits: **100 appends or 1 MiB**, whichever is
+reached first. Record the storage settings when comparing builds.
 
 Iteration setup recreates the cluster and warms one complete chain. Each iteration
 contains one measured invocation, keeping journal and deduplication history bounded

@@ -16,6 +16,7 @@ public sealed class CatalogItemGrain : DurableGrain, ICatalogItemGrain
     private readonly OrderMessages _messages;
     private readonly IDurableValue<CatalogItem> _item;
     private readonly IDurableDictionary<Guid, int> _reservations;
+    private readonly IDurableDictionary<Guid, StockReservation> _reservationOutcomes;
 
     public CatalogItemGrain(IInbox inbox, IOutbox outbox, OrderMessages messages)
     {
@@ -23,6 +24,7 @@ public sealed class CatalogItemGrain : DurableGrain, ICatalogItemGrain
         _messages = messages;
         _item = StateManager.GetOrAddValue<CatalogItem>("item");
         _reservations = StateManager.GetOrAddDictionary<Guid, int>("reservations");
+        _reservationOutcomes = StateManager.GetOrAddDictionary<Guid, StockReservation>("reservation-outcomes");
         inbox.Register(messages.ReserveStock, HandleReserve)
             .Register(messages.ReleaseStock, HandleRelease)
             .Register(messages.CommitStock, HandleCommit);
@@ -36,9 +38,22 @@ public sealed class CatalogItemGrain : DurableGrain, ICatalogItemGrain
     public Task<CatalogItem?> GetAsync() => Task.FromResult(Item);
 
     // The reply is staged before stock changes, so a failed send leaves stock untouched for the retry.
-    // An order which already holds a reservation is confirmed without reserving again.
+    // Each order retains its outcome after release or commit, independently of inbox deduplication.
     private void HandleReserve(ReserveStock request, IInboxHandlerContext context)
     {
+        if (_reservationOutcomes.TryGetValue(request.OrderId, out var outcome))
+        {
+            if (outcome.Units is { } units && units != request.Units)
+            {
+                context.Fail($"Order {request.OrderId} already requested a different reservation quantity.");
+                return;
+            }
+
+            _outbox.SendReply(_messages.StockResult, context, request.ReplyTo, new StockResult(ProductId, outcome.Confirmed));
+            context.Complete();
+            return;
+        }
+
         var item = Item;
         var reserved = _reservations.ContainsKey(request.OrderId);
         var reserve = !reserved && item is not null && request.Units > 0 && item.AvailableStock >= request.Units;
@@ -54,11 +69,14 @@ public sealed class CatalogItemGrain : DurableGrain, ICatalogItemGrain
             _reservations[request.OrderId] = request.Units;
         }
 
+        _reservationOutcomes[request.OrderId] = new(request.Units, reserved || reserve);
         context.Complete();
     }
 
     private void HandleRelease(ReleaseStock request, IInboxHandlerContext context)
     {
+        // A release which overtakes the reserve records a terminal rejection for that order.
+        _reservationOutcomes.TryAdd(request.OrderId, new(null, false));
         if (_reservations.Remove(request.OrderId, out var units))
         {
             var item = Item!;
@@ -74,6 +92,7 @@ public sealed class CatalogItemGrain : DurableGrain, ICatalogItemGrain
 
     private void HandleCommit(CommitStock request, IInboxHandlerContext context)
     {
+        _reservationOutcomes.TryAdd(request.OrderId, new(null, false));
         if (_reservations.Remove(request.OrderId, out var units))
         {
             var item = Item!;

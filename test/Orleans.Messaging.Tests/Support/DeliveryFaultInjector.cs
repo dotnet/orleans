@@ -1,12 +1,10 @@
 using System.Collections.Concurrent;
-using Polly;
-using Polly.Timeout;
+using Orleans.Runtime;
 
 namespace Orleans.Messaging.Tests.Support;
 
 /// <summary>
-/// Injects scripted faults into the outbox's call to the receiver, as a strategy of
-/// <see cref="Configuration.DurableMessagingOptions.DeliveryResiliencePipeline"/>.
+/// Injects scripted faults into the outbox's call to the receiver by decorating each silo's outbox transport.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -19,7 +17,7 @@ namespace Orleans.Messaging.Tests.Support;
 /// can assert what the receiver decided independently of what the sender observed.
 /// </para>
 /// </remarks>
-public sealed class DeliveryFaultInjector : ResilienceStrategy
+public sealed class DeliveryFaultInjector
 {
     private readonly ConcurrentQueue<DeliveryFault> _script = new();
     private readonly CountSignal _executions = new();
@@ -28,7 +26,7 @@ public sealed class DeliveryFaultInjector : ResilienceStrategy
     private readonly List<DeliveryStatus> _answers = [];
     private Func<DeliveryFault>? _repeat;
 
-    /// <summary>Gets the number of delivery tries which reached this strategy.</summary>
+    /// <summary>Gets the number of delivery tries which reached the injector.</summary>
     public int Executions => _executions.Value;
 
     /// <summary>Gets the number of tries which called the receiver.</summary>
@@ -43,12 +41,8 @@ public sealed class DeliveryFaultInjector : ResilienceStrategy
         }
     }
 
-    /// <summary>Creates a pipeline which consists of this strategy only.</summary>
-    public ResiliencePipeline CreatePipeline() => AddTo(new ResiliencePipelineBuilder()).Build();
-
-    /// <summary>Adds this strategy to <paramref name="builder"/>, innermost after the strategies added before it.</summary>
-    public ResiliencePipelineBuilder AddTo(ResiliencePipelineBuilder builder) =>
-        builder.AddStrategy(_ => this, new Options());
+    /// <summary>Returns a transport which injects this injector's faults into calls through <paramref name="inner"/>.</summary>
+    internal IOutboxTransport Wrap(IOutboxTransport inner) => new Transport(this, inner);
 
     /// <summary>Scripts <paramref name="faults"/> for the next delivery tries, in order.</summary>
     public void Enqueue(params DeliveryFault[] faults)
@@ -62,7 +56,14 @@ public sealed class DeliveryFaultInjector : ResilienceStrategy
     /// <summary>Lets tries call the receiver unchanged once the script is exhausted.</summary>
     public void StopRepeating() => _repeat = null;
 
-    /// <summary>Waits until <paramref name="count"/> tries have reached this strategy.</summary>
+    /// <summary>Discards scripted faults which no try has taken, and stops repeating.</summary>
+    public void Clear()
+    {
+        _script.Clear();
+        _repeat = null;
+    }
+
+    /// <summary>Waits until <paramref name="count"/> tries have reached the injector.</summary>
     public Task WaitForExecutionsAsync(int count) => _executions.WaitAsync(count);
 
     /// <summary>Waits until <paramref name="count"/> tries have called the receiver.</summary>
@@ -75,104 +76,81 @@ public sealed class DeliveryFaultInjector : ResilienceStrategy
         return Answers;
     }
 
-    protected override ValueTask<Outcome<TResult>> ExecuteCore<TResult, TState>(
-        Func<ResilienceContext, TState, ValueTask<Outcome<TResult>>> callback,
-        ResilienceContext context,
-        TState state)
+    // Awaits continue on the sending activation's scheduler, so every receiver call is made from the sending grain.
+    private ValueTask<DeliveryResult> DeliverAsync(IOutboxTransport inner, GrainId receiver, InboxMessage message, CancellationToken cancellationToken)
     {
         _executions.Increment();
         var fault = _script.TryDequeue(out var scripted) ? scripted : _repeat?.Invoke();
-        return fault is null ? CallReceiverAsync(callback, context, state, null) : PlayAsync(fault, callback, context, state);
+        return fault is null
+            ? CallReceiverAsync(inner, receiver, message, cancellationToken, null)
+            : PlayAsync(fault, inner, receiver, message, cancellationToken);
     }
 
-    private async ValueTask<Outcome<TResult>> PlayAsync<TResult, TState>(
-        DeliveryFault fault,
-        Func<ResilienceContext, TState, ValueTask<Outcome<TResult>>> callback,
-        ResilienceContext context,
-        TState state)
+    private async ValueTask<DeliveryResult> PlayAsync(
+        DeliveryFault fault, IOutboxTransport inner, GrainId receiver, InboxMessage message, CancellationToken cancellationToken)
     {
-        var continueOnCapturedContext = context.ContinueOnCapturedContext;
-        var cancellationToken = context.CancellationToken;
         if (fault.Kind != DeliveryFaultKind.HoldAfterCall) fault.OnEntered();
         switch (fault.Kind)
         {
             case DeliveryFaultKind.Throw:
-                return Outcome.FromException<TResult>(fault.Exception!);
+                throw fault.Exception!;
             case DeliveryFaultKind.TimeOut:
-                return Outcome.FromException<TResult>(new TimeoutRejectedException("Injected delivery timeout before the receiver was called."));
+                throw new TimeoutException("Injected delivery timeout before the receiver was called.");
             case DeliveryFaultKind.Answer:
-                return Outcome.FromResult((TResult)(object)fault.Result!.Value);
+                return fault.Result!.Value;
             case DeliveryFaultKind.TimeOutInFlight:
                 // The abandoned call continues to the receiver; its answer is observable through ReceiverAnswer only.
-                _ = CallReceiverAsync(callback, context, state, fault).AsTask();
-                return Outcome.FromException<TResult>(new TimeoutRejectedException("Injected delivery timeout while the receiver call was in flight."));
+                CallReceiverAsync(inner, receiver, message, cancellationToken, fault).AsTask().Ignore();
+                throw new TimeoutException("Injected delivery timeout while the receiver call was in flight.");
             case DeliveryFaultKind.LoseResponse:
-                await CallReceiverAsync(callback, context, state, fault).ConfigureAwait(continueOnCapturedContext);
-                return Outcome.FromException<TResult>(new TimeoutRejectedException("Injected loss of the receiver's response."));
+                try
+                {
+                    await CallReceiverAsync(inner, receiver, message, cancellationToken, fault);
+                }
+                catch
+                {
+                }
+
+                throw new TimeoutException("Injected loss of the receiver's response.");
             case DeliveryFaultKind.HoldBeforeCall:
-                try
-                {
-                    await fault.WaitForReleaseAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext);
-                }
-                catch (Exception exception)
-                {
-                    return Outcome.FromException<TResult>(exception);
-                }
-
-                return await CallReceiverAsync(callback, context, state, fault).ConfigureAwait(continueOnCapturedContext);
+                await fault.WaitForReleaseAsync(cancellationToken);
+                return await CallReceiverAsync(inner, receiver, message, cancellationToken, fault);
             case DeliveryFaultKind.HoldAfterCall:
-                var outcome = await CallReceiverAsync(callback, context, state, fault).ConfigureAwait(continueOnCapturedContext);
+                var answer = await CallReceiverAsync(inner, receiver, message, cancellationToken, fault);
                 fault.OnEntered();
-                try
-                {
-                    await fault.WaitForReleaseAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext);
-                }
-                catch (Exception exception)
-                {
-                    return Outcome.FromException<TResult>(exception);
-                }
-
-                return outcome;
+                await fault.WaitForReleaseAsync(cancellationToken);
+                return answer;
             default:
                 throw new InvalidOperationException($"Unknown delivery fault '{fault.Kind}'.");
         }
     }
 
-    private async ValueTask<Outcome<TResult>> CallReceiverAsync<TResult, TState>(
-        Func<ResilienceContext, TState, ValueTask<Outcome<TResult>>> callback,
-        ResilienceContext context,
-        TState state,
-        DeliveryFault? fault)
+    private async ValueTask<DeliveryResult> CallReceiverAsync(
+        IOutboxTransport inner, GrainId receiver, InboxMessage message, CancellationToken cancellationToken, DeliveryFault? fault)
     {
-        var continueOnCapturedContext = context.ContinueOnCapturedContext;
         _receiverCalls.Increment();
-        Outcome<TResult> outcome;
+        DeliveryResult result;
         try
         {
-            outcome = await callback(context, state).ConfigureAwait(continueOnCapturedContext);
+            result = await inner.DeliverAsync(receiver, message, cancellationToken);
         }
         catch (Exception exception)
         {
-            outcome = Outcome.FromException<TResult>(exception);
+            fault?.OnAnswered(exception);
+            throw;
         }
 
-        if (outcome.Exception is { } failure)
-        {
-            fault?.OnAnswered(failure);
-        }
-        else
-        {
-            var result = (DeliveryResult)(object)outcome.Result!;
-            lock (_answers) _answers.Add(result.Status);
-            _answerCount.Increment();
-            fault?.OnAnswered(result);
-        }
-
-        return outcome;
+        lock (_answers) _answers.Add(result.Status);
+        _answerCount.Increment();
+        fault?.OnAnswered(result);
+        return result;
     }
 
-    private sealed class Options : ResilienceStrategyOptions;
-
+    private sealed class Transport(DeliveryFaultInjector owner, IOutboxTransport inner) : IOutboxTransport
+    {
+        public ValueTask<DeliveryResult> DeliverAsync(GrainId receiver, InboxMessage message, CancellationToken cancellationToken) =>
+            owner.DeliverAsync(inner, receiver, message, cancellationToken);
+    }
     /// <summary>A counter whose waiters complete once it reaches their target.</summary>
     private sealed class CountSignal
     {
@@ -275,7 +253,7 @@ public sealed class DeliveryFault
     public static DeliveryFault Throw(Exception? exception = null) =>
         new(DeliveryFaultKind.Throw, exception ?? new IOException("Injected transient delivery failure."));
 
-    /// <summary>Times the try out with a <see cref="TimeoutRejectedException"/>, without calling the receiver.</summary>
+    /// <summary>Times the try out with a <see cref="TimeoutException"/>, without calling the receiver.</summary>
     public static DeliveryFault TimeOut() => new(DeliveryFaultKind.TimeOut);
 
     /// <summary>Answers the try with <paramref name="result"/>, without calling the receiver.</summary>
@@ -288,7 +266,7 @@ public sealed class DeliveryFault
     public static DeliveryFault TimeOutInFlight() => new(DeliveryFaultKind.TimeOutInFlight);
 
     /// <summary>
-    /// Calls the receiver and lets it decide, then fails the try with a <see cref="TimeoutRejectedException"/>, as when
+    /// Calls the receiver and lets it decide, then fails the try with a <see cref="TimeoutException"/>, as when
     /// the response is lost after the receiver committed.
     /// </summary>
     public static DeliveryFault LoseResponse() => new(DeliveryFaultKind.LoseResponse);

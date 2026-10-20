@@ -17,7 +17,9 @@ suited to local execution.
 
 All handler examples finish validation and asynchronous preparation with local
 values, then send typed messages, apply the business update, and call `Complete()`
-without awaiting. The inbox persists that outcome. Ordinary grain methods await
+without awaiting. Input which can never become valid is dead-lettered with
+`Fail(reason)` or answered with a typed rejection reply. The inbox persists that
+outcome. Ordinary grain methods await
 their own journal write. Each grain registers typed handlers with
 <xref:Orleans.Messaging.InboxExtensions.Register*> and injects the outbox directly.
 Grains inject the application's `Messages` class, whose
@@ -31,8 +33,8 @@ hierarchical command IDs exercise acceptance, insufficient stock, and invalid
 quantity. For each command, the host arms an explicit journal-acknowledgement
 observer before submission, awaits the typed reply's acknowledgement, and resubmits
 the same immutable command. It verifies `Duplicate` admission for successful and
-rejected commands, one handler execution per ID, unchanged stock for rejections,
-and one stock decrement using acknowledged replies and state snapshots.
+rejected commands, unchanged stock for rejections, and one stock decrement per
+command ID using acknowledged replies and state snapshots.
 
 From the repository root:
 
@@ -80,9 +82,10 @@ within its configured delivery policy.
 
 For a nonpositive `Restock` increment, the handler calls
 <xref:Orleans.Messaging.IInboxHandlerContext.Fail*> with a clear reason
-and returns before mutation. A positive increment computes the checked new stock
-value before mutation, then commits that update with inbox completion. Checked
-overflow still throws and follows the ordinary bounded processing retry policy.
+and returns before mutation, because that command can never become valid. A positive
+increment computes the checked new stock value before mutation, then commits that
+update with inbox completion. Checked overflow throws and follows the processing
+retry policy until `InboxRetryTimeout`.
 Give each distinct
 restocking operation its own stable command ID. The example's `SetAvailableAsync`
 is an administrative absolute-stock update. In
@@ -102,9 +105,13 @@ reconciliation protocol.
 
 :::code source="../snippets/compiled/Grains/MessagingRecipes.cs" id="messaging_payment" language="csharp":::
 
-The provider call precedes shared journaled changes. The asynchronous handler
+The handler first validates the immutable command. An amount, currency, or response
+destination which can never become valid dead-letters the command with
+<xref:Orleans.Messaging.IInboxHandlerContext.Fail*>, before any provider call. The
+provider call precedes shared journaled changes. The asynchronous handler
 passes its token to the gateway, and the method checks cancellation after that
-await before `SendReply` and the final result update. If the provider succeeds and activation
+await before `SendReply` and the final result update. A provider fault throws, so the
+message retries with backoff. If the provider succeeds and activation
 loss interrupts the local commit, a replacement attempt uses the same provider key.
 The canonical envelope ID is also the provider idempotency key. After local
 completion, the inbox recognizes a resubmission during retention. The result-query
@@ -128,7 +135,9 @@ increasing version for the same tenant/SKU.
 :::code source="../snippets/compiled/Grains/MessagingRecipes.cs" id="messaging_projection" language="csharp":::
 
 If version 12 arrives before version 11, the projection retains version 12 and
-completes version 11 as superseded. A repeated version binds to its original content.
+completes version 11 as superseded. A repeated version binds to its original content:
+a snapshot which reuses a version with different content, or carries an invalid
+version or stock value, is dead-lettered with `Fail(reason)`.
 The version and complete stock value are one durable record. A stable message ID
 recognizes the completed snapshot command; the domain version orders different
 snapshot commands.
@@ -147,10 +156,10 @@ recipient set.
 
 The campaign record and every outgoing intent are captured in the same sender
 journal write. The typed batch
-<xref:Orleans.Messaging.OutboxExtensions.Send*> helper encodes and stages each
-recipient command in order. The campaign record is added after all sends succeed.
-When a send fails, earlier intents stay staged, and a repeated submission uses the
-same recipient command identities and content.
+<xref:Orleans.Messaging.OutboxExtensions.Send*> helper encodes every recipient
+command before staging any, so an encoding failure stages nothing, then stages them
+in order. The campaign record is added after all sends succeed, and a repeated
+submission uses the same recipient command identities and content.
 Each destination commits independently through the
 [notification handler](messaging.md#deployment-requirements). Each envelope's
 ID is a stable recipient child under the campaign root, with literal grain identity
@@ -195,8 +204,9 @@ steps have succeeded, one transition emits `shipment/create`.
 | Finished | Record shipment or compensation outcomes and retain workflow state for result queries and audit. |
 
 Each transition uses the same prepare-then-synchronous-final-block pattern. Keep
-business rejection in the workflow state and reserve exception retry policy for
-preparation failures. Use recorded step outcomes to answer status queries during outages.
+business rejection in the workflow state, dead-letter permanently invalid input with
+`Fail(reason)`, and reserve exceptions for transient preparation failures. Use
+recorded step outcomes to answer status queries during outages.
 
 ## Schedule a workflow step
 
@@ -206,10 +216,13 @@ buyer cancels first:
 
 :::code source="../snippets/compiled/Grains/MessagingRecipes.cs" id="messaging_grace_period" language="csharp":::
 
+The checkout computes `deliverAt` from the Durable Jobs clock, which it injects as
+the keyed <xref:System.TimeProvider> named `DurableJobTimeProviderNames.DurableJobs`.
 The checkout's inbox accepts the `GracePeriodElapsed` message in the same journal
 write that records the submission, so the scheduled step exists exactly when the
-`Submitted` status does. Messaging wakes the grain when the message is due and
-runs its handler with the inbox's retry policy. The handler acts on the current
+`Submitted` status does. The scheduled message counts toward the checkout's
+`MaxCapacity` until it completes. Messaging wakes the grain when the message is due
+and runs its handler with the inbox's retry policy. The handler acts on the current
 status, so a cancelled checkout completes the message without changing state.
 The message ID is a child of the submission's ID, and a redelivered submission
 finds a recorded status and schedules nothing new.
@@ -244,9 +257,10 @@ storage/provider outcomes against the actual providers used in deployment.
 The executable documentation examples exercise hierarchical key isolation,
 typed reservation acceptance, zero/negative-quantity rejections, shortages,
 polymorphic result round trips, reply-stage failure without stock mutation,
-permanent invalid-restock dead-lettering, checked restock overflow,
-provider-success/local-cancellation retry,
-out-of-order projections, typed multi-subject dispatch, and ordinary composite-message
+permanent invalid-restock, invalid-payment, and invalid-snapshot dead-lettering,
+checked restock overflow, provider-success/local-cancellation retry,
+out-of-order projections, typed multi-subject dispatch, campaign batch encoding,
+scheduled steps on the Durable Jobs clock, and ordinary composite-message
 round trips. Verify the original reply's actual journal acknowledgement and
 the exact completion-retention boundary when testing end-to-end resubmission.
 For runtime guarantees and operating controls, see

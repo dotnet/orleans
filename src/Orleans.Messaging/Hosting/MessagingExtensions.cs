@@ -46,6 +46,18 @@ public static class MessagingExtensions
     {
         services.AddDurableJobs();
         services.TryAddSingleton(TimeProvider.System);
+
+        // The pump job is each grain's only durable wake-up for committed messaging work, so it retries indefinitely
+        // while other jobs keep the configured policy.
+        services.AddOptions<DurableJobsOptions>().PostConfigure<IServiceProvider>(static (options, services) =>
+        {
+            var shouldRetry = options.ShouldRetry;
+            var clock = services.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs);
+            var messaging = services.GetRequiredService<IOptions<DurableMessagingOptions>>();
+            options.ShouldRetry = (context, exception) => string.Equals(context.Job.Name, MessagingPump.JobName, StringComparison.Ordinal)
+                ? MessagingPump.GetRetryTime(context, clock.GetUtcNow(), messaging.Value.RetryInitialInterval)
+                : shouldRetry(context, exception);
+        });
         services.Configure<JsonJournalOptions>(options =>
         {
             options.AddTypeInfoResolver(InboxJsonContext.Default);
@@ -75,6 +87,7 @@ public static class MessagingExtensions
 
         services.ConfigureNamedOptionForLogging<DurableMessagingOptions>(Options.DefaultName);
         services.TryAddSingleton<MessagingInstruments>();
+        services.TryAddSingleton<IOutboxTransport, GrainOutboxTransport>();
         services.TryAddScoped<MessagingPump>();
         services.TryAddScoped<Inbox>();
         services.Replace(ServiceDescriptor.Scoped<IInbox>(static sp => sp.GetRequiredService<Inbox>()));

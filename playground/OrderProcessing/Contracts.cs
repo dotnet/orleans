@@ -46,40 +46,57 @@ public enum StockLineStatus
     Committed,
 }
 
+// Parameter-targeted IDs preserve the existing positional constructor-field wire layout.
 [GenerateSerializer, Immutable]
-public sealed record Address(string Street, string City, string State, string Country, string ZipCode);
+public sealed record Address(
+    [Id(0)] string Street,
+    [Id(1)] string City,
+    [Id(2)] string State,
+    [Id(3)] string Country,
+    [Id(4)] string ZipCode);
 
 [GenerateSerializer, Immutable]
-public sealed record OrderLine(int ProductId, string ProductName, decimal UnitPrice, int Units);
+public sealed record OrderLine(
+    [Id(0)] int ProductId,
+    [Id(1)] string ProductName,
+    [Id(2)] decimal UnitPrice,
+    [Id(3)] int Units);
 
 [GenerateSerializer, Immutable]
 public sealed record CatalogItem(
-    int Id,
-    string Type,
-    string Brand,
-    string Name,
-    decimal Price,
-    int AvailableStock,
-    int ReservedStock,
-    int SoldStock);
+    [Id(0)] int Id,
+    [Id(1)] string Type,
+    [Id(2)] string Brand,
+    [Id(3)] string Name,
+    [Id(4)] decimal Price,
+    [Id(5)] int AvailableStock,
+    [Id(6)] int ReservedStock,
+    [Id(7)] int SoldStock);
 
 [GenerateSerializer, Immutable]
-public sealed record BasketItem(int ProductId, string ProductName, decimal UnitPrice, int Quantity);
+public sealed record BasketItem(
+    [Id(0)] int ProductId,
+    [Id(1)] string ProductName,
+    [Id(2)] decimal UnitPrice,
+    [Id(3)] int Quantity);
 
 [GenerateSerializer, Immutable]
-public sealed record CheckoutRequest(Guid RequestId, Address Address, string CardNumber);
+public sealed record CheckoutRequest(
+    [Id(0)] Guid RequestId,
+    [Id(1)] Address Address,
+    [Id(2)] string CardNumber);
 
 [GenerateSerializer, Immutable]
 public sealed record OrderState(
-    Guid OrderId,
-    string BuyerId,
-    int Version,
-    OrderStatus Status,
-    DateTimeOffset OrderDate,
-    OrderLine[] Lines,
-    Address Address,
-    string CardLast4,
-    string? Description)
+    [Id(0)] Guid OrderId,
+    [Id(1)] string BuyerId,
+    [Id(2)] int Version,
+    [Id(3)] OrderStatus Status,
+    [Id(4)] DateTimeOffset OrderDate,
+    [Id(5)] OrderLine[] Lines,
+    [Id(6)] Address Address,
+    [Id(7)] string CardLast4,
+    [Id(8)] string? Description)
 {
     public decimal Total => Lines.Sum(line => line.UnitPrice * line.Units);
 
@@ -87,14 +104,22 @@ public sealed record OrderState(
 }
 
 [GenerateSerializer, Immutable]
-public sealed record StockLine(int ProductId, StockLineStatus Status);
+public sealed record StockLine([Id(0)] int ProductId, [Id(1)] StockLineStatus Status);
 
 [GenerateSerializer, Immutable]
-public sealed record OrderDetails(OrderState Order, StockLine[] Stock);
+public sealed record OrderDetails([Id(0)] OrderState Order, [Id(1)] StockLine[] Stock);
+
+[GenerateSerializer, Immutable]
+public sealed record StockReservation([Id(0)] int? Units, [Id(1)] bool Confirmed);
 
 // Messages.
 [GenerateSerializer, Immutable]
-public sealed record SubmitOrder(string BuyerId, OrderLine[] Lines, Address Address, string CardLast4);
+public sealed record SubmitOrder(
+    [Id(0)] string BuyerId,
+    [Id(1)] OrderLine[] Lines,
+    [Id(2)] Address Address,
+    [Id(3)] string CardLast4,
+    [Id(4)] DateTimeOffset OrderDate);
 
 // The order sends this to itself, scheduled for the end of the grace period.
 [GenerateSerializer, Immutable]
@@ -102,30 +127,30 @@ public sealed record GracePeriodElapsed;
 
 [GenerateSerializer, Immutable]
 public sealed record OrderSummary(
-    Guid OrderId,
-    int Version,
-    OrderStatus Status,
-    decimal Total,
-    DateTimeOffset OrderDate,
-    string? Description);
+    [Id(0)] Guid OrderId,
+    [Id(1)] int Version,
+    [Id(2)] OrderStatus Status,
+    [Id(3)] decimal Total,
+    [Id(4)] DateTimeOffset OrderDate,
+    [Id(5)] string? Description);
 
 [GenerateSerializer, Immutable]
-public sealed record ReserveStock(Guid OrderId, int Units, GrainId ReplyTo);
+public sealed record ReserveStock([Id(0)] Guid OrderId, [Id(1)] int Units, [Id(2)] GrainId ReplyTo);
 
 [GenerateSerializer, Immutable]
-public sealed record StockResult(int ProductId, bool Confirmed);
+public sealed record StockResult([Id(0)] int ProductId, [Id(1)] bool Confirmed);
 
 [GenerateSerializer, Immutable]
-public sealed record ReleaseStock(Guid OrderId);
+public sealed record ReleaseStock([Id(0)] Guid OrderId);
 
 [GenerateSerializer, Immutable]
-public sealed record CommitStock(Guid OrderId);
+public sealed record CommitStock([Id(0)] Guid OrderId);
 
 [GenerateSerializer, Immutable]
-public sealed record AuthorizePayment(decimal Amount, string CardLast4, GrainId ReplyTo);
+public sealed record AuthorizePayment([Id(0)] decimal Amount, [Id(1)] string CardLast4, [Id(2)] GrainId ReplyTo);
 
 [GenerateSerializer, Immutable]
-public sealed record PaymentResult(bool Succeeded, string? Reason);
+public sealed record PaymentResult([Id(0)] bool Succeeded, [Id(1)] string? Reason);
 
 public sealed class OrderingOptions
 {
@@ -136,9 +161,11 @@ public sealed class OrderingOptions
 // Journaled state is stored as JSON lines, so each persisted type needs source-generated metadata.
 [JsonSerializable(typeof(int))]
 [JsonSerializable(typeof(Guid))]
+[JsonSerializable(typeof(DateTimeOffset?))]
 [JsonSerializable(typeof(StockLineStatus))]
 [JsonSerializable(typeof(CatalogItem))]
 [JsonSerializable(typeof(BasketItem))]
 [JsonSerializable(typeof(OrderState))]
 [JsonSerializable(typeof(OrderSummary))]
+[JsonSerializable(typeof(StockReservation))]
 internal sealed partial class OrderProcessingJsonContext : JsonSerializerContext;
