@@ -4397,7 +4397,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             storage.LogicalTimes,
             storage.Invocations,
             shared,
-            [transport]);
+            [transport],
+            manager);
         if (initialize)
         {
             runtime.InitializeForActivation(context);
@@ -4438,6 +4439,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public GrainId GrainId { get; } = GrainId.Create("test", "probe");
 
         public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+
+        // The probe hosts no journaled state.
+        public DurableTaskAccessLog? CreateAccessLog(TaskId executionId, TaskScheduler scheduler, Func<DurableTaskDivergenceException, Exception> diverge) => null;
         public Task<CancellationToken> SchedulingStarted => _schedulingStarted.Task;
 
         public ValueTask<DurableTaskResponse> ScheduleDelayAsync(
@@ -4518,6 +4522,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public GrainId GrainId { get; } = GrainId.Create("test", "probe");
 
         public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+
+        // The probe hosts no journaled state.
+        public DurableTaskAccessLog? CreateAccessLog(TaskId executionId, TaskScheduler scheduler, Func<DurableTaskDivergenceException, Exception> diverge) => null;
         public int SchedulerInvocationCount => Volatile.Read(ref _schedulerInvocationCount);
 
         public ValueTask<IScheduledTaskHandle> ScheduleChildAsync(
@@ -4624,8 +4631,14 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         }
     }
 
-    private sealed class TestStorage(TestStateManager manager, TimeProvider? timeProvider = null) : IDurableTaskGrainStorage
+    private sealed class TestStorage(TestStateManager manager, TimeProvider? timeProvider = null) : IDurableTaskGrainStorage, IDurableTaskAccessLogStorage
     {
+        private readonly Dictionary<TaskId, byte[]> _accessLogs = [];
+
+        public byte[] GetAccessLog(TaskId taskId) => _accessLogs.GetValueOrDefault(taskId) ?? [];
+
+        public void AppendAccessLog(TaskId taskId, ReadOnlySpan<byte> records) => _accessLogs[taskId] = [.. GetAccessLog(taskId), .. records];
+
         private readonly Dictionary<TaskId, TestTaskState> _states = [];
         private readonly DurableTaskHierarchy _hierarchy = new();
         private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
@@ -4830,8 +4843,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     /// Models the journaled state manager's write protocol: preparation, capture, storage acknowledgement, and
     /// completion callbacks. A preparation failure retains staged changes; a storage failure fences the manager.
     /// </summary>
-    private sealed class TestStateManager : IJournaledStateManager
+    private sealed class TestStateManager : IJournaledStateManager, IJournaledStateContextHost
     {
+        public JournaledStateContextProvider? ContextProvider { get; set; }
+
         private readonly Dictionary<string, IStateMachine> _stateMachines = new(StringComparer.Ordinal);
         private readonly SemaphoreSlim _writeGate = new(1, 1);
         private Exception? _failure;
