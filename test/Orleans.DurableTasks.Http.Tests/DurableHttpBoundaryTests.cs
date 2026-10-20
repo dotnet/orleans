@@ -220,18 +220,39 @@ public sealed class DurableHttpBoundaryTests
     }
 
     [Theory]
-    [InlineData("r")]
-    [InlineData("s")]
-    public void OperationWorkRoundTripsThroughItsJournalText(string kind)
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void OperationWorkRoundTripsThroughItsJournalText(int kindValue)
     {
+        var kind = (DurableOperationWorkKind)kindValue;
         var work = new DurableOperationWork(
-            new DurableTaskAddress(GrainId.Create("durable-http-test", "a:b/c"), TaskId.CreateRoot("orders").Child("@ada").Child("k")),
-            IsSubscription: kind == "s");
+            kind,
+            GrainId.Create("durable-http-test", "a:b/c"),
+            kind == DurableOperationWorkKind.Subscription ? string.Empty : "Invokable_IOrder_Place:1",
+            kind == DurableOperationWorkKind.NotStarted ? null : TaskId.CreateRoot("orders").Child("@ada").Child("k"));
 
         Assert.Equal(work, DurableOperationWork.Parse(work.Format()));
-        Assert.Same(DurableOperationWork.NotStarted, DurableOperationWork.Parse(DurableOperationWork.NotStarted.Format()));
     }
 
+    [Fact]
+    public void WorkIsIdentifiedByWhatItPerformsNotByItsTask()
+    {
+        var grain = GrainId.Create("durable-http-test", "a");
+        var task = TaskId.CreateRoot("k");
+        var run = new DurableOperationWork(DurableOperationWorkKind.Run, grain, "Place", task);
+
+        // A request describes a call before its task exists, and work which never started has no task.
+        Assert.True(run.IsSameWorkAs(run with { TaskId = null }));
+        Assert.True(run.IsSameWorkAs(run with { Kind = DurableOperationWorkKind.NotStarted, TaskId = null }));
+        Assert.False(run.IsSameWorkAs(run with { Method = "Cancel" }));
+        Assert.False(run.IsSameWorkAs(run with { Target = GrainId.Create("durable-http-test", "b") }));
+        Assert.False(run.IsSameWorkAs(new DurableOperationWork(DurableOperationWorkKind.Subscription, grain, string.Empty, task)));
+
+        var subscription = new DurableOperationWork(DurableOperationWorkKind.Subscription, grain, string.Empty, task);
+        Assert.True(subscription.IsSameWorkAs(subscription));
+        Assert.False(subscription.IsSameWorkAs(subscription with { TaskId = TaskId.CreateRoot("other") }));
+    }
     [Fact]
     public void StartsAreNotMappedToSafeMethods()
     {

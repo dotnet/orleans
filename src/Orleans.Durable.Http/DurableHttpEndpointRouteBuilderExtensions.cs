@@ -60,7 +60,8 @@ public static class DurableHttpEndpointRouteBuilderExtensions
     /// </description></item>
     /// <item><description>
     /// <c>400 Bad Request</c> for an invalid or missing key, and <c>422 Unprocessable Content</c> for a key which another
-    /// request used to start other work.
+    /// request used to start other work: a call of another method or on another grain, or a subscription to another
+    /// task. A retry whose arguments differ reaches the operation, as the durable task runtime identifies operations.
     /// </description></item>
     /// <item><description>
     /// <c>503 Service Unavailable</c> with a <c>Retry-After</c> header when the request didn't reach the operation, which it
