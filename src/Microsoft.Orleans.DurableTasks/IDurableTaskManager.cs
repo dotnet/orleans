@@ -62,9 +62,10 @@ public interface IDurableTaskManager
     /// The request is monotonic and idempotent, and a terminal task is unchanged. The first request determines the reason,
     /// which the task and its execution tree record with the request and which reaches the tree's calls to other grains.
     /// A running task observes the request through its durable cancellation token and decides its own outcome; the
-    /// operation doesn't wait for it to finish. A request for a task which doesn't exist yet is recorded, so the task
-    /// terminalizes as canceled when its invocation arrives.
+    /// operation doesn't wait for it to finish. A request for a task which this grain doesn't retain throws
+    /// <see cref="DurableTaskNotFoundException"/> and stores nothing.
     /// </remarks>
+    /// <exception cref="DurableTaskNotFoundException">This grain doesn't retain the task.</exception>
     ValueTask CancelAsync(TaskId taskId, string? reason, CancellationToken cancellationToken = default);
 
     /// <summary>Durably requests cancellation of the root task <paramref name="rootId"/> of this grain and its execution tree.</summary>

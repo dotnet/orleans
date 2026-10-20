@@ -258,6 +258,16 @@ described in [Inspect and replay dead letters](messaging-operations.md#inspect-a
   reason. The runtime retires that completion and retains the task for
   `ResultRetentionPeriod`; operations which read the result, such as polls, report the
   decoding error. The grain keeps processing its other work.
+- A task whose stored request no longer decodes, for example after a deployment removed a
+  type which its arguments hold, stalls without failing the grain's activation: the grain
+  runs its other tasks, polls report the task as `Pending`, and `ExecutionStalled` reports
+  it with the reason `Diverged` and the decoding error. Its stored request is kept, so a
+  later activation whose code decodes the request runs the task; abort the task to end it
+  instead.
+- A task whose result or exception doesn't serialize, such as a value or an exception
+  whose data holds a value of a type without a codec, fails with a `SerializerException`
+  which names the type. The failure commits like any outcome, and the grain keeps
+  committing its other work.
 
 A dead-lettered completion leaves the calling execution waiting. Decide whether to
 cancel or abort that execution, and replay a dead letter only after correcting its

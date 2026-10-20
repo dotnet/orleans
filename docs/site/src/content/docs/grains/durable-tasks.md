@@ -456,7 +456,8 @@ Cancellation is cooperative, durable, and idempotent. A grain requests it for it
 tasks with `IDurableTaskManager.CancelAsync(rootId, reason)`, and clients and other
 callers request it through
 <xref:Orleans.DurableTasks.ScheduledTask.CancelAsync*?displayProperty=nameWithType>.
-The request commits before it propagates through the task's execution tree:
+A request for a task which the grain doesn't retain throws `DurableTaskNotFoundException`
+and changes nothing. The request commits before it propagates through the task's execution tree:
 
 - Delays, children whose bodies haven't started, and new children which the canceled
   task schedules terminate as canceled without running.
