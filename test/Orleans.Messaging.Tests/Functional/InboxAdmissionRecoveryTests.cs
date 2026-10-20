@@ -50,8 +50,10 @@ public sealed class InboxAdmissionRecoveryTests
         Assert.Equal(floor, await fixture.OnGrainAsync(receiver, () => InboxTestAccess.AdmissionFloor(inbox)));
         Assert.DoesNotContain(original.Envelope.MessageId,
             await fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox)));
-        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, original)).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, retained)).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Expired>(await DeliverAsync(receiver, original));
+        // The recent record was staged two days later; restore a legitimate receiver clock before replaying it.
+        fixture.JobClock.Advance(retained.SentAt - fixture.JobClock.GetUtcNow());
+        DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await DeliverAsync(receiver, retained));
         Assert.Equal(retained.SentAt, await fixture.OnGrainAsync(receiver, () =>
             InboxTestAccess.GetProcessedSentAt(inbox, retained.Envelope.MessageId)));
         Assert.Equal(2, fixture.SourceSinkProbe.For(receiver).SinkOffers);

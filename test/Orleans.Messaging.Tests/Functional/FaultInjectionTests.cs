@@ -878,6 +878,8 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
             DeliveryResultAssert.IsCase<DeliveryResult.Expired>(await DeliverAsync(receiver, expiredMessage));
         }
 
+        // Keep the floor+1 boundary at the permitted future upper bound after the earlier clock rollback.
+        _cluster.JobClock.Advance(TimeSpan.FromTicks(1));
         var available = CreateEnvelope(receiver, NewMessage(82, "above-floor")) with { SentAt = floor.AddTicks(1) };
         DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, available));
         await Fixture.WaitForInboxCountAsync(receiver, 0);
@@ -1033,6 +1035,8 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         {
             DeliveryResultAssert.IsCase<DeliveryResult.Expired>(await extension.DeliverAsync(message, TestContext.Current.CancellationToken));
         }
+        // Do not present the later retained record outside the receiver's new future-time bound after rollback.
+        _cluster.JobClock.Advance(ordinary.SentAt - _cluster.JobClock.GetUtcNow());
         foreach (var message in recent.Append(future).Append(ordinary))
         {
             DeliveryResultAssert.IsCase<DeliveryResult.Duplicate>(await extension.DeliverAsync(message, TestContext.Current.CancellationToken));
