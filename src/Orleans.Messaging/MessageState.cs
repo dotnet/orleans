@@ -37,8 +37,7 @@ internal sealed class OutboxMessageState
 
     /// <summary>
     /// Gets or sets when the outbox stops attempting the message and dead-letters it, on the Durable Jobs clock:
-    /// <c>OutboxRetryTimeout</c> after the send, or after the start of the latest attempt which the receiver answered with
-    /// <see cref="DeliveryStatus.Backpressured"/>.
+    /// <c>OutboxRetryTimeout</c> after the send. This immutable value is also the logical send's admission cutoff.
     /// </summary>
     [Id(3)]
     public DateTimeOffset? ExpirationTime { get; set; }
