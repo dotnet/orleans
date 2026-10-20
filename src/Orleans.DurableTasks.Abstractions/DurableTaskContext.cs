@@ -137,9 +137,11 @@ public abstract class DurableTaskContext
 
     /// <summary>Gets a value indicating whether durable cancellation of the task has been requested.</summary>
     /// <remarks>
-    /// Task cancellation is durable: the host records the request, and every attempt of the task, including a replay,
-    /// observes it from the start. Code which decides a durable outcome, such as whether to compensate, checks this value,
-    /// for example in <c>catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)</c>.
+    /// Task cancellation is durable: the host records the request, and records, for each execution, the point at which
+    /// the execution first observed it. Every attempt of the task, including a replay, observes the cancellation at that
+    /// same point, so the body takes the same path in every run, and cleanup which follows the observation is recorded
+    /// like the body's other operations. Code which decides a durable outcome, such as whether to compensate, checks this
+    /// value, for example in <c>catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)</c>.
     /// The cancellation of an attempt leaves it <see langword="false"/>.
     /// </remarks>
     public bool IsTaskCancellationRequested => _taskCancellationRequested;
@@ -150,7 +152,8 @@ public abstract class DurableTaskContext
     /// </summary>
     /// <remarks>
     /// The first cancellation request determines the reason, and later requests leave it unchanged. The host retains the
-    /// reason with the task's cancellation, so a replay observes the same reason. The reason is set before
+    /// reason with the task's cancellation, so a replay, which observes the cancellation at the point where the original
+    /// run first observed it, reads the same reason. The reason is set before
     /// <see cref="CancellationToken"/> is canceled, so code which observes the cancellation, such as a
     /// <see langword="catch"/> block, reads it.
     /// </remarks>
@@ -401,10 +404,12 @@ public abstract class DurableTaskContext
     /// cancellation.
     /// </param>
     /// <remarks>
-    /// The host records the request durably before it calls this, so every later attempt of the task observes it, and
-    /// calls it on the execution's scheduler. The request sets <see cref="IsTaskCancellationRequested"/> and then cancels
-    /// <see cref="CancellationToken"/>, whose registrations run synchronously, as they do for any
-    /// <see cref="CancellationTokenSource"/>. Later requests change nothing.
+    /// The host records the request durably, and records the point at which this execution first observes it. It calls
+    /// this on the execution's scheduler when the execution reaches that point: in the first run when the request arrives,
+    /// and in a replay at the recorded point, so the replay observes the cancellation where the original run did. The
+    /// request sets <see cref="IsTaskCancellationRequested"/> and then cancels <see cref="CancellationToken"/>, whose
+    /// registrations run synchronously, as they do for any <see cref="CancellationTokenSource"/>. Later requests change
+    /// nothing.
     /// </remarks>
     protected internal void RequestTaskCancellation(string? reason)
     {

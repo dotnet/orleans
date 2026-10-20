@@ -13,7 +13,7 @@ A durable task is an asynchronous operation whose progress survives grain deacti
 
 A method which returns `DurableTask` or `DurableTask<T>` defines a task, and the task runs when the caller awaits it, schedules it with `ScheduleAsync`, or posts it with `Post`. Each run of a task's body is an attempt, which runs on its grain activation's scheduler and reads its context from `DurableTask.Current`: its identifier, its logical time `UtcNow`, and its cancellation state.
 
-- **Task cancellation** is durable. A caller requests it, for example with `CancelAsync` on the task's handle, and the host records the request, so every attempt observes it through `IsTaskCancellationRequested`, `TaskCancellationReason`, and `CancellationToken`. The body decides the task's outcome, for example by compensating.
+- **Task cancellation** is durable. A caller requests it, for example with `CancelAsync` on the task's handle, and the host records the request together with the point at which each execution first observes it. The body observes it through `IsTaskCancellationRequested`, `TaskCancellationReason`, and `CancellationToken`, and every replay observes it at that same recorded point. The body decides the task's outcome, for example by compensating.
 - **Attempt cancellation** ends the current attempt when its activation stops, when the task is aborted or deleted, or when its replay diverges from its record. Every durable operation of a canceled attempt throws `DurableTaskAttemptCanceledException`, the host discards the attempt's outcome, and a later attempt runs the task again when it still needs an outcome. `AttemptCancellationToken` is canceled only by attempt cancellation.
 
 ## Writing replay-safe workflows
