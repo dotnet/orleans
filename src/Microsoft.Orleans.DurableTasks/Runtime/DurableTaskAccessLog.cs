@@ -21,10 +21,13 @@ namespace Orleans.DurableTasks.Runtime;
 /// result, or the exception which either threw. Outcomes are encoded with the Orleans serializer when the access runs, so
 /// later in-place changes to a mutable value don't change its record. An exception whose encoding fails is normalized to a
 /// description which both the recording attempt and replay throw. A write without a result records no value. A read
-/// whose outcome repeats the latest read of the same state and operation which this attempt recorded with a value records
-/// a reference to it instead: when its result is equal (for results which compare exactly, such as strings and
-/// primitives), or when the state hasn't changed since and the read's argument is absent or equal. Consecutive references
-/// to one read with the same arguments share one record.
+/// records a reference to this attempt's latest read of the same state and operation which it recorded with a value,
+/// instead of its own value, when it returns the same outcome: when its result is equal, for results which compare
+/// exactly, such as strings and primitives; or when the state hasn't changed since, the read's argument is absent or
+/// equal, and its result is immutable, such as a floating-point number or a date, or is a copy of elements which are.
+/// Every other read records its value, so a replay returns what each read observed when it ran, including the effect of
+/// earlier in-place changes to objects which the state holds. Consecutive references to one read with the same arguments
+/// share one record.
 /// </para>
 /// <para>
 /// A write's record is staged with the write, in the same work item, so whichever journal write commits the change also
@@ -34,8 +37,8 @@ namespace Orleans.DurableTasks.Runtime;
 /// kind, operation, state, and arguments, and runs live once it has consumed them all. An access which differs from its
 /// record, or whose recorded outcome no longer decodes or names an exception type which this version can't construct,
 /// diverges: the runtime stalls the attempt. A replayed reference returns the outcome of the read it refers to, as a live
-/// repeat of an unchanged state does: the same result, or, for operations which return copies, a new copy which holds the
-/// same elements.
+/// repeat does: an equal or immutable result, or, for operations which return copies, a new copy which holds the same
+/// elements.
 /// </para>
 /// <para>
 /// Each access runs in a covered region of the attempt (<see cref="DurableTaskContext.IsInCoveredRegion"/>), as effects
@@ -278,7 +281,7 @@ internal sealed class DurableTaskAccessLog(
             return RunLive(state, operation, apply);
         }
 
-        if (access.Kind is JournaledStateAccessKind.Read && LiveRead<TArgument, TResult>.CanRepeat)
+        if (access.Kind is JournaledStateAccessKind.Read && LiveRead<TArgument, TResult>.CanRepeat(access.Operation))
         {
             Debug.Assert(apply is null, "A read changes no state.");
             return RecordRead(access, argument, state, operation);
@@ -360,11 +363,16 @@ internal sealed class DurableTaskAccessLog(
             ? last
             : FindLiveRead(target, access.Operation);
         var typed = earlier as LiveRead<TArgument, TResult>;
+        Debug.Assert(earlier is null || typed is not null, "Every read of one state's operation has the same argument and result types.");
+
+        // A read can depend on the stamp which it observes before it runs: code which it runs, such as a comparer, or
+        // which records its result, such as a serializer, could change the state.
+        var stamp = target.Stamp;
         bool repeats;
         try
         {
             result = operation(state);
-            repeats = typed?.Repeats(argument, result) is true;
+            repeats = typed?.Repeats(argument, result, stamp) is true;
             if (!repeats)
             {
                 encoded = Encode(result);
@@ -402,7 +410,7 @@ internal sealed class DurableTaskAccessLog(
             _liveReads[_liveReadCount++] = typed;
         }
 
-        typed.Set(argument, result, argumentHash);
+        typed.Set(argument, result, stamp, argumentHash);
         _lastLiveRead = typed;
         return result;
     }
@@ -600,28 +608,27 @@ internal sealed class DurableTaskAccessLog(
         }
     }
 
-    // Returns the outcome of the recorded read which a reference refers to: the read's own result, which a live repeat of
-    // an unchanged state returns too, or, for an operation which returns copies, a new copy which holds the same elements.
+    // Returns the outcome of the recorded read which a reference refers to: the read's own result, which a live repeat
+    // returns too, or, for an operation which returns copies, a new copy which holds the same elements. A recorded read
+    // which doesn't stand for the access's result diverges, on both the first reference of a run and the later ones.
     private TResult ReadRepeated<TResult>(in JournaledStateAccess access, int index, ref RecordedRead read)
     {
-        if (read.HasInstance)
-        {
-            return JournaledStateOperations.ReturnsCopy(access.Operation) ? (TResult)((Array)read.Instance!).Clone() : (TResult)read.Instance!;
-        }
-
-        TResult value;
         try
         {
-            value = _serializer.Deserialize<TResult>(read.Value)!;
+            if (read.HasInstance)
+            {
+                return JournaledStateOperations.ReturnsCopy(access.Operation) ? (TResult)((Array)read.Instance!).Clone() : (TResult)read.Instance!;
+            }
+
+            var value = _serializer.Deserialize<TResult>(read.Value)!;
+            read.Instance = value;
+            read.HasInstance = true;
+            return value;
         }
         catch (Exception decodeFailure)
         {
             throw DecodeFailure(access, index, decodeFailure);
         }
-
-        read.Instance = value;
-        read.HasInstance = true;
-        return value;
     }
 
     private void RememberRead<TResult>(int stateIndex, JournaledStateOperation operation, ReadOnlyMemory<byte> value, int? hash, TResult result)
@@ -928,67 +935,92 @@ internal sealed class DurableTaskAccessLog(
 
     private sealed class LiveRead<TArgument, TResult>(JournaledStateAccessTarget target, JournaledStateOperation operation) : LiveRead(target, operation)
     {
+        // Whether a read with an unchanged stamp and an equal argument returns an outcome which a replayed reference
+        // reproduces: an immutable result, or a copy of immutable elements, which no in-place change can make differ from
+        // the recorded value.
+        private static readonly bool StampRepeatsValue =
+            (typeof(TArgument) == typeof(JournaledStateAccessNoArgument) || ExactEquality<TArgument>.IsSupported)
+            && ValueKinds.IsImmutable(typeof(TResult));
+
+        private static readonly bool StampRepeatsCopy =
+            (typeof(TArgument) == typeof(JournaledStateAccessNoArgument) || ExactEquality<TArgument>.IsSupported)
+            && typeof(TResult).IsSZArray && ValueKinds.IsImmutable(typeof(TResult).GetElementType()!);
+
         private TArgument _argument = default!;
-        private TResult _result = default!;
         private long _stamp;
 
+        // The result, which references compare when results compare exactly, and which debug builds keep to check that a
+        // reference by the stamp returns the same outcome. Otherwise references don't retain it.
+        private TResult _result = default!;
+
         /// <summary>
-        /// Gets whether reads of these types can repeat: by comparing their results, or by their state's stamp and their
-        /// argument. A read without a result, such as a check which throws, records nothing to refer to.
+        /// Gets whether reads of <paramref name="operation"/> with these types can repeat: by comparing their results, or
+        /// by their state's stamp and their argument. A read without a result, such as a check which throws, records
+        /// nothing to refer to.
         /// </summary>
-        public static bool CanRepeat { get; } =
+        public static bool CanRepeat(JournaledStateOperation operation) =>
             typeof(TResult) != typeof(JournaledStateAccessNoResult)
             && (ExactEquality<TResult>.IsSupported
-                || typeof(TArgument) == typeof(JournaledStateAccessNoArgument)
-                || ExactEquality<TArgument>.IsSupported);
+                || (JournaledStateOperations.ReturnsCopy(operation) ? StampRepeatsCopy : StampRepeatsValue));
 
-        public void Set(TArgument argument, TResult result, int? hash)
+        public void Set(TArgument argument, TResult result, long stamp, int? hash)
         {
-            _argument = argument;
-            _result = result;
-            _stamp = Target.Stamp;
             Hash = hash;
+            if (ExactEquality<TResult>.IsSupported)
+            {
+                _result = result;
+                return;
+            }
+
+            _argument = argument;
+            _stamp = stamp;
+            KeepResult(result);
         }
 
         // A read returns this read's outcome when its result is equal, or, for results which don't compare exactly, when the
         // state hasn't changed and the read's argument is equal.
-        public bool Repeats(TArgument argument, TResult result) => ExactEquality<TResult>.IsSupported
-            ? EqualityComparer<TResult>.Default.Equals(_result, result)
-            : _stamp == Target.Stamp
-                && (typeof(TArgument) == typeof(JournaledStateAccessNoArgument) || EqualityComparer<TArgument>.Default.Equals(_argument, argument));
-    }
-}
-
-/// <summary>
-/// Describes whether the default equality of <typeparamref name="T"/> holds exactly when two values are indistinguishable,
-/// so a value equal to a recorded one can stand for it.
-/// </summary>
-/// <remarks>
-/// Primitives other than floating-point numbers, strings (ordinally), enumerations, <see cref="Guid"/>,
-/// <see cref="TimeSpan"/>, and nullable values and pairs of these compare exactly. Floating-point numbers, whose equality
-/// equates zeroes of either sign, and decimals and dates, whose equality ignores scale, kind or offset, don't.
-/// </remarks>
-internal static class ExactEquality<T>
-{
-    public static bool IsSupported { get; } = Compute(typeof(T));
-
-    private static bool Compute(Type type)
-    {
-        if (type.IsEnum
-            || type == typeof(bool) || type == typeof(char) || type == typeof(string)
-            || type == typeof(sbyte) || type == typeof(byte) || type == typeof(short) || type == typeof(ushort)
-            || type == typeof(int) || type == typeof(uint) || type == typeof(long) || type == typeof(ulong)
-            || type == typeof(nint) || type == typeof(nuint) || type == typeof(Guid) || type == typeof(TimeSpan))
+        public bool Repeats(TArgument argument, TResult result, long stamp)
         {
+            if (ExactEquality<TResult>.IsSupported)
+            {
+                return EqualityComparer<TResult>.Default.Equals(_result, result);
+            }
+
+            if (_stamp != stamp
+                || (typeof(TArgument) != typeof(JournaledStateAccessNoArgument) && !EqualityComparer<TArgument>.Default.Equals(_argument, argument)))
+            {
+                return false;
+            }
+
+            AssertSameOutcome(result);
             return true;
         }
 
-        if (type.IsGenericType && type.GetGenericTypeDefinition() is var definition
-            && (definition == typeof(Nullable<>) || definition == typeof(ValueTuple<,>)))
+        [Conditional("DEBUG")]
+        private void KeepResult(TResult result) => _result = result;
+
+        // A state whose stamp is unchanged returns the same outcome to reads of one operation with equal arguments: the same
+        // instance or an equal value, or, for operations which return copies, the same elements.
+        [Conditional("DEBUG")]
+        private void AssertSameOutcome(TResult result) =>
+            Debug.Assert(
+                JournaledStateOperations.ReturnsCopy(Operation)
+                    ? SameElements((Array)(object)_result!, (Array)(object)result!)
+                    : typeof(TResult).IsValueType ? EqualityComparer<TResult>.Default.Equals(_result, result) : ReferenceEquals(_result, result),
+                $"State '{Target.Name}' returned a different outcome to '{Operation}' without a change of its stamp.");
+
+        private static bool SameElements(Array earlier, Array later)
         {
-            foreach (var argument in type.GetGenericArguments())
+            if (earlier.Length != later.Length)
             {
-                if (!Compute(argument))
+                return false;
+            }
+
+            for (var i = 0; i < earlier.Length; i++)
+            {
+                var left = earlier.GetValue(i);
+                var right = later.GetValue(i);
+                if (left is null ? right is not null : left.GetType().IsValueType ? !left.Equals(right) : !ReferenceEquals(left, right))
                 {
                     return false;
                 }
@@ -996,7 +1028,68 @@ internal static class ExactEquality<T>
 
             return true;
         }
+    }
+}
 
-        return false;
+/// <summary>
+/// Describes whether the default equality of <typeparamref name="T"/> holds exactly when two values are indistinguishable,
+/// so a value equal to a recorded one can stand for it.
+/// </summary>
+internal static class ExactEquality<T>
+{
+    public static bool IsSupported { get; } = ValueKinds.IsExact(typeof(T));
+}
+
+/// <summary>Classifies the results and arguments of reads by what a recorded value can stand for.</summary>
+internal static class ValueKinds
+{
+    /// <summary>
+    /// Gets whether the default equality of <paramref name="type"/> holds exactly when two values are indistinguishable.
+    /// </summary>
+    /// <remarks>
+    /// Primitives other than floating-point numbers, strings (ordinally), enumerations, <see cref="Guid"/>,
+    /// <see cref="TimeSpan"/>, and nullable values and pairs of these compare exactly. Floating-point numbers, whose
+    /// equality equates zeroes of either sign, and decimals and dates, whose equality ignores scale, kind or offset, don't.
+    /// </remarks>
+    public static bool IsExact(Type type) =>
+        IsExactScalar(type) || IsComposedOf(type, IsExact, typeof(Nullable<>), typeof(ValueTuple<,>));
+
+    /// <summary>
+    /// Gets whether values of <paramref name="type"/> have no identity and no content which code can change in place, so a
+    /// value decoded once stands for every later value which unchanged state returns.
+    /// </summary>
+    /// <remarks>
+    /// The types which compare exactly, floating-point numbers, decimals, dates and times, and nullable values, pairs and
+    /// key-value pairs of these are immutable.
+    /// </remarks>
+    public static bool IsImmutable(Type type) =>
+        IsExactScalar(type)
+        || type == typeof(Half) || type == typeof(float) || type == typeof(double) || type == typeof(decimal)
+        || type == typeof(DateTime) || type == typeof(DateTimeOffset) || type == typeof(DateOnly) || type == typeof(TimeOnly)
+        || IsComposedOf(type, IsImmutable, typeof(Nullable<>), typeof(ValueTuple<,>), typeof(KeyValuePair<,>));
+
+    private static bool IsExactScalar(Type type) =>
+        type.IsEnum
+        || type == typeof(bool) || type == typeof(char) || type == typeof(string)
+        || type == typeof(sbyte) || type == typeof(byte) || type == typeof(short) || type == typeof(ushort)
+        || type == typeof(int) || type == typeof(uint) || type == typeof(long) || type == typeof(ulong)
+        || type == typeof(nint) || type == typeof(nuint) || type == typeof(Guid) || type == typeof(TimeSpan);
+
+    private static bool IsComposedOf(Type type, Func<Type, bool> component, params Type[] definitions)
+    {
+        if (!type.IsGenericType || Array.IndexOf(definitions, type.GetGenericTypeDefinition()) < 0)
+        {
+            return false;
+        }
+
+        foreach (var argument in type.GetGenericArguments())
+        {
+            if (!component(argument))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
