@@ -142,49 +142,32 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task RedeliveryDeadlineBeyondDeduplicationWindow_IsAcceptedAndRemainsImmutable()
+    public async Task KnownSentAt_OlderAndEqualResendsDoNotWriteOrShortenRetention()
     {
         var receiver = NewGrain();
-        _ = await receiver.GetSnapshotAsync();
-        var services = Fixture.GetGrainContext(receiver).ActivationServices;
-        var window = services.GetRequiredService<IOptions<DurableMessagingOptions>>().Value.DeduplicationWindow;
-        var jobClock = services.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs);
-        var envelope = CreateEnvelope(receiver, NewMessage(31, "beyond-window"));
-        var late = envelope with { RedeliveryDeadline = jobClock.GetUtcNow() + window + TimeSpan.FromHours(1) };
-
-        var first = await DeliverAsync(receiver, late);
-        var redelivery = await DeliverAsync(receiver, late);
-
-        Assert.Equal(DeliveryStatus.Accepted, first.Status);
-        Assert.Null(first.Code);
-        Assert.Equal(DeliveryStatus.Duplicate, redelivery.Status);
+        var message = CreateEnvelope(receiver, NewMessage(31, "same-command"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, message)).Status);
         await Fixture.WaitForInboxCountAsync(receiver, 0);
-        var accepted = await receiver.GetSnapshotAsync();
-        Assert.Equal((0, 1), (accepted.InboxCount, accepted.ProcessedMessageCount));
-        Assert.Empty(accepted.InboxDeadLetters);
-
-        // The cutoff belongs to the logical send. A different cutoff cannot reuse its tracked identity.
-        var covered = envelope with { RedeliveryDeadline = jobClock.GetUtcNow() + window - TimeSpan.FromMinutes(1) };
-        await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverAsync(receiver, covered));
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, late)).Status);
-        Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
+        await receiver.RetryWriteStateAsync();
+        var journal = JournalId.FromGrainId(receiver.GetGrainId());
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(-1) })).Status);
+        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        var inbox = Fixture.GetInbox(receiver);
+        Assert.Equal(message.SentAt, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedSentAt(inbox, message.Envelope.MessageId)));
+        Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task TrackedMessage_RequiresTheOriginalCutoff(bool completed, bool legacyNull)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NewerSentAt_PendingAndProcessedResendsWaitForRetentionDurability(bool completed)
     {
         var receiver = NewGrain();
-        const string route = "messages/cutoff-identity";
+        const string route = "messages/sent-time-retention";
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
-        var cutoff = Fixture.Clock.GetUtcNow() + TimeSpan.FromHours(1);
-        var message = CreateEnvelope(receiver, NewMessage(32, "immutable-cutoff"), route) with
-        {
-            RedeliveryDeadline = legacyNull ? null : cutoff
-        };
+        var message = CreateEnvelope(receiver, NewMessage(32, "retained-command"), route);
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, message)).Status);
         await handler.WaitUntilEnteredAsync();
         if (completed)
@@ -193,23 +176,38 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
             await Fixture.WaitForInboxCountAsync(receiver, 0);
         }
 
+        await receiver.RetryWriteStateAsync();
+        var beforeResends = Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId()));
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            DeliverAsync(receiver, message with { RedeliveryDeadline = cutoff + TimeSpan.FromTicks(1) }));
-        if (!legacyNull)
-        {
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                DeliverAsync(receiver, message with { RedeliveryDeadline = cutoff - TimeSpan.FromTicks(1) }));
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                DeliverAsync(receiver, message with { RedeliveryDeadline = null }));
-        }
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message with { SentAt = message.SentAt.AddTicks(-1) })).Status);
+        Assert.Equal(beforeResends, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
+        Fixture.Clock.Advance(TimeSpan.FromMinutes(1));
+        var newer = message with { SentAt = Fixture.JobNow };
+        var inbox = Fixture.GetInbox(receiver);
+        var journal = JournalId.FromGrainId(receiver.GetGrainId());
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
+        using var acknowledgement = Fixture.Storage.BlockAcknowledgement(journal);
+        var updating = DeliverAsync(receiver, newer);
+        await acknowledgement.WaitUntilEnteredAsync();
+        Assert.False(updating.IsCompleted);
+        Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.Equal(newer.SentAt, await Fixture.OnGrainAsync(receiver, () => completed
+            ? InboxTestAccess.GetProcessedSentAt(inbox, message.Envelope.MessageId)
+            : InboxTestAccess.GetPendingMessages(inbox)[message.Envelope.MessageId].Message.SentAt));
+        var olderReply = await Fixture.OnGrainAsync(receiver, () => inbox.DeliverAsync(message, TestContext.Current.CancellationToken).AsTask());
+        Assert.False(olderReply.IsCompleted);
+        acknowledgement.Release();
+        Assert.Equal(DeliveryStatus.Duplicate, (await updating).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await olderReply).Status);
+        Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(journal));
 
         handler.Release();
         await Fixture.WaitForInboxCountAsync(receiver, 0);
         var state = await receiver.GetSnapshotAsync();
-        Assert.Equal("immutable-cutoff", Assert.Single(state.Effects).Value);
+        Assert.Equal("retained-command", Assert.Single(state.Effects).Value);
         Assert.Equal(1, Assert.Single(state.Effects).Count);
         Assert.Equal(1, state.ProcessedMessageCount);
+        Assert.Equal(newer.SentAt, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedSentAt(inbox, message.Envelope.MessageId)));
     }
 
     [Fact]

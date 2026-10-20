@@ -24,8 +24,8 @@ public sealed class InboxCapacityBehaviorTests(InboxCapacityClusterFixture fixtu
         var receiver = fixture.Client.GetGrain<IMessagingTestGrain>(Guid.NewGuid());
         var sessions = fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var sender = GrainId.Create("capacity-test-sender", Guid.NewGuid().ToString("N"));
-        var poison = TestApplicationProtocol.CreateInbox(sessions, sender, "messages/capacity", new TestMessage(TestApplicationProtocol.NewMessageId(), 31, "poison", ThrowDuringPreparation: true));
-        var rejected = TestApplicationProtocol.CreateInbox(sessions, sender, "messages/capacity", new TestMessage(TestApplicationProtocol.NewMessageId(), 32, "accepted-after-capacity"));
+        var poison = TestApplicationProtocol.CreateInbox(sessions, sender, "messages/capacity", new TestMessage(TestApplicationProtocol.NewMessageId(), 31, "poison", ThrowDuringPreparation: true), fixture.JobNow);
+        var rejected = TestApplicationProtocol.CreateInbox(sessions, sender, "messages/capacity", new TestMessage(TestApplicationProtocol.NewMessageId(), 32, "accepted-after-capacity"), fixture.JobNow);
         const string processedInstrument = "orleans-messaging-inbox-messages-processed";
         var firstRetryAcknowledged = fixture.Metrics.WaitForCountAsync(processedInstrument, 1, "retry");
 
@@ -67,6 +67,8 @@ public sealed class InboxCapacityBehaviorTests(InboxCapacityClusterFixture fixtu
                 $"failureCompleted={currentGrain.DeactivationFailure.Task.IsCompleted}.", exception);
         }
 
+        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, rejected)).Status);
+        rejected = rejected with { SentAt = fixture.JobNow };
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, rejected)).Status);
         var recovered = await fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal("accepted-after-capacity", Assert.Single(recovered.Effects).Value);
