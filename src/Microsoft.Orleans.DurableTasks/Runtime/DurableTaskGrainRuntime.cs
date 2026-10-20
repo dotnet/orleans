@@ -195,17 +195,16 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </remarks>
     internal void StartRecoveredExecutions()
     {
-        if (_recoveredStarts is not { } starts)
+        if (_recoveredStarts is { } starts)
         {
-            return;
+            _recoveredStarts = null;
+            foreach (var taskId in starts)
+            {
+                StartRequest(taskId);
+            }
         }
 
-        _recoveredStarts = null;
-
-        foreach (var taskId in starts)
-        {
-            StartRequest(taskId);
-        }
+        _shared.ReplayObserver?.OnRecovered(this);
     }
 
     /// <summary>
@@ -962,7 +961,9 @@ internal sealed partial class DurableTaskGrainRuntime(
                 Debug.Assert(
                     IsVersionRecord(recorded) && decision is { IsCompleted: true },
                     "Only version decisions are recorded under version segments.");
-                return decision!.GetResult<int>();
+                var recordedVersion = decision!.GetResult<int>();
+                _shared.ReplayObserver?.OnVersion(GrainId, executionId, name, recordedVersion, recorded: true);
+                return recordedVersion;
             }
 
             if (_storage.TryGetTask(execution, out var state) && IsInvoked(state))
@@ -974,6 +975,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var recordId = executionId.Child(segment);
         AddRecord(recordId, DurableTaskRecordKind.Version, VersionFingerprint, DurableTaskResponse.FromResult(version));
         DurableTaskEvents.EmitVersionRecorded(GrainContext, executionId, name, version);
+        _shared.ReplayObserver?.OnVersion(GrainId, executionId, name, version, recorded: false);
         return version;
     }
 
@@ -1661,15 +1663,26 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </para>
     /// </remarks>
     TimeSpan? IInboxWorkSource.GetWakeupDelay() =>
+        HasRunnableWork
+            ? _shared.Options.RunnableExecutionWakeupDelay
+            : HasStalledExecutions() ? _shared.Options.StalledExecutionRetryInterval : null;
+
+    /// <summary>
+    /// Gets whether an attempt is runnable or work which the runtime staged is pending; see
+    /// <see cref="IInboxWorkSource.GetWakeupDelay"/>. Read on the activation's scheduler.
+    /// </summary>
+    /// <remarks>
+    /// In replay mode, where no message advances a parked attempt, a runtime without runnable work has replayed as far as
+    /// its recorded history goes.
+    /// </remarks>
+    internal bool HasRunnableWork =>
         HasRunnableAttempts()
         || _pendingStarts.Count > 0
         || _pendingHandleResponses.Count > 0
         || _pendingCancellationPropagations.Count > 0
         || _backgroundTasks.Count > 0
         || _recoveredStarts is not null
-        || ((!_recovered || _stopping) && HasPendingExecutions())
-            ? _shared.Options.RunnableExecutionWakeupDelay
-            : HasStalledExecutions() ? _shared.Options.StalledExecutionRetryInterval : null;
+        || ((!_recovered || _stopping) && HasPendingExecutions());
 
     private bool HasRunnableAttempts()
     {
@@ -2303,8 +2316,14 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         try
         {
+            if (_shared.ReplayObserver is { } replayObserver)
+            {
+                // A replay reports the attempt's outcome without recording it, so the recorded history stays unchanged.
+                replayObserver.OnAttemptEnded(GrainId, context.Id, response, context.AttemptCancellation);
+            }
+
             // A canceled attempt's response is discarded: its task continues in the next activation, or has its outcome.
-            if (response.IsCompleted && !context.IsAttemptEnded)
+            else if (response.IsCompleted && !context.IsAttemptEnded)
             {
                 Debug.Assert(!_stopping && !IsUnregistered(context), "The runtime cancels every attempt which it stops or discards.");
                 await SetResponseAsync(context.Id, response, CancellationToken.None);
@@ -3263,6 +3282,23 @@ internal sealed partial class DurableTaskGrainRuntime(
         _storage.TryGetTask(taskId, out var state) ? state.CompletedAt : null;
 
     public void OnReplayEnded(TaskId executionId) => DurableTaskEvents.EmitReplayEnded(GrainContext, executionId);
+
+    /// <summary>Gets the observer of the replay host which runs this runtime in replay mode, or <see langword="null"/>.</summary>
+    public IDurableTaskReplayObserver? ReplayObserver => _shared.ReplayObserver;
+
+    /// <remarks>
+    /// The attempt ends as deactivation ends it, for <see cref="DurableTaskAttemptCancellationReason.ActivationStopping"/>:
+    /// the replay host stops it at the end of its recorded history, it is discarded rather than resumed, and the task
+    /// would continue in a later attempt.
+    /// </remarks>
+    void IDurableTaskGrainRuntime.StopReplayAttempt(GrainDurableTaskContext context)
+    {
+        Debug.Assert(_shared.ReplayObserver is not null, "Only a runtime in replay mode stops attempts at the end of their history.");
+        CancelAttempt(context, DurableTaskAttemptCancellationReason.ActivationStopping);
+    }
+
+    bool IDurableTaskGrainRuntime.HasRecordedDelay(TaskId taskId) =>
+        _storage.TryGetTask(taskId, out var state) && (state.DueTime is not null || HasStoredResult(state));
 
     /// <remarks>
     /// An execution's recorded operations are its nearest stored descendants: descendants which are themselves executions,
