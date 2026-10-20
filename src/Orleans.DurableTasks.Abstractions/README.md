@@ -45,11 +45,12 @@ on this abstractions assembly.
 - `CancelAsync(reason)` attaches a reason to the request, which the task's code reads from
   `DurableTask.Current.TaskCancellationReason`, for example in the `catch` block which decides its
   outcome. The first request determines the reason, the host retains it with the task's cancellation
-  and passes it to the task's attached children, and a replay observes the same reason.
+  and passes it to the task's attached children, and a replay, which observes the cancellation at the
+  point where the original run first observed it, reads the same reason.
   `TaskCancellationReason` is `null` until cancellation is requested and when the request carries no
-  reason. A host supplies the reason through `DurableTaskRuntimeHelper.RequestTaskCancellation`.
+  reason. A host supplies the reason through `DurableTaskContext.RequestTaskCancellation`.
 - A host cancels an *attempt*, one in-memory run of a task's body, with
-  `DurableTaskRuntimeHelper.CancelAttempt` when the attempt's work can't be recorded any more: its
+  `DurableTaskContext.CancelAttempt` when the attempt's work can't be recorded any more: its
   grain activation is stopping, the task was aborted or deleted, or the running code can't replay the
   task's recorded execution (`UnsupportedVersion` or `Diverged`). From then on, every durable
   operation of the attempt throws `DurableTaskAttemptCanceledException`, which derives from
@@ -369,7 +370,9 @@ public async DurableTask<OrderResult> PlaceOrderAsync(Order order)
   haven't started, and attached children which aren't shielded and are scheduled after the request,
   which don't run. A child which already completed keeps its recorded result, and a running child
   observes the request itself.
-- A replay of a canceled task observes the request from the start, so the body takes the same path.
+- A replay of a canceled task observes the request at the point where the original run first observed
+  it, which the host records for each execution, so the body takes the same path, and the cleanup which
+  follows replays from its records.
 
 ## Aborting tasks
 
