@@ -56,7 +56,7 @@ public sealed class MessagingCommandSerializationTests
         Assert.Null(serializer.Deserialize(serializer.SerializeToArray(immediate))!.Message!.Value.Envelope.DeliverAt);
     }
 
-    private static InboxMessage InboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt) };
+    private static InboxMessage InboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt), SentAt = Now };
 
     private static Envelope Envelope(string id, DateTimeOffset? deliverAt = null) => new()
     {
@@ -76,8 +76,9 @@ public sealed class MessagingCommandSerializationTests
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("accept"), State = new() },
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("scheduled", Now), State = new() },
             new() { Kind = InboxCommandKind.Retry, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom" } },
-            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), DeadLetter = deadLetter },
-            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "dead"), DeadLetter = deadLetter, Rejection = rejection },
+            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), SentAt = Now, DeadLetter = deadLetter },
+            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "dead"), SentAt = Now, DeadLetter = deadLetter, Rejection = rejection },
+            new() { Kind = InboxCommandKind.UpdateSentAt, MessageId = MessageId.Create("orders", "done"), SentAt = Now.AddHours(1) },
             new() { Kind = InboxCommandKind.RemoveDeadLetters, RemovedKeys = [MessageId.Create("orders", "dead")] },
             new()
             {
@@ -87,8 +88,8 @@ public sealed class MessagingCommandSerializationTests
                     Messages = [new() { Message = InboxMessage("pending"), State = new() { AttemptCount = 1 } }, new() { Message = InboxMessage("scheduled", Now), State = new() }],
                     Processed =
                     [
-                        new() { MessageId = MessageId.Create("orders", "done") },
-                        new() { MessageId = MessageId.Create("orders", "dead"), Rejection = rejection }
+                        new() { MessageId = MessageId.Create("orders", "done"), SentAt = Now },
+                        new() { MessageId = MessageId.Create("orders", "dead"), SentAt = Now, Rejection = rejection }
                     ],
                     DeadLetters = [deadLetter]
                 }

@@ -212,7 +212,7 @@ public sealed class EnvelopeContractTests
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var letter = new DeadLetter<InboxMessage>
         {
-            Message = new InboxMessage { Envelope = Create([1, 2]) with { Subject = "subject.v1" } },
+            Message = new InboxMessage { Envelope = Create([1, 2]) with { Subject = "subject.v1" }, SentAt = SentAt },
             DeadLetteredAt = DateTimeOffset.UnixEpoch,
             Reason = "failure",
             AttemptCount = 3
