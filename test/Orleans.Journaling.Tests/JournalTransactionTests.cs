@@ -239,8 +239,10 @@ public sealed class JournalTransactionTests
             activation.Dictionary["a"] = "x";
             await RunOutsideTransaction(() =>
             {
+                // Interleaving code reads the transaction's uncommitted change, and its write conflicts.
                 Assert.Equal("x", activation.Dictionary["a"]);
-                Assert.Throws<InvalidOperationException>(() => activation.Dictionary["a"] = "other");
+                var conflict = Assert.Throws<JournaledStateConflictException>(() => activation.Dictionary["a"] = "other");
+                Assert.Equal("dictionary", conflict.StateName);
 
                 // States which the transaction didn't change stay writable.
                 activation.List.Add("outside");
@@ -251,6 +253,100 @@ public sealed class JournalTransactionTests
         Assert.Equal("x", activation.Dictionary["a"]);
         Assert.Equal(["outside"], activation.List);
         activation.Dictionary["a"] = "after";
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task HostWritesToHeldStatesJournalOutsideTheTransactionAndSurviveItsAbort(bool abort)
+    {
+        using var host = new TransactionTestHost(Binary);
+        var storage = new ControlledJournalStorage(Binary);
+        var activation = await host.ActivateAsync(storage);
+        activation.Dictionary["host"] = "before";
+        await activation.Manager.WriteStateAsync(Cancellation);
+        var stateHost = (IJournaledStateContextHost)activation.Manager;
+
+        var transaction = activation.Manager.RunTransactionAsync(async _ =>
+        {
+            activation.Dictionary["transaction"] = "uncommitted";
+
+            // The host's own work, such as an outbox delivery, writes the held state directly, into the journal rather
+            // than the segment, and a write by another flow makes its change durable while the transaction is open.
+            await RunOutsideTransaction(async () =>
+            {
+                stateHost.EnterHostAccess();
+                try
+                {
+                    activation.Dictionary["host"] = "host";
+                }
+                finally
+                {
+                    stateHost.ExitHostAccess();
+                }
+
+                await activation.Manager.WriteStateAsync(Cancellation);
+            });
+
+            if (abort)
+            {
+                throw new InvalidOperationException("abort");
+            }
+        }, Cancellation);
+
+        if (abort)
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() => transaction);
+        }
+        else
+        {
+            await transaction;
+        }
+
+        Assert.Equal("host", activation.Dictionary["host"]);
+        Assert.Equal(!abort, activation.Dictionary.ContainsKey("transaction"));
+        var recovered = await host.ActivateAsync(storage);
+        Assert.Equal("host", recovered.Dictionary["host"]);
+        Assert.Equal(!abort, recovered.Dictionary.ContainsKey("transaction"));
+    }
+
+    [Fact]
+    public async Task HostWriteToAHeldStateWhichNoWriteCapturedSurvivesTheAbort()
+    {
+        using var host = new TransactionTestHost(Binary);
+        var storage = new ControlledJournalStorage(Binary);
+        var activation = await host.ActivateAsync(storage);
+        var stateHost = (IJournaledStateContextHost)activation.Manager;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => activation.Manager.RunTransactionAsync(async _ =>
+        {
+            activation.Dictionary["transaction"] = "uncommitted";
+
+            // The rebuild replays the journal's unwritten entries, including the host's change to the held state.
+            await RunOutsideTransaction(() =>
+            {
+                stateHost.EnterHostAccess();
+                try
+                {
+                    activation.Dictionary["host"] = "host";
+                }
+                finally
+                {
+                    stateHost.ExitHostAccess();
+                }
+
+                return Task.CompletedTask;
+            });
+
+            throw new InvalidOperationException("abort");
+        }, Cancellation));
+
+        Assert.Equal("host", activation.Dictionary["host"]);
+        Assert.False(activation.Dictionary.ContainsKey("transaction"));
+        await activation.Manager.WriteStateAsync(Cancellation);
+        var recovered = await host.ActivateAsync(storage);
+        Assert.Equal("host", recovered.Dictionary["host"]);
+        Assert.False(recovered.Dictionary.ContainsKey("transaction"));
     }
 
     [Fact]
@@ -1046,13 +1142,34 @@ public sealed class JournalTransactionTests
 
                 foreach (var change in step.Outside)
                 {
-                    // Another flow's write to a state which the transaction holds throws; otherwise it applies, and survives
-                    // the transaction's abort. A change which writes nothing, such as removing from an empty list, does nothing.
+                    // A read through a context which records it, as a durable task body's, conflicts with a state which the
+                    // transaction holds, since its record would outlive the transaction's abort; it reads any other state.
                     var isHeld = held.Contains(StateOf(change.Kind));
+                    activation.Manager.ContextProvider = RecordingContextProvider.Instance;
+                    try
+                    {
+                        var readThrown = await RunOutsideTransaction(() => Task.FromResult(Record.Exception(() => RecordingContextProvider.Run(() => Read(activation, StateOf(change.Kind))))));
+                        if (isHeld)
+                        {
+                            Assert.IsType<JournaledStateConflictException>(readThrown);
+                        }
+                        else
+                        {
+                            Assert.Null(readThrown);
+                        }
+                    }
+                    finally
+                    {
+                        activation.Manager.ContextProvider = null;
+                    }
+
+                    // Another flow's write to a state which the transaction holds conflicts; otherwise it applies, and
+                    // survives the transaction's abort. A change which writes nothing, such as removing from an empty list,
+                    // does nothing.
                     var thrown = await RunOutsideTransaction(() => Task.FromResult(Record.Exception(() => Apply(activation, change))));
                     if (isHeld && attempt.WouldWrite(change))
                     {
-                        Assert.IsType<InvalidOperationException>(thrown);
+                        Assert.IsType<JournaledStateConflictException>(thrown);
                     }
                     else
                     {
@@ -1176,6 +1293,18 @@ public sealed class JournalTransactionTests
                 return true;
         }
     }
+
+    // Reads the content of one state.
+    private static object? Read(TransactionActivation activation, StateKind kind) => kind switch
+    {
+        StateKind.Dictionary => activation.Dictionary.Count,
+        StateKind.Value => activation.Value.Value,
+        StateKind.List => activation.List.Count,
+        StateKind.Queue => activation.Queue.Count,
+        StateKind.Set => activation.Set.Count,
+        StateKind.Completion => activation.Completion.State.Status,
+        _ => activation.Log.Count,
+    };
 
     private static StateKind StateOf(ChangeKind kind) => kind switch
     {
@@ -1369,6 +1498,47 @@ public sealed class JournalTransactionTests
             string.Join(',', _log));
 
         public override string ToString() => Capture();
+    }
+
+    /// <summary>Supplies a context which records accesses to the code which <see cref="Run{T}"/> runs.</summary>
+    private sealed class RecordingContextProvider : JournaledStateContextProvider
+    {
+        private static readonly AsyncLocal<bool> Recording = new();
+        private readonly RecordingContext _context = new();
+
+        public static RecordingContextProvider Instance { get; } = new();
+
+        public override JournaledStateContext? Current => Recording.Value ? _context : null;
+
+        public static T Run<T>(Func<T> read)
+        {
+            Recording.Value = true;
+            try
+            {
+                return read();
+            }
+            finally
+            {
+                Recording.Value = false;
+            }
+        }
+
+        private sealed class RecordingContext : JournaledStateContext
+        {
+            internal override bool RecordsAccesses => true;
+
+            protected override TResult Access<TArgument, TState, TResult>(
+                in JournaledStateAccess access,
+                TArgument argument,
+                TState state,
+                Func<TState, TResult> operation,
+                Action<TState, TResult>? apply)
+            {
+                var result = operation(state);
+                apply?.Invoke(state, result);
+                return result;
+            }
+        }
     }
 
     private sealed class FixedContextProvider : JournaledStateContextProvider
