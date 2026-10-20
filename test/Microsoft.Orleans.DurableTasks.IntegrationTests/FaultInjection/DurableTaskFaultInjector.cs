@@ -2,6 +2,7 @@ using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.DurableJobs;
+using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
 using Orleans.Hosting;
 using Orleans.Journaling;
@@ -90,6 +91,12 @@ public enum FaultPoint
     /// request which excludes the segment.
     /// </summary>
     SegmentEndCrashesSilo,
+
+    /// <summary>
+    /// The task's grain admits a poll for a task's response and holds it, unanswered, until the test releases it, as a
+    /// silo which crashes while the poll waits leaves it.
+    /// </summary>
+    PollHeldAtReceiver,
 }
 
 /// <summary>One armed fault: it fires on the <see cref="Occurrence"/>th operation which matches it, counting from zero.</summary>
@@ -417,8 +424,8 @@ public sealed class DurableTaskFaultInjector
 }
 
 /// <summary>
-/// Holds admitted delivery calls at their receiver, and deactivates or crashes an activation at the start or end of a
-/// durable task segment.
+/// Holds admitted delivery calls and polls at their receiver, and deactivates or crashes an activation at the start or end
+/// of a durable task segment.
 /// </summary>
 /// <remarks>
 /// Segments are local requests whose interface is <see cref="IDurableTaskSegment"/>, so the activation's incoming call
@@ -439,6 +446,13 @@ internal sealed class FaultInjectingReceiverFilter(DurableTaskFaultInjector inje
             && injector.OnOperation(FaultPoint.DeliveryHeldAtReceiver, context.TargetId.ToString(), message.Envelope.Subject) is { } hold)
         {
             await hold.Released;
+        }
+
+        if (context.MethodName == nameof(IDurableTaskServer.SubscribeOrPollAsync)
+            && typeof(IDurableTaskServer).IsAssignableFrom(context.Request.GetInterfaceType())
+            && injector.OnOperation(FaultPoint.PollHeldAtReceiver, context.TargetId.ToString()) is { } heldPoll)
+        {
+            await heldPoll.Released;
         }
 
         await context.Invoke();

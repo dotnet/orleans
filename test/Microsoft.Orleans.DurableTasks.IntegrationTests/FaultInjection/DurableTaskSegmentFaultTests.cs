@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.DurableTasks;
 using Orleans.Hosting;
 using Xunit;
 
@@ -66,6 +67,53 @@ public abstract class DurableTaskSegmentFaultTests(string journalFormatKey) : IA
         Assert.True(run.Fired, "The fault didn't fire.");
         Assert.True(run.Violations.Count == 0, string.Join(Environment.NewLine, run.Violations));
         Assert.Equal(silos - 1, _harness.Fixture.Cluster.Silos.Count);
+    }
+
+    /// <summary>
+    /// A silo crash while the client's poll for the workflow's response waits on it only delays completion: the crashed
+    /// silo never answers the poll, so the client's wait continues on the workflow's next activation.
+    /// </summary>
+    /// <remarks>
+    /// A client fails a call which a crashed silo never answers only once the call's response timeout elapses, so the
+    /// harness ends its calls in flight when a silo crashes, and retries them once the cluster declared the silo dead.
+    /// </remarks>
+    [Fact]
+    public async Task SiloCrashWhileTheClientsPollWaitsOnItOnlyDelaysCompletion()
+    {
+        const string rootId = FaultScenario.RootId;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var injector = _harness.Injector;
+        var workflow = _harness.Client.GetGrain<IFaultWorkflowGrain>(Guid.NewGuid());
+        var partnerKey = Guid.NewGuid();
+        var partner = _harness.Client.GetGrain<IFaultPartnerGrain>(partnerKey);
+        var silos = _harness.Fixture.Cluster.Silos.Count;
+        injector.Reset();
+
+        // The workflow parks on its call to the partner, which holds the invocation, and the client's first poll waits on
+        // the workflow's activation, which holds it unanswered.
+        var invocation = injector.Arm(FaultPoint.DeliveryHeldAtReceiver, partner.GetGrainId(), 0, "durable-rpc/invoke");
+        var poll = injector.Arm(FaultPoint.PollHeldAtReceiver, workflow.GetGrainId(), 0);
+        var run = _harness.RunAsync<string>(
+            workflow,
+            rootId,
+            token => workflow.PipelineAsync(partnerKey, rootId).WithId(rootId).ScheduleAsync(token),
+            cancellationToken);
+        await Task.WhenAll(invocation.Fired, poll.Fired).WaitAsync(DurableTaskFaultHarness.RunTimeout, cancellationToken);
+
+        // The call's completion resumes the workflow, whose silo crashes once that segment ends.
+        var crash = injector.Arm(FaultPoint.SegmentEndCrashesSilo, workflow.GetGrainId(), 0);
+        invocation.Release();
+        var response = await run;
+
+        Assert.True(crash.HasFired, $"{crash} didn't fire.");
+        Assert.Equal(silos - 1, _harness.Fixture.Cluster.Silos.Count);
+        Assert.True(response.Status == DurableTaskStatus.CompletedSuccessfully, $"Status {response.Status}: {response.Exception}");
+        Assert.Equal("step=20;effect=1;processed=40;ready=60;echoed=41", response.GetResult<string>());
+        await _harness.Crash;
+        await _harness.SettleAsync([workflow.GetGrainId(), partner.GetGrainId()], cancellationToken);
+        var violations = await FaultScenario.CheckGrainAsync(_harness, "workflow", workflow, new() { ["workflow"] = 1 });
+        violations.AddRange(await FaultScenario.CheckGrainAsync(_harness, "partner", partner, new() { ["process"] = 1, ["echo"] = 1 }));
+        Assert.True(violations.Count == 0, string.Join(Environment.NewLine, violations));
     }
 }
 
