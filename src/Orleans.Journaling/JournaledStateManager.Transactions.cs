@@ -480,8 +480,14 @@ internal partial class JournaledStateManager
 
             using var committed = _journalWriter.GetCommittedBuffer();
             history.Replay(committed, WriteJournalFormatKey);
+
+            foreach (var (_, state, _) in transaction.HeldStates)
+            {
+                (state as IJournaledStateRollback)?.OnRollbackCompleted();
+            }
         }
     }
+
     /// <summary>Throws when the calling code runs in this manager's open transaction, whose commit journals its changes.</summary>
     private void ThrowIfInTransaction()
     {

@@ -367,6 +367,9 @@ internal interface IJournaledStateRollback
 {
     /// <summary>Clears the state's journaled content before the manager replays its journal into it.</summary>
     void ResetForRollback(JournalStreamWriter writer);
+
+    /// <summary>Called once the manager has replayed the journal, including its unwritten entries, into the state.</summary>
+    void OnRollbackCompleted();
 }
 
 /// <summary>
