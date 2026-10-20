@@ -330,7 +330,8 @@ namespace Orleans.Serialization
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -345,7 +346,8 @@ namespace Orleans.Serialization
         {
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -360,7 +362,8 @@ namespace Orleans.Serialization
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -375,7 +378,8 @@ namespace Orleans.Serialization
         {
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -390,7 +394,8 @@ namespace Orleans.Serialization
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -405,7 +410,8 @@ namespace Orleans.Serialization
         {
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -420,7 +426,8 @@ namespace Orleans.Serialization
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -435,7 +442,8 @@ namespace Orleans.Serialization
         {
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -450,7 +458,8 @@ namespace Orleans.Serialization
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -465,7 +474,8 @@ namespace Orleans.Serialization
         {
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -534,44 +544,8 @@ namespace Orleans.Serialization
         public T Deserialize<T, TInput>(ref Reader<TInput> source)
         {
             var codec = source.Session.CodecProvider.GetCodec<T>();
-            return Deserialize(ref source, codec);
-        }
-
-        [return: MaybeNull]
-        internal static T Deserialize<T, TInput>(ref Reader<TInput> source, IFieldCodec<T> codec)
-        {
-            var session = source.Session;
-            var position = session.ArcBuffers.Begin();
-            var success = false;
-            try
-            {
-                var field = source.ReadFieldHeader();
-                var result = codec.ReadValue(ref source, field);
-                success = true;
-                return result;
-            }
-            finally
-            {
-                session.ArcBuffers.End(position, success);
-            }
-        }
-
-        internal static object? Deserialize<TInput>(ref Reader<TInput> source, IFieldCodec codec)
-        {
-            var session = source.Session;
-            var position = session.ArcBuffers.Begin();
-            var success = false;
-            try
-            {
-                var field = source.ReadFieldHeader();
-                var result = codec.ReadValue(ref source, field);
-                success = true;
-                return result;
-            }
-            finally
-            {
-                session.ArcBuffers.End(position, success);
-            }
+            var field = source.ReadFieldHeader();
+            return codec.ReadValue(ref source, field);
         }
     }
 
@@ -830,7 +804,8 @@ namespace Orleans.Serialization
         [return: MaybeNull]
         public T Deserialize<TInput>(ref Reader<TInput> source)
         {
-            return Serializer.Deserialize(ref source, _codec);
+            var field = source.ReadFieldHeader();
+            return _codec.ReadValue(ref source, field);
         }
 
         /// <summary>
@@ -843,7 +818,8 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
-            return Deserialize(ref reader);
+            var field = reader.ReadFieldHeader();
+            return _codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -856,7 +832,8 @@ namespace Orleans.Serialization
         public T Deserialize(Stream source, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
-            return Deserialize(ref reader);
+            var field = reader.ReadFieldHeader();
+            return _codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -869,7 +846,8 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
-            return Deserialize(ref reader);
+            var field = reader.ReadFieldHeader();
+            return _codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -890,7 +868,8 @@ namespace Orleans.Serialization
         public T Deserialize(ReadOnlySequence<byte> source, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
-            return Deserialize(ref reader);
+            var field = reader.ReadFieldHeader();
+            return _codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -903,7 +882,8 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
-            return Deserialize(ref reader);
+            var field = reader.ReadFieldHeader();
+            return _codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -916,7 +896,8 @@ namespace Orleans.Serialization
         public T Deserialize(PooledBuffer.BufferSlice source, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
-            return Deserialize(ref reader);
+            var field = reader.ReadFieldHeader();
+            return _codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -929,7 +910,8 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
-            return Deserialize(ref reader);
+            var field = reader.ReadFieldHeader();
+            return _codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -942,7 +924,8 @@ namespace Orleans.Serialization
         public T Deserialize(ArcBuffer source, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
-            return Deserialize(ref reader);
+            var field = reader.ReadFieldHeader();
+            return _codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -955,7 +938,8 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
-            return Deserialize(ref reader);
+            var field = reader.ReadFieldHeader();
+            return _codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -968,7 +952,8 @@ namespace Orleans.Serialization
         public T Deserialize(ReadOnlySpan<byte> source, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
-            return Deserialize(ref reader);
+            var field = reader.ReadFieldHeader();
+            return _codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -1685,7 +1670,8 @@ namespace Orleans.Serialization
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec(type);
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -1699,7 +1685,8 @@ namespace Orleans.Serialization
         {
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec(type);
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -1713,7 +1700,8 @@ namespace Orleans.Serialization
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec(type);
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -1727,7 +1715,8 @@ namespace Orleans.Serialization
         {
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec(type);
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -1741,7 +1730,8 @@ namespace Orleans.Serialization
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec(type);
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -1755,7 +1745,8 @@ namespace Orleans.Serialization
         {
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec(type);
-            return Serializer.Deserialize(ref reader, codec);
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
         }
 
         /// <summary>
@@ -1819,7 +1810,8 @@ namespace Orleans.Serialization
         public object? Deserialize<TInput>(ref Reader<TInput> source, Type type)
         {
             var codec = source.Session.CodecProvider.GetCodec(type);
-            return Serializer.Deserialize(ref source, codec);
+            var field = source.ReadFieldHeader();
+            return codec.ReadValue(ref source, field);
         }
     }
 
@@ -1890,7 +1882,7 @@ namespace Orleans.Serialization
         public T? Copy(T? value)
         {
             using var context = _contextPool.GetContext();
-            return context.DeepCopy(value, _copier);
+            return _copier.DeepCopy(value, context);
         }
     }
 }

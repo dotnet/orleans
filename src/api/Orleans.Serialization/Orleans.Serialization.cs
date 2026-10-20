@@ -607,7 +607,6 @@ namespace Orleans.Serialization.Buffers
 {
     public partial struct ArcBuffer : System.IDisposable
     {
-        private object _dummy;
         private int _dummyPrimitive;
         public readonly ArcBufferPage? First;
         public readonly int Length;
