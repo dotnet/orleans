@@ -49,9 +49,12 @@ public sealed class DurableHttpRecoveryTests(DurableHttpFixture fixture)
         var grain = fixture.Client.GetGrain<IDurableHttpTestGrain>(Guid.NewGuid().ToString("N"));
         await grain.ApplyEffectAsync(id).WithId("effect").ScheduleAsync(cancellationToken);
 
-        // The server applied the first request, and the deactivation loses its response, as a crash would.
+        // The server applied the first request, and a deactivation which aborts the step loses its response, as a silo
+        // which shuts down does.
         await WaitUntilAsync(() => Requests(id).Length == 1, cancellationToken);
-        await DeactivateAsync(grain.GetGrainId(), cancellationToken);
+        var activation = DurableHttpTestGrain.Activations[grain.GetGrainId()];
+        activation.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationRequested, "The test interrupts the step."), cancellationToken);
+        await activation.Deactivated.WaitAsync(Timeout, cancellationToken);
         await grain.SignalDurableTaskAsync("effect", DurableHttpTestGrain.Approved, "ada", cancellationToken);
 
         var result = await grain.GetDurableTask<string>("effect").GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken);

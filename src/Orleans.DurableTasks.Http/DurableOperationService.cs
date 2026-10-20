@@ -1,4 +1,3 @@
-using Orleans.DurableTasks.Protocol;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 
@@ -210,7 +209,7 @@ internal sealed class DurableOperationService(IGrainFactory grainFactory, TimePr
     }
 
     /// <summary>Returns <paramref name="work"/> when it is a durable grain call, which an operation runs.</summary>
-    private static DurableTask ValidateCall(DurableTask work) => work is IDurableTaskRequest
+    private static DurableTask ValidateCall(DurableTask work) => work.TryGetTarget(out _)
         ? work
         : throw new InvalidOperationException(
             $"A durable operation runs a durable grain call, such as 'grain.MethodAsync(...)', or subscribes to an existing task, which 'grain.GetDurableTask<T>(id)' references, not '{work.GetType()}'.");

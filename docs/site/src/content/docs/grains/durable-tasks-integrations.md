@@ -155,9 +155,10 @@ returns, and inject the client as a keyed service:
 :::code source="../snippets/compiled/Grains/DurableTaskIntegrationSnippets.cs" id="durable_tasks_http" language="csharp":::
 
 - **Idempotency keys come from step identities.** Each step's unsafe requests carry an
-  `Idempotency-Key` derived from the service, the grain, and the step's task ID, so a
-  step which runs again after a failure or a deactivation reaches the job which its
-  first attempt started. The key handler precedes the handlers which the builder adds,
+  `Idempotency-Key` derived from the service, the grain, the step's task ID, and the
+  task's run, `DurableTaskContext.Incarnation`, so a step which runs again after a
+  failure or a deactivation reaches the job which its first attempt started, and a later
+  run of the same task ID sends new keys. The key handler precedes the handlers which the builder adds,
   such as a resilience handler, so their retries carry the same key.
 - **Responses are recorded.** A replay reads each step's recorded response without
   sending its request again.
