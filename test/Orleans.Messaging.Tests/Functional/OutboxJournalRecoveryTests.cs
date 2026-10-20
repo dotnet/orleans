@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Messaging.Tests.Support;
@@ -14,6 +15,64 @@ public sealed class OutboxJournalRecoveryTests : MessagingBehaviorTestBase
 {
     public OutboxJournalRecoveryTests() : base(receiverOnly: false)
     {
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task RecoveredSnapshot_EveryPendingEntryRequiresItsImmutableExpiration(bool reference, bool hasExpiration)
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        _ = await sender.GetSnapshotAsync();
+        var first = TestApplicationProtocol.Create(Sessions, sender.GetGrainId(), receiver.GetGrainId(),
+            "messages/recovered-expiration", NewMessage(63, "first-valid"));
+        var target = TestApplicationProtocol.Create(Sessions, sender.GetGrainId(), receiver.GetGrainId(),
+            "messages/recovered-expiration", NewMessage(64, "second-validated"));
+        var expiration = new DateTimeOffset(2040, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var outbox = Fixture.GetGrainContext(sender).ActivationServices.GetRequiredService<Outbox>();
+        await Fixture.OnGrainAsync(sender, () =>
+        {
+            if (reference) outbox.Register(Substitute.For<IOutboxMessageSource>());
+            ((IDurableValueCommandHandler<OutboxCommand>)outbox).ApplySet(new()
+            {
+                Kind = OutboxCommandKind.Snapshot,
+                Snapshot = new()
+                {
+                    Messages =
+                    [
+                        new() { Message = first, State = new() { ExpirationTime = expiration } },
+                        new()
+                        {
+                            Message = reference ? null : target,
+                            Reference = reference ? new() { MessageId = target.Envelope.MessageId } : null,
+                            State = new() { ExpirationTime = hasExpiration ? expiration : null }
+                        }
+                    ]
+                }
+            });
+
+            if (hasExpiration)
+            {
+                ((IStateMachine)outbox).OnRecoveryCompleted();
+            }
+            else
+            {
+                var error = Assert.Throws<InvalidOperationException>(() => ((IStateMachine)outbox).OnRecoveryCompleted());
+                Assert.Equal(
+                    "A recovered outbox entry requires its immutable retry expiration and admission cutoff.",
+                    error.Message);
+            }
+
+            Assert.Equal(2, outbox.MessageState.Count);
+            Assert.Equal(expiration, outbox.MessageState[first.Envelope.MessageId].State.ExpirationTime);
+            var recovered = outbox.MessageState[target.Envelope.MessageId];
+            Assert.Equal(target.Envelope.MessageId, recovered.MessageId);
+            Assert.Equal(reference, recovered.Reference is not null);
+            Assert.Equal(hasExpiration ? expiration : (DateTimeOffset?)null, recovered.State.ExpirationTime);
+        });
     }
 
     [Fact]
