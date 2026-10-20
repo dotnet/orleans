@@ -334,6 +334,14 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                             isSnapshot = workItem is WriteSnapshotWorkItem
                                 || _migrationSnapshotRequired
                                 || _storage.IsCompactionRequested;
+                            if (isSnapshot && _transaction is not null)
+                            {
+                                // A snapshot would capture the open transaction's uncommitted changes. The transaction ends
+                                // with its request, and the journal needs no snapshot while it is open.
+                                Debug.Assert(!_migrationSnapshotRequired);
+                                isSnapshot = false;
+                            }
+
                             if (isSnapshot)
                             {
                                 try
@@ -374,6 +382,13 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                         {
                                             isSnapshot = _positions.SnapshotPassesBarriers(positionResolution);
                                         }
+                                    }
+
+                                    if (isSnapshot && _transaction is not null)
+                                    {
+                                        // A transaction began while the states prepared.
+                                        Debug.Assert(!_migrationSnapshotRequired);
+                                        isSnapshot = false;
                                     }
 
                                     var operationLabel = isSnapshot
@@ -465,6 +480,15 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                                 {
                                                     if (id is 0 || state is null)
                                                     {
+                                                        continue;
+                                                    }
+
+                                                    if (IsHeldByTransaction(state))
+                                                    {
+                                                        // The open transaction stages the state's pending changes into its own
+                                                        // segment when it commits. A state which a write doesn't capture
+                                                        // acknowledges nothing of it, so no effect of durability observes the
+                                                        // transaction's changes before the write which captures its commit.
                                                         continue;
                                                     }
 
@@ -658,6 +682,12 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                         ThrowIfFenced();
                                         _state = ManagerState.Ready;
                                     }
+                                    break;
+                                }
+
+                            case RollbackWorkItem rollback:
+                                {
+                                    await RollbackAsync(rollback.Transaction, _shutdownCancellation.Token).ConfigureAwait(true);
                                     break;
                                 }
 
@@ -915,6 +945,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         lock (_lock)
         {
             ThrowIfStateOperationsUnavailable();
+            if (_transaction is not null)
+            {
+                throw new InvalidOperationException("Journaled state can't be deleted while a transaction is open.");
+            }
+
             task = EnqueueOrGetPendingWorkItem<DeleteStateWorkItem>(out didEnqueue);
         }
 
@@ -1058,8 +1093,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
     /// <summary>Gets the journal's positions, its compaction barriers, and the resolution of positional reads.</summary>
     internal JournalPositionTracker Positions => _positions;
 
-    /// <summary>Gets whether the manager can honor positions: it's ready and no format migration is pending.</summary>
-    internal bool AcceptsPositions => _state is ManagerState.Ready && !_migrationSnapshotRequired;
+    /// <summary>
+    /// Gets whether the manager can honor positions: it's ready, no format migration is pending, and no transaction is open.
+    /// </summary>
+    /// <remarks>An open transaction's changes are in live state but not yet in the journal, so reads record values.</remarks>
+    internal bool AcceptsPositions => _state is ManagerState.Ready && !_migrationSnapshotRequired && _transaction is null;
 
     internal ILogger Logger => _shared.Logger;
 
@@ -1171,6 +1209,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         lock (_lock)
         {
             ThrowIfStateOperationsUnavailable();
+            ThrowIfInTransaction();
             var isSnapshot = _migrationSnapshotRequired || _storage.IsCompactionRequested;
             operation = isSnapshot ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
             pendingWrite = isSnapshot
@@ -1412,6 +1451,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         {
             _shutdownCancellation.Dispose();
             _journalWriter.Dispose();
+            _idleTransactionWriter?.Dispose();
         }
     }
 

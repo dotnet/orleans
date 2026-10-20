@@ -8,7 +8,7 @@ using Orleans.Serialization;
 namespace Orleans.Durable.Journaling;
 
 [DebuggerDisplay("Count = {Count}, NextSequence = {NextSequence}")]
-internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLogCommandHandler<T>, IReplicableState, IJournaledStateReplica
+internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLogCommandHandler<T>, IReplicableState, IJournaledStateReplica, IJournaledStateResync, IJournaledStateRollback
 {
     private readonly IDurableLogCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
@@ -300,6 +300,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         ArgumentOutOfRangeException.ThrowIfNegative(epoch);
         return DurableStateObservation.WatchAsync(
             DurableStateObservation.GetRequiredManager(_manager),
+            this,
             (Log: this, FromSequence: fromSequence, Epoch: epoch, IncludeDrafts: includeDrafts, ResumeDraftId: resumeDraftId),
             static (hub, arg) => arg.Log.CreateReader(hub, arg.FromSequence, arg.Epoch, arg.IncludeDrafts, arg.ResumeDraftId),
             cancellationToken);
@@ -334,14 +335,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
-        _items.Clear();
-        _epoch = 0;
-        _firstSequence = 0;
-        _resetSequence = 0;
-        _isSealed = false;
-        _captured = _committed = default;
-        _draftCommits?.Clear();
-        _writer = writer;
+        ClearJournaledContent(writer);
         if (_drafts is { } drafts)
         {
             while (drafts.Open.Count > 0)
@@ -351,6 +345,22 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         }
 
         SignalAllReaders();
+    }
+
+    // An aborted transaction's rebuild keeps open drafts, which other code owns. A reader whose cursor passed the rebuilt
+    // end resynchronizes on its own, as after any shortening of the log.
+    void IJournaledStateRollback.ResetForRollback(JournalStreamWriter writer) => ClearJournaledContent(writer);
+
+    private void ClearJournaledContent(JournalStreamWriter writer)
+    {
+        _items.Clear();
+        _epoch = 0;
+        _firstSequence = 0;
+        _resetSequence = 0;
+        _isSealed = false;
+        _captured = _committed = default;
+        _draftCommits?.Clear();
+        _writer = writer;
     }
 
     void IStateMachine.OnRecoveryCompleted()
@@ -563,6 +573,9 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             topic.SignalAll();
         }
     }
+
+    // Readers read the log itself, so waking them shows them what a transaction changed.
+    void IJournaledStateResync.PublishResync(StateTopic topic) => topic.SignalAll();
 
     private void CloseDraft(Draft draft, DraftOutcome outcome)
     {

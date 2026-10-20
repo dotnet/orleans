@@ -197,6 +197,16 @@ internal interface IChangeSink<TChange>
     void OnChange(TChange change, long version);
 }
 
+/// <summary>Publishes a state's whole content to its watchers, as a staged change.</summary>
+/// <remarks>
+/// A transaction's states publish nothing while it is open; when it ends, each publishes its content once, which the write
+/// that captures the transaction's outcome confirms.
+/// </remarks>
+internal interface IJournaledStateResync
+{
+    void PublishResync(StateTopic topic);
+}
+
 /// <summary>
 /// One reader of a watched state machine.
 /// </summary>
@@ -395,7 +405,7 @@ internal static class DurableStateObservation
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryGetTopic(JournaledStateManager? manager, IStateMachine state, [NotNullWhen(true)] out StateTopic? topic)
     {
-        if (manager?.Observers is { } observers)
+        if (manager?.Observers is { } observers && !manager.IsHeldByTransaction(state))
         {
             return observers.TryGetTopic(state, out topic);
         }
@@ -414,6 +424,7 @@ internal static class DurableStateObservation
         WatchAsync(
             GetRequiredManager(manager),
             state,
+            state,
             static (hub, state) =>
             {
                 // A dirty value is captured by the next write, and a value which the in-flight write captured is durable once that
@@ -429,13 +440,19 @@ internal static class DurableStateObservation
     /// <summary>
     /// Creates a watcher when enumeration begins and delivers its events until the hub completes or the token is canceled.
     /// </summary>
+    /// <remarks>
+    /// A watch of state which an open transaction holds begins once the transaction ends, so its initial content is never
+    /// uncommitted.
+    /// </remarks>
     public static async IAsyncEnumerable<TEvent> WatchAsync<TArg, TEvent>(
         JournaledStateManager manager,
+        IStateMachine state,
         TArg arg,
         Func<JournaledStateObservers, TArg, StateWatcher<TEvent>> createWatcher,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        await manager.WaitUntilReleasedAsync(state, cancellationToken);
         var hub = manager.GetOrCreateObservers();
         var watcher = createWatcher(hub, arg);
         hub.Add(watcher);
