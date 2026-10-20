@@ -70,6 +70,9 @@ internal sealed partial class JournalPositionTracker
     /// <summary>Gets whether any owner holds a compaction barrier.</summary>
     public bool HasBarriers => Barriers.HasBarriers;
 
+    /// <summary>Gets whether a deletion of the journal is replacing its history.</summary>
+    public bool IsDeleting => _suspended;
+
     // The position at which storage's content ends.
     private long StoredPosition => _offset + _storedEntryCount;
 

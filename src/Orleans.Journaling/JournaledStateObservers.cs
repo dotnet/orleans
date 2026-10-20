@@ -218,7 +218,7 @@ internal interface IChangeSink<TChange>
 /// <summary>
 /// A watchable collection which creates snapshots of its complete current contents.
 /// </summary>
-internal interface IResyncSource<TChange>
+internal interface IResyncSource<TChange> : IJournaledStateResync
 {
     /// <summary>
     /// Gets a value indicating whether the collection has journal entries which no captured write contains.
@@ -226,6 +226,18 @@ internal interface IResyncSource<TChange>
     bool HasStagedEntries { get; }
 
     TChange CreateResync();
+
+    void IJournaledStateResync.PublishResync(StateTopic topic) => topic.PublishStaged(CreateResync());
+}
+
+/// <summary>Publishes a state's whole content to its watchers, as a staged change.</summary>
+/// <remarks>
+/// A transaction's states publish nothing while it is open; when it ends, each publishes its content once, which the write
+/// that captures the transaction's outcome confirms.
+/// </remarks>
+internal interface IJournaledStateResync
+{
+    void PublishResync(StateTopic topic);
 }
 
 /// <summary>
@@ -611,7 +623,7 @@ internal static class DurableStateObservation
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryGetTopic(JournaledStateManager? manager, IStateMachine state, [NotNullWhen(true)] out StateTopic? topic)
     {
-        if (manager?.Observers is { } observers)
+        if (manager?.Observers is { } observers && !manager.IsHeldByTransaction(state))
         {
             return observers.TryGetTopic(state, out topic);
         }
@@ -668,6 +680,7 @@ internal static class DurableStateObservation
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(capacity);
         return WatchAsync(
             GetRequiredManager(manager),
+            state,
             (state, mode, capacity),
             static (hub, arg) =>
             {
@@ -689,6 +702,7 @@ internal static class DurableStateObservation
         ValidateMode(mode);
         return WatchAsync(
             GetRequiredManager(manager),
+            state,
             (state, mode),
             static (hub, arg) =>
             {
@@ -704,13 +718,19 @@ internal static class DurableStateObservation
     /// <summary>
     /// Creates a watcher when enumeration begins and delivers its events until the hub completes or the token is canceled.
     /// </summary>
+    /// <remarks>
+    /// A watch of state which an open transaction holds begins once the transaction ends, so its initial content is never
+    /// uncommitted.
+    /// </remarks>
     public static async IAsyncEnumerable<TEvent> WatchAsync<TArg, TEvent>(
         JournaledStateManager manager,
+        IStateMachine state,
         TArg arg,
         Func<JournaledStateObservers, TArg, StateWatcher<TEvent>> createWatcher,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        await manager.WaitUntilReleasedAsync(state, cancellationToken);
         var hub = manager.GetOrCreateObservers();
         var watcher = createWatcher(hub, arg);
         hub.Add(watcher);

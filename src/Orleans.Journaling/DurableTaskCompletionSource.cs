@@ -43,7 +43,7 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IReportsStagedChanges, IDurableTaskCompletionSourceCommandHandler<T>, IReplicableState, IJournaledStateReplica
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IReportsStagedChanges, IDurableTaskCompletionSourceCommandHandler<T>, IReplicableState, IJournaledStateReplica, ICoalescingJournaledState
 {
     private readonly IDurableTaskCompletionSourceCommandCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
@@ -198,6 +198,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
+        Debug.Assert(_accessTarget.Manager is not { } manager || !manager.IsHeldByTransaction(this), "A write captures no state which an open transaction holds.");
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
             WriteState(writer);
@@ -209,6 +210,17 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     {
         WriteState(snapshotWriter);
         _isCompletionCaptured = _status is not DurableTaskCompletionSourceStatus.Pending;
+    }
+
+    // A transaction journals the completion through its stream: into the journal when it first writes the completion
+    // source, and into its segment when it commits. The write which captures this state after the transaction ends journals
+    // the completion again and publishes it.
+    void ICoalescingJournaledState.StagePendingChanges(JournalStreamWriter writer)
+    {
+        if (_status is not DurableTaskCompletionSourceStatus.Pending)
+        {
+            WriteState(writer);
+        }
     }
 
     private void WriteState(JournalStreamWriter writer)
