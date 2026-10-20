@@ -15,8 +15,9 @@ namespace Benchmarks.Journaling;
 /// transaction which commits, and, for reference, in one which aborts and rebuilds its states from the journal.
 /// </summary>
 /// <remarks>
-/// The manager has no activation, so the transaction runs inline: the figures exclude the exclusive section or request
-/// which an activation adds. Each operation stages its entries and then clears the journal buffer, so no write runs.
+/// The manager has no activation, so the transaction runs inline: the figures exclude the exclusive section which an
+/// activation adds. Each operation writes its entries to storage which discards them: the direct writes with a journal
+/// write, and the transaction with the write which its commit awaits. The aborted transaction writes nothing.
 /// </remarks>
 [BenchmarkCategory("Journaling")]
 [MemoryDiagnoser(displayGenColumns: false)]
@@ -27,7 +28,6 @@ public class JournalTransactionBenchmarks
     private JournaledStateManager _manager = null!;
     private DurableDictionary<string, string> _dictionary = null!;
     private DurableValue<string> _value = null!;
-    private uint _valueStream;
     private Func<CancellationToken, Task> _writes = null!;
     private Func<CancellationToken, Task<string?>> _read = null!;
     private Func<CancellationToken, Task> _abort = null!;
@@ -38,8 +38,7 @@ public class JournalTransactionBenchmarks
     [GlobalSetup]
     public void GlobalSetup()
     {
-        (_manager, _dictionary, _value) = CreateAsync().GetAwaiter().GetResult();
-        _valueStream = GetStream(_manager);
+        (_manager, _dictionary, _value, _) = CreateAsync().GetAwaiter().GetResult();
         _writes = _ =>
         {
             Write();
@@ -57,21 +56,14 @@ public class JournalTransactionBenchmarks
     public void GlobalCleanup() => _manager.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
     [Benchmark(Baseline = true)]
-    public void Direct()
+    public async Task Direct()
     {
         Write();
-
-        // A write captures the value's pending change, as the transaction's commit does.
-        Stage(_manager, _value, _valueStream);
-        _manager.JournalWriter.Reset();
+        await _manager.WriteStateAsync();
     }
 
     [Benchmark]
-    public async Task Committed()
-    {
-        await _manager.RunTransactionAsync(_writes);
-        _manager.JournalWriter.Reset();
-    }
+    public Task Committed() => _manager.RunTransactionAsync(_writes);
 
     [Benchmark]
     public Task<string?> ReadOnly() => _manager.RunTransactionAsync(_read);
@@ -93,7 +85,7 @@ public class JournalTransactionBenchmarks
     /// <summary>Prints the journal bytes which the same writes stage directly and in a committed transaction.</summary>
     public static void ReportBytes()
     {
-        var (manager, dictionary, value) = CreateAsync().GetAwaiter().GetResult();
+        var (manager, dictionary, value, storage) = CreateAsync().GetAwaiter().GetResult();
         foreach (var writes in new[] { 1, 8, 64 })
         {
             void Write()
@@ -106,18 +98,15 @@ public class JournalTransactionBenchmarks
                 value.Value = "value";
             }
 
-            manager.JournalWriter.Reset();
             Write();
-            Stage(manager, value, GetStream(manager));
-            var direct = manager.JournalWriter.CommittedLength;
-            manager.JournalWriter.Reset();
+            manager.WriteStateAsync().AsTask().GetAwaiter().GetResult();
+            var direct = storage.LastAppendLength;
             manager.RunTransactionAsync(_ =>
             {
                 Write();
                 return Task.CompletedTask;
             }).GetAwaiter().GetResult();
-            var transactional = manager.JournalWriter.CommittedLength;
-            manager.JournalWriter.Reset();
+            var transactional = storage.LastAppendLength;
             Console.WriteLine($"{writes,3} writes: direct {direct,6} B, transaction {transactional,6} B (+{transactional - direct} B)");
         }
     }
@@ -132,13 +121,7 @@ public class JournalTransactionBenchmarks
         _value.Value = "value";
     }
 
-    private static uint GetStream(JournaledStateManager manager) => manager.GetTransactionalState(new JournaledStateAccessTarget("value", manager)).StreamId;
-
-    // Journals the value's pending change, as a write's capture does.
-    private static void Stage(JournaledStateManager manager, DurableValue<string> value, uint stream) =>
-        ((ICoalescingJournaledState)value).StagePendingChanges(manager.JournalWriter.CreateJournalStreamWriter(new(stream)));
-
-    private static async Task<(JournaledStateManager, DurableDictionary<string, string>, DurableValue<string>)> CreateAsync()
+    private static async Task<(JournaledStateManager, DurableDictionary<string, string>, DurableValue<string>, DiscardingJournalStorage)> CreateAsync()
     {
         var serviceCollection = new ServiceCollection().AddSerializer();
         serviceCollection.AddSingleton<OrleansBinaryJournalFormat>();
@@ -152,13 +135,35 @@ public class JournalTransactionBenchmarks
             Options.Create(new JournaledStateManagerOptions { JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey }),
             TimeProvider.System,
             services);
-        var manager = new JournaledStateManager(shared, new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey));
+        var storage = new DiscardingJournalStorage();
+        var manager = new JournaledStateManager(shared, storage);
         var dictionary = new DurableDictionary<string, string>(
             "dictionary",
             manager,
             new OrleansBinaryDurableDictionaryCommandCodec<string, string>(codecs.GetCodec<string>(), codecs.GetCodec<string>(), sessions));
         var value = new DurableValue<string>("value", manager, new OrleansBinaryDurableValueCommandCodec<string>(codecs.GetCodec<string>(), sessions));
         await manager.InitializeAsync();
-        return (manager, dictionary, value);
+        return (manager, dictionary, value, storage);
+    }
+
+    // Storage which holds nothing, so the benchmarks measure the manager rather than a growing store; an abort's rebuild
+    // reads it as empty.
+    private sealed class DiscardingJournalStorage : IJournalStorage
+    {
+        public long LastAppendLength { get; private set; }
+
+        public bool IsCompactionRequested => false;
+
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken) => default;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            LastAppendLength = value.Length;
+            return default;
+        }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 }

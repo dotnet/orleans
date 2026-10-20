@@ -51,19 +51,17 @@ public sealed class OutboxDeliveryBehaviorTests : MessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task TransactionalSend_IsDeliveredOnlyAfterTheCommitsWrite()
+    public async Task TransactionalSend_IsDeliveredOnceTheTransactionReturns()
     {
         var sender = NewGrain();
         var receiver = NewGrain();
 
+        // The transaction returns once the write which holds its send completed, so the send needs no further write.
         await sender.SendInTransactionAsync(receiver.GetGrainId(), "messages/transactional", NewMessage(56, "transactional"), abort: false);
-        await Task.Delay(500, TestContext.Current.CancellationToken);
-        Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
-        Assert.Equal(1, (await sender.GetSnapshotAsync()).OutboxCount);
-
-        await sender.RetryWriteStateAsync();
         var delivered = await Fixture.WaitForEffectCountAsync(receiver, 1);
+
         Assert.Equal("transactional", Assert.Single(delivered.Effects).Value);
+        await Fixture.WaitForOutboxCountAsync(sender, 0);
     }
 
     [Fact]
@@ -73,15 +71,50 @@ public sealed class OutboxDeliveryBehaviorTests : MessagingBehaviorTestBase
         var receiver = NewGrain();
 
         await sender.SendInTransactionAsync(receiver.GetGrainId(), "messages/transactional", NewMessage(57, "aborted"), abort: true);
-        await sender.RetryWriteStateAsync();
-        await Task.Delay(500, TestContext.Current.CancellationToken);
-
         Assert.Equal(0, (await sender.GetSnapshotAsync()).OutboxCount);
-        Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
+
+        // Once a later send is delivered and the sender's outbox is empty, nothing else can arrive from the sender.
+        await sender.SendAsync(receiver.GetGrainId(), "messages/transactional", NewMessage(58, "committed"));
+        await Fixture.WaitForEffectCountAsync(receiver, 1);
+        await Fixture.WaitForOutboxCountAsync(sender, 0);
+        Assert.Equal("committed", Assert.Single((await receiver.GetSnapshotAsync()).Effects).Value);
         await sender.RequestDeactivationAsync();
         Assert.Equal(0, (await sender.GetSnapshotAsync()).OutboxCount);
     }
 
+    [Fact]
+    public async Task TransactionalSendToSameGrain_IsProcessedOnceAfterTheCommit()
+    {
+        var grain = NewGrain();
+
+        await grain.SendInTransactionAsync(grain.GetGrainId(), "messages/loopback", NewMessage(59, "loopback"), abort: false);
+        var delivered = await Fixture.WaitForEffectCountAsync(grain, 1);
+        Assert.Equal("loopback", Assert.Single(delivered.Effects).Value);
+
+        // The inbox's acceptance and the message's completion are durable in that order, so recovery doesn't process it again.
+        await grain.RequestDeactivationAsync();
+        var recovered = await grain.GetSnapshotAsync();
+        Assert.Equal("loopback", Assert.Single(recovered.Effects).Value);
+        Assert.Equal(0, recovered.InboxCount);
+    }
+
+    [Fact]
+    public async Task AbortedTransactionalSendToSameGrain_IsNeverProcessed()
+    {
+        var grain = NewGrain();
+
+        await grain.SendInTransactionAsync(grain.GetGrainId(), "messages/loopback", NewMessage(60, "aborted"), abort: true);
+        Assert.Equal(0, (await grain.GetSnapshotAsync()).InboxCount);
+
+        // A later send to the grain is processed; the aborted one never is, live or after recovery.
+        await grain.SendAsync(grain.GetGrainId(), "messages/loopback", NewMessage(61, "committed"));
+        await Fixture.WaitForEffectCountAsync(grain, 1);
+        Assert.Equal("committed", Assert.Single((await grain.GetSnapshotAsync()).Effects).Value);
+        await grain.RequestDeactivationAsync();
+        var recovered = await grain.GetSnapshotAsync();
+        Assert.Equal("committed", Assert.Single(recovered.Effects).Value);
+        Assert.Equal(0, recovered.InboxCount);
+    }
     [Fact]
     public async Task DuplicateOutboxEnqueue_UsesOneDurableWakeup()
     {

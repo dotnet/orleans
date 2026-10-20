@@ -136,7 +136,22 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         return true;
     }
 
-    public Task<T> Task => _completion.Task;
+    /// <exception cref="InvalidOperationException">
+    /// The calling code runs in the transaction which completed the source, whose task completes after the transaction ends.
+    /// </exception>
+    public Task<T> Task
+    {
+        get
+        {
+            if (!_completion.Task.IsCompleted && _accessTarget.Manager is { } manager && manager.IsHeldByCurrentTransaction(this))
+            {
+                throw new InvalidOperationException(
+                    "A transaction's code can't wait for a completion source which the transaction changed: its task completes once the transaction's commit is durable.");
+            }
+
+            return _completion.Task;
+        }
+    }
 
     public DurableTaskCompletionSourceState<T> State => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
         ? context.ReadWhole(_accessTarget, JournaledStateOperation.CompletionSourceState, this, static self => self.StateCore)
@@ -213,10 +228,11 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     }
 
     // A transaction journals the completion through its stream: into the journal when it first writes the completion
-    // source, and into its segment when it commits. The write which captures this state after the transaction ends journals
-    // the completion again and publishes it.
+    // source, and into its segment when it commits. Captures skip a held source, so its change leaves the segment only through
+    // the commit. The write which captures this state after the transaction ends journals the completion again and publishes it.
     void ICoalescingJournaledState.StagePendingChanges(JournalStreamWriter writer)
     {
+        Debug.Assert(_accessTarget.Manager is not { } manager || manager.MayStagePendingChanges(this), "A held state stages only into its transaction's segment.");
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
             WriteState(writer);
