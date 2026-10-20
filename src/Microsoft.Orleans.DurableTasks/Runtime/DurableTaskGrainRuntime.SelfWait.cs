@@ -25,6 +25,6 @@ internal sealed partial class DurableTaskGrainRuntime
 
         throw new InvalidOperationException(
             $"A request of grain {GrainId} waits for its durable task '{taskId}', whose code runs as requests to the same grain, which the grain holds until the waiting request completes, so the wait can't end. "
-            + "Await the task from durable code, such as a method which returns DurableTask, return the task's handle instead of waiting for it, or let the waiting request interleave: mark its method [AlwaysInterleave] or [Reentrant], or the grain [Reentrant].");
+            + "Await the task from durable code, such as a method which returns DurableTask, return the task's handle instead of waiting for it, or let the waiting request interleave: mark its interface method [AlwaysInterleave] or the grain class [Reentrant].");
     }
 }

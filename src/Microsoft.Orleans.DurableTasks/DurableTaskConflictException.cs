@@ -4,11 +4,12 @@ namespace Orleans.DurableTasks;
 
 /// <summary>
 /// Represents a schedule of a request under a task identifier which the target grain already associates with a different
-/// operation, such as the same method with different arguments.
+/// operation, such as a different method or caller.
 /// </summary>
 /// <remarks>
-/// A task identifier deduplicates schedules of one request, so a caller which reuses an identifier for another request
-/// receives this exception and the existing task is unchanged.
+/// A task identifier deduplicates schedules of the same method and caller. Repeated starts of that operation return the
+/// stored task, including when the arguments differ. A start with a different method or caller receives this exception,
+/// and the existing task is unchanged.
 /// </remarks>
 [GenerateSerializer]
 [Alias("Orleans.DurableTasks.DurableTaskConflictException")]
