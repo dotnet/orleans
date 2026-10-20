@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using CsCheck;
 using Orleans.Journaling.Json;
+using Orleans.Storage;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -666,6 +667,37 @@ public sealed class JournalTransactionTests
 
         Assert.Same(failure, exception.InnerException);
         Assert.Null(activation.Manager.OpenTransaction);
+    }
+
+    [Fact]
+    public async Task AbortWhoseHistoryReadFindsAnotherWriterFencesTheJournal()
+    {
+        using var host = new TransactionTestHost(Binary);
+        var storage = new ControlledJournalStorage(Binary);
+        var activation = await host.ActivateAsync(storage);
+        activation.Dictionary["a"] = "x";
+        await activation.Manager.WriteStateAsync(Cancellation);
+
+        // The rebuild reads history through the storage instance whose precondition this activation holds, so storage rejects
+        // the read once another writer changed the journal: the failure fails the abort and fences the journal, and a new
+        // activation recovers the other writer's content instead.
+        await Assert.ThrowsAsync<InconsistentStateException>(() => activation.Manager.RunTransactionAsync(async _ =>
+        {
+            activation.Dictionary["a"] = "uncommitted";
+            await RunOutsideTransaction(async () =>
+            {
+                var other = await host.ActivateAsync(storage.CreateOtherWriter());
+                other.Dictionary["a"] = "other";
+                await other.Manager.WriteStateAsync(Cancellation);
+            });
+
+            throw new FormatException("abort");
+        }, Cancellation).WaitAsync(Timeout, Cancellation));
+
+        Assert.Null(activation.Manager.OpenTransaction);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => activation.Manager.WriteStateAsync(Cancellation).AsTask());
+        var recovered = await host.ActivateAsync(storage.CreateOtherWriter());
+        Assert.Equal("other", recovered.Dictionary["a"]);
     }
 
     [Fact]
