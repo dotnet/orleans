@@ -31,6 +31,7 @@ public sealed class WorkflowGrain(ILocalSiloDetails localSiloDetails) : DurableG
     // results in item order once every branch has completed.
     public async DurableTask<FanOutWorkflowResult> RunFanOutAsync(string[] items)
     {
+        ArgumentNullException.ThrowIfNull(items);
         ArgumentOutOfRangeException.ThrowIfZero(items.Length);
         var workflowId = WorkflowId;
         var branches = await DurableTask.WhenAll(items.Select((item, index) =>
@@ -63,16 +64,22 @@ public sealed class WorkflowGrain(ILocalSiloDetails localSiloDetails) : DurableG
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(holdPeriod, TimeSpan.Zero);
         var workflowId = WorkflowId;
         var inventory = GrainFactory.GetGrain<IInventoryGrain>(workflowId);
+        var reservations = await DurableTask.WhenAllCompleted([inventory.ReserveAsync($"{workflowId}:reserve")])
+            .WithId("reserve");
+        var reservation = reservations[0];
         try
         {
-            await inventory.ReserveAsync($"{workflowId}:reserve").WithId("reserve");
+            await reservation;
             await DurableTask.Delay(holdPeriod).WithId("hold");
             return new(workflowId, Canceled: false, Reason: null);
         }
         catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
         {
-            // A shielded child runs to completion although the workflow was canceled.
-            await inventory.ReleaseAsync($"{workflowId}:release").WithId("release").Shielded();
+            if (reservation.Status is DurableTaskStatus.CompletedSuccessfully)
+            {
+                // A shielded child runs to completion although the workflow was canceled.
+                await inventory.ReleaseAsync($"{workflowId}:release").WithId("release").Shielded();
+            }
 
             return new(workflowId, Canceled: true, DurableTask.Current.TaskCancellationReason);
         }
