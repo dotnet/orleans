@@ -36,11 +36,11 @@ internal sealed class OutboxMessageState
     public string? LastError { get; set; }
 
     /// <summary>
-    /// Gets or sets when the outbox stops attempting the message and dead-letters it, on the Durable Jobs clock:
-    /// <c>OutboxRetryTimeout</c> after the send. This immutable value is also the logical send's admission cutoff.
+    /// Gets or sets the logical send's staging time on the Durable Jobs clock. Every attempt preserves this value;
+    /// retries end <c>OutboxRetryTimeout</c> after it. A recovered entry requires this journaled value.
     /// </summary>
     [Id(3)]
-    public DateTimeOffset? ExpirationTime { get; set; }
+    public DateTimeOffset? SentAt { get; set; }
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxDeadLetter")]
