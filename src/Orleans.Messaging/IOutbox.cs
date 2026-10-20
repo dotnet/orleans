@@ -10,8 +10,8 @@ namespace Orleans.Messaging;
 /// Its write-completion callback makes captured messages eligible for dispatch.
 /// Each wakeup checks the grain's messages and their retry deadlines. Messages remain pending until the destination
 /// acknowledges durable acceptance, recognizes a duplicate, or reports a terminal delivery outcome.
-/// The outbox journals one immutable admission cutoff and an absolute retry budget for each send. Backpressure and
-/// recovery preserve both. Applications use <see cref="Send(MessageId)"/> and
+/// The outbox journals each send's <see cref="InboxMessage.SentAt"/>; every attempt, backpressure, and recovery reuse
+/// it, and retries end <c>OutboxRetryTimeout</c> after it. Applications use <see cref="Send(MessageId)"/> and
 /// <see cref="IOutboxMessageSource.OnRetired"/> to stage crash-recoverable responses to terminal outcomes in the
 /// same journal write as retirement.
 /// Applications namespace command identities and define ordering in their protocols.
@@ -58,8 +58,9 @@ public interface IOutbox
     /// pending ID again coalesces with the pending message. A message which a source addresses to
     /// the sending grain is rejected; send it through <see cref="Send(OutboxMessage)"/>, which stages it in the grain's
     /// own inbox.
-    /// A timeout or fenced cutoff reports <see cref="OutboxMessageRetirementStatus.DeadLettered"/> to the source;
-    /// the receiver's earlier outcome is unknown, so the application reconciles it before starting a new send.
+    /// A retry timeout or <see cref="DeliveryStatus.Expired"/> reports
+    /// <see cref="OutboxMessageRetirementStatus.DeadLettered"/> to the source; the receiver's earlier outcome is unknown,
+    /// so the application reconciles it before starting a new send.
     /// </remarks>
     /// <exception cref="ArgumentException">
     /// The ID is unset or too long, or the source's message is invalid or addressed to the sending grain.

@@ -29,7 +29,7 @@ public sealed class DeliveryAndOptionsContractTests
         Assert.Equal("duplicate order", coded.Message);
         Assert.Equal("orders/duplicate", coded.Code);
         Assert.Equal(DeliveryStatus.Expired, expired.Status);
-        Assert.Equal("The message's admission cutoff is fenced; its earlier delivery outcome is unknown.", expired.Message);
+        Assert.Equal("The message was sent before the receiver's deduplication window; its earlier delivery outcome is unknown.", expired.Message);
         Assert.Null(expired.Code);
     }
 
@@ -42,7 +42,7 @@ public sealed class DeliveryAndOptionsContractTests
         var decoded = serializer.Deserialize(serializer.SerializeToArray(DeliveryResult.Expired()));
 
         Assert.Equal(DeliveryStatus.Expired, decoded.Status);
-        Assert.Equal("The message's admission cutoff is fenced; its earlier delivery outcome is unknown.", decoded.Message);
+        Assert.Equal("The message was sent before the receiver's deduplication window; its earlier delivery outcome is unknown.", decoded.Message);
         Assert.Null(decoded.Code);
     }
 
@@ -107,10 +107,10 @@ public sealed class DeliveryAndOptionsContractTests
     }
 
     [Theory]
-    [InlineData(1, 2)]
-    [InlineData(1, 1)]
-    [InlineData(2, 1)]
-    public void Validate_RetryTimeoutAndDeduplicationWindow_AreIndependentPositiveDurations(long retryTimeoutTicks, long deduplicationWindowTicks)
+    [InlineData(1, 2, true)]
+    [InlineData(2, 2, false)]
+    [InlineData(3, 2, false)]
+    public void Validate_OutboxRetryTimeout_MustEndWithinTheDeduplicationWindow(long retryTimeoutTicks, long deduplicationWindowTicks, bool valid)
     {
         var options = new DurableMessagingOptions
         {
@@ -118,6 +118,14 @@ public sealed class DeliveryAndOptionsContractTests
             OutboxRetryTimeout = TimeSpan.FromTicks(retryTimeoutTicks),
         };
 
-        Assert.Null(Record.Exception(options.Validate));
+        if (valid)
+        {
+            options.Validate();
+            return;
+        }
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
+        Assert.Equal(nameof(DurableMessagingOptions.OutboxRetryTimeout), exception.ParamName);
+        Assert.Contains("less than DeduplicationWindow", exception.Message, StringComparison.Ordinal);
     }
 }
