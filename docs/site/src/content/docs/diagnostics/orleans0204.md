@@ -25,7 +25,7 @@ The delegate which `DurableTask.RunInline` receives assigns, increments, or decr
 
 The state changes which the effect makes, such as the increment of `_lastNumber`, are correct: they commit with the record, and the replay finds them in the grain's state.
 
-For recorded effects, see [Recorded effects](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#recorded-effects).
+For recorded effects, see [Recorded effects](../grains/durable-tasks.md#recorded-effects).
 
 ## How to fix violations
 
