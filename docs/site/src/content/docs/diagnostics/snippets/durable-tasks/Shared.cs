@@ -51,13 +51,28 @@ public interface IOrderWorkflows
     DurableTask<OrderResult> PlaceOrderAsync(Guid orderId);
 }
 
-// Stand in for grain interfaces whose durable methods return DurableTask, which a detached start runs as a root task.
-public interface ICustomerSurveys
+// Grains whose durable methods other examples call, so a detached start runs the call as a root task on its grain.
+public interface ICustomerSurveys : IGrainWithStringKey
 {
     DurableTask SendSurveyAsync(string customer);
 }
 
-public interface IStudentMail
+public sealed class CustomerSurveysGrain(IEmailSender email) : DurableGrain, ICustomerSurveys
+{
+    public async DurableTask SendSurveyAsync(string customer) =>
+        await email.SendAsync(customer, "How was your order?", DurableTask.Current.CancellationToken);
+}
+
+public interface IStudentMail : IGrainWithStringKey
 {
     DurableTask<bool> WelcomeAsync(string student, int seat);
+}
+
+public sealed class StudentMailGrain(IEmailSender email) : DurableGrain, IStudentMail
+{
+    public async DurableTask<bool> WelcomeAsync(string student, int seat)
+    {
+        await email.SendAsync(student, $"Welcome! Your seat is {seat}.", DurableTask.Current.CancellationToken);
+        return true;
+    }
 }
