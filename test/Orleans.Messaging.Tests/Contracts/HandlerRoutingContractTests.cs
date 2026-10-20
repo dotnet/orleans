@@ -45,16 +45,26 @@ public sealed class HandlerRoutingContractTests : IDisposable
         Assert.Equal(["declines?", "accepts?", "accepts!"], order);
     }
 
-    [Fact]
-    public async Task Dispatch_NoMatchingHandler_ThrowsWithSubject()
+    [Theory]
+    [InlineData("unknown", "No handler is registered for message subject 'unknown'.")]
+    [InlineData(null, "No handler is registered for message subject '<absent>'.")]
+    public async Task Dispatch_NoMatchingHandler_ThrowsWithSubject(string? subject, string expectedMessage)
     {
         var dispatcher = new TestInbox().Register(CreateType("known"), (_, context) => context.Complete());
-        var context = CreateContext(CreateType("unknown"), "body");
+        var context = new FakeContext(new InboxMessage
+        {
+            Envelope = new Envelope
+            {
+                MessageId = MessageId.Create("unhandled"),
+                Payload = [],
+                Subject = subject
+            }
+        });
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => dispatcher.HandleAsync(context, CancellationToken.None).AsTask());
 
-        Assert.Equal("No handler is registered for message subject 'unknown'.", exception.Message);
+        Assert.Equal(expectedMessage, exception.Message);
         Assert.Equal(0, context.Completions);
     }
 

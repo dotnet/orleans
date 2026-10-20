@@ -32,6 +32,6 @@ internal readonly struct InboxDispatcher
         }
 
         throw new InvalidOperationException(
-            $"No handler is registered for message subject '{context.Message.Envelope.Subject}'.");
+            $"No handler is registered for message subject '{context.Message.Envelope.Subject ?? "<absent>"}'.");
     }
 }
