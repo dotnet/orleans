@@ -21,8 +21,9 @@ namespace Orleans.Serialization.Buffers;
 /// A <see cref="IBufferWriter{T}"/> implementation implemented using pooled arrays which is specialized for creating <see cref="ReadOnlySequence{T}"/> instances.
 /// </summary>
 /// <remarks>
-/// Backing buffers can contain data from earlier uses. Callers must initialize every byte before
-/// advancing the writer and read only the written region of a buffer.
+/// As with <see cref="ArrayPool{T}.Shared"/>, backing buffers can contain data from earlier uses and
+/// are returned without clearing. Callers must initialize every byte before advancing the writer
+/// and read only the written region of a buffer.
 /// Fixed-size pinned pages are reused and evicted every 10 seconds according to recent pool activity.
 /// Larger arrays return to <see cref="ArrayPool{T}.Shared"/> when their last owner releases them.
 /// </remarks>
