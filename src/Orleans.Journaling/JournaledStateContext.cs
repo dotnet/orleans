@@ -106,11 +106,25 @@ internal abstract class JournaledStateContext
 }
 
 /// <summary>Supplies the <see cref="JournaledStateContext"/> of the states of one manager.</summary>
-/// <remarks>A host installs one provider per manager, through <see cref="JournaledStateManager.ContextProvider"/>.</remarks>
+/// <remarks>A host installs one provider per manager, through <see cref="IJournaledStateContextHost.ContextProvider"/>.</remarks>
 internal abstract class JournaledStateContextProvider
 {
     /// <summary>Gets the context of the calling code, or <see langword="null"/> when its accesses run directly.</summary>
     public abstract JournaledStateContext? Current { get; }
+}
+
+/// <summary>A journaled state manager whose states run their accesses through a context which a host supplies.</summary>
+/// <remarks>
+/// A host which records accesses, such as the durable task runtime, requires its manager to implement this, so its
+/// states' accesses can't silently bypass the host's context.
+/// </remarks>
+internal interface IJournaledStateContextHost
+{
+    /// <summary>
+    /// Gets or sets the provider of the context in which code accesses the manager's states, or <see langword="null"/>
+    /// when every access runs against the state directly.
+    /// </summary>
+    JournaledStateContextProvider? ContextProvider { get; set; }
 }
 
 /// <summary>Identifies journaled state whose accesses run through a <see cref="JournaledStateContext"/>.</summary>

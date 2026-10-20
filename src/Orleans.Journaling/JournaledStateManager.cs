@@ -8,7 +8,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal partial class JournaledStateManager : IJournaledStateManager, IJournaledStateContextHost, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const uint MinApplicationJournalStreamId = 8u;
 #if NET9_0_OR_GREATER
@@ -35,7 +35,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     /// Gets or sets the provider of the context in which code accesses this manager's states, which a host installs, or
     /// <see langword="null"/> when every access runs against the state directly.
     /// </summary>
-    internal JournaledStateContextProvider? ContextProvider { get; set; }
+    public JournaledStateContextProvider? ContextProvider { get; set; }
 
     // The names of the states whose accesses run through a context, by identifier, which records of accesses store.
     private Dictionary<int, string>? _accessTargetNames;

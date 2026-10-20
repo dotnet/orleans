@@ -2,8 +2,16 @@ namespace Orleans.DurableTasks.Runtime;
 
 /// <summary>Stores the access logs of durable task executions, which record their accesses to journaled state.</summary>
 /// <remarks>
-/// A storage removes an execution's access log when it stores the execution's result or removes the execution's task:
-/// the execution's body never runs again.
+/// <para>
+/// Every durable task storage which the Orleans grain host binds to stores access logs: the runtime fails to bind to an
+/// activation whose storage doesn't.
+/// </para>
+/// <para>
+/// Appended records commit in the same atomic write as the changes to the activation's journaled state which were staged
+/// before them, so a recovered activation holds a change together with the records which precede it, or neither. A
+/// storage removes an execution's access log when it stores the execution's result or removes the execution's task: the
+/// execution's body never runs again.
+/// </para>
 /// </remarks>
 internal interface IDurableTaskAccessLogStorage
 {
