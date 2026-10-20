@@ -207,14 +207,15 @@ public sealed class ArcBufferPagePoolTests
     }
 
     [Fact]
-    public void ShrinkingPopulatedPool_ReleasesExcessFromBothQueuesImmediately()
+    public void ShrinkingPopulatedPool_ReleasesExcessMinimumPagesImmediately()
     {
         var pool = new ArcBufferPagePool();
         var minimum = Enumerable.Range(0, 4).Select(_ => pool.Rent()).ToArray();
         var large = Enumerable.Range(0, 2).Select(_ => pool.Rent(1024 * 1024)).ToArray();
         foreach (var page in minimum.Concat(large)) pool.Return(page);
-        Assert.Equal(4 * PageSize + 2 * 1024 * 1024, pool.RetainedBytes);
-        Assert.Equal(6, pool.RetainedPages);
+        Assert.Equal(4 * PageSize, pool.RetainedBytes);
+        Assert.Equal(4, pool.RetainedPages);
+        Assert.All(large, page => Assert.Empty(page.Array));
 
         pool.MaxRetainedBytes = 3 * PageSize;
 
@@ -255,49 +256,50 @@ public sealed class ArcBufferPagePoolTests
     [Fact]
     public void RaisingBudget_KeepsExistingPagesAndAllowsMoreRetention()
     {
-        var pool = new ArcBufferPagePool(3 * PageSize);
+        var pool = new ArcBufferPagePool(PageSize);
         var minimum = pool.Rent();
-        var large = pool.Rent(2 * PageSize);
         var extra = pool.Rent();
         var minimumArray = minimum.Array;
-        var largeArray = large.Array;
         pool.Return(minimum);
-        pool.Return(large);
 
-        pool.MaxRetainedBytes = 4 * PageSize;
+        pool.MaxRetainedBytes = 2 * PageSize;
         pool.Return(extra);
 
-        Assert.Equal(4 * PageSize, pool.RetainedBytes);
-        Assert.Equal(3, pool.RetainedPages);
+        Assert.Equal(2 * PageSize, pool.RetainedBytes);
+        Assert.Equal(2, pool.RetainedPages);
         Assert.Same(minimumArray, minimum.Array);
-        Assert.Same(largeArray, large.Array);
         Assert.Same(minimum, pool.Rent());
         Assert.Same(extra, pool.Rent());
-        Assert.Same(large, pool.Rent(2 * PageSize));
         Assert.Equal(0, pool.RetainedBytes);
         Assert.Equal(0, pool.RetainedPages);
         pool.MaxRetainedBytes = 0;
-        foreach (var page in new[] { minimum, large, extra }) pool.Return(page);
+        foreach (var page in new[] { minimum, extra }) pool.Return(page);
     }
 
-    [Fact]
-    public void RaisingFromZero_EnablesRetentionWithoutChangingIndividualPageLimit()
+    [Theory]
+    [InlineData(2 * PageSize)]
+    [InlineData(1024 * 1024)]
+    [InlineData(2 * 1024 * 1024)]
+    public void LargePages_ReturnToArrayPoolWithoutUsingThePinnedPageBudget(int size)
     {
         var pool = new ArcBufferPagePool(0);
         pool.MaxRetainedBytes = int.MaxValue;
-        var cacheable = pool.Rent(1024 * 1024);
-        var oversized = pool.Rent(2 * 1024 * 1024);
+        var minimum = pool.Rent();
+        var large = pool.Rent(size);
 
-        pool.Return(cacheable);
-        pool.Return(oversized);
+        pool.Return(minimum);
+        pool.Return(large);
 
         Assert.Equal(int.MaxValue, pool.MaxRetainedBytes);
-        Assert.Equal(1024 * 1024, pool.RetainedBytes);
+        Assert.Equal(PageSize, pool.RetainedBytes);
         Assert.Equal(1, pool.RetainedPages);
-        Assert.Equal(1024 * 1024, cacheable.Array.Length);
-        Assert.Empty(oversized.Array);
+        Assert.Empty(large.Array);
+        Assert.Same(minimum, pool.Rent());
+        Assert.Equal(0, pool.RetainedBytes);
+        Assert.Equal(0, pool.RetainedPages);
         pool.MaxRetainedBytes = 0;
-        Assert.Empty(cacheable.Array);
+        pool.Return(minimum);
+        Assert.Empty(minimum.Array);
     }
 
     [Theory]
@@ -317,9 +319,9 @@ public sealed class ArcBufferPagePoolTests
         using var slice = owner.Slice(8, 16);
         try
         {
-            var free = pool.Rent(size);
+            var free = pool.Rent();
             pool.Return(free);
-            Assert.Equal(size, pool.RetainedBytes); // The active page and its pins are outside the budget.
+            Assert.Equal(PageSize, pool.RetainedBytes); // The active page and its pins are outside the budget.
 
             pool.MaxRetainedBytes = 0;
 
@@ -352,14 +354,14 @@ public sealed class ArcBufferPagePoolTests
 
         Assert.Same(array, active.Array);
         Assert.Equal(version, active.Version);
-        Assert.Equal(size, pool.RetainedBytes);
-        Assert.Equal(1, pool.RetainedPages);
+        Assert.Equal(size == PageSize ? PageSize : 0, pool.RetainedBytes);
+        Assert.Equal(size == PageSize ? 1 : 0, pool.RetainedPages);
         pool.MaxRetainedBytes = 0;
         // ArcBufferPage.Unpin returns the reader-owned page to Shared, whose configuration is unchanged by this test.
     }
 
     [Fact]
-    public async Task LatePublishedReturn_AfterShrink_TrimsExcessWithoutLosingReservations()
+    public async Task LatePublishedReturn_AfterShrink_TrimsToCurrentPageLimit()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var pool = new ArcBufferPagePool(3 * PageSize);
@@ -367,32 +369,32 @@ public sealed class ArcBufferPagePoolTests
         var pending = pool.Rent();
         var rejected = pool.Rent();
         pool.Return(alreadyFree);
-        var reserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var admitted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var publish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var returning = Task.Run(async () =>
         {
-            // Execute the real return phases, holding publication until the setter finishes trimming.
-            Assert.True(pool.TryReserve(pending.Array.Length));
-            reserved.SetResult();
+            // A return can observe capacity before the setter runs and publish after it finishes.
+            Assert.True(pool.RetainedPages < pool.MaxRetainedBytes / PageSize);
+            admitted.SetResult();
             await publish.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
             pool.Publish(pending);
         }, cancellationToken);
 
         try
         {
-            await reserved.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
-            Assert.Equal(2 * PageSize, pool.RetainedBytes);
+            await admitted.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            Assert.Equal(PageSize, pool.RetainedBytes);
             Assert.Equal(1, pool.RetainedPages);
 
             pool.MaxRetainedBytes = 0;
 
             Assert.Empty(alreadyFree.Array); // Already-queued free pages are released before the setter returns.
             Assert.Equal(PageSize, pending.Array.Length);
-            Assert.Equal(PageSize, pool.RetainedBytes); // Only the unpublished reservation remains, temporarily above zero.
+            Assert.Equal(0, pool.RetainedBytes);
             Assert.Equal(0, pool.RetainedPages);
             pool.Return(rejected);
-            Assert.Empty(rejected.Array); // New reservations use the current zero budget.
-            Assert.Equal(PageSize, pool.RetainedBytes);
+            Assert.Empty(rejected.Array);
+            Assert.Equal(0, pool.RetainedBytes);
             Assert.Equal(0, pool.RetainedPages);
         }
         finally
@@ -401,7 +403,7 @@ public sealed class ArcBufferPagePoolTests
             await returning.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         }
 
-        Assert.Empty(pending.Array); // Publication must trigger another trim; the earlier setter could not see this page.
+        Assert.Empty(pending.Array); // A late publication rechecks the limit without separate reservations.
         Assert.Equal(0, pool.RetainedBytes);
         Assert.Equal(0, pool.RetainedPages);
         pool.MaxRetainedBytes = PageSize;
@@ -414,7 +416,7 @@ public sealed class ArcBufferPagePoolTests
     }
 
     [Fact]
-    public async Task StaleOverflowTrim_AfterIncrease_PreservesAllFreePages()
+    public async Task StaleTrim_AfterIncrease_PreservesAllFreePages()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var pool = new ArcBufferPagePool(2 * PageSize);
@@ -422,16 +424,14 @@ public sealed class ArcBufferPagePoolTests
         var other = pool.Rent();
         var pendingArray = pending.Array;
         var otherArray = other.Array;
-        Assert.True(pool.TryReserve(pending.Array.Length));
-        pool.MaxRetainedBytes = 0; // No published page can be trimmed yet, leaving an overflow request to repair.
+        pool.MaxRetainedBytes = 0;
         var overflowObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var trim = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var trimming = Task.Run(async () =>
         {
-            Assert.True(pool.RetainedBytes > pool.MaxRetainedBytes);
             overflowObserved.SetResult();
             await trim.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
-            pool.Trim(); // The same slow path used by Publish, now acting on an obsolete overflow observation.
+            pool.Trim(); // A trim request rechecks the limit instead of acting on an earlier observation.
         }, cancellationToken);
 
         try
@@ -464,7 +464,184 @@ public sealed class ArcBufferPagePoolTests
     }
 
     [Fact]
-    public async Task ConcurrentRentReturnAndBudgetChanges_PreserveOwnershipAndExactAccounting()
+    public void PageBudget_RoundsDownWithoutChangingTheConfiguredByteLimit()
+    {
+        var pool = new ArcBufferPagePool(2 * PageSize - 1);
+        var first = pool.Rent();
+        var second = pool.Rent();
+        pool.Return(first);
+        pool.Return(second);
+        Assert.Equal(2 * PageSize - 1, pool.MaxRetainedBytes);
+        Assert.Equal(1, pool.RetainedPages);
+        Assert.Equal(PageSize, pool.RetainedBytes);
+        Assert.Empty(second.Array);
+
+        pool.MaxRetainedBytes = 2 * PageSize;
+        var third = new ArcBufferPage(PageSize);
+        pool.Return(third);
+        Assert.Equal(2, pool.RetainedPages);
+        pool.MaxRetainedBytes = 2 * PageSize - 1;
+        Assert.Equal(1, pool.RetainedPages);
+        Assert.Empty(first.Array);
+        Assert.Equal(PageSize, third.Array.Length);
+        pool.MaxRetainedBytes = 0;
+        Assert.Empty(third.Array);
+    }
+
+    [Theory]
+    [InlineData(1, 0, 199)]
+    [InlineData(1, 1, 198)]
+    [InlineData(0, 40, 238)]
+    [InlineData(0, 1, 201)]
+    [InlineData(0, 0, 190)]
+    public void Eviction_AdaptsToGrowingSteadyDecliningAndIdleDemand(int rents, int returns, int expectedPages)
+    {
+        var pool = new ArcBufferPagePool();
+        var pages = Enumerable.Range(0, 240).Select(_ => pool.Rent()).ToArray();
+        foreach (var page in pages[..200])
+        {
+            pool.Return(page);
+        }
+
+        // Initial misses represent growing demand and must leave the newly returned working set intact.
+        pool.Evict();
+        Assert.Equal(200, pool.RetainedPages);
+        var held = pages[200..].ToList();
+        for (var i = 0; i < rents; i++)
+        {
+            held.Add(pool.Rent());
+        }
+
+        for (var i = 0; i < returns; i++)
+        {
+            pool.Return(held[^1]);
+            held.RemoveAt(held.Count - 1);
+        }
+
+        pool.Evict();
+
+        Assert.Equal(expectedPages, pool.RetainedPages);
+        Assert.Equal((long)expectedPages * PageSize, pool.RetainedBytes);
+        Assert.Equal(200 - rents + returns - expectedPages, pages.Count(static page => page.Array.Length == 0));
+        Assert.Equal(128 * 1024 * 1024, pool.MaxRetainedBytes);
+        pool.MaxRetainedBytes = 0;
+        foreach (var page in held)
+        {
+            pool.Return(page);
+        }
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(9)]
+    [InlineData(10)]
+    [InlineData(200)]
+    public void Eviction_RepeatedIdleTicksDrainTheCacheBelowItsCeiling(int count)
+    {
+        var pool = new ArcBufferPagePool();
+        var pages = Enumerable.Range(0, count).Select(_ => pool.Rent()).ToArray();
+        foreach (var page in pages)
+        {
+            pool.Return(page);
+        }
+
+        pool.Evict();
+        Assert.Equal(count, pool.RetainedPages);
+        var expected = count;
+        while (expected > 0)
+        {
+            expected = Math.Max(0, expected - Math.Max(10, expected / 20));
+            pool.Evict();
+            Assert.Equal(expected, pool.RetainedPages);
+            Assert.Equal((long)expected * PageSize, pool.RetainedBytes);
+        }
+
+        pool.Evict();
+        Assert.Equal(0, pool.RetainedBytes);
+        Assert.All(pages, static page => Assert.Empty(page.Array));
+        Assert.Equal(128 * 1024 * 1024, pool.MaxRetainedBytes);
+    }
+
+    [Fact]
+    public void Eviction_LargePageActivityDoesNotKeepPinnedPagesAlive()
+    {
+        var pool = new ArcBufferPagePool();
+        var pages = Enumerable.Range(0, 200).Select(_ => pool.Rent()).ToArray();
+        foreach (var page in pages)
+        {
+            pool.Return(page);
+        }
+
+        pool.Evict();
+        Assert.Equal(200, pool.RetainedPages);
+        for (var i = 0; i < 50; i++)
+        {
+            var large = pool.Rent(2 * PageSize);
+            pool.Return(large);
+            Assert.Empty(large.Array);
+        }
+
+        pool.Evict();
+
+        Assert.Equal(190, pool.RetainedPages);
+        Assert.Equal(190L * PageSize, pool.RetainedBytes);
+        Assert.All(pages[..10], static page => Assert.Empty(page.Array));
+        pool.MaxRetainedBytes = 0;
+    }
+
+    [Fact]
+    public void Eviction_PreservesActivePinnedSlices()
+    {
+        var pool = new ArcBufferPagePool();
+        var active = pool.Rent();
+        var token = active.Version;
+        active.Pin(token);
+        active.Array[0] = 42;
+        active.SetLength(1, token);
+        var owner = new ArcBuffer(active, token, 0, 1);
+        using var reader = owner.Slice(0);
+        owner.Dispose();
+        var pages = Enumerable.Range(0, 20).Select(_ => pool.Rent()).ToArray();
+        foreach (var page in pages)
+        {
+            pool.Return(page);
+        }
+
+        pool.Evict();
+        Assert.Equal(20, pool.RetainedPages);
+        pool.Evict();
+        Assert.Equal(10, pool.RetainedPages);
+        pool.Evict();
+
+        Assert.Equal(0, pool.RetainedBytes);
+        Assert.All(pages, static page => Assert.Empty(page.Array));
+        Assert.Equal(1, active.ReferenceCount);
+        Assert.Equal(token, active.Version);
+        Assert.Equal(new byte[] { 42 }, reader.ToArray());
+    }
+
+    [Fact]
+    public void Eviction_WithAnUnpublishedReturn_DoesNotCountOrReleaseIt()
+    {
+        var pool = new ArcBufferPagePool();
+        var published = pool.Rent();
+        var pending = pool.Rent();
+        pool.Return(published);
+        pool.Evict();
+        pool.Evict();
+        Assert.Empty(published.Array);
+        Assert.Equal(PageSize, pending.Array.Length);
+        Assert.Equal(0, pool.RetainedBytes);
+
+        pool.Publish(pending);
+        Assert.Equal(PageSize, pool.RetainedBytes);
+        pool.Evict();
+        Assert.Empty(pending.Array);
+        Assert.Equal(0, pool.RetainedBytes);
+    }
+
+    [Fact]
+    public async Task ConcurrentRentReturnEvictionAndBudgetChanges_PreserveOwnershipAndExactAccounting()
     {
         const int workerCount = 4;
         const int rounds = 100;
@@ -498,7 +675,7 @@ public sealed class ArcBufferPagePoolTests
                         pool.Return(page);
                     }
                 }
-                else
+                else if (worker == workerCount)
                 {
                     for (var iteration = 0; iteration < 32; iteration++)
                     {
@@ -510,10 +687,18 @@ public sealed class ArcBufferPagePoolTests
                         };
                     }
                 }
+                else
+                {
+                    for (var iteration = 0; iteration < 32; iteration++)
+                    {
+                        pool.Evict();
+                    }
+                }
 
                 Assert.True(barrier.SignalAndWait(TimeSpan.FromSeconds(30), cancellationToken), $"Worker {worker}, round {round}: end barrier timed out.");
                 // No rents, returns, or setters can run until all workers pass the next start barrier.
                 Assert.True(pool.RetainedBytes <= pool.MaxRetainedBytes, "The settled pool exceeded its configured budget.");
+                Assert.Equal((long)pool.RetainedPages * PageSize, pool.RetainedBytes);
             }
         }, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default)).ToArray();
 
