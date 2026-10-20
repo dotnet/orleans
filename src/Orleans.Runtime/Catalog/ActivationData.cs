@@ -1826,7 +1826,6 @@ internal sealed partial class ActivationData :
             return;
         }
 
-
         var reject = DeactivationException is not null && ForwardingAddress is null;
         if (reject)
         {

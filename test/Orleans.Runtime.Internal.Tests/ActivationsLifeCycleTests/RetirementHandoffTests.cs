@@ -6,10 +6,12 @@ using Orleans.Metadata;
 using Orleans.Placement;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Session;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Diagnostics;
 using Xunit;
 
 namespace UnitTests.ActivationsLifeCycleTests;
@@ -312,10 +314,22 @@ public sealed class RetirementHandoffTests
         }
     }
 
-    [Fact]
-    public async Task MigratedRequestResponse_UpdatesTheCallersCacheToTheNewActivation()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExplicitMigration_CarriesQueuedRequestsAndUpdatesTheCallersCache(bool migrateDirectly)
     {
-        await using var cluster = await DeployAsync();
+        var carriedRequest = new TaskCompletionSource<CorrelationId>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
+        {
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
+            {
+                var package = Assert.Single((List<GrainMigrationPackage>)context.Request.GetArgument(0)!);
+                carriedRequest.TrySetResult(Assert.Single(package.Requests!).Id);
+            }
+
+            await context.Invoke();
+        })));
         var caller = cluster.Silos[0];
         var source = cluster.Silos[1];
         var target = cluster.Silos[2];
@@ -325,6 +339,7 @@ public sealed class RetirementHandoffTests
         var state = RetirementHandoffState.Create(key);
         var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
         await PlaceOnAsync(source, () => grain.GetLocation());
+        var activation = Assert.IsType<ActivationData>(FindActivation(source, grain.GetGrainId()));
         Assert.True(locator.TryLookupInCache(grain.GetGrainId(), out var cached));
         Assert.Equal(source.SiloAddress, cached.SiloAddress);
 
@@ -332,12 +347,36 @@ public sealed class RetirementHandoffTests
         await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
         var queued = grain.Record("queued").AsTask();
         await WaitUntilAsync(() => GetWaitingCount(source, grain.GetGrainId()) == 1);
+        var requestId = FindPendingCallback(caller, grain.GetGrainId(), nameof(IRetirementHandoffGrain.Record)).Message.Id;
+        using var events = new DiagnosticEventCollector(GrainLifecycleEvents.ListenerName);
+        var deactivating = events.WaitForEventAsync(nameof(GrainLifecycleEvents.Deactivating),
+            e => e.Payload is GrainLifecycleEvents.Deactivating d && ReferenceEquals(d.GrainContext, activation), Timeout, Cancellation);
 
         // The grain migrates with its queued request, and the source stays in the cluster.
-        await grain.MigrateOnIdleTo(target.SiloAddress);
-        state.ReleaseBlock.TrySetResult();
+        try
+        {
+            if (migrateDirectly)
+            {
+                activation.Migrate(new() { [IPlacementDirector.PlacementHintKey] = target.SiloAddress }, Cancellation);
+            }
+            else
+            {
+                await grain.MigrateOnIdleTo(target.SiloAddress);
+            }
+
+            Assert.Equal(ActivationState.Deactivating, activation.State);
+            var reason = Assert.IsType<GrainLifecycleEvents.Deactivating>((await deactivating).Payload).Reason;
+            Assert.Equal(DeactivationReasonCode.Migrating, reason.ReasonCode);
+        }
+        finally
+        {
+            state.ReleaseBlock.TrySetResult();
+        }
+
         await running.WaitAsync(Timeout, Cancellation);
+        Assert.Equal(requestId, await carriedRequest.Task.WaitAsync(Timeout, Cancellation));
         await queued.WaitAsync(Timeout, Cancellation);
+        Assert.Equal(["queued"], state.Calls);
 
         // The response to the migrated request replaces the old activation in the caller's cache, so its next call goes directly to the new activation.
         Assert.True(locator.TryLookupInCache(grain.GetGrainId(), out cached));
@@ -1857,7 +1896,6 @@ public sealed class RetirementHandoffTests
         => new() { GrainId = grainId, SiloAddress = silo.SiloAddress, ActivationId = ActivationId.NewId() };
 
     private sealed class UnserializableValue;
-
 
     [Fact]
     public async Task Migration_RetainsRequestsWhichExceedTheMessageSizeLimitTogether()
