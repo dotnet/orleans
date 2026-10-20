@@ -2408,20 +2408,6 @@ internal sealed partial class DurableTaskGrainRuntime(
         return new(attempt, _accessLogStorage, _shared.Serializer, scheduler, diverge);
     }
 
-    /// <summary>
-    /// Stages the pending read records of the durable task body which calls the runtime's work, such as a cancellation or
-    /// an abort, which can commit a durable consequence of the body's decisions.
-    /// </summary>
-    private void FlushCallingBodysReads()
-    {
-        if (DurableTaskContext.TryGetCurrent(out var current)
-            && current is GrainDurableTaskContext context
-            && ReferenceEquals(context.Runtime, this))
-        {
-            context.FlushAccessLog();
-        }
-    }
-
     private sealed record RunningRequest(
         Task Task,
         GrainDurableTaskContext Context);
@@ -2986,8 +2972,6 @@ internal sealed partial class DurableTaskGrainRuntime(
         string? reason,
         CancellationToken cancellationToken)
     {
-        FlushCallingBodysReads();
-
         // Cancellation is persisted before it propagates.
         var propagation = StageCancellationTree(taskId, callerId, reason);
         if (!propagation.Changed)
@@ -3131,7 +3115,6 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <remarks>A terminal task, or a task which this grain doesn't retain, is unchanged.</remarks>
     internal async ValueTask AbortTaskAsync(TaskId taskId, string reason, CancellationToken cancellationToken)
     {
-        FlushCallingBodysReads();
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
         if (StageAbort(taskId, reason, callerId: default))
         {
