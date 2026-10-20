@@ -212,6 +212,14 @@ public sealed class DurableTaskAccessLogStorageContractTests
     {
         public JournaledStateContextProvider? ContextProvider { get; set; }
 
+        public void EnterHostAccess()
+        {
+        }
+
+        public void ExitHostAccess()
+        {
+        }
+
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
         public void RegisterStateMachine(string name, IStateMachine stateMachine) { }

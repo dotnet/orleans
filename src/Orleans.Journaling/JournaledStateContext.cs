@@ -31,7 +31,7 @@ internal abstract class JournaledStateContext
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryGetCurrent(JournaledStateAccessTarget? target, [NotNullWhen(true)] out JournaledStateContext? context)
     {
-        context = target?.Manager?.ContextProvider?.Current;
+        context = target?.Manager is { HostAccessDepth: 0 } manager ? manager.ContextProvider?.Current : null;
         return context is not null;
     }
 
@@ -125,6 +125,21 @@ internal interface IJournaledStateContextHost
     /// when every access runs against the state directly.
     /// </summary>
     JournaledStateContextProvider? ContextProvider { get; set; }
+
+    /// <summary>
+    /// Marks the host's own synchronous work, such as the durable task runtime's sends through the outbox, until
+    /// <see cref="ExitHostAccess"/>: the accesses which it makes run against the states directly, so no context records
+    /// them or supplies their outcomes.
+    /// </summary>
+    /// <remarks>
+    /// The host enters and exits in the same synchronous run of code on the activation's scheduler, so no other code
+    /// runs meanwhile. A host owns state which no context should record, such as its own bookkeeping, by creating it
+    /// without an access target instead.
+    /// </remarks>
+    void EnterHostAccess();
+
+    /// <summary>Ends the host's work which <see cref="EnterHostAccess"/> marked.</summary>
+    void ExitHostAccess();
 }
 
 /// <summary>Identifies journaled state whose accesses run through a <see cref="JournaledStateContext"/>.</summary>

@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Runtime;
+using Orleans.Journaling;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -60,7 +61,21 @@ internal static class MessagingTestHelpers
     public static DurableTaskMessageTypes MessageTypes { get; } = new(Services.GetRequiredService<Serializer>());
 
     public static DurableTaskMessageTransport CreateTransport(RecordingOutbox outbox) =>
-        new(new Lazy<IOutbox>(outbox), MessageTypes);
+        new(new Lazy<IOutbox>(outbox), MessageTypes, new StateHost());
+
+    /// <summary>A journaled state host which routes no accesses, such as one without a durable task body.</summary>
+    private sealed class StateHost : IJournaledStateContextHost
+    {
+        public JournaledStateContextProvider? ContextProvider { get; set; }
+
+        public void EnterHostAccess()
+        {
+        }
+
+        public void ExitHostAccess()
+        {
+        }
+    }
 
     public static InboxMessage CreateMessage<T>(MessageType<T> messageType, GrainId sender, GrainId receiver, TaskId taskId, T body) =>
         messageType.Create(
