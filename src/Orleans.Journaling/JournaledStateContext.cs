@@ -222,17 +222,31 @@ internal sealed class JournaledStateAccessTarget
     public JournaledStateManager? Manager { get; }
 
     /// <summary>
-    /// Gets a number which changes whenever the content which the state's reads observe changes, in this activation.
+    /// Gets the state's change stamp, which strictly increases with every change of the content which the state's reads
+    /// observe, so it never takes the same value twice.
     /// </summary>
     /// <remarks>
-    /// The state calls <see cref="OnChanged"/> for every change of that content: its own operations, whether or not they
-    /// run through a context, journal entries which it replays, resets, and changes which storage acknowledgements make,
-    /// such as a log's committed sequence. In-place changes to a value which a read returned aren't changes of the state.
-    /// The stamp lives in memory only.
+    /// <para>
+    /// Two equal stamps of one target therefore bracket no change: reads of the same operation with equal arguments return
+    /// the same outcome while the stamp is unchanged. A stamp is scoped to its target and lives in memory only: stamps of
+    /// different targets, including targets of the same state in different activations, aren't comparable. The stamp
+    /// never decreases because state in memory never rolls back: when a journal write fails, the manager fences and the
+    /// activation deactivates instead of restoring earlier content.
+    /// </para>
+    /// <para>
+    /// A state changes the content which its reads observe only in its <c>Apply</c> methods, each of which calls
+    /// <see cref="OnChanged"/>. Its own operations, whether or not they run through a context, the journal entries and
+    /// snapshots which recovery replays, resets, and storage acknowledgements which change what reads observe, such as a
+    /// log's committed sequence, all pass through them. In-place changes to a value which a read returned aren't changes
+    /// of the state.
+    /// </para>
     /// </remarks>
     public long Stamp => _stamp;
 
-    /// <summary>Records a change of the content which the state's reads observe.</summary>
+    /// <summary>
+    /// Records a change of the content which the state's reads observe. The state calls this from each of its
+    /// <c>Apply</c> methods, which make every such change, and from nowhere else.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void OnChanged() => _stamp++;
 

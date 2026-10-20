@@ -108,10 +108,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             return false;
         }
 
-        _accessTarget.OnChanged();
-        _status = DurableTaskCompletionSourceStatus.Completed;
-        _writer.MarkModified();
-        _value = _copier.Copy(value);
+        ApplyCompleted(_copier.Copy(value));
         return true;
     }
 
@@ -122,10 +119,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             return false;
         }
 
-        _accessTarget.OnChanged();
-        _status = DurableTaskCompletionSourceStatus.Faulted;
-        _writer.MarkModified();
-        _exception = _exceptionCopier.Copy(exception);
+        ApplyFaulted(_exceptionCopier.Copy(exception));
         return true;
     }
 
@@ -136,8 +130,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             return false;
         }
 
-        _accessTarget.OnChanged();
-        _status = DurableTaskCompletionSourceStatus.Canceled;
+        ApplyCanceled();
         _writer.MarkModified();
         return true;
     }
@@ -157,11 +150,8 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _ => throw new InvalidOperationException($"Unexpected status, \"{_status}\""),
     };
 
-    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context)
-    {
-        _accessTarget.OnChanged();
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
-    }
 
     private void OnValuePersisted()
     {
@@ -194,11 +184,8 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
-        _accessTarget.OnChanged();
         _writer = writer;
-        _status = DurableTaskCompletionSourceStatus.Pending;
-        _value = default;
-        _exception = null;
+        ApplyPending();
         _isCompletionCaptured = false;
 
         // Reset the task completion source if necessary.
@@ -242,22 +229,42 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IDurableTaskCompletionSourceCommandHandler<T>.ApplyPending() => _status = DurableTaskCompletionSourceStatus.Pending;
-    void IDurableTaskCompletionSourceCommandHandler<T>.ApplyCompleted(T value)
+    void IDurableTaskCompletionSourceCommandHandler<T>.ApplyPending() => ApplyPending();
+    void IDurableTaskCompletionSourceCommandHandler<T>.ApplyCompleted(T value) => ApplyCompleted(value);
+    void IDurableTaskCompletionSourceCommandHandler<T>.ApplyFaulted(Exception exception) => ApplyFaulted(exception);
+    void IDurableTaskCompletionSourceCommandHandler<T>.ApplyCanceled() => ApplyCanceled();
+
+    // The Apply methods make every change of the state which reads observe, for live operations and replayed entries
+    // alike, so they record each change.
+    private void ApplyPending()
     {
+        _accessTarget.OnChanged();
+        _status = DurableTaskCompletionSourceStatus.Pending;
+        _value = default;
+        _exception = null;
+    }
+
+    private void ApplyCompleted(T? value)
+    {
+        _accessTarget.OnChanged();
         _status = DurableTaskCompletionSourceStatus.Completed;
         _writer.MarkModified();
         _value = value;
     }
 
-    void IDurableTaskCompletionSourceCommandHandler<T>.ApplyFaulted(Exception exception)
+    private void ApplyFaulted(Exception exception)
     {
+        _accessTarget.OnChanged();
         _status = DurableTaskCompletionSourceStatus.Faulted;
         _writer.MarkModified();
         _exception = exception;
     }
 
-    void IDurableTaskCompletionSourceCommandHandler<T>.ApplyCanceled() => _status = DurableTaskCompletionSourceStatus.Canceled;
+    private void ApplyCanceled()
+    {
+        _accessTarget.OnChanged();
+        _status = DurableTaskCompletionSourceStatus.Canceled;
+    }
 
 }
 
