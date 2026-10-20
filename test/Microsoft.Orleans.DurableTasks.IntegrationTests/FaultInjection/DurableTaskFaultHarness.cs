@@ -35,7 +35,11 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
     public static readonly TimeSpan WorkflowDelay = TimeSpan.FromMilliseconds(10);
     private const int MaxClientAttempts = 20;
     private readonly MessagingWakeupTracker _wakeups = new();
+
+    // The crash of the silo which a fault crashed last, and a token which the next crash cancels, as it starts.
+    private readonly object _crashLock = new();
     private Task _crash = Task.CompletedTask;
+    private CancellationTokenSource _crashing = new();
 
     public DurableTaskFaultHarness(string journalFormatKey, Action<ISiloBuilder>? configureSilo = null)
     {
@@ -60,10 +64,22 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
     /// Gets the crash of the silo which a fault crashed last, which completes once the cluster has declared it dead.
     /// </summary>
     /// <remarks>
-    /// The client's calls which fail meanwhile are retried once the crash completes. A cluster which crashes silos sets
-    /// Durable Jobs' <c>ShardCheckInterval</c> short, so a remaining silo adopts the crashed silo's wake-ups promptly.
+    /// The client's calls which are in flight when a crash starts end, since the crashed silo may never answer them: a
+    /// client fails a call which no silo answers only once the call's response timeout elapses, which by default is as
+    /// long as <see cref="RunTimeout"/>. They and the calls which fail meanwhile are retried once the crash completes. A
+    /// cluster which crashes silos sets Durable Jobs' <c>ShardCheckInterval</c> short, so a remaining silo adopts the
+    /// crashed silo's wake-ups promptly.
     /// </remarks>
-    public Task Crash => Volatile.Read(ref _crash);
+    public Task Crash
+    {
+        get
+        {
+            lock (_crashLock)
+            {
+                return _crash;
+            }
+        }
+    }
 
     public async ValueTask InitializeAsync()
     {
@@ -148,9 +164,22 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
     {
         for (var attempt = 1; ; attempt++)
         {
+            // An attempt which starts while a silo crashes waits until the cluster declared it dead, so it reaches the
+            // grain's next activation; one which is in flight when a crash starts ends, since the crashed silo may never
+            // answer it and the client fails such a call only once its response timeout elapses.
+            Task crash;
+            CancellationToken crashing;
+            lock (_crashLock)
+            {
+                crash = _crash;
+                crashing = _crashing.Token;
+            }
+
+            await crash;
+            using var attemptCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, crashing);
             try
             {
-                await call(cancellationToken);
+                await call(attemptCancellation.Token);
                 return;
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested
@@ -158,21 +187,25 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
                 && attempt < MaxClientAttempts)
             {
                 failures.Add(exception.GetType().Name + ": " + exception.Message);
-
-                // A call which a crashing silo failed reaches the grain's next activation once the cluster declared the
-                // silo dead.
-                await Crash;
             }
         }
     }
 
-    private void OnCrashSilo(SiloAddress address) =>
-        Volatile.Write(ref _crash, Task.Run(async () =>
+    private void OnCrashSilo(SiloAddress address)
+    {
+        lock (_crashLock)
         {
-            var silo = Fixture.Cluster.Silos.Single(silo => silo.SiloAddress.Equals(address));
-            await Fixture.Cluster.KillSiloAsync(silo, CancellationToken.None);
-            await Fixture.Cluster.WaitForLivenessToStabilizeAsync(didKill: true);
-        }));
+            var crashing = _crashing;
+            _crashing = new();
+            _crash = Task.Run(async () =>
+            {
+                crashing.Cancel();
+                var silo = Fixture.Cluster.Silos.Single(silo => silo.SiloAddress.Equals(address));
+                await Fixture.Cluster.KillSiloAsync(silo, CancellationToken.None);
+                await Fixture.Cluster.WaitForLivenessToStabilizeAsync(didKill: true);
+            });
+        }
+    }
 
     /// <summary>
     /// Tracks the messaging wake-up jobs which Durable Jobs holds for each grain, through the Durable Jobs activities.
