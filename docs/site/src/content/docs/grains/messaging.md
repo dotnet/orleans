@@ -269,7 +269,8 @@ source or an inbox sink keeps that state as the only journaled copy:
 Register sources, sinks, and work sources during construction or activation setup, before journal
 recovery. A recovered source-provided message fails the activation when no source is
 registered. The inbox deduplicates a tracked identity before offering it to a sink,
-and fences a compacted identity's original cutoff before any sink effects.
+and expires an untracked message sent at or before its durable admission floor
+before any sink effects.
 
 ## Commit and delivery guarantees
 
@@ -296,7 +297,7 @@ and fences a compacted identity's original cutoff before any sink effects.
   together and persist in one journal write.
 - Transport is **at-least-once**. If the sender loses its activation after the
   receiver accepts a message and before the outbox records the delivery, the outbox
-  sends the message again using its original admission cutoff. Effects apply once
+  sends the message again using its original `SentAt`. Effects apply once
   per logical send through retained completion records and a durable admission floor;
   a handler can execute more than once for the same message, so its preparation must
   tolerate repetition.
@@ -305,9 +306,9 @@ and fences a compacted identity's original cutoff before any sink effects.
   payload, and `DeliverAt` time match, and fails when they differ. A repeat of a
   completed message returns `Duplicate` while the completion record is retained,
   or the original `DeadLettered` reason and code when an inbox sink rejected it.
-  Both pending and completed repeats require the original admission cutoff.
-  Once the record is compacted, the durable floor fences its original cutoff
-  with `Expired`, whose earlier acceptance outcome is unknown.
+  A later `SentAt` extends either record's retention durably before the answer.
+  Once the record is compacted, an untracked message sent at or before the durable
+  floor receives `Expired`, whose earlier acceptance outcome is unknown.
 - A message with <xref:Orleans.Messaging.Envelope.DeliverAt> is delivered and
   accepted immediately, then processed once its acceptance is durable and the
   Durable Jobs clock reaches `DeliverAt`. A message the grain sends to itself is
@@ -456,19 +457,21 @@ with the same backoff while other messages continue:
   retry like `HandlerNotFound`.
 
 <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.OutboxRetryTimeout> starts
-when the message is sent, with its immutable expiration journaled together with the send.
+at the staging time recorded in
+<xref:Orleans.Messaging.InboxMessage.SentAt>. Each attempt and recovery preserves
+that time; retry expiration is `SentAt + OutboxRetryTimeout`.
 No attempt starts after the timeout elapses; the outbox then moves the message to its
 dead letters with a reason stating that the retry timeout elapsed. Each attempt
-carries that same expiration as its
-<xref:Orleans.Messaging.InboxMessage.RedeliveryDeadline> admission cutoff.
+carries the original `SentAt`.
 The receiver checks pending and completed identities first. For an untracked
-identity, a cutoff at or below its non-decreasing admission floor returns
+identity, a send time at or below its non-decreasing admission floor returns
 <xref:Orleans.Messaging.DeliveryStatus.Expired> before any sink or handler runs.
 The outbox retains that message as a dead letter and retires it as `DeadLettered`:
 earlier acceptance may have succeeded with a lost acknowledgement. Stage durable
 application reconciliation through the source callback before authorizing another
 send. The Durable Jobs clock governs retry scheduling and candidate floor
-advancement; the journaled cutoff and floor preserve safety across clock changes.
+advancement; the journaled send time and floor preserve admission decisions across
+clock changes. `OutboxRetryTimeout` must be shorter than `DeduplicationWindow`.
 
 Inspect dead letters through <xref:Orleans.Messaging.IMessagingDiagnostics> and remove
 handled records with <xref:Orleans.Messaging.IMessagingDiagnostics.RemoveInboxDeadLetter*>
@@ -478,9 +481,10 @@ collections; see [Capacity, retries, and retention](messaging-operations.md#capa
 
 Snapshots advance the admission floor to the later of its current value and
 observed Durable Jobs time minus `DeduplicationWindow`, and compact completed
-records whose cutoff that floor fences. The floor and compacted history persist
-atomically, and in-memory records remain until acknowledgement. Null-cutoff
-completion records remain permanent.
+records whose latest observed `SentAt` is at or below that floor. The floor and
+compacted history persist atomically, and in-memory records remain until
+acknowledgement. Repeats with a later send time durably extend tracked records
+before receiving their duplicate or rejection answer.
 
 ## State, recovery, and deletion
 

@@ -31,8 +31,8 @@ command ID. A new workflow command
 uses a distinct child or sibling ID; fan-out derives one stable recipient child
 per destination.
 
-One key identifies one immutable command: destination, subject, body, and admission
-cutoff retain their original meaning. A genuinely new reservation, authorized compensation, or
+One key identifies one immutable command: destination, subject, and body retain
+their original meaning. A genuinely new reservation, authorized compensation, or
 revision uses a new key. Protocol upgrades preserve the identity of an existing
 command even when producers and consumers are deployed at different times.
 
@@ -44,9 +44,10 @@ commands. A pending duplicate refers to the already-accepted work and carries th
 same subject, body bytes, and `DeliverAt` time; a pending repeat with a different
 subject, body, or `DeliverAt` fails.
 A completed duplicate returns `Duplicate` while its completion record is retained.
-Completed records retain the ID and immutable
-<xref:Orleans.Messaging.InboxMessage.RedeliveryDeadline> admission cutoff. A repeat
-with a different cutoff fails for both pending and completed identities.
+Completed records retain the ID and latest observed
+<xref:Orleans.Messaging.InboxMessage.SentAt>. A repeat with a later send time
+extends the pending or completed record's retention; that update is durable before
+the receiver answers `Duplicate` or repeats its recorded rejection.
 Applications uphold the immutable command contract; the completion fact
 acknowledges the original execution.
 
@@ -58,24 +59,27 @@ apply once per logical send. A handler can execute
 more than once for the same ID, for example after a failed attempt or activation
 loss, so its preparation must tolerate repetition.
 
-The sending journal write fixes the cutoff at `OutboxRetryTimeout` after the send.
-Every attempt and recovery uses that same value, including after backpressure.
-Each inbox journals a non-decreasing admission floor. Its
+The sending journal write records `SentAt` from the Durable Jobs clock. Every
+attempt and recovery uses that same time, including after backpressure, and the
+retry budget ends at `SentAt + OutboxRetryTimeout`. Configure `OutboxRetryTimeout`
+shorter than
+<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>.
+Each inbox journals a non-decreasing admission floor. The retention period
 <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>
-controls how far behind the observed Durable Jobs time the floor advances. A
-snapshot can forget a completed identity only together with a durable floor
-which fences its cutoff. A delayed repeat then receives `Expired` before any
-sink or handler runs. Forward clock jumps can fence new sends early; backward
-jumps can retain history longer. Both preserve the logical send's once-only effects.
-Direct deliveries with a null cutoff retain their completion facts permanently.
-Budget retained history accordingly. Application result-query retention serves
-the business's query and audit needs independently.
+controls how far behind the observed Durable Jobs time the floor advances.
+Completed records become eligible for removal once their latest `SentAt` is at
+or below that durable floor. Snapshot acknowledgement and recovery reclaim them.
+A delayed delivery with that original send time then receives `Expired` before
+any sink or handler runs. Forward clock jumps can expire sends early; backward
+jumps can retain history longer. Budget history by processing rate and retention.
+Application result-query retention serves business query and audit needs independently.
 
 `Expired` means that earlier acceptance is unknown: an acknowledgement may have
 been lost before the receiver compacted its completion record. Reconcile business
 state using the original ID before authorizing another command. Preserve the
-original cutoff when replaying a logical send; a fresh cutoff is a new admission
-opportunity and requires an application decision.
+original `SentAt` when replaying a logical send. A fresh submission after an
+identity's retention ends can be processed again when its new send time is
+admitted; reconcile the original outcome before authorizing it.
 
 The outbox coalesces equivalent messages that share a pending message ID, whether
 staged or durable. Equivalent messages have the same destination, subject,
@@ -85,8 +89,9 @@ for different content throws and leaves the original message in place.
 A message a grain sends to itself is keyed only in that grain's inbox. `Send` applies
 the receiver rules synchronously: a pending repeat with the same subject, body bytes,
 and `DeliverAt` time coalesces, a retained completed ID is a duplicate, and a pending
-repeat with different content throws. The inbox stamps a fixed cutoff for the
-first local send and reuses it for tracked repeats.
+repeat with different content throws. A local send receives a staging time which
+the inbox admits, including after a clock rollback. A later local repeat extends
+the tracked identity's retention in the caller's journal write.
 
 ## Hierarchical business-operation keys
 
@@ -216,7 +221,7 @@ and recovery path across independently committed grain journals.
 | Replace a projection with a complete snapshot | Apply only a newer domain version; complete older snapshots as superseded. |
 | Apply every incremental event | Persist the expected sequence and buffer gaps before applying contiguous events. |
 | Intentionally reprocess with corrected logic | Authorize a new revision key and record its relationship to the original outcome. |
-| Replay an inbox dead letter | Reconcile effects keyed by the original ID, then authorize a new revision key, such as a child of the original; a retained completion answers `Duplicate`, and a compacted cutoff answers `Expired`. |
+| Replay an inbox dead letter | Reconcile effects keyed by the original ID, then authorize a new revision key, such as a child of the original; a retained completion answers `Duplicate`, and an untracked old send time answers `Expired`. |
 
 Message identity recognizes completed commands; a domain version or sequence
 establishes order. The
