@@ -309,7 +309,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// Gets the grain which runs this execution, which qualifies the root identifiers of the detached tasks which the
     /// execution starts without a name, so executions with the same identifier on different grains derive different ones.
     /// </summary>
-    protected override string HostId => _runtime.GrainId.ToString();
+    protected internal override string HostId => _runtime.GrainId.ToString();
 
     /// <summary>Notes that this attempt reached <paramref name="operationId"/>, which can end its replay.</summary>
     /// <param name="operationId">The operation's identifier.</param>
@@ -511,7 +511,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// start is recorded under <c>$detach:{target}:{rootId}</c>, so each detached task which this execution starts has
     /// one record, independently of other operations which a deployment adds or removes.
     /// </remarks>
-    protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(
+    protected internal override ValueTask<IScheduledTaskHandle> StartTaskAsync(
         TaskId taskId,
         DurableTask task,
         DurableTaskStartOptions options,
@@ -574,7 +574,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// the same handle without starting the task again.
     /// </remarks>
     /// <exception cref="InvalidOperationException">The caller isn't running on the activation's scheduler.</exception>
-    protected override IScheduledTaskHandle PostTask(TaskId taskId, DurableTask task, DurableTaskStartOptions options)
+    protected internal override IScheduledTaskHandle PostTask(TaskId taskId, DurableTask task, DurableTaskStartOptions options)
     {
         if (TaskScheduler.Current != _scheduler)
         {
@@ -647,7 +647,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
     }
 
-    protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
+    protected internal override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
         TaskId taskId,
         DateTimeOffset dueTime,
         CancellationToken cancellationToken) =>
@@ -678,7 +678,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// completes on another scheduler has its response handled by the attempt, and a canceled attempt's response is
     /// discarded.
     /// </remarks>
-    protected override void OnBodyCompleted(DurableTaskResponse response)
+    protected internal override void OnBodyCompleted(DurableTaskResponse response)
     {
         if (TaskScheduler.Current != _scheduler || IsAttemptEnded)
         {
@@ -700,7 +700,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// The attempt was canceled, or stalled because an earlier run recorded another kind of operation under the effect's
     /// identifier.
     /// </exception>
-    protected override DurableTaskResponse RunEffect<TState>(
+    protected internal override DurableTaskResponse RunEffect<TState>(
         TaskId effectId,
         TState state,
         Func<TState, DurableTaskResponse> effect)
@@ -736,7 +736,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// The runtime canceled the attempt, for example because the execution's version lies outside the supported range,
     /// whose <see cref="DurableTaskVersionException"/> is then the inner exception.
     /// </exception>
-    protected override int GetVersion(string name, int minSupported, int maxSupported)
+    protected internal override int GetVersion(string name, int minSupported, int maxSupported)
     {
         if (TaskScheduler.Current != _scheduler)
         {
@@ -804,7 +804,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// The wait observes the signals of the invoked task whose execution tree contains this execution, and advances this
     /// execution's logical time to when the signal was recorded.
     /// </remarks>
-    protected override ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, CancellationToken cancellationToken) =>
+    protected internal override ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, CancellationToken cancellationToken) =>
         RunOnScheduler(
             _scheduler,
             () => WaitForSignalCoreAsync(name, cancellationToken));
@@ -861,7 +861,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         return await CompleteOperationAsync(_runtime.SendSignalAsync(markerId, target, taskId, name, value, throwOnRejection, operationCts.Token));
     }
 
-    protected override ValueTask<TaskId> SelectCompletionAsync(
+    protected internal override ValueTask<TaskId> SelectCompletionAsync(
         TaskId decisionId,
         IReadOnlyList<TaskId> candidates,
         CancellationToken cancellationToken) =>
