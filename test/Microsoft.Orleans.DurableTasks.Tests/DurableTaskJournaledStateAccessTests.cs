@@ -60,7 +60,7 @@ public sealed class DurableTaskJournaledStateAccessTests
         replay.Grain.OpenGate();
 
         Assert.Equal(1, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<int>());
-        Assert.Empty(replay.Storage.GetAccessLog(WorkflowId));
+        Assert.True(replay.Storage.GetAccessLog(WorkflowId).IsEmpty);
 
         static async DurableTask<int> ReserveAsync(ReplayGrain grain)
         {
@@ -314,12 +314,12 @@ public sealed class DurableTaskJournaledStateAccessTests
         await activation.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
 
         // No later operation depends on the read yet, so its record isn't staged.
-        Assert.Empty(activation.Storage.GetAccessLog(WorkflowId));
+        Assert.True(activation.Storage.GetAccessLog(WorkflowId).IsEmpty);
         activation.Grain.OpenGate();
 
         // The write stages the read's record and its own, and the result removes both.
         Assert.True((await activation.GetResponseAsync(WorkflowId, TestCancellation)).IsCompleted);
-        Assert.Empty(activation.Storage.GetAccessLog(WorkflowId));
+        Assert.True(activation.Storage.GetAccessLog(WorkflowId).IsEmpty);
         Assert.Equal(1, activation.Grain.Counter.Value);
 
         static async DurableTask Workflow(ReplayGrain grain)

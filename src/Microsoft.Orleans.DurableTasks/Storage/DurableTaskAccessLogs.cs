@@ -54,7 +54,8 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IReportsStagedChang
                 services,
                 services.GetRequiredService<JournaledStateManagerShared>().JournalFormatKey));
 
-    public byte[] Get(TaskId taskId) => _logs.TryGetValue(taskId, out var log) ? log.Records.AsSpan(0, log.Length).ToArray() : [];
+    // Appends never change bytes which a log already holds, so the records which this returns stay as they are.
+    public ReadOnlyMemory<byte> Get(TaskId taskId) => _logs.TryGetValue(taskId, out var log) ? new(log.Records, 0, log.Length) : default;
 
     public void Append(TaskId taskId, ReadOnlySpan<byte> records)
     {

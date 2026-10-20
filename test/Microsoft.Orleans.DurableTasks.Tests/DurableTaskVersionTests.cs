@@ -417,7 +417,7 @@ public sealed class DurableTaskVersionTests
             Assert.Equal(("change", 0, 1, 1), (unsupported.Name, unsupported.Version, unsupported.MinSupported, unsupported.MaxSupported));
         });
         Assert.Equal(0, replay.Grain.Counter.Value);
-        Assert.Empty(replay.Storage.GetAccessLog(workflowId));
+        Assert.True(replay.Storage.GetAccessLog(workflowId).IsEmpty);
         Assert.True(replay.Storage.TryGetTask(workflowId, out var state));
         Assert.False(state.Result is { IsCompleted: true });
         Assert.DoesNotContain(replay.Storage.Tasks, task => task.Id == workflowId.Child("fallback"));
