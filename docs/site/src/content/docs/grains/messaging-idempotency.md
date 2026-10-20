@@ -31,8 +31,8 @@ command ID. A new workflow command
 uses a distinct child or sibling ID; fan-out derives one stable recipient child
 per destination.
 
-One key identifies one immutable command: destination, subject, and body retain
-their original meaning. A genuinely new reservation, authorized compensation, or
+One key identifies one immutable command: destination, subject, body, and admission
+cutoff retain their original meaning. A genuinely new reservation, authorized compensation, or
 revision uses a new key. Protocol upgrades preserve the identity of an existing
 command even when producers and consumers are deployed at different times.
 
@@ -43,30 +43,39 @@ receiver regardless of sender or subject. A parent and its child are independent
 commands. A pending duplicate refers to the already-accepted work and carries the
 same subject, body bytes, and `DeliverAt` time; a pending repeat with a different
 subject, body, or `DeliverAt` fails.
-A completed duplicate returns `Duplicate` while its completion record is within
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>.
-Completed records retain the ID and timestamp. Applications uphold the immutable
-command contract; the completion fact acknowledges the original execution.
+A completed duplicate returns `Duplicate` while its completion record is retained.
+Completed records retain the ID, timestamp, and immutable
+<xref:Orleans.Messaging.InboxMessage.RedeliveryDeadline> admission cutoff. A repeat
+with a different cutoff fails for both pending and completed identities.
+Applications uphold the immutable command contract; the completion fact
+acknowledges the original execution.
 
 A handler stages its business changes and outgoing messages, then calls
 <xref:Orleans.Messaging.IInboxHandlerContext.Complete*>, which stages the inbox
 removal and completion record. One journal write persists them together, and replay
 restores the business effects and completion record together. Effects therefore
-apply once per message ID within the deduplication window. A handler can execute
+apply once per logical send. A handler can execute
 more than once for the same ID, for example after a failed attempt or activation
 loss, so its preparation must tolerate repetition.
 
-After the record expires, the same key can be admitted and handled again. Retain
-completion facts for the complete supported resubmission horizon, including outage
-recovery and operator replay delays. The outbox starts no delivery attempt later than
-`OutboxRetryTimeout` after the send or the last `Backpressured` answer, and each
-attempt tells the receiver when its redeliveries end. A receiver whose window
-doesn't cover that time rejects the message with `DeduplicationWindowExceeded`
-before recording it, so outbox redeliveries stay within the window. Producer fleets
-configure both values uniformly.
-Permanent idempotency requires permanent or appropriately retained completion facts
-and an explicit storage budget. Application result-query retention serves the
-business's query and audit needs.
+The sending journal write fixes the cutoff at `OutboxRetryTimeout` after the send.
+Every attempt and recovery uses that same value, including after backpressure.
+Each inbox journals a non-decreasing admission floor. Its
+<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>
+controls how far behind the observed Durable Jobs time the floor advances. A
+snapshot can forget a completed identity only together with a durable floor
+which fences its cutoff. A delayed repeat then receives `Expired` before any
+sink or handler runs. Forward clock jumps can fence new sends early; backward
+jumps can retain history longer. Both preserve the logical send's once-only effects.
+Direct deliveries with a null cutoff retain their completion facts permanently.
+Budget retained history accordingly. Application result-query retention serves
+the business's query and audit needs independently.
+
+`Expired` means that earlier acceptance is unknown: an acknowledgement may have
+been lost before the receiver compacted its completion record. Reconcile business
+state using the original ID before authorizing another command. Preserve the
+original cutoff when replaying a logical send; a fresh cutoff is a new admission
+opportunity and requires an application decision.
 
 The outbox coalesces equivalent messages that share a pending message ID, whether
 staged or durable. Equivalent messages have the same destination, subject,
@@ -75,8 +84,9 @@ for different content throws and leaves the original message in place.
 
 A message a grain sends to itself is keyed only in that grain's inbox. `Send` applies
 the receiver rules synchronously: a pending repeat with the same subject, body bytes,
-and `DeliverAt` time coalesces, a completed ID within the deduplication window is a
-duplicate, and a pending repeat with different content throws.
+and `DeliverAt` time coalesces, a retained completed ID is a duplicate, and a pending
+repeat with different content throws. The inbox stamps a fixed cutoff for the
+first local send and reuses it for tracked repeats.
 
 ## Hierarchical business-operation keys
 
@@ -206,7 +216,7 @@ and recovery path across independently committed grain journals.
 | Replace a projection with a complete snapshot | Apply only a newer domain version; complete older snapshots as superseded. |
 | Apply every incremental event | Persist the expected sequence and buffer gaps before applying contiguous events. |
 | Intentionally reprocess with corrected logic | Authorize a new revision key and record its relationship to the original outcome. |
-| Replay an inbox dead letter | Reconcile effects keyed by the original ID, then resubmit under a new revision key, such as a child of the original; the original ID answers `Duplicate` within the deduplication window. |
+| Replay an inbox dead letter | Reconcile effects keyed by the original ID, then authorize a new revision key, such as a child of the original; a retained completion answers `Duplicate`, and a compacted cutoff answers `Expired`. |
 
 Message identity recognizes completed commands; a domain version or sequence
 establishes order. The
