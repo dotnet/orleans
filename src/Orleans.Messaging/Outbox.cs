@@ -390,7 +390,14 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         var start = Stopwatch.GetTimestamp();
         try
         {
-            var result = await Shared.Transport.DeliverAsync(message.ReceiverId, message.ToInboxMessage(), cancellationToken).ConfigureAwait(true);
+            // No attempt starts after the expiration, and none reaches the receiver more than MaxAttemptDuration after it
+            // starts, so the receiver can reject a message whose redeliveries would outlast its deduplication record.
+            var delivery = new InboxMessage
+            {
+                Envelope = message.Envelope,
+                RedeliveryDeadline = MessagingTime.AddClamped(entry.State.ExpirationTime!.Value, Shared.MaxAttemptDuration)
+            };
+            var result = await Shared.Transport.DeliverAsync(message.ReceiverId, delivery, cancellationToken).ConfigureAwait(true);
             return new(entry, message, result, null, Stopwatch.GetElapsedTime(start), startedAt);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -474,7 +481,19 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 if (!_messages.TryGetValue(id, out var current) || !ReferenceEquals(current, outcome.Entry)) continue;
 
                 var status = outcome.Result?.Status;
-                if (status is DeliveryStatus.Accepted or DeliveryStatus.Duplicate or DeliveryStatus.DeadLettered)
+                if (status == DeliveryStatus.DeadLettered && outcome.Result!.Value.Code == DeliveryResult.DeduplicationWindowExceededCode)
+                {
+                    // The receiver keeps nothing for this rejection, so the outbox keeps the message, which can be sent
+                    // again under its ID once the receiver's window covers the sender's retries.
+                    var reason = outcome.Result.Value.Message ?? "The receiver's deduplication window doesn't cover the message's redeliveries.";
+                    StageDeadLetter(
+                        current,
+                        current.Reference is null ? outcome.Message : CopySourceMessage(outcome.Message),
+                        reason,
+                        checked(current.State.AttemptCount + 1),
+                        OutboxMessageRetirement.Rejected(reason, DeliveryResult.DeduplicationWindowExceededCode));
+                }
+                else if (status is DeliveryStatus.Accepted or DeliveryStatus.Duplicate or DeliveryStatus.DeadLettered)
                 {
                     Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = id });
                     Retire(current, status == DeliveryStatus.DeadLettered
@@ -595,7 +614,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     /// Stages the removal of <paramref name="entry"/> with its dead letter, and retires it with its owning source, if any,
     /// in the same journal write.
     /// </summary>
-    private void StageDeadLetter(OutboxEntry entry, OutboxMessage message, string reason, int attemptCount)
+    private void StageDeadLetter(
+        OutboxEntry entry, OutboxMessage message, string reason, int attemptCount, OutboxMessageRetirement? retirement = null)
     {
         var now = TimeProvider.GetUtcNow();
         var id = entry.MessageId;
@@ -606,7 +626,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             MessageId = id,
             DeadLetter = new() { Message = message, DeadLetteredAt = now, Reason = reason, AttemptCount = attemptCount }
         });
-        Retire(entry, OutboxMessageRetirement.DeadLettered(reason));
+        Retire(entry, retirement ?? OutboxMessageRetirement.DeadLettered(reason));
     }
 
     private bool CompactDeadLetters(DateTimeOffset now, int reservedCapacity = 0)
