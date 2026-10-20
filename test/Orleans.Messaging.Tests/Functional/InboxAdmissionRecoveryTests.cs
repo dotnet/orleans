@@ -99,7 +99,8 @@ public sealed class InboxAdmissionRecoveryTests
         {
             ((IDurableValueCommandHandler<InboxCommand>)inbox).ApplySet(new()
             {
-                Kind = InboxCommandKind.Snapshot, Snapshot = recovered
+                Kind = InboxCommandKind.Snapshot,
+                Snapshot = recovered
             });
             var error = Assert.Throws<InvalidOperationException>(() => ((IStateMachine)inbox).OnRecoveryCompleted());
             Assert.Equal("A recovered inbox entry requires its admitted send time.", error.Message);
