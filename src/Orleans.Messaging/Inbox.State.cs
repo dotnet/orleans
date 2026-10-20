@@ -15,7 +15,7 @@ internal sealed partial class Inbox
     private readonly Dictionary<MessageId, InboxDeadLetter> _deadLetters = [];
     private JournalStreamWriter _writer;
 
-    // Forgetting an identity requires a durable fence against every later delivery of its immutable cutoff.
+    // Forgetting an identity requires a durable floor which excludes its latest observed send time.
     private DateTimeOffset _admissionFloor = DateTimeOffset.MinValue;
     private DateTimeOffset _capturedAdmissionFloor = DateTimeOffset.MinValue;
     private DateTimeOffset _durableAdmissionFloor = DateTimeOffset.MinValue;
@@ -84,7 +84,7 @@ internal sealed partial class Inbox
     }
 
     private static bool IsFenced(InboxProcessedEntry entry, DateTimeOffset floor) =>
-        entry.RedeliveryDeadline is { } cutoff && cutoff <= floor;
+        entry.SentAt <= floor;
 
     private void CompactProcessed()
     {
@@ -102,6 +102,7 @@ internal sealed partial class Inbox
         {
             { Kind: InboxCommandKind.Accept, Message: { } message } => message.Envelope.DeliverAt ?? DateTimeOffset.MinValue,
             { Kind: InboxCommandKind.Retry, State: { } state } => state.NextAttemptAt,
+            { Kind: InboxCommandKind.UpdateSentAt, MessageId: var key } when _messages.TryGetValue(key, out var pending) => GetDueTime(pending),
             _ => (DateTimeOffset?)null
         };
         if (dueTime is { } due && (_stagedWakeup is null || due < _stagedWakeup)) _stagedWakeup = due;
@@ -128,6 +129,7 @@ internal sealed partial class Inbox
         foreach (var (key, entry) in _messages)
         {
             EnvelopeValidation.Validate(entry.Message);
+            ValidateRecoveredSentAt(entry.Message.SentAt);
             if (key != entry.Message.Envelope.MessageId)
             {
                 throw new InvalidOperationException("The recovered inbox key does not match its command identity.");
@@ -137,11 +139,14 @@ internal sealed partial class Inbox
         foreach (var (key, letter) in _deadLetters)
         {
             EnvelopeValidation.Validate(letter.Message);
+            ValidateRecoveredSentAt(letter.Message.SentAt);
             if (key != letter.Message.Envelope.MessageId)
             {
                 throw new InvalidOperationException("The recovered inbox dead-letter key does not match its command identity.");
             }
         }
+
+        foreach (var entry in _processed.Values) ValidateRecoveredSentAt(entry.SentAt);
 
         _capturedSequence = _durableSequence = _lastSequence;
         _capturedAdmissionFloor = _durableAdmissionFloor = _admissionFloor;
@@ -192,7 +197,7 @@ internal sealed partial class Inbox
                 _processed[command.MessageId] = new()
                 {
                     MessageId = command.MessageId,
-                    RedeliveryDeadline = command.RedeliveryDeadline,
+                    SentAt = command.SentAt,
                     Rejection = command.Rejection,
                     Sequence = _lastSequence
                 };
@@ -200,6 +205,26 @@ internal sealed partial class Inbox
                 break;
             case InboxCommandKind.AdvanceAdmissionFloor:
                 AdvanceAdmissionFloor(command.AdmissionFloor);
+                break;
+            case InboxCommandKind.UpdateSentAt:
+                ValidateRecoveredSentAt(command.SentAt);
+                if (_messages.TryGetValue(command.MessageId, out var pending))
+                {
+                    if (command.SentAt > pending.Message.SentAt)
+                    {
+                        pending.Message = pending.Message with { SentAt = command.SentAt };
+                        pending.Sequence = ++_lastSequence;
+                    }
+                }
+                else
+                {
+                    var processed = _processed[command.MessageId];
+                    if (command.SentAt > processed.SentAt)
+                    {
+                        processed.SentAt = command.SentAt;
+                        processed.Sequence = _lastCompletionSequence = ++_lastSequence;
+                    }
+                }
                 break;
             case InboxCommandKind.RemoveDeadLetters:
                 foreach (var key in command.RemovedKeys!) _deadLetters.Remove(key);
@@ -232,6 +257,12 @@ internal sealed partial class Inbox
         if (floor < _admissionFloor) throw new InvalidOperationException("The inbox admission floor cannot move backward.");
         _admissionFloor = floor;
     }
+
+    private static void ValidateRecoveredSentAt(DateTimeOffset sentAt)
+    {
+        // Admission requires a time above a floor which is at least MinValue, so default cannot be admitted state.
+        if (sentAt == DateTimeOffset.MinValue) throw new InvalidOperationException("A recovered inbox entry requires its admitted send time.");
+    }
 }
 
 internal enum InboxCommandKind
@@ -241,7 +272,8 @@ internal enum InboxCommandKind
     Complete = 3,
     RemoveDeadLetters = 4,
     Snapshot = 6,
-    AdvanceAdmissionFloor = 7
+    AdvanceAdmissionFloor = 7,
+    UpdateSentAt = 8
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand")]
@@ -255,7 +287,7 @@ internal sealed class InboxCommand
     [Id(6)] public MessageId[]? RemovedKeys { get; init; }
     [Id(7)] public InboxSnapshot? Snapshot { get; init; }
     [Id(8)] public InboxRejection? Rejection { get; init; }
-    [Id(9)] public DateTimeOffset? RedeliveryDeadline { get; init; }
+    [Id(9)] public DateTimeOffset SentAt { get; init; }
     [Id(10)] public DateTimeOffset AdmissionFloor { get; init; }
 }
 
@@ -273,9 +305,9 @@ internal sealed class InboxProcessedEntry
 {
     [Id(0)] public MessageId MessageId { get; init; }
     [Id(2)] public InboxRejection? Rejection { get; init; }
-    [Id(3)] public DateTimeOffset? RedeliveryDeadline { get; init; }
+    [Id(3)] public required DateTimeOffset SentAt { get; set; }
     [field: NonSerialized]
-    [JsonIgnore] public long Sequence { get; init; }
+    [JsonIgnore] public long Sequence { get; set; }
 }
 
 /// <summary>The answer which an inbox sink gave when it rejected a message on delivery.</summary>
@@ -289,10 +321,10 @@ internal sealed class InboxRejection
 [GenerateSerializer, Alias("Orleans.Messaging.InboxEntry")]
 internal sealed class InboxEntry
 {
-    [Id(0)] public required InboxMessage Message { get; init; }
+    [Id(0)] public required InboxMessage Message { get; set; }
     [Id(1)] public required InboxMessageState State { get; set; }
     [field: NonSerialized]
-    [JsonIgnore] public long Sequence { get; init; }
+    [JsonIgnore] public long Sequence { get; set; }
 }
 
 [JsonSerializable(typeof(InboxCommand))]
