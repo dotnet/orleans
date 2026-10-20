@@ -15,7 +15,7 @@ ms.topic: reference
 
 ## Cause
 
-A `try` block in a durable task body contains durable operations, and one of its `catch` clauses catches `OperationCanceledException`, a type it derives from, or a type which derives from it, has no filter which reads `DurableTaskContext.IsTaskCancellationRequested`, and doesn't rethrow:
+A `try` block in a durable task body contains durable operations, and one of its `catch` clauses catches `OperationCanceledException`, a type it derives from, or a type which derives from it, has no filter which reads `DurableTaskContext.IsTaskCancellationRequested` or excludes `OperationCanceledException`, such as `when (e is not OperationCanceledException)`, and doesn't rethrow:
 
 :::code source="snippets/durable-tasks/Orleans0212.cs" id="orleans0212_violation" language="csharp":::
 

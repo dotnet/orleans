@@ -411,6 +411,67 @@ public class DurableTaskUsageRuleTests
         """);
 
     [Fact]
+    public Task FiltersWhichExcludeCancellationNeedNoTaskCancellationFilter() => AnalyzerVerifier.VerifyAsync($$"""
+        public class C
+        {
+        {{Members}}
+            public async DurableTask<int> RunAsync()
+            {
+                try
+                {
+                    await Step(1).WithId("pattern");
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                }
+
+                try
+                {
+                    await Step(2).WithId("negation");
+                }
+                catch (Exception e) when (!(e is OperationCanceledException))
+                {
+                }
+
+                try
+                {
+                    await Step(3).WithId("negated-pattern");
+                }
+                catch (Exception e) when (!(e is OperationCanceledException canceled) && e.Message.Length > 0)
+                {
+                }
+
+                try
+                {
+                    await Step(4).WithId("conjunction");
+                }
+                catch (Exception e) when (e.Message.Length > 0 && e is not OperationCanceledException)
+                {
+                }
+
+                // Excluding only a derived cancellation, or excluding it in one branch of '||', still catches cancellation.
+                try
+                {
+                    await Step(5).WithId("derived");
+                }
+                {|ORLEANS0212:catch|} (Exception e) when (e is not TaskCanceledException)
+                {
+                }
+
+                try
+                {
+                    await Step(6).WithId("disjunction");
+                }
+                {|ORLEANS0212:catch|} (Exception e) when (e is not OperationCanceledException || e.Message.Length > 0)
+                {
+                }
+
+                return 0;
+            }
+        }
+        """);
+
+    [Fact]
     public Task CancellationHandlersFilterByIsTaskCancellationRequested() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {
