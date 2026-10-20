@@ -180,7 +180,8 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     internal bool IsDiscarded => AttemptEndReason
         is DurableTaskAttemptCancellationReason.ActivationStopping
         or DurableTaskAttemptCancellationReason.Diverged
-        or DurableTaskAttemptCancellationReason.UnsupportedVersion;
+        or DurableTaskAttemptCancellationReason.UnsupportedVersion
+        or DurableTaskAttemptCancellationReason.TransactionConflict;
 
     /// <summary>Gets whether a segment of the attempt runs or is queued, so the attempt makes progress without a message.</summary>
     /// <remarks>
@@ -590,6 +591,14 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// <summary>Stalls this attempt because an operation diverged from the execution's record.</summary>
     private DurableTaskAttemptCanceledException Diverge(DurableTaskDivergenceException divergence) =>
         Stall(DurableTaskAttemptCancellationReason.Diverged, divergence);
+
+    /// <summary>
+    /// Stalls this attempt because a recorded access met state which an open transaction holds. The access records
+    /// nothing, and the runtime runs a new attempt of the task once the transaction ends, which replays this attempt's
+    /// records up to the access and then runs it live.
+    /// </summary>
+    internal DurableTaskAttemptCanceledException StallForConflict(Orleans.Journaling.JournaledStateConflictException conflict) =>
+        Stall(DurableTaskAttemptCancellationReason.TransactionConflict, conflict);
 
     /// <summary>Throws <see cref="DurableTaskAttemptCanceledException"/> when the runtime canceled this attempt.</summary>
     private void ThrowIfAttemptCanceled()

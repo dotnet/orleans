@@ -697,8 +697,8 @@ public sealed class JournalTransactionTests
             activation.Completion.TrySetResult(3);
             activation.List.Add("uncommitted");
 
-            // A durable task body which reads a held state records its value, since the journal doesn't hold the
-            // transaction's changes, and a write by another flow captures none of them.
+            // No read takes a position while the journal doesn't hold the transaction's changes, and a write by another
+            // flow captures none of them.
             await RunOutsideTransaction(async () =>
             {
                 Assert.False(activation.Manager.Positions.TryGetPosition(out var position));
