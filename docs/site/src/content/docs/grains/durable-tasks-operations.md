@@ -168,6 +168,9 @@ but doesn't decide whether they match. Typical causes:
   operations.
 - A loop or condition schedules children under IDs which depend on a nondeterministic
   value.
+- A deployment changed a canceled task's body so that its replay ends before the
+  cancellation point where the earlier run observed the cancellation. The message names
+  the point which the replay reached and the recorded one.
 
 Code between children which reads a value which differs on replay, such as
 `DateTime.UtcNow`, a random number, or mutable grain state, and passes it to a child

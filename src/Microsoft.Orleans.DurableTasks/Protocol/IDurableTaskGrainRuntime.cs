@@ -249,6 +249,20 @@ internal interface IDurableTaskGrainRuntime
     }
 
     /// <summary>
+    /// Returns the cancellation point at which an earlier attempt of <paramref name="executionId"/> first observed its
+    /// task's cancellation, or <see langword="null"/> when none is recorded.
+    /// </summary>
+    int? GetCancellationPoint(TaskId executionId) => null;
+
+    /// <summary>
+    /// Stages a record of the cancellation point at which <paramref name="executionId"/> first observed its task's
+    /// cancellation, without writing.
+    /// </summary>
+    void RecordCancellationPoint(TaskId executionId, int point)
+    {
+    }
+
+    /// <summary>
     /// Stages the terminal response of the body which <paramref name="context"/> runs, from the work item which ran the
     /// body's final code on the activation, without writing.
     /// </summary>

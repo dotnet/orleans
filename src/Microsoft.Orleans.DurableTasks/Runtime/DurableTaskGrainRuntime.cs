@@ -459,6 +459,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         { RequestFingerprint: { } fingerprint } when TryParseIdentity(SubscriptionFingerprintPrefix, fingerprint, out var target, out var subscribed) => DescribeSubscription(target, subscribed),
         { RequestFingerprint: EffectFingerprint } => "a DurableTask.RunInline effect",
         { RequestFingerprint: VersionFingerprint } => "a version decision",
+        { Kind: DurableTaskRecordKind.CancellationObserved } => "the point at which the execution observed its cancellation",
         { Method: { } method } => $"a request for {DescribeMethod(method)} ({AbbreviateFingerprint(state.RequestFingerprint)})",
         { RequestFingerprint: { } fingerprint } => $"a request ({AbbreviateFingerprint(fingerprint)})",
         { Kind: DurableTaskRecordKind.EarlyCancellation } => "a cancellation which arrived before its request",
@@ -505,8 +506,10 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <param name="taskId">The task id.</param>
     /// <returns>The new execution context.</returns>
     /// <remarks>
-    /// A body which starts, or replays, after cancellation of its task was requested observes the request from the start:
-    /// its <see cref="DurableTaskContext.CancellationToken"/> is canceled,
+    /// An attempt which starts, or replays, after cancellation of its task was requested receives the request here, and
+    /// its body observes it at a cancellation point: the one which the execution recorded when an earlier attempt first
+    /// observed it, or otherwise the start of a first run, or the point at which a replay ends. From then on, its
+    /// <see cref="DurableTaskContext.CancellationToken"/> is canceled,
     /// <see cref="DurableTaskContext.IsTaskCancellationRequested"/> is set, and
     /// <see cref="DurableTaskContext.TaskCancellationReason"/> reports the recorded reason.
     /// </remarks>
@@ -521,7 +524,6 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (_storage.TryGetTask(taskId, out var taskState) && taskState.CancellationRequestedAt.HasValue)
         {
-            // Nothing observes the token before the body starts.
             context.DeliverTaskCancellation(taskState.CancellationReason);
         }
 
@@ -977,6 +979,40 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     private static bool IsVersionRecord(IDurableTaskState state) => state.Kind == DurableTaskRecordKind.Version;
+
+    /// <summary>The segment of the record which holds the cancellation point at which an execution observed its cancellation.</summary>
+    internal const string CancellationPointSegment = "$cancellation-observed";
+
+    private const string CancellationPointFingerprint = "$cancellation-observed";
+
+    /// <remarks>An earlier attempt's delivery records the point, and later attempts read it.</remarks>
+    public int? GetCancellationPoint(TaskId executionId)
+    {
+        if (!_storage.TryGetTask(executionId.Child(CancellationPointSegment), out var record))
+        {
+            return null;
+        }
+
+        Debug.Assert(
+            IsCancellationPointRecord(record) && record.Result is { IsCompleted: true },
+            "Only cancellation points are recorded under the cancellation point segment.");
+        return record.Result!.GetResult<int>();
+    }
+
+    /// <remarks>
+    /// The record is a terminal entry of the execution's tree, staged in the calling work item, so it commits with the
+    /// grain's next journal write, and is deleted with the tree. A replay which starts before that write commits it
+    /// delivers the cancellation as an execution without a record does.
+    /// </remarks>
+    public void RecordCancellationPoint(TaskId executionId, int point)
+    {
+        Debug.Assert(!_stopping, "A stopping activation's attempts are canceled, so none observes its task's cancellation.");
+        var recordId = executionId.Child(CancellationPointSegment);
+        Debug.Assert(!_storage.TryGetTask(recordId, out _), "The first observation of an execution's cancellation records its point.");
+        AddRecord(recordId, DurableTaskRecordKind.CancellationObserved, CancellationPointFingerprint, DurableTaskResponse.FromResult(point));
+    }
+
+    private static bool IsCancellationPointRecord(IDurableTaskState state) => state.Kind == DurableTaskRecordKind.CancellationObserved;
 
     void IDurableTaskGrainRuntime.ThrowIfRecordedAsEffect(TaskId operationId, TaskId effectId, string requested)
     {
@@ -2247,6 +2283,8 @@ internal sealed partial class DurableTaskGrainRuntime(
             response = DurableTaskResponse.FromException(exception);
         }
 
+        context.VerifyCancellationPointReached();
+
         // A cancellation which arrives while this attempt still runs, for example while a delay's journal write is in
         // flight, cancels only the attempt's token. The attempt then terminalizes the task, so a pending operation
         // which it returns, such as a delay, does not outlive the cancellation.
@@ -3220,16 +3258,21 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// An execution's recorded operations are its nearest stored descendants: descendants which are themselves executions,
     /// such as local steps, hold their own operations. Signal values belong to the invoked task, which senders deliver
     /// independently of its attempts; invoked descendants keep their own lifecycle; a cancellation which arrived
-    /// before its request records no operation of this execution; and version decisions record which code the execution
+    /// before its request records no operation of this execution; version decisions record which code the execution
     /// follows rather than an operation which it reaches, so a deployment which removes a version check leaves no
-    /// operation which its replays never reach.
+    /// operation which its replays never reach; and a cancellation point records where the execution observed its
+    /// cancellation, which a replay reaches by counting its operations.
     /// </remarks>
     public HashSet<TaskId>? GetRecordedOperations(TaskId executionId)
     {
         HashSet<TaskId>? operations = null;
         foreach (var (id, state) in _storage.GetChildren(executionId))
         {
-            if (!IsInvoked(state) && !IsSignalRecord(state) && !IsCancellationRecord(state) && !IsVersionRecord(state))
+            if (!IsInvoked(state)
+                && !IsSignalRecord(state)
+                && !IsCancellationRecord(state)
+                && !IsVersionRecord(state)
+                && !IsCancellationPointRecord(state))
             {
                 (operations ??= []).Add(id);
             }

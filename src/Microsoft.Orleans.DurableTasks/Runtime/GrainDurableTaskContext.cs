@@ -44,6 +44,11 @@ namespace Orleans.DurableTasks.Runtime;
 /// activation replays the execution from its records. Its open segment, if any, observes the cancellation and ends.
 /// </para>
 /// <para>
+/// The body observes its task's cancellation at a <em>cancellation point</em>, the start of one of its durable operations,
+/// which the execution records when it first observes it, so a replay observes it at the same point; see
+/// <see cref="DeliverTaskCancellation"/>.
+/// </para>
+/// <para>
 /// The attempt's state is confined to the activation's scheduler. Its entry points from the abstractions switch to the
 /// scheduler before they read or change that state, because a body can continue elsewhere, such as after
 /// <c>ConfigureAwait(false)</c>.
@@ -87,6 +92,14 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     // The versions which this attempt decided, by change name.
     private Dictionary<string, int>? _versions;
 
+    // The cancellation points which the attempt reached; the point at which the execution first observed its task's
+    // cancellation, which a record holds or this attempt chose; and whether task cancellation was requested and awaits
+    // its point, with its reason.
+    private int _cancellationPoints;
+    private int? _cancellationPoint;
+    private bool _cancellationPending;
+    private string? _pendingCancellationReason;
+
     // Why the running code can't replay the execution, when the runtime stalled this attempt: a version which the code
     // doesn't support, or a divergence from the execution's record.
     private Exception? _stallException;
@@ -107,6 +120,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         _utcNowTicks = (utcNow ?? runtime.UtcNow).UtcTicks;
         _unreached = runtime.GetRecordedOperations(taskId);
         _replaying = _unreached is not null;
+        _cancellationPoint = runtime.GetCancellationPoint(taskId);
     }
 
     /// <inheritdoc/>
@@ -149,13 +163,91 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
     }
 
-    /// <summary>Delivers the task cancellation of this attempt, which releases its parked waits.</summary>
+    /// <summary>
+    /// Delivers the task cancellation of this attempt at its cancellation point, which releases its parked waits.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The cancellation points of an attempt are the starts of its body's durable operations, in order: each operation
+    /// which <see cref="ObserveOperation"/> notes, and each durable wait, such as for a task or a signal, whether or not
+    /// it parks, so a replay which finds the awaited event already recorded counts the same points. A deterministic replay
+    /// reaches the same points as the run which it replays, as it reaches the same operations.
+    /// </para>
+    /// <para>
+    /// The execution's body observes its task's cancellation at one point, which the execution records under
+    /// <c>{execution}/$cancellation-observed</c> when it first observes it, in the journal write which follows. A live
+    /// attempt observes it at its current point, which for a parked attempt is the start of the parked wait. A replay
+    /// observes it when it reaches the recorded point, at that operation's start, and its durable token stays uncanceled
+    /// until then. A replay of an execution which recorded no point, because its attempt ended before the record committed,
+    /// observes it at the point where the replay ends, as it reaches the last operation which earlier attempts recorded or
+    /// starts one which they didn't, and records that point; so does a request which arrives while the attempt replays.
+    /// No operation which the earlier attempt started after its observation committed, so the replay chooses the point.
+    /// A first run reaches no recorded operations, so it observes a request which precedes its body at the start, point 0.
+    /// </para>
+    /// <para>
+    /// The delivery cancels <see cref="DurableTaskContext.CancellationToken"/>, whose registrations run synchronously, so
+    /// a registration which throws fails the delivery or, at a later point, that point's operation.
+    /// </para>
+    /// </remarks>
     /// <exception cref="AggregateException">A registration on a token threw.</exception>
     internal void DeliverTaskCancellation(string? reason)
     {
         AssertOnScheduler();
+        if (IsTaskCancellationRequested || _cancellationPending)
+        {
+            return;
+        }
+
+        Debug.Assert(
+            _cancellationPoint is not { } point || point >= _cancellationPoints,
+            "An execution which recorded its cancellation point receives its cancellation when its attempt starts, before it reaches that point.");
+        _cancellationPending = true;
+        _pendingCancellationReason = reason;
+        DeliverPendingCancellation();
+    }
+
+    /// <summary>Notes that the body reached its next cancellation point, where a pending task cancellation can be delivered.</summary>
+    /// <exception cref="AggregateException">A registration on a token threw.</exception>
+    private void ReachCancellationPoint()
+    {
+        _cancellationPoints++;
+        DeliverPendingCancellation();
+    }
+
+    /// <summary>
+    /// Delivers a pending task cancellation once the attempt is at the point where its body observes it, and records that
+    /// point when the execution has no record of one.
+    /// </summary>
+    private void DeliverPendingCancellation()
+    {
+        if (!_cancellationPending || (_cancellationPoint is { } point ? point != _cancellationPoints : _replaying))
+        {
+            return;
+        }
+
+        _cancellationPending = false;
+        if (_cancellationPoint is null && !IsAttemptEnded)
+        {
+            _cancellationPoint = _cancellationPoints;
+            _runtime.RecordCancellationPoint(Id, _cancellationPoints);
+        }
+
         _resumePending |= _parkedWaits > 0;
-        RequestTaskCancellation(reason);
+        RequestTaskCancellation(_pendingCancellationReason);
+    }
+
+    /// <summary>
+    /// Stalls the attempt as diverged when its body ended before reaching the cancellation point at which an earlier
+    /// attempt observed its task's cancellation, so the running code doesn't replay the execution.
+    /// </summary>
+    internal void VerifyCancellationPointReached()
+    {
+        AssertOnScheduler();
+        if (_cancellationPending && _cancellationPoint is { } point && !IsAttemptEnded)
+        {
+            _ = Diverge(new DurableTaskDivergenceException(
+                $"Durable task '{Id}' ended at cancellation point {_cancellationPoints}, before point {point}, where an earlier run observed its task's cancellation. A replay reaches the same durable operations as the run which it replays."));
+        }
     }
 
     /// <summary>
@@ -320,6 +412,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     private void ObserveOperation(TaskId operationId, bool recordsOperation)
     {
         AssertOnScheduler();
+        ReachCancellationPoint();
         if (_unreached is not { } unreached)
         {
             return;
@@ -352,6 +445,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
         _replaying = false;
         _runtime.OnReplayEnded(Id);
+        DeliverPendingCancellation();
     }
 
     /// <summary>
@@ -676,11 +770,18 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// The body's final code runs in the work item which calls this, so staging the response here commits it in the same
     /// journal write as the journaled state that code changed, whichever operation requests that write. A body which
     /// completes on another scheduler has its response handled by the attempt, and a canceled attempt's response is
-    /// discarded.
+    /// discarded. A body which ended before the cancellation point at which an earlier attempt observed its task's
+    /// cancellation diverged, so its attempt stalls and stages nothing.
     /// </remarks>
     protected internal override void OnBodyCompleted(DurableTaskResponse response)
     {
-        if (TaskScheduler.Current != _scheduler || IsAttemptEnded)
+        if (TaskScheduler.Current != _scheduler)
+        {
+            return;
+        }
+
+        VerifyCancellationPointReached();
+        if (IsAttemptEnded)
         {
             return;
         }
@@ -811,6 +912,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     private async ValueTask<DurableTaskResponse> WaitForSignalCoreAsync(string name, CancellationToken cancellationToken)
     {
+        ReachCancellationPoint();
         ThrowIfAttemptCanceled();
         using var operationCts = CreateOperationCancellationSource(cancellationToken);
         var (value, recordedAt) = await CompleteOperationAsync(_runtime.WaitForSignalAsync(this, Id, name, operationCts.Token));
@@ -1004,6 +1106,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
         private async ValueTask<DurableTaskResponse> WaitCoreAsync(CancellationToken cancellationToken)
         {
+            owner.ReachCancellationPoint();
             owner.ThrowIfAttemptCanceled();
             using var operationCts = owner.CreateOperationCancellationSource(cancellationToken);
             return Observe(await owner.CompleteOperationAsync(owner.ParkAsync(inner.WaitAsync(operationCts.Token).AsTask(), [inner.TaskId])));

@@ -445,9 +445,17 @@ synchronously on the activation which makes them, when the runtime stages them: 
   completes with the body's result or failure. Attached children which aren't shielded and which the
   body starts after the request are canceled without running, and from such a start on, the body
   observes the request through `IsTaskCancellationRequested`, even before the request's write
-  completes. Recovery replays a canceled body with its cancellation
-  requested, so completed children return their recorded results. The first durable terminal result
-  wins a race.
+  completes. The body observes the cancellation at a cancellation point: the start of one of its
+  durable operations, such as a child's start, a `RunInline` effect, or a wait for a task or a
+  signal. A running body observes it at its current point, which for a body parked at a durable
+  wait is that wait, and the execution records the point under `{execution}/$cancellation-observed`
+  in the journal write which follows. A replay of a canceled body keeps its durable token
+  uncanceled until it reaches the recorded point, and observes the cancellation there, so completed
+  children return their recorded results and the body compensates where it first did. A replay
+  which finds no recorded point observes the cancellation where it reaches the last operation which
+  earlier attempts recorded, and records that point. A replay which ends before its recorded point
+  diverges, and stalls until code which reaches the point replays it. The first durable terminal
+  result wins a race.
 - A body starts compensation with `.Shielded()`. A shielded child, such as a local step, a delay, or a
   call to another grain, records that its ancestors' cancellation doesn't reach it: it is created and
   runs when its parent's cancellation was already requested, a later request skips it and its
