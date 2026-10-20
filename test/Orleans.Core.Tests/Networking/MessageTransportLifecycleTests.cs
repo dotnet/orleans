@@ -190,6 +190,24 @@ public class MessageTransportLifecycleTests
         readRequest.Reset();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MessageSerializer_RejectsNullCacheInvalidationEntries(bool beyondRetainedLimit)
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        var entries = Enumerable.Range(0, Message.MaxCacheInvalidationHeaderEntries + 2)
+            .Select(i => new GrainAddressCacheUpdate(new GrainAddress { GrainId = GrainId.Create("test", i.ToString()) }, validAddress: null))
+            .ToList();
+        entries[beyondRetainedLimit ? entries.Count - 1 : 0] = null!;
+        using var message = new Message { CacheInvalidationHeader = entries, BodyObject = "body" };
+        using var frame = new ArcBufferWriter();
+        MessageFrames.Write(services.GetRequiredService<MessageSerializer>(), frame, message);
+
+        Assert.Throws<InvalidMessageFrameException>(() => MessageFrames.Read(shared, frame));
+    }
+
     [Fact]
     public void MessageFactory_ResponseTimeToLive_IsSerialized()
     {

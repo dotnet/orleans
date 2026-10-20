@@ -337,7 +337,8 @@ namespace Orleans.Runtime.Messaging
                 var list = new List<GrainAddressCacheUpdate>(retainedCount);
                 for (uint i = 0; i < count; i++)
                 {
-                    var entry = _activationAddressCodec.ReadValue(ref reader, reader.ReadFieldHeader())!;
+                    var entry = _activationAddressCodec.ReadValue(ref reader, reader.ReadFieldHeader())
+                        ?? throw new InvalidMessageFrameException("A cache invalidation header entry cannot be null.");
                     if (list.Count < Message.MaxCacheInvalidationHeaderEntries)
                     {
                         list.Add(entry);

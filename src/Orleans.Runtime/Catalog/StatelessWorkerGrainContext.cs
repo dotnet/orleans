@@ -249,63 +249,10 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     private void ReceiveMessageInternal(object message)
     {
-        if (_terminated)
-        {
-            ForwardToReplacementContext((Message)message);
-            return;
-        }
-
+        IGrainContext? destination;
         try
         {
-            ActivationData? worker = null;
-            ActivationData? minimumWaitingCountWorker = null;
-            var minimumWaitingCount = int.MaxValue;
-
-            // Make sure there is at least one worker
-            if (_workers.Count == 0)
-            {
-                worker = CreateWorker(message);
-            }
-            else
-            {
-                // Check to see if we have any inactive workers, prioritizing
-                // them in the order they were created to minimize the number
-                // of workers spawned
-                for (var i = 0; i < _workers.Count; i++)
-                {
-                    var candidate = _workers[i];
-                    var status = candidate.GetRequestStatus();
-                    if (status.IsInactive)
-                    {
-                        worker = candidate;
-                        break;
-                    }
-                    else
-                    {
-                        // Track the worker with the lowest value for WaitingCount,
-                        // this is used if all workers are busy
-                        if (status.WaitingCount < minimumWaitingCount)
-                        {
-                            minimumWaitingCount = status.WaitingCount;
-                            minimumWaitingCountWorker = candidate;
-                        }
-                    }
-                }
-
-                if (worker is null)
-                {
-                    if (_workers.Count >= _shared.MaxLocalWorkers)
-                    {
-                        // Pick the one with the lowest waiting count
-                        worker = minimumWaitingCountWorker;
-                    }
-
-                    // If there are no workers, make one.
-                    worker ??= CreateWorker(message);
-                }
-            }
-
-            worker.ReceiveMessage(message);
+            destination = _terminated ? GetReplacementContext((Message)message) : GetWorker(message);
         }
         catch (Exception exception) when (message is Message msg)
         {
@@ -314,21 +261,64 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
                 Message.RejectionTypes.Transient,
                 exception,
                 "Exception while creating grain context");
+            return;
         }
+
+        if (destination is null)
+        {
+            _shared.Shared.InternalRuntime.MessageCenter.RejectMessage(
+                (Message)message, Message.RejectionTypes.Transient, null, "The silo is no longer creating activations.");
+            return;
+        }
+
+        // Ownership transfers on this call, including if the destination reports a failure.
+        destination.ReceiveMessage(message);
     }
 
-    private void ForwardToReplacementContext(Message message)
+    private ActivationData GetWorker(object message)
+    {
+        if (_workers.Count == 0)
+        {
+            return CreateWorker(message);
+        }
+
+        ActivationData? minimumWaitingCountWorker = null;
+        var minimumWaitingCount = int.MaxValue;
+        for (var i = 0; i < _workers.Count; i++)
+        {
+            var candidate = _workers[i];
+            var status = candidate.GetRequestStatus();
+            if (status.IsInactive)
+            {
+                return candidate;
+            }
+
+            if (status.WaitingCount < minimumWaitingCount)
+            {
+                minimumWaitingCount = status.WaitingCount;
+                minimumWaitingCountWorker = candidate;
+            }
+        }
+
+        return _workers.Count >= _shared.MaxLocalWorkers ? minimumWaitingCountWorker! : CreateWorker(message);
+    }
+
+    private IGrainContext? GetReplacementContext(Message message)
     {
         // The catalog cannot return this context because we set _terminated before
         // unregistering it, and a terminated context is never re-registered.
-        // Therefore the replacement is always a fresh context for the same grain id.
+        // A replacement returned by the catalog is a fresh context for the same grain id.
         Debug.Assert(_terminated);
         var replacement = _shared.Shared.InternalRuntime.Catalog.GetOrCreateActivation(
             GrainId,
-            message.RequestContextData ?? [])!;
+            message.RequestContextData ?? []);
         Debug.Assert(!ReferenceEquals(replacement, this), "Catalog must not resolve to a terminated stateless worker context.");
-        StatelessWorkerEvents.EmitMessageForwarded(this, replacement, message);
-        replacement.ReceiveMessage(message);
+        if (replacement is not null)
+        {
+            StatelessWorkerEvents.EmitMessageForwarded(this, replacement, message);
+        }
+
+        return replacement;
     }
 
     private ActivationData CreateWorker(object? message)

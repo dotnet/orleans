@@ -370,6 +370,7 @@ namespace Orleans.Runtime
 
                 default:
                     LogInvalidMessage(_logger, msg);
+                    msg.Dispose();
                     break;
             }
         }

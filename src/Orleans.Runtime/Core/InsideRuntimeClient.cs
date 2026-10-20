@@ -306,6 +306,7 @@ namespace Orleans.Runtime
                 if (message.IsExpired)
                 {
                     this.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
+                    message.Dispose();
                     return;
                 }
 

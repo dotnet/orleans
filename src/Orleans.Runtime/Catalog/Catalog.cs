@@ -126,7 +126,6 @@ namespace Orleans.Runtime
         /// <remarks>
         /// There is no guarantee about the validity of the activation which is returned.
         /// Activations are responsible for handling any messages which they receive.
-        /// Initialization failure deactivates a newly created activation through its ordinary lifecycle.
         /// </remarks>
         /// <param name="grainId">The grain identity.</param>
         /// <param name="requestContextData">Optional request context data.</param>
@@ -140,12 +139,21 @@ namespace Orleans.Runtime
         {
             Debug.Assert(migration is null || migration.Value.GrainId == grainId);
             var rehydrationContext = migration?.MigrationContext;
-            IGrainContext? createdActivation = null;
             try
             {
+                GrainAddress? previousAddress = null;
+                if (migration is { Requests.Count: > 0 } package)
+                {
+                    package.MigrationContext.TryGetValue(ActivationData.GrainAddressMigrationContextKey, out previousAddress);
+                    if (previousAddress is not null && previousAddress.GrainId != grainId)
+                    {
+                        throw new ArgumentException("The migration's previous address must identify the migrating grain.", nameof(migration));
+                    }
+                }
+
                 if (TryGetGrainContext(grainId, out var result))
                 {
-                    ReceiveRequests(result, migration);
+                    ReceiveRequests(result, migration, previousAddress);
                     return result;
                 }
                 else if (grainId.IsSystemTarget())
@@ -153,6 +161,7 @@ namespace Orleans.Runtime
                     return null;
                 }
 
+                var created = false;
                 lock (GetStripedLock(grainId))
                 {
                     if (!TryGetGrainContext(grainId, out result) && _siloStatusOracle.CurrentStatus == SiloStatus.Active)
@@ -167,7 +176,7 @@ namespace Orleans.Runtime
 
                         result = this.grainActivator.CreateInstance(address);
                         activations.RecordNewTarget(result);
-                        createdActivation = result;
+                        created = true;
                     }
                 } // End lock
 
@@ -176,49 +185,54 @@ namespace Orleans.Runtime
                     return UnableToCreateActivation(this, grainId);
                 }
 
-                if (createdActivation is null)
+                if (!created)
                 {
                     // Admission can reject a request and synchronously complete a caller, so deliver outside the catalog lock.
-                    ReceiveRequests(result, migration);
+                    ReceiveRequests(result, migration, previousAddress);
                     return result;
                 }
 
-                // Start activation span with parent context from request if available
-                var parentContext = requestContextData.TryGetActivityContext();
-                var activationActivity = parentContext.HasValue
-                    ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
-                    : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
-                if (activationActivity is not null)
+                try
                 {
-                    activationActivity.SetTag(ActivityTagKeys.GrainId, grainId.ToString());
-                    activationActivity.SetTag(ActivityTagKeys.GrainType, grainId.Type.ToString());
-                    activationActivity.SetTag(ActivityTagKeys.SiloId, Silo.ToString());
-                    activationActivity.SetTag(ActivityTagKeys.ActivationCause, rehydrationContext is null ? "new" : "rehydrate");
-                    if (result is ActivationData act)
+                    // Start activation span with parent context from request if available
+                    var parentContext = requestContextData.TryGetActivityContext();
+                    var activationActivity = parentContext.HasValue
+                        ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
+                        : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
+                    if (activationActivity is not null)
                     {
-                        activationActivity.SetTag(ActivityTagKeys.ActivationId, act.ActivationId.ToString());
-                        act.SetActivationActivity(activationActivity);
-                        activationActivity.AddEvent(new ActivityEvent("creating"));
+                        activationActivity.SetTag(ActivityTagKeys.GrainId, grainId.ToString());
+                        activationActivity.SetTag(ActivityTagKeys.GrainType, grainId.Type.ToString());
+                        activationActivity.SetTag(ActivityTagKeys.SiloId, Silo.ToString());
+                        activationActivity.SetTag(ActivityTagKeys.ActivationCause, rehydrationContext is null ? "new" : "rehydrate");
+                        if (result is ActivationData act)
+                        {
+                            activationActivity.SetTag(ActivityTagKeys.ActivationId, act.ActivationId.ToString());
+                            act.SetActivationActivity(activationActivity);
+                            activationActivity.AddEvent(new ActivityEvent("creating"));
+                        }
                     }
+
+                    _catalogInstruments.OnActivationCreated(GetGrainTypeMetricName(result));
+
+                    // Admit requests before rehydration can dispose the context and activation can register in the directory.
+                    ReceiveRequests(result, migration, previousAddress);
                 }
-
-                _catalogInstruments.OnActivationCreated(GetGrainTypeMetricName(result));
-
-                // Admit requests before rehydration can dispose the context and activation can register in the directory.
-                ReceiveRequests(result, migration);
-
-                // Rehydration occurs before activation.
-                if (rehydrationContext is not null)
+                finally
                 {
-                    result.Rehydrate(rehydrationContext);
-                    rehydrationContext = null;
+                    // Creation commits us to scheduling activation. These calls transfer work to the context, which owns failures.
+                    if (rehydrationContext is not null)
+                    {
+                        result.Rehydrate(rehydrationContext);
+                        rehydrationContext = null;
+                    }
+
+                    result.Activate(requestContextData);
                 }
 
-                // Initialize the new activation asynchronously.
-                result.Activate(requestContextData);
                 return result;
             }
-            catch (Exception exception)
+            catch
             {
                 if (migration?.Requests is { } requests)
                 {
@@ -230,9 +244,6 @@ namespace Orleans.Runtime
                     requests.Clear();
                 }
 
-                createdActivation?.Deactivate(
-                    new(DeactivationReasonCode.ActivationFailed, exception, "Failed to initialize activation."),
-                    CancellationToken.None);
                 throw;
             }
             finally
@@ -240,14 +251,13 @@ namespace Orleans.Runtime
                 rehydrationContext?.Dispose();
             }
 
-            void ReceiveRequests(IGrainContext destination, GrainMigrationPackage? migration)
+            void ReceiveRequests(IGrainContext destination, GrainMigrationPackage? migration, GrainAddress? previousAddress)
             {
-                if (migration is not { Requests: { Count: > 0 } requests } package)
+                if (migration is not { Requests: { Count: > 0 } requests })
                 {
                     return;
                 }
 
-                package.MigrationContext.TryGetValue(ActivationData.GrainAddressMigrationContextKey, out GrainAddress? previousAddress);
                 var admitted = 0;
                 try
                 {
