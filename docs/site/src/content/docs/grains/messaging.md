@@ -211,7 +211,7 @@ source or an inbox sink keeps that state as the only journaled copy:
     `Reason`, and a `Code`. Its status is `Delivered` when the receiver accepted the
     message or reported it as a duplicate, `Rejected` when the receiver dead-lettered
     it durably, and `DeadLettered` when the outbox dead-lettered it after its retry
-    timeout, a source failure, or a receiver admission fence. `DeadLettered`
+    timeout, a source failure, or an `Expired` answer. `DeadLettered`
     leaves earlier receiver acceptance unknown. `Reason` is the dead letter's reason, and `Code` is the
     application-defined code that the receiver reported with a rejection. An outbox
     dead letter receives its own copy of the materialized message first, so the
