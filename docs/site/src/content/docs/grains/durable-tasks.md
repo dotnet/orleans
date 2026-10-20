@@ -209,10 +209,14 @@ The order workflow changes its status this way:
   another operation, so a replay runs them at another point. The body's `catch` block is
   where compensation changes state.
 - The access log holds one record for each access in re-executed code and is deleted when
-  the execution completes. A read which returns the same outcome as the execution's latest
-  recorded read of the same state and operation records a reference to that read, and
-  consecutive references share one record, so a loop which reads unchanged state adds a
-  few bytes rather than a value per iteration. A workflow which loops indefinitely
+  the execution completes. A read records a reference to the attempt's latest recorded
+  read of the same state and operation, rather than its value, when its result is equal
+  and compares exactly, as strings, integers, and enumerations do, or when the state is
+  unchanged since that read, the read's key or index is equal, and its result is
+  immutable, such as a `double`, a date, or a copy of such values. Consecutive
+  references share one record, so a loop which reads unchanged values adds a few bytes
+  rather than a value per iteration. Every other read records its value, so a replay
+  returns what each read observed when it ran. A workflow which loops indefinitely
   bounds its history as
   [Replay-safety rules](durable-tasks-replay-rules.md#rules-which-the-analyzers-dont-check)
   describes.
