@@ -71,6 +71,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     /// </remarks>
     public void Send(OutboxMessage message)
     {
+        // Shutdown fails a send before it runs, so no context records the shutdown as the send's outcome.
+        _pump.ShutdownToken.ThrowIfCancellationRequested();
         if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
         {
             context.Write(_accessTarget, JournaledStateOperation.OutboxSend, (Self: this, Message: message), static state => state.Self.SendCore(state.Message));
@@ -82,7 +84,6 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
     private void SendCore(OutboxMessage message)
     {
-        _pump.ShutdownToken.ThrowIfCancellationRequested();
         EnvelopeValidation.Validate(message);
         if (_messages.TryGetValue(message.Envelope.MessageId, out var existing))
         {
@@ -116,6 +117,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     /// <remarks>A send runs through the caller's <see cref="JournaledStateContext"/> as a write.</remarks>
     public void Send(MessageId messageId)
     {
+        _pump.ShutdownToken.ThrowIfCancellationRequested();
         if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
         {
             context.Write(_accessTarget, JournaledStateOperation.OutboxSend, (Self: this, MessageId: messageId), static state => state.Self.SendCore(state.MessageId));
@@ -127,7 +129,6 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
     private void SendCore(MessageId messageId)
     {
-        _pump.ShutdownToken.ThrowIfCancellationRequested();
         EnvelopeValidation.ValidateMessageId(messageId);
         if (_messages.TryGetValue(messageId, out var existing))
         {
