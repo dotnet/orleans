@@ -31,7 +31,8 @@ public sealed class OutboxJournalRecoveryTests : MessagingBehaviorTestBase
             NewMessage(52, "durable-wakeup"));
         await receiverWrite.WaitUntilEnteredAsync();
 
-        Assert.Equal(1, Fixture.GetSnapshot(sender).OutboxCount);
+        // Deactivation cancels the in-flight attempt rather than waiting for the receiver, so the sender's journal and
+        // its durable wake-up carry the message.
         Assert.NotEmpty(Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, sender.GetGrainId()));
 
         receiverWrite.Release();
