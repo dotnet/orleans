@@ -34,7 +34,7 @@ public enum DeliveryStatus
     /// The receiver rejected the message permanently and moved it to its dead-letter store.
     /// </summary>
     /// <remarks>
-    /// A redelivery of the message within the deduplication window receives the same result.
+    /// A redelivery while its processed record is retained receives the same result.
     /// </remarks>
     DeadLettered = 5,
 
