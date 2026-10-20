@@ -43,7 +43,6 @@ namespace Orleans.Runtime
                 RequestContextData = requestContextData,
             };
 
-            (body as IOutgoingMessageBody)?.OnMessageCreated();
             return message;
         }
 

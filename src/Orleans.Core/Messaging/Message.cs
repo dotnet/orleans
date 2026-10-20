@@ -87,11 +87,6 @@ namespace Orleans.Runtime
                 _bodyObject = null;
                 readRequest.Reset();
             }
-            else if (_bodyObject is IOutgoingMessageBody outgoing)
-            {
-                _bodyObject = null;
-                outgoing.ReleaseResources();
-            }
         }
 
         public void Dispose()

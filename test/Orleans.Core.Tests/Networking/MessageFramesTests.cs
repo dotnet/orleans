@@ -27,7 +27,6 @@ namespace Orleans.Core.Tests.Networking;
 public sealed class MessageFramesTests : IDisposable
 {
     private readonly ServiceProvider _services;
-    private readonly Serializer _serializer;
 
     public MessageFramesTests()
     {
@@ -49,7 +48,6 @@ public sealed class MessageFramesTests : IDisposable
                     messaging);
             })
             .BuildServiceProvider();
-        _serializer = _services.GetRequiredService<Serializer>();
     }
 
     public void Dispose() => _services.Dispose();
@@ -133,33 +131,52 @@ public sealed class MessageFramesTests : IDisposable
     }
 
     [Fact]
-    public void MessageWhichCannotBeSerialized_FailsTheEnclosingMessage()
+    public void MessageWhichCannotBeSerialized_FailsTheSnapshot()
     {
         var unserializable = CreateRequest(2, timeToLive: null);
         unserializable.RequestContextData = new() { ["unserializable"] = new UnserializableValue() };
 
-        Assert.ThrowsAny<Exception>(() => _serializer.SerializeToArray(new List<Message> { CreateRequest(1, timeToLive: null), unserializable }));
+        Assert.ThrowsAny<Exception>(() => MessageFrames.WriteRequests(_services.GetRequiredService<MessageHandlerShared>(), [CreateRequest(1, timeToLive: null), unserializable]));
     }
 
     [Fact]
-    public void NullAndRepeatedMessages_RoundTripAsReferences()
+    public void SnapshotSurvivesSourceDisposalAndCanBeReadTwice()
     {
         var request = CreateRequest(1, timeToLive: null);
         request.BodyObject = "value";
 
-        // A message which appears twice is serialized once, and both entries read back as the same message.
-        var messages = RoundTrip([request, null!, request]);
-        Assert.Equal(3, messages.Count);
-        Assert.Null(messages[1]);
-        Assert.Same(messages[0], messages[2]);
-        Assert.Equal(request.Id, messages[0].Id);
-        Assert.Equal("value", messages[0].BodyObject);
+        var shared = _services.GetRequiredService<MessageHandlerShared>();
+        var snapshot = MessageFrames.WriteRequests(shared, [request]);
+        request.Dispose();
+        for (var i = 0; i < 2; i++)
+        {
+            using var copy = Assert.Single(MessageFrames.ReadRequests(shared, snapshot));
+            Assert.Equal(request.Id, copy.Id);
+            Assert.Equal("value", copy.BodyObject);
+        }
+    }
+
+    [Fact]
+    public void MalformedSnapshot_ReleasesDecodedPrefix()
+    {
+        var shared = _services.GetRequiredService<MessageHandlerShared>();
+        using var request = CreateRequest(1, timeToLive: null);
+        request.BodyObject = new byte[20_000];
+        var snapshot = MessageFrames.WriteRequests(shared, [request]).Append((byte)0).ToArray();
+        var handler = shared.GetReceiveMessageHandler();
+        handler.Reset();
+
+        Assert.Throws<InvalidMessageFrameException>(() => MessageFrames.ReadRequests(shared, snapshot));
+        Assert.Equal(0, handler.BodyLength);
+        var returned = shared.GetReceiveMessageHandler();
+        Assert.Same(handler, returned);
+        returned.Reset();
     }
 
     [Theory]
     [InlineData(100, 100)]
     [InlineData(10, 20_000)]
-    public void EmbeddedMessages_SharePagesAndOutliveTheEnclosingMessage(int count, int payloadSize)
+    public void SnapshotMessages_SharePagesAndKeepBodiesSerialized(int count, int payloadSize)
     {
         var shared = _services.GetRequiredService<MessageHandlerShared>();
         var requests = Enumerable.Range(0, count).Select(i =>
@@ -168,31 +185,9 @@ public sealed class MessageFramesTests : IDisposable
             message.BodyObject = Enumerable.Repeat((byte)i, payloadSize).ToArray();
             return message;
         }).ToList();
-        var enclosing = CreateRequest(count, timeToLive: null);
-        enclosing.BodyObject = requests;
-        List<Message> received;
+        var snapshot = MessageFrames.WriteRequests(shared, requests);
+        var received = MessageFrames.ReadRequests(shared, snapshot);
         var pages = new HashSet<byte[]>();
-        using (var buffer = new ArcBufferWriter())
-        {
-            var serializer = shared.GetMessageSerializer();
-            try
-            {
-                MessageFrames.Write(serializer, buffer, enclosing);
-            }
-            finally
-            {
-                shared.Return(serializer);
-            }
-
-            using var copy = MessageFrames.Read(shared, buffer);
-            var body = Assert.IsType<MessageReadRequest>(copy._bodyObject);
-            foreach (var segment in body.Body.ArraySegments)
-            {
-                pages.Add(segment.Array!);
-            }
-
-            received = Assert.IsType<List<Message>>(copy.BodyObject);
-        }
 
         try
         {
@@ -203,12 +198,14 @@ public sealed class MessageFramesTests : IDisposable
                 var body = Assert.IsType<MessageReadRequest>(message._bodyObject);
                 foreach (var segment in body.Body.ArraySegments)
                 {
-                    Assert.Contains(segment.Array!, pages);
+                    pages.Add(segment.Array!);
                 }
 
                 Assert.Equal(new CorrelationId(i), message.Id);
                 Assert.Equal(Enumerable.Repeat((byte)i, payloadSize), Assert.IsType<byte[]>(message.BodyObject));
             }
+
+            Assert.InRange(pages.Count, 1, (snapshot.Length + ArcBufferWriter.MinimumPageSize - 1) / ArcBufferWriter.MinimumPageSize);
         }
         finally
         {
@@ -216,7 +213,11 @@ public sealed class MessageFramesTests : IDisposable
         }
     }
 
-    private List<Message> RoundTrip(List<Message> messages) => _serializer.Deserialize<List<Message>>(_serializer.SerializeToArray(messages))!;
+    private List<Message> RoundTrip(List<Message> messages)
+    {
+        var shared = _services.GetRequiredService<MessageHandlerShared>();
+        return MessageFrames.ReadRequests(shared, MessageFrames.WriteRequests(shared, messages));
+    }
 
     [Fact]
     public void PreparedRequestBody_SurvivesNonConsumingContextSizingAndForwarding()

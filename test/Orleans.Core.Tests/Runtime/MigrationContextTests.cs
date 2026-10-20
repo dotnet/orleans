@@ -16,7 +16,7 @@ namespace Orleans.Core.Tests.Runtime;
 public sealed class MigrationContextTests
 {
     [Fact]
-    public void SerializationTransfersBufferOwnershipAndPreservesTheWireFormat()
+    public void ManagedSnapshotSurvivesSourceDisposalAndPreservesTheWireFormat()
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var sessions = services.GetRequiredService<SerializerSessionPool>();
@@ -33,12 +33,15 @@ public sealed class MigrationContextTests
         var legacySerializer = services.GetRequiredService<Serializer<LegacyMigrationContext>>();
         var modernSerializer = services.GetRequiredService<Serializer<MigrationContext>>();
         var legacyBytes = legacySerializer.SerializeToArray(legacy);
-        var modernBytes = modernSerializer.SerializeToArray(context);
-        Assert.Equal(legacyBytes, modernBytes);
-        Assert.Equal(0, context.SerializedBuffer.Length);
-
-        // Both versions read the same fields. The source context can be disposed after serialization without returning its sent buffer twice.
+        using var snapshot = context.CreateSnapshot();
         context.Dispose();
+        var modernBytes = modernSerializer.SerializeToArray(snapshot);
+        Assert.Equal(legacyBytes, modernBytes);
+        Assert.Equal(modernBytes, modernSerializer.SerializeToArray(snapshot));
+        Assert.True(snapshot.TryGetValue("payload", out byte[]? snapshotValue));
+        Assert.Equal(payload, snapshotValue);
+
+        // Both versions read the same fields; repeated sends read the immutable managed snapshot.
         using var modernCopy = Assert.IsType<MigrationContext>(modernSerializer.Deserialize(legacyBytes));
         Assert.True(modernCopy.TryGetValue("payload", out byte[]? actual));
         Assert.Equal(payload, actual);

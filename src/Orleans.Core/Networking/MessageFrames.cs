@@ -1,15 +1,12 @@
 using System;
-using System.Buffers;
 using System.Buffers.Binary;
-using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Generic;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Runtime.Messaging;
 
 /// <summary>
-/// Writes messages in the framing which connections use, and reads them back with their bodies left serialized, as received messages hold them.
+/// Writes messages in connection framing and snapshots migration requests, leaving decoded message bodies serialized.
 /// </summary>
 /// <remarks>
 /// A message read back from a frame is equivalent to one received from a connection: its headers are decoded, and its body is decoded when it is first accessed.
@@ -17,6 +14,67 @@ namespace Orleans.Runtime.Messaging;
 /// </remarks>
 internal static class MessageFrames
 {
+    internal static byte[] WriteRequests(MessageHandlerShared shared, List<Message> messages)
+    {
+        using var buffer = new ArcBufferWriter();
+        var serializer = shared.GetMessageSerializer();
+        try
+        {
+            foreach (var message in messages)
+            {
+                Write(serializer, buffer, message);
+            }
+
+            using var bytes = buffer.PeekSlice(buffer.Length);
+            return bytes.ToArray();
+        }
+        finally
+        {
+            shared.Return(serializer);
+        }
+    }
+
+    internal static List<Message> ReadRequests(MessageHandlerShared shared, byte[] bytes)
+    {
+        // One receive buffer serves the entire snapshot; each decoded message owns its body slice.
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(bytes);
+        var messages = new List<Message>();
+        try
+        {
+            Span<byte> framing = stackalloc byte[Message.LENGTH_HEADER_SIZE];
+            while (buffer.Length > 0)
+            {
+                if (buffer.Peek(framing) != framing.Length)
+                {
+                    throw new InvalidMessageFrameException("The frame is incomplete.");
+                }
+
+                var headers = BinaryPrimitives.ReadInt32LittleEndian(framing);
+                var body = BinaryPrimitives.ReadInt32LittleEndian(framing[sizeof(int)..]);
+                var length = (long)Message.LENGTH_HEADER_SIZE + headers + body;
+                if (headers <= 0 || body < 0 || length > buffer.Length)
+                {
+                    throw new InvalidMessageFrameException("The frame's length does not match its contents.");
+                }
+
+                using var frame = buffer.ConsumeSlice((int)length);
+                messages.Add(Read(shared, frame));
+            }
+
+            return messages;
+        }
+        catch
+        {
+            foreach (var message in messages)
+            {
+                message.Dispose();
+            }
+
+            throw;
+        }
+    }
+
     /// <summary>
     /// Appends a frame for <paramref name="message"/> to <paramref name="buffer"/> using <paramref name="serializer"/>.
     /// </summary>
@@ -111,82 +169,5 @@ internal static class MessageFrames
         {
             shared.Return(serializer);
         }
-    }
-}
-
-/// <summary>
-/// Serializes a message as its frame, so that a message can be carried within another message.
-/// </summary>
-/// <remarks>
-/// Serializing a message consumes it as sending it does: values such as <see cref="PooledBuffer"/> arguments release their storage.
-/// A deserialized message holds its serialized body, as a received message does.
-/// </remarks>
-[RegisterSerializer]
-internal sealed class MessageCodec(IServiceProvider serviceProvider) : IFieldCodec<Message>
-{
-    // List<Message> supplies the expected type and field deltas 0 or 1: one tag plus at most five bytes for the frame length.
-    internal const int MaxFramingSize = 1 + 5;
-
-    private MessageHandlerShared? _shared;
-
-    // Resolved on first use, since the messaging services depend on the serializer.
-    private MessageHandlerShared Shared => _shared ??= serviceProvider.GetRequiredService<MessageHandlerShared>();
-
-    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type? expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Message value)
-        where TBufferWriter : IBufferWriter<byte>
-    {
-        if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
-        {
-            return;
-        }
-
-        writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(Message), WireType.LengthPrefixed);
-
-        using var frame = new ArcBufferWriter();
-        var serializer = Shared.GetMessageSerializer();
-        try
-        {
-            MessageFrames.Write(serializer, frame, value);
-        }
-        finally
-        {
-            Shared.Return(serializer);
-        }
-
-        writer.WriteVarUInt32((uint)frame.Length);
-        using var bytes = frame.PeekSlice(frame.Length);
-        foreach (var span in bytes)
-        {
-            writer.Write(span);
-        }
-    }
-
-    public Message? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
-    {
-        if (field.WireType == WireType.Reference)
-        {
-            return ReferenceCodec.ReadReference<Message, TInput>(ref reader, field);
-        }
-
-        field.EnsureWireType(WireType.LengthPrefixed);
-        var length = checked((int)reader.ReadVarUInt32());
-        Message message;
-        if (reader.TryReadSlice(length, out var frame))
-        {
-            using (frame)
-            {
-                message = MessageFrames.Read(Shared, frame);
-            }
-        }
-        else
-        {
-            using var buffer = new ArcBufferWriter();
-            var output = buffer;
-            reader.ReadBytes(ref output, length);
-            message = MessageFrames.Read(Shared, buffer);
-        }
-
-        ReferenceCodec.RecordObject(reader.Session, message);
-        return message;
     }
 }

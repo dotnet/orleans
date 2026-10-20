@@ -324,7 +324,7 @@ public sealed class RetirementHandoffTests
         {
             if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
             {
-                var package = Assert.Single((List<GrainMigrationPackage>)context.Request.GetArgument(0)!);
+                var package = UnpackMigration(context);
                 carriedRequest.TrySetResult(Assert.Single(package.Requests!).Id);
             }
 
@@ -809,6 +809,7 @@ public sealed class RetirementHandoffTests
                 {
                     var packages = (List<GrainMigrationPackage>)context.Request.GetArgument(0)!;
                     Assert.All(packages, package => Assert.Null(package.Requests));
+                    Assert.All(packages, package => Assert.Null(package.RequestFrames));
                 }
 
                 await context.Invoke();
@@ -1065,7 +1066,7 @@ public sealed class RetirementHandoffTests
         {
             if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
             {
-                var package = Assert.Single((List<GrainMigrationPackage>)context.Request.GetArgument(0)!);
+                var package = UnpackMigration(context);
                 var requests = Assert.IsType<List<Message>>(package.Requests);
                 Assert.Equal(2, requests.Count);
                 requests[0].TimeToLive = TimeSpan.FromSeconds(-1);
@@ -1190,8 +1191,6 @@ public sealed class RetirementHandoffTests
         var firstCall = first.Record("first").AsTask();
         var secondCall = second.Record("second").AsTask();
         await WaitUntilAsync(() => GetWaitingCount(source, first.GetGrainId()) == 1 && GetWaitingCount(source, second.GetGrainId()) == 1);
-        Message? carried = null;
-
         try
         {
             await first.MigrateOnIdleTo(target.SiloAddress);
@@ -1199,18 +1198,15 @@ public sealed class RetirementHandoffTests
             await firstRunning.WaitAsync(Timeout, Cancellation);
             var firstBatch = await firstSubmitted.Task.WaitAsync(Timeout, Cancellation);
             await serializing.Task.WaitAsync(Timeout, Cancellation);
-            carried = Assert.Single(Assert.Single(firstBatch).Requests!);
-            var body = Assert.IsType<Orleans.Runtime.Messaging.MessageReadRequest>(carried._bodyObject);
-            var page = body.Body.First!;
-            var pageVersion = page.Version;
+            var snapshot = Assert.IsType<byte[]>(Assert.Single(firstBatch).RequestFrames);
+            var expected = snapshot.ToArray();
 
             // Trigger the caller's timeout while its outbound writer still owns the unsent invocation.
             var remote = source.ServiceProvider.GetRequiredService<IInternalGrainFactory>()
                 .GetSystemTarget<IActivationMigrationManagerSystemTarget>(Constants.ActivationMigratorType, target.SiloAddress);
             FindPendingCallback(source, remote.GetGrainId()).OnTimeout();
             await Assert.ThrowsAsync<OrleansMessageRejectionException>(() => firstCall.WaitAsync(Timeout, Cancellation));
-            Assert.Same(body, carried._bodyObject);
-            page.CheckValidity(pageVersion);
+            Assert.Equal(expected, snapshot);
 
             await second.MigrateOnIdleTo(target.SiloAddress);
             secondState.ReleaseBlock.TrySetResult();
@@ -1234,8 +1230,6 @@ public sealed class RetirementHandoffTests
         Assert.Equal(["first"], firstState.Calls);
         Assert.Equal(["second"], secondState.Calls);
         Assert.Equal(2, Volatile.Read(ref invocationCount));
-        await WaitUntilAsync(() => carried!._bodyObject is null);
-        Assert.Null(carried!._bodyObject);
     }
 
     [Fact]
@@ -1290,7 +1284,7 @@ public sealed class RetirementHandoffTests
         {
             if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
             {
-                var package = Assert.Single((List<GrainMigrationPackage>)context.Request.GetArgument(0)!);
+                var package = UnpackMigration(context);
                 var request = Assert.Single(package.Requests!);
                 await context.Invoke();
                 accepted.TrySetResult((request.SendingGrain, request.Id));
@@ -1688,9 +1682,9 @@ public sealed class RetirementHandoffTests
         RetirementHandoffState.Create(key);
         var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
 
-        // The grain is already active on the target, which therefore declines the requests without running them.
+        // An already-active destination receives the carried requests through ordinary admission.
         await PlaceOnAsync(target, () => grain.GetLocation());
-        // The value spans several of the context's buffer segments, which serializing the context would release.
+        // Sizing preserves the state which will be copied into the outgoing snapshot.
         var marker = new string('x', 10_000);
         var context = new MigrationContext(source.ServiceProvider.GetRequiredService<SerializerSessionPool>());
         Assert.True(context.TryAddValue("marker", marker));
@@ -1801,10 +1795,9 @@ public sealed class RetirementHandoffTests
         await Assert.ThrowsAnyAsync<Exception>(() => migration.Completion.WaitAsync(Timeout, Cancellation));
         Assert.Null(FindActivation(target, grainId));
 
-        // No writer can still access the rejected invocation. Cleanup covers even the request which serialization never reached.
+        // Snapshotting releases pooled source bodies before any writer can access the outgoing invocation,
+        // including requests which a failed snapshot never reached.
         migration.Deliver(laterRequests: null);
-        // Callback completion can precede the send worker's failure cleanup.
-        await WaitUntilAsync(() => page.Version != pageVersion);
         if (failure == "preparation")
         {
             Assert.IsType<UnserializableValue>(request._bodyObject);
@@ -1816,6 +1809,66 @@ public sealed class RetirementHandoffTests
         Assert.Null(later._bodyObject);
         Assert.Empty(migrationContext.Keys);
         Assert.NotEqual(pageVersion, page.Version);
+    }
+
+    [Fact]
+    public async Task MigrationSnapshot_ReleasesSourceBuffersBeforeRpcAndPreservesExpiration()
+    {
+        await using var cluster = await DeployAsync();
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var services = source.ServiceProvider;
+        var manager = services.GetRequiredService<ActivationMigrationManager>();
+        var shared = services.GetRequiredService<Orleans.Runtime.Messaging.MessageHandlerShared>();
+        var serializer = services.GetRequiredService<Orleans.Serialization.Serializer>();
+        var grainId = GrainId.Create("test", "snapshot");
+        var context = new MigrationContext(services.GetRequiredService<SerializerSessionPool>());
+        var payload = Enumerable.Repeat((byte)0x5A, 20_000).ToArray();
+        Assert.True(context.TryAddValue("payload", payload));
+        using var expired = CreateReceivedRequest(cluster, source, grainId, 1, 20_000);
+        using var live = CreateReceivedRequest(cluster, source, grainId, 2, 20_000);
+        expired.TimeToLive = TimeSpan.FromMinutes(1);
+        live.TimeToLive = TimeSpan.FromMinutes(5);
+        var page = Assert.IsType<Orleans.Runtime.Messaging.MessageReadRequest>(live._bodyObject).Body.First!;
+        var version = page.Version;
+        List<Message> requests = [expired, live];
+        var migration = new ActivationMigration(manager, CreateSourceAddress(source, grainId), target.SiloAddress,
+            new() { GrainId = grainId, MigrationContext = context, Requests = requests }, requests, routes: null, size: 0, Cancellation);
+        Assert.True(migration.TrySend());
+        var snapshot = migration.CreateSnapshot(shared);
+        Assert.Null(expired._bodyObject);
+        Assert.Null(live._bodyObject);
+        Assert.Empty(context.Keys);
+        Assert.NotEqual(version, page.Version);
+
+        // A timed-out call releases its source state while a late writer can still read the snapshot.
+        migration.Complete(new TimeoutException("Acknowledgement lost."));
+        await Assert.ThrowsAsync<TimeoutException>(() => migration.Completion);
+        snapshot.SnapshotAge = TimeSpan.FromMinutes(2);
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var received = serializer.Deserialize<GrainMigrationPackage>(serializer.SerializeToArray(snapshot));
+            received.UnpackRequests(shared);
+            try
+            {
+                Assert.True(received.MigrationContext.TryGetValue("payload", out byte[]? actual));
+                Assert.Equal(payload, actual);
+                Assert.Equal(2, received.Requests!.Count);
+                Assert.True(received.Requests[0].IsExpired);
+                Assert.False(received.Requests[1].IsExpired);
+                Assert.InRange(received.Requests[1].TimeToLive!.Value, TimeSpan.FromMinutes(2.5), TimeSpan.FromMinutes(3));
+                Assert.All(received.Requests, request =>
+                    Assert.Equal(new byte[20_000], Assert.IsType<Orleans.Runtime.Messaging.MessageReadRequest>(request._bodyObject).Body.ToArray()));
+            }
+            finally
+            {
+                received.MigrationContext.Dispose();
+                foreach (var request in received.Requests!)
+                {
+                    request.Dispose();
+                }
+            }
+        }
     }
 
     [Fact]
@@ -1938,6 +1991,15 @@ public sealed class RetirementHandoffTests
         TargetGrain = grainId,
         BodyObject = body,
     };
+
+    private static GrainMigrationPackage UnpackMigration(IIncomingGrainCallContext context)
+    {
+        var packages = (List<GrainMigrationPackage>)context.Request.GetArgument(0)!;
+        var package = Assert.Single(packages);
+        package.UnpackRequests(context.TargetContext.ActivationServices.GetRequiredService<Orleans.Runtime.Messaging.MessageHandlerShared>());
+        packages[0] = package;
+        return package;
+    }
 
     private static Orleans.Serialization.Buffers.PooledBuffer CreatePooledBuffer(byte[] contents)
     {
@@ -2062,7 +2124,7 @@ public sealed class RetirementHandoffTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Migration_AccountsForCurrentHeadersAndEachEmbeddedFramesCodecOverhead(bool previouslyMigrated)
+    public async Task Migration_AccountsForCurrentSnapshotHeaders(bool previouslyMigrated)
     {
         const int BodyLimit = 1024 * 1024;
         var frameLength = previouslyMigrated ? 950 : 1047;
@@ -2100,10 +2162,10 @@ public sealed class RetirementHandoffTests
                 buffer.Reset();
             }
 
-            // The frames fit before codec tags and length prefixes are included, but the serialized list alone exceeds the limit.
+            // Earlier cache headers can push a formerly fitting snapshot over the wire-size limit.
             Assert.True(frameLength * requests.Count < BodyLimit - 1024);
-            var serialized = services.GetRequiredService<Orleans.Serialization.Serializer>().SerializeToArray(requests);
-            Assert.True(serialized.Length > BodyLimit);
+            var serialized = Orleans.Runtime.Messaging.MessageFrames.WriteRequests(shared, requests);
+            Assert.Equal(previouslyMigrated, serialized.Length > BodyLimit);
             ActivationMigration? migration = null;
             await manager.RunOrQueueTask(() =>
             {

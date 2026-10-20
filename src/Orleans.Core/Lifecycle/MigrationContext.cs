@@ -36,31 +36,48 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
     private Dictionary<string, (int Offset, int Length)> _indices = new(StringComparer.Ordinal);
 
     [NonSerialized]
-    private PooledBuffer _buffer = new();
+    private ArrayBufferWriter<byte> _buffer = new();
 
-    // PooledBuffer's codec consumes its value. Transfer ownership to it so disposing this context after sending is safe.
+    // Keep the shipped wire representation. Migration is infrequent, so copy into the consuming codec's buffer.
     [Id(1), Immutable]
-    [System.Diagnostics.DebuggerBrowsable(System.Diagnostics.DebuggerBrowsableState.Never)]
     internal PooledBuffer SerializedBuffer
     {
         get
         {
             lock (_lock)
             {
-                var result = _buffer;
-                _buffer = default;
+                var result = new PooledBuffer();
+                result.Write(_buffer.WrittenSpan);
                 return result;
             }
         }
-        set => _buffer = value;
+        set
+        {
+            try
+            {
+                _buffer = new();
+                value.CopyTo(ref _buffer);
+            }
+            finally
+            {
+                value.Dispose();
+            }
+        }
+    }
+
+    internal MigrationContext CreateSnapshot()
+    {
+        lock (_lock)
+        {
+            var result = new MigrationContext(_sessionPool) { _indices = new(_indices, StringComparer.Ordinal) };
+            result._buffer.Write(_buffer.WrittenSpan);
+            return result;
+        }
     }
 
     /// <summary>
     /// Gets an upper bound on the serialized size of this context.
     /// </summary>
-    /// <remarks>
-    /// Serializing a context releases its buffer, so callers which must not consume the context use this bound instead of measuring it.
-    /// </remarks>
     internal long GetMaxSerializedSize()
     {
         // Each entry adds its key and two variable-length integers, each with field framing.
@@ -68,7 +85,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
         const int ContextOverhead = 64;
         lock (_lock)
         {
-            long size = ContextOverhead + _buffer.Length;
+            long size = ContextOverhead + _buffer.WrittenCount;
             foreach (var key in _indices.Keys)
             {
                 size += System.Text.Encoding.UTF8.GetByteCount(key) + EntryOverhead;
@@ -82,7 +99,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
     {
         lock (_lock)
         {
-            _indices.Add(key, (_buffer.Length, value.Length));
+            _indices.Add(key, (_buffer.WrittenCount, value.Length));
             _buffer.Write(value);
         }
     }
@@ -91,9 +108,9 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
     {
         lock (_lock)
         {
-            var startOffset = _buffer.Length;
+            var startOffset = _buffer.WrittenCount;
             valueWriter(value, this);
-            var endOffset = _buffer.Length;
+            var endOffset = _buffer.WrittenCount;
             _indices.Add(key, (startOffset, endOffset - startOffset));
         }
     }
@@ -107,14 +124,14 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
                 ref var indexValue = ref CollectionsMarshal.GetValueRefOrAddDefault(_indices, key, out var exists);
                 if (!exists)
                 {
-                    var startOffset = _buffer.Length;
+                    var startOffset = _buffer.WrittenCount;
 
                     using var session = _sessionPool.GetSession();
                     var writer = Writer.Create(this, session);
                     codec.WriteField(ref writer, 0, typeof(T), value!);
                     writer.Commit();
 
-                    var endOffset = _buffer.Length;
+                    var endOffset = _buffer.WrittenCount;
                     indexValue = (Offset: startOffset, Length: endOffset - startOffset);
                     return true;
                 }
@@ -131,8 +148,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
         lock (_lock)
         {
             _indices = [];
-            _buffer.Reset();
-            _buffer = default;
+            _buffer = new();
         }
     }
 
@@ -144,7 +160,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
         {
             if (_indices.TryGetValue(key, out var record))
             {
-                value = _buffer.AsReadOnlySequence().Slice(record.Offset, record.Length);
+                value = new ReadOnlySequence<byte>(_buffer.WrittenMemory.Slice(record.Offset, record.Length));
                 return true;
             }
         }
@@ -160,7 +176,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
             if (_indices.TryGetValue(key, out var record) && _sessionPool.CodecProvider.TryGetCodec<T>() is { } codec)
             {
                 using var session = _sessionPool.GetSession();
-                var source = _buffer.Slice(record.Offset, record.Length);
+                var source = _buffer.WrittenMemory.Slice(record.Offset, record.Length);
                 var reader = Reader.Create(source, session);
                 var field = reader.ReadFieldHeader();
                 value = codec.ReadValue(ref reader, field);
@@ -172,7 +188,6 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
         return false;
     }
 
-    // Implemented on this class to prevent the need to repeatedly box & unbox _buffer.
     void IBufferWriter<byte>.Advance(int count) => _buffer.Advance(count);
     Memory<byte> IBufferWriter<byte>.GetMemory(int sizeHint) => _buffer.GetMemory(sizeHint);
     Span<byte> IBufferWriter<byte>.GetSpan(int sizeHint) => _buffer.GetSpan(sizeHint);
