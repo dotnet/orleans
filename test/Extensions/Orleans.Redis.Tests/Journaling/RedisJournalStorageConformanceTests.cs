@@ -20,6 +20,7 @@ public sealed class RedisJournalStorageConformanceTests : JournalStorageConforma
 
     protected override async ValueTask<IJournalStorageProvider> CreateProviderAsync(JournalStorageFaultInjector? faults, CancellationToken cancellationToken)
     {
+        TestUtils.CheckForRedis();
         var connectionString = TestDefaultConfiguration.RedisConnectionString
             ?? throw new InvalidOperationException("Redis connection string is not configured.");
         _multiplexer ??= await ConnectionMultiplexer.ConnectAsync(connectionString);

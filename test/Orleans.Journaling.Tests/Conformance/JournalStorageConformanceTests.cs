@@ -511,81 +511,81 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
                     await ExpectWriteAsync(() => writer.DeleteAsync(CancellationToken), model.Delete);
                     break;
                 case ModelOperationKind.ForeignAppend:
-                {
-                    var other = CreateStorage(journalId);
-                    await ReadContentAsync(other);
-                    await other.AppendAsync(new ReadOnlySequence<byte>(operation.Data), CancellationToken);
-                    model.ForeignAppend(operation.Data);
-                    break;
-                }
+                    {
+                        var other = CreateStorage(journalId);
+                        await ReadContentAsync(other);
+                        await other.AppendAsync(new ReadOnlySequence<byte>(operation.Data), CancellationToken);
+                        model.ForeignAppend(operation.Data);
+                        break;
+                    }
 
                 case ModelOperationKind.ForeignDelete:
-                {
-                    var other = CreateStorage(journalId);
-                    await ReadContentAsync(other);
-                    await other.DeleteAsync(CancellationToken);
-                    model.ForeignDelete();
-                    break;
-                }
+                    {
+                        var other = CreateStorage(journalId);
+                        await ReadContentAsync(other);
+                        await other.DeleteAsync(CancellationToken);
+                        model.ForeignDelete();
+                        break;
+                    }
 
                 case ModelOperationKind.Read:
                     Assert.Equal(model.Content, await ReadContentAsync(writer));
                     model.Read(exists: !History(writer).WriteVersion.IsAbsent);
                     break;
                 case ModelOperationKind.OversizedAppend when MaxAppendBytes is { } maxAppendBytes:
-                {
-                    var versionBefore = History(writer).WriteVersion;
-                    var oversized = LargeSequence(maxAppendBytes + 1, operation.Data[0]);
-                    await Assert.ThrowsAnyAsync<Exception>(() => writer.AppendAsync(oversized, CancellationToken).AsTask());
-                    Assert.Equal(versionBefore, History(writer).WriteVersion);
-                    break;
-                }
-
-                case ModelOperationKind.AbortedAppend when SupportedFaults.Contains(JournalStorageFaultKind.AbortRequestBody):
-                {
-                    Faults.Arm(JournalStorageFaultKind.AbortRequestBody, count: int.MaxValue);
-                    Exception? exception;
-                    try
                     {
-                        exception = await CaptureAsync(() => writer.AppendAsync(new ReadOnlySequence<byte>(operation.Data), CancellationToken));
-                    }
-                    finally
-                    {
-                        Faults.Disarm();
-                    }
-
-                    Assert.NotNull(exception);
-                    await RecoverAfterFailureAsync();
-                    break;
-                }
-
-                case ModelOperationKind.LostResponseAppend when SupportedFaults.Contains(JournalStorageFaultKind.LoseResponse):
-                {
-                    Faults.Arm(JournalStorageFaultKind.LoseResponse, count: 1);
-                    var exception = await CaptureAsync(() => writer.AppendAsync(new ReadOnlySequence<byte>(operation.Data), CancellationToken));
-                    Faults.Disarm();
-                    if (exception is null)
-                    {
-                        Assert.False(model.IsWriterStale);
-                        model.Append(operation.Data);
+                        var versionBefore = History(writer).WriteVersion;
+                        var oversized = LargeSequence(maxAppendBytes + 1, operation.Data[0]);
+                        await Assert.ThrowsAnyAsync<Exception>(() => writer.AppendAsync(oversized, CancellationToken).AsTask());
+                        Assert.Equal(versionBefore, History(writer).WriteVersion);
                         break;
                     }
 
-                    // The outcome is indeterminate: the segment was written whole or not at all.
-                    var content = await ReadContentAsync(CreateStorage(journalId));
-                    var withSegment = Concat([model.Content, operation.Data]);
-                    var applied = !model.IsWriterStale && content.AsSpan().SequenceEqual(withSegment);
-                    Assert.True(
-                        applied || content.AsSpan().SequenceEqual(model.Content),
-                        $"Read {content.Length} bytes after a lost append response; expected {model.Content.Length} or {withSegment.Length}.");
-                    if (applied)
+                case ModelOperationKind.AbortedAppend when SupportedFaults.Contains(JournalStorageFaultKind.AbortRequestBody):
                     {
-                        model.ForeignAppend(operation.Data);
+                        Faults.Arm(JournalStorageFaultKind.AbortRequestBody, count: int.MaxValue);
+                        Exception? exception;
+                        try
+                        {
+                            exception = await CaptureAsync(() => writer.AppendAsync(new ReadOnlySequence<byte>(operation.Data), CancellationToken));
+                        }
+                        finally
+                        {
+                            Faults.Disarm();
+                        }
+
+                        Assert.NotNull(exception);
+                        await RecoverAfterFailureAsync();
+                        break;
                     }
 
-                    await RecoverAfterFailureAsync();
-                    break;
-                }
+                case ModelOperationKind.LostResponseAppend when SupportedFaults.Contains(JournalStorageFaultKind.LoseResponse):
+                    {
+                        Faults.Arm(JournalStorageFaultKind.LoseResponse, count: 1);
+                        var exception = await CaptureAsync(() => writer.AppendAsync(new ReadOnlySequence<byte>(operation.Data), CancellationToken));
+                        Faults.Disarm();
+                        if (exception is null)
+                        {
+                            Assert.False(model.IsWriterStale);
+                            model.Append(operation.Data);
+                            break;
+                        }
+
+                        // The outcome is indeterminate: the segment was written whole or not at all.
+                        var content = await ReadContentAsync(CreateStorage(journalId));
+                        var withSegment = Concat([model.Content, operation.Data]);
+                        var applied = !model.IsWriterStale && content.AsSpan().SequenceEqual(withSegment);
+                        Assert.True(
+                            applied || content.AsSpan().SequenceEqual(model.Content),
+                            $"Read {content.Length} bytes after a lost append response; expected {model.Content.Length} or {withSegment.Length}.");
+                        if (applied)
+                        {
+                            model.ForeignAppend(operation.Data);
+                        }
+
+                        await RecoverAfterFailureAsync();
+                        break;
+                    }
 
                 default:
                     // The provider has no per-append limit or fault injection, so the operation is an ordinary append.

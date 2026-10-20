@@ -4,8 +4,10 @@ namespace Orleans.Journaling;
 /// Identifies a version of a journal's content in storage: the value which a storage instance's write precondition compares.
 /// </summary>
 /// <remarks>
-/// Two versions of one journal are equal only if no content write or deletion changed the journal between them. A metadata
-/// update leaves the version unchanged unless the provider rewrites the stored journal to apply it, as the S3 provider does.
+/// Equal versions of an existing journal identify the same content version, with no intervening content write or deletion.
+/// All observations of an absent journal use <see cref="Absent"/>: equality confirms absence at both observations, including
+/// when another writer created and deleted the journal between them. A metadata update leaves the version unchanged unless
+/// the provider rewrites the stored journal to apply it, as the S3 provider does.
 /// Providers create versions with <see cref="Create"/>; the default value is <see cref="Unknown"/>.
 /// </remarks>
 internal readonly record struct JournalStorageVersion
@@ -57,8 +59,9 @@ internal readonly record struct JournalStorageVersion
 /// <remarks>
 /// Every journal storage provider in this repository implements this interface. A caller which already writes through a storage
 /// instance reads the journal with <see cref="ReadHistoryAsync"/> and compares the returned version with
-/// <see cref="WriteVersion"/>: equal versions mean the content read is exactly the content this instance last read or wrote,
-/// and that no other writer changed the journal since.
+/// <see cref="WriteVersion"/>: equal versions of an existing journal mean the content read is exactly the content this instance
+/// last read or wrote, and that no other writer changed the journal since. Equal <see cref="JournalStorageVersion.Absent"/>
+/// versions confirm absence at both observations, including after an intervening creation and deletion.
 /// </remarks>
 internal interface IJournalHistoryStorage
 {
