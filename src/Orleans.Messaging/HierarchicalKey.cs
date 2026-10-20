@@ -198,7 +198,7 @@ public readonly struct HierarchicalKey : ISpanFormattable, IEquatable<Hierarchic
     public override bool Equals(object? obj) => obj is HierarchicalKey other && Equals(other);
 
     /// <inheritdoc/>
-    public override int GetHashCode() => _value?.GetHashCode() ?? 0;
+    public override int GetHashCode() => _value is null ? 0 : StringComparer.Ordinal.GetHashCode(_value);
 
     /// <summary>Compares complete ordinal key values.</summary>
     /// <param name="left">The first identity.</param>
