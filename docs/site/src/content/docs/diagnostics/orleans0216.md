@@ -23,7 +23,7 @@ Code outside a grain and outside a durable task body calls `Post` on a durable t
 
 `Post` is synchronous: it stages the start in the durable outbox of the grain which runs the calling code, and the start commits with that grain's next journal write, together with the state changes which the calling code made. A grain method, a durable task body, and a `DurableTask.Run` delegate run in a grain. A client has no durable outbox, so `Post` throws `InvalidOperationException` there, and the checkout fails.
 
-For how tasks start, see [Starting and observing tasks](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#starting-and-observing-tasks).
+For how tasks start, see [Starting and observing tasks](../grains/durable-tasks.md#starting-and-observing-tasks).
 
 ## How to fix violations
 

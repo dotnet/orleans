@@ -30,7 +30,7 @@ When a deployment removes the welcome email while executions are pending, the re
 
 Distinct names keep each call site's identifier when other call sites are added, removed, or reordered.
 
-For identifiers and versioning, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
+For identifiers and versioning, see [Writing replay-safe workflows](../grains/durable-tasks.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 

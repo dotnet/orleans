@@ -25,7 +25,7 @@ A task records the first value which a sender delivers for each signal name, and
 
 In the example, the first review rejects the contract. Every later round's wait returns that rejection at once, so the negotiation ends after one review, and the reviewers' later decisions are rejected.
 
-For signals, see [Signals](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#signals).
+For signals, see [Signals](../grains/durable-tasks.md#signals).
 
 ## How to fix violations
 

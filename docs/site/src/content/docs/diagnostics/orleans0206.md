@@ -23,7 +23,7 @@ A local variable holds a definition which an `async DurableTask` method in the s
 
 An `async DurableTask` method returns a single-use definition: it holds the method's state machine, which runs once. The first iteration of the loop runs the definition. The second iteration's run throws `InvalidOperationException` with the message `A deferred durable task definition can execute only once.`, which fails the task after its first reminder.
 
-For definitions, see [Starting and observing tasks](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#starting-and-observing-tasks).
+For definitions, see [Starting and observing tasks](../grains/durable-tasks.md#starting-and-observing-tasks).
 
 ## How to fix violations
 
