@@ -21,9 +21,11 @@ Durable task code changes an object which grain state holds, in place: it assign
 
 ## Rule description
 
-Journaled grain state records each change which passes through its API, such as an assignment to `IDurableValue<T>.Value` or `IPersistentState<T>.State`, or to an entry of a durable dictionary. The change commits with the grain's next journal write.
+Durable values and collections record each change which passes through their APIs, such as an assignment to `IDurableValue<T>.Value` or to an entry of a durable dictionary. The change commits with the grain's next journal write.
 
-A change made in place to an object which the state holds bypasses the API. The object in memory holds the change, and no record holds it until another change writes the whole value. In the example, the task completes and its result commits while the journal holds the wishlist without the new item. An activation which recovers the grain from the journal loses the item.
+A change made in place to an object which these operation-tracked values or collection entries hold bypasses the API. The object in memory holds the change, and no record holds it until another change writes the whole value. In the example, the task completes and its result commits while the journal holds the wishlist without the new item. An activation which recovers the grain from the journal loses the item.
+
+Journal-backed `IPersistentState<T>` records its whole state on each journal write, including in-place changes to its serialized members and collections. The rule also recommends immutable values and assignment for this state in durable task code.
 
 Value types, records whose members are init-only, and immutable collections change through assignment, which the API records, so the rule reports none of them.
 
