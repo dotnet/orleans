@@ -23,7 +23,7 @@ A `try` block in a durable task body contains durable operations, and one of its
 
 A durable task observes two kinds of cancellation through `OperationCanceledException`:
 
-- **Task cancellation** is durable: a caller requests it, such as with `CancelAsync` on the task's handle, and the host records it with the task. Every attempt, including a replay, observes it, and the body decides the task's outcome, for example by compensating.
+- **Task cancellation** is durable: a caller requests it, such as with `CancelAsync` on the task's handle, and the host records it with the task, together with the point at which each execution first observes it. A replay observes it at that same point, and the body decides the task's outcome, for example by compensating.
 - **Attempt cancellation** stops the current run of the body, for example when the activation stops, or the task is aborted or deleted. The attempt's later durable operations throw `DurableTaskAttemptCanceledException`, and its changes to journaled state commit with the grain's next journal write. A stopping activation's task continues in a new attempt.
 
 An unfiltered handler treats both alike. When the host cancels the attempt during the hold period, the handler in the example compensates for a booking which nobody canceled: its state change commits, and an external call which it makes, such as releasing the room in a booking system, takes effect, while the next attempt replays the task and confirms the booking.
