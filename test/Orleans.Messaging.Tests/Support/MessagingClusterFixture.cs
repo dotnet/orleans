@@ -52,6 +52,8 @@ public class MessagingClusterFixture : IAsyncLifetime
         _cluster ?? throw new InvalidOperationException($"The cluster is available after {nameof(InitializeAsync)} builds it.");
 
     public IClusterClient Client => Cluster.Client!;
+    public DateTimeOffset JobNow => Cluster.Silos[0].ServiceProvider
+        .GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs).GetUtcNow();
     public FakeTimeProvider Clock { get; }
     public ControlledJournalStorageProvider Storage { get; }
     public MessagingMetricProbe Metrics { get; }
@@ -128,7 +130,7 @@ public class MessagingClusterFixture : IAsyncLifetime
         services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs, new TestJobClock(Clock));
 
     /// <summary>A Durable Jobs clock which follows real time plus the test clock's advance since the fixture started.</summary>
-    private sealed class FollowingJobClock(TimeProvider clock, DateTimeOffset clockStart) : TimeProvider
+    internal sealed class FollowingJobClock(TimeProvider clock, DateTimeOffset clockStart) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => System.GetUtcNow() + (clock.GetUtcNow() - clockStart);
     }
