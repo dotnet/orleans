@@ -512,22 +512,21 @@ namespace Orleans.Serialization.Buffers
             if (IsArcBufferInput)
             {
                 ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
-                var result = input.Slice(checked((int)(Position - _sequenceOffset)), length);
+                var result = input.Slice(_bufferPos, length);
                 Skip(length);
                 return result;
             }
 
-            using var output = new ArcBufferWriter();
-            while (length > 0)
+            var output = new ArcBufferWriter();
+            try
             {
-                var destination = output.GetSpan();
-                var count = Math.Min(length, destination.Length);
-                ReadBytes(destination[..count]);
-                output.AdvanceWriter(count);
-                length -= count;
+                ReadBytes(ref output, length);
+                return output.ConsumeSlice(output.Length);
             }
-
-            return output.ConsumeSlice(output.Length);
+            finally
+            {
+                output.Dispose();
+            }
         }
 
         /// <summary>

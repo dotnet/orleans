@@ -1,12 +1,17 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Session;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.UnitTests;
 
@@ -87,6 +92,158 @@ public sealed class ArcBufferCodecTests
         finally
         {
             original.Dispose();
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CustomCopier_DisposedAcquisitionIsNotReleasedAgainOnFailure(bool typed)
+    {
+        var localCopier = new DisposingThrowingCopier();
+        var registrations = new ServiceCollection().AddSerializer();
+        registrations.Configure<TypeManifestOptions>(options => options.AddSerializer<ArcCopyFailureMember>(
+            _ => throw new NotSupportedException(), _ => localCopier));
+        using var services = registrations.BuildServiceProvider();
+        using var source = new ArcBufferWriter();
+        var expected = Bytes(50037);
+        source.Write(expected);
+        using var original = source.PeekSlice(source.Length);
+        var pages = original.Pages.ToArray();
+        var before = pages.Select(page => page.ReferenceCount).ToArray();
+        var value = new ArcCopyFailureMember { Buffer = original };
+        localCopier.OnAcquired = () =>
+            Assert.Equal(before.Select(count => count + 1), pages.Select(page => page.ReferenceCount));
+        localCopier.OnDisposed = () =>
+            Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+
+        if (typed)
+        {
+            Assert.Throws<IOException>(() => services.GetRequiredService<DeepCopier<ArcCopyFailureMember>>().Copy(value));
+        }
+        else
+        {
+            Assert.Throws<IOException>(() => services.GetRequiredService<DeepCopier>().Copy((object)value));
+        }
+
+        Assert.Equal(1, localCopier.Calls);
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+        source.Dispose();
+        Assert.All(pages, page => Assert.Equal(1, page.ReferenceCount));
+        Assert.Equal(expected, original.ToArray());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CustomCodec_DisposedAcquisitionIsNotReleasedAgainOnFailure(bool typed)
+    {
+        var localCodec = new DisposingThrowingCodec();
+        var registrations = new ServiceCollection().AddSerializer();
+        registrations.Configure<TypeManifestOptions>(options => options.AddSerializer<ArcCopyFailureMember>(
+            _ => localCodec, _ => throw new NotSupportedException()));
+        using var services = registrations.BuildServiceProvider();
+        using var source = new ArcBufferWriter();
+        var expected = Bytes(50037);
+        source.Write(expected);
+        using var original = source.PeekSlice(source.Length);
+        using var wire = new ArcBufferWriter();
+        wire.Write(services.GetRequiredService<Serializer<ArcBuffer>>().SerializeToArray(original));
+        using var input = wire.PeekSlice(wire.Length);
+        var pages = input.Pages.ToArray();
+        var before = pages.Select(page => page.ReferenceCount).ToArray();
+        var expectedWire = input.ToArray();
+        localCodec.OnAcquired = () =>
+            Assert.Equal(before.Select(count => count + 1), pages.Select(page => page.ReferenceCount));
+        localCodec.OnDisposed = () =>
+            Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+
+        if (typed)
+        {
+            Assert.Throws<IOException>(() => services.GetRequiredService<Serializer<ArcCopyFailureMember>>().Deserialize(input, session));
+        }
+        else
+        {
+            Assert.Throws<IOException>(() => services.GetRequiredService<Serializer>().Deserialize<ArcCopyFailureMember>(input, session));
+        }
+
+        Assert.Equal(1, localCodec.Calls);
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+        wire.Dispose();
+        Assert.All(pages, page => Assert.Equal(1, page.ReferenceCount));
+        Assert.Equal(expectedWire, input.ToArray());
+        Assert.Equal(expected, original.ToArray());
+    }
+
+    [Fact]
+    public void GeneratedContainer_ArcValuePreservesFollowingSharedReferences()
+    {
+        using var services = Services();
+        using var source = new ArcBufferWriter();
+        var expected = Bytes(50037);
+        source.Write(expected);
+        using var original = source.PeekSlice(source.Length);
+        var shared = new List<int> { 17, 29, 43 };
+        var value = new ArcReferenceContainer { Buffer = original, First = shared, Second = shared };
+        var serializer = services.GetRequiredService<Serializer<ArcReferenceContainer>>();
+        var decoded = Assert.IsType<ArcReferenceContainer>(serializer.Deserialize(serializer.SerializeToArray(value)));
+        using var decodedBuffer = decoded.Buffer;
+        Assert.Equal(expected, decodedBuffer.ToArray());
+        Assert.Equal(shared, decoded.First);
+        Assert.Same(decoded.First, decoded.Second);
+        Assert.NotSame(shared, decoded.First);
+    }
+
+    private sealed class DisposingThrowingCopier : IDeepCopier<ArcCopyFailureMember>
+    {
+        public Action OnAcquired { get; set; } = null!;
+        public Action OnDisposed { get; set; } = null!;
+        public int Calls { get; private set; }
+        [return: NotNullIfNotNull(nameof(input))]
+        public ArcCopyFailureMember? DeepCopy(ArcCopyFailureMember? input, CopyContext context)
+        {
+            Calls++;
+            // A custom implementation can discharge ownership before propagating a later failure.
+            var acquired = new ArcBufferCopier().DeepCopy(input!.Buffer, context);
+            try
+            {
+                OnAcquired();
+            }
+            finally
+            {
+                acquired.Dispose();
+            }
+
+            OnDisposed();
+            throw new IOException("Custom copy failed after local cleanup.");
+        }
+    }
+
+    private sealed class DisposingThrowingCodec : IFieldCodec<ArcCopyFailureMember>
+    {
+        public Action OnAcquired { get; set; } = null!;
+        public Action OnDisposed { get; set; } = null!;
+        public int Calls { get; private set; }
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta,
+            Type? expectedType, ArcCopyFailureMember? value) where TBufferWriter : IBufferWriter<byte>
+            => throw new NotSupportedException();
+
+        public ArcCopyFailureMember ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        {
+            Calls++;
+            var acquired = new ArcBufferCodec().ReadValue(ref reader, field);
+            try
+            {
+                OnAcquired();
+            }
+            finally
+            {
+                acquired.Dispose();
+            }
+
+            OnDisposed();
+            throw new IOException("Custom read failed after local cleanup.");
         }
     }
 
@@ -187,6 +344,137 @@ public sealed class ArcBufferCodecTests
         empty.Dispose();
         try { emptyReader.ReadOwnedBuffer(1); Assert.Fail("Truncated Arc input must throw."); }
         catch (IndexOutOfRangeException) { }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(7)]
+    public void ArcReaderInput_SliceIsRelativeToMostRecentlyReturnedSpan(int offset)
+    {
+        using var source = new ArcBufferWriter();
+        var expected = Bytes(ArcBufferWriter.MinimumPageSize * 3 + 37);
+        source.Write(expected);
+        using var full = source.PeekSlice(source.Length);
+        using var input = full.Slice(offset, full.Length - offset - 11);
+        var pages = input.Pages.ToArray();
+        Assert.Equal(4, pages.Length);
+        var before = pages.Select(page => page.ReferenceCount).ToArray();
+        var adaptor = new ArcBufferReaderInput(in input);
+        var absoluteOffset = offset;
+
+        for (var i = 0; i < pages.Length; i++)
+        {
+            var pageOffset = i == 0 ? offset : 0;
+            var span = adaptor.GetNext();
+            var spanLength = Math.Min(pages[i].Length - pageOffset, full.Length - 11 - absoluteOffset);
+            Assert.Equal(spanLength, span.Length);
+            Assert.Equal(expected.AsSpan(absoluteOffset, spanLength).ToArray(), span.ToArray());
+            Assert.Equal(absoluteOffset + spanLength - offset, adaptor.Position);
+
+            // Offset zero must select this span's page, not restart at the original input.
+            using (var owned = adaptor.Slice(0, 7))
+            {
+                Assert.Same(pages[i], owned.First);
+                Assert.Equal(pageOffset, owned.Offset);
+                Assert.Equal(expected.AsSpan(absoluteOffset, 7).ToArray(), owned.ToArray());
+                Assert.Equal(before.Select((count, index) => count + (index == i ? 1 : 0)),
+                    pages.Select(page => page.ReferenceCount));
+            }
+
+            Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+            if (i + 1 < pages.Length)
+            {
+                // An offset at the span's end normalizes onto the next page without pinning this one.
+                using (var boundary = adaptor.Slice(span.Length, 7))
+                {
+                    Assert.Same(pages[i + 1], boundary.First);
+                    Assert.Equal(0, boundary.Offset);
+                    Assert.Equal(expected.AsSpan(absoluteOffset + spanLength, 7).ToArray(), boundary.ToArray());
+                    Assert.Equal(before.Select((count, index) => count + (index == i + 1 ? 1 : 0)),
+                        pages.Select(page => page.ReferenceCount));
+                }
+
+                Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+            }
+
+            absoluteOffset += spanLength;
+        }
+
+        Assert.Equal(input.Length, adaptor.Position);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(7)]
+    public void ReadOwnedBuffer_SequentialSlicesPinOnlyCoveredPages(int offset)
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        using var source = new ArcBufferWriter();
+        source.GetSpan(ArcBufferWriter.MinimumPageSize * 2);
+        source.GetSpan(ArcBufferWriter.MinimumPageSize * 4);
+        var expected = Bytes(ArcBufferWriter.MinimumPageSize * 10 + 37);
+        source.Write(expected);
+        using var full = source.PeekSlice(source.Length);
+        Assert.Equal(0, full.First!.Length);
+        Assert.Equal(0, full.First.Next!.Length);
+        // Peek preserves the consecutive leading empty pages; Slice(0) would normalize past them.
+        using var input = offset == 0 ? source.PeekSlice(source.Length) : full.Slice(offset, full.Length - offset - 11);
+        if (offset == 0) Assert.Same(full.First, input.First);
+        var pages = full.Pages.ToArray();
+        var before = pages.Select(page => page.ReferenceCount).ToArray();
+        const int globalOffset = 113;
+        var reader = new Reader<ArcBufferReaderInput>(new ArcBufferReaderInput(in input), session, globalOffset);
+        var firstDataPage = pages.First(page => page.Length > 0);
+        var firstBoundary = firstDataPage.Length - offset;
+
+        // Leave three bytes, cross the boundary, then begin a read at an exact page boundary.
+        AssertOwnedRead(ref reader, firstBoundary - 3, offset, globalOffset, expected, pages, before);
+        AssertOwnedRead(ref reader, 9, offset, globalOffset, expected, pages, before);
+        var nextPage = firstDataPage.Next!;
+        AssertOwnedRead(ref reader, nextPage.Length - 6, offset, globalOffset, expected, pages, before);
+        AssertOwnedRead(ref reader, 7, offset, globalOffset, expected, pages, before);
+
+        var parentPosition = reader.Position;
+        reader.ForkFrom(globalOffset + firstBoundary - 2, out var fork);
+        fork.ForkFrom(globalOffset + firstBoundary + 1, out var nested);
+        AssertOwnedRead(ref nested, nextPage.Length, offset, globalOffset, expected, pages, before);
+        AssertOwnedRead(ref nested, 3, offset, globalOffset, expected, pages, before);
+        Assert.Equal(parentPosition, reader.Position);
+        Assert.Equal(globalOffset + firstBoundary - 2, fork.Position);
+        AssertOwnedRead(ref reader, (int)reader.Remaining, offset, globalOffset, expected, pages, before);
+        Assert.Equal(globalOffset + input.Length, reader.Position);
+        Assert.Equal(0, reader.Remaining);
+    }
+
+    private static void AssertOwnedRead(ref Reader<ArcBufferReaderInput> reader, int length, int inputOffset,
+        int globalOffset, byte[] expected, ArcBufferPage[] pages, int[] before)
+    {
+        var position = reader.Position;
+        var remaining = reader.Remaining;
+        var start = checked((int)(position - globalOffset)) + inputOffset;
+        var value = reader.ReadOwnedBuffer(length);
+        try
+        {
+            Assert.Equal(expected.AsSpan(start, length).ToArray(), value.ToArray());
+            Assert.Equal(position + length, reader.Position);
+            Assert.Equal(remaining - length, reader.Remaining);
+            var pageStart = 0;
+            for (var i = 0; i < pages.Length; i++)
+            {
+                var pageEnd = pageStart + pages[i].Length;
+                // Independent physical-range oracle: empty and earlier pages acquire no pin.
+                var covered = pages[i].Length > 0 && pageStart < start + length && pageEnd > start;
+                Assert.Equal(before[i] + (covered ? 1 : 0), pages[i].ReferenceCount);
+                pageStart = pageEnd;
+            }
+        }
+        finally
+        {
+            value.Dispose();
+        }
+
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
     }
 
     [Theory]
@@ -655,4 +943,20 @@ public sealed class ArcContainer
 {
     [Id(0)]
     public ArcBuffer Buffer { get; set; }
+}
+
+public sealed class ArcCopyFailureMember
+{
+    public ArcBuffer Buffer { get; set; }
+}
+
+[GenerateSerializer]
+public sealed class ArcReferenceContainer
+{
+    [Id(0)]
+    public ArcBuffer Buffer { get; set; }
+    [Id(1)]
+    public List<int> First { get; set; } = new();
+    [Id(2)]
+    public List<int> Second { get; set; } = new();
 }
