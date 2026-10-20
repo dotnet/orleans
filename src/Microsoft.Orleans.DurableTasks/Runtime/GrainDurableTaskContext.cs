@@ -505,7 +505,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     }
 
     /// <remarks>
-    /// Only durable grain calls can be detached: the target recovers a root task from its serialized request. A detached
+    /// This host detaches durable grain calls: the target recovers the root task from the call's serialized request. The
+    /// abstraction detaches any <see cref="ISchedulableTask"/>, so this host rejects the others with
+    /// <see cref="NotSupportedException"/> before recording or sending anything. A detached
     /// start is recorded under <c>$detach:{target}:{rootId}</c>, so each detached task which this execution starts has
     /// one record, independently of other operations which a deployment adds or removes.
     /// </remarks>
