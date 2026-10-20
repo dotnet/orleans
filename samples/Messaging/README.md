@@ -64,8 +64,8 @@ will not replace its declared versions.
    `Send` and `SendReply` serialize the records, and typed `inbox.Register` handlers
    receive them decoded.
 3. `OrderGrain.ReserveAsync` stages the command and awaits `WriteStateAsync`; the
-   outbox delivers it once that write is durable and retries until the stock grain
-   answers.
+   outbox delivers it once that write is durable and retries within its original
+   absolute delivery budget.
 4. The stock handler computes the outcome locally, then sends the reply with
    `SendReply`, updates inventory, and calls `context.Complete()` in one synchronous
    block, so the reply, the inventory, and the inbox completion commit in one journal
@@ -76,9 +76,10 @@ will not replace its declared versions.
    the outcome in its journaled receipts and completes, and `WaitForOutcomeAsync`
    returns once that receipt is durable. Deliveries interleave with the waiting
    request, so the reply reaches the order while the host waits for it.
-6. The stock grain's inbox records each completed command ID for
-   `DeduplicationWindow`, so a redelivery of a command, such as a retry whose answer
-   was lost, is answered `Duplicate` without running the handler again.
+6. The stock grain's inbox retains each completed command's ID and immutable
+   admission cutoff. A redelivery, such as a retry whose answer was lost, receives
+   `Duplicate` while that record is retained. Compaction durably fences the cutoff;
+   a delayed repeat then receives `Expired` before the handler runs.
 
 A successful run prints:
 
@@ -101,11 +102,17 @@ and durable job. **Stopping the process discards its state.** Configure persiste
 journal and job providers to recover across process restarts. The sample journals
 its Orleans-serializable records with the `orleans-binary` journal format.
 
-Retain inbox completion records for the full supported resubmission horizon.
-After expiry, the same command ID can be admitted and executed again. A completed
-duplicate acknowledges the retained ID/time fact; callers obtain business results
+The receiver's journaled admission floor only advances, including across clock
+changes and recovery. Its cutoff fence preserves once-only effects after
+completion records are compacted. A completed duplicate acknowledges the retained
+completion fact; callers obtain business results
 from the original durable reply or query genuine business state. The originally
 committed outbox intent delivers that reply within its configured retry policy.
+An `Expired` result or sender retry exhaustion leaves earlier acceptance unknown.
+Reconcile business state by the original command ID before authorizing a new send.
+Applications which require crash-recoverable terminal action use an
+`IOutboxMessageSource` and stage their outcome and a self-addressed follow-up
+message in `OnRetired`, atomically with removing the outgoing entry.
 
 In a production order service, derive tenant ownership from trusted ingress,
 authorize command IDs, subjects, and reply destinations, and define reservation

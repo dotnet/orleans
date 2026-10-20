@@ -39,37 +39,28 @@ behavior through `AddMessaging`, and is validated at startup.
 | Setting | Default | Operational effect |
 | --- | --- | --- |
 | `MaxCapacity` | 1,000 | Bounds pending inbox messages. Every pending message, including a scheduled message waiting for its `DeliverAt` time, counts from its acceptance until it completes. New messages receive `Backpressured` at capacity; repeats of existing messages receive `Duplicate`. Messages a grain sends to itself are admitted regardless of the limit and count until they complete. |
-| `DeduplicationWindow` | 7 days | Retains completed message IDs. Budget records by processing rate multiplied by retention. Must exceed `OutboxRetryTimeout`. |
+| `DeduplicationWindow` | 7 days | Sets the lag between observed Durable Jobs time and the candidate admission floor. Snapshots compact completed IDs only when the durable floor fences their immutable cutoff. Null-cutoff records remain permanent. |
 | `RetryInitialInterval` | 1 second | Delay before the first inbox processing retry or outbox delivery retry. Each retry doubles the delay, up to 64 times this interval. |
 | `InboxRetryTimeout` | 6 hours | Moves a message to the inbox dead letters when its handler attempts keep failing for this long after the first failure. The last attempt runs when the timeout elapses, and the retrying message keeps its place in `MaxCapacity`. `TimeSpan.Zero` dead-letters at the first failure. |
-| `OutboxRetryTimeout` | 6 hours | Bounds when delivery attempts start. The timeout starts when the message is sent and restarts at the start of each attempt which the receiver answers with `Backpressured`. Once it elapses, the outbox dead-letters the message at the sender. Must be shorter than `DeduplicationWindow`. |
+| `OutboxRetryTimeout` | 6 hours | Fixes the absolute retry expiration and admission cutoff in the sending write. Backpressure and other failures use that same budget. Once it elapses, the outbox dead-letters the message at the sender. |
 | `DeadLetterRetentionPeriod` | 30 days | Removes dead letters older than this age, using the grain's clock for their timestamps and retention. |
 | `MaxRetainedDeadLetters` | 1,000 | Bounds the inbox and the outbox dead letters separately, removing the oldest first. |
 | `InboxBatchSize` | 32 | Bounds the inbox messages processed per pump pass. |
 | `OutboxBatchSize` | 32 | Bounds the delivery attempts in flight for one grain. Each attempt completes on its own and frees its slot, so a slow receiver holds one slot without delaying messages to other receivers. |
 
-Configure `OutboxRetryTimeout` and `DeduplicationWindow` uniformly across the cluster,
-with `OutboxRetryTimeout` shorter than `DeduplicationWindow` by a margin which covers
-the grain call response timeout. Each delivery attempt carries its redelivery
-deadline: the time its retries end plus the response timeout. A receiver first
-accepting a message checks that its window covers that deadline, and otherwise
-answers `DeadLettered` with
-<xref:Orleans.Messaging.DeliveryResult.DeduplicationWindowExceededCode> and records
-nothing. The sender keeps such a message in its outbox dead letters, and the receiver
-logs an error. A window too short for the cluster's retries
-therefore stops deliveries visibly instead of risking a second processing. The
-check compares the sender's and the receiver's Durable Jobs clocks, so it relies on
-clock skew between silos being much smaller than the window. Retry times and
-timeouts follow the Durable Jobs clock.
+Choose the retry budget for tolerated outages and backpressure, and the admission
+floor lag for availability and retained-history cost. Each attempt carries the
+original journaled cutoff. The receiver deduplicates tracked identities before
+checking its floor; an untracked cutoff at or below the floor returns `Expired`.
+The floor only advances and survives recovery and journal-format migration.
+Clock jumps can fence new work early or retain more history, while the cutoff
+and durable floor preserve once-only effects for the original send.
 
 Dead-letter retention applies when an activation starts and whenever a new dead
-letter is added. Expired completed IDs are removed from storage when the journal
-writes a snapshot, and duplicate checks apply the window exactly.
-
-Size completion retention across the entire producer fleet. Include reconstructed
-submissions, outage recovery, and authorized operator replay in the supported
-resubmission horizon. After a completion record expires, the same ID is processed
-again.
+letter is added. A snapshot persists its admission floor and compacted history
+atomically. In-memory completion records remain until the floor is acknowledged.
+Budget history by processing rate and the time until each cutoff is fenced,
+including outages, clock motion, and permanent records from null-cutoff deliveries.
 
 Inbox capacity supplies receiver backpressure; bound sender admission in the
 application when outbox depth grows. Set per-tenant payload and submission limits:
@@ -98,10 +89,11 @@ cost alongside other pending messages. The inbox depth counter includes them.
 | `Duplicate` | The receiver has this message ID pending or completed within retention. The outbox removes the message; business results come from a reply or query. A repeat of a message which an inbox sink rejected receives the original `DeadLettered` result instead. |
 | `Backpressured` | The receiver is at capacity. The outbox retries. Examine receiver depth, oldest message age, and handler latency. |
 | `HandlerNotFound` | The receiver has no registered handlers. The outbox logs an error and retries. Check handler registration during activation and deployment skew. |
-| `DeadLettered` | The receiver rejected the message permanently, with a reason and an optional application-defined code. The outbox removes the message, and a source-provided message retires as `Rejected` with that reason and code. For `DeduplicationWindowExceeded`, the receiver recorded nothing and the outbox also keeps the message as a dead letter. |
+| `DeadLettered` | The receiver durably rejected the message, with a reason and an optional application-defined code. The outbox removes the message, and a source-provided message retires as `Rejected` with that reason and code. |
+| `Expired` | The receiver fenced the admission cutoff. Earlier acceptance is unknown, for example after a lost acknowledgement and compaction. The outbox keeps a dead letter and retires a source-provided message as `DeadLettered`. Reconcile business state before authorizing another send. |
 | Any other status | The sender can't interpret the status, for example one from a newer receiver, so the outcome is unknown. The outbox retries until `OutboxRetryTimeout`. |
 
-`Accepted`, `Duplicate`, and `DeadLettered` are the terminal statuses.
+`Accepted`, `Duplicate`, `DeadLettered`, and `Expired` are the terminal statuses.
 
 A sender's journal write establishes durability of its outgoing message. Receiver
 acceptance establishes durability of the inbox entry. The handler's journal write
@@ -119,8 +111,8 @@ end-to-end business confirmation.
 | Grain deactivates after a handler returns | The handler called `Complete()` and `Fail(reason)` with conflicting outcomes. Ensure every branch stages exactly one outcome. |
 | Handler error logged after `Complete()` | The staged completion and outgoing messages persist. Diagnose the error using committed state. |
 | Grain deactivates after a storage or staging failure | Messaging vetoes every later journal write of the activation, and the grain deactivates. The next activation recovers the committed journal and resumes pending work. |
-| Outbox dead letter whose reason states that the retry timeout elapsed | No delivery attempt succeeded within `OutboxRetryTimeout` of the send or of the last `Backpressured` answer. Check receiver availability and handler registration, then follow the replay procedure. |
-| Outbox dead letters with `DeduplicationWindowExceeded`, and receiver errors naming the deduplication window | The receiver's `DeduplicationWindow` doesn't cover the sender's `OutboxRetryTimeout` plus the response timeout. Lengthen the window or shorten the timeout uniformly, then resend under the original IDs. |
+| Outbox dead letter whose reason states that the retry timeout elapsed | No terminal answer was recorded within the original send's `OutboxRetryTimeout`. Check receiver availability and handler registration, then reconcile the possibly accepted command before authorizing replay. |
+| Receiver admission fence or `Expired` answer | The immutable cutoff is at or below the receiver's durable floor. Inspect clock motion, outages, and business state keyed by the original ID; use the application's durable reconciliation path. |
 | Caller cancellation | An accepted write or delivery continues through its actual outcome. Query durable business status or retry with the same command ID. |
 
 Handlers follow a two-phase pattern: all asynchronous and fallible preparation uses
@@ -160,25 +152,38 @@ handler, and authorize a corrected submission. Capture the evidence before reten
 removes it, and authorize replay and diagnostic access separately from ordinary
 submissions.
 
+### Guarantee application follow-up
+
+Use an <xref:Orleans.Messaging.IOutboxMessageSource> when terminal delivery
+outcomes require application action. In
+<xref:Orleans.Messaging.IOutboxMessageSource.OnRetired*>, synchronously stage the
+terminal outcome and a self-addressed follow-up message in application journaled
+state, together with payload release. The outbox removal, outcome, and follow-up
+acceptance commit atomically. Recovery before commit retries the pending entry and
+callback; recovery after commit resumes the follow-up through the inbox's durable
+wake-up. The follow-up handler can query participants, reconcile unknown effects,
+and commit the application's next decision.
+
+`DeadLettered` retirements cover retry exhaustion, admission fencing, and source
+failure. Earlier acceptance remains unknown; `Rejected` identifies a durable
+receiver rejection. Keep source ownership registered through recovery. A callback
+exception fails the activation and preserves the last committed pending entry.
+Application outcome and work retention follow the application's business policy;
+the diagnostic dead-letter collections follow their configured capacity and age.
+
 The receiver records every inbox dead letter's message ID as processed, so the
-original ID answers `Duplicate` within `DeduplicationWindow`. An outbox dead letter
-received no terminal answer: the receiver either never accepted it or accepted it
-with the answer lost, so resending the original ID delivers it or answers
-`Duplicate`. An outbox dead letter with `DeduplicationWindowExceeded` reached a
-receiver which recorded nothing. Replay each kind accordingly.
+original send receives `Duplicate` while the completion is retained and `Expired`
+after its cutoff is fenced and its record compacted. An outbox dead letter can
+represent earlier acceptance with a lost answer. Replay follows reconciliation.
 
 To replay an outbox dead letter:
 
-1. Repair the receiver availability, handler registration, payload compatibility, or
-   window configuration issue.
-2. Resend the message through an authorized grain method with its original message
-   ID, destination, subject, and payload. Resending under the original ID is safe
-   while the receiver's `DeduplicationWindow` covers the original send, because the
-   receiver deduplicates any earlier acceptance, and for a
-   `DeduplicationWindowExceeded` dead letter, which the receiver never recorded.
-   Otherwise, reconcile receiver state first: the resend carries a new redelivery
-   deadline, so the receiver can no longer recognize an acceptance whose record
-   expired.
+1. Repair the receiver availability, handler registration, or payload compatibility
+   issue, and query participant business state by the original command ID.
+2. Reconcile the original outcome. A replay of the original logical send preserves
+   its ID, destination, subject, payload, and cutoff. Authorize a new revision ID
+   only when the business protocol permits another effect. Record its relationship
+   to the original send; a fresh cutoff creates a new admission opportunity.
 3. Record the replay disposition and remove the record with
    <xref:Orleans.Messaging.IMessagingDiagnostics.RemoveOutboxDeadLetter*>. The
    disposition, removal, and replayed message persist in the next journal write.
@@ -206,10 +211,10 @@ carries a `grain_type` tag; counters with outcomes also carry a `status` tag.
 
 | Instrument | Type | Interpretation |
 | --- | --- | --- |
-| `orleans-messaging-inbox-messages-received` | Counter | Delivery outcomes at the receiver: `accepted`, `duplicate`, `backpressured`, or `handler_not_found`. Messages a grain sends to itself record `accepted` or `duplicate` when sent. Messages an inbox sink takes record `accepted`, or `dead_lettered` when the sink dead-letters them. |
+| `orleans-messaging-inbox-messages-received` | Counter | Delivery outcomes at the receiver: `accepted`, `duplicate`, `backpressured`, `handler_not_found`, or `expired` (the cutoff is fenced). Messages a grain sends to itself record `accepted` or `duplicate` when sent. Messages an inbox sink takes record `accepted`, or `dead_lettered` when the sink dead-letters them. |
 | `orleans-messaging-inbox-messages-processed` | Counter | Handler outcomes: `success`, `retry`, or `dead_lettered`. A sink acceptance records `success`; a sink dead-letter records `dead_lettered`. |
 | `orleans-messaging-outbox-messages-sent` | Counter | Messages staged with `Send`, including messages a grain sends to itself, which bypass the outbox. |
-| `orleans-messaging-outbox-messages-delivered` | Counter | Delivery attempt outcomes at the sender: `accepted`, `duplicate`, `deadlettered` (the receiver rejected the message), `backpressured`, `handler_not_found`, or `error` (the call failed without an answer). Messages which retire without an attempt record `withdrawn` (a source withdrew the message), `expired` (the retry timeout elapsed), `source_error` (the owning source failed to provide the message), or `unprovided` (no registered source provides a recovered message). A status the sender can't interpret records its lowercase name. |
+| `orleans-messaging-outbox-messages-delivered` | Counter | Delivery attempt outcomes at the sender: `accepted`, `duplicate`, `deadlettered` (a durable receiver rejection), `expired` (the cutoff is fenced), `backpressured`, `handler_not_found`, or `error` (the call failed without an answer). Messages which retire without an attempt record `withdrawn` (a source withdrew the message), `expired` (the retry timeout elapsed), `source_error` (the owning source failed to provide the message), or `unprovided` (no registered source provides a recovered message). A status the sender can't interpret records its lowercase name. |
 | `orleans-messaging-inbox-processing-duration` | Histogram, ms | Handler processing duration. |
 | `orleans-messaging-outbox-delivery-duration` | Histogram, ms | Delivery duration. |
 | `orleans-messaging-inbox-depth` | UpDownCounter | Pending inbox messages across active grains. |
@@ -224,7 +229,7 @@ synchronously on the activation which makes them, with its `IGrainContext`:
 
 | Event | Raised |
 | --- | --- |
-| `InboxMessageReceiving` | A delivery attempt reached the inbox and isn't a duplicate, before the inbox stages anything for it. An observer's exception fails the attempt like a sink exception, so the sender retries it. |
+| `InboxMessageReceiving` | A new delivery passed deduplication and the admission fence, before the inbox stages message effects. An observer's exception fails the attempt like a sink exception, so the sender retries it. |
 | `OutboxRetryScheduled` | A failed delivery attempt was rescheduled, with its attempt count, error, and next attempt time. |
 | `OutboxMessageRetired` | A message retired as delivered, rejected, or dead-lettered, with its retirement. |
 
