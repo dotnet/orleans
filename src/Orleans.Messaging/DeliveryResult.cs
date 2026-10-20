@@ -68,10 +68,10 @@ public readonly struct DeliveryResult
         Code = code
     };
 
-    /// <summary>Creates a terminal result for a fenced send whose earlier delivery outcome is unknown.</summary>
+    /// <summary>Creates a terminal result for an expired send whose earlier delivery outcome is unknown.</summary>
     public static DeliveryResult Expired() => new()
     {
         Status = DeliveryStatus.Expired,
-        Message = "The message's admission cutoff is fenced; its earlier delivery outcome is unknown."
+        Message = "The message was sent before the receiver's deduplication window; its earlier delivery outcome is unknown."
     };
 }

@@ -1,3 +1,4 @@
+using System;
 using Orleans.Runtime;
 
 namespace Orleans.Messaging;
@@ -15,6 +16,7 @@ public readonly struct OutboxMessage
     public required GrainId ReceiverId { get; init; }
 
     /// <summary>Creates the incoming view by sharing the envelope, payload, and headers.</summary>
+    /// <param name="sentAt">The logical send's time, which every delivery of this command reuses.</param>
     /// <returns>A received message whose destination is implied by the receiving grain.</returns>
-    public InboxMessage ToInboxMessage() => new() { Envelope = Envelope };
+    public InboxMessage ToInboxMessage(DateTimeOffset sentAt) => new() { Envelope = Envelope, SentAt = sentAt };
 }

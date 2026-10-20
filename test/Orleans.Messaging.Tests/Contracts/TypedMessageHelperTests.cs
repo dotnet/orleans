@@ -1802,8 +1802,8 @@ public sealed class TypedMessageHelperTests
 
     private sealed class CountingInboxHandlerContext(InboxMessage message) : IInboxHandlerContext
     {
-        public CountingInboxHandlerContext(Envelope envelope) : this(new InboxMessage { Envelope = envelope }) { }
-        public CountingInboxHandlerContext(OutboxMessage outgoing) : this(outgoing.ToInboxMessage()) { }
+        public CountingInboxHandlerContext(Envelope envelope) : this(new InboxMessage { Envelope = envelope, SentAt = DateTimeOffset.UnixEpoch }) { }
+        public CountingInboxHandlerContext(OutboxMessage outgoing) : this(outgoing.ToInboxMessage(DateTimeOffset.UnixEpoch)) { }
 
         public InboxMessage Message { get; } = message;
         public int CompletionCount { get; private set; }
@@ -2001,7 +2001,7 @@ public sealed class TypedMessageHelperTests
         var type = new MessageType<string>(Subject, serializer);
 
         var outgoing = type.Create(MessageKey, Receiver, "shared payload € / 東京");
-        var incoming = outgoing.ToInboxMessage();
+        var incoming = outgoing.ToInboxMessage(DateTimeOffset.UnixEpoch);
         var envelope = outgoing.Envelope;
 
         Assert.Equal(MessageKey, envelope.MessageId);

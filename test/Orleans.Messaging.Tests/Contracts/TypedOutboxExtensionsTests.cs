@@ -205,7 +205,7 @@ public sealed class TypedOutboxExtensionsTests
         var type = new MessageType<string>(Subject, serializer);
         var received = new MessageType<string>("orders.reserve", serializer)
             .Create(CommandId, Owner, "incoming reserve");
-        var context = new CountingContext(received.ToInboxMessage());
+        var context = new CountingContext(received.ToInboxMessage(DateTimeOffset.UnixEpoch));
         var outbox = new StoringOutbox();
         IAddressable reference = new AddressableDestination(Destination);
 
@@ -484,7 +484,7 @@ public sealed class TypedOutboxExtensionsTests
     private static CountingContext Context(MessageId? key = null)
     {
         var messageId = key ?? CommandId;
-        if (messageId == default) return new(new InboxMessage { Envelope = default });
+        if (messageId == default) return new(new InboxMessage { Envelope = default, SentAt = DateTimeOffset.UnixEpoch });
         using var services = CreateServices();
         return new(new InboxMessage
         {
@@ -497,7 +497,8 @@ public sealed class TypedOutboxExtensionsTests
                 {
                     ["sender"] = services.GetRequiredService<Serializer<GrainId>>().SerializeToArray(ReceivedSender)
                 }
-            }
+            },
+            SentAt = DateTimeOffset.UnixEpoch
         });
     }
 

@@ -25,15 +25,14 @@ public sealed class WireFormatTests : IDisposable
         { "HierarchicalKey", "2040276F72646572732F345C2F322F72657365727665E0" },
         { "Envelope.Minimal", "202040276F72646572732F345C2F322F72657365727665E04101C101C101C101E0" },
         { "Envelope.Full", "202040276F72646572732F345C2F322F72657365727665E041070102034129696E76656E746F72792E726573657276652E7631210103410B747261636540050908E02180005444B1DC2DDF088100D088C310000000E0E0" },
-        { "InboxMessage", "20202040276F72646572732F345C2F322F72657365727665E041070102034129696E76656E746F72792E726573657276652E7631210103410B747261636540050908E02180005444B1DC2DDF088100D088C310000000E0E0C101E0" },
-        { "InboxMessage.RedeliveryDeadline", "20202040276F72646572732F345C2F322F72657365727665E041070102034129696E76656E746F72792E726573657276652E7631210103410B747261636540050908E02180005444B1DC2DDF088100D088C310000000E0E021800014AEDBA52EDF088100D088C310000000E0E0" },
+        { "InboxMessage", "20202040276F72646572732F345C2F322F72657365727665E041070102034129696E76656E746F72792E726573657276652E7631210103410B747261636540050908E02180005444B1DC2DDF088100D088C310000000E0E021800094DA86132DDF088100D088C310000000E0E0" },
         { "OutboxMessage", "20202040276F72646572732F345C2F322F72657365727665E041070102034129696E76656E746F72792E726573657276652E7631210103410B747261636540050908E02180005444B1DC2DDF088100D088C310000000E0E021202060697CAED241117265636569766572E0E021605D5ABF1541057231E0E0E0" },
         { "DeliveryResult.Accepted", "20080305C101C101E0" },
         { "DeliveryResult.Duplicate", "20080309C101C101E0" },
         { "DeliveryResult.Backpressured", "2008030DC101C101E0" },
         { "DeliveryResult.HandlerNotFound", "20080311413F4E6F20696E626F782068616E646C657220697320726567697374657265642EC101E0" },
         { "DeliveryResult.DeadLettered", "2008031541196F7574206F662073746F636B41196F72646572732F73746F636BE0" },
-        { "DeliveryResult.Expired", "2008031941A5546865206D65737361676527732061646D697373696F6E206375746F66662069732066656E6365643B20697473206561726C6965722064656C6976657279206F7574636F6D6520697320756E6B6E6F776E2EC101E0" },
+        { "DeliveryResult.Expired", "2008031941D3546865206D657373616765207761732073656E74206265666F72652074686520726563656976657227732064656475706C69636174696F6E2077696E646F773B20697473206561726C6965722064656C6976657279206F7574636F6D6520697320756E6B6E6F776E2EC101E0" },
     };
 
     [Theory]
@@ -46,9 +45,8 @@ public sealed class WireFormatTests : IDisposable
             case "HierarchicalKey": Check(Id.Key, hex); break;
             case "Envelope.Minimal": Check(new Envelope { MessageId = Id, Payload = [] }, hex, AssertEnvelope); break;
             case "Envelope.Full": Check(FullEnvelope(), hex, AssertEnvelope); break;
-            case "InboxMessage": Check(new InboxMessage { Envelope = FullEnvelope() }, hex, AssertInboxMessage); break;
-            case "InboxMessage.RedeliveryDeadline":
-                Check(new InboxMessage { Envelope = FullEnvelope(), RedeliveryDeadline = DeliverAt.AddDays(1) }, hex, AssertInboxMessage);
+            case "InboxMessage":
+                Check(new InboxMessage { Envelope = FullEnvelope(), SentAt = DeliverAt.AddDays(-1) }, hex, AssertInboxMessage);
                 break;
             case "OutboxMessage":
                 Check(new OutboxMessage { Envelope = FullEnvelope(), ReceiverId = Receiver }, hex, (e, a) =>
@@ -91,8 +89,8 @@ public sealed class WireFormatTests : IDisposable
     private static void AssertInboxMessage(InboxMessage expected, InboxMessage actual)
     {
         AssertEnvelope(expected.Envelope, actual.Envelope);
-        Assert.Equal(expected.RedeliveryDeadline, actual.RedeliveryDeadline);
-        Assert.Equal(expected.RedeliveryDeadline?.Offset, actual.RedeliveryDeadline?.Offset);
+        Assert.Equal(expected.SentAt, actual.SentAt);
+        Assert.Equal(expected.SentAt.Offset, actual.SentAt.Offset);
     }
 
     private static void AssertEnvelope(Envelope expected, Envelope actual)
