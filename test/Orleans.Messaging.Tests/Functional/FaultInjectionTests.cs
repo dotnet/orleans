@@ -1059,8 +1059,12 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         var payload = realSink
             ? RandomNumberGenerator.GetBytes(32)
             : TestApplicationProtocol.Encode(Sessions, new TestApplicationMessage(Route, new TestMessage(id, 84, "late-redelivery")));
+        using var events = new DeliveryEventObserver(sender.GetGrainId(), receiver.GetGrainId(), id, faults: 0);
+        var retryScheduled = events.RetryScheduled.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var retired = events.Retired.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var lost = DeliveryFault.LoseResponse();
-        Deliveries.Enqueue(lost);
+        var delayed = DeliveryFault.HoldBeforeCall();
+        Deliveries.Enqueue(lost, delayed);
         var started = _cluster.JobClock.GetUtcNow();
         // The source's payload is raw in the sink case and a real application envelope in the handler case.
         if (realSink)
@@ -1080,9 +1084,24 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         }
 
         Assert.Equal(DeliveryStatus.Accepted, (await lost.ReceiverAnswer).Status);
-        await WaitForFailedAttemptAsync(sender, id, 1);
+        Assert.Equal(id, (await retryScheduled).MessageId);
         if (!realSink) await Fixture.WaitForInboxCountAsync((IMessagingTestGrain)receiver, 0);
+        await sender.WriteAsync();
+        // Start the retry inside its original budget, then delay its arrival beyond receiver compaction.
+        // A pending retry could otherwise legitimately expire while the shared clock is two days ahead.
+        await _cluster.AdvanceAndRunPumpAsync(sender, RetryInterval);
+        await delayed.WaitUntilEnteredAsync();
+        Assert.Equal(1, Deliveries.ReceiverCalls);
         _cluster.JobClock.Advance(TimeSpan.FromDays(2));
+        await Fixture.RunPumpAsync(sender);
+        var pending = await Fixture.OnGrainAsync(sender, () =>
+        {
+            Assert.True(Fixture.GetGrainContext(sender).ActivationServices.GetRequiredService<Outbox>().IsDelivering);
+            return _cluster.GetOutboxState(sender).Attempt(id);
+        });
+        Assert.Equal(1, pending.AttemptCount);
+        Assert.Equal(started + RetryTimeout, pending.ExpirationTime);
+        Assert.False(retired.IsCompleted);
         Fixture.Storage.RequestSnapshot(JournalId.FromGrainId(receiver.GetGrainId()));
         await WriteJournalAsync(receiver);
         var inbox = Fixture.GetGrainContext(receiver).ActivationServices.GetRequiredService<Inbox>();
@@ -1111,11 +1130,16 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
             Assert.Equal(1, effect.Count);
         }
 
-        // Retrying the original send after clock rollback reaches that durable fence before its sender budget
-        // expires. Its earlier acceptance is real, but the source must receive UNKNOWN, not a false rejection.
-        await _cluster.AdvanceAndRunPumpAsync(sender, RetryInterval);
-        await Fixture.WaitUntilAsync(sender, () => !_cluster.GetOutboxState(sender).AttemptKeys.Any());
-        Assert.Equal([DeliveryStatus.Accepted, DeliveryStatus.Expired], Deliveries.Answers);
+        // Observe this delayed attempt's answer and retirement, not an empty outbox caused by an earlier timeout.
+        // Its earlier acceptance is real, but the source must receive UNKNOWN, not a false rejection.
+        var answers = Deliveries.WaitForAnswersAsync(2);
+        delayed.Release();
+        Assert.Equal(DeliveryStatus.Expired, (await delayed.ReceiverAnswer).Status);
+        Assert.Equal([DeliveryStatus.Accepted, DeliveryStatus.Expired],
+            await answers.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        Assert.Equal(OutboxMessageRetirementStatus.DeadLettered, (await retired).Retirement.Status);
+        await sender.WriteAsync();
+        Assert.Empty(await Fixture.OnGrainAsync(sender, () => _cluster.GetOutboxState(sender).AttemptKeys.ToArray()));
         var terminal = await Fixture.OnGrainAsync(sender, () => _cluster.GetOutboxState(sender).DeadLetter(id));
         Assert.Equal(id, terminal.Message.Envelope.MessageId);
         if (realSink)
