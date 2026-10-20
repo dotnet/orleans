@@ -121,6 +121,35 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         _unreached = runtime.GetRecordedOperations(taskId);
         _replaying = _unreached is not null;
         _cancellationPoint = runtime.GetCancellationPoint(taskId);
+        AccessLog = runtime.CreateAccessLog(taskId, scheduler, Diverge);
+    }
+
+    /// <summary>Gets the runtime which runs this attempt.</summary>
+    internal IDurableTaskGrainRuntime Runtime => _runtime;
+
+    /// <summary>
+    /// Gets the log which records the attempt's accesses to journaled state and returns the recorded outcomes of earlier
+    /// attempts' accesses, or <see langword="null"/> when the runtime doesn't record them. The runtime closes it when it
+    /// ends the attempt and when the body completes, after which the attempt's accesses run directly, unrecorded.
+    /// </summary>
+    internal DurableTaskAccessLog? AccessLog { get; }
+
+    /// <summary>
+    /// Marks the runtime's synchronous work on behalf of the attempt until the returned value is disposed, so the accesses
+    /// to journaled state which it makes, including those of an effect, aren't recorded as the body's.
+    /// </summary>
+    private DurableTaskAccessLog.OperationScope EnterOperation() => AccessLog is { } log ? log.EnterOperation() : default;
+
+    /// <summary>
+    /// Stages the records of the reads which the body made since its last write, before an operation which can depend on
+    /// them becomes durable.
+    /// </summary>
+    internal void FlushAccessLog()
+    {
+        if (AccessLog is { IsOpen: true } accessLog && TaskScheduler.Current == _scheduler)
+        {
+            accessLog.Flush();
+        }
     }
 
     /// <inheritdoc/>
@@ -218,9 +247,14 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// Delivers a pending task cancellation once the attempt is at the point where its body observes it, and records that
     /// point when the execution has no record of one.
     /// </summary>
+    /// <remarks>
+    /// Without a recorded point, the attempt observes the cancellation once it replays neither recorded operations nor
+    /// recorded accesses to journaled state (<see cref="IsReplaying"/>): accesses which an earlier attempt recorded after its
+    /// last operation precede the point which this attempt chooses, so their records still replay.
+    /// </remarks>
     private void DeliverPendingCancellation()
     {
-        if (!_cancellationPending || (_cancellationPoint is { } point ? point != _cancellationPoints : _replaying))
+        if (!_cancellationPending || (_cancellationPoint is { } point ? point != _cancellationPoints : IsReplaying))
         {
             return;
         }
@@ -383,19 +417,20 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// and effect records, but not signal values, which senders record, invoked descendants, or cancellations which
     /// arrived before their requests. The attempt reaches an operation when it starts or posts it, looks up its handle,
     /// signals under its marker, selects a completion under its decision, or runs an effect under its name. Starting an
-    /// operation which no earlier attempt recorded ends the replay; reaching an operation again doesn't.
+    /// operation which no earlier attempt recorded ends the replay; reaching an operation again doesn't. The attempt also
+    /// replays while it hasn't consumed every recorded access to journaled state.
     /// </remarks>
-    public override bool IsReplaying => _replaying;
+    public override bool IsReplaying => _replaying || AccessLog?.IsReplaying is true;
 
     /// <summary>
-    /// Gets whether earlier attempts recorded operations which this attempt hasn't reached yet, so an earlier run went
-    /// past the attempt's current point.
+    /// Gets whether earlier attempts recorded operations or accesses to journaled state which this attempt hasn't reached
+    /// yet, so an earlier run went past the attempt's current point.
     /// </summary>
     /// <remarks>
     /// An execution's body runs its durable operations in one logical flow, and concurrent work runs in child executions,
     /// so a deterministic replay reaches the recorded operations in the order in which the earlier run created them.
     /// </remarks>
-    private bool HasUnreachedOperations => _unreached is not null;
+    private bool HasUnreachedOperations => _unreached is not null || AccessLog?.IsReplaying is true;
 
     /// <summary>
     /// Gets the grain which runs this execution, which qualifies the root identifiers of the detached tasks which the
@@ -413,6 +448,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         AssertOnScheduler();
         ReachCancellationPoint();
+        FlushAccessLog();
         if (_unreached is not { } unreached)
         {
             return;
@@ -477,8 +513,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     /// <summary>
     /// Ends this attempt for <paramref name="reason"/> at once: from now on, its durable operations throw
-    /// <see cref="DurableTaskAttemptCanceledException"/>, and a discarded attempt isn't resumed.
-    /// <see cref="ApplyCancellation"/> then cancels the attempt's tokens.
+    /// <see cref="DurableTaskAttemptCanceledException"/>, its code's accesses to journaled state, such as its cleanup's,
+    /// run directly, unrecorded, and a discarded attempt isn't resumed. <see cref="ApplyCancellation"/> then cancels the
+    /// attempt's tokens.
     /// </summary>
     /// <returns><see langword="true"/> when this call ended the attempt.</returns>
     /// <remarks>
@@ -495,6 +532,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
 
         _endReason = reason;
+
+        // The attempt's later code, such as its cleanup, accesses journaled state directly: no replay reproduces it.
+        AccessLog?.Close();
         if (IsDiscarded && _segment is null)
         {
             _settled.TrySetResult();
@@ -678,6 +718,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
         ThrowIfAttemptCanceled();
         var shielded = SchedulesShieldedChildren;
+        using var _ = EnterOperation();
         try
         {
             if (options.HasFlag(DurableTaskStartOptions.Detached))
@@ -744,10 +785,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     protected internal override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
         TaskId taskId,
         DateTimeOffset dueTime,
-        CancellationToken cancellationToken) =>
-        RunOnScheduler(
+        CancellationToken cancellationToken)
+    {
+        FlushAccessLog();
+        return RunOnScheduler(
             _scheduler,
             () => ScheduleDelayCoreAsync(taskId, dueTime, cancellationToken));
+    }
 
     private async ValueTask<DurableTaskResponse> ScheduleDelayCoreAsync(
         TaskId taskId,
@@ -777,10 +821,14 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         if (TaskScheduler.Current != _scheduler)
         {
+            AccessLog?.Close();
             return;
         }
 
         VerifyCancellationPointReached();
+
+        // The body never replays once its response commits, so work which outlives it isn't recorded.
+        AccessLog?.Close();
         if (IsAttemptEnded)
         {
             return;
@@ -815,6 +863,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         ThrowIfNotChildTaskId(effectId);
         ThrowIfAttemptCanceled();
         ObserveOperation(effectId, recordsOperation: true);
+
+        // The effect's record covers the accesses to journaled state which the effect makes.
+        using var _ = EnterOperation();
         try
         {
             return _runtime.RunEffect(effectId, state, effect);
@@ -855,6 +906,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         {
             try
             {
+                using var _ = EnterOperation();
                 version = _runtime.GetOrRecordVersion(Id, name, HasUnreachedOperations ? 0 : maxSupported);
             }
             catch (DurableTaskDivergenceException divergence)
@@ -905,10 +957,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// The wait observes the signals of the invoked task whose execution tree contains this execution, and advances this
     /// execution's logical time to when the signal was recorded.
     /// </remarks>
-    protected internal override ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, CancellationToken cancellationToken) =>
-        RunOnScheduler(
+    protected internal override ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, CancellationToken cancellationToken)
+    {
+        FlushAccessLog();
+        return RunOnScheduler(
             _scheduler,
             () => WaitForSignalCoreAsync(name, cancellationToken));
+    }
 
     private async ValueTask<DurableTaskResponse> WaitForSignalCoreAsync(string name, CancellationToken cancellationToken)
     {
@@ -1004,10 +1059,15 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             AttemptCancellationToken);
 
     /// <summary>Runs an entry point's <paramref name="callback"/>, which the activation's scheduler runs.</summary>
+    /// <remarks>
+    /// The runtime's work on behalf of the attempt, such as recording a child's start, isn't the body's: its accesses to
+    /// journaled state aren't recorded.
+    /// </remarks>
     /// <exception cref="InvalidOperationException">The caller isn't running on the activation's scheduler.</exception>
     private static ValueTask RunOnScheduler(TaskScheduler scheduler, Func<ValueTask> callback)
     {
         ThrowIfOffScheduler(scheduler);
+        using var _ = DurableTaskHostFlow.Enter();
         return callback();
     }
 
@@ -1015,6 +1075,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     private static ValueTask<TResult> RunOnScheduler<TResult>(TaskScheduler scheduler, Func<ValueTask<TResult>> callback)
     {
         ThrowIfOffScheduler(scheduler);
+        using var _ = DurableTaskHostFlow.Enter();
         return callback();
     }
 
@@ -1059,10 +1120,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             where TFeature : class =>
             addressedHost.IsDefault ? null : new DurableTaskAddress(addressedHost, TargetTaskId) as TFeature;
 
-        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) =>
-            RunOnScheduler(
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
+        {
+            owner.FlushAccessLog();
+            return RunOnScheduler(
                 owner._scheduler,
                 () => CancelCoreAsync(reason, cancellationToken));
+        }
 
         private async ValueTask CancelCoreAsync(string? reason, CancellationToken cancellationToken)
         {
@@ -1071,10 +1135,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             await owner.CompleteOperationAsync(inner.CancelAsync(reason, operationCts.Token));
         }
 
-        public ValueTask AbortAsync(string reason, CancellationToken cancellationToken) =>
-            RunOnScheduler(
+        public ValueTask AbortAsync(string reason, CancellationToken cancellationToken)
+        {
+            owner.FlushAccessLog();
+            return RunOnScheduler(
                 owner._scheduler,
                 () => AbortCoreAsync(reason, cancellationToken));
+        }
 
         private async ValueTask AbortCoreAsync(string reason, CancellationToken cancellationToken)
         {

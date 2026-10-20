@@ -98,7 +98,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     [FromKeyedServices("$task-logical-times")] IDurableDictionary<TaskId, DateTimeOffset> logicalTimes,
     [FromKeyedServices("$task-invocations")] IDurableDictionary<MessageId, PendingInvocation> invocations,
     DurableTaskGrainRuntimeShared shared,
-    IEnumerable<IDurableTaskMessageTransport> messageTransports) :
+    IEnumerable<IDurableTaskMessageTransport> messageTransports,
+    IJournaledStateManager? stateManager = null) :
     IDurableTaskGrainRuntime,
     IDurableTaskGrainExtension,
     IDurableTaskManager,
@@ -110,9 +111,9 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <summary>The journal state machine name of the runtime's commit hook.</summary>
     /// <remarks>
     /// The hook journals no entries of its own: the runtime stages every change in the built-in durable states which hold
-    /// its task state, which report each change, and the effects it runs after a write follow those changes. It therefore
-    /// reports its changes (<see cref="IReportsStagedChanges"/>), so Messaging can tell whether a failed handler attempt
-    /// staged anything.
+    /// its task state and in its tasks' access logs, which report each change, and the effects it runs after a write follow
+    /// those changes. It therefore reports its changes (<see cref="IReportsStagedChanges"/>), so Messaging can tell whether a
+    /// failed handler attempt staged anything.
     /// </remarks>
     internal const string StateMachineName = "orleans.durable-tasks.runtime";
 
@@ -124,6 +125,9 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly Dictionary<TaskId, DurableTaskResponse> _pendingHandleResponses = [];
     private readonly Dictionary<long, CancellationPropagation> _pendingCancellationPropagations = [];
     private readonly Dictionary<long, Task> _backgroundTasks = [];
+
+    // The activation's journaled state manager, whose context provider records the accesses of durable task bodies.
+    private readonly JournaledStateManager? _stateManager = stateManager as JournaledStateManager;
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
     private readonly IDurableDictionary<TaskId, DateTimeOffset> _logicalTimes = logicalTimes;
@@ -2273,11 +2277,14 @@ internal sealed partial class DurableTaskGrainRuntime(
         GrainDurableTaskContext context,
         Task start)
     {
+        // The invocation can start from the flow which scheduled it, such as a parent's body: its own work, such as
+        // committing its response, isn't that body's.
+        using var hostFlow = DurableTaskHostFlow.Enter();
         await start;
         DurableTaskResponse? response;
         try
         {
-            response = await DurableTaskRuntimeHelper.RunAsync(createTask(state), context);
+            response = await RunAttemptAsync(createTask, state, context);
         }
         catch (Exception exception)
         {
@@ -2290,6 +2297,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         context.VerifyCancellationPointReached();
+        context.AccessLog?.Close();
 
         // A cancellation which arrives while this attempt still runs, for example while a delay's journal write is in
         // flight, cancels only the attempt's token. The attempt then terminalizes the task, so a pending operation
@@ -2339,6 +2347,63 @@ internal sealed partial class DurableTaskGrainRuntime(
                 DurableTaskEvents.EmitExecutionStopped(GrainContext, context.Id);
             }
         }
+    }
+
+    /// <summary>Runs an attempt's body, whose accesses to journaled state the attempt's access log records.</summary>
+    /// <remarks>
+    /// The body's definition is created within the attempt, so the code which a method that returns a definition without
+    /// being <see langword="async"/> runs belongs to the body.
+    /// </remarks>
+    private static ValueTask<DurableTaskResponse> RunAttemptAsync<TState>(
+        Func<TState, DurableTask> createTask,
+        TState state,
+        GrainDurableTaskContext context)
+    {
+        using var _ = DurableTaskHostFlow.Exit();
+        DurableTask task;
+        using (DurableTaskContext.Enter(context))
+        {
+            task = createTask(state);
+        }
+
+        return DurableTaskRuntimeHelper.RunAsync(task, context);
+    }
+
+    DurableTaskAccessLog? IDurableTaskGrainRuntime.CreateAccessLog(
+        TaskId executionId,
+        TaskScheduler scheduler,
+        Func<DurableTaskDivergenceException, Exception> diverge)
+    {
+        if (_stateManager is not { } manager || _storage is not IDurableTaskAccessLogStorage storage)
+        {
+            return null;
+        }
+
+        Debug.Assert(manager.ContextProvider is null or DurableTaskAccessContextProvider, "The durable task runtime supplies the context of its activation's journaled state.");
+        manager.ContextProvider ??= new DurableTaskAccessContextProvider(this);
+        return new(executionId, storage, _shared.Serializer, scheduler, diverge);
+    }
+
+    /// <summary>
+    /// Marks the runtime's work which the calling code requests, such as a cancellation, abort, or poll, until the returned
+    /// value is disposed, so the accesses to journaled state which it makes aren't recorded as a calling body's.
+    /// </summary>
+    /// <param name="stagesBodyReads">
+    /// Whether the work can commit a durable consequence of a calling body's decisions, so the body's pending read records
+    /// are staged first.
+    /// </param>
+    private DurableTaskHostFlow.Restorer EnterHostWork(bool stagesBodyReads)
+    {
+        if (stagesBodyReads
+            && !DurableTaskHostFlow.IsActive
+            && DurableTaskContext.TryGetCurrent(out var current)
+            && current is GrainDurableTaskContext context
+            && ReferenceEquals(context.Runtime, this))
+        {
+            context.FlushAccessLog();
+        }
+
+        return DurableTaskHostFlow.Enter();
     }
 
     private sealed record RunningRequest(
@@ -2764,6 +2829,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <inheritdoc/>
     public async ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options, CancellationToken cancellationToken)
     {
+        using var hostFlow = EnterHostWork(stagesBodyReads: false);
         ThrowIfStopping();
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -2905,6 +2971,8 @@ internal sealed partial class DurableTaskGrainRuntime(
         string? reason,
         CancellationToken cancellationToken)
     {
+        using var hostFlow = EnterHostWork(stagesBodyReads: true);
+
         // Cancellation is persisted before it propagates.
         var propagation = StageCancellationTree(taskId, callerId, reason);
         if (!propagation.Changed)
@@ -3048,6 +3116,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <remarks>A terminal task, or a task which this grain doesn't retain, is unchanged.</remarks>
     internal async ValueTask AbortTaskAsync(TaskId taskId, string reason, CancellationToken cancellationToken)
     {
+        using var hostFlow = EnterHostWork(stagesBodyReads: true);
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
         if (StageAbort(taskId, reason, callerId: default))
         {
