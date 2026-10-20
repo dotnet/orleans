@@ -1,7 +1,7 @@
 ---
 title: Configure Orleans Journaling
 description: Select an experimental Orleans Journaling storage provider and journal format.
-ms.date: 08/21/2026
+ms.date: 10/19/2026
 ms.topic: how-to
 ---
 
@@ -25,13 +25,14 @@ See [Use durable state](durable-state.md) for source-backed constructor injectio
 
 ## Choose a storage provider
 
-| Provider | Package | Storage model | Compaction trigger |
-| --- | --- | --- | --- |
-| [Azure Blob Storage](azure-storage.md#azure-blob-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | Append blob plus immutable checkpoint blobs | Append-blob block budget |
-| [Azure Table Storage](azure-storage.md#azure-table-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | One partition per journal with header and ordered data rows | Row count or journal bytes |
-| [Redis](redis-journal-storage.md) | `Microsoft.Orleans.Journaling.Redis` | String journal plus hash metadata | Journal bytes |
+| Provider | Package | Storage model | Compaction trigger | Largest append |
+| --- | --- | --- | --- | --- |
+| [Azure Blob Storage](azure-storage.md#azure-blob-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | Append blob plus immutable checkpoint blobs | Append-blob block budget | 100 MiB |
+| [Azure Table Storage](azure-storage.md#azure-table-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | One partition per journal with header and ordered data rows | Row count or journal bytes | 2 MiB |
+| [Redis](redis-journal-storage.md) | `Microsoft.Orleans.Journaling.Redis` | String journal plus hash metadata | Journal bytes | Whole journal within the server's string limit (512 MB by default) |
+| Amazon S3 | `Microsoft.Orleans.Journaling.S3` | WAL object plus immutable checkpoint objects | Append part budget | 5 GB |
 
-Select a provider based on atomic-write limits, replay latency, durability configuration, backup tooling, maximum hot-grain size, and operational familiarity.
+Every provider writes each append and replacement all-or-nothing and fails a write which exceeds its limits as a whole; see [Journal storage contract](runtime-behavior.md#journal-storage-contract). Select a provider based on atomic-write limits, replay latency, durability configuration, backup tooling, maximum hot-grain size, and operational familiarity.
 
 ## Select named providers
 

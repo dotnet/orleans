@@ -98,7 +98,7 @@ public partial class StateManagerTests : JournalingTestBase
     [Fact]
     public async Task StateManager_Initialize_ThrowsWhenCompletedReadLeavesData()
     {
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         using (var data = CreateBuffer([1, 2, 3]))
         {
             await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
@@ -164,7 +164,7 @@ public partial class StateManagerTests : JournalingTestBase
     [Fact]
     public async Task StateManager_Recovery_PreservesUnknownStateEntry()
     {
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         using var segment = new OrleansBinaryJournalBufferWriter();
         using (var entry = segment.CreateJournalStreamWriter(new JournalStreamId(99)).BeginEntry())
         {

@@ -157,7 +157,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
 
         await using (var writerProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, blobName, cts.Token))
         {
-            var storage = writerProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
+            var storage = await writerProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId)).ReadForWriteAsync();
             await storage.ReplaceAsync(new ReadOnlySequence<byte>(checkpointBytes), cts.Token);
             await storage.AppendAsync(new ReadOnlySequence<byte>(walBytes), cts.Token);
         }

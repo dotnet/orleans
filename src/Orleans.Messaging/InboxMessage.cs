@@ -22,4 +22,5 @@ public readonly struct InboxMessage
     /// than the window.
     /// </remarks>
     [Id(1)]
-    public DateTimeOffset? RedeliveryDeadline { get; init; }}
+    public DateTimeOffset? RedeliveryDeadline { get; init; }
+}
