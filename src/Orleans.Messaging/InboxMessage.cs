@@ -11,15 +11,27 @@ public readonly struct InboxMessage
     public required Envelope Envelope { get; init; }
 
     /// <summary>
-    /// Gets the latest time at which the sender can deliver this message again, on the sender's Durable Jobs clock, or
-    /// <see langword="null"/> when nothing redelivers it.
+    /// Gets the immutable admission cutoff for this logical send, or <see langword="null"/> for permanent
+    /// deduplication tracking.
     /// </summary>
     /// <remarks>
-    /// The outbox stamps each delivery attempt with the time its retries end plus the attempt's longest duration. An
-    /// inbox which first accepts the message keeps its deduplication record for <c>DeduplicationWindow</c>, so it answers
-    /// <see cref="DeliveryResult.DeduplicationWindowExceededCode"/> for a deadline beyond that window rather than accept a
-    /// message whose redelivery it couldn't recognize. The comparison assumes clock skew between silos is much smaller
-    /// than the window.
+    /// <para>
+    /// The outbox journals this value when it stages the send and preserves it across every attempt and recovery.
+    /// Direct senders likewise preserve it when retrying the same command. The receiver first checks its pending and
+    /// processed records. An untracked message whose cutoff is at or below the receiver's durable admission floor
+    /// receives <see cref="DeliveryStatus.Expired"/> before any message effects are staged.
+    /// </para>
+    /// <para>
+    /// The receiver retains a processed record until its admission floor fences the cutoff. The floor only advances
+    /// and survives recovery, so forgetting a record permanently fences that send's delayed retries. Clock readings
+    /// guide floor advancement and retry scheduling; journaled admission decisions establish deduplication safety.
+    /// Forward clock jumps can fence undelivered messages early, and backward jumps can prolong retention.
+    /// </para>
+    /// <para>
+    /// A null cutoff retains the processed record permanently. Reusing a command's identity with a fresh cutoff
+    /// after an uncertain delivery creates a new admission opportunity; applications preserve the original cutoff
+    /// or reconcile the outcome through their own idempotent protocol.
+    /// </para>
     /// </remarks>
     [Id(1)]
     public DateTimeOffset? RedeliveryDeadline { get; init; }

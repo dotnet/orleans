@@ -22,7 +22,7 @@ public readonly struct DeliveryResult
 
     /// <summary>
     /// Gets the code which identifies why the receiver dead-lettered the message: an application-defined code from an
-    /// inbox message sink, such as <c>"orders/duplicate-order"</c>, or <see cref="DeduplicationWindowExceededCode"/>;
+    /// inbox message sink, such as <c>"orders/duplicate-order"</c>;
     /// <see langword="null"/> when the receiver reported none.
     /// </summary>
     /// <remarks>
@@ -31,17 +31,6 @@ public readonly struct DeliveryResult
     /// </remarks>
     [Id(2)]
     public string? Code { get; init; }
-
-    /// <summary>
-    /// The <see cref="Code"/> of a message which the receiver rejects because its
-    /// <see cref="InboxMessage.RedeliveryDeadline"/> is later than the receiver's deduplication window would cover.
-    /// </summary>
-    /// <remarks>
-    /// The receiver stages nothing for the message and answers every redelivery the same way, so the sending outbox keeps
-    /// the message as a dead letter and retires it as <see cref="OutboxMessageRetirementStatus.Rejected"/>. It indicates
-    /// that the sender's <c>OutboxRetryTimeout</c> isn't shorter than the receiver's <c>DeduplicationWindow</c>.
-    /// </remarks>
-    public const string DeduplicationWindowExceededCode = "DeduplicationWindowExceeded";
 
     /// <summary>
     /// Creates a result indicating the message was accepted and persisted to inbox.
@@ -77,5 +66,12 @@ public readonly struct DeliveryResult
         Status = DeliveryStatus.DeadLettered,
         Message = reason,
         Code = code
+    };
+
+    /// <summary>Creates a terminal result for a fenced send whose earlier delivery outcome is unknown.</summary>
+    public static DeliveryResult Expired() => new()
+    {
+        Status = DeliveryStatus.Expired,
+        Message = "The message's admission cutoff is fenced; its earlier delivery outcome is unknown."
     };
 }

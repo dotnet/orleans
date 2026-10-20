@@ -33,6 +33,7 @@ public sealed class WireFormatTests : IDisposable
         { "DeliveryResult.Backpressured", "2008030DC101C101E0" },
         { "DeliveryResult.HandlerNotFound", "20080311413F4E6F20696E626F782068616E646C657220697320726567697374657265642EC101E0" },
         { "DeliveryResult.DeadLettered", "2008031541196F7574206F662073746F636B41196F72646572732F73746F636BE0" },
+        { "DeliveryResult.Expired", "2008031941A5546865206D65737361676527732061646D697373696F6E206375746F66662069732066656E6365643B20697473206561726C6965722064656C6976657279206F7574636F6D6520697320756E6B6E6F776E2EC101E0" },
     };
 
     [Theory]
@@ -61,6 +62,7 @@ public sealed class WireFormatTests : IDisposable
             case "DeliveryResult.Backpressured": Check(DeliveryResult.Backpressured(), hex); break;
             case "DeliveryResult.HandlerNotFound": Check(DeliveryResult.HandlerNotFound(), hex); break;
             case "DeliveryResult.DeadLettered": Check(DeliveryResult.DeadLettered("out of stock", "orders/stock"), hex); break;
+            case "DeliveryResult.Expired": Check(DeliveryResult.Expired(), hex); break;
             default: throw new ArgumentOutOfRangeException(nameof(name), name, null);
         }
     }
