@@ -982,6 +982,7 @@ public abstract class MessageSourceAndSinkFixture(string journalFormatKey) : IAs
 
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(byte[]))]
+[JsonSerializable(typeof(int))]
 internal sealed partial class SourceSinkJsonContext : JsonSerializerContext;
 
 public enum SinkMode
@@ -1018,11 +1019,16 @@ public sealed class SourceSinkProbe
         private int _sinkAcceptances;
         private int _handled;
         private int _failuresRemaining;
+        private int _retirementFailuresRemaining;
+        private int _retirementCallbacks;
 
         public volatile SinkMode Mode;
 
         /// <summary>Makes the source share its payload array as a header value, and clear that array when the message retires.</summary>
         public volatile bool ReleaseBuffersOnRetired;
+        /// <summary>Opt-in application policy: journal a terminal outcome and a real self-inbox follow-up.</summary>
+        public DateTimeOffset? FollowUpAt { get; set; }
+        public int RetirementCallbacks => Volatile.Read(ref _retirementCallbacks);
         public ConcurrentDictionary<MessageId, SourceFault> Faults { get; } = new();
         public int Activations => Volatile.Read(ref _activations);
         public int Materializations => Volatile.Read(ref _materializations);
@@ -1040,6 +1046,9 @@ public sealed class SourceSinkProbe
         public void FailNextOffers(int count) => Volatile.Write(ref _failuresRemaining, count);
 
         public bool TryConsumeFailure() => Interlocked.Decrement(ref _failuresRemaining) >= 0;
+        public void FailNextRetirements(int count) => Volatile.Write(ref _retirementFailuresRemaining, count);
+        public void OnRetiring() => Interlocked.Increment(ref _retirementCallbacks);
+        public bool TryConsumeRetirementFailure() => Interlocked.Decrement(ref _retirementFailuresRemaining) >= 0;
     }
 }
 
@@ -1064,6 +1073,9 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
     internal const string RejectionCode = "source-sink/rejected";
     internal const string SinkFailure = "The sink failed before deciding the message's outcome.";
     internal const string SourceFailure = "The source can't decode the stored message.";
+    internal const string FollowUpSubject = "source-sink/terminal-follow-up";
+    internal const string RetirementFailure = "Injected failure after staging terminal outcome and follow-up.";
+    private readonly GrainId _grainId;
     private readonly IJournaledStateManager _manager;
     private readonly IOutbox _outbox;
     private readonly IDurableDictionary<string, byte[]> _outgoing;
@@ -1072,6 +1084,8 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
     private readonly IDurableDictionary<string, string> _retired;
     private readonly IDurableDictionary<string, string> _reasons;
     private readonly IDurableDictionary<string, string> _codes;
+    private readonly IDurableDictionary<string, int> _terminalCounts;
+    private readonly IDurableDictionary<string, int> _followUpCounts;
     private readonly SourceSinkProbe.Counters _probe;
 
     public SourceSinkGrain(
@@ -1085,8 +1099,11 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         [FromKeyedServices("retired")] IDurableDictionary<string, string> retired,
         [FromKeyedServices("reasons")] IDurableDictionary<string, string> reasons,
         [FromKeyedServices("codes")] IDurableDictionary<string, string> codes,
+        [FromKeyedServices("terminal-counts")] IDurableDictionary<string, int> terminalCounts,
+        [FromKeyedServices("follow-up-counts")] IDurableDictionary<string, int> followUpCounts,
         SourceSinkProbe probe)
     {
+        _grainId = context.GrainId;
         _manager = manager;
         _outbox = outbox;
         _outgoing = outgoing;
@@ -1095,10 +1112,12 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         _retired = retired;
         _reasons = reasons;
         _codes = codes;
+        _terminalCounts = terminalCounts;
+        _followUpCounts = followUpCounts;
         _probe = probe.For(context.GrainId);
         _probe.OnActivated();
         outbox.Register(this);
-        inbox.Register(this).Register(new Handler(_probe));
+        inbox.Register(this).Register(new Handler(_probe, _followUpCounts));
     }
 
     internal (Dictionary<string, byte[]> Outgoing, Dictionary<string, byte[]> Received, Dictionary<string, string> Retired) GetState() =>
@@ -1109,6 +1128,8 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
 
     /// <summary>Gets the receivers' rejection codes for this source's rejected messages, by message ID.</summary>
     internal Dictionary<string, string> GetRetirementCodes() => new(_codes);
+    internal Dictionary<string, int> GetTerminalCounts() => new(_terminalCounts);
+    internal Dictionary<string, int> GetFollowUpCounts() => new(_followUpCounts);
 
     /// <summary>Stores an outgoing message in the source's state without sending it.</summary>
     internal void StoreOutgoing(GrainId receiver, MessageId messageId, byte[] payload)
@@ -1201,6 +1222,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
 
     void IOutboxMessageSource.OnRetired(MessageId messageId, OutboxMessageRetirement retirement)
     {
+        _probe.OnRetiring();
         var key = messageId.ToString();
         if (_probe.ReleaseBuffersOnRetired) Array.Clear(_outgoing[key]);
         Assert.True(_outgoing.Remove(key));
@@ -1208,6 +1230,23 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         _retired[key] = retirement.Status.ToString();
         if (retirement.Reason is { } reason) _reasons[key] = reason;
         if (retirement.Code is { } code) _codes[key] = code;
+        if (_probe.FollowUpAt is { } followUpAt)
+        {
+            _terminalCounts.TryGetValue(key, out var previous);
+            _terminalCounts[key] = previous + 1;
+            _outbox.Send(new OutboxMessage
+            {
+                ReceiverId = _grainId,
+                Envelope = new()
+                {
+                    MessageId = new MessageId(messageId.Key.CreateChildKey("terminal-follow-up")),
+                    Payload = Encoding.UTF8.GetBytes(key),
+                    Subject = FollowUpSubject,
+                    DeliverAt = followUpAt
+                }
+            });
+            if (_probe.TryConsumeRetirementFailure()) throw new InvalidOperationException(RetirementFailure);
+        }
     }
 
     bool IInboxMessageSink.TryAccept(InboxMessage message, out DeliveryResult result)
@@ -1246,13 +1285,19 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         return true;
     }
 
-    private sealed class Handler(SourceSinkProbe.Counters probe) : IInboxHandler
+    private sealed class Handler(SourceSinkProbe.Counters probe, IDurableDictionary<string, int> followUpCounts) : IInboxHandler
     {
-        public bool CanHandle(InboxMessage message) => message.Envelope.Subject == Subject;
+        public bool CanHandle(InboxMessage message) => message.Envelope.Subject is Subject or FollowUpSubject;
 
         public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             probe.OnHandled();
+            if (context.Message.Envelope.Subject == FollowUpSubject)
+            {
+                var key = Encoding.UTF8.GetString(context.Message.Envelope.Payload);
+                followUpCounts.TryGetValue(key, out var previous);
+                followUpCounts[key] = previous + 1;
+            }
             context.Complete();
             return ValueTask.CompletedTask;
         }
