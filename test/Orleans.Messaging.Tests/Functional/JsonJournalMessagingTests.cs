@@ -37,10 +37,12 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
             await Task.Delay(10, Token);
         }
 
+        var cutoff = await ReadCutoffAsync(receiverContext, messageId);
+        Assert.NotNull(cutoff);
         await receiver.DeactivateAsync();
         await receiverContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Token);
         var type = new MessageType<int>(JsonMessagingGrain.Subject, Cluster.Client.ServiceProvider.GetRequiredService<Serializer<int>>());
-        var redelivery = type.Create(messageId, receiver.GetGrainId(), 42).ToInboxMessage();
+        var redelivery = type.Create(messageId, receiver.GetGrainId(), 42).ToInboxMessage() with { RedeliveryDeadline = cutoff };
 
         Assert.Equal(DeliveryStatus.Duplicate, (await receiver.AsReference<IMessagingExtension>().DeliverAsync(redelivery, Token)).Status);
         Assert.Equal(new[] { 42 }, Probe.Get(receiver.GetGrainId()));
@@ -103,6 +105,8 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
         Assert.Equal(0, await grain.GetOutboxCountAsync());
         Assert.Equal(new[] { 8 }, await Probe.WaitAsync(grain.GetGrainId(), 1, Token));
         Assert.True(Cluster.TryGetGrainContext(grain.GetGrainId(), out var context));
+        var cutoff = await ReadCutoffAsync(context, immediateId);
+        Assert.NotNull(cutoff);
         await grain.DeactivateAsync();
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Token);
 
@@ -115,9 +119,26 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
         recoveredContext.Scheduler.QueueAction(() => recovered.SetResult((inbox.Count, inbox.MessageState[scheduledId].Message.Envelope.DeliverAt)));
         Assert.Equal((1, deliverAt), await recovered.Task.WaitAsync(TimeSpan.FromSeconds(30), Token));
         var type = new MessageType<int>(JsonMessagingGrain.Subject, Cluster.Client.ServiceProvider.GetRequiredService<Serializer<int>>());
-        var redelivery = type.Create(immediateId, grain.GetGrainId(), 8).ToInboxMessage();
+        var redelivery = type.Create(immediateId, grain.GetGrainId(), 8).ToInboxMessage() with { RedeliveryDeadline = cutoff };
         Assert.Equal(DeliveryStatus.Duplicate, (await grain.AsReference<IMessagingExtension>().DeliverAsync(redelivery, Token)).Status);
         Assert.Equal(new[] { 8 }, Probe.Get(grain.GetGrainId()));
+    }
+
+    private static Task<DateTimeOffset?> ReadCutoffAsync(IGrainContext context, MessageId messageId)
+    {
+        var result = new TaskCompletionSource<DateTimeOffset?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        context.Scheduler.QueueAction(() =>
+        {
+            try
+            {
+                var inbox = context.ActivationServices.GetRequiredService<Inbox>();
+                result.SetResult(inbox.MessageState.TryGetValue(messageId, out var pending)
+                    ? pending.Message.RedeliveryDeadline
+                    : InboxTestAccess.GetProcessedCutoff(inbox, messageId));
+            }
+            catch (Exception exception) { result.SetException(exception); }
+        });
+        return result.Task.WaitAsync(TimeSpan.FromSeconds(30), Token);
     }
 
     public sealed class Fixture : IAsyncLifetime
