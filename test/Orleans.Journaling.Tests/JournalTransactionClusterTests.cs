@@ -114,6 +114,40 @@ public sealed class JournalTransactionClusterTests(IntegrationTestFixture fixtur
     }
 
     [Fact]
+    public async Task CallbackOnTheTransactionsCallChainReadsItsChangeAndCantChangeItsState()
+    {
+        var grain = Client.GetGrain<ITransactionalGrain>(Guid.NewGuid());
+
+        // The callback is admitted inside the transaction's section, reads its uncommitted change, and its write conflicts.
+        var (read, conflicted) = await grain.RunTransactionWithWritingCallback("a", 3).WaitAsync(Timeout, TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, read);
+        Assert.True(conflicted);
+        Assert.Equal(3, await grain.Get("a"));
+    }
+
+    [Fact]
+    public async Task ReentrantRequestRunningAlongsideATransactionReadsItsChangeAndCantChangeItsState()
+    {
+        var grain = Client.GetGrain<IReentrantTransactionalGrain>(Guid.NewGuid());
+
+        // A request which was already running when the transaction's section opened resumes alongside it.
+        var writer = grain.WriteAfterGate("a", 7);
+        await grain.WaitUntilWriterWaits().WaitAsync(Timeout, TestContext.Current.CancellationToken);
+        var transaction = grain.RunBlockingTransaction("a", 5);
+        await grain.WaitUntilTransactionBlocked().WaitAsync(Timeout, TestContext.Current.CancellationToken);
+
+        await grain.ReleaseWriter();
+        var (read, conflicted) = await writer.WaitAsync(Timeout, TestContext.Current.CancellationToken);
+        Assert.Equal(5, read);
+        Assert.True(conflicted);
+
+        await grain.ReleaseTransaction();
+        await transaction.WaitAsync(Timeout, TestContext.Current.CancellationToken);
+        Assert.Equal(5, await grain.Get("a"));
+    }
+
+    [Fact]
     public async Task TransactionFromOutsideTheSchedulerThrows()
     {
         var grain = Client.GetGrain<IReentrantTransactionalGrain>(Guid.NewGuid());
@@ -167,6 +201,18 @@ public interface ITransactionalGrain : IGrainWithGuidKey
 
     Task<int> RunTransactionWithCallback(string key, int value);
 
+    Task<(int Read, bool Conflicted)> RunTransactionWithWritingCallback(string key, int value);
+
+    Task<(int Read, bool Conflicted)> WriteAfterGate(string key, int value);
+
+    [AlwaysInterleave]
+    Task WaitUntilWriterWaits();
+
+    [AlwaysInterleave]
+    Task ReleaseWriter();
+
+    Task<bool> TryWrite(string key, int value);
+
     Task StartBackgroundTransactions();
 
     [AlwaysInterleave]
@@ -198,11 +244,16 @@ public interface IReentrantTransactionalGrain : ITransactionalGrain;
 public interface ITransactionCallbackGrain : IGrainWithGuidKey
 {
     Task<int> CallBack(ITransactionalGrain grain, string key);
+
+    Task<(int Read, bool Conflicted)> CallBackToWrite(ITransactionalGrain grain, string key, int value);
 }
 
 public class TransactionCallbackGrain : Grain, ITransactionCallbackGrain
 {
     public Task<int> CallBack(ITransactionalGrain grain, string key) => grain.Get(key);
+
+    public async Task<(int Read, bool Conflicted)> CallBackToWrite(ITransactionalGrain grain, string key, int value) =>
+        (await grain.Get(key), !await grain.TryWrite(key, value));
 }
 
 public class TransactionalGrain([FromKeyedServices("dictionary")] IDurableDictionary<string, int> dictionary) : DurableGrain, ITransactionalGrain
@@ -211,6 +262,8 @@ public class TransactionalGrain([FromKeyedServices("dictionary")] IDurableDictio
     internal static readonly ConcurrentDictionary<Guid, (Task Holder, Task Queued, TaskCompletionSource Gate)> Background = new();
 
     private readonly List<string> _events = [];
+    private readonly TaskCompletionSource _writerWaits = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _writerGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private TaskCompletionSource _blocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -265,6 +318,46 @@ public class TransactionalGrain([FromKeyedServices("dictionary")] IDurableDictio
         });
     }
 
+    public async Task<(int Read, bool Conflicted)> RunTransactionWithWritingCallback(string key, int value)
+    {
+        using var reentrancy = RequestContext.AllowCallChainReentrancy();
+        var self = this.AsReference<ITransactionalGrain>();
+        return await Manager.RunTransactionAsync(async _ =>
+        {
+            dictionary[key] = value;
+            return await GrainFactory.GetGrain<ITransactionCallbackGrain>(Guid.NewGuid()).CallBackToWrite(self, key, value + 1);
+        });
+    }
+
+    public async Task<(int Read, bool Conflicted)> WriteAfterGate(string key, int value)
+    {
+        _writerWaits.TrySetResult();
+        await _writerGate.Task;
+        var read = dictionary.TryGetValue(key, out var current) ? current : -1;
+        return (read, !await TryWrite(key, value));
+    }
+
+    public Task WaitUntilWriterWaits() => _writerWaits.Task;
+
+    public Task ReleaseWriter()
+    {
+        _writerGate.TrySetResult();
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> TryWrite(string key, int value)
+    {
+        try
+        {
+            dictionary[key] = value;
+            return Task.FromResult(true);
+        }
+        catch (JournaledStateConflictException)
+        {
+            return Task.FromResult(false);
+        }
+    }
+
     public Task StartBackgroundTransactions()
     {
         // Work which the activation's scheduler runs outside any request, as a timer's or a durable task's.
@@ -307,18 +400,7 @@ public class TransactionalGrain([FromKeyedServices("dictionary")] IDurableDictio
 
     public Task<int> ReadInterleaved(string key) => Task.FromResult(dictionary.TryGetValue(key, out var value) ? value : -1);
 
-    public Task<bool> TryWriteInterleaved(string key, int value)
-    {
-        try
-        {
-            dictionary[key] = value;
-            return Task.FromResult(true);
-        }
-        catch (InvalidOperationException)
-        {
-            return Task.FromResult(false);
-        }
-    }
+    public Task<bool> TryWriteInterleaved(string key, int value) => TryWrite(key, value);
 
     public Task<string[]> GetEvents() => Task.FromResult(_events.ToArray());
 

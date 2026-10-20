@@ -155,13 +155,18 @@ internal partial class JournaledStateManager
     /// directly, and its callers serialize their accesses.
     /// </para>
     /// <para>
-    /// Code which runs alongside the body reads its uncommitted changes, and its writes to states which the body changed
-    /// throw. The commit is a durable prepare: the call returns once a journal write which holds the transaction's entries
-    /// has completed, and effects which depend on durability, such as outbox deliveries, follow that write. The exclusive
-    /// section ends at the commit, so transactions which commit while the write is pending share it. When the write fails,
-    /// the call throws its exception, and the journal's failure deactivates the activation, whose next activation recovers
-    /// none of the transaction. An abort leaves no trace in the journal and rebuilds the states which the body changed from
-    /// the journal.
+    /// Code which runs alongside the body, such as a request on a reentrant grain or one which always interleaves, reads the
+    /// body's uncommitted changes, as it reads any request's intermediate state. Its writes to states which the body changed
+    /// throw <see cref="JournaledStateConflictException"/>. A durable task body's recorded reads of those states throw it
+    /// too, and the durable task runtime reruns the body once the transaction ends. The host's own work, such as the outbox's
+    /// deliveries, writes those states directly into the journal; an abort keeps its changes.
+    /// </para>
+    /// <para>
+    /// The commit is a durable prepare: the call returns once a journal write which holds the transaction's entries has
+    /// completed, and effects which depend on durability, such as outbox deliveries, follow that write. The exclusive section
+    /// ends at the commit, so transactions which commit while the write is pending share it. When the write fails, the call
+    /// throws its exception, and the journal's failure deactivates the activation, whose next activation recovers none of the
+    /// transaction. An abort leaves no trace in the journal and rebuilds the states which the body changed from the journal.
     /// </para>
     /// </remarks>
     /// <exception cref="InvalidOperationException">
