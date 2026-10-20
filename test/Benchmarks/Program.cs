@@ -369,6 +369,10 @@ internal class Program
         {
             JournalTransactionBenchmarks.ReportBytes();
         },
+        ["Journaling.TransactionCost"] = args =>
+        {
+            JournalTransactionCost.Run(args);
+        },
         ["Journaling.PositionResolution"] = args =>
         {
             PositionResolutionCost.Run(args);
