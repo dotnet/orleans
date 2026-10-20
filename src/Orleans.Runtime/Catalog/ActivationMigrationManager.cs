@@ -39,7 +39,7 @@ internal interface IActivationMigrationManagerSystemTarget : ISystemTarget
     /// This silo takes ownership of the requests when it accepts the call. The activation receives them through ordinary FIFO admission.
     /// A new activation receives the requests before it registers in the grain directory.
     /// </remarks>
-    [Alias("29E9E63F")]
+    [Alias("29E9E63F"), MigrationMessage]
     ValueTask AcceptMigratingGrains(
         [Immutable] List<GrainMigrationPackage> migratingGrains,
         CancellationToken cancellationToken = default);
@@ -82,6 +82,38 @@ internal struct GrainMigrationPackage
     /// </remarks>
     [Id(2)]
     public List<Message>? Requests { get; set; }
+
+    // Source-side ownership follows the outgoing message; it is not part of the migration wire contract.
+    [NonSerialized]
+    internal ActivationMigration? Source;
+}
+
+[AttributeUsage(AttributeTargets.Method)]
+[InvokableBaseType(typeof(GrainReference), typeof(ValueTask), typeof(MigrationMessageRequest))]
+internal sealed class MigrationMessageAttribute : Attribute;
+
+[SerializerTransparent]
+internal abstract class MigrationMessageRequest : Request, IOutgoingMessageBody
+{
+    void IOutgoingMessageBody.OnMessageCreated()
+    {
+        foreach (var package in (List<GrainMigrationPackage>)GetArgument(0))
+        {
+            package.Source?.OnMessageCreated();
+        }
+    }
+
+    void IOutgoingMessageBody.ReleaseResources()
+    {
+        // A received invocation has no source owner, and its generated Dispose clears its arguments.
+        if (GetArgument(0) is List<GrainMigrationPackage> packages)
+        {
+            foreach (var package in packages)
+            {
+                package.Source?.ReleasePayload();
+            }
+        }
+    }
 }
 
 /// <summary>
@@ -114,7 +146,8 @@ internal interface IActivationMigrationManager
 /// through <see cref="Deliver"/>. The activation does not access the requests afterwards.
 /// </para>
 /// <para>
-/// Requests which the migration sent are released once the target accepts them, and are rejected if the migration fails or its outcome is unknown,
+/// The outgoing message releases its payload when sending completes, retained bytes replace it for retry, or it is discarded.
+/// Requests are rejected if the migration fails or its outcome is unknown,
 /// so their callers can retry them. Requests which the migration did not send are forwarded, followed by the later requests.
 /// </para>
 /// </remarks>
@@ -131,6 +164,7 @@ internal sealed class ActivationMigration(
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private CancellationTokenRegistration _cancellation;
     private Stage _stage;
+    private bool _messageOwnsPayload;
 
     private enum Stage { Queued, Sent, Accepted }
 
@@ -221,6 +255,11 @@ internal sealed class ActivationMigration(
             {
                 Package.MigrationContext.Dispose();
             }
+            else if (!_messageOwnsPayload)
+            {
+                // A call filter or request creation failed before an outgoing message took the payload.
+                ReleasePayload();
+            }
 
             // Unregister without waiting for a cancellation callback which may be waiting for this lock.
             _cancellation.Unregister();
@@ -235,8 +274,34 @@ internal sealed class ActivationMigration(
         }
     }
 
+    internal void OnMessageCreated()
+    {
+        lock (_completion)
+        {
+            if (_messageOwnsPayload)
+            {
+                throw new InvalidOperationException("A migration payload can belong to only one outgoing message.");
+            }
+
+            Debug.Assert(_stage == Stage.Sent && !Completion.IsCompleted);
+            _messageOwnsPayload = true;
+        }
+    }
+
+    internal void ReleasePayload()
+    {
+        Package.MigrationContext.Dispose();
+        if (Package.Requests is { } carried)
+        {
+            foreach (var request in carried)
+            {
+                request.ReleaseBodyBuffer();
+            }
+        }
+    }
+
     /// <summary>
-    /// Disposes of the migration's requests, followed by <paramref name="laterRequests"/>, once the activation has left the catalog.
+    /// Rejects or forwards the migration's requests, followed by <paramref name="laterRequests"/>, once the activation has left the catalog.
     /// </summary>
     /// <param name="laterRequests">The requests which reached the activation after the migration started, if any.</param>
     /// <remarks>The activation calls this once, after <see cref="Completion"/> has completed.</remarks>
@@ -550,7 +615,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     }
 
     /// <summary>
-    /// Disposes of a migration's requests once its outcome is known and its source activation has left the catalog.
+    /// Rejects or forwards a migration's requests once its outcome is known and its source activation has left the catalog.
     /// </summary>
     /// <param name="source">The migrating activation's address.</param>
     /// <param name="target">The migration target.</param>
@@ -564,16 +629,10 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         {
             foreach (var request in requests)
             {
-                if (accepted)
-                {
-                    // The target owns the request. A request which this silo received still holds its serialized body.
-                    // A request from a caller on this silo shares its body with the caller's pending call, so it is left intact.
-                    request.ReleaseBodyBuffer();
-                }
-                else if (request.Direction is Message.Directions.Request)
+                if (!accepted && request.Direction is Message.Directions.Request)
                 {
                     // The target may have taken the request, and sending it may consume it, so it is rejected and its caller can retry it.
-                    // The migration's message may still be awaiting serialization, so the request is left intact rather than disposed.
+                    // The outgoing message owns body cleanup and may still be awaiting serialization.
                     MessageCenter.SendRejectionResponse(request, Message.RejectionTypes.Transient, "The activation's migration did not deliver the request.", exception: null);
                 }
 
@@ -670,7 +729,9 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                         }
 
                         items.Add(workItem);
-                        batch.Add(workItem.Package);
+                        var package = workItem.Package;
+                        package.Source = workItem;
+                        batch.Add(package);
                         batchSize += workItem.Size;
                     }
 

@@ -35,8 +35,25 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
     [Id(0), Immutable]
     private Dictionary<string, (int Offset, int Length)> _indices = new(StringComparer.Ordinal);
 
-    [Id(1), Immutable]
+    [NonSerialized]
     private PooledBuffer _buffer = new();
+
+    // PooledBuffer's codec consumes its value. Transfer ownership to it so disposing this context after sending is safe.
+    [Id(1), Immutable]
+    [System.Diagnostics.DebuggerBrowsable(System.Diagnostics.DebuggerBrowsableState.Never)]
+    internal PooledBuffer SerializedBuffer
+    {
+        get
+        {
+            lock (_lock)
+            {
+                var result = _buffer;
+                _buffer = default;
+                return result;
+            }
+        }
+        set => _buffer = value;
+    }
 
     /// <summary>
     /// Gets an upper bound on the serialized size of this context.

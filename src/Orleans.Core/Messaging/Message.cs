@@ -36,7 +36,7 @@ namespace Orleans.Runtime
 
             set
             {
-                (_bodyObject as MessageReadRequest)?.Reset();
+                ReleaseBodyBuffer();
                 _bodyObject = value;
             }
         }
@@ -72,9 +72,9 @@ namespace Orleans.Runtime
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void SetMessageReadRequest(MessageReadRequest request)
         {
-            if (_bodyObject is MessageReadRequest current && !ReferenceEquals(current, request))
+            if (!ReferenceEquals(_bodyObject, request))
             {
-                current.Reset();
+                ReleaseBodyBuffer();
             }
 
             _bodyObject = request;
@@ -87,11 +87,16 @@ namespace Orleans.Runtime
                 _bodyObject = null;
                 readRequest.Reset();
             }
+            else if (_bodyObject is IOutgoingMessageBody outgoing)
+            {
+                _bodyObject = null;
+                outgoing.ReleaseResources();
+            }
         }
 
         public void Dispose()
         {
-            (_bodyObject as MessageReadRequest)?.Reset();
+            ReleaseBodyBuffer();
             _bodyObject = null;
         }
 

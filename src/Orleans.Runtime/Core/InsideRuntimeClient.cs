@@ -202,6 +202,7 @@ namespace Orleans.Runtime
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
+                    message.Dispose();
                     return;
                 }
 
@@ -213,6 +214,7 @@ namespace Orleans.Runtime
                 context?.Complete();
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
+                    message.Dispose();
                     return;
                 }
             }
@@ -222,6 +224,7 @@ namespace Orleans.Runtime
             if (Volatile.Read(ref _isStopping) != 0)
             {
                 callbackData?.OnHostShutdown();
+                message.Dispose();
                 return;
             }
 
