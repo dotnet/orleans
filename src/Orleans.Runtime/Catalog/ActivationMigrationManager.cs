@@ -24,20 +24,12 @@ namespace Orleans.Runtime;
 /// Remote interface for migrating grain activations to a silo.
 /// </summary>
 /// <remarks>
-/// Version 1 adds <see cref="AcceptMigratingGrainsWithRequests"/> and <see cref="RetargetMigratedRequests"/>.
+/// Version 1 accepts queued requests with migrating grains and adds <see cref="RetargetMigratedRequests"/>.
 /// A silo sends queued requests only to silos whose manifest lists version 1 or later of this interface.
 /// </remarks>
 [Version(ActivationMigrationManager.MigratedRequestsVersion)]
 internal interface IActivationMigrationManagerSystemTarget : ISystemTarget
 {
-    /// <summary>
-    /// Accepts migrating grains on a best-effort basis.
-    /// </summary>
-    [Alias("29E9E63F")]
-    ValueTask AcceptMigratingGrains(
-        [Immutable] List<GrainMigrationPackage> migratingGrains,
-        CancellationToken cancellationToken = default);
-
     /// <summary>
     /// Accepts migrating grains on a best-effort basis, together with the requests which were queued for them.
     /// </summary>
@@ -47,8 +39,8 @@ internal interface IActivationMigrationManagerSystemTarget : ISystemTarget
     /// This silo takes ownership of the requests when it accepts the call. A grain's new activation queues its requests before it can receive any other request.
     /// When the grain's activation is not new, or cannot queue the requests ahead of others, this silo delivers them as it delivers forwarded requests.
     /// </remarks>
-    [Alias("AcceptMigratingGrainsWithRequests")]
-    ValueTask AcceptMigratingGrainsWithRequests(
+    [Alias("29E9E63F")]
+    ValueTask AcceptMigratingGrains(
         [Immutable] List<GrainMigrationPackage> migratingGrains,
         CancellationToken cancellationToken = default);
 
@@ -86,7 +78,6 @@ internal struct GrainMigrationPackage
     /// The requests which were queued for the grain when it migrated, if any.
     /// </summary>
     /// <remarks>
-    /// Only <see cref="IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests"/> carries requests.
     /// The requests are serialized when the package is sent, as messages are, so the destination decodes their bodies only when it invokes them.
     /// </remarks>
     [Id(2)]
@@ -137,16 +128,11 @@ internal sealed class ActivationMigration(
     long size,
     CancellationToken cancellationToken)
 {
-    private const int Queued = 0;
-    private const int Sent = 1;
-    private const int Accepted = 2;
-    private const int Completed = 3;
-
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private CancellationTokenRegistration _cancellation;
-    private bool _sent;
-    private bool _requestsAccepted;
-    private int _state;
+    private Stage _stage;
+
+    private enum Stage { Queued, Sent, Accepted }
 
     /// <summary>
     /// Completes when the target has responded and, if it took the migration's requests, their callers' retargeting has completed or the activation's deadline has passed.
@@ -168,13 +154,14 @@ internal sealed class ActivationMigration(
 
     internal void RegisterCancellation()
     {
-        _cancellation = cancellationToken.UnsafeRegister(static state => ((ActivationMigration)state!).OnCanceled(), this);
-
-        // Cancellation can complete the migration before the registration is published, in which case the registration is disposed here.
-        Interlocked.MemoryBarrier();
-        if (Volatile.Read(ref _state) == Completed)
+        lock (_completion)
         {
-            _cancellation.Dispose();
+            _cancellation = cancellationToken.UnsafeRegister(static state => ((ActivationMigration)state!).OnCanceled(), this);
+            if (Completion.IsCompleted)
+            {
+                // Register can invoke the callback synchronously before assigning the registration.
+                _cancellation.Unregister();
+            }
         }
     }
 
@@ -183,43 +170,63 @@ internal sealed class ActivationMigration(
     /// </summary>
     internal bool TrySend()
     {
-        if (!TryTransition(Queued, Sent))
+        lock (_completion)
         {
-            return false;
-        }
+            if (Completion.IsCompleted)
+            {
+                return false;
+            }
 
-        _sent = true;
-        return true;
+            Debug.Assert(_stage == Stage.Queued);
+            _stage = Stage.Sent;
+            return true;
+        }
     }
 
     /// <summary>
-    /// Records that the target took the migration's requests, after which cancellation completes the migration while its callers are retargeted.
+    /// Records acceptance and completes migrations which have no pending retargets or have reached their deadline.
     /// </summary>
     internal void SetAccepted()
     {
-        if (TryTransition(Sent, Accepted) && cancellationToken.IsCancellationRequested)
+        lock (_completion)
         {
-            OnCanceled();
+            if (Completion.IsCompleted)
+            {
+                return;
+            }
+
+            Debug.Assert(_stage == Stage.Sent);
+            _stage = Stage.Accepted;
+            if (Routes is null || cancellationToken.IsCancellationRequested)
+            {
+                Complete();
+            }
         }
     }
 
     /// <summary>
-    /// Records the migration's outcome and completes it.
+    /// Completes the migration after acceptance, retargeting, or failure.
     /// </summary>
-    /// <param name="requestsAccepted">Whether the target took the requests which the migration carried.</param>
     /// <param name="exception">The error which prevented the migration, if any.</param>
-    internal void SetOutcome(bool requestsAccepted, Exception? exception = null)
+    internal void Complete(Exception? exception = null)
     {
-        var state = Volatile.Read(ref _state);
-        while (state != Completed)
+        lock (_completion)
         {
-            if (TryTransition(state, Completed))
+            if (Completion.IsCompleted)
             {
-                Complete(requestsAccepted, exception);
                 return;
             }
 
-            state = Volatile.Read(ref _state);
+            // Unregister without waiting for a cancellation callback which may be waiting for this lock.
+            _cancellation.Unregister();
+            if (exception is null)
+            {
+                _completion.SetResult();
+            }
+            else
+            {
+                _completion.SetException(exception);
+            }
         }
     }
 
@@ -231,37 +238,19 @@ internal sealed class ActivationMigration(
     public void Deliver(List<Message>? laterRequests)
     {
         Debug.Assert(Completion.IsCompleted, "The migration delivers its requests once its outcome is known.");
-        manager.DeliverRequests(source, target, carried: _sent && Package.Requests is not null, _requestsAccepted, requests, laterRequests);
+        manager.DeliverRequests(source, target, carried: _stage != Stage.Queued && Package.Requests is not null, _stage == Stage.Accepted, requests, laterRequests);
         requests = null;
     }
 
     private void OnCanceled()
     {
-        if (TryTransition(Queued, Completed))
+        lock (_completion)
         {
-            // The migration has not been sent, so its requests remain with this silo.
-            Complete(requestsAccepted: false, new OperationCanceledException(cancellationToken));
-        }
-        else if (TryTransition(Accepted, Completed))
-        {
-            // The target owns the requests. Their callers' retargeting continues without this migration waiting for it.
-            Complete(requestsAccepted: true, exception: null);
-        }
-    }
-
-    private bool TryTransition(int from, int to) => Interlocked.CompareExchange(ref _state, to, from) == from;
-
-    private void Complete(bool requestsAccepted, Exception? exception)
-    {
-        _requestsAccepted = requestsAccepted;
-        _cancellation.Dispose();
-        if (exception is null)
-        {
-            _completion.SetResult();
-        }
-        else
-        {
-            _completion.SetException(exception);
+            // A sent migration waits for its outcome before disposing of its requests.
+            if (_stage != Stage.Sent)
+            {
+                Complete(_stage == Stage.Queued ? new OperationCanceledException(cancellationToken) : null);
+            }
         }
     }
 }
@@ -346,11 +335,6 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private MessageCenter MessageCenter => _messageCenter ??= _runtimeClient.ServiceProvider.GetRequiredService<MessageCenter>();
 
     public async ValueTask AcceptMigratingGrains(
-        List<GrainMigrationPackage> migratingGrains,
-        CancellationToken cancellationToken = default)
-        => await AcceptMigratingGrainsWithRequests(migratingGrains, cancellationToken);
-
-    public async ValueTask AcceptMigratingGrainsWithRequests(
         List<GrainMigrationPackage> migratingGrains,
         CancellationToken cancellationToken = default)
     {
@@ -504,7 +488,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         migration.RegisterCancellation();
         if (!GetOrCreateWorker(targetSilo).TryWrite(migration))
         {
-            migration.SetOutcome(requestsAccepted: false, new SiloUnavailableException($"Silo {targetSilo} is no longer active"));
+            migration.Complete(new SiloUnavailableException($"Silo {targetSilo} is no longer active"));
         }
 
         return migration;
@@ -651,7 +635,6 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                 {
                     // Collect a batch of work items within the message size limit.
                     long batchSize = 0;
-                    var carriesRequests = false;
                     while (batch.Count < MaxBatchSize
                         && reader.TryPeek(out var next)
                         && (batch.Count == 0 || batchSize + next.Size <= maxBatchSize)
@@ -666,7 +649,6 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                         items.Add(workItem);
                         batch.Add(workItem.Package);
                         batchSize += workItem.Size;
-                        carriesRequests |= workItem.Package.Requests is not null;
                     }
 
                     if (items.Count == 0)
@@ -674,20 +656,8 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                         continue;
                     }
 
-                    // Attempt to migrate the batch.
-                    if (!carriesRequests)
-                    {
-                        await remote.AcceptMigratingGrains(batch, _shuttingDownCts.Token);
-                        foreach (var item in items)
-                        {
-                            item.SetOutcome(requestsAccepted: false);
-                        }
-                    }
-                    else
-                    {
-                        await remote.AcceptMigratingGrainsWithRequests(batch, _shuttingDownCts.Token);
-                        CompleteAfterRetargeting(items);
-                    }
+                    await remote.AcceptMigratingGrains(batch, _shuttingDownCts.Token);
+                    CompleteAfterRetargeting(items);
 
                     LogDebugMigratedActivations(items.Count, targetSilo);
                 }
@@ -701,7 +671,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                     // The target may have taken the requests which the batch carried, so they are rejected rather than resent.
                     foreach (var item in items)
                     {
-                        item.SetOutcome(requestsAccepted: false, exception);
+                        item.Complete(exception);
                     }
 
                     // If the silo is terminating, we should stop trying to migrate activations to it.
@@ -740,19 +710,12 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         for (var i = 0; i < items.Count; i++)
         {
             var item = items[i];
-            if (item.Package.Requests is null)
-            {
-                item.SetOutcome(requestsAccepted: false);
-                continue;
-            }
-
+            item.SetAccepted();
             if (item.Routes is not { } routes)
             {
-                item.SetOutcome(requestsAccepted: true);
                 continue;
             }
 
-            item.SetAccepted();
             (awaitingRetarget ??= []).Add(item);
             foreach (var (callerSilo, route) in routes)
             {
@@ -800,7 +763,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             {
                 foreach (var item in items)
                 {
-                    item.SetOutcome(requestsAccepted: true);
+                    item.Complete();
                 }
             }
         }
@@ -844,7 +807,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             var exception = new SiloUnavailableException($"Silo {targetSilo} is no longer active");
             while (entry.WorkItemChannel.Reader.TryRead(out var item))
             {
-                item.SetOutcome(requestsAccepted: false, exception);
+                item.Complete(exception);
             }
         }
     }

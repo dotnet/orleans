@@ -68,7 +68,7 @@ sequenceDiagram
 
     Manager->>Source: Begin migration
     Source->>Source: OnDehydrate(MigrationContext)
-    Manager->>Target: AcceptMigratingGrainsWithRequests
+    Manager->>Target: AcceptMigratingGrains
     Target->>Target: Create, OnRehydrate, and queue requests
     Target->>Directory: Replace the source's registration
     Target->>Target: OnActivateAsync

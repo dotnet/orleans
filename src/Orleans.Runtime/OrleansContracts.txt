@@ -63,7 +63,6 @@ class [GrainType("remotegraindirectory")] Orleans.Runtime.GrainDirectory.RemoteG
 
 interface [GrainInterfaceType("Orleans.Runtime.IActivationMigrationManagerSystemTarget")] Orleans.Runtime.IActivationMigrationManagerSystemTarget [Version(1)]
   29E9E63F: AcceptMigratingGrains(System.Collections.Generic.List<Orleans.Runtime.GrainMigrationPackage>, System.Threading.CancellationToken) -> ValueTask
-  AcceptMigratingGrainsWithRequests: AcceptMigratingGrainsWithRequests(System.Collections.Generic.List<Orleans.Runtime.GrainMigrationPackage>, System.Threading.CancellationToken) -> ValueTask
   RetargetMigratedRequests: RetargetMigratedRequests(System.Collections.Generic.List<Orleans.Runtime.MigratedRequestRoute>, System.Threading.CancellationToken) -> ValueTask
 
 interface [GrainInterfaceType("Orleans.Runtime.ICatalog")] Orleans.Runtime.ICatalog [Version(0)]

@@ -408,7 +408,7 @@ public sealed class RetirementHandoffTests
         {
             switch (context.Request.GetMethodName())
             {
-                case nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests):
+                case nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains):
                     await context.Invoke();
                     throw new InvalidOperationException("The acknowledgement is lost.");
                 case nameof(IActivationMigrationManagerSystemTarget.RetargetMigratedRequests):
@@ -469,7 +469,7 @@ public sealed class RetirementHandoffTests
             silo.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = DeactivationTimeout);
             silo.AddIncomingGrainCallFilter(async context =>
             {
-                if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
+                if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
                 {
                     acceptArrived.TrySetResult();
                     await releaseFailure.Task;
@@ -525,7 +525,7 @@ public sealed class RetirementHandoffTests
         var migrationsReceived = 0;
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
         {
-            if (context.Request.GetMethodName() is nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests) or nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
             {
                 Interlocked.Increment(ref migrationsReceived);
             }
@@ -564,7 +564,7 @@ public sealed class RetirementHandoffTests
             silo.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = DeactivationTimeout);
             silo.AddIncomingGrainCallFilter(async context =>
             {
-                if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
+                if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
                 {
                     acceptArrived.TrySetResult();
                     await releaseFailure.Task;
@@ -624,7 +624,7 @@ public sealed class RetirementHandoffTests
         var received = new ConcurrentQueue<GrainId>();
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
         {
-            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
             {
                 foreach (var package in (List<GrainMigrationPackage>)context.Request.GetArgument(0)!)
                 {
@@ -714,7 +714,7 @@ public sealed class RetirementHandoffTests
         // The target fails the migration.
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
         {
-            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
             {
                 throw new InvalidOperationException("The migration fails.");
             }
@@ -758,10 +758,15 @@ public sealed class RetirementHandoffTests
             silo.AddIncomingGrainCallFilter(async context =>
             {
                 if (context.Request.GetMethodName() is nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains)
-                    or nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests)
                     or nameof(IActivationMigrationManagerSystemTarget.RetargetMigratedRequests))
                 {
                     calls.Enqueue(context.Request.GetMethodName());
+                }
+
+                if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
+                {
+                    var packages = (List<GrainMigrationPackage>)context.Request.GetArgument(0)!;
+                    Assert.All(packages, package => Assert.Null(package.Requests));
                 }
 
                 await context.Invoke();
@@ -833,7 +838,7 @@ public sealed class RetirementHandoffTests
             MigrationContext = context,
             Requests = [request],
         };
-        await migrationManager.AcceptMigratingGrainsWithRequests([package], Cancellation);
+        await migrationManager.AcceptMigratingGrains([package], Cancellation);
         Assert.Same(activation, FindActivation(silo, grain.GetGrainId()));
         Assert.Equal(1, activation.WaitingCount);
         Assert.Equal(1, request.ForwardCount);
@@ -866,7 +871,7 @@ public sealed class RetirementHandoffTests
             MigrationContext = new MigrationContext(silo.ServiceProvider.GetRequiredService<SerializerSessionPool>()),
             Requests = [CreateOneWayRequest(grainId, 1), CreateOneWayRequest(grainId, 2), CreateOneWayRequest(grainId, 3)],
         };
-        var accepting = migrationManager.AcceptMigratingGrainsWithRequests([package], Cancellation).AsTask();
+        var accepting = migrationManager.AcceptMigratingGrains([package], Cancellation).AsTask();
         try
         {
             // Ordinary delivery admits two requests to an activation with a hard limit of one, so the new activation does not queue the batch of three ahead of others.
@@ -916,7 +921,7 @@ public sealed class RetirementHandoffTests
         var received = new TaskCompletionSource<(Message Expired, Message Live)>(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
         {
-            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
             {
                 var package = Assert.Single((List<GrainMigrationPackage>)context.Request.GetArgument(0)!);
                 var requests = Assert.IsType<List<Message>>(package.Requests);
@@ -985,7 +990,7 @@ public sealed class RetirementHandoffTests
             silo.Services.AddSingleton<MigrationSerializationCallbacks>();
             silo.AddOutgoingGrainCallFilter(async context =>
             {
-                if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
+                if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
                 {
                     var batch = (List<GrainMigrationPackage>)context.Request.GetArgument(0)!;
                     switch (Interlocked.Increment(ref invocationCount))
@@ -1119,7 +1124,7 @@ public sealed class RetirementHandoffTests
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
         {
             await context.Invoke();
-            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
             {
                 var package = Assert.Single((List<GrainMigrationPackage>)context.Request.GetArgument(0)!);
                 var request = Assert.Single(package.Requests!);
@@ -1234,7 +1239,7 @@ public sealed class RetirementHandoffTests
         var releaseAccept = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
         {
-            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
             {
                 acceptArrived.TrySetResult();
                 await releaseAccept.Task;
@@ -1671,7 +1676,7 @@ public sealed class RetirementHandoffTests
         var migrationsReceived = 0;
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
         {
-            if (context.Request.GetMethodName() is nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests) or nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
             {
                 Interlocked.Increment(ref migrationsReceived);
             }
