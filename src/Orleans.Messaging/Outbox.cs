@@ -487,7 +487,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 var status = outcome.Result?.Status;
                 if (status == DeliveryStatus.Expired)
                 {
-                    // Fencing proves no new admission, not that an earlier attempt was never accepted.
+                    // Expired means this send is at or below the admission floor; earlier acceptance remains unknown.
                     var reason = outcome.Result!.Value.Message ?? "The message was sent before the receiver's deduplication window; its earlier delivery outcome is unknown.";
                     StageDeadLetter(
                         current,
