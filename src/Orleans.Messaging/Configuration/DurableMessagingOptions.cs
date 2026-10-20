@@ -69,7 +69,8 @@ public class DurableMessagingOptions
     /// and survives recovery and migration. A processed record becomes eligible for removal once its
     /// <see cref="InboxMessage.SentAt"/> is at or below the durable floor. A message the inbox doesn't track whose send
     /// time is at or below the floor receives <see cref="DeliveryStatus.Expired"/>, including after a backward clock
-    /// jump.
+    /// jump. A delivery whose send time is later than the inbox's clock plus this window is rejected without staging
+    /// anything, so every record becomes eligible for removal within twice this window of the receiver's clock.
     /// </para>
     /// <para>
     /// Clock jumps and skew change when messages expire and how long records are retained; deduplication follows the
@@ -124,8 +125,8 @@ public class DurableMessagingOptions
     /// </para>
     /// </remarks>
     /// <value>
-    /// Must be greater than zero and less than <see cref="DeduplicationWindow"/>, so the receiver admits every attempt.
-    /// Defaults to 6 hours.
+    /// Must be greater than zero and less than <see cref="DeduplicationWindow"/>, so the retry budget ends within the
+    /// receiver's retention window. Defaults to 6 hours.
     /// </value>
     public TimeSpan OutboxRetryTimeout { get; set; } = TimeSpan.FromHours(6);
 
