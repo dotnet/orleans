@@ -2311,9 +2311,6 @@ internal sealed partial class DurableTaskGrainRuntime(
         GrainDurableTaskContext context,
         Task start)
     {
-        // The invocation can start from the flow which scheduled it, such as a parent's body: its own work, such as
-        // committing its response, isn't that body's.
-        using var hostFlow = DurableTaskHostFlow.Enter();
         await start;
         DurableTaskResponse? response;
         try
@@ -2393,7 +2390,6 @@ internal sealed partial class DurableTaskGrainRuntime(
         TState state,
         GrainDurableTaskContext context)
     {
-        using var _ = DurableTaskHostFlow.Exit();
         DurableTask task;
         using (DurableTaskContext.Enter(context))
         {
@@ -2413,25 +2409,17 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     /// <summary>
-    /// Marks the runtime's work which the calling code requests, such as a cancellation, abort, or poll, until the returned
-    /// value is disposed, so the accesses to journaled state which it makes aren't recorded as a calling body's.
+    /// Stages the pending read records of the durable task body which calls the runtime's work, such as a cancellation or
+    /// an abort, which can commit a durable consequence of the body's decisions.
     /// </summary>
-    /// <param name="stagesBodyReads">
-    /// Whether the work can commit a durable consequence of a calling body's decisions, so the body's pending read records
-    /// are staged first.
-    /// </param>
-    private DurableTaskHostFlow.Restorer EnterHostWork(bool stagesBodyReads)
+    private void FlushCallingBodysReads()
     {
-        if (stagesBodyReads
-            && !DurableTaskHostFlow.IsActive
-            && DurableTaskContext.TryGetCurrent(out var current)
+        if (DurableTaskContext.TryGetCurrent(out var current)
             && current is GrainDurableTaskContext context
             && ReferenceEquals(context.Runtime, this))
         {
             context.FlushAccessLog();
         }
-
-        return DurableTaskHostFlow.Enter();
     }
 
     private sealed record RunningRequest(
@@ -2857,7 +2845,6 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <inheritdoc/>
     public async ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options, CancellationToken cancellationToken)
     {
-        using var hostFlow = EnterHostWork(stagesBodyReads: false);
         ThrowIfStopping();
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -2999,7 +2986,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         string? reason,
         CancellationToken cancellationToken)
     {
-        using var hostFlow = EnterHostWork(stagesBodyReads: true);
+        FlushCallingBodysReads();
 
         // Cancellation is persisted before it propagates.
         var propagation = StageCancellationTree(taskId, callerId, reason);
@@ -3144,7 +3131,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <remarks>A terminal task, or a task which this grain doesn't retain, is unchanged.</remarks>
     internal async ValueTask AbortTaskAsync(TaskId taskId, string reason, CancellationToken cancellationToken)
     {
-        using var hostFlow = EnterHostWork(stagesBodyReads: true);
+        FlushCallingBodysReads();
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
         if (StageAbort(taskId, reason, callerId: default))
         {

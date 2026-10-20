@@ -769,6 +769,14 @@ public sealed partial class DurableTaskSignalTests
     {
         public JournaledStateContextProvider? ContextProvider { get; set; }
 
+        public void EnterHostAccess()
+        {
+        }
+
+        public void ExitHostAccess()
+        {
+        }
+
         private readonly Dictionary<string, IStateMachine> _stateMachines = new(StringComparer.Ordinal);
         private readonly SemaphoreSlim _writeGate = new(1, 1);
 

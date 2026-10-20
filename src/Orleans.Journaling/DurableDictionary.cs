@@ -25,7 +25,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     private readonly IDurableDictionaryCommandCodec<TKey, TValue> _codec;
     private readonly Dictionary<TKey, TValue> _items = [];
     private readonly JournaledStateManager? _manager;
-    // Null for the manager's own bookkeeping dictionary, whose accesses always run directly.
+    // Null for state which a host owns, such as the manager's own bookkeeping, whose accesses always run directly.
     private readonly JournaledStateAccessTarget? _accessTarget;
     private JournalStreamWriter _writer;
     private bool _hasStagedEntries;
@@ -41,21 +41,37 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         IJournaledStateManager manager,
         JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
-        : this(JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<TKey, TValue>>(serviceProvider, shared.JournalFormatKey))
+        : this(key, manager, JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<TKey, TValue>>(serviceProvider, shared.JournalFormatKey), routed: true)
+    {
+    }
+
+    internal DurableDictionary(string key, IJournaledStateManager manager, IDurableDictionaryCommandCodec<TKey, TValue> codec)
+        : this(key, manager, codec, routed: true)
+    {
+    }
+
+    private DurableDictionary(string key, IJournaledStateManager manager, IDurableDictionaryCommandCodec<TKey, TValue> codec, bool routed) : this(codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _manager = manager as JournaledStateManager;
-        _accessTarget = new(key, manager);
+        _accessTarget = routed ? new(key, manager) : null;
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableDictionary(string key, IJournaledStateManager manager, IDurableDictionaryCommandCodec<TKey, TValue> codec) : this(codec)
-    {
-        ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _manager = manager as JournaledStateManager;
-        _accessTarget = new(key, manager);
-        manager.RegisterStateMachine(key, this);
-    }
+    /// <summary>
+    /// Creates a dictionary which a host owns, such as the durable task runtime's bookkeeping, whose accesses always run
+    /// directly: no host's context records them, whichever code accesses it.
+    /// </summary>
+    /// <param name="key">The state's name.</param>
+    /// <param name="services">The activation's services, which supply its journaled state manager and the journal format's codec.</param>
+    internal static DurableDictionary<TKey, TValue> CreateHostState(string key, IServiceProvider services) =>
+        new(
+            key,
+            services.GetRequiredService<IJournaledStateManager>(),
+            JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<TKey, TValue>>(
+                services,
+                services.GetRequiredService<JournaledStateManagerShared>().JournalFormatKey),
+            routed: false);
 
     public TValue this[TKey key]
     {

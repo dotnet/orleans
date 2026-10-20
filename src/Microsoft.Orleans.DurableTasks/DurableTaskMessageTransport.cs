@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks;
+using Orleans.Journaling;
 using Orleans.Messaging;
 using Orleans.Runtime;
 
@@ -27,11 +28,14 @@ namespace Orleans.DurableTasks.Runtime;
 /// journal write; its identity also covers the delay's incarnation, generation, and due time. A signal's identity also
 /// covers its name, its value, and the sending run's incarnation. A subscription's, an unsubscription's, and a
 /// subscriber's completion's identities also cover the subscribing task, so each subscription of a task has its own
-/// messages. The runtime derives readiness from journaled state, so duplicate and stale resumes are harmless.
+/// messages. The runtime derives readiness from journaled state, so duplicate and stale resumes are harmless. The
+/// runtime's sends are its own work, even when a durable task body's operation requests them, so they run as the
+/// journaled state host's: no context records them as a body's accesses.
 /// </remarks>
 internal sealed class DurableTaskMessageTransport(
     Lazy<IOutbox> outbox,
-    DurableTaskMessageTypes messageTypes) : IDurableTaskMessageTransport
+    DurableTaskMessageTypes messageTypes,
+    IJournaledStateContextHost stateHost) : IDurableTaskMessageTransport
 {
     internal const string MessageIdRoot = "durable-rpc";
 
@@ -83,7 +87,18 @@ internal sealed class DurableTaskMessageTransport(
             ReceiverId = target,
         };
 
-    public void Send(MessageId messageId) => outbox.Value.Send(messageId);
+    public void Send(MessageId messageId)
+    {
+        stateHost.EnterHostAccess();
+        try
+        {
+            outbox.Value.Send(messageId);
+        }
+        finally
+        {
+            stateHost.ExitHostAccess();
+        }
+    }
 
     /// <remarks>
     /// The identity of a completion to a subscriber whose task differs from <paramref name="taskId"/> also covers that
@@ -285,8 +300,19 @@ internal sealed class DurableTaskMessageTransport(
         TaskId taskId,
         T body,
         MessageId messageId,
-        DateTimeOffset? deliverAt) =>
-        outbox.Value.Send(Create(messageType, sender, target, taskId, body, messageId, deliverAt));
+        DateTimeOffset? deliverAt)
+    {
+        var message = Create(messageType, sender, target, taskId, body, messageId, deliverAt);
+        stateHost.EnterHostAccess();
+        try
+        {
+            outbox.Value.Send(message);
+        }
+        finally
+        {
+            stateHost.ExitHostAccess();
+        }
+    }
 
     private static OutboxMessage Create<T>(
         MessageType<T> messageType,

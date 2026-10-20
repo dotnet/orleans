@@ -37,6 +37,19 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
     /// </summary>
     public JournaledStateContextProvider? ContextProvider { get; set; }
 
+    /// <summary>Gets the depth of the host's work which <see cref="EnterHostAccess"/> marked.</summary>
+    internal int HostAccessDepth { get; private set; }
+
+    /// <inheritdoc/>
+    public void EnterHostAccess() => HostAccessDepth++;
+
+    /// <inheritdoc/>
+    public void ExitHostAccess()
+    {
+        Debug.Assert(HostAccessDepth > 0, "The host exits only the work which it entered.");
+        HostAccessDepth--;
+    }
+
     // The names of the states whose accesses run through a context, by identifier, which records of accesses store.
     private Dictionary<int, string>? _accessTargetNames;
 

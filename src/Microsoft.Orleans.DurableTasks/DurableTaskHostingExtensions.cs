@@ -72,12 +72,21 @@ public static class DurableTaskHostingExtensions
             });
         siloBuilder.Services.AddSingleton<DurableTaskGrainRuntimeShared>();
         siloBuilder.Services.TryAddSingleton<DurableTaskMessageTypes>();
+
+        // The runtime's own state is never part of a body's records: no context routes its accesses.
+        siloBuilder.Services.TryAddKeyedScoped<IDurableDictionary<TaskId, DateTimeOffset>>(
+            "$task-logical-times",
+            static (services, key) => DurableDictionary<TaskId, DateTimeOffset>.CreateHostState((string)key!, services));
+        siloBuilder.Services.TryAddKeyedScoped<IDurableDictionary<MessageId, PendingInvocation>>(
+            "$task-invocations",
+            static (services, key) => DurableDictionary<MessageId, PendingInvocation>.CreateHostState((string)key!, services));
         siloBuilder.Services.AddScoped<DurableTaskGrainRuntime>();
         siloBuilder.Services.AddFromExisting<IDurableTaskGrainRuntime, DurableTaskGrainRuntime>();
         siloBuilder.Services.AddFromExisting<IDurableTaskManager, DurableTaskGrainRuntime>();
         siloBuilder.Services.AddScoped(static services => new DurableTaskMessageTransport(
             new Lazy<IOutbox>(services.GetRequiredService<IOutbox>),
-            services.GetRequiredService<DurableTaskMessageTypes>()));
+            services.GetRequiredService<DurableTaskMessageTypes>(),
+            (IJournaledStateContextHost)services.GetRequiredService<IJournaledStateManager>()));
         siloBuilder.Services.AddFromExisting<IDurableTaskMessageTransport, DurableTaskMessageTransport>();
         siloBuilder.Services.AddScoped<DurableTaskMessageHandler>();
         siloBuilder.Services.TryAddEnumerable(
@@ -89,6 +98,15 @@ public static class DurableTaskHostingExtensions
 
         siloBuilder.Services.TryAddSingleton(TimeProvider.System);
         siloBuilder.Services.TryAddKeyedScoped(DurableTaskAccessLogs.StateMachineName, static (services, _) => DurableTaskAccessLogs.Create(services));
+        siloBuilder.Services.TryAddKeyedScoped<IDurableDictionary<TaskId, DurableTaskState>>(
+            "$tasks",
+            static (services, key) => DurableDictionary<TaskId, DurableTaskState>.CreateHostState((string)key!, services));
+        siloBuilder.Services.TryAddKeyedScoped<IDurableDictionary<TaskId, byte[]>>(
+            "$task-requests",
+            static (services, key) => DurableDictionary<TaskId, byte[]>.CreateHostState((string)key!, services));
+        siloBuilder.Services.TryAddKeyedScoped<IDurableDictionary<TaskId, byte[]>>(
+            "$task-results",
+            static (services, key) => DurableDictionary<TaskId, byte[]>.CreateHostState((string)key!, services));
         siloBuilder.Services.TryAddScoped<DurableTaskGrainStorage>();
         siloBuilder.Services.AddFromExisting<IDurableTaskGrainStorage, DurableTaskGrainStorage>();
         return siloBuilder;
