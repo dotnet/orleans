@@ -1253,6 +1253,63 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task ReplayedRemoteCancellationDoesNotSendItsMessageAgain() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        storage.AddInvoked(TaskId.Parse("root"));
+        var taskId = TaskId.Parse("root/remote");
+        var target = GrainId.Create("target", "one");
+        var state = storage.GetOrCreate(taskId);
+        storage.SetRemoteRequest(taskId, state, target, "method", "fingerprint");
+        await runtime.CancelRemoteAsync(taskId, target, reason: "first", TestContext.Current.CancellationToken);
+        var requestedAt = storage.Get(taskId).CancellationRequestedAt;
+        Assert.Single(transport.Cancellations);
+
+        // The outbox may already have retired the committed message. Sending its identity again would start a new send
+        // with a later admission cutoff, which a receiver that processed the first rejects, so a recovered activation whose
+        // replay cancels the task again stages nothing.
+        var (recovered, _, _, recoveredTransport) = CreateRuntime(storage, manager);
+        await recovered.CancelRemoteAsync(taskId, target, reason: "replayed", TestContext.Current.CancellationToken);
+        await runtime.CancelRemoteAsync(taskId, target, reason: "repeated", TestContext.Current.CancellationToken);
+
+        Assert.Empty(recoveredTransport.Cancellations);
+        Assert.Single(transport.Cancellations);
+        Assert.Equal(requestedAt, storage.Get(taskId).CancellationRequestedAt);
+        Assert.Equal("first", storage.Get(taskId).CancellationReason);
+    });
+
+    [Fact]
+    public Task DeletingTreeDoesNotSendRecordedRemoteCancellationAgain() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime(TimeSpan.FromDays(1));
+        var taskId = TaskId.Parse("root");
+        var canceledId = TaskId.Parse("root/canceled");
+        var pendingId = TaskId.Parse("root/pending");
+        var target = GrainId.Create("target", "one");
+        runtime.ScheduleFromInbox(taskId, CreateRequest(1));
+        var canceled = storage.GetOrCreate(canceledId);
+        storage.SetRemoteRequest(canceledId, canceled, target, "method", "canceled");
+        storage.SetRemoteRequest(pendingId, storage.GetOrCreate(pendingId), target, "method", "pending");
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await runtime.CancelRemoteAsync(canceledId, target, reason: null, TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => transport.Completions.Count == 1);
+        await WaitUntilIdleAsync(runtime);
+        var completion = Assert.Single(transport.Completions);
+        var canceledWireId = runtime.GetWireId(canceledId);
+        var pendingWireId = runtime.GetWireId(pendingId);
+        Assert.Equal(canceledWireId, Assert.Single(transport.Cancellations).TaskId);
+
+        // Deleting the tree cancels its pending remote child; the canceled child's committed message is the outbox's.
+        ((IOutboxMessageSource)runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.Delivered());
+
+        Assert.False(storage.Contains(canceledId));
+        Assert.False(storage.Contains(pendingId));
+        Assert.Equal(
+            new[] { canceledWireId, pendingWireId },
+            transport.Cancellations.Select(static cancellation => cancellation.TaskId));
+    });
+
+    [Fact]
     public Task FailedCancellationWriteFencesAndKeepsMonotonicCancellation() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, _) = CreateRuntime();

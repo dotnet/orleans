@@ -115,7 +115,6 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly HashSet<TaskId> _pendingStarts = [];
     private readonly Dictionary<TaskId, DurableTaskResponse> _pendingHandleResponses = [];
     private readonly Dictionary<long, CancellationPropagation> _pendingCancellationPropagations = [];
-    private readonly HashSet<(TaskId TaskId, GrainId Target)> _preStagedCancellations = [];
     private readonly Dictionary<long, Task> _backgroundTasks = [];
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
@@ -1039,13 +1038,14 @@ internal sealed partial class DurableTaskGrainRuntime(
                 $"Durable task '{taskId}' is not associated with remote target '{target}'.");
         }
 
-        // The cancellation and its message commit together; the outbox delivers the message only after that commit. The
-        // message carries the recorded reason, which the first request determines.
-        var recordedReason = state.CancellationRequestedAt.HasValue ? state.CancellationReason : reason;
-        _storage.RequestCancellation(taskId, state, reason);
-        if (!_preStagedCancellations.Remove((taskId, target)))
+        // The cancellation and its message commit together; the outbox delivers the message only after that commit, and
+        // retries it under the admission cutoff of that send. A recorded request, such as one which a replay repeats,
+        // therefore stages nothing: sending the identity again after the outbox retired it would be a new send, which a
+        // receiver that processed the first rejects for its different cutoff.
+        if (!state.CancellationRequestedAt.HasValue)
         {
-            StageCancellation(taskId, target, recordedReason);
+            _storage.RequestCancellation(taskId, state, reason);
+            StageCancellation(taskId, target, reason);
         }
 
         await WriteStateAsync(cancellationToken);
@@ -1749,7 +1749,6 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         _pendingCancellationPropagations.Clear();
-        _preStagedCancellations.Clear();
         _pendingCompletions = null;
         _nextExpiry = DateTimeOffset.MinValue;
         _committingStarts = [];
@@ -2722,8 +2721,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         var terminal = state.CompletedAt.HasValue;
         if (!terminal && !state.RemoteTarget.IsDefault)
         {
-            StageCancellation(taskId, state.RemoteTarget, state.CancellationReason);
-            _preStagedCancellations.Remove((taskId, state.RemoteTarget));
+            // A recorded cancellation request staged its message, which the outbox owns until it retires; sending the
+            // identity again would be a new send with a different admission cutoff.
+            if (!state.CancellationRequestedAt.HasValue)
+            {
+                StageCancellation(taskId, state.RemoteTarget, state.CancellationReason);
+            }
         }
         else if (!terminal && TryGetSubscription(state, out var target, out var subscribedTaskId))
         {
@@ -3006,8 +3009,8 @@ internal sealed partial class DurableTaskGrainRuntime(
                     && request.Context is { } requestContext
                     && requestContext.TargetId != GrainId)
                 {
+                    // The recorded request covers the execution's own cancellation of its remote call; see CancelRemoteAsync.
                     StageCancellation(currentTaskId, requestContext.TargetId, reason);
-                    _preStagedCancellations.Add((currentTaskId, requestContext.TargetId));
                 }
 
                 contexts.Add(context);
