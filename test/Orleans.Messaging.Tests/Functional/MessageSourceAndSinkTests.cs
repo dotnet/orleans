@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
+using Orleans.DurableJobs;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -27,7 +28,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     private SourceSinkProbe Probe => fixture.Probe;
 
     [Fact]
-    public async Task SinkAcceptance_DeduplicatesWithinTheWindowAndTheSinkReportsLaterDuplicates()
+    public async Task SinkAcceptance_TrackedSentAtDeduplicatesWithoutReofferingTheSink()
     {
         var receiver = NewGrain();
         var message = NewInboxMessage("deduplicated", NewPayload());
@@ -41,7 +42,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
 
         fixture.Clock.Advance(MessageSourceAndSinkFixture.DeduplicationWindow);
         Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(message, Token)).Status);
-        Assert.Equal(2, Probe.For(receiver).SinkOffers);
+        Assert.Equal(1, Probe.For(receiver).SinkOffers);
         Assert.Equal(1, Probe.For(receiver).SinkAcceptances);
         Assert.Equal(0, Probe.For(receiver).Handled);
         Assert.Equal(0, await OnGrainAsync(receiver, context => Inbox(context).Count));
@@ -92,17 +93,17 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(0, Probe.For(receiver).SinkAcceptances);
         Assert.Equal(0, Probe.For(receiver).Handled);
 
-        // Once the processed record leaves the deduplication window, the message is offered to the sink again.
+        // A tracked rejection remains the answer until an acknowledged floor compacts its send time.
         fixture.Clock.Advance(MessageSourceAndSinkFixture.DeduplicationWindow);
-        Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(message, Token)).Status);
-        Assert.Equal(2, Probe.For(receiver).SinkOffers);
-        Assert.Equal(1, Probe.For(receiver).SinkAcceptances);
+        AssertRejected(await extension.DeliverAsync(message, Token));
+        Assert.Equal(1, Probe.For(receiver).SinkOffers);
+        Assert.Equal(0, Probe.For(receiver).SinkAcceptances);
 
-        // The new completion replaces the old rejection, so a lost-answer retry learns that the message was processed.
-        Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(message, Token)).Status);
+        // Removing the diagnostic dead letter does not erase the durable receiver decision.
+        AssertRejected(await extension.DeliverAsync(message, Token));
         await receiver.DeactivateAsync();
-        Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(message, Token)).Status);
-        Assert.Equal(2, Probe.For(receiver).SinkOffers);
+        AssertRejected(await extension.DeliverAsync(message, Token));
+        Assert.Equal(1, Probe.For(receiver).SinkOffers);
 
         static void AssertRejected(DeliveryResult duplicate)
         {
@@ -210,9 +211,10 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
 
     private static byte[] NewPayload() => RandomNumberGenerator.GetBytes(48);
 
-    private static InboxMessage NewInboxMessage(string name, byte[] payload, DateTimeOffset? deliverAt = null) => new()
+    private InboxMessage NewInboxMessage(string name, byte[] payload, DateTimeOffset? deliverAt = null) => new()
     {
-        Envelope = new Envelope { MessageId = NewMessageId(name), Payload = payload, Subject = SourceSinkGrain.Subject, DeliverAt = deliverAt }
+        Envelope = new Envelope { MessageId = NewMessageId(name), Payload = payload, Subject = SourceSinkGrain.Subject, DeliverAt = deliverAt },
+        SentAt = fixture.JobNow
     };
 
     private static JournalId Journal(IAddressable grain) => JournalId.FromGrainId(grain.GetGrainId());
@@ -286,6 +288,8 @@ public abstract class MessageSourceAndSinkFixture(string journalFormatKey) : IAs
     public RecordingJournalStorageProvider Storage { get; } = new();
     public SourceSinkProbe Probe { get; } = new();
     public InProcessTestCluster Cluster { get; private set; } = null!;
+    public DateTimeOffset JobNow => Cluster.Silos[0].ServiceProvider
+        .GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs).GetUtcNow();
 
     public async ValueTask InitializeAsync()
     {
@@ -296,6 +300,8 @@ public abstract class MessageSourceAndSinkFixture(string journalFormatKey) : IAs
             silo.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
             silo.Services.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(SourceSinkJsonContext.Default));
             silo.Services.AddSingleton<TimeProvider>(Clock);
+            silo.Services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs,
+                new MessagingClusterFixture.FollowingJobClock(Clock, Clock.GetUtcNow()));
             silo.Services.UseTimeProviderForBackgroundAreas(TimeProvider.System);
             silo.UseInMemoryDurableJobs();
             silo.AddMessaging(options =>
