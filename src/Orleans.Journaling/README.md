@@ -25,7 +25,9 @@ replays the journal's history to resolve those reads into values, then writes th
 snapshot. A format migration's snapshot resolves them without waiting. A read which
 can't be resolved keeps its barrier, and the manager logs an error.
 While a transaction over the journaled state is open, a requested snapshot is
-written as an append; the next write after the transaction ends writes it.
+written as an append; the write which the transaction's commit awaits, or the
+next write after an abort, writes it. A transaction which defers more than 16
+snapshots aborts.
 Successful replacement resets both counters; the snapshot itself is excluded
 from append history. Deletion and recreation reset the history too. A single
 append can exceed the byte threshold. Larger limits amortize snapshot copies

@@ -171,10 +171,11 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
     }
 
     // A transaction journals the value's pending change through its stream: into the journal when it first writes the
-    // value, and into its segment when it commits. The write which captures this state after the transaction ends
-    // acknowledges it.
+    // value, and into its segment when it commits. Nothing else stages it, so a held value's change never leaves the segment.
+    // The write which captures this state after the transaction ends acknowledges it.
     void ICoalescingJournaledState.StagePendingChanges(JournalStreamWriter writer)
     {
+        Debug.Assert(_manager is not { } manager || manager.MayStagePendingChanges(this), "A held state stages only into its transaction's segment.");
         if (_isDirty)
         {
             WriteState(writer);

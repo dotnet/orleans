@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Runtime;
 using Orleans.Serialization.Buffers;
@@ -7,30 +8,32 @@ namespace Orleans.Journaling;
 
 internal partial class JournaledStateManager
 {
-    // The open transaction, or null. At most one is open at a time.
+    // The open transaction, or null. At most one is open at a time. The work loop reads it while capturing writes, which for
+    // a manager without an activation runs on another thread, so it changes under the lock.
     private JournalTransaction? _transaction;
 
-    // The segment writer of the last transaction which ended, which the next one reuses.
-    private JournalBufferWriter? _idleTransactionWriter;
-
-    // Completes when the open transaction ends, for code which waits for its states' release.
+    // Completes when the open transaction ends, for code which waits for its states' release. Used by the transaction's
+    // callers only, which run on the activation's scheduler.
     private TaskCompletionSource? _transactionEnded;
 
     /// <summary>Completes once no open transaction holds <paramref name="state"/>.</summary>
     /// <remarks>
-    /// A watch starts after the transaction which holds its state, so its initial content is never uncommitted. A watch which
-    /// the transaction's own code starts starts after the transaction ends too.
+    /// A watch starts after the transaction which holds its state, so its initial content is never uncommitted.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The calling code runs in the transaction which holds <paramref name="state"/>, which would wait for its own end.
+    /// </exception>
     internal async ValueTask WaitUntilReleasedAsync(IStateMachine state, CancellationToken cancellationToken)
     {
-        while (IsHeldByTransaction(state))
+        while (_transaction is { } transaction && transaction.Holds(state))
         {
-            Task ended;
-            lock (_lock)
+            if (ReferenceEquals(JournalTransaction.Current, transaction))
             {
-                ended = (_transactionEnded ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
+                throw new InvalidOperationException(
+                    "A transaction's code can't watch state which the transaction changed: the watch starts when the transaction ends.");
             }
 
+            var ended = (_transactionEnded ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
             await ended.WaitAsync(cancellationToken).ConfigureAwait(true);
         }
     }
@@ -52,31 +55,29 @@ internal partial class JournaledStateManager
     /// <summary>Gets the open transaction, or <see langword="null"/>.</summary>
     internal JournalTransaction? OpenTransaction => _transaction;
 
-    /// <summary>Gets the writer of a transaction's segment, in the journal's format.</summary>
-    internal JournalBufferWriter CreateTransactionWriter()
-    {
-        var writer = _idleTransactionWriter ?? _shared.JournalFormat.CreateWriter();
-        _idleTransactionWriter = null;
-        return writer;
-    }
-
-    /// <summary>Returns a transaction's segment writer, which the next transaction reuses.</summary>
-    internal void ReturnTransactionWriter(JournalBufferWriter writer)
-    {
-        writer.Reset();
-        if (_idleTransactionWriter is null)
-        {
-            _idleTransactionWriter = writer;
-        }
-        else
-        {
-            writer.Dispose();
-        }
-    }
+    /// <summary>Creates the writer of a transaction's segment, in the journal's format.</summary>
+    internal JournalBufferWriter CreateTransactionWriter() => _shared.JournalFormat.CreateWriter();
 
     /// <summary>Gets whether the open transaction holds <paramref name="state"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool IsHeldByTransaction(IStateMachine state) => _transaction is { } transaction && transaction.Holds(state);
+
+    /// <summary>Gets whether the open transaction holds <paramref name="state"/> and the calling code runs in it.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool IsHeldByCurrentTransaction(IStateMachine state) =>
+        _transaction is { } transaction && transaction.Holds(state) && ReferenceEquals(JournalTransaction.Current, transaction);
+
+    /// <summary>
+    /// Gets whether <paramref name="state"/>, a state which journals its changes when asked, may stage its pending changes
+    /// now: unless the open transaction holds it, and then only into the transaction's segment.
+    /// </summary>
+    /// <remarks>
+    /// A held state's pending value is the transaction's uncommitted change, which reaches the journal only through the
+    /// transaction's commit; journal captures skip held states. States assert this when they stage.
+    /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool MayStagePendingChanges(IStateMachine state) =>
+        _transaction is not { } transaction || ReferenceEquals(_journalWriter.Redirect, transaction) || !transaction.Holds(state);
 
     /// <summary>Gets the state machine and stream id of the state which <paramref name="target"/> identifies.</summary>
     internal (IStateMachine State, uint StreamId) GetTransactionalState(JournaledStateAccessTarget target)
@@ -92,7 +93,21 @@ internal partial class JournaledStateManager
         throw new InvalidOperationException($"Journaled state '{target.Name}' isn't registered with this manager, so a transaction can't change it.");
     }
 
-    /// <inheritdoc cref="RunTransactionAsync{T}(Func{CancellationToken, Task{T}}, Action{T}?, CancellationToken)"/>
+    /// <summary>Gets the state machine whose entries journal stream <paramref name="streamId"/> holds.</summary>
+    internal IStateMachine GetTransactionalState(uint streamId)
+    {
+        lock (_lock)
+        {
+            if (_statesMap.TryGetValue(streamId, out var state))
+            {
+                return state;
+            }
+        }
+
+        throw new InvalidOperationException($"Journal stream {streamId} belongs to no state of this manager, so a transaction can't change it.");
+    }
+
+    /// <inheritdoc cref="RunTransactionAsync{T}(Func{CancellationToken, Task{T}}, Action{T}?, Action{Exception}?, CancellationToken)"/>
     internal Task RunTransactionAsync(Func<CancellationToken, Task> body, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(body);
@@ -103,12 +118,13 @@ internal partial class JournaledStateManager
                 return null;
             },
             onCommit: null,
+            onAbort: null,
             cancellationToken);
     }
 
-    /// <inheritdoc cref="RunTransactionAsync{T}(Func{CancellationToken, Task{T}}, Action{T}?, CancellationToken)"/>
+    /// <inheritdoc cref="RunTransactionAsync{T}(Func{CancellationToken, Task{T}}, Action{T}?, Action{Exception}?, CancellationToken)"/>
     internal Task<T> RunTransactionAsync<T>(Func<CancellationToken, Task<T>> body, CancellationToken cancellationToken = default) =>
-        RunTransactionAsync(body, onCommit: null, cancellationToken);
+        RunTransactionAsync(body, onCommit: null, onAbort: null, cancellationToken);
 
     /// <summary>
     /// Runs <paramref name="body"/> as a transaction over this manager's states: its changes commit together when it
@@ -119,10 +135,15 @@ internal partial class JournaledStateManager
     /// Runs in the transaction's commit, with the body's result, so the changes it makes commit with the body's. An exception
     /// it throws aborts the transaction.
     /// </param>
+    /// <param name="onAbort">
+    /// Runs once the transaction has aborted and its states are rebuilt, with the exception which the call throws, so the
+    /// changes it makes join the journal as ordinary changes. It doesn't run when the manager can't abort the transaction,
+    /// because the journal failed or the manager is stopping.
+    /// </param>
     /// <param name="cancellationToken">
     /// The token passed to <paramref name="body"/>, which also cancels the wait for other transactions to end.
     /// </param>
-    /// <returns>The body's result, once the transaction has committed.</returns>
+    /// <returns>The body's result, once a journal write which holds the transaction's commit has completed.</returns>
     /// <remarks>
     /// <para>
     /// The body runs exclusively on the activation, in the caller's flow, within an exclusive section
@@ -135,32 +156,50 @@ internal partial class JournaledStateManager
     /// </para>
     /// <para>
     /// Code which runs alongside the body reads its uncommitted changes, and its writes to states which the body changed
-    /// throw. The commit is logical: the changes become durable with the next journal write, as every change does, and
-    /// effects which depend on durability, such as outbox deliveries, wait for that write. An abort leaves no trace in the
-    /// journal and rebuilds the states which the body changed from the journal.
+    /// throw. The commit is a durable prepare: the call returns once a journal write which holds the transaction's entries
+    /// has completed, and effects which depend on durability, such as outbox deliveries, follow that write. The exclusive
+    /// section ends at the commit, so transactions which commit while the write is pending share it. When the write fails,
+    /// the call throws its exception, and the journal's failure deactivates the activation, whose next activation recovers
+    /// none of the transaction. An abort leaves no trace in the journal and rebuilds the states which the body changed from
+    /// the journal.
     /// </para>
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// The caller runs on another thread than the activation's scheduler, for example after <c>ConfigureAwait(false)</c>.
+    /// The caller runs on another thread than the activation's scheduler, for example after <c>ConfigureAwait(false)</c>, or
+    /// in code which a durable task records, whose transactions run through <c>DurableTaskTransactions.RunAsync</c>.
     /// </exception>
-    /// <exception cref="NotSupportedException">The manager's grain context can't open exclusive sections.</exception>
-    internal Task<T> RunTransactionAsync<T>(Func<CancellationToken, Task<T>> body, Action<T>? onCommit, CancellationToken cancellationToken)
+    /// <exception cref="NotSupportedException">
+    /// The caller runs in a transaction of another manager, or the manager's grain context can't open exclusive sections.
+    /// </exception>
+    internal Task<T> RunTransactionAsync<T>(
+        Func<CancellationToken, Task<T>> body,
+        Action<T>? onCommit,
+        Action<Exception>? onAbort,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
-        if (JournalTransaction.Current is { } outer && ReferenceEquals(outer, _transaction))
+        if (JournalTransaction.Current is { } current && ReferenceEquals(current.Manager.OpenTransaction, current))
         {
-            if (onCommit is not null)
+            if (!ReferenceEquals(current.Manager, this))
             {
-                throw new NotSupportedException("A transaction nested in another transaction of the same journal can't run code at its commit.");
+                // Each journal commits in its own append, so the nested transaction would become durable on its own and
+                // survive the abort of the transaction around it.
+                throw new NotSupportedException("A transaction can't run inside a transaction over another journaled state manager's states.");
             }
 
-            return RunNestedTransactionAsync(outer, body, cancellationToken);
+            if (onCommit is not null || onAbort is not null)
+            {
+                throw new NotSupportedException("A transaction nested in another transaction of the same journal can't run code at its commit or abort.");
+            }
+
+            return RunNestedTransactionAsync(current, body, cancellationToken);
         }
 
-        if (JournalTransaction.Current is { } other && ReferenceEquals(other.Manager.OpenTransaction, other))
+        if (ContextProvider?.Current is not null)
         {
-            // A transaction of another journal of the activation holds the activation exclusively already.
-            return RunTransactionCoreAsync(body, onCommit, cancellationToken);
+            // The host records the calling code's accesses and replays them, which would apply the transaction's changes again.
+            throw new InvalidOperationException(
+                "A durable task body runs a transaction over journaled state through DurableTaskTransactions.RunAsync, which records its outcome.");
         }
 
         if (_grainContext is { } grainContext)
@@ -177,11 +216,11 @@ internal partial class JournaledStateManager
                     "A transaction over a grain's journaled state runs on the grain activation's scheduler. Code which continues elsewhere, for example after ConfigureAwait(false), can't run one.");
             }
 
-            return RunTransactionInSectionAsync(admission, body, onCommit, cancellationToken);
+            return RunExclusiveTransactionAsync(admission, body, onCommit, onAbort, cancellationToken);
         }
 
         // A manager without a grain context relies on its callers to serialize their accesses.
-        return RunTransactionCoreAsync(body, onCommit, cancellationToken);
+        return RunExclusiveTransactionAsync(admission: null, body, onCommit, onAbort, cancellationToken);
     }
 
     private static async Task<T> RunNestedTransactionAsync<T>(JournalTransaction outer, Func<CancellationToken, Task<T>> body, CancellationToken cancellationToken)
@@ -197,19 +236,34 @@ internal partial class JournaledStateManager
         }
     }
 
-    private async Task<T> RunTransactionInSectionAsync<T>(
-        IGrainRequestAdmission admission,
+    private async Task<T> RunExclusiveTransactionAsync<T>(
+        IGrainRequestAdmission? admission,
         Func<CancellationToken, Task<T>> body,
         Action<T>? onCommit,
+        Action<Exception>? onAbort,
         CancellationToken cancellationToken)
     {
-        using var section = await admission.EnterExclusiveSectionAsync(cancellationToken);
-        return await RunTransactionCoreAsync(body, onCommit, cancellationToken);
+        (T Result, Task Durable) committed;
+        var section = admission is null ? null : await admission.EnterExclusiveSectionAsync(cancellationToken);
+        try
+        {
+            committed = await RunTransactionCoreAsync(body, onCommit, onAbort, cancellationToken);
+        }
+        finally
+        {
+            section?.Dispose();
+        }
+
+        // The commit's write may still be pending: transactions which commit meanwhile join it. The caller learns its outcome
+        // whether or not it is canceled meanwhile, since the commit is part of the journal either way.
+        await committed.Durable;
+        return committed.Result;
     }
 
-    private async Task<T> RunTransactionCoreAsync<T>(
+    private async Task<(T Result, Task Durable)> RunTransactionCoreAsync<T>(
         Func<CancellationToken, Task<T>> body,
         Action<T>? onCommit,
+        Action<Exception>? onAbort,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -222,28 +276,46 @@ internal partial class JournaledStateManager
         var transaction = BeginTransaction();
         JournalTransaction.Current = transaction;
         T result;
+        bool appended;
         try
         {
             result = await body(cancellationToken);
             if (transaction.DoomedBy is { } doom)
             {
-                throw new InvalidOperationException("A transaction nested in this transaction failed, so this transaction aborted.", doom);
+                throw new InvalidOperationException("The transaction was doomed to abort, so it aborted.", doom);
             }
 
-            transaction.Commit(onCommit is null ? null : () => onCommit(result));
+            lock (_lock)
+            {
+                ThrowIfStateOperationsUnavailable();
+            }
+
+            appended = transaction.Commit(onCommit is null ? null : () => onCommit(result));
         }
-        catch
+        catch (Exception exception)
         {
+            // Throws the journal's failure instead when the manager can't abort the transaction.
             await AbortTransactionAsync(transaction);
+            onAbort?.Invoke(exception);
             throw;
         }
 
-        EndTransaction(transaction);
-        return result;
+        Task durable;
+        try
+        {
+            durable = appended ? EnqueueCommitWrite() : Task.CompletedTask;
+        }
+        finally
+        {
+            EndTransaction(transaction);
+        }
+
+        return (result, durable);
     }
 
     private JournalTransaction BeginTransaction()
     {
+        AssertOnActivationScheduler();
         lock (_lock)
         {
             ThrowIfStateOperationsUnavailable();
@@ -260,9 +332,15 @@ internal partial class JournaledStateManager
             Debug.Assert(!_migrationSnapshotRequired, "A transaction begins after the snapshot which the journal needs.");
             var transaction = new JournalTransaction(this);
             _transaction = transaction;
+            _journalWriter.Transaction = transaction;
             return transaction;
         }
     }
+
+    // A transaction's state belongs to the activation's scheduler, which runs every access to its states.
+    [Conditional("DEBUG")]
+    private void AssertOnActivationScheduler() =>
+        Debug.Assert(_grainContext is null || ReferenceEquals(RuntimeContext.Current, _grainContext), "Transactions run on the activation's scheduler.");
 
     // Called under the lock.
     private bool HasQueuedDeletion()
@@ -278,36 +356,61 @@ internal partial class JournaledStateManager
         return false;
     }
 
-    private async ValueTask AbortTransactionAsync(JournalTransaction transaction)
+    // Joins the journal write which a caller already queued, or queues one: the queued write captures the journal buffer, and
+    // with it the commit, after the commit appended its segment. A write which fails fences the manager.
+    private Task EnqueueCommitWrite()
     {
-        transaction.End();
-        if (transaction.HeldStates.Count == 0)
-        {
-            EndTransaction(transaction);
-            return;
-        }
-
-        Task task;
+        WorkItem write;
+        bool didEnqueue;
         lock (_lock)
         {
-            var rollback = new RollbackWorkItem(transaction)
-            {
-                EnqueuedTimestamp = _shared.TimeProvider.GetTimestamp(),
-                DeletionGeneration = _deletionGeneration,
-            };
-
-            _workQueue.Enqueue(rollback);
-            task = rollback.Task;
+            ThrowIfStateOperationsUnavailable();
+            write = EnqueueOrGetPendingWrite(out didEnqueue, out _);
+            write.CarriesCommit = true;
         }
 
-        _workSignal.Signal();
+        if (didEnqueue)
+        {
+            _workSignal.Signal();
+        }
+
+        return write.Task;
+    }
+
+    private async ValueTask AbortTransactionAsync(JournalTransaction transaction)
+    {
         try
         {
-            await task;
+            // Ends the transaction first, so its code can't change the states while they're rebuilt.
+            transaction.End();
+            Task rollback;
+            lock (_lock)
+            {
+                // A fenced or stopping manager runs no more work, so the rollback would never run: the activation recovers
+                // from the journal instead, which doesn't hold the transaction.
+                ThrowIfStateOperationsUnavailable();
+                if (transaction.HeldStates.Count == 0)
+                {
+                    return;
+                }
+
+                var item = new RollbackWorkItem(transaction)
+                {
+                    EnqueuedTimestamp = _shared.TimeProvider.GetTimestamp(),
+                    DeletionGeneration = _deletionGeneration,
+                };
+
+                _workQueue.Enqueue(item);
+                rollback = item.Task;
+            }
+
+            _workSignal.Signal();
+
+            // A failed rollback fences the manager, which deactivates its activation.
+            await rollback;
         }
         finally
         {
-            // A failed rollback fences the manager, which deactivates its activation; the transaction ends either way.
             EndTransaction(transaction);
         }
     }
@@ -316,25 +419,48 @@ internal partial class JournaledStateManager
     // content to their watchers, which saw none of the transaction's changes.
     private void EndTransaction(JournalTransaction transaction)
     {
-        TaskCompletionSource? ended;
-        lock (_lock)
+        Debug.Assert(ReferenceEquals(_transaction, transaction));
+        AssertOnActivationScheduler();
+        try
         {
-            Debug.Assert(ReferenceEquals(_transaction, transaction));
             transaction.End();
-            _transaction = null;
-            ended = _transactionEnded;
+        }
+        finally
+        {
+            lock (_lock)
+            {
+                _transaction = null;
+                _journalWriter.Transaction = null;
+            }
+
+            var ended = _transactionEnded;
             _transactionEnded = null;
+            ended?.TrySetResult();
+            PublishResyncs(transaction);
+        }
+    }
+
+    // The transaction's outcome stands whether or not its watchers can be told: a watcher which can't receive its state's
+    // content ends with the failure rather than miss the change.
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Publication follows the transaction's outcome and can't change it.")]
+    private void PublishResyncs(JournalTransaction transaction)
+    {
+        if (Observers is not { } observers)
+        {
+            return;
         }
 
-        ended?.TrySetResult();
-
-        if (Observers is { } observers)
+        foreach (var (_, state, _) in transaction.HeldStates)
         {
-            foreach (var (_, state, _) in transaction.HeldStates)
+            if (state is IJournaledStateResync resync && observers.TryGetTopic(state, out var topic))
             {
-                if (state is IJournaledStateResync resync && observers.TryGetTopic(state, out var topic))
+                try
                 {
                     resync.PublishResync(topic);
+                }
+                catch (Exception exception)
+                {
+                    topic.Complete(exception);
                 }
             }
         }
@@ -369,7 +495,20 @@ internal partial class JournaledStateManager
         if (_transaction is { } transaction && ReferenceEquals(JournalTransaction.Current, transaction))
         {
             throw new InvalidOperationException(
-                "A transaction's code can't write journaled state: the transaction's changes join the journal when it commits, and become durable with the next write after it.");
+                "A transaction's code can't write journaled state: the transaction's changes join the journal when it commits.");
+        }
+    }
+
+    /// <summary>
+    /// Throws when the calling code runs in this manager's open transaction, for state which doesn't take part in
+    /// transactions, such as <c>IPersistentState</c>, whose changes would survive the transaction's abort.
+    /// </summary>
+    internal void ThrowIfInTransaction(string stateDescription)
+    {
+        if (_transaction is { } transaction && ReferenceEquals(JournalTransaction.Current, transaction))
+        {
+            throw new InvalidOperationException(
+                $"{stateDescription} doesn't take part in transactions, so a transaction's code can't use it: its changes would survive the transaction's abort.");
         }
     }
 
@@ -377,7 +516,6 @@ internal partial class JournaledStateManager
     {
         public JournalTransaction Transaction { get; } = transaction;
     }
-
 
     /// <summary>
     /// Copies storage's history, then resets an aborted transaction's states and replays their entries into them, in the

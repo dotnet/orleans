@@ -5,8 +5,9 @@ using Xunit;
 namespace Microsoft.Orleans.DurableTasks.Tests;
 
 /// <summary>
-/// Verifies durable transactions: a transaction's changes and its record commit in one journal write, a replay returns the
-/// recorded outcome without running the body again, and an aborted transaction leaves no trace.
+/// Verifies durable transactions: a transaction's changes and its record commit in one journal write, which completes
+/// before the transaction returns; a replay returns the recorded outcome without running the body again; and a transaction
+/// which aborts cleanly leaves no trace and records its failure.
 /// </summary>
 [TestSuite("BVT")]
 [TestProvider("None")]
@@ -31,9 +32,7 @@ public sealed class DurableTaskTransactionTests
             Assert.Equal(4, activation.Grain.Stock["a"]);
             Assert.Equal(1, activation.Grain.Stock["b"]);
 
-            // A write commits the transaction's changes together with its record.
-            activation.Grain.RequestUnrelatedWrite();
-            await activation.Grain.UnrelatedWrites;
+            // No further write: the transaction returned once the write which holds its changes and record completed.
         }
 
         await using var replay = await harness.ActivateAsync(TestCancellation);
@@ -46,25 +45,39 @@ public sealed class DurableTaskTransactionTests
     });
 
     [Fact]
-    public Task TransactionWhoseCommitNoWriteCapturedRunsAgain() => ActivationScheduler.RunAsync(async () =>
+    public Task TransactionWhoseCommitWriteFailsRunsAgain() => ActivationScheduler.RunAsync(async () =>
     {
-        await using var harness = new DurableTaskReplayHarness(static grain => MoveAsync(grain));
+        await using var harness = new DurableTaskReplayHarness(static grain => MoveAfterGateAsync(grain));
         await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
             await WriteStockAsync(activation.Grain, "a", 5);
             await activation.ScheduleAsync(WorkflowId, TestCancellation);
             await activation.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+
+            // The commit's write fails, so neither the changes nor the record reach the journal.
+            activation.FailWrites();
+            activation.Grain.OpenGate();
+            await activation.FailedWrite.WaitAsync(Timeout, TestCancellation);
         }
 
-        // Neither the changes nor the record reached the journal, so the replay runs the body once more, against the
-        // committed state.
+        // The replay runs the body once more, against the committed state.
         await using var replay = await harness.ActivateAsync(TestCancellation);
         await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(2, harness.EffectRuns);
         Assert.Equal(4, replay.Grain.Stock["a"]);
-        Assert.Equal(1, replay.Grain.Stock["b"]);
         replay.Grain.OpenGate();
         Assert.Equal(1, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<int>());
+        Assert.Equal(1, replay.Grain.Stock["b"]);
+
+        static async DurableTask<int> MoveAfterGateAsync(ReplayGrain grain) =>
+            await DurableTaskTransactions.RunAsync("move", async _ =>
+            {
+                grain.Harness.CountEffectRun();
+                grain.Stock["a"] -= 1;
+                await grain.WaitAtPlainGateAsync();
+                grain.Stock["b"] = 1;
+                return 1;
+            });
     });
 
     [Fact]
