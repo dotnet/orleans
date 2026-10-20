@@ -79,6 +79,8 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         _accessLogs.Append(taskId, records);
     }
 
+    public void AddPendingRecords(IDurableTaskPendingAccessRecords source) => _accessLogs.AddPendingRecords(source);
+
     public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks =>
         _items.Select(pair => (pair.Key, (IDurableTaskState)Expose(pair.Key, pair.Value)));
 

@@ -625,6 +625,8 @@ public sealed partial class DurableTaskSignalTests
 
         public void AppendAccessLog(TaskId taskId, ReadOnlySpan<byte> records) => _accessLogs[taskId] = [.. GetAccessLog(taskId), .. records];
 
+        public void AddPendingRecords(IDurableTaskPendingAccessRecords source) => source.Flush();
+
         private readonly Dictionary<TaskId, State> _states = [];
         private readonly DurableTaskHierarchy _hierarchy = new();
 

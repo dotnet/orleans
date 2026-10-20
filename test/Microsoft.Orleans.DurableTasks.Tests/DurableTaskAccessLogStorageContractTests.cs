@@ -177,6 +177,7 @@ public sealed class DurableTaskAccessLogStorageContractTests
         public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks => _tasks.Tasks;
         public byte[] GetAccessLog(TaskId taskId) => [];
         public void AppendAccessLog(TaskId taskId, ReadOnlySpan<byte> records) { }
+        public void AddPendingRecords(IDurableTaskPendingAccessRecords source) { }
         public IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId task) => _tasks.GetChildren(task);
         public IDurableTaskState GetOrCreateTask(TaskId taskId, DurableTaskRecordKind kind, IDurableTaskRequest? request) => _tasks.GetOrCreateTask(taskId, kind, request);
         public void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request) { }

@@ -30,9 +30,9 @@ namespace Orleans.DurableTasks.Runtime;
 /// </para>
 /// <para>
 /// A write's record is staged with the write, in the same work item, so whichever journal write commits the change also
-/// commits its record. A read's record is staged with the attempt's next write or recorded operation, which are the only
-/// ways a decision based on the read becomes durable; reads which the body's tail makes, after its last durable operation,
-/// are never staged. A replay consumes the records in order, checking each access's kind, operation, state, and
+/// commits its record. A read's record is staged with the attempt's next write, or by the storage as the next journal
+/// write captures, which is the only way a decision based on the read becomes durable; reads which no write captures
+/// before the body completes are dropped with its log. A replay consumes the records in order, checking each access's kind, operation, state, and
 /// arguments, and runs live once it has consumed them all. An access which differs from its record, or whose recorded
 /// outcome no longer decodes or names an exception type which this version can't construct, diverges: the runtime stalls
 /// the attempt.
@@ -56,7 +56,7 @@ internal sealed class DurableTaskAccessLog(
     IDurableTaskAccessLogStorage storage,
     Serializer serializer,
     TaskScheduler scheduler,
-    Func<DurableTaskDivergenceException, Exception> diverge) : JournaledStateContext
+    Func<DurableTaskDivergenceException, Exception> diverge) : JournaledStateContext, IDurableTaskPendingAccessRecords
 {
     // Each record: [kind | flags][operation][state:4], then [hash:4] when it has an argument hash, then
     // [length:4][outcome] when it has an outcome.
@@ -82,8 +82,13 @@ internal sealed class DurableTaskAccessLog(
     private int _position;
     private int _consumed;
 
-    // The records which this attempt made and hasn't staged yet: reads which no later write or operation depended on.
+    // The records which this attempt made and hasn't staged yet: reads which no later write depended on, which the
+    // storage stages as its next write captures.
     private ArrayBufferWriter<byte>? _pending;
+    private bool _addedPending;
+
+    // Whether an access runs, which no journal write's capture interrupts.
+    private bool _accessing;
 
     private AccessLogState _state;
 
@@ -102,10 +107,15 @@ internal sealed class DurableTaskAccessLog(
     /// <summary>Gets whether the attempt hasn't yet consumed every access which earlier attempts recorded.</summary>
     public bool IsReplaying => _position < _recorded.Length;
 
-    /// <summary>Stages the records of the reads which the attempt made since its last write or recorded operation.</summary>
-    /// <remarks>The attempt calls this as it reaches a recorded operation, which can depend on those reads.</remarks>
+    /// <summary>Stages the records of the reads which the attempt made since its last write.</summary>
+    /// <remarks>
+    /// A write of the attempt stages them before its own record, and the storage stages them as a journal write captures,
+    /// which is when any durable consequence of a read commits. The activation runs one work item at a time, so a write
+    /// never captures while an access, or the code which it covers, runs.
+    /// </remarks>
     public void Flush()
     {
+        _addedPending = false;
         if (_pending is { WrittenCount: > 0 } pending)
         {
             _storage.AppendAccessLog(_taskId, pending.WrittenSpan);
@@ -161,6 +171,30 @@ internal sealed class DurableTaskAccessLog(
     {
         Debug.Assert(TaskScheduler.Current == _scheduler, "A durable task body accesses journaled state on its activation's scheduler.");
         using var region = _attempt.EnterCoveredRegion();
+        _accessing = true;
+        try
+        {
+            return RunAccess(access, argument, state, operation, apply);
+        }
+        finally
+        {
+            _accessing = false;
+        }
+    }
+
+    void IDurableTaskPendingAccessRecords.Flush()
+    {
+        Debug.Assert(!_accessing, "A journal write captures between accesses: the activation runs one work item at a time.");
+        Flush();
+    }
+
+    private TResult RunAccess<TArgument, TState, TResult>(
+        in JournaledStateAccess access,
+        TArgument argument,
+        TState state,
+        Func<TState, TResult> operation,
+        Action<TState, TResult>? apply)
+    {
         if (_state is AccessLogState.Discarding)
         {
             return access.Kind is JournaledStateAccessKind.Write ? throw _discarded!() : operation(state);
@@ -383,10 +417,16 @@ internal sealed class DurableTaskAccessLog(
 
         pending.Advance(length);
 
-        // A write's record commits with the write, together with the reads which it can depend on.
+        // A write's record commits with the write, together with the reads which it can depend on. A read's record commits
+        // with the next write which captures, unless the attempt's own write stages it first.
         if (access.Kind is JournaledStateAccessKind.Write)
         {
             Flush();
+        }
+        else if (!_addedPending)
+        {
+            _addedPending = true;
+            _storage.AddPendingRecords(this);
         }
     }
 

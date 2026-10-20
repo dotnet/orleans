@@ -334,6 +334,37 @@ public sealed class DurableTaskAccessRecordingTests
     }
 
     [Fact]
+    public Task ReadCommitsWithTheWriteWhichMakesItsConsequenceDurable() => ActivationScheduler.RunAsync(async () =>
+    {
+        await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await activation.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+
+            // Other grain work changes the counter after the body's read decided which child to start.
+            activation.Grain.Counter.Value = 5;
+            activation.Grain.RequestUnrelatedWrite();
+            await activation.Grain.UnrelatedWrites;
+        }
+
+        // The child's start committed together with the read which chose it, so the replay chooses the same child.
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        replay.Grain.OpenGate();
+        Assert.Equal("zero", (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<string>());
+        Assert.False(replay.Storage.TryGetTask(WorkflowId.Child("other"), out _));
+
+        static async DurableTask<string> Workflow(ReplayGrain grain)
+        {
+            var choice = grain.Counter.Value == 0 ? "zero" : "other";
+            await DurableTask.Run(static _ => { }).WithId(choice);
+            await grain.WaitAtGateAsync();
+            return choice;
+        }
+    });
+
+    [Fact]
     public void TransportSendsThroughTheOutboxAsTheJournaledStateHostsWork()
     {
         var host = new CountingHost();
