@@ -49,7 +49,19 @@ public abstract class DurableTaskCrashExplorationTests(string journalFormatKey) 
         SweepJournalWritesAsync(_harness, FaultWorkflow.Pipeline, FaultPoint.JournalWriteAfterDurable);
 
     /// <summary>Fails each journal write of each grain of <paramref name="workflow"/> in turn, and checks every run.</summary>
-    internal static async Task SweepJournalWritesAsync(DurableTaskFaultHarness harness, FaultWorkflow workflow, FaultPoint point)
+    internal static Task SweepJournalWritesAsync(DurableTaskFaultHarness harness, FaultWorkflow workflow, FaultPoint point) =>
+        SweepAsync(harness, workflow, point, "write", static run => run.Writes);
+
+    /// <summary>
+    /// Injects <paramref name="point"/> at each operation of each grain of <paramref name="workflow"/> in turn, counting the
+    /// operations which <paramref name="operations"/> selects from a run's outcome, and checks every run.
+    /// </summary>
+    internal static async Task SweepAsync(
+        DurableTaskFaultHarness harness,
+        FaultWorkflow workflow,
+        FaultPoint point,
+        string operationName,
+        Func<FaultRunOutcome, Dictionary<FaultRole, int>> operations)
     {
         var baseline = await FaultScenario.RunAsync(harness, workflow);
         Assert.Empty(baseline.Violations);
@@ -57,28 +69,29 @@ public abstract class DurableTaskCrashExplorationTests(string journalFormatKey) 
         var injected = new Dictionary<FaultRole, int>();
         foreach (var role in Enum.GetValues<FaultRole>())
         {
-            // Messages which arrive together can share a write, so runs differ by a write or so. The sweep tries every
-            // write index below the longest run observed, including runs whose fault shifted later writes.
-            var longest = baseline.Writes[role];
+            // Messages which arrive together can share a write or a segment, so runs differ by an operation or so. The
+            // sweep tries every operation index below the longest run observed, including runs whose fault shifted later
+            // operations.
+            var longest = operations(baseline)[role];
             injected[role] = 0;
             for (var occurrence = 0; occurrence < longest; occurrence++)
             {
                 var run = await FaultScenario.RunAsync(harness, workflow, new FaultSpec(point, role, occurrence));
-                longest = Math.Max(longest, run.Writes[role]);
+                longest = Math.Max(longest, operations(run)[role]);
                 if (!run.Fired)
                 {
                     continue;
                 }
 
                 injected[role]++;
-                violations.AddRange(run.Violations.Select(violation => $"{role} write #{occurrence}: {violation}"));
+                violations.AddRange(run.Violations.Select(violation => $"{role} {operationName} #{occurrence}: {violation}"));
             }
 
             Assert.True(injected[role] > 0, $"No fault fired on the {role}.");
         }
 
         TestContext.Current.TestOutputHelper?.WriteLine(
-            $"{workflow} {point}: baseline writes {string.Join(", ", baseline.Writes)}; injected {string.Join(", ", injected)}.");
+            $"{workflow} {point}: baseline {operationName}s {string.Join(", ", operations(baseline))}; injected {string.Join(", ", injected)}.");
         Assert.True(violations.Count == 0, string.Join(Environment.NewLine, violations));
     }
 }

@@ -121,4 +121,27 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await WaitUntilAsync(() => ((IInboxWorkSource)replacement).GetWakeupDelay() is null);
         await replacement.StopAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
     });
+
+    [Fact]
+    public Task StoppedRuntimeKeepsTheWakeupOfARunnableExecutionWhichItDiscarded() => ActivationScheduler.RunAsync(async () =>
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (runtime, _, _, _) = CreateRuntime();
+        await runtime.RecoverAsync(cancellationToken);
+        var workSource = (IInboxWorkSource)runtime;
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await ((IDurableTaskServer)runtime).ScheduleAsync(TaskId.Parse("root"), CreateRequest(1, () => DurableTask.Run(async token =>
+        {
+            started.TrySetResult();
+            await Task.Delay(Timeout.Infinite, token);
+            return 1;
+        })), cancellationToken);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+
+        // The stop discards the running attempt, and messaging keeps consulting its work sources until its pump stops: a
+        // wake-up which ran then must leave a successor, which reactivates the grain to resume the execution.
+        await runtime.StopAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+
+        Assert.Equal(new DurableTaskOptions().RunnableExecutionWakeupDelay, workSource.GetWakeupDelay());
+    });
 }

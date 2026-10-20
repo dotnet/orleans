@@ -1643,6 +1643,13 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// recovered state, so committed work is never stranded.
     /// </para>
     /// <para>
+    /// Messaging also consults them while the activation deactivates, until its pump stops. The runtime discards every
+    /// attempt as deactivation starts, so none of them is runnable any more, and a wake-up which ran then would end without
+    /// a successor, stranding an execution which was runnable when the activation stopped or whose awaited event committed
+    /// while it stopped. A stopping runtime therefore reports its pending executions as runnable too. A parked execution
+    /// which this keeps awake costs one more activation, whose recovery parks it again.
+    /// </para>
+    /// <para>
     /// The delay, <see cref="Orleans.Configuration.DurableTaskOptions.RunnableExecutionWakeupDelay"/>, bounds how late a
     /// grain which crashed resumes a runnable attempt. The wake-up only matters after a crash or a deactivation: while the
     /// grain is active, a wake-up only reschedules itself, so a long delay keeps that cheap rather than polling.
@@ -1660,7 +1667,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         || _pendingCancellationPropagations.Count > 0
         || _backgroundTasks.Count > 0
         || _recoveredStarts is not null
-        || (!_recovered && HasPendingExecutions())
+        || ((!_recovered || _stopping) && HasPendingExecutions())
             ? _shared.Options.RunnableExecutionWakeupDelay
             : HasStalledExecutions() ? _shared.Options.StalledExecutionRetryInterval : null;
 

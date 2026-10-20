@@ -347,7 +347,10 @@ synchronously on the activation which makes them, when the runtime stages them: 
   grain's Durable Jobs wake-up, which a journal write ensures before it becomes
   durable. A grain which crashes while an execution is runnable is reactivated
   within about 30 seconds, and recovery resumes the execution. When an
-  activation starts, its recovered pending executions re-arm the wake-up. A
+  activation starts, its recovered pending executions re-arm the wake-up, and
+  while it deactivates, its pending executions keep the wake-up, so an
+  execution which the deactivation discards while runnable resumes in the next
+  activation. A
   parked execution resumes when the message it waits for reactivates the grain.
 - Activation shutdown begins when deactivation starts, before the grain's
   `OnDeactivateAsync` runs. It stops new execution and cancels every running
