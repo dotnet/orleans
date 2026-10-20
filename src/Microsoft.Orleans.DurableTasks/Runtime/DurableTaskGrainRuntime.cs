@@ -169,7 +169,15 @@ internal sealed partial class DurableTaskGrainRuntime(
         "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
 
     /// <summary>Binds the runtime to <paramref name="grainContext"/>, the activation whose executions it runs.</summary>
-    internal void InitializeForActivation(IGrainContext grainContext) => _grainContext = grainContext;
+    /// <remarks>
+    /// The activation records the request which each request's code belongs to, so a wait for a task of this grain which
+    /// that request holds the task's segments behind fails at once; see <see cref="ThrowIfWaitHoldsSegments"/>.
+    /// </remarks>
+    internal void InitializeForActivation(IGrainContext grainContext)
+    {
+        _grainContext = grainContext;
+        grainContext.GetComponent<IGrainRequestAdmission>()?.TrackCurrentRequest();
+    }
 
     /// <summary>
     /// Recovers committed task state during the activation's lifecycle, deferring the recovered executions to
