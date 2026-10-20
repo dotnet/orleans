@@ -337,6 +337,60 @@ public sealed class DurableTaskJournaledStateAccessTests
     });
 
     [Fact]
+    public Task AttemptWhichDivergesFromARecordedResultDiscardsItsCleanupWrites() => ActivationScheduler.RunAsync(async () =>
+    {
+        var readsText = false;
+        var failures = new List<Exception>();
+        var failed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, readsText, failures, failed));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await CommitAtGateAsync(activation);
+        }
+
+        // A later version reads the step's recorded result as another type. The abstractions end the attempt as diverged
+        // without the runtime, so its cleanup's write throws the attempt's cancellation and leaves the state unchanged.
+        readsText = true;
+        await using var diverged = await harness.ActivateAsync(TestCancellation);
+        await failed.Task.WaitAsync(Timeout, TestCancellation);
+        var failure = Assert.IsType<DurableTaskAttemptCanceledException>(Assert.Single(failures));
+        Assert.Equal(DurableTaskAttemptCancellationReason.Diverged, failure.Reason);
+        Assert.Equal(0, diverged.Grain.Counter.Value);
+
+        static async DurableTask<int> Workflow(ReplayGrain grain, bool readsText, List<Exception> failures, TaskCompletionSource failed)
+        {
+            if (!readsText)
+            {
+                // The body records no access, so the later version's cleanup finds no record to replay.
+                var value = await DurableTask.Run(static _ => 1).WithId("step");
+                await grain.WaitAtGateAsync();
+                return value;
+            }
+
+            try
+            {
+                _ = await DurableTask.Run(static _ => "one").WithId("step");
+                throw new InvalidOperationException("The step's recorded result has another type.");
+            }
+            catch (DurableTaskAttemptCanceledException)
+            {
+                try
+                {
+                    grain.Counter.Value = 99;
+                }
+                catch (Exception exception)
+                {
+                    failures.Add(exception);
+                }
+
+                failed.TrySetResult();
+                throw;
+            }
+        }
+    });
+
+    [Fact]
     public Task ReplayWhichAccessesOtherStateStallsUntilCodeWhichReplaysTheRecordRunsIt() => ActivationScheduler.RunAsync(async () =>
     {
         var readsLog = false;
@@ -405,39 +459,96 @@ public sealed class DurableTaskJournaledStateAccessTests
     });
 
     [Fact]
-    public Task WorkWhichOutlivesACanceledAttemptChangesStateUnrecorded() => ActivationScheduler.RunAsync(async () =>
+    public Task DiscardedAttemptsCleanupWritesThrowAndItsReadsRunLive() => ActivationScheduler.RunAsync(async () =>
     {
-        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var outcome = new TaskCompletionSource<(Exception? Write, int Read)>(TaskCreationOptions.RunContinuationsAsynchronously);
-        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, release.Task, outcome));
+        var cleanup = new TaskCompletionSource<(Exception? Write, int Read)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, cleanup));
         await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
             await activation.ScheduleAsync(WorkflowId, TestCancellation);
             await activation.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+            activation.Grain.RequestUnrelatedWrite();
+            await activation.Grain.UnrelatedWrites;
 
-            // Stopping the activation cancels the attempt, which drains, so no attempt runs on the activation afterwards.
+            // Stopping the activation discards the attempt waiting at the gate: the next activation reruns it.
         }
 
-        // The canceled attempt's log is closed, so the work's change applies directly, as other grain code's does.
-        release.SetResult();
-        var (write, read) = await outcome.Task.WaitAsync(Timeout, TestCancellation);
-        Assert.Null(write);
-        Assert.Equal(5, read);
+        // The cleanup isn't part of the execution's history, so its write throws the attempt's cancellation without
+        // changing the counter, and its read observes the counter directly.
+        var (write, read) = await cleanup.Task.WaitAsync(Timeout, TestCancellation);
+        Assert.Equal(DurableTaskAttemptCancellationReason.ActivationStopping, Assert.IsType<DurableTaskAttemptCanceledException>(write).Reason);
+        Assert.Equal(1, read);
 
-        static async DurableTask Workflow(ReplayGrain grain, Task release, TaskCompletionSource<(Exception?, int)> outcome)
+        // The replay returns the committed increment's record and increments once more after the gate.
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        Assert.Equal(1, replay.Grain.Counter.Value);
+        replay.Grain.OpenGate();
+        Assert.Equal(2, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<int>());
+        Assert.Equal(2, replay.Grain.Counter.Value);
+
+        static async DurableTask<int> Workflow(ReplayGrain grain, TaskCompletionSource<(Exception?, int)> cleanup)
         {
-            grain.Counter.Value = 1;
-
-            // Task.Run flows the attempt's context into work which outlives the attempt.
-            _ = Task.Run(async () =>
+            grain.Counter.Value++;
+            try
             {
-                await release;
-                var write = Record.Exception(() => grain.Counter.Value = 5);
-                outcome.TrySetResult((write, grain.Counter.Value));
-            });
+                await grain.WaitAtGateAsync();
+            }
+            catch (OperationCanceledException)
+            {
+                cleanup.TrySetResult((Record.Exception(() => grain.Counter.Value += 10), grain.Counter.Value));
+                throw;
+            }
 
-            await DurableTask.Run(static _ => { }).WithId("step");
+            return ++grain.Counter.Value;
+        }
+    });
+
+    [Fact]
+    public Task AbortedTasksCleanupChangesStateAfterReplayingTheCommittedRecords() => ActivationScheduler.RunAsync(async () =>
+    {
+        var cleanup = new TaskCompletionSource<(Exception? Write, int Read)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var harness = new DurableTaskReplayHarness(static grain => Increment(grain));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await CommitAtGateAsync(activation);
+            Assert.Equal(1, activation.Grain.Counter.Value);
+        }
+
+        // The abort ends the task while the replay still holds the committed increment's records: the cleanup's increment
+        // returns them instead of applying the increment again, and its next write applies directly.
+        harness.Workflow = grain => WaitThenCleanUp(grain, cleanup);
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        await ((IDurableTaskManager)replay.Runtime).AbortAsync(WorkflowId, "operator", TestCancellation);
+        var (write, read) = await cleanup.Task.WaitAsync(Timeout, TestCancellation);
+        Assert.Null(write);
+        Assert.Equal(101, read);
+        Assert.Equal(101, replay.Grain.Counter.Value);
+
+        static async DurableTask Increment(ReplayGrain grain)
+        {
+            grain.Counter.Value++;
             await grain.WaitAtGateAsync();
+        }
+
+        static async DurableTask WaitThenCleanUp(ReplayGrain grain, TaskCompletionSource<(Exception?, int)> cleanup)
+        {
+            try
+            {
+                await grain.WaitAtGateAsync();
+            }
+            catch (OperationCanceledException)
+            {
+                var write = Record.Exception(() =>
+                {
+                    grain.Counter.Value++;
+                    grain.Counter.Value += 100;
+                });
+                cleanup.TrySetResult((write, grain.Counter.Value));
+                throw;
+            }
         }
     });
 

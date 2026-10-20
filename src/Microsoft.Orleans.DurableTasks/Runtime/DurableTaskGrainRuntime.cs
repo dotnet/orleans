@@ -3426,9 +3426,10 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <remarks>
     /// Deactivation, an abort, and the deletion of a task's tree cancel attempts this way, on the activation's scheduler.
     /// From the cancellation on, the attempt's durable operations throw <see cref="DurableTaskAttemptCanceledException"/>,
-    /// so the runtime records none of them, and the attempt's result is discarded. Journaled state changes which its code
-    /// makes, such as cleanup, commit with the grain's next journal write. Its code observes the cancellation through its
-    /// tokens once they are signaled, outside the runtime's current operation.
+    /// so the runtime records none of them, and the attempt's result is discarded. Journaled state changes which an aborted
+    /// or deleted task's code makes, such as cleanup, commit with the grain's next journal write; those of an attempt which
+    /// a later attempt replays, after deactivation or a stall, throw its cancellation. Its code observes the cancellation
+    /// through its tokens once they are signaled, outside the runtime's current operation.
     /// </remarks>
     private bool CancelAttempt(GrainDurableTaskContext context, DurableTaskAttemptCancellationReason reason)
     {

@@ -20,9 +20,10 @@ namespace Orleans.DurableTasks.Runtime;
 /// <para>
 /// The runtime cancels the attempt when the activation stops, or when the task is aborted or deleted with its execution
 /// tree, through <see cref="EndAttempt"/>. From then on, the attempt's durable operations throw
-/// <see cref="DurableTaskAttemptCanceledException"/>, and the changes which its code makes to the grain's journaled state,
-/// such as cleanup, commit with the grain's next journal write. The runtime discards the canceled attempt's response;
-/// after the activation stops, the next activation replays the task in a new context.
+/// <see cref="DurableTaskAttemptCanceledException"/>. When the task ends with the cancellation, the changes which the
+/// attempt's code makes to the grain's journaled state, such as cleanup, commit with the grain's next journal write. When
+/// the activation stops, the attempt is discarded: its writes to journaled state throw its cancellation, and the next
+/// activation replays the task in a new context. The runtime discards the canceled attempt's response.
 /// </para>
 /// <para>
 /// An attempt which the running code can't replay stalls: the runtime cancels it for
@@ -129,10 +130,28 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     /// <summary>
     /// Gets the log which records the attempt's accesses to journaled state and returns the recorded outcomes of earlier
-    /// attempts' accesses, or <see langword="null"/> when the runtime doesn't record them. The runtime closes it when it
-    /// ends the attempt and when the body completes, after which the attempt's accesses run directly, unrecorded.
+    /// attempts' accesses, or <see langword="null"/> when the runtime doesn't record them. The runtime closes it when the
+    /// attempt ends with its task or its body completes, and discards it when the attempt ends otherwise.
     /// </summary>
     internal DurableTaskAccessLog? AccessLog { get; }
+
+    /// <summary>
+    /// Gets the attempt's access log for an access to journaled state which the attempt's code makes, discarding it once
+    /// the attempt ended without a record of its end.
+    /// </summary>
+    /// <remarks>
+    /// The runtime discards the log when it ends the attempt. The abstractions end an attempt whose replay departs from a
+    /// recorded result without the runtime, so its code's next access discards the log.
+    /// </remarks>
+    internal DurableTaskAccessLog? GetAccessLogForAccess()
+    {
+        if (AccessLog is { IsOpen: true } log && IsDiscarded)
+        {
+            log.Discard(() => CreateAttemptEndedException());
+        }
+
+        return AccessLog;
+    }
 
     /// <summary>
     /// Marks the runtime's synchronous work on behalf of the attempt until the returned value is disposed, so the accesses
@@ -513,9 +532,11 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     /// <summary>
     /// Ends this attempt for <paramref name="reason"/> at once: from now on, its durable operations throw
-    /// <see cref="DurableTaskAttemptCanceledException"/>, its code's accesses to journaled state, such as its cleanup's,
-    /// run directly, unrecorded, and a discarded attempt isn't resumed. <see cref="ApplyCancellation"/> then cancels the
-    /// attempt's tokens.
+    /// <see cref="DurableTaskAttemptCanceledException"/>. When the task ends with the attempt, because it was aborted or
+    /// deleted, the attempt's later accesses to journaled state, such as its cleanup's, apply to the state unrecorded.
+    /// Otherwise the attempt is discarded and isn't resumed: a later attempt reruns the body, so this attempt's later
+    /// writes to journaled state throw its cancellation, and its reads run unrecorded. <see cref="ApplyCancellation"/>
+    /// then cancels the attempt's tokens.
     /// </summary>
     /// <returns><see langword="true"/> when this call ended the attempt.</returns>
     /// <remarks>
@@ -532,9 +553,15 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
 
         _endReason = reason;
+        if (IsDiscarded)
+        {
+            AccessLog?.Discard(() => CreateAttemptEndedException());
+        }
+        else
+        {
+            AccessLog?.Close();
+        }
 
-        // The attempt's later code, such as its cleanup, accesses journaled state directly: no replay reproduces it.
-        AccessLog?.Close();
         if (IsDiscarded && _segment is null)
         {
             _settled.TrySetResult();

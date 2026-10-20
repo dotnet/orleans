@@ -32,8 +32,13 @@ namespace Orleans.DurableTasks.Runtime;
 /// <para>
 /// Accesses which run while the log runs an access or the runtime runs one of the attempt's operations belong to that
 /// access or operation, so the provider supplies no context for them while <see cref="Depth"/> is above zero. The runtime
-/// closes the log when it records the attempt's cancellation and when the body completes: from then on, the attempt's
-/// accesses run against the state directly and aren't recorded.
+/// closes the log when the attempt ends in a way which it records, so no later attempt replays the body: the body
+/// completed, or the task was aborted or deleted. The attempt's later accesses then return the outcomes of the records
+/// which it hasn't consumed yet, and run against the state directly, unrecorded, after that. Recorded task cancellation
+/// doesn't close the log: the body's compensation is part of the execution's history, recorded and replayed as any of its
+/// accesses. The runtime discards the attempt when it ends in a way which it doesn't record, such as the activation
+/// stopping or a stall: the next attempt reruns the body from the staged records, so the discarded attempt's writes throw
+/// its cancellation and its reads run against the state directly, unrecorded.
 /// </para>
 /// </remarks>
 internal sealed class DurableTaskAccessLog(
@@ -67,9 +72,19 @@ internal sealed class DurableTaskAccessLog(
     // The records which this attempt made and hasn't staged yet: reads which no later write or operation depended on.
     private ArrayBufferWriter<byte>? _pending;
 
+    private AccessLogState _state;
+
+    // Creates the exception which a discarded attempt's writes throw.
+    private Func<Exception>? _discarded;
 
     /// <summary>Gets whether the runtime still records the attempt's accesses.</summary>
-    public bool IsOpen { get; private set; } = true;
+    public bool IsOpen => _state is AccessLogState.Recording;
+
+    /// <summary>
+    /// Gets whether the attempt's accesses run through this log: while it records them, while it returns the records which
+    /// earlier attempts staged, and while it discards the attempt.
+    /// </summary>
+    public bool IsActive => _state is not AccessLogState.Closed || IsReplaying;
 
     /// <summary>
     /// Gets the number of accesses and runtime operations of the attempt which are running. Accesses made meanwhile belong
@@ -105,15 +120,42 @@ internal sealed class DurableTaskAccessLog(
     }
 
     /// <summary>
-    /// Stops recording: the attempt's later accesses run against the state directly, and the records which the attempt
-    /// made but didn't stage are discarded. Records which were staged stay, with the changes which depend on them.
+    /// Stops recording, because the attempt ended in a way which the runtime records: its body completed, or its task was
+    /// aborted or deleted, so no later attempt replays it.
     /// </summary>
+    /// <remarks>
+    /// The attempt's later accesses, such as its cleanup's, first return the outcomes of the records which earlier attempts
+    /// staged and which it hasn't consumed yet, because those changes already committed; after that, they run against the
+    /// state directly and aren't recorded. The reads which the attempt made but didn't stage are dropped.
+    /// </remarks>
     public void Close()
     {
-        IsOpen = false;
-        _pending = null;
-        _recorded = [];
-        _position = 0;
+        if (_state is AccessLogState.Recording)
+        {
+            _state = AccessLogState.Closed;
+            _pending = null;
+        }
+    }
+
+    /// <summary>
+    /// Discards the attempt, which ended in a way which the runtime doesn't record, such as its activation stopping or a
+    /// stall: a later attempt runs the body again from the records which this one staged.
+    /// </summary>
+    /// <param name="canceled">Creates the exception which the attempt's later writes throw: its cancellation.</param>
+    /// <remarks>
+    /// The attempt's later code, such as its cleanup, isn't part of the execution's history: recording it would diverge
+    /// from the next attempt, and applying it would apply it a second time once the next attempt reaches the same point.
+    /// Its writes therefore throw <paramref name="canceled"/>'s exception without changing the state, and its reads run
+    /// against the state directly, unrecorded. The reads which the attempt made but didn't stage are dropped.
+    /// </remarks>
+    public void Discard(Func<Exception> canceled)
+    {
+        if (_state is AccessLogState.Recording)
+        {
+            _state = AccessLogState.Discarding;
+            _discarded = canceled;
+            _pending = null;
+        }
     }
 
     protected override TResult Access<TState, TResult>(in JournaledStateAccess access, TState state, Func<TState, TResult> operation)
@@ -123,9 +165,19 @@ internal sealed class DurableTaskAccessLog(
         Depth++;
         try
         {
+            if (_state is AccessLogState.Discarding)
+            {
+                return access.Kind is JournaledStateAccessKind.Write ? throw _discarded!() : operation(state);
+            }
+
             if (IsReplaying)
             {
                 return Replay<TResult>(access);
+            }
+
+            if (_state is AccessLogState.Closed)
+            {
+                return operation(state);
             }
 
             TResult result;
@@ -133,13 +185,18 @@ internal sealed class DurableTaskAccessLog(
             {
                 result = operation(state);
             }
-            catch (Exception exception)
+            catch (Exception exception) when (IsOpen && IsRecordable(exception))
             {
                 RecordAndThrowException(access, exception);
                 throw;
             }
 
-            RecordResult(access, result);
+            // The runtime can end the attempt while the operation runs, such as from a callback which it calls.
+            if (IsOpen)
+            {
+                RecordResult(access, result);
+            }
+
             return result;
         }
         finally
@@ -147,6 +204,9 @@ internal sealed class DurableTaskAccessLog(
             Depth--;
         }
     }
+
+    // The cancellation of the attempt ends it, so it's no outcome of the access which every later attempt observes.
+    private static bool IsRecordable(Exception exception) => exception is not DurableTaskAttemptCanceledException;
 
     private TResult Replay<TResult>(in JournaledStateAccess access)
     {
@@ -305,5 +365,12 @@ internal sealed class DurableTaskAccessLog(
                 log.Depth--;
             }
         }
+    }
+
+    private enum AccessLogState : byte
+    {
+        Recording,
+        Closed,
+        Discarding,
     }
 }
