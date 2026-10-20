@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,8 +18,10 @@ namespace Benchmarks.Journaling;
 /// <summary>The bodies which <see cref="AccessRecordingBenchmarks"/> and <see cref="AccessRecordingBytes"/> run.</summary>
 internal enum AccessRecordingScenario
 {
+    ReadOnce,
     ReadDistinct,
     ReadSameKey,
+    ReadAlternating,
     ReadValue,
     ReadAWriteB,
     WriteValue,
@@ -25,66 +30,132 @@ internal enum AccessRecordingScenario
     TypicalBody,
 }
 
-internal static class AccessRecordingScenarios
+/// <summary>The values which the fixture's states hold.</summary>
+public enum AccessRecordingValueKind
 {
-    public const int KeysReads = 64;
+    /// <summary>
+    /// 32-character strings: the access log records a read which repeats the attempt's latest read of the same state and
+    /// operation with an equal result as a reference to it.
+    /// </summary>
+    String,
 
-    public static Func<AccessRecordingFixture, int> Get(AccessRecordingScenario scenario) => scenario switch
+    /// <summary>
+    /// Instances of <see cref="AccessRecordingItem"/>, a record class with the same string and a number: the access log
+    /// records every read with its value, since code can change a class instance in place.
+    /// </summary>
+    Record,
+}
+
+/// <summary>A class value, as grains commonly keep in journaled state.</summary>
+[GenerateSerializer]
+public sealed record AccessRecordingItem([property: Id(0)] string Name, [property: Id(1)] int Quantity);
+
+/// <summary>
+/// The bodies of <see cref="AccessRecordingScenario"/> for each kind of value, as exact-typed delegates into which the JIT
+/// inlines <see cref="AccessRecordingScenarios{TValue}"/>, so their accesses compile as a grain's code does rather than as
+/// generic code shared between reference types, which adds lookups of its own to each access.
+/// </summary>
+internal static class AccessRecordingBodies
+{
+    public static Func<AccessRecordingFixture<string>, int> OfStrings(AccessRecordingScenario scenario) => scenario switch
     {
-        AccessRecordingScenario.ReadDistinct => ReadDistinct,
-        AccessRecordingScenario.ReadSameKey => ReadSameKey,
-        AccessRecordingScenario.ReadValue => ReadValue,
-        AccessRecordingScenario.ReadAWriteB => ReadAWriteB,
-        AccessRecordingScenario.WriteValue => WriteValue,
-        AccessRecordingScenario.WriteDictionary => WriteDictionary,
-        AccessRecordingScenario.Keys => Keys,
-        AccessRecordingScenario.TypicalBody => TypicalBody,
+        AccessRecordingScenario.ReadOnce => static f => AccessRecordingScenarios<string>.ReadOnce(f),
+        AccessRecordingScenario.ReadDistinct => static f => AccessRecordingScenarios<string>.ReadDistinct(f),
+        AccessRecordingScenario.ReadSameKey => static f => AccessRecordingScenarios<string>.ReadSameKey(f),
+        AccessRecordingScenario.ReadAlternating => static f => AccessRecordingScenarios<string>.ReadAlternating(f),
+        AccessRecordingScenario.ReadValue => static f => AccessRecordingScenarios<string>.ReadValue(f),
+        AccessRecordingScenario.ReadAWriteB => static f => AccessRecordingScenarios<string>.ReadAWriteB(f),
+        AccessRecordingScenario.WriteValue => static f => AccessRecordingScenarios<string>.WriteValue(f),
+        AccessRecordingScenario.WriteDictionary => static f => AccessRecordingScenarios<string>.WriteDictionary(f),
+        AccessRecordingScenario.Keys => static f => AccessRecordingScenarios<string>.Keys(f),
+        AccessRecordingScenario.TypicalBody => static f => AccessRecordingScenarios<string>.TypicalBody(f),
         _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
     };
 
+    public static Func<AccessRecordingFixture<AccessRecordingItem>, int> OfRecords(AccessRecordingScenario scenario) => scenario switch
+    {
+        AccessRecordingScenario.ReadOnce => static f => AccessRecordingScenarios<AccessRecordingItem>.ReadOnce(f),
+        AccessRecordingScenario.ReadDistinct => static f => AccessRecordingScenarios<AccessRecordingItem>.ReadDistinct(f),
+        AccessRecordingScenario.ReadSameKey => static f => AccessRecordingScenarios<AccessRecordingItem>.ReadSameKey(f),
+        AccessRecordingScenario.ReadAlternating => static f => AccessRecordingScenarios<AccessRecordingItem>.ReadAlternating(f),
+        AccessRecordingScenario.ReadValue => static f => AccessRecordingScenarios<AccessRecordingItem>.ReadValue(f),
+        AccessRecordingScenario.ReadAWriteB => static f => AccessRecordingScenarios<AccessRecordingItem>.ReadAWriteB(f),
+        AccessRecordingScenario.WriteValue => static f => AccessRecordingScenarios<AccessRecordingItem>.WriteValue(f),
+        AccessRecordingScenario.WriteDictionary => static f => AccessRecordingScenarios<AccessRecordingItem>.WriteDictionary(f),
+        AccessRecordingScenario.Keys => static f => AccessRecordingScenarios<AccessRecordingItem>.Keys(f),
+        AccessRecordingScenario.TypicalBody => static f => AccessRecordingScenarios<AccessRecordingItem>.TypicalBody(f),
+        _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
+    };
+}
+
+internal static class AccessRecordingScenarios<TValue> where TValue : class
+{
+    /// <summary>One read of a key.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int ReadOnce(AccessRecordingFixture<TValue> f) => f.Dictionary.TryGetValue(f.Keys[0], out _) ? 1 : 0;
+
     /// <summary><see cref="AccessRecordingBenchmarks.Ops"/> reads of different keys, in turn.</summary>
-    public static int ReadDistinct(AccessRecordingFixture f)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int ReadDistinct(AccessRecordingFixture<TValue> f)
     {
         var dictionary = f.Dictionary;
         var keys = f.Keys;
         var n = 0;
         for (var i = 0; i < AccessRecordingBenchmarks.Ops; i++)
         {
-            n += dictionary.TryGetValue(keys[i & 63], out var value) ? value.Length : 0;
+            n += dictionary.TryGetValue(keys[i & 63], out _) ? 1 : 0;
         }
 
         return n;
     }
 
     /// <summary><see cref="AccessRecordingBenchmarks.Ops"/> reads of one key of an unchanged dictionary.</summary>
-    public static int ReadSameKey(AccessRecordingFixture f)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int ReadSameKey(AccessRecordingFixture<TValue> f)
     {
         var dictionary = f.Dictionary;
         var key = f.Keys[0];
         var n = 0;
         for (var i = 0; i < AccessRecordingBenchmarks.Ops; i++)
         {
-            n += dictionary.TryGetValue(key, out var value) ? value.Length : 0;
+            n += dictionary.TryGetValue(key, out _) ? 1 : 0;
+        }
+
+        return n;
+    }
+
+    /// <summary><see cref="AccessRecordingBenchmarks.Ops"/> reads of an unchanged dictionary, alternating between two keys.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int ReadAlternating(AccessRecordingFixture<TValue> f)
+    {
+        var dictionary = f.Dictionary;
+        var keys = f.Keys;
+        var n = 0;
+        for (var i = 0; i < AccessRecordingBenchmarks.Ops; i++)
+        {
+            n += dictionary.TryGetValue(keys[i & 1], out _) ? 1 : 0;
         }
 
         return n;
     }
 
     /// <summary><see cref="AccessRecordingBenchmarks.Ops"/> reads of an unchanged value.</summary>
-    public static int ReadValue(AccessRecordingFixture f)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int ReadValue(AccessRecordingFixture<TValue> f)
     {
         var state = f.Value;
         var n = 0;
         for (var i = 0; i < AccessRecordingBenchmarks.Ops; i++)
         {
-            n += state.Value!.Length;
+            n += state.Value is null ? 0 : 1;
         }
 
         return n;
     }
 
     /// <summary>Iterations which each read one key and write another key of the same dictionary.</summary>
-    public static int ReadAWriteB(AccessRecordingFixture f)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int ReadAWriteB(AccessRecordingFixture<TValue> f)
     {
         var dictionary = f.Dictionary;
         var read = f.Keys[0];
@@ -93,14 +164,15 @@ internal static class AccessRecordingScenarios
         var n = 0;
         for (var i = 0; i < AccessRecordingBenchmarks.Ops; i++)
         {
-            n += dictionary.TryGetValue(read, out var value) ? value.Length : 0;
+            n += dictionary.TryGetValue(read, out _) ? 1 : 0;
             dictionary[written] = values[i & 63];
         }
 
         return n;
     }
 
-    public static int WriteValue(AccessRecordingFixture f)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteValue(AccessRecordingFixture<TValue> f)
     {
         var state = f.Value;
         var values = f.Values;
@@ -112,7 +184,8 @@ internal static class AccessRecordingScenarios
         return 0;
     }
 
-    public static int WriteDictionary(AccessRecordingFixture f)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int WriteDictionary(AccessRecordingFixture<TValue> f)
     {
         var dictionary = f.Dictionary;
         var keys = f.Keys;
@@ -125,12 +198,13 @@ internal static class AccessRecordingScenarios
         return 0;
     }
 
-    /// <summary><see cref="KeysReads"/> reads of the keys of an unchanged dictionary.</summary>
-    public static int Keys(AccessRecordingFixture f)
+    /// <summary><see cref="AccessRecordingBenchmarks.KeysReads"/> reads of the keys of an unchanged dictionary.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int Keys(AccessRecordingFixture<TValue> f)
     {
         var dictionary = f.Dictionary;
         var n = 0;
-        for (var i = 0; i < KeysReads; i++)
+        for (var i = 0; i < AccessRecordingBenchmarks.KeysReads; i++)
         {
             n += dictionary.Keys.Count;
         }
@@ -139,7 +213,8 @@ internal static class AccessRecordingScenarios
     }
 
     /// <summary>A typical step: three reads, three writes and a count.</summary>
-    public static int TypicalBody(AccessRecordingFixture f)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int TypicalBody(AccessRecordingFixture<TValue> f)
     {
         var dictionary = f.Dictionary;
         var keys = f.Keys;
@@ -147,7 +222,7 @@ internal static class AccessRecordingScenarios
         var n = 0;
         for (var i = 0; i < 3; i++)
         {
-            n += dictionary.TryGetValue(keys[i], out var value) ? value.Length : 0;
+            n += dictionary.TryGetValue(keys[i], out _) ? 1 : 0;
             dictionary[keys[i + 32]] = values[i];
         }
 
@@ -156,29 +231,73 @@ internal static class AccessRecordingScenarios
 }
 
 /// <summary>
-/// A journaled state manager with a dictionary, a value and the durable task access logs, whose accesses run through the
-/// access log of the attempt which <see cref="Provider"/> holds, as a durable task grain's do.
+/// Runs the bodies of <see cref="AccessRecordingScenario"/> over a journaled state manager with a dictionary of 64 entries,
+/// a value and the durable task access logs: outside a durable task, or as attempts of a durable task which the runtime's
+/// context provider routes the accesses of, as a durable task grain does.
 /// </summary>
-internal sealed class AccessRecordingFixture : IDisposable
+/// <remarks>
+/// Each attempt is a <see cref="GrainDurableTaskContext"/> of <see cref="TaskId"/>, a task identifier of the depth and form
+/// which the runtime gives a step of a child of an invoked task, and runs its body through
+/// <see cref="DurableTaskRuntimeHelper.RunAsync"/>, which makes the attempt current, so
+/// <see cref="DurableTaskAccessContextProvider"/> finds the attempt's access log as it does in a grain.
+/// </remarks>
+internal abstract class AccessRecordingFixture : IDisposable
 {
-    private readonly TaskId _taskId = TaskId.CreateRoot("bench");
-    private readonly Serializer _serializer;
-    private readonly AccessLogProvider _provider = new();
+    /// <summary>
+    /// The task whose attempts run the bodies: a step of the first child of an invoked task with a generated identifier.
+    /// </summary>
+    public static TaskId TaskId { get; } = TaskId.CreateRoot("0f8fad5bd9cb469fa16570867728950e").Child("$child-1").Child("reserve-stock-1");
+
+    public static IEnumerable<string> Formats => (Environment.GetEnvironmentVariable("BENCH_FORMATS") ?? "binary,json").Split(',');
+
+    public static AccessRecordingFixture Create(string format, AccessRecordingValueKind valueKind) => valueKind switch
+    {
+        AccessRecordingValueKind.String => new AccessRecordingFixture<string>(format, AccessRecordingBodies.OfStrings, static i => $"value-{i:D2}-{new string('x', 23)}"),
+        AccessRecordingValueKind.Record => new AccessRecordingFixture<AccessRecordingItem>(format, AccessRecordingBodies.OfRecords, static i => new($"value-{i:D2}-{new string('x', 23)}", i)),
+        _ => throw new ArgumentOutOfRangeException(nameof(valueKind)),
+    };
+
+    /// <summary>Runs the body of <paramref name="scenario"/> <paramref name="count"/> times outside a durable task.</summary>
+    public abstract int RunOutside(AccessRecordingScenario scenario, int count = 1);
+
+    /// <summary>Runs the body of <paramref name="scenario"/> <paramref name="count"/> times, each in an attempt which has no access log.</summary>
+    public abstract int RunUnrecorded(AccessRecordingScenario scenario, int count = 1);
+
+    /// <summary>
+    /// Runs the body of <paramref name="scenario"/> <paramref name="count"/> times, each in a recording attempt which then
+    /// stages, journals and removes its records, as completing it does.
+    /// </summary>
+    public abstract int Record(AccessRecordingScenario scenario, int count = 1);
+
+    /// <summary>Runs the body of <paramref name="scenario"/> <paramref name="count"/> times, each in an attempt which replays its records.</summary>
+    public abstract int Replay(AccessRecordingScenario scenario, int count = 1);
+
+    /// <summary>
+    /// Runs the body of <paramref name="scenario"/> in a recording attempt and returns the bytes which journaling its
+    /// records takes, and the bytes of the removal which completing it journals.
+    /// </summary>
+    public abstract (int Records, int Removal) MeasureBytes(AccessRecordingScenario scenario);
+
+    public abstract void Dispose();
+}
+
+internal sealed class AccessRecordingFixture<TValue> : AccessRecordingFixture where TValue : class
+{
+    private readonly AccessRecordingRuntime _runtime;
     private readonly DurableTaskAccessLogs _logs;
     private readonly AccessLogStorage _storage;
     private readonly JournalBufferWriter _stateJournal;
     private readonly JournalBufferWriter _accessJournal;
     private readonly JournalStreamWriter _accessStream;
-    private readonly IJournalFormat _journalFormat;
-    private readonly IDurableDictionaryCommandCodec<TaskId, byte[]> _accessCodec;
-    private readonly JournaledStateManager _manager;
-    private readonly Dictionary<AccessRecordingScenario, AccessLogStorage> _recorded = [];
+    private readonly Func<AccessRecordingFixture<TValue>, int>[] _bodies;
+    private readonly AccessLogStorage[] _recorded;
+    private readonly BodyTask _body;
 
-    public AccessRecordingFixture(string format)
+    public AccessRecordingFixture(string format, Func<AccessRecordingScenario, Func<AccessRecordingFixture<TValue>, int>> getBody, Func<int, TValue> createValue)
     {
         var formatKey = format == "json" ? JsonLinesJournalFormat.JournalFormatKey : OrleansBinaryJournalFormat.JournalFormatKey;
         var services = new ServiceCollection();
-        services.AddSerializer();
+        services.AddSerializer(serializer => serializer.AddAssembly(typeof(AccessRecordingItem).Assembly));
         services.AddSingleton<OrleansBinaryJournalFormat>();
         services.AddKeyedSingleton<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey, static (sp, _) => sp.GetRequiredService<OrleansBinaryJournalFormat>());
         services.AddKeyedSingleton(typeof(IDurableDictionaryCommandCodec<,>), OrleansBinaryJournalFormat.JournalFormatKey, typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
@@ -186,65 +305,70 @@ internal sealed class AccessRecordingFixture : IDisposable
         services.Configure<JsonJournalOptions>(options => options.SerializerOptions = new JsonSerializerOptions { TypeInfoResolver = new DefaultJsonTypeInfoResolver() });
         services.AddJsonJournalFormat(tryAdd: false);
         var serviceProvider = services.BuildServiceProvider();
-        _serializer = serviceProvider.GetRequiredService<Serializer>();
-        _journalFormat = serviceProvider.GetRequiredKeyedService<IJournalFormat>(formatKey);
-        _accessCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<TaskId, byte[]>>(serviceProvider, formatKey);
+        var journalFormat = serviceProvider.GetRequiredKeyedService<IJournalFormat>(formatKey);
+        var accessCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<TaskId, byte[]>>(serviceProvider, formatKey);
+        _runtime = new AccessRecordingRuntime(serviceProvider.GetRequiredService<Serializer>());
 
         var shared = new JournaledStateManagerShared(
             NullLogger<JournaledStateManager>.Instance,
             Options.Create(new JournaledStateManagerOptions { JournalFormatKey = formatKey }),
             TimeProvider.System,
             serviceProvider);
-        _manager = new JournaledStateManager(shared, new VolatileJournalStorage(formatKey)) { ContextProvider = _provider };
-        Dictionary = new DurableDictionary<string, string>(
+        var manager = new JournaledStateManager(shared, new VolatileJournalStorage(formatKey))
+        {
+            ContextProvider = new DurableTaskAccessContextProvider(_runtime),
+        };
+        Dictionary = new DurableDictionary<string, TValue>(
             "dict",
-            _manager,
-            JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, string>>(serviceProvider, formatKey));
-        Value = new DurableValue<string>(
+            manager,
+            JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, TValue>>(serviceProvider, formatKey));
+        Value = new DurableValue<TValue>(
             "value",
-            _manager,
-            JournalFormatServices.GetRequiredCommandCodec<IDurableValueCommandCodec<string>>(serviceProvider, formatKey));
-        _logs = new DurableTaskAccessLogs(_manager, _accessCodec);
+            manager,
+            JournalFormatServices.GetRequiredCommandCodec<IDurableValueCommandCodec<TValue>>(serviceProvider, formatKey));
+        _logs = new DurableTaskAccessLogs(manager, accessCodec);
         _storage = new(_logs);
+        _body = new(this);
 
         // The states journal into buffers which each invocation resets, rather than through the manager's writes.
-        _stateJournal = _journalFormat.CreateWriter();
-        _accessJournal = _journalFormat.CreateWriter();
+        _stateJournal = journalFormat.CreateWriter();
+        _accessJournal = journalFormat.CreateWriter();
         _accessStream = _accessJournal.CreateJournalStreamWriter(new JournalStreamId(3));
         ((IStateMachine)Dictionary).Reset(_stateJournal.CreateJournalStreamWriter(new JournalStreamId(1)));
         ((IStateMachine)Value).Reset(_stateJournal.CreateJournalStreamWriter(new JournalStreamId(2)));
         ((IStateMachine)_logs).Reset(_accessStream);
 
         Keys = [.. Enumerable.Range(0, 64).Select(i => $"key-{i:D2}")];
-        Values = [.. Enumerable.Range(0, 64).Select(i => $"value-{i:D2}-{new string('x', 23)}")];
+        Values = [.. Enumerable.Range(0, 64).Select(createValue)];
         foreach (var (key, value) in Keys.Zip(Values))
         {
-            ((IDurableDictionaryCommandHandler<string, string>)Dictionary).ApplySet(key, value);
+            ((IDurableDictionaryCommandHandler<string, TValue>)Dictionary).ApplySet(key, value);
         }
 
-        ((IDurableValueCommandHandler<string>)Value).ApplySet(Values[0]);
+        ((IDurableValueCommandHandler<TValue>)Value).ApplySet(Values[0]);
 
         // Record each scenario once, so a replay consumes exactly its records, and check that it does.
-        foreach (var scenario in Enum.GetValues<AccessRecordingScenario>())
+        var scenarios = Enum.GetValues<AccessRecordingScenario>();
+        _bodies = new Func<AccessRecordingFixture<TValue>, int>[scenarios.Length];
+        _recorded = new AccessLogStorage[scenarios.Length];
+        foreach (var scenario in scenarios)
         {
-            var logs = new DurableTaskAccessLogs(new NullManager(), _accessCodec);
-            var storage = new AccessLogStorage(logs);
-            var log = CreateLog(storage);
-            RunInAttempt(log, AccessRecordingScenarios.Get(scenario));
+            var body = _bodies[(int)scenario] = getBody(scenario);
+            var storage = new AccessLogStorage(new DurableTaskAccessLogs(new NullManager(), accessCodec));
+            var log = RunInAttempt(storage, body, out _);
             log.Flush();
             log.Close();
-            _recorded[scenario] = storage;
+            _recorded[(int)scenario] = storage;
 
-            var replay = CreateLog(storage);
-            RunInAttempt(replay, AccessRecordingScenarios.Get(scenario));
+            var replay = RunInAttempt(storage, body, out _);
             if (replay.IsReplaying)
             {
                 throw new InvalidOperationException($"The replay of {scenario} didn't consume its records.");
             }
 
-            var length = storage.GetAccessLogLength(_taskId);
+            var length = storage.GetAccessLogLength(TaskId);
             replay.Flush();
-            if (storage.GetAccessLogLength(_taskId) != length)
+            if (storage.GetAccessLogLength(TaskId) != length)
             {
                 throw new InvalidOperationException($"The replay of {scenario} recorded further accesses.");
             }
@@ -253,36 +377,48 @@ internal sealed class AccessRecordingFixture : IDisposable
         ResetJournals();
     }
 
-    public static IEnumerable<string> Formats => (Environment.GetEnvironmentVariable("BENCH_FORMATS") ?? "binary,json").Split(',');
-
     public string[] Keys { get; }
 
-    public string[] Values { get; }
+    public TValue[] Values { get; }
 
-    public DurableDictionary<string, string> Dictionary { get; }
+    public DurableDictionary<string, TValue> Dictionary { get; }
 
-    public DurableValue<string> Value { get; }
+    public DurableValue<TValue> Value { get; }
 
-    /// <summary>Runs <paramref name="body"/> in one recording attempt, then stages, journals and removes its records.</summary>
-    public int Record(Func<AccessRecordingFixture, int> body)
+    public override int RunOutside(AccessRecordingScenario scenario, int count = 1)
     {
-        var log = CreateLog(_storage);
-        var result = RunInAttempt(log, body);
-        log.Flush();
-        log.Close();
-        JournalAndComplete();
+        var body = _bodies[(int)scenario];
+        var result = 0;
+        for (var i = 0; i < count; i++)
+        {
+            result += body(this);
+        }
+
         ResetJournals();
         return result;
     }
 
-    /// <summary>Runs <paramref name="count"/> bodies, each in an attempt which journals and completes.</summary>
-    public int RecordBodies(Func<AccessRecordingFixture, int> body, int count)
+    public override int RunUnrecorded(AccessRecordingScenario scenario, int count = 1)
     {
+        var body = _bodies[(int)scenario];
         var result = 0;
         for (var i = 0; i < count; i++)
         {
-            var log = CreateLog(_storage);
-            result += RunInAttempt(log, body);
+            result += RunInAttempt(body);
+        }
+
+        ResetJournals();
+        return result;
+    }
+
+    public override int Record(AccessRecordingScenario scenario, int count = 1)
+    {
+        var body = _bodies[(int)scenario];
+        var result = 0;
+        for (var i = 0; i < count; i++)
+        {
+            var log = RunInAttempt(_storage, body, out var bodyResult);
+            result += bodyResult;
             log.Flush();
             log.Close();
             JournalAndComplete();
@@ -292,92 +428,94 @@ internal sealed class AccessRecordingFixture : IDisposable
         return result;
     }
 
-    /// <summary>Runs the body of <paramref name="scenario"/> in an attempt which replays its records.</summary>
-    public int Replay(AccessRecordingScenario scenario)
+    public override int Replay(AccessRecordingScenario scenario, int count = 1)
     {
-        var log = CreateLog(_recorded[scenario]);
-        var result = RunInAttempt(log, AccessRecordingScenarios.Get(scenario));
-        log.Close();
-        return result;
-    }
-
-    /// <summary>Replays the body of <paramref name="scenario"/> <paramref name="count"/> times.</summary>
-    public int ReplayBodies(AccessRecordingScenario scenario, int count)
-    {
-        var body = AccessRecordingScenarios.Get(scenario);
-        var storage = _recorded[scenario];
+        var body = _bodies[(int)scenario];
+        var storage = _recorded[(int)scenario];
         var result = 0;
         for (var i = 0; i < count; i++)
         {
-            var log = CreateLog(storage);
-            result += RunInAttempt(log, body);
+            var log = RunInAttempt(storage, body, out var bodyResult);
+            result += bodyResult;
             log.Close();
         }
 
+        ResetJournals();
         return result;
     }
 
-    /// <summary>
-    /// Runs <paramref name="body"/> in a recording attempt and returns the bytes which journaling its records takes, and
-    /// the bytes of the removal which completing it journals.
-    /// </summary>
-    public (int Records, int Removal) MeasureBytes(Func<AccessRecordingFixture, int> body)
+    public override (int Records, int Removal) MeasureBytes(AccessRecordingScenario scenario)
     {
-        var log = CreateLog(_storage);
-        RunInAttempt(log, body);
+        var log = RunInAttempt(_storage, _bodies[(int)scenario], out _);
         log.Flush();
         log.Close();
         ResetJournals();
         ((IStateMachine)_logs).WritePendingEntries(_accessStream);
         var records = _accessJournal.CommittedLength;
-        _logs.Remove(_taskId);
+        _logs.Remove(TaskId);
         ((IStateMachine)_logs).WritePendingEntries(_accessStream);
         var removal = _accessJournal.CommittedLength - records;
         ResetJournals();
         return (records, removal);
     }
 
-    public void ResetJournals()
-    {
-        _stateJournal.Reset();
-        _accessJournal.Reset();
-    }
-
-    public void Dispose()
+    public override void Dispose()
     {
         _stateJournal.Dispose();
         _accessJournal.Dispose();
     }
 
+    private void ResetJournals()
+    {
+        _stateJournal.Reset();
+        _accessJournal.Reset();
+    }
+
     private void JournalAndComplete()
     {
         ((IStateMachine)_logs).WritePendingEntries(_accessStream);
-        _logs.Remove(_taskId);
+        _logs.Remove(TaskId);
         ((IStateMachine)_logs).WritePendingEntries(_accessStream);
     }
 
-    private DurableTaskAccessLog CreateLog(AccessLogStorage storage) =>
-        new(new BenchmarkAttempt(_taskId), storage, _serializer, TaskScheduler.Current, static exception => exception);
-
-    private int RunInAttempt(DurableTaskAccessLog log, Func<AccessRecordingFixture, int> body)
+    // Runs body in an attempt whose access log the runtime creates over storage, and returns the log.
+    private DurableTaskAccessLog RunInAttempt(AccessLogStorage storage, Func<AccessRecordingFixture<TValue>, int> body, out int result)
     {
-        _provider.Log = log;
-        try
-        {
-            return body(this);
-        }
-        finally
-        {
-            _provider.Log = null;
-        }
+        _runtime.Storage = storage;
+        var attempt = new GrainDurableTaskContext(TaskId, _runtime, grainContext: null!, TaskScheduler.Current);
+        _runtime.Storage = null;
+        result = Run(attempt, body);
+        return attempt.AccessLog!;
     }
 
-    // Supplies the attempt's log while it records, as the durable task runtime's provider does.
-    private sealed class AccessLogProvider : JournaledStateContextProvider
-    {
-        public DurableTaskAccessLog? Log;
+    // Runs body in an attempt which has no access log.
+    private int RunInAttempt(Func<AccessRecordingFixture<TValue>, int> body) =>
+        Run(new GrainDurableTaskContext(TaskId, _runtime, grainContext: null!, TaskScheduler.Current), body);
 
-        public override JournaledStateContext? Current => Log is { IsActive: true } log ? log : null;
+    private int Run(GrainDurableTaskContext attempt, Func<AccessRecordingFixture<TValue>, int> body)
+    {
+        _body.Body = body;
+        var run = DurableTaskRuntimeHelper.RunAsync(_body, attempt);
+        Debug.Assert(run.IsCompleted, "The bodies run synchronously.");
+        if (run.Result.Exception is { } exception)
+        {
+            ExceptionDispatchInfo.Throw(exception);
+        }
+
+        return _body.Result;
+    }
+
+    // Runs the fixture's current body as a durable task's body, as the runtime runs a grain's durable task method.
+    private sealed class BodyTask(AccessRecordingFixture<TValue> fixture) : DurableTask
+    {
+        public Func<AccessRecordingFixture<TValue>, int> Body = null!;
+        public int Result;
+
+        protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
+        {
+            Result = Body(fixture);
+            return new(DurableTaskResponse.Completed);
+        }
     }
 
     private sealed class NullManager : IJournaledStateManager
