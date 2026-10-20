@@ -58,7 +58,8 @@ public sealed class HandlerRoutingContractTests : IDisposable
                 MessageId = MessageId.Create("unhandled"),
                 Payload = [],
                 Subject = subject
-            }
+            },
+            SentAt = DateTimeOffset.UnixEpoch
         });
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -97,7 +98,8 @@ public sealed class HandlerRoutingContractTests : IDisposable
     private static FakeContext CreateContext(MessageType<string> type, string body) =>
         new(new InboxMessage
         {
-            Envelope = type.Create(MessageId.Create(Guid.NewGuid().ToString("N")), GrainId.Create("test", "receiver"), body).Envelope
+            Envelope = type.Create(MessageId.Create(Guid.NewGuid().ToString("N")), GrainId.Create("test", "receiver"), body).Envelope,
+            SentAt = DateTimeOffset.UnixEpoch
         });
 
     private sealed class FakeContext(InboxMessage message) : IInboxHandlerContext

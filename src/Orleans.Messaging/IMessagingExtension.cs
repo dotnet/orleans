@@ -23,6 +23,7 @@ public interface IMessagingExtension : IGrainExtension
     /// Direct admission shares the payload array, header dictionary, and header value arrays under the immutable-publication contract.
     /// RPC copying and deserialization isolate payload arrays, header dictionaries, and header value arrays using ordinary Orleans serialization.
     /// A successful result means the inbox durably accepted the message, or already processed it.
+    /// Callers retrying a delivery reuse the message's <see cref="InboxMessage.SentAt"/>.
     /// <para>
     /// Deliveries interleave with the grain's other requests. A delivery runs no handler: it validates, deduplicates,
     /// and stages the message's acceptance synchronously, then waits for that journal write, and the messaging pump runs

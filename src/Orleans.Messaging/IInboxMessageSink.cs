@@ -20,11 +20,10 @@ namespace Orleans.Messaging;
 /// passed; decline a scheduled message to have the inbox hold it until then.
 /// </para>
 /// <para>
-/// Sinks must be idempotent. The inbox deduplicates the message ID while its processed record is retained. Before
-/// compacting that record, the inbox durably fences the send's immutable admission cutoff; delayed retries of that
-/// send receive <see cref="DeliveryStatus.Expired"/> before reaching a sink. Null-cutoff records are retained
-/// permanently. A message whose journal write fails is redelivered to the next activation, which recovers the sink's
-/// state from the journal.
+/// Sinks must be idempotent. The inbox deduplicates the message ID while it retains the processed record, for
+/// <c>DeduplicationWindow</c> after the message's <see cref="InboxMessage.SentAt"/>. Delayed retries after that receive
+/// <see cref="DeliveryStatus.Expired"/> before reaching a sink. A message whose journal write fails is redelivered to
+/// the next activation, which recovers the sink's state from the journal.
 /// </para>
 /// </remarks>
 public interface IInboxMessageSink
