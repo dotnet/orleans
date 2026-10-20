@@ -92,7 +92,7 @@ cost alongside other pending messages. The inbox depth counter includes them.
 | `Backpressured` | The receiver is at capacity. The outbox retries. Examine receiver depth, oldest message age, and handler latency. |
 | `HandlerNotFound` | The receiver has no registered handlers. The outbox logs an error and retries. Check handler registration during activation and deployment skew. |
 | `DeadLettered` | The receiver durably rejected the message, with a reason and an optional application-defined code. The outbox removes the message, and a source-provided message retires as `Rejected` with that reason and code. |
-| `Expired` | The send time is at or below the receiver's durable admission floor. Earlier acceptance is unknown, for example after a lost acknowledgement and compaction. The outbox keeps a dead letter and retires a source-provided message as `DeadLettered`. Reconcile business state before authorizing another send. |
+| `Expired` | The send time is at or below the receiver's durable admission floor, for example after delivery was delayed past `SentAt + DeduplicationWindow` or the receiver's clock jumped forward. Earlier acceptance is unknown. The outbox keeps a dead letter and retires a source-provided message as `DeadLettered`. Reconcile through the application before authorizing another send. |
 | Any other status | The sender can't interpret the status, for example one from a newer receiver, so the outcome is unknown. The outbox retries until `OutboxRetryTimeout`. |
 
 `Accepted`, `Duplicate`, `DeadLettered`, and `Expired` are the terminal statuses.
@@ -114,7 +114,7 @@ end-to-end business confirmation.
 | Handler error logged after `Complete()` | The staged completion and outgoing messages persist. Diagnose the error using committed state. |
 | Grain deactivates after a storage or staging failure | Messaging vetoes every later journal write of the activation, and the grain deactivates. The next activation recovers the committed journal and resumes pending work. |
 | Outbox dead letter whose reason states that the retry timeout elapsed | No terminal answer was recorded within the original send's `OutboxRetryTimeout`. Check receiver availability and handler registration, then reconcile the possibly accepted command before authorizing replay. |
-| Receiver admission floor or `Expired` answer | The send time is at or below the receiver's durable floor. Inspect clock motion, outages, and business state keyed by the original ID; use the application's durable reconciliation path. |
+| Sender dead-letters with `Expired` and an unknown receiver outcome | Delivery was delayed past `SentAt + DeduplicationWindow`, or a forward receiver clock jump advanced its durable admission floor. Reconcile business state through the application, check sender/receiver clocks, and size `DeduplicationWindow` for tolerated delivery delays and clock variation. Keep `OutboxRetryTimeout` shorter than that window. |
 | Caller cancellation | An accepted write or delivery continues through its actual outcome. Query durable business status or retry with the same command ID. |
 
 Handlers follow a two-phase pattern: all asynchronous and fallible preparation uses
