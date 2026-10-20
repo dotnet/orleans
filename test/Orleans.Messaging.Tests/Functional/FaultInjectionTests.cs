@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
+using Orleans.Configuration;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Messaging.Tests.Support;
@@ -358,6 +360,61 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         Assert.Equal([DeliveryStatus.Backpressured, DeliveryStatus.Backpressured, DeliveryStatus.Accepted], Deliveries.Answers);
         Assert.Equal(3, probe.SinkOffers);
         Assert.Equal(1, probe.SinkAcceptances);
+    }
+
+    [Fact]
+    public async Task DeliveryAttempts_CarryTheirRetryHorizonPlusTheCallTimeoutAsTheRedeliveryDeadline()
+    {
+        var sender = NewSinkGrain();
+        var receiver = NewSinkGrain();
+        var probe = _cluster.SourceSinkProbe.For(receiver);
+        probe.Mode = SinkMode.Backpressure;
+        var id = NewSourceMessageId("redelivery-deadline");
+        var callTimeout = Fixture.Cluster.Silos[0].ServiceProvider
+            .GetRequiredService<IOptions<SiloMessagingOptions>>().Value.ResponseTimeout;
+
+        var sentAt = _cluster.JobClock.GetUtcNow();
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), id, RandomNumberGenerator.GetBytes(32), write: true);
+        await WaitForFailedAttemptAsync(sender, id, 1);
+        var step = RetryTimeout * 3 / 4;
+        await _cluster.AdvanceAndRunPumpAsync(sender, step);
+        await WaitForFailedAttemptAsync(sender, id, 2);
+        var secondAttemptAt = _cluster.JobClock.GetUtcNow();
+        probe.Mode = SinkMode.Accept;
+        await _cluster.AdvanceAndRunPumpAsync(sender, step);
+        await Fixture.WaitUntilAsync(sender, () => Sink(sender).GetState().Retired.Count == 1);
+
+        // Each attempt carries the expiration it started under, which a backpressured attempt restarts, plus the longest
+        // time a call takes to reach the receiver.
+        Assert.Equal(
+            [sentAt + RetryTimeout + callTimeout, sentAt + RetryTimeout + callTimeout, secondAttemptAt + RetryTimeout + callTimeout],
+            Deliveries.Deadlines);
+    }
+
+    [Fact]
+    public async Task RedeliveryDeadlineBeyondTheReceiversWindow_DeadLettersAtTheSenderAndRetiresTheMessageAsRejected()
+    {
+        var sender = NewSinkGrain();
+        var receiver = NewSinkGrain();
+        Deliveries.Enqueue(DeliveryFault.ExtendRedeliveryDeadline(TimeSpan.FromDays(2)));
+        var id = NewSourceMessageId("beyond-window");
+
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), id, RandomNumberGenerator.GetBytes(32), write: true);
+
+        // The receiver keeps nothing for the rejection, so the sender keeps the message as a dead letter.
+        await Fixture.WaitUntilAsync(sender, () => Sink(sender).GetState().Retired.Count == 1);
+        var (retired, reasons, codes, deadLetter) = await Fixture.OnGrainAsync(sender, () => (
+            Sink(sender).GetState().Retired,
+            Sink(sender).GetRetirementReasons(),
+            Sink(sender).GetRetirementCodes(),
+            _cluster.GetOutboxState(sender).DeadLetter(id)));
+        Assert.Equal(nameof(OutboxMessageRetirementStatus.Rejected), retired[id.ToString()]);
+        Assert.Equal(DeliveryResult.DeduplicationWindowExceededCode, codes[id.ToString()]);
+        Assert.Equal(reasons[id.ToString()], deadLetter.Reason);
+        Assert.Equal(1, deadLetter.AttemptCount);
+        Assert.Equal([DeliveryStatus.DeadLettered], Deliveries.Answers);
+        Assert.Equal(0, _cluster.SourceSinkProbe.For(receiver).SinkOffers);
+
     }
 
     [Theory]
