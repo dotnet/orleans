@@ -73,9 +73,11 @@ public class DurableMessagingOptions
     /// </para>
     /// <para>
     /// Every outbox delivery attempt starts within <see cref="OutboxRetryTimeout"/> of the time the message was sent or
-    /// last backpressured, so a window which exceeds that timeout plus the longest grain call duration and clock skew
-    /// deduplicates every redelivery. Configure both values uniformly across the cluster. Senders which resubmit outside
-    /// the outbox need a window which covers their own retry horizon.
+    /// last backpressured, and carries the time its redeliveries end as <see cref="InboxMessage.RedeliveryDeadline"/>.
+    /// An inbox first accepting a message whose deadline is later than this window covers answers
+    /// <see cref="DeliveryResult.DeduplicationWindowExceededCode"/>, so every redelivery it accepts is deduplicated.
+    /// Configure both values uniformly across the cluster. Senders which resubmit outside the outbox need a window
+    /// which covers their own retry horizon.
     /// </para>
     /// </remarks>
     /// <value>

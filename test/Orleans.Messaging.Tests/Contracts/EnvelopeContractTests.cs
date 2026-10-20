@@ -205,7 +205,7 @@ public sealed class EnvelopeContractTests
     public void SimpleEnvelopeSurfaceUsesGeneratedOrdinaryFields()
     {
         AssertIds(typeof(Envelope), ("MessageId", 0u), ("Payload", 1u), ("Subject", 2u), ("Headers", 3u), ("DeliverAt", 4u));
-        AssertIds(typeof(InboxMessage), ("Envelope", 0u));
+        AssertIds(typeof(InboxMessage), ("Envelope", 0u), ("RedeliveryDeadline", 1u));
         AssertIds(typeof(OutboxMessage), ("Envelope", 0u), ("ReceiverId", 1u));
         Assert.Equal(typeof(Dictionary<string, byte[]>), typeof(Envelope).GetProperty("Headers")!.PropertyType);
         Assert.Equal(typeof(byte[]), typeof(Envelope).GetProperty("Payload")!.PropertyType);

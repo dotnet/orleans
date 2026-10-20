@@ -127,6 +127,10 @@ public enum OutboxMessageRetirementStatus
     /// </summary>
     DeadLettered = 2,
 
-    /// <summary>The receiver dead-lettered the message, with the reason which it reported.</summary>
+    /// <summary>
+    /// The receiver dead-lettered the message, with the reason and code which it reported. For
+    /// <see cref="DeliveryResult.DeduplicationWindowExceededCode"/>, the receiver keeps nothing and the outbox keeps the
+    /// message as a dead letter.
+    /// </summary>
     Rejected = 3
 }
