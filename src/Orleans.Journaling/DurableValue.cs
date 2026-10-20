@@ -56,7 +56,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
     public T? Value
     {
         get => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-            ? context.Read(_accessTarget, JournaledStateOperation.ValueGet, this, static self => self._value)
+            ? context.ReadWhole(_accessTarget, JournaledStateOperation.ValueGet, this, static self => self._value)
             : _value;
         set
         {

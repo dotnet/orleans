@@ -138,7 +138,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     public Task<T> Task => _completion.Task;
 
     public DurableTaskCompletionSourceState<T> State => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.CompletionSourceState, this, static self => self.StateCore)
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.CompletionSourceState, this, static self => self.StateCore)
         : StateCore;
 
     private DurableTaskCompletionSourceState<T> StateCore => _status switch

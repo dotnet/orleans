@@ -61,29 +61,29 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
     }
 
     public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.LogCount, this, static self => self._items.Count)
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.LogCount, this, static self => self._items.Count)
         : _items.Count;
 
     public long Epoch => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.LogEpoch, this, static self => self._epoch)
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.LogEpoch, this, static self => self._epoch)
         : _epoch;
 
     public long FirstSequence => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.LogFirstSequence, this, static self => self._firstSequence)
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.LogFirstSequence, this, static self => self._firstSequence)
         : _firstSequence;
 
     public long NextSequence => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.LogNextSequence, this, static self => self.NextSequenceCore)
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.LogNextSequence, this, static self => self.NextSequenceCore)
         : NextSequenceCore;
 
     private long NextSequenceCore => _firstSequence + _items.Count;
 
     public long CommittedSequence => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.LogCommittedSequence, this, static self => self._committed.NextSequence)
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.LogCommittedSequence, this, static self => self._committed.NextSequence)
         : _committed.NextSequence;
 
     public bool IsSealed => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.LogIsSealed, this, static self => self._isSealed)
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.LogIsSealed, this, static self => self._isSealed)
         : _isSealed;
 
     public T this[long sequence] => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
@@ -219,7 +219,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
         // begins the draft exactly when the recording attempt did.
         if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
         {
-            context.Read(
+            context.ReadWhole(
                 _accessTarget,
                 JournaledStateOperation.LogBeginDraft,
                 this,
@@ -258,7 +258,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
     }
 
     public IEnumerator<T> GetEnumerator() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? ((IEnumerable<T>)context.Read(_accessTarget, JournaledStateOperation.LogSnapshot, this, static self => self._items.ToArray())).GetEnumerator()
+        ? ((IEnumerable<T>)context.ReadWhole(_accessTarget, JournaledStateOperation.LogSnapshot, this, static self => self._items.ToArray())).GetEnumerator()
         : _items.GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();

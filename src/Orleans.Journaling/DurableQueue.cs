@@ -100,7 +100,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
     }
 
     public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.QueueCount, this, static self => self._items.Count)
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.QueueCount, this, static self => self._items.Count)
         : _items.Count;
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
@@ -149,14 +149,14 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
     }
 
     public T Peek() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.QueuePeek, this, static self => self._items.Peek())
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.QueuePeek, this, static self => self._items.Peek())
         : _items.Peek();
 
     public bool TryPeek([MaybeNullWhen(false)] out T item)
     {
         if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
         {
-            (var found, item) = context.Read(
+            (var found, item) = context.ReadWhole(
                 _accessTarget,
                 JournaledStateOperation.QueueTryPeek,
                 this,
@@ -260,7 +260,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
 
     // A context records the items which the code enumerates, so a replay enumerates the same items.
     private T[] ReadSnapshot(JournaledStateContext context) =>
-        context.Read(_accessTarget, JournaledStateOperation.QueueSnapshot, this, static self => self._items.ToArray());
+        context.ReadWhole(_accessTarget, JournaledStateOperation.QueueSnapshot, this, static self => self._items.ToArray());
 
     internal IAsyncEnumerable<QueueChange<T>> WatchAsync(DurableWatchMode mode, int capacity, CancellationToken cancellationToken) =>
         DurableStateObservation.WatchChanges<DurableQueue<T>, QueueChange<T>>(_manager, this, mode, capacity, cancellationToken);
