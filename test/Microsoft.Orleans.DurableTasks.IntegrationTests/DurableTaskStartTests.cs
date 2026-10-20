@@ -110,7 +110,7 @@ public abstract class DurableTaskStartTests(string journalFormatKey) : IAsyncLif
         // its name.
         Assert.Equal(6 + 8, await workflow.WaitAsync(Timeout, cancellationToken));
         var worker = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey);
-        Assert.Equal(6, (await worker.GetDurableTask<int>($"{starter.GetGrainId()}/workflow:$child-1").GetResponseAsync(cancellationToken)).GetResult<int>());
+        Assert.Equal(6, (await worker.GetDurableTask<int>(GetDetachedRootId(starter, "workflow", "$child-1")).GetResponseAsync(cancellationToken)).GetResult<int>());
         Assert.Equal(8, (await worker.GetDurableTask<int>("scheduled-echo").GetResponseAsync(cancellationToken)).GetResult<int>());
 
         // Outside a durable execution, awaiting a reference waits for the task's result, and the reference reads its task
@@ -134,13 +134,12 @@ public abstract class DurableTaskStartTests(string journalFormatKey) : IAsyncLif
 
         // The detached start's handle names the worker's root task, which the workflow observes through it, and which a
         // client reads through it. The call's handle names the task which the worker stores under the starter's scope.
-        var detachedRootId = TaskId.CreateRoot($"{starter.GetGrainId()}/workflow:$child-1");
+        var detachedRootId = GetDetachedRootId(starter, "workflow", "$child-1");
         Assert.Equal(detachedRootId, ids.DetachedTarget);
         Assert.NotEqual(ids.DetachedTarget, ids.Detached);
         Assert.Equal((workflowId.Child("$child-2"), detachedRootId), (ids.Observed, ids.ObservedTarget));
-        Assert.Equal(
-            (workflowId.Child("$child-3"), CallerScope.GetTaskId(starter.GetGrainId(), workflowId.Child("$child-3"))),
-            (ids.Call, ids.CallTarget));
+        Assert.Equal(workflowId.Child("$child-3"), ids.Call);
+        Assert.True(DurableTaskEventBarriers.IsCallerChild(starter.GetGrainId(), ids.Call, ids.CallTarget));
         var worker = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey);
         Assert.Equal(8, (await worker.GetDurableTask<int>(ids.DetachedTarget).GetResponseAsync(cancellationToken)).GetResult<int>());
     }
@@ -179,6 +178,13 @@ public abstract class DurableTaskStartTests(string journalFormatKey) : IAsyncLif
         Assert.Equal(DurableTaskStatus.Canceled, response.Status);
     }
 
+    /// <summary>
+    /// Derives the root ID of a detached task which <paramref name="host"/>'s execution <paramref name="executionId"/> starts
+    /// as its operation <paramref name="segment"/>: one segment holding <c>{HostId}/{Id}/{segment}</c>, each part escaped.
+    /// </summary>
+    private static TaskId GetDetachedRootId(IAddressable host, string executionId, string segment) =>
+        TaskId.CreateRoot($"{TaskId.CreateRoot(host.GetGrainId().ToString())}/{TaskId.CreateRoot(executionId).Child(segment)}");
+
     private static async Task<List<TaskId>> GetTaskIdsAsync(IAddressable grain, CancellationToken cancellationToken)
     {
         var taskIds = new List<TaskId>();
@@ -209,6 +215,8 @@ public interface IDurableTaskStartingGrain : IGrainWithGuidKey
 {
     Task PostEchoAsync(Guid workerKey, int value, string rootId);
 
+    // A request which awaits a task of its own grain interleaves, since the task's segments are requests to the grain.
+    [AlwaysInterleave]
     Task<(int Own, int Other)> ScheduleAndAwaitAsync(Guid workerKey, int value);
 
     DurableTask<int> TripleAsync(int value);
@@ -223,6 +231,7 @@ public interface IDurableTaskStartingGrain : IGrainWithGuidKey
 
     DurableTask<int> WaitForCancellationAsync();
 
+    [AlwaysInterleave]
     Task<DurableTaskStatus> CancelThroughManagerAsync(string rootId);
 }
 

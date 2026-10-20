@@ -50,9 +50,11 @@ public abstract class DurableTaskClientWaitTests(string journalFormatKey) : IAsy
         var waiting = await StartWaitAsync(key, partner);
         Assert.True(_harness.Fixture.Cluster.TryGetGrainContext(partner.GetGrainId(), out var activation));
 
-        await partner.DeactivateAsync();
-        await activation.Deactivated.WaitAsync(WaitTimeout, CancellationToken);
+        // The gated step's segment holds the non-reentrant partner, so deactivation starts on the activation itself and
+        // completes once the segment, whose result the stop discards, has ended.
+        activation.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "The test deactivates the partner."), CancellationToken);
         _harness.Gates.Open(key);
+        await activation.Deactivated.WaitAsync(WaitTimeout, CancellationToken);
 
         Assert.Equal(Value + 1, (await waiting.WaitAsync(WaitTimeout, CancellationToken)).GetResult<int>());
     }

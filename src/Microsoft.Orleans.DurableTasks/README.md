@@ -169,7 +169,10 @@ var placement = await order.PlaceOrderAsync(request).WithId(PlaceOrderTaskId(ord
   write; a replay which reaches the child doesn't send it again. The target holds a posted task once
   the invocation is delivered, so code which hands a task's ID to other parties starts the task with
   `ScheduleAsync`.
-- A detached call is an independent root task on its target. The execution records it under
+- A detached call is an independent root task on its target. This host detaches durable grain calls:
+  the target recovers the root task from the call's serialized request, so detaching any other
+  `ISchedulableTask` fails the operation with `NotSupportedException` before anything is recorded or
+  sent. The execution records it under
   `{taskId}/$detach:{target}:{rootId}`, whose fingerprint covers the root ID and the request, so a
   replay which reaches the record doesn't start the task again and one which starts another request
   under the same record diverges. The invocation carries the request and names the record
@@ -177,9 +180,10 @@ var placement = await order.PlaceOrderAsync(request).WithId(PlaceOrderTaskId(ord
   the task.
   The record observes the task like a `GetDurableTask` subscription: the task's result completes it,
   and its cancellation, an abort or deletion of its tree, or the starter's cancellation ends only the
-  subscription. Its root ID is the `WithId` name, verbatim, or `{grainId}/{taskId}:{segment}`, where
-  `{grainId}` is the starting grain and `{segment}` is the generated ID of the execution's next unnamed
-  operation, so workflows with the same task ID on different grains derive different root IDs.
+  subscription. Its root ID is the `.Detached(rootId)` name, verbatim, or the single segment
+  `{grainId}/{taskId}/{segment}`, in which each part escapes `/` and `\` as task IDs do, `{grainId}`
+  is the starting grain and `{segment}` is the operation's segment, so workflows with the same task ID
+  on different grains derive different root IDs.
 - A handle's `TargetTaskId` names the task which its record started or observes, on the grain which
   stores it: the root ID of a detached task, the subscribed task of a `GetDurableTask` subscription,
   and `$caller/{grainId}/{incarnation}/{taskId}` for a call to a grain. Other parties address the task by it, such as
