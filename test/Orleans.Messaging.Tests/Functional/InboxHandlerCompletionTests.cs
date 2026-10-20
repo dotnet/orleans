@@ -465,9 +465,12 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         {
             self.Mutate();
             self.Context.Complete();
-            var timestamp = Assert.Single(rig.Processed).Value;
+            var completedId = Assert.Single(rig.Processed);
+            Assert.Equal(self.Context.Message.Envelope.MessageId, completedId);
+            var stagedBytes = rig.Manager.PendingWriteByteCount;
             self.Context.Complete();
-            Assert.Equal(timestamp, Assert.Single(rig.Processed).Value);
+            Assert.Equal(completedId, Assert.Single(rig.Processed));
+            Assert.Equal(stagedBytes, rig.Manager.PendingWriteByteCount);
             return ValueTask.CompletedTask;
         };
         var input = await DeliverAsync(rig);
@@ -638,7 +641,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
     private static void AssertCompletedState(Rig rig, InboxMessage input)
     {
         Assert.Empty(rig.Inbox);
-        Assert.Equal(input.Envelope.MessageId, Assert.Single(rig.Processed).Key);
+        Assert.Equal(input.Envelope.MessageId, Assert.Single(rig.Processed));
     }
 
     private static void AssertSuccess(Rig rig, InboxMessage input, int outputCount)
@@ -731,7 +734,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         TestHandler Handler, Inbox InboxState)
     {
         public IReadOnlyDictionary<MessageId, InboxEntry> Inbox => InboxTestAccess.GetPendingMessages(InboxState);
-        public IReadOnlyDictionary<MessageId, DateTimeOffset> Processed => InboxTestAccess.GetProcessedMessages(InboxState);
+        public IReadOnlySet<MessageId> Processed => InboxTestAccess.GetProcessedKeys(InboxState);
 
         public JournalId Journal => JournalId.FromGrainId(Receiver.GetGrainId());
     }
