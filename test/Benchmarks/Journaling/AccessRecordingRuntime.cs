@@ -72,22 +72,37 @@ internal sealed class AccessRecordingRuntime(Serializer serializer) : IDurableTa
 
     /// <summary>
     /// Runs <paramref name="body"/> as an attempt of <paramref name="taskId"/> whose access log this runtime creates over
-    /// <paramref name="storage"/>, through <see cref="DurableTaskRuntimeHelper.RunAsync"/>, as the grain runtime runs a
-    /// durable task's body, and returns the attempt's log.
+    /// <paramref name="storage"/>, and returns the attempt's log.
     /// </summary>
     public DurableTaskAccessLog RunAttempt(TaskId taskId, IDurableTaskAccessLogStorage storage, Action body)
+    {
+        var attempt = StartAttempt(taskId, storage);
+        RunSegment(attempt, body);
+        return attempt.AccessLog!;
+    }
+
+    /// <summary>Creates an attempt of <paramref name="taskId"/> whose access log this runtime creates over <paramref name="storage"/>.</summary>
+    public GrainDurableTaskContext StartAttempt(TaskId taskId, IDurableTaskAccessLogStorage storage)
     {
         Storage = storage;
         var attempt = new GrainDurableTaskContext(taskId, this, grainContext: null!, TaskScheduler.Current);
         Storage = null;
+        return attempt;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="body"/> as a segment of <paramref name="attempt"/>, through
+    /// <see cref="DurableTaskRuntimeHelper.RunAsync"/>, which makes the attempt current, as the grain runtime runs a durable
+    /// task's body.
+    /// </summary>
+    public static void RunSegment(GrainDurableTaskContext attempt, Action body)
+    {
         var run = DurableTaskRuntimeHelper.RunAsync(new ActionTask(body), attempt);
         Debug.Assert(run.IsCompleted, "The attempt's body runs synchronously.");
         if (run.Result.Exception is { } exception)
         {
             ExceptionDispatchInfo.Throw(exception);
         }
-
-        return attempt.AccessLog!;
     }
 
     private sealed class ActionTask(Action body) : DurableTask

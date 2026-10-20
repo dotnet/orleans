@@ -364,9 +364,9 @@ internal class Program
         {
             AccessRecordingBytes.Run();
         },
-        ["Journaling.PositionResolution"] = _ =>
+        ["Journaling.PositionResolution"] = args =>
         {
-            PositionResolutionCost.Run();
+            PositionResolutionCost.Run(args);
         },
         ["Journaling.Azure"] = args =>
         {
