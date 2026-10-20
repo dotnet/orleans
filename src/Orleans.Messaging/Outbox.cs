@@ -433,26 +433,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 var id = outcome.Entry.MessageId;
                 if (!_messages.TryGetValue(id, out var current) || !ReferenceEquals(current, outcome.Entry)) continue;
 
-                var status = outcome.Result?.Status;
-                if (status == DeliveryStatus.Expired)
-                {
-                    // Fencing proves no new admission, not that an earlier attempt was never accepted.
-                    var reason = outcome.Result!.Value.Message ?? "The message was sent before the receiver's deduplication window; its earlier delivery outcome is unknown.";
-                    StageDeadLetter(
-                        current,
-                        current.Reference is null ? outcome.Message : CopySourceMessage(outcome.Message),
-                        reason,
-                        checked(current.State.AttemptCount + 1));
-                }
-                else if (status is DeliveryStatus.Accepted or DeliveryStatus.Duplicate or DeliveryStatus.DeadLettered)
-                {
-                    Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = id });
-                    Retire(current, status == DeliveryStatus.DeadLettered
-                        ? OutboxMessageRetirement.Rejected(outcome.Result!.Value.Message ?? "The receiver dead-lettered the message.", outcome.Result.Value.Code)
-                        : OutboxMessageRetirement.Delivered());
-                    delivered++;
-                }
-                else
+                switch (outcome.Answer)
                 {
                     case DeliveryAnswer.Answered { Result: DeliveryResult.Expired }:
                         // Expired means this send is at or below the admission floor; earlier acceptance remains unknown.

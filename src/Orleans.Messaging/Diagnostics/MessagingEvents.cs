@@ -40,7 +40,7 @@ public static class MessagingEvents
     }
 
     /// <summary>
-    /// Event payload for a new delivery which passed the inbox's deduplication and admission fence, before the inbox
+    /// Event payload for a new delivery whose send time is above the inbox's admission floor, before the inbox
     /// stages message effects.
     /// </summary>
     /// <param name="grainContext">The receiving activation.</param>
