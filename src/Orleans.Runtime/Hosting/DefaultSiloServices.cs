@@ -437,6 +437,7 @@ namespace Orleans.Hosting
             services.AddFromExisting<MessagingTrace, RuntimeMessagingTrace>();
 
             // Activation migration
+            services.AddSingleton<MigrationClock.Callbacks>();
             services.AddSingleton<ActivationMigrationManager>();
             services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
 

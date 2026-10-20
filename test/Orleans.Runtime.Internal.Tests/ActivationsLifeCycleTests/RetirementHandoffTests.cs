@@ -810,6 +810,7 @@ public sealed class RetirementHandoffTests
                     var packages = (List<GrainMigrationPackage>)context.Request.GetArgument(0)!;
                     Assert.All(packages, package => Assert.Null(package.Requests));
                     Assert.All(packages, package => Assert.Null(package.RequestFrames));
+                    Assert.Null(RequestContext.Get(MigrationClock.RequestContextKey));
                 }
 
                 await context.Invoke();
@@ -1835,7 +1836,8 @@ public sealed class RetirementHandoffTests
         var migration = new ActivationMigration(manager, CreateSourceAddress(source, grainId), target.SiloAddress,
             new() { GrainId = grainId, MigrationContext = context, Requests = requests }, requests, routes: null, size: 0, Cancellation);
         Assert.True(migration.TrySend());
-        var snapshot = migration.CreateSnapshot(shared);
+        var clock = MigrationClock.Start();
+        var snapshot = migration.CreateSnapshot(shared, clock);
         Assert.Null(expired._bodyObject);
         Assert.Null(live._bodyObject);
         Assert.Empty(context.Keys);
@@ -1844,11 +1846,11 @@ public sealed class RetirementHandoffTests
         // A timed-out call releases its source state while a late writer can still read the snapshot.
         migration.Complete(new TimeoutException("Acknowledgement lost."));
         await Assert.ThrowsAsync<TimeoutException>(() => migration.Completion);
-        snapshot.SnapshotAge = TimeSpan.FromMinutes(2);
+        clock.TimestampMilliseconds -= (long)TimeSpan.FromMinutes(2).TotalMilliseconds;
         for (var attempt = 0; attempt < 2; attempt++)
         {
             var received = serializer.Deserialize<GrainMigrationPackage>(serializer.SerializeToArray(snapshot));
-            received.UnpackRequests(shared);
+            received.UnpackRequests(shared, clock);
             try
             {
                 Assert.True(received.MigrationContext.TryGetValue("payload", out byte[]? actual));
@@ -1996,7 +1998,9 @@ public sealed class RetirementHandoffTests
     {
         var packages = (List<GrainMigrationPackage>)context.Request.GetArgument(0)!;
         var package = Assert.Single(packages);
-        package.UnpackRequests(context.TargetContext.ActivationServices.GetRequiredService<Orleans.Runtime.Messaging.MessageHandlerShared>());
+        package.UnpackRequests(
+            context.TargetContext.ActivationServices.GetRequiredService<Orleans.Runtime.Messaging.MessageHandlerShared>(),
+            (MigrationClock?)RequestContext.Get(MigrationClock.RequestContextKey));
         packages[0] = package;
         return package;
     }

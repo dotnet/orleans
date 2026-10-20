@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Connections;
@@ -26,6 +27,7 @@ using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Session;
 using TestExtensions;
 using Xunit;
@@ -752,6 +754,299 @@ public class MessageTransportLifecycleTests
         public void Complete() => Response = Orleans.Serialization.Invocation.Response.Completed;
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MigrationSnapshot_SerializationBetweenRequestsPreservesEachDeadline(bool delayDuringDecoding)
+    {
+        var source = Guid.NewGuid();
+        var destination = Guid.NewGuid();
+        var sourceTime = new MillisecondTimeProvider();
+        var destinationTime = new MillisecondTimeProvider();
+        using var sourceServices = CreateServiceProvider(migrationClockCallbacks: new(source, sourceTime));
+        using var destinationServices = CreateServiceProvider(migrationClockCallbacks: new(destination, destinationTime));
+        using var sourceShared = CreateMessageHandlerShared(sourceServices);
+        using var destinationShared = CreateMessageHandlerShared(destinationServices);
+        using var first = new Message { Direction = Message.Directions.Request, Id = new(1), BodyObject = "first" };
+        using var second = new Message { Direction = Message.Directions.Request, Id = new(2), BodyObject = "second" };
+        using var infinite = new Message { Direction = Message.Directions.Request, Id = new(3), BodyObject = "infinite" };
+        var clock = MigrationClock.Start(source, sourceTime);
+        first.SetTimeToLiveMilliseconds(2_000, clock.TimestampMilliseconds);
+        second.SetTimeToLiveMilliseconds(10_000, clock.TimestampMilliseconds);
+        var serialized = false;
+        first.RequestContextData = new()
+        {
+            ["gate"] = new RetrySerializationGate
+            {
+                OnWrite = () =>
+                {
+                    Assert.False(serialized);
+                    serialized = true;
+                    sourceTime.Advance(TimeSpan.FromSeconds(6));
+                    // Model the ordinary header's decreasing TTL while the first context is being serialized.
+                    second.TimeToLive = TimeSpan.FromSeconds(4);
+                }
+            }
+        };
+        var package = Snapshot(sourceServices, sourceShared, clock, [first, second, infinite]);
+        using var outer = new Message
+        {
+            Direction = Message.Directions.Request,
+            BodyObject = package,
+            RequestContextData = new() { [MigrationClock.RequestContextKey] = clock }
+        };
+        using var frame = new ArcBufferWriter();
+        MessageFrames.Write(sourceServices.GetRequiredService<MessageSerializer>(), frame, outer);
+        using var received = MessageFrames.Read(destinationShared, frame);
+        var receivedClock = Assert.IsType<MigrationClock>(received.RequestContextData![MigrationClock.RequestContextKey]);
+        var snapshot = Assert.IsType<GrainMigrationPackage>(received.BodyObject);
+        Assert.True(serialized);
+        Assert.Equal(new long?[] { 2_000, 10_000, null }, snapshot.RequestDeadlinesMilliseconds);
+        var decodeDelayMilliseconds = delayDuringDecoding ? 3_000 : 0;
+        destinationServices.GetRequiredService<RetrySerializationCallbacks>().OnRead =
+            () => destinationTime.Advance(TimeSpan.FromMilliseconds(decodeDelayMilliseconds));
+        snapshot.UnpackRequests(destinationShared, receivedClock);
+        try
+        {
+            Assert.Collection(snapshot.Requests!,
+                request =>
+                {
+                    Assert.Equal(new CorrelationId(1), request.Id);
+                    Assert.True(request.IsExpired);
+                    Assert.Equal(-4_000 - decodeDelayMilliseconds, request.GetTimeToLiveMilliseconds(destinationTime.GetTimestamp()));
+                },
+                request =>
+                {
+                    Assert.Equal(new CorrelationId(2), request.Id);
+                    Assert.Equal(4_000 - decodeDelayMilliseconds, request.GetTimeToLiveMilliseconds(destinationTime.GetTimestamp()));
+                },
+                request =>
+                {
+                    Assert.Equal(new CorrelationId(3), request.Id);
+                    Assert.Null(request.TimeToLive);
+                });
+        }
+        finally
+        {
+            package.MigrationContext.Dispose();
+            snapshot.MigrationContext.Dispose();
+            foreach (var request in snapshot.Requests!) request.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task MigrationSnapshot_TransportRetriesRefreshAgeWithoutChangingRetainedBody()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        var source = Guid.NewGuid();
+        var destination = Guid.NewGuid();
+        var sourceTime = new MillisecondTimeProvider();
+        var destinationTime = new MillisecondTimeProvider();
+        using var sourceServices = CreateServiceProvider(migrationClockCallbacks: new(source, sourceTime));
+        using var destinationServices = CreateServiceProvider(migrationClockCallbacks: new(destination, destinationTime));
+        using var sourceShared = CreateMessageHandlerShared(sourceServices);
+        using var destinationShared = CreateMessageHandlerShared(destinationServices);
+        await using var transport = new CapturingTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(sourceServices, sourceShared), sourceShared.MessageCenter);
+        using var shortRequest = new Message { Direction = Message.Directions.Request, BodyObject = "short" };
+        using var longRequest = new Message { Direction = Message.Directions.Request, BodyObject = "long" };
+        var clock = MigrationClock.Start(source, sourceTime);
+        shortRequest.SetTimeToLiveMilliseconds(2_000, clock.TimestampMilliseconds);
+        longRequest.SetTimeToLiveMilliseconds(10_000, clock.TimestampMilliseconds);
+        var package = Snapshot(sourceServices, sourceShared, clock, [shortRequest, longRequest]);
+        var invocationType = typeof(ActivationMigrationManager).Assembly.GetTypes()
+            .Where(type => !type.IsAbstract && typeof(IInvokable).IsAssignableFrom(type)
+                && type.Name.StartsWith("Invokable_IActivationMigrationManagerSystemTarget_", StringComparison.Ordinal))
+            .Single(type => ((IInvokable)Activator.CreateInstance(type)!).GetMethodName()
+                == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains));
+        var invocation = (IInvokable)Activator.CreateInstance(invocationType)!;
+        invocation.SetArgument(0, new List<GrainMigrationPackage> { package });
+        invocation.SetArgument(1, CancellationToken.None);
+        using var message = new Message
+        {
+            Direction = Message.Directions.Request,
+            BodyObject = invocation,
+            RequestContextData = new() { [MigrationClock.RequestContextKey] = clock }
+        };
+        byte[]? retained = null;
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var write = sourceShared.GetSendMessageHandler(connection);
+            write.WriteMessage(message);
+            write.CompleteWriting();
+            write.Buffers.ConsumeSlice(write.Buffers.Length).Dispose();
+            sourceTime.Advance(TimeSpan.FromSeconds(attempt == 0 ? 3 : 2));
+            write.RerouteMessages(new ConnectionClosedException());
+            Assert.Same(message, (await connection.Retries.Reader.ReadAsync(cancellation)).Message);
+            var bytes = Assert.IsType<MessageReadRequest>(message._bodyObject).Body.ToArray();
+            if (retained is null)
+            {
+                retained = bytes;
+            }
+            else
+            {
+                Assert.Equal(retained, bytes);
+            }
+
+            var retryClock = Assert.IsType<MigrationClock>(message.RequestContextData![MigrationClock.RequestContextKey]);
+            Assert.Equal(clock.TimestampMilliseconds, retryClock.TimestampMilliseconds);
+            Assert.Equal(source, retryClock.Origin);
+        }
+
+        var retry = sourceShared.GetSendMessageHandler(connection);
+        retry.WriteMessage(message);
+        retry.CompleteWriting();
+        Assert.True(transport.EnqueueWrite(retry));
+        using var frame = new ArcBufferWriter();
+        frame.Write(transport.Written!);
+        using var received = MessageFrames.Read(destinationShared, frame);
+        Assert.Null(received.TimeToLive);
+        Assert.Equal(retained, Assert.IsType<MessageReadRequest>(received._bodyObject).Body.ToArray());
+        var receivedClock = Assert.IsType<MigrationClock>(received.RequestContextData![MigrationClock.RequestContextKey]);
+        Assert.Equal(destination, receivedClock.Origin);
+        Assert.Equal(TimeSpan.FromSeconds(5), receivedClock.Elapsed);
+        var receivedInvocation = Assert.IsAssignableFrom<IInvokable>(received.BodyObject);
+        var snapshot = Assert.Single(Assert.IsType<List<GrainMigrationPackage>>(receivedInvocation.GetArgument(0)));
+        snapshot.UnpackRequests(destinationShared, receivedClock);
+        try
+        {
+            Assert.Collection(snapshot.Requests!,
+                request =>
+                {
+                    Assert.True(request.IsExpired);
+                    Assert.Equal(-3_000, request.GetTimeToLiveMilliseconds(destinationTime.GetTimestamp()));
+                },
+                request =>
+                {
+                    Assert.Equal(5_000, request.GetTimeToLiveMilliseconds(destinationTime.GetTimestamp()));
+                });
+            Assert.Null(message._bodyObject);
+        }
+        finally
+        {
+            package.MigrationContext.Dispose();
+            snapshot.MigrationContext.Dispose();
+            foreach (var request in snapshot.Requests!) request.Dispose();
+            await connection.CloseAsync(null);
+        }
+    }
+
+    [Fact]
+    public void MigrationClock_PreservesSenderEpochAndRebasesAcrossDifferentProcessClocks()
+    {
+        var source = Guid.NewGuid();
+        var destination = Guid.NewGuid();
+        var sourceTime = new MillisecondTimeProvider(100_000);
+        var destinationTime = new MillisecondTimeProvider(9_000_000);
+        using var sourceServices = CreateServiceProvider(migrationClockCallbacks: new(source, sourceTime));
+        using var destinationServices = CreateServiceProvider(migrationClockCallbacks: new(destination, destinationTime));
+        var sourceSerializer = sourceServices.GetRequiredService<Serializer>();
+        var destinationSerializer = destinationServices.GetRequiredService<Serializer>();
+        var clock = MigrationClock.Start(source, sourceTime);
+        sourceTime.Advance(TimeSpan.FromSeconds(2));
+        var bytes = sourceSerializer.SerializeToArray(clock);
+        sourceTime.Advance(TimeSpan.FromSeconds(5));
+
+        var retryClock = Assert.IsType<MigrationClock>(sourceSerializer.Deserialize<MigrationClock>(bytes));
+        Assert.Equal(100_000, retryClock.TimestampMilliseconds);
+        Assert.Equal(TimeSpan.FromSeconds(7), retryClock.Elapsed);
+
+        var receivedClock = Assert.IsType<MigrationClock>(destinationSerializer.Deserialize<MigrationClock>(bytes));
+        Assert.Equal(destination, receivedClock.Origin);
+        Assert.Equal(8_998_000, receivedClock.TimestampMilliseconds);
+        Assert.Equal(TimeSpan.FromSeconds(2), receivedClock.Elapsed);
+        destinationTime.Advance(TimeSpan.FromSeconds(3));
+        Assert.Equal(TimeSpan.FromSeconds(5), receivedClock.Elapsed);
+    }
+
+    [Theory]
+    [InlineData("clock", typeof(InvalidOperationException))]
+    [InlineData("deadlines", typeof(InvalidOperationException))]
+    [InlineData("count", typeof(InvalidOperationException))]
+    [InlineData("overflow", typeof(OverflowException))]
+    public void MigrationSnapshot_InvalidLifetimeMetadataLeavesRequestsUnadmitted(string invalid, Type exceptionType)
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        var clock = MigrationClock.Start();
+        using var original = new Message { Direction = Message.Directions.Request, BodyObject = "request" };
+        var snapshot = Snapshot(services, shared, clock, [original]);
+        if (invalid == "deadlines")
+        {
+            snapshot.RequestDeadlinesMilliseconds = null;
+        }
+        else if (invalid == "count")
+        {
+            snapshot.RequestDeadlinesMilliseconds = [];
+        }
+        else if (invalid == "overflow")
+        {
+            snapshot.RequestDeadlinesMilliseconds = [long.MaxValue];
+        }
+
+        try
+        {
+            Assert.Throws(exceptionType, () => snapshot.UnpackRequests(shared, invalid == "clock" ? null : clock));
+            Assert.Null(snapshot.Requests);
+            Assert.NotNull(snapshot.RequestFrames);
+
+            snapshot.RequestDeadlinesMilliseconds = [null];
+            snapshot.UnpackRequests(shared, clock);
+            Assert.Equal("request", Assert.Single(snapshot.Requests!).BodyObject);
+        }
+        finally
+        {
+            snapshot.MigrationContext.Dispose();
+            if (snapshot.Requests is { } requests)
+            {
+                foreach (var request in requests) request.Dispose();
+            }
+        }
+    }
+
+    [Fact]
+    public void Message_RelativeDeadlineAtZeroIsExpired()
+    {
+        using var message = new Message();
+        message.SetTimeToLiveMilliseconds(1_000, referenceTimestamp: -1_000);
+
+        Assert.NotNull(message.TimeToLive);
+        Assert.True(message.IsExpired);
+    }
+
+    private static GrainMigrationPackage Snapshot(
+        IServiceProvider services, MessageHandlerShared shared, MigrationClock clock, List<Message> requests)
+    {
+        var package = new GrainMigrationPackage
+        {
+            GrainId = GrainId.Create("test", "snapshot"),
+            MigrationContext = new MigrationContext(services.GetRequiredService<SerializerSessionPool>()),
+            Requests = requests
+        };
+        var silo = SiloAddress.New(IPAddress.Loopback, 12345, 1);
+        var address = GrainAddress.GetAddress(silo, package.GrainId, ActivationId.NewId());
+        var migration = new ActivationMigration(null!, address, silo, package, requests, null, 0, CancellationToken.None);
+        Assert.True(migration.TrySend());
+        return migration.CreateSnapshot(shared, clock);
+    }
+
+    private sealed class MillisecondTimeProvider : TimeProvider
+    {
+        private readonly FakeTimeProvider _clock = new();
+        private readonly long _timestamp;
+        private readonly long _origin;
+
+        public MillisecondTimeProvider(long? timestamp = null)
+        {
+            _timestamp = timestamp ?? CoarseStopwatch.GetTimestamp();
+            _origin = _clock.GetTimestamp();
+        }
+
+        public override long TimestampFrequency => CoarseStopwatch.Frequency;
+        public override long GetTimestamp() => _timestamp + (long)_clock.GetElapsedTime(_origin, _clock.GetTimestamp()).TotalMilliseconds;
+        public void Advance(TimeSpan duration) => _clock.Advance(duration);
+    }
+
     [GenerateSerializer, SerializationCallbacks(typeof(RetrySerializationCallbacks))]
     public sealed class RetrySerializationGate
     {
@@ -761,7 +1056,9 @@ public class MessageTransportLifecycleTests
 
     public sealed class RetrySerializationCallbacks
     {
+        public Action? OnRead { get; set; }
         public void OnSerializing(RetrySerializationGate value) => value.OnWrite?.Invoke();
+        public void OnDeserialized(RetrySerializationGate value) => OnRead?.Invoke();
     }
 
     [Fact]
@@ -1190,9 +1487,12 @@ public class MessageTransportLifecycleTests
         Assert.True(inner.Disposed);
     }
 
-    private static ServiceProvider CreateServiceProvider(SiloMessagingOptions? options = null) => new ServiceCollection()
+    private static ServiceProvider CreateServiceProvider(
+        SiloMessagingOptions? options = null,
+        MigrationClock.Callbacks? migrationClockCallbacks = null) => new ServiceCollection()
         .AddMetrics()
         .AddSerializer()
+        .AddSingleton(migrationClockCallbacks ?? new MigrationClock.Callbacks())
         .AddSingleton<UnreadableContextCallbacks>()
         .AddSingleton<RetrySerializationCallbacks>()
         .AddSingleton<OrleansInstruments>()

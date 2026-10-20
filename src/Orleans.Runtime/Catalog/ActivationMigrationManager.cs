@@ -86,42 +86,55 @@ internal struct GrainMigrationPackage
     [Id(2)]
     public byte[]? RequestFrames { get; set; }
 
-    [NonSerialized]
-    private TimeSpan _snapshotAge;
-    [NonSerialized]
-    private CoarseStopwatch _snapshotClock;
+    // Each deadline is relative to the batch's header clock, independent of when its frame is written or read.
+    [Id(4)]
+    public long?[]? RequestDeadlinesMilliseconds { get; set; }
 
-    // Relative age survives different silo clocks and includes time queued before and after transport serialization.
-    [Id(3)]
-    public TimeSpan SnapshotAge
-    {
-        get => _snapshotAge + _snapshotClock.Elapsed;
-        set
-        {
-            ArgumentOutOfRangeException.ThrowIfLessThan(value, TimeSpan.Zero);
-            _snapshotAge = value;
-            _snapshotClock = CoarseStopwatch.StartNew();
-        }
-    }
-
-    internal void UnpackRequests(MessageHandlerShared shared)
+    internal void UnpackRequests(MessageHandlerShared shared, MigrationClock? clock)
     {
         if (RequestFrames is not { } frames)
         {
             return;
         }
 
-        var age = SnapshotAge;
-        Requests = MessageFrames.ReadRequests(shared, frames);
-        foreach (var request in Requests)
+        if (clock is null || RequestDeadlinesMilliseconds is not { } deadlines)
         {
-            if (request.TimeToLive is { } remaining)
-            {
-                request.TimeToLive = remaining <= age ? TimeSpan.FromMilliseconds(-1) : remaining - age;
-            }
+            throw new InvalidOperationException("Migrated request frames require a clock and per-request deadlines.");
         }
 
+        var requests = MessageFrames.ReadRequests(shared, frames);
+        try
+        {
+            if (deadlines.Length != requests.Count)
+            {
+                throw new InvalidOperationException("The number of migrated request deadlines must match the number of frames.");
+            }
+
+            for (var i = 0; i < requests.Count; i++)
+            {
+                if (deadlines[i] is { } deadline)
+                {
+                    requests[i].SetTimeToLiveMilliseconds(deadline, clock.TimestampMilliseconds);
+                }
+                else
+                {
+                    requests[i].SetInfiniteTimeToLive();
+                }
+            }
+        }
+        catch
+        {
+            foreach (var request in requests)
+            {
+                request.Dispose();
+            }
+
+            throw;
+        }
+
+        Requests = requests;
         RequestFrames = null;
+        RequestDeadlinesMilliseconds = null;
     }
 }
 
@@ -281,16 +294,26 @@ internal sealed class ActivationMigration(
         }
     }
 
-    internal GrainMigrationPackage CreateSnapshot(MessageHandlerShared shared)
+    internal GrainMigrationPackage CreateSnapshot(MessageHandlerShared shared, MigrationClock clock)
     {
         Debug.Assert(_stage == Stage.Sent);
         try
         {
+            long?[]? deadlines = null;
+            if (Package.Requests is { } requests)
+            {
+                deadlines = new long?[requests.Count];
+                for (var i = 0; i < requests.Count; i++)
+                {
+                    deadlines[i] = requests[i].GetTimeToLiveMilliseconds(clock.TimestampMilliseconds);
+                }
+            }
+
             return new()
             {
                 GrainId = Package.GrainId,
                 MigrationContext = Package.MigrationContext.CreateSnapshot(),
-                SnapshotAge = TimeSpan.Zero,
+                RequestDeadlinesMilliseconds = deadlines,
                 RequestFrames = Package.Requests is { } carried ? MessageFrames.WriteRequests(shared, carried) : null,
             };
         }
@@ -345,6 +368,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private const int MaxBatchSize = 1_000;
     private const int MessageBodyFramingAllowance = 1_024;
     private const int PackageFramingAllowance = 64;
+    private const int RequestDeadlineFramingAllowance = 32;
 
     private readonly ConcurrentDictionary<SiloAddress, (Task PumpTask, Channel<ActivationMigration> WorkItemChannel)> _workers = new();
     private readonly CancellationTokenSource _shuttingDownCts = new();
@@ -414,10 +438,12 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         var nextPackage = 0;
         try
         {
+            var clock = (MigrationClock?)RequestContext.Get(MigrationClock.RequestContextKey);
+            RequestContext.Remove(MigrationClock.RequestContextKey);
             for (var i = 0; i < migratingGrains.Count; i++)
             {
                 var package = migratingGrains[i];
-                package.UnpackRequests(_runtimeClient.ServiceProvider.GetRequiredService<MessageHandlerShared>());
+                package.UnpackRequests(_runtimeClient.ServiceProvider.GetRequiredService<MessageHandlerShared>(), clock);
                 migratingGrains[i] = package;
 
                 ValidateRequests(package);
@@ -574,7 +600,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                     foreach (var request in requests)
                     {
                         requestsSize += serializer.PrepareRequestBody(shared, buffer, request)
-                            + serializer.GetHeaderSizeBound(buffer, request) + Message.LENGTH_HEADER_SIZE;
+                            + serializer.GetHeaderSizeBound(buffer, request) + Message.LENGTH_HEADER_SIZE + RequestDeadlineFramingAllowance;
                         if (size + requestsSize > MaxBatchBodySize)
                         {
                             break;
@@ -752,6 +778,8 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             {
                 // The invocation owns its batch even if it times out before the transport serializes it.
                 var batch = new List<GrainMigrationPackage>();
+                var clock = MigrationClock.Start();
+                var carriesRequests = false;
                 try
                 {
                     // Collect a batch of work items within the message size limit.
@@ -768,7 +796,9 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                         }
 
                         items.Add(workItem);
-                        batch.Add(workItem.CreateSnapshot(_runtimeClient.ServiceProvider.GetRequiredService<MessageHandlerShared>()));
+                        var snapshot = workItem.CreateSnapshot(_runtimeClient.ServiceProvider.GetRequiredService<MessageHandlerShared>(), clock);
+                        batch.Add(snapshot);
+                        carriesRequests |= snapshot.RequestFrames is not null;
                         batchSize += workItem.Size;
                     }
 
@@ -777,7 +807,25 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                         continue;
                     }
 
-                    await remote.AcceptMigratingGrains(batch, _shuttingDownCts.Token);
+                    if (carriesRequests)
+                    {
+                        RequestContext.Set(MigrationClock.RequestContextKey, clock);
+                    }
+                    else
+                    {
+                        // Request-free batches can target older silos, so inherited migration metadata stays local.
+                        RequestContext.Remove(MigrationClock.RequestContextKey);
+                    }
+
+                    try
+                    {
+                        await remote.AcceptMigratingGrains(batch, _shuttingDownCts.Token);
+                    }
+                    finally
+                    {
+                        RequestContext.Remove(MigrationClock.RequestContextKey);
+                    }
+
                     CompleteAfterRetargeting(items);
 
                     LogDebugMigratedActivations(items.Count, targetSilo);
