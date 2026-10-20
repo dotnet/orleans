@@ -96,19 +96,20 @@ public abstract class DurableTaskCompletionDeadLetterTests : IAsyncLifetime
         Assert.Single(await callee.GetOutboxDeadLettersAsync());
 
         // The dead-lettered completion retains its result for polling, and polling surfaces the decoding failure.
-        var childId = CallerScope.GetTaskId(caller.GetGrainId(), TaskId.CreateRoot("fragile-root").Child(FragileResultCallerGrain.CallId));
-        var error = await Assert.ThrowsAnyAsync<Exception>(() => callee.AsReference<IDurableTaskGrainExtension>()
-            .SubscribeOrPollAsync(childId, new SubscribeOrPollOptions { PollTimeout = TimeSpan.Zero }, cancellationToken).AsTask());
-        Assert.Contains(FragileResultHooks.Error, error.ToString(), StringComparison.Ordinal);
-        Assert.Equal(2, probe.CalleeActivations);
-
-        // Diagnostics report the undecodable result and keep listing the other tasks.
         var diagnostics = new Dictionary<TaskId, DurableTaskDiagnosticState>();
         await foreach (var (taskId, state) in callee.AsReference<IDurableTaskGrainExtension>().GetTasksAsync(cancellationToken))
         {
             diagnostics[taskId] = state;
         }
 
+        var callId = TaskId.CreateRoot("fragile-root").Child(FragileResultCallerGrain.CallId);
+        var childId = Assert.Single(diagnostics.Keys, taskId => DurableTaskEventBarriers.IsCallerChild(caller.GetGrainId(), callId, taskId));
+        var error = await Assert.ThrowsAnyAsync<Exception>(() => callee.AsReference<IDurableTaskGrainExtension>()
+            .SubscribeOrPollAsync(childId, new SubscribeOrPollOptions { PollTimeout = TimeSpan.Zero }, cancellationToken).AsTask());
+        Assert.Contains(FragileResultHooks.Error, error.ToString(), StringComparison.Ordinal);
+        Assert.Equal(2, probe.CalleeActivations);
+
+        // Diagnostics report the undecodable result and keep listing the other tasks.
         Assert.Equal("Unreadable", diagnostics[childId].Status);
         Assert.Contains(FragileResultHooks.Error, diagnostics[childId].Response, StringComparison.Ordinal);
         Assert.Equal("Completed", diagnostics[TaskId.CreateRoot("later")].Status);

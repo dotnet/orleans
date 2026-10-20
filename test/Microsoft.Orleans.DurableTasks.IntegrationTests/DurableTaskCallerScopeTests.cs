@@ -36,14 +36,15 @@ public abstract class DurableTaskCallerScopeTests : IAsyncLifetime
         var second = _fixture.Client.GetGrain<ISharedRootCallerGrain>(Guid.NewGuid());
         var calleeId = callee.GetGrainId();
         var childId = TaskId.CreateRoot("place-order").Child(SharedRootCallerGrain.CallId);
-        var firstChildId = CallerScope.GetTaskId(first.GetGrainId(), childId);
-        var secondChildId = CallerScope.GetTaskId(second.GetGrainId(), childId);
         using var events = DurableTaskEventBarriers.Collect();
 
         // Each caller's workflow is the root task 'place-order' on its own grain, and calls the callee as 'reserve'.
         var firstOrder = await first.PlaceOrderAsync(callee.GetPrimaryKey(), 1).WithId("place-order").ScheduleAsync(cancellationToken);
         var secondOrder = await second.PlaceOrderAsync(callee.GetPrimaryKey(), 2).WithId("place-order").ScheduleAsync(cancellationToken);
         await Task.WhenAll(_probe.Started(1), _probe.Started(2)).WaitAsync(Timeout, cancellationToken);
+        var firstChildId = await events.WaitForCallerChildAsync(calleeId, first.GetGrainId(), childId);
+        var secondChildId = await events.WaitForCallerChildAsync(calleeId, second.GetGrainId(), childId);
+        Assert.NotEqual(firstChildId, secondChildId);
 
         var running = new List<TaskId>();
         await foreach (var taskId in callee.AsReference<IDurableTaskGrainExtension>().GetRunningTasksAsync(cancellationToken))

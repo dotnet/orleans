@@ -142,7 +142,7 @@ internal sealed class DurableTaskMessageHandler(
     {
         cancellationToken.ThrowIfCancellationRequested();
         var resume = messageTypes.Resume.Decode(context.Message.Envelope);
-        runtime.ResumeDelayFromInbox(resume.TaskId, resume.Generation, GetSender(resume.Sender));
+        runtime.ResumeDelayFromInbox(resume.TaskId, resume.Incarnation, resume.Generation, GetSender(resume.Sender));
         context.Complete();
         return ValueTask.CompletedTask;
     }

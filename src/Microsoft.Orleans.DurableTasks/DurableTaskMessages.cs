@@ -10,6 +10,11 @@ namespace Orleans.DurableTasks.Runtime;
 [GenerateSerializer]
 internal sealed class DurableTaskInvocationMessage
 {
+    /// <summary>
+    /// Gets the task which the invocation addresses: the wire identifier of the sender's attached child, which the
+    /// receiver stores under the sender's scope, or the receiver's root task, for a detached invocation or a subscription.
+    /// </summary>
+    /// <remarks>See <see cref="CallerScope"/>.</remarks>
     [Id(0)]
     public TaskId TaskId { get; init; }
 
@@ -31,9 +36,9 @@ internal sealed class DurableTaskInvocationMessage
     public bool Detached { get; init; }
 
     /// <summary>
-    /// Gets the sender's task which subscribes to the result of the receiver's task <see cref="TaskId"/>: the task which a
-    /// detached invocation starts, or an existing task, for a subscription which carries no request. A detached invocation
-    /// without a subscriber, which an ordinary grain method posts, has none.
+    /// Gets the wire identifier of the sender's task which subscribes to the result of the receiver's task
+    /// <see cref="TaskId"/>: the task which a detached invocation starts, or an existing task, for a subscription which
+    /// carries no request. A detached invocation without a subscriber, which an ordinary grain method posts, has none.
     /// </summary>
     /// <remarks>
     /// A subscriber neither claims the task nor validates its caller: the receiver adds it to the task's completion
@@ -57,8 +62,8 @@ internal sealed class DurableTaskCompletionMessage
     public GrainId Sender { get; init; }
 
     /// <summary>
-    /// Gets the receiver's task which the result completes, when it differs from <see cref="TaskId"/>: a task which
-    /// subscribed to the sender's task without invoking it.
+    /// Gets the wire identifier of the receiver's task which the result completes, when it differs from
+    /// <see cref="TaskId"/>: the receiver's child which invoked the sender's task, or a task which subscribed to it.
     /// </summary>
     [Id(3)]
     public TaskId? SubscriberId { get; init; }
@@ -67,6 +72,10 @@ internal sealed class DurableTaskCompletionMessage
 [GenerateSerializer]
 internal sealed class DurableTaskCancellationMessage
 {
+    /// <summary>
+    /// Gets the task which the message addresses: the wire identifier of the sender's attached child, for a cancellation
+    /// or an abort, or the receiver's task to which <see cref="SubscriberId"/> subscribed, for an unsubscription.
+    /// </summary>
     [Id(0)]
     public TaskId TaskId { get; init; }
 
@@ -87,8 +96,8 @@ internal sealed class DurableTaskCancellationMessage
     public string? CancellationReason { get; init; }
 
     /// <summary>
-    /// Gets the sender's task whose subscription to <see cref="TaskId"/> the message ends, or <see langword="null"/> for a
-    /// cancellation or abort of the task. Ending a subscription doesn't cancel the task.
+    /// Gets the wire identifier of the sender's task whose subscription to <see cref="TaskId"/> the message ends, or
+    /// <see langword="null"/> for a cancellation or abort of the task. Ending a subscription doesn't cancel the task.
     /// </summary>
     [Id(4)]
     public TaskId? SubscriberId { get; init; }
@@ -108,6 +117,10 @@ internal sealed class DurableTaskResumeMessage
 
     [Id(2)]
     public GrainId Sender { get; init; }
+
+    /// <summary>Gets the incarnation of the delay's execution tree, the run which scheduled the resume.</summary>
+    [Id(3)]
+    public Guid Incarnation { get; init; }
 }
 
 /// <summary>

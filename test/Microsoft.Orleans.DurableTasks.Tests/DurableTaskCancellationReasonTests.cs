@@ -104,12 +104,12 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var (runtime, storage, _, transport) = CreateRuntime();
         var rootId = TaskId.Parse("root");
         var childId = TaskId.Parse("root/remote");
-        storage.GetOrCreate(rootId);
+        storage.AddInvoked(rootId);
         _ = await runtime.ScheduleChildAsync(childId, new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(1)), TestContext.Current.CancellationToken);
 
         await ((IDurableTaskManager)runtime).CancelAsync(rootId, "buyer", TestContext.Current.CancellationToken);
 
-        Assert.Equal(childId, Assert.Single(transport.Cancellations).TaskId);
+        Assert.Equal(runtime.GetWireId(childId), Assert.Single(transport.Cancellations).TaskId);
         Assert.Equal("buyer", Assert.Single(transport.CancellationReasons));
         Assert.Equal("buyer", storage.Get(childId).CancellationReason);
     });
@@ -131,7 +131,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await canceled.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
 
-        Assert.Equal(childId, Assert.Single(transport.Cancellations).TaskId);
+        Assert.Equal(runtime.GetWireId(childId), Assert.Single(transport.Cancellations).TaskId);
         Assert.Equal("no longer needed", Assert.Single(transport.CancellationReasons));
         Assert.Equal("no longer needed", storage.Get(childId).CancellationReason);
         Assert.Null(storage.Get(rootId).CancellationReason);

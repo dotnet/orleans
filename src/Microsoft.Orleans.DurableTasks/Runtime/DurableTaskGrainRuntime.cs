@@ -62,7 +62,9 @@ namespace Orleans.DurableTasks.Runtime;
 /// completion was dead-lettered. A task without a stored ancestor, such as a remote child scheduled outside a durable
 /// execution, is deleted on the same retention schedule. Deleting a tree cancels its non-terminal tasks: it stages a
 /// cancellation to each pending remote child and cancels each running attempt, whose result is then discarded.
-/// Completions and resumes which arrive for a deleted task are ignored. A cancellation or a signal which arrives before its
+/// Completions and resumes which arrive for a deleted task, or for an earlier run of a task's tree, are ignored: each run
+/// of a root task ID has its own incarnation, which the identifiers of the messages which name its nodes cover, as
+/// <see cref="CallerScope"/> describes. A cancellation or a signal which arrives before its
 /// invocation is recorded, and the invocation finds it in its tree. The grain admits an invocation until
 /// <see cref="Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow"/> has elapsed since its sender
 /// first staged it, and dead-letters a later one, so a record whose invocation doesn't arrive within that window is
@@ -739,7 +741,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly record struct PendingCompletion(TaskId TaskId, DurableTaskSubscriber Destination);
 
     private void StageCancellation(TaskId taskId, GrainId target, string? reason) =>
-        MessageTransport.SendCancellation(GrainId, target, taskId, reason);
+        MessageTransport.SendCancellation(GrainId, target, GetWireId(taskId), reason);
 
     private ValueTask WriteStateAsync(CancellationToken cancellationToken) => _storage.WriteAsync(cancellationToken);
 
@@ -831,7 +833,8 @@ internal sealed partial class DurableTaskGrainRuntime(
         // A recorded acceptance shows that the invocation retired, and the target holds the task.
         if (state.Accepted is null)
         {
-            SendInvocation(transport.CreateInvocation(GrainId, context.TargetId, taskId, request), recordId: taskId);
+            var wireId = GetWireId(taskId);
+            SendInvocation(transport.CreateInvocation(GrainId, context.TargetId, wireId, request), recordId: wireId);
         }
 
         return DurableTaskResponse.Pending;
@@ -1055,7 +1058,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         // The grain's own inbox accepts the resume in the same journal write as the delay, so every durable delay has a
         // durable resume.
-        transport.SendResume(GrainId, taskId, generation, dueTime);
+        transport.SendResume(GrainId, taskId, GetIncarnation(taskId), generation, dueTime);
         await WriteStateAsync(cancellationToken);
         return DurableTaskResponse.Pending;
     }
@@ -1072,11 +1075,17 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <summary>
     /// Stages the outcome of a delay whose scheduled resume message became due, completing its handle after commit.
     /// </summary>
+    /// <param name="taskId">The delay.</param>
+    /// <param name="incarnation">The incarnation of the delay's tree when the resume was scheduled.</param>
+    /// <param name="generation">The delay's generation when the resume was scheduled.</param>
+    /// <param name="sender">The grain which sent the resume, which is this grain.</param>
     /// <remarks>
-    /// A delay whose cancellation was requested terminalizes as canceled. A pending delay of the same generation
-    /// completes. Resumes for an earlier generation, a terminal delay, or a missing task change nothing.
+    /// A delay whose cancellation was requested terminalizes as canceled. A pending delay of the same incarnation and
+    /// generation completes. Resumes for an earlier run of the delay's tree, which a later run's delay with the same
+    /// identifier can't tell apart by its generation, for an earlier generation, for a terminal delay, or for a missing
+    /// task change nothing.
     /// </remarks>
-    internal void ResumeDelayFromInbox(TaskId taskId, long generation, GrainId sender)
+    internal void ResumeDelayFromInbox(TaskId taskId, Guid incarnation, long generation, GrainId sender)
     {
         ThrowIfStopping();
         if (sender != GrainId)
@@ -1086,7 +1095,8 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         if (!_storage.TryGetTask(taskId, out var state)
-            || state.Result is { IsCompleted: true })
+            || state.Result is { IsCompleted: true }
+            || GetIncarnation(taskId) != incarnation)
         {
             return;
         }
@@ -1122,33 +1132,28 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     /// <summary>
-    /// Stages a remote child's terminal response, which its callee sent for the task which it stores under this grain's
-    /// scope.
-    /// </summary>
-    internal void AcceptResponseFromInbox(TaskId taskId, DurableTaskResponse response, GrainId sender) =>
-        AcceptResponseFromInbox(taskId, CallerScope.GetTaskId(GrainId, taskId), response, sender);
-
-    /// <summary>
-    /// Stages the terminal response of a task of <paramref name="sender"/> which <paramref name="taskId"/> awaits: a remote
+    /// Stages the terminal response of a task of <paramref name="sender"/> which this grain's node awaits: a remote
     /// child's own result, or the result of the existing task <paramref name="sourceTaskId"/> to which a subscription
-    /// child subscribed. The local handle completes after commit.
+    /// child subscribed. The completion names the node by its wire identifier, <paramref name="wireId"/>. The local handle
+    /// completes after commit.
     /// </summary>
     /// <remarks>
     /// The inbox accepts the completion directly into task state, so this stored response is its only journaled copy.
     /// The sender retains its result until the inbox reports this acceptance to the sender's outbox. A completion for a
-    /// task which no longer exists is accepted without changing state: the task was deleted with its execution tree,
-    /// which canceled it, and nothing awaits its result. A subscription which already ended, for example because it was
+    /// node which no longer exists, or which belongs to another run of its tree than the run which the wire identifier
+    /// names, is accepted without changing state: the run which awaited it was deleted with its execution tree, which
+    /// canceled it, and nothing awaits its result. A subscription which already ended, for example because it was
     /// canceled, also accepts the completion without changes.
     /// </remarks>
-    internal void AcceptResponseFromInbox(TaskId taskId, TaskId sourceTaskId, DurableTaskResponse response, GrainId sender)
+    internal void AcceptResponseFromInbox(TaskId wireId, TaskId sourceTaskId, DurableTaskResponse response, GrainId sender)
     {
         ThrowIfStopping();
-        if (!_storage.TryGetTask(taskId, out var state))
+        if (!TryGetNode(wireId, out var taskId, out var state))
         {
             return;
         }
 
-        ThrowIfNotStartedBy(taskId, sourceTaskId, state, sender);
+        ThrowIfNotStartedBy(taskId, wireId, sourceTaskId, state, sender);
 
         // The task's result shows that its grain holds the task, so it records the acceptance which the invocation's
         // retirement would otherwise record.
@@ -1303,7 +1308,13 @@ internal sealed partial class DurableTaskGrainRuntime(
     private ScheduledRequest StageSchedule(TaskId taskId, IDurableTaskRequest request, bool fromInbox)
     {
         ThrowIfStopping();
-        CallerScope.ThrowIfReserved(taskId);
+
+        // Only invocations from other grains store tasks beneath the reserved caller scope root.
+        if (!fromInbox)
+        {
+            CallerScope.ThrowIfReserved(taskId);
+        }
+
         if (request.Context is not { } requestContext)
         {
             throw new InvalidOperationException($"No context for durable task request {request}");
@@ -2965,7 +2976,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (!state.RemoteTarget.IsDefault)
         {
-            MessageTransport.SendAbort(GrainId, state.RemoteTarget, taskId, reason);
+            MessageTransport.SendAbort(GrainId, state.RemoteTarget, GetWireId(taskId), reason);
         }
 
         // Unregistering the attempt discards its result; deactivation waits for it to drain.
@@ -3036,9 +3047,9 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <remarks>
     /// The record of a subscription or a detached start names the task which it observes and that task's grain, which
-    /// other parties address. A call to a grain reaches the task which the target stores under this grain's scope, and
-    /// retains until this grain accepts its completion. The identifier of any other operation, or of one which recorded
-    /// nothing, such as a start which an earlier cancellation prevented, is its own.
+    /// other parties address. A call to a grain reaches the task which the target stores under this grain's scope, by the
+    /// call's wire identifier, and retains until this grain accepts its completion. The identifier of any other operation,
+    /// or of one which recorded nothing, such as a start which an earlier cancellation prevented, is its own.
     /// </remarks>
     public TaskId GetTargetTaskId(TaskId taskId, out GrainId addressedHost)
     {
@@ -3054,7 +3065,43 @@ internal sealed partial class DurableTaskGrainRuntime(
             return observedId;
         }
 
-        return state.RemoteTarget.IsDefault ? taskId : CallerScope.GetTaskId(GrainId, taskId);
+        return state.RemoteTarget.IsDefault ? taskId : CallerScope.GetTaskId(GrainId, GetWireId(taskId));
+    }
+
+    /// <summary>
+    /// Returns the wire identifier of <paramref name="nodeId"/>, a stored node of one of this grain's execution trees, or
+    /// one which its execution is about to record: the identifier which messages to and from other grains name it by.
+    /// </summary>
+    /// <remarks>
+    /// The identifier covers the incarnation of the node's tree, so each run of a root identifier sends its own messages.
+    /// See <see cref="CallerScope"/>.
+    /// </remarks>
+    internal TaskId GetWireId(TaskId nodeId) => CallerScope.GetWireId(GetIncarnation(nodeId), nodeId);
+
+    /// <summary>
+    /// Returns the node which <paramref name="wireId"/> names, and its state when the node is stored and belongs to the run
+    /// of its tree which <paramref name="wireId"/> names.
+    /// </summary>
+    /// <returns>
+    /// <see langword="false"/> when the run which the wire identifier names was deleted: the node isn't stored, or a later
+    /// run of its tree stores it.
+    /// </returns>
+    /// <exception cref="InvalidOperationException"><paramref name="wireId"/> isn't a wire identifier.</exception>
+    private bool TryGetNode(TaskId wireId, out TaskId nodeId, [NotNullWhen(true)] out IDurableTaskState? state)
+    {
+        if (!CallerScope.TryParseWireId(wireId, out var incarnation, out nodeId))
+        {
+            throw new InvalidOperationException(
+                $"Task ID '{wireId}' doesn't name a node of an execution tree of grain '{GrainId}'.");
+        }
+
+        if (_storage.TryGetTask(nodeId, out state) && GetIncarnation(nodeId) == incarnation)
+        {
+            return true;
+        }
+
+        state = null;
+        return false;
     }
 
     /// <remarks>

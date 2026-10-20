@@ -34,7 +34,7 @@ public sealed partial class DurableTaskSignalTests
         await timedOut.ScheduleAsync(WorkflowId, () => TryWait(deadline));
         var resume = await timedOut.WaitForResumeAsync();
         Assert.Equal((raceId.Child("1"), deadline), (resume.TaskId, resume.DueTime));
-        timedOut.Runtime.ResumeDelayFromInbox(resume.TaskId, resume.Generation, timedOut.Runtime.GrainId);
+        timedOut.Runtime.ResumeDelayFromInbox(resume.TaskId, resume.Incarnation, resume.Generation, timedOut.Runtime.GrainId);
         await timedOut.Manager.WriteStateAsync(TestCancellation);
 
         Assert.Equal("timed out", await timedOut.GetResultAsync<string>(WorkflowId));
@@ -61,7 +61,7 @@ public sealed partial class DurableTaskSignalTests
             return received ? "received before the deadline" : $"received later:{await Approved.WaitAsync()}";
         });
         var resume = await harness.WaitForResumeAsync();
-        harness.Runtime.ResumeDelayFromInbox(resume.TaskId, resume.Generation, harness.Runtime.GrainId);
+        harness.Runtime.ResumeDelayFromInbox(resume.TaskId, resume.Incarnation, resume.Generation, harness.Runtime.GrainId);
         await harness.Manager.WriteStateAsync(TestCancellation);
         await timedOut.Task.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
 

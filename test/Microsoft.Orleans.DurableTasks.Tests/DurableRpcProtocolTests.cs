@@ -162,16 +162,17 @@ public sealed class DurableRpcProtocolTests
         Assert.NotNull(state.ResultPayload);
     }
     [Fact]
-    public void ResumeIsScheduledSelfMessageCarryingTaskIdentityAndGeneration()
+    public void ResumeIsScheduledSelfMessageCarryingTaskIdentityIncarnationAndGeneration()
     {
         var outbox = new RecordingOutbox();
         var transport = MessagingTestHelpers.CreateTransport(outbox);
         var grain = GrainId.Create("target", "one");
         var taskId = TaskId.Parse("root/delay");
+        var incarnation = Guid.NewGuid();
         var dueTime = new DateTimeOffset(2040, 1, 2, 3, 4, 5, TimeSpan.Zero);
 
-        transport.SendResume(grain, taskId, 7, dueTime);
-        transport.SendResume(grain, taskId, 7, dueTime);
+        transport.SendResume(grain, taskId, incarnation, 7, dueTime);
+        transport.SendResume(grain, taskId, incarnation, 7, dueTime);
 
         var messages = outbox.Messages.ToArray();
         Assert.Equal(2, messages.Length);
@@ -181,24 +182,26 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(dueTime, message.Envelope.DeliverAt);
         var body = MessagingTestHelpers.MessageTypes.Resume.Decode(message.Envelope);
         Assert.Equal(taskId, body.TaskId);
+        Assert.Equal(incarnation, body.Incarnation);
         Assert.Equal(7, body.Generation);
         Assert.Equal(grain, body.Sender);
 
         // Replays coalesce in the grain's own inbox: the identity and content are stable for one delay generation.
         Assert.Equal(message.Envelope.MessageId, messages[1].Envelope.MessageId);
         Assert.Equal(message.Envelope.Payload, messages[1].Envelope.Payload);
-        Assert.Equal(DurableTaskMessageTransport.CreateResumeMessageId(grain, taskId, 7, dueTime), message.Envelope.MessageId);
+        Assert.Equal(DurableTaskMessageTransport.CreateResumeMessageId(grain, taskId, incarnation, 7, dueTime), message.Envelope.MessageId);
         var segments = message.Envelope.MessageId.ToString().Split(HierarchicalKey.SegmentSeparator);
         Assert.Equal(new[] { DurableTaskMessageTransport.MessageIdRoot, "resume" }, segments[..2]);
         Assert.Equal(64, segments[2].Length);
         Assert.Equal("7", segments[3]);
         Assert.Equal(4, segments.Length);
 
-        Assert.NotEqual(message.Envelope.MessageId, DurableTaskMessageTransport.CreateResumeMessageId(grain, taskId, 8, dueTime));
-        Assert.NotEqual(message.Envelope.MessageId, DurableTaskMessageTransport.CreateResumeMessageId(grain, taskId, 7, dueTime.AddTicks(1)));
-        Assert.NotEqual(message.Envelope.MessageId, DurableTaskMessageTransport.CreateResumeMessageId(grain, TaskId.Parse("root/other"), 7, dueTime));
-        Assert.NotEqual(message.Envelope.MessageId, DurableTaskMessageTransport.CreateResumeMessageId(GrainId.Create("target", "two"), taskId, 7, dueTime));
-        Assert.Throws<ArgumentOutOfRangeException>(() => transport.SendResume(grain, taskId, 0, dueTime));
+        Assert.NotEqual(message.Envelope.MessageId, DurableTaskMessageTransport.CreateResumeMessageId(grain, taskId, incarnation, 8, dueTime));
+        Assert.NotEqual(message.Envelope.MessageId, DurableTaskMessageTransport.CreateResumeMessageId(grain, taskId, incarnation, 7, dueTime.AddTicks(1)));
+        Assert.NotEqual(message.Envelope.MessageId, DurableTaskMessageTransport.CreateResumeMessageId(grain, TaskId.Parse("root/other"), incarnation, 7, dueTime));
+        Assert.NotEqual(message.Envelope.MessageId, DurableTaskMessageTransport.CreateResumeMessageId(GrainId.Create("target", "two"), taskId, incarnation, 7, dueTime));
+        Assert.NotEqual(message.Envelope.MessageId, DurableTaskMessageTransport.CreateResumeMessageId(grain, taskId, Guid.NewGuid(), 7, dueTime));
+        Assert.Throws<ArgumentOutOfRangeException>(() => transport.SendResume(grain, taskId, incarnation, 0, dueTime));
     }
 
     [Theory]
@@ -566,10 +569,37 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(scoped, CallerScope.GetCallerTaskId(other, scoped));
         Assert.Equal(childId, CallerScope.GetCallerTaskId(default, childId));
 
-        // A root ID addresses the target's root task itself, and the scopes' root is reserved.
+        // A root ID addresses the target's root task itself, and the scopes' root and every ID beneath it are reserved.
         Assert.Equal(TaskId.CreateRoot("detached"), CallerScope.Resolve(caller, TaskId.CreateRoot("detached")));
         Assert.Throws<ArgumentException>(() => CallerScope.ThrowIfReserved(CallerScope.Root));
+        Assert.Throws<ArgumentException>(() => CallerScope.ThrowIfReserved(scoped));
         CallerScope.ThrowIfReserved(TaskId.CreateRoot("place-order"));
+        CallerScope.ThrowIfReserved(TaskId.Parse("place-order/$caller"));
+    }
+
+    [Fact]
+    public void WireIdNamesTheNodeOfOneRunAndParsesBack()
+    {
+        var incarnation = Guid.NewGuid();
+        var nodeId = TaskId.Parse("place-order/reserve\\/items");
+
+        var wireId = CallerScope.GetWireId(incarnation, nodeId);
+
+        // The incarnation is the root segment, followed by the node's own segments.
+        Assert.Equal(TaskId.CreateRoot(incarnation.ToString("N")), wireId.Parent().Parent());
+        Assert.Equal($"{incarnation:N}/{nodeId}", wireId.ToString());
+        Assert.True(CallerScope.TryParseWireId(wireId, out var parsedIncarnation, out var parsedNodeId));
+        Assert.Equal((incarnation, nodeId), (parsedIncarnation, parsedNodeId));
+
+        // Each run of the node's tree has its own wire ID, which a target stores under its own scoped ID.
+        var caller = GrainId.Create("caller", "one");
+        var laterWireId = CallerScope.GetWireId(Guid.NewGuid(), nodeId);
+        Assert.NotEqual(wireId, laterWireId);
+        Assert.NotEqual(CallerScope.GetTaskId(caller, wireId), CallerScope.GetTaskId(caller, laterWireId));
+        Assert.Equal(wireId, CallerScope.GetCallerTaskId(caller, CallerScope.GetTaskId(caller, wireId)));
+
+        Assert.False(CallerScope.TryParseWireId(nodeId, out _, out _));
+        Assert.False(CallerScope.TryParseWireId(TaskId.CreateRoot(incarnation.ToString("N")), out _, out _));
     }
 
     [Fact]

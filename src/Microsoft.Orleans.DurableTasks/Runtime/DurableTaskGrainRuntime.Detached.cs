@@ -129,7 +129,10 @@ internal sealed partial class DurableTaskGrainRuntime
         else
         {
             PrepareDetachedInvocation(request);
-            SendInvocation(MessageTransport.CreateDetachedInvocation(GrainId, target, rootId, request, recordId), recordId);
+            var recordWireId = GetWireId(recordId);
+            SendInvocation(
+                MessageTransport.CreateDetachedInvocation(GrainId, target, rootId, request, recordWireId),
+                recordWireId);
         }
 
         var handle = StageSubscriptionRecord(recordId, fingerprint, shielded, response);
@@ -193,11 +196,11 @@ internal sealed partial class DurableTaskGrainRuntime
     }
 
     /// <summary>Stages an invocation which the inbox delivered.</summary>
-    /// <param name="taskId">The invoked task: the caller's child, or a detached root task.</param>
+    /// <param name="taskId">The invoked task: the caller's child, under the caller's scope, or a detached root task.</param>
     /// <param name="request">The request which the task runs.</param>
     /// <param name="sender">The grain which sent the invocation.</param>
     /// <param name="detached">Whether the invocation starts a detached task, which has no caller.</param>
-    /// <param name="subscriberId">The sender's task which subscribes to a detached task, if any.</param>
+    /// <param name="subscriberId">The wire identifier of the sender's task which subscribes to a detached task, if any.</param>
     /// <remarks>
     /// A detached task's subscriber is added to the task's completion destinations in the same write which stores the
     /// task. An invocation which conflicts with the stored task, such as another request under the same identifier,
@@ -210,6 +213,8 @@ internal sealed partial class DurableTaskGrainRuntime
             ?? throw new InvalidOperationException("The durable task invocation request has no context.");
         if (detached)
         {
+            // A detached task is a root task, which no other grain's invocation creates beneath the reserved scope root.
+            CallerScope.ThrowIfReserved(taskId);
             PrepareDetachedInvocation(request);
         }
         else if (subscriberId is not null)
@@ -232,12 +237,14 @@ internal sealed partial class DurableTaskGrainRuntime
 
     /// <summary>
     /// Stages <paramref name="invocation"/> in the outbox by reference, and journals it in the table of pending invocations
-    /// until it retires, with <paramref name="recordId"/>, the task which records the start's outcome, if any.
+    /// until it retires, with <paramref name="recordId"/>, the wire identifier of the task which records the start's
+    /// outcome, if any.
     /// </summary>
     /// <remarks>
     /// A pending invocation with the same identity coalesces: the replay of a start which recovery restored stages nothing.
-    /// A pending invocation which carries another request under the same identity, which a deleted tree started, fails the
-    /// start.
+    /// The identity of a start which a record makes covers the record's wire identifier, so each run of a tree sends its
+    /// own. A pending invocation which carries another request under the same identity, which an earlier post of the same
+    /// root task sent, fails the start.
     /// </remarks>
     private void SendInvocation(OutboxMessage invocation, TaskId? recordId)
     {
@@ -265,11 +272,14 @@ internal sealed partial class DurableTaskGrainRuntime
     /// The outbox stages the invocation's removal in the same journal write. A record which the task's result already
     /// reached recorded the acceptance then. A record which already stores its own outcome, such as its cancellation or
     /// abort, keeps it, so every replay observes the outcome which it observed first. A posted root task has no record,
-    /// and a record which was deleted with its tree ignores the retirement.
+    /// and a record which was deleted with its tree ignores the retirement, as does a record which a later run of the tree
+    /// recreated under the same identifier.
     /// </remarks>
     private void RetireInvocation(PendingInvocation invocation, OutboxMessageRetirement retirement)
     {
-        if (invocation.RecordId is not { } recordId || !_storage.TryGetTask(recordId, out var state) || state.Accepted.HasValue)
+        if (invocation.RecordId is not { } recordWireId
+            || !TryGetNode(recordWireId, out var recordId, out var state)
+            || state.Accepted.HasValue)
         {
             return;
         }
@@ -296,17 +306,18 @@ internal sealed partial class DurableTaskGrainRuntime
     }
 
     /// <summary>
-    /// Throws unless <paramref name="recordId"/> started <paramref name="sourceTaskId"/> of <paramref name="sender"/>: it
-    /// is the remote child which that grain stores under this grain's caller scope, or it subscribes to that task.
+    /// Throws unless <paramref name="recordId"/>, whose wire identifier is <paramref name="wireId"/>, started
+    /// <paramref name="sourceTaskId"/> of <paramref name="sender"/>: it is the remote child which that grain stores under
+    /// this grain's caller scope, or it subscribes to that task.
     /// </summary>
-    private void ThrowIfNotStartedBy(TaskId recordId, TaskId sourceTaskId, IDurableTaskState state, GrainId sender)
+    private void ThrowIfNotStartedBy(TaskId recordId, TaskId wireId, TaskId sourceTaskId, IDurableTaskState state, GrainId sender)
     {
         var matches = TryGetSubscription(state, out var target, out var subscribedTaskId)
             ? target == sender && subscribedTaskId == sourceTaskId
             : !state.RemoteTarget.IsDefault
                 && state.RemoteRequestFingerprint is not null
                 && state.RemoteTarget == sender
-                && sourceTaskId == CallerScope.GetTaskId(GrainId, recordId);
+                && sourceTaskId == CallerScope.GetTaskId(GrainId, wireId);
         if (!matches)
         {
             throw new InvalidOperationException(

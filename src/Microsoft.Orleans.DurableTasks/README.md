@@ -151,11 +151,17 @@ var placement = await order.PlaceOrderAsync(request).WithId(PlaceOrderTaskId(ord
 - In a durable task, awaiting a call, scheduling it, or posting it records an attached child under its
   task ID and stages a `durable-rpc/invoke` message, whose target claims the task for the caller.
   Root IDs are scoped per grain, so the target stores the child under the caller's scope,
-  `$caller/{callerGrainId}/{taskId}`: two callers whose workflows share a root ID and a child name
-  run separate tasks on a shared target. The caller's invocation, cancellation, and abort address its
-  own child's ID, which the target maps to its scope, and the target's completion names the caller's
-  child as its subscriber. A root ID, which a detached start sends, addresses the target's root task
-  itself, and the root ID `$caller` is reserved.
+  `$caller/{callerGrainId}/{incarnation}/{taskId}`: two callers whose workflows share a root ID and a
+  child name run separate tasks on a shared target. Messages name the child by its *wire ID*,
+  `{incarnation}/{taskId}`, where `{incarnation}` is the incarnation of the caller's run, the GUID
+  which the caller's grain mints when it stores the root task's invocation, formatted with `"N"`. A
+  root ID which runs again after its grain deleted the earlier run has a new incarnation, so its calls
+  reach new tasks and their messages aren't deduplicated against the earlier run's. The caller's
+  invocation, cancellation, and abort address its child's wire ID, which the target maps to its scope,
+  and the target's completion names that wire ID as its subscriber; the caller ignores a completion
+  for an earlier run. Subscriptions and detached starts name their recording child by its wire ID too.
+  A root ID, which a detached start sends, addresses the target's root task itself, and the root ID
+  `$caller` is reserved: only calls from other grains create tasks beneath it.
   The target acknowledges the invocation once its journal write stores the task, and the starter's outbox
   retires the invocation as delivered, in the write which records the acceptance on the child.
   `ScheduleAsync` returns once that acceptance, or the task's result, is durable. `Post` stages the
@@ -176,7 +182,7 @@ var placement = await order.PlaceOrderAsync(request).WithId(PlaceOrderTaskId(ord
   operation, so workflows with the same task ID on different grains derive different root IDs.
 - A handle's `TargetTaskId` names the task which its record started or observes, on the grain which
   stores it: the root ID of a detached task, the subscribed task of a `GetDurableTask` subscription,
-  and `$caller/{grainId}/{taskId}` for a call to a grain. Other parties address the task by it, such as
+  and `$caller/{grainId}/{incarnation}/{taskId}` for a call to a grain. Other parties address the task by it, such as
   a client which polls a detached task with `GetDurableTask<T>(handle.TargetTaskId)`. The handle's `Id`
   names the record, which combinators, cancellation, and replays address.
 - The outbox holds every invocation of a task on another grain by reference, and the starter provides
@@ -252,7 +258,7 @@ await tasks.SignalAsync(workflowId, Shipped, shipment);
   such as retries after `TaskNotFound`, are numbered `$send:...$2`, and so on, so each sends
   again and the target reports an equal value as `Duplicate`. A signal to
   another grain is a `durable-rpc/signal` message in the outbox, whose identity covers the
-  sender, target, task, name, and value; the target's inbox records the value directly in task
+  sender, target, task, name, value, and the incarnation of the sending run; the target's inbox records the value directly in task
   state. A signal to the grain itself is recorded in the same write.
 - From a client or an ordinary grain method, `SignalDurableTaskAsync` calls the target, which
   completes once the task durably holds the value. A grain signals its own tasks through
@@ -371,7 +377,8 @@ synchronously on the activation which makes them, when the runtime stages them: 
   grain caller, such as a task scheduled by a client; when the completion is
   dead-lettered, for that period after the dead letter. A task identifier
   therefore deduplicates schedules for `ResultRetentionPeriod` after completion,
-  and scheduling it after the deletion executes the request again. External
+  and scheduling it after the deletion executes the request again, as a new run with
+  its own incarnation, independently of Messaging's `DeduplicationWindow`. External
   clients poll retained results, and a poll after the deletion throws
   `DurableTaskNotFoundException`. The grain applies retention when it activates,
   after each journal write, and before it answers a poll, a client's schedule, or an
@@ -382,7 +389,8 @@ synchronously on the activation which makes them, when the runtime stages them: 
   write sends a cancellation to each pending call to another grain, and each
   running execution is signaled after that write and its result discarded. A
   deleted execution's further scheduling throws `OperationCanceledException`.
-  Completions and delay resumes which arrive for deleted tasks are ignored. A
+  Completions and delay resumes which arrive for deleted tasks, or for an earlier run
+  of a root ID which runs again, are ignored. A
   cancellation which arrives before its invocation is recorded, so the invocation
   terminalizes as canceled when it arrives, and the record is deleted with its tree. The
   grain admits an invocation until Messaging's `DeduplicationWindow` has elapsed since its
@@ -442,7 +450,7 @@ synchronously on the activation which makes them, when the runtime stages them: 
   in one write, and the inbox processes the resume once the Durable Jobs clock
   reaches the due time. Logical time, due times, and task timestamps read that clock,
   the `TimeProvider` keyed `DurableJobTimeProviderNames.DurableJobs`, so they share
-  one time domain with Messaging's scheduling. Resumes are generation-fenced: a resume for a canceled delay
+  one time domain with Messaging's scheduling. Resumes are fenced by the delay's generation and its run's incarnation, which the resume carries: a resume for a canceled delay
   terminalizes it as canceled, and duplicate and stale resumes are harmless.
   Like every scheduled message, a resume doesn't count toward Messaging's
   `MaxCapacity`: its sender bounds it, and the grain holds one resume for each

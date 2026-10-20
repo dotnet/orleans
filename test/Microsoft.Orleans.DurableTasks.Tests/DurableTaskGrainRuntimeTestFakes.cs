@@ -36,7 +36,7 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
     public List<RecordedCompletion> Completions { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId)> Cancellations { get; } = [];
     public List<string?> CancellationReasons { get; } = [];
-    public List<(GrainId GrainId, TaskId TaskId, long Generation, DateTimeOffset DueTime)> Resumes { get; } = [];
+    public List<(GrainId GrainId, TaskId TaskId, long Generation, DateTimeOffset DueTime, Guid Incarnation)> Resumes { get; } = [];
     public Task ResumeSent => _resumeSent.Task;
     public Action<GrainId, GrainId, TaskId, IDurableTaskRequest>? BeforeSendInvocation { get; set; }
     public Action<GrainId, GrainId, TaskId>? BeforeSendCancellation { get; set; }
@@ -143,9 +143,9 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
         StateChanges.Notify();
     }
 
-    public void SendResume(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime)
+    public void SendResume(GrainId grainId, TaskId taskId, Guid incarnation, long generation, DateTimeOffset dueTime)
     {
-        Resumes.Add((grainId, taskId, generation, dueTime));
+        Resumes.Add((grainId, taskId, generation, dueTime, incarnation));
         _resumeSent.TrySetResult();
         StateChanges.Notify();
     }

@@ -48,7 +48,9 @@ A root task has no parent on its grain. The party which starts it chooses its ro
 | A durable task, with `.Detached(name)` | `name`, verbatim | `archive-q3` |
 | A durable task, with `.Detached()` and no name | One segment, `{grainId}/{taskId}/{segment}`: the starting grain, the starting execution's ID, and the generated segment of the execution's next unnamed operation, each with its `/` and `\` escaped | `report\/q3/publish-q3/$child-2` |
 
-The root ID `$caller` is reserved for the caller scopes described below. Outside a
+The root ID `$caller` is reserved for the caller scopes described below: only calls from
+other grains create tasks beneath it, and a client's or grain's start under it throws
+`ArgumentException`. Outside a
 durable task, `.Detached()` changes nothing, because every task which a client starts is
 already a root. A derived detached root ID includes the starting grain, so workflows
 with the same task ID on different grains start different tasks; starters which must
@@ -90,18 +92,29 @@ Each operation which a body runs is recorded beneath the execution's ID:
 ### Calls to other grains
 
 A call to another grain is recorded in the caller's tree under the call's segment, such
-as `publish-q3/render/0`. The callee stores the task under the caller's scope:
+as `publish-q3/render/0`. Messages between the grains name the call by its *wire ID*:
+the incarnation of the caller's run, a GUID which the caller's grain mints when it stores
+the root task's invocation, formatted with `"N"`, followed by the call's segments. The
+callee stores the task under the caller's scope, by that wire ID:
 
 ```text
-$caller/{callerGrainId}/{callerTaskId}
-$caller/report\/q3/publish-q3/render/0
+{incarnation}/{callerTaskId}
+$caller/{callerGrainId}/{incarnation}/{callerTaskId}
+$caller/report\/q3/9b1c0e4f2d7a4e8c8f3b5a6d1e2c3b4a/publish-q3/render/0
 ```
 
 The scope keeps callers apart: two grains whose workflows have the same task ID call one
-callee under different IDs, so neither reattaches to the other's task. The mapping is a
-pure function of the caller and its child ID, so replays and redeliveries of the call
-reach the same task. In the callee, `DurableTask.Current.Id` reports the scoped ID. A
-detached start sends a root ID instead, which the callee stores verbatim.
+callee under different IDs, so neither reattaches to the other's task. The incarnation
+keeps runs apart: once a grain deletes a root task's tree, scheduling the same root ID
+runs it again with a new incarnation, so its calls reach new tasks, its messages aren't
+deduplicated against the earlier run's, and replies for the earlier run, such as a late
+completion or delay resume, change nothing. Within one run, the mapping is a pure
+function of the caller, the incarnation, and the child ID, so replays and redeliveries of
+the call reach the same task. In the callee, `DurableTask.Current.Id` reports the scoped
+ID, and `DurableTask.Current.Incarnation` reports the run of each tree. A detached start
+sends a root ID instead, which the callee stores verbatim. Subscriptions and detached
+starts name their recording child by its wire ID too, as the subscriber which the
+result's completion addresses.
 
 ### Signals and subscriptions
 
@@ -246,7 +259,10 @@ A reference resolves while the grain retains the task:
   accepted its result.
 
 After deletion, polls and subscriptions throw `DurableTaskNotFoundException`, signals
-return `TaskNotFound`, and a start under the same ID runs the request again. A
+return `TaskNotFound`, and a start under the same ID runs the request again as a new run
+with its own incarnation, even within Messaging's `DeduplicationWindow`: the calls,
+cancellations, subscriptions, signals, and delay resumes of the new run have their own
+message IDs, and the earlier run's late replies don't reach it. A
 `DurableTaskNotFoundException` also reports a task which never started, or whose start
 hasn't reached its grain yet; `ScheduleAsync` returns once the grain holds the task, so
 an ID which it returned is found until retention ends. See

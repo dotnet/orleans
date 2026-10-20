@@ -13,7 +13,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// A subscription lets a durable execution await the terminal result of a task which it didn't start as an attached
 /// child: an existing invoked task, which <c>GetDurableTask</c> addresses, or a detached task which the execution starts.
 /// The subscribing grain records a child of the execution, whose fingerprint names the task's grain and identifier, and
-/// stages the subscription in the same journal write: an invocation message which carries the child's identifier, so it
+/// stages the subscription in the same journal write: an invocation message which carries the child's wire identifier, so it
 /// neither claims the task nor validates its caller, and which carries the request of a detached task. Like a delay, the
 /// child is a cancellation leaf: its own cancellation, its ancestors' cancellation, an abort of its tree, or deletion of
 /// its tree terminalizes it without reaching the task, and stages an unsubscription, a cancellation message which names
@@ -68,7 +68,7 @@ internal sealed partial class DurableTaskGrainRuntime
         }
         else
         {
-            MessageTransport.SendSubscription(GrainId, subscription.Target, subscription.Id, taskId);
+            MessageTransport.SendSubscription(GrainId, subscription.Target, subscription.Id, GetWireId(taskId));
         }
 
         return new(StageSubscriptionRecord(taskId, fingerprint, shielded, response), RequiresWrite: true);
@@ -239,7 +239,7 @@ internal sealed partial class DurableTaskGrainRuntime
         }
         else
         {
-            MessageTransport.SendUnsubscription(GrainId, target, taskId, subscriberId);
+            MessageTransport.SendUnsubscription(GrainId, target, taskId, GetWireId(subscriberId));
         }
     }
 

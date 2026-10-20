@@ -173,4 +173,23 @@ internal static class DurableTaskGrainRuntimeTestExtensions
             decisionId,
             candidates,
             cancellationToken);
+
+    /// <summary>
+    /// Delivers the completion which <paramref name="sender"/> sends for the remote child <paramref name="taskId"/> of the
+    /// current run of its tree, as the inbox delivers it: addressed to the child's wire identifier, from the task which the
+    /// callee stores under the runtime's caller scope.
+    /// </summary>
+    public static void AcceptResponseFromInbox(
+        this global::Orleans.DurableTasks.Runtime.DurableTaskGrainRuntime runtime,
+        TaskId taskId,
+        DurableTaskResponse response,
+        GrainId sender)
+    {
+        var wireId = runtime.GetWireId(taskId);
+        runtime.AcceptResponseFromInbox(
+            wireId,
+            global::Orleans.DurableTasks.Runtime.CallerScope.GetTaskId(runtime.GrainId, wireId),
+            response,
+            sender);
+    }
 }

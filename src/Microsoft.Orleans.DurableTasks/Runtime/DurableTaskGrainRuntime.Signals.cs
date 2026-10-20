@@ -153,7 +153,7 @@ internal sealed partial class DurableTaskGrainRuntime
         }
         else
         {
-            MessageTransport.SendSignal(GrainId, target, taskId, name, value, payloadFingerprint);
+            MessageTransport.SendSignal(GrainId, target, taskId, name, value, payloadFingerprint, GetIncarnation(markerId));
         }
 
         var marker = GetOrCreateTask(markerId, request: null);

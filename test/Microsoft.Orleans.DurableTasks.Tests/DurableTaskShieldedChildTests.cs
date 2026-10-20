@@ -130,7 +130,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await ((IDurableTaskManager)runtime).CancelAsync(rootId, "buyer", TestContext.Current.CancellationToken);
         Assert.Null(storage.Get(recordId).Result);
         Assert.Empty(transport.Cancellations);
-        runtime.AcceptResponseFromInbox(recordId, TaskId.CreateRoot("shipment"), DurableTaskResponse.FromResult(1), target);
+        runtime.AcceptResponseFromInbox(runtime.GetWireId(recordId), TaskId.CreateRoot("shipment"), DurableTaskResponse.FromResult(1), target);
         var resume = Assert.Single(transport.Resumes);
         await HandleAsync(CreateHandler(runtime), ResumeContext(runtime, resume.TaskId, resume.Generation, resume.DueTime));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -148,7 +148,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var afterSent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         transport.BeforeSendInvocation = (_, _, taskId, _) =>
         {
-            if (taskId == rootId.Child("after"))
+            if (taskId == CallerScope.GetWireId(storage.Get(rootId).Incarnation, rootId.Child("after")))
             {
                 afterSent.TrySetResult();
             }
@@ -184,7 +184,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Equal(nameof(DurableTaskStatus.Canceled), (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
         Assert.Equal(
             [rootId.Child("before"), rootId.Child("after")],
-            transport.Invocations.Select(static invocation => invocation.TaskId));
+            transport.Invocations.Select(static invocation => GetNodeId(invocation.TaskId)));
         Assert.Empty(transport.Cancellations);
         Assert.True(storage.Get(rootId.Child("after")).Shielded);
     });

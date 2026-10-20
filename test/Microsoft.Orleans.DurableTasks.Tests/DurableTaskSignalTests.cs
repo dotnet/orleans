@@ -176,7 +176,7 @@ public sealed partial class DurableTaskSignalTests
         var resume = await harness.WaitForResumeAsync();
 
         Assert.Equal(deadline, resume.DueTime);
-        harness.Runtime.ResumeDelayFromInbox(resume.TaskId, resume.Generation, harness.Runtime.GrainId);
+        harness.Runtime.ResumeDelayFromInbox(resume.TaskId, resume.Incarnation, resume.Generation, harness.Runtime.GrainId);
         await harness.Manager.WriteStateAsync(TestCancellation);
 
         Assert.Equal("timed out", await harness.GetResultAsync<string>(WorkflowId));
@@ -376,6 +376,9 @@ public sealed partial class DurableTaskSignalTests
         var target = GrainId.Create("target", "one");
         var markerId = WorkflowId.Child("$child-1");
         var value = DurableTaskResponse.FromResult("ada");
+        var workflow = harness.Storage.GetOrCreateTask(WorkflowId, request: null);
+        harness.Storage.SetRequestFingerprint(WorkflowId, workflow, "0123456789ABCDEF");
+        harness.Storage.SetIncarnation(WorkflowId, workflow, Guid.NewGuid());
 
         await harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, value, throwOnRejection: true, TestCancellation);
         await harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, value, throwOnRejection: true, TestCancellation);
@@ -385,6 +388,7 @@ public sealed partial class DurableTaskSignalTests
         Assert.Contains("another operation", reuse.Message, StringComparison.Ordinal);
         var sent = Assert.Single(harness.Transport.Signals);
         Assert.Equal((harness.Runtime.GrainId, target, TaskId.CreateRoot("order"), "approved"), (sent.Sender, sent.Target, sent.TaskId, sent.Name));
+        Assert.Equal(workflow.Incarnation, sent.Incarnation);
         Assert.Equal("ada", sent.Value.GetResult<string>());
         var marker = harness.Storage.Get(markerId);
         Assert.StartsWith("$signal-send:", marker.RequestFingerprint, StringComparison.Ordinal);
@@ -484,17 +488,22 @@ public sealed partial class DurableTaskSignalTests
         var transport = MessagingTestHelpers.CreateTransport(outbox);
         var sender = GrainId.Create("sender", "one");
         var target = GrainId.Create("target", "one");
-        var first = DurableTaskMessageTransport.CreateSignalMessageId(sender, target, WorkflowId, "approved", "$signal:AA");
+        var incarnation = Guid.NewGuid();
+        var first = DurableTaskMessageTransport.CreateSignalMessageId(sender, target, WorkflowId, "approved", "$signal:AA", incarnation);
 
-        transport.SendSignal(sender, target, WorkflowId, "approved", DurableTaskResponse.FromResult("ada"), "$signal:AA");
+        transport.SendSignal(sender, target, WorkflowId, "approved", DurableTaskResponse.FromResult("ada"), "$signal:AA", incarnation);
 
         var message = Assert.Single(outbox.Messages);
         Assert.Equal((first, target, DurableTaskMessageTypes.SignalSubject), (message.Envelope.MessageId, message.ReceiverId, message.Envelope.Subject));
         var body = MessagingTestHelpers.MessageTypes.Signal.Decode(message.Envelope);
         Assert.Equal((WorkflowId, "approved", "ada", sender), (body.TaskId, body.Name, body.Value.GetResult<string>(), body.Sender));
-        Assert.Equal(first, DurableTaskMessageTransport.CreateSignalMessageId(sender, target, WorkflowId, "approved", "$signal:AA"));
-        Assert.NotEqual(first, DurableTaskMessageTransport.CreateSignalMessageId(sender, target, WorkflowId, "approved", "$signal:BB"));
-        Assert.NotEqual(first, DurableTaskMessageTransport.CreateSignalMessageId(sender, target, WorkflowId, "approved/2", "$signal:AA"));
+        Assert.Equal(first, DurableTaskMessageTransport.CreateSignalMessageId(sender, target, WorkflowId, "approved", "$signal:AA", incarnation));
+        Assert.NotEqual(first, DurableTaskMessageTransport.CreateSignalMessageId(sender, target, WorkflowId, "approved", "$signal:BB", incarnation));
+        Assert.NotEqual(first, DurableTaskMessageTransport.CreateSignalMessageId(sender, target, WorkflowId, "approved/2", "$signal:AA", incarnation));
+
+        // Each run of the sending execution's tree sends its own signal, which Messaging doesn't deduplicate against an
+        // earlier run's.
+        Assert.NotEqual(first, DurableTaskMessageTransport.CreateSignalMessageId(sender, target, WorkflowId, "approved", "$signal:AA", Guid.NewGuid()));
     }
 
     /// <summary>A runtime over in-memory task state whose journal hook runs on each write.</summary>
@@ -593,7 +602,7 @@ public sealed partial class DurableTaskSignalTests
         public Task WaitForSignalWaitsAsync(int count) =>
             StateChanges.WaitUntilAsync(() => SignalWaitCount == count, description: $"{count} signal waits");
 
-        public async Task<(GrainId GrainId, TaskId TaskId, long Generation, DateTimeOffset DueTime)> WaitForResumeAsync()
+        public async Task<(GrainId GrainId, TaskId TaskId, long Generation, DateTimeOffset DueTime, Guid Incarnation)> WaitForResumeAsync()
         {
             await Transport.ResumeSent.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
             return Assert.Single(Transport.Resumes);
