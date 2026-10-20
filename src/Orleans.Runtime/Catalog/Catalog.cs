@@ -128,35 +128,18 @@ namespace Orleans.Runtime
         /// </remarks>
         /// <param name="grainId">The grain identity.</param>
         /// <param name="requestContextData">Optional request context data.</param>
-        /// <param name="rehydrationContext">Optional rehydration context.</param>
-        /// <returns></returns>
+        /// <param name="migration">Optional migration state and requests. The returned activation receives the requests through ordinary admission,
+        /// before a new activation begins rehydrating and activating. If this returns null, the caller retains the requests.</param>
         public IGrainContext? GetOrCreateActivation(
             in GrainId grainId,
             Dictionary<string, object>? requestContextData,
-            MigrationContext? rehydrationContext)
-            => GetOrCreateActivation(grainId, requestContextData, rehydrationContext, migratedRequests: null, previousAddress: null, out _);
-
-        /// <summary>
-        /// If activation already exists, return it.
-        /// Otherwise, creates a new activation, begins rehydrating it and activating it, then returns it.
-        /// </summary>
-        /// <param name="grainId">The grain identity.</param>
-        /// <param name="requestContextData">Optional request context data.</param>
-        /// <param name="rehydrationContext">Optional rehydration context.</param>
-        /// <param name="migratedRequests">Requests which were queued for the grain's previous activation, which a new activation queues ahead of any other request.</param>
-        /// <param name="previousAddress">The address of the activation which <paramref name="migratedRequests"/> were queued for, which their callers replace in their caches.</param>
-        /// <param name="requestsAccepted">Whether this call created the activation and it took ownership of <paramref name="migratedRequests"/>.</param>
-        public IGrainContext? GetOrCreateActivation(
-            in GrainId grainId,
-            Dictionary<string, object>? requestContextData,
-            MigrationContext? rehydrationContext,
-            List<Message>? migratedRequests,
-            GrainAddress? previousAddress,
-            out bool requestsAccepted)
+            GrainMigrationPackage? migration = null)
         {
-            requestsAccepted = false;
+            Debug.Assert(migration is null || migration.Value.GrainId == grainId);
+            var rehydrationContext = migration?.MigrationContext;
             if (TryGetGrainContext(grainId, out var result))
             {
+                ReceiveRequests(result, migration);
                 rehydrationContext?.Dispose();
                 return result;
             }
@@ -166,15 +149,10 @@ namespace Orleans.Runtime
                 return null;
             }
 
+            var created = false;
             lock (GetStripedLock(grainId))
             {
-                if (TryGetGrainContext(grainId, out result))
-                {
-                    rehydrationContext?.Dispose();
-                    return result;
-                }
-
-                if (_siloStatusOracle.CurrentStatus == SiloStatus.Active)
+                if (!TryGetGrainContext(grainId, out result) && _siloStatusOracle.CurrentStatus == SiloStatus.Active)
                 {
                     var address = new GrainAddress
                     {
@@ -186,6 +164,7 @@ namespace Orleans.Runtime
 
                     result = this.grainActivator.CreateInstance(address);
                     activations.RecordNewTarget(result);
+                    created = true;
                 }
             } // End lock
 
@@ -193,6 +172,14 @@ namespace Orleans.Runtime
             {
                 rehydrationContext?.Dispose();
                 return UnableToCreateActivation(this, grainId);
+            }
+
+            if (!created)
+            {
+                // Admission can reject a request and synchronously complete a caller, so deliver outside the catalog lock.
+                ReceiveRequests(result, migration);
+                rehydrationContext?.Dispose();
+                return result;
             }
 
             // Start activation span with parent context from request if available
@@ -216,21 +203,37 @@ namespace Orleans.Runtime
 
             _catalogInstruments.OnActivationCreated(GetGrainTypeMetricName(result));
 
+            // Admit requests before rehydration can dispose the context and activation can register in the directory.
+            ReceiveRequests(result, migration);
+
             // Rehydration occurs before activation.
             if (rehydrationContext is not null)
             {
                 result.Rehydrate(rehydrationContext);
             }
 
-            // Migrated requests are queued before activation, so they precede any request which reaches the new activation directly.
-            if (migratedRequests is not null && result is ActivationData activation)
-            {
-                requestsAccepted = activation.TryEnqueueMigratedRequests(migratedRequests, previousAddress);
-            }
-
             // Initialize the new activation asynchronously.
             result.Activate(requestContextData);
             return result;
+
+            static void ReceiveRequests(IGrainContext destination, GrainMigrationPackage? migration)
+            {
+                if (migration is not { Requests: { Count: > 0 } requests } package)
+                {
+                    return;
+                }
+
+                package.MigrationContext.TryGetValue(ActivationData.GrainAddressMigrationContextKey, out GrainAddress? previousAddress);
+                foreach (var request in requests)
+                {
+                    if (previousAddress is not null)
+                    {
+                        request.AddToCacheInvalidationHeader(previousAddress, destination.Address);
+                    }
+
+                    destination.ReceiveMessage(request);
+                }
+            }
 
             [MethodImpl(MethodImplOptions.NoInlining)]
             static IGrainContext? UnableToCreateActivation(Catalog self, GrainId grainId)

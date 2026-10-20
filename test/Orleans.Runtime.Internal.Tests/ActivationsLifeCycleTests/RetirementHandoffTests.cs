@@ -852,7 +852,7 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task MigratedRequestsWhichWouldExceedTheHardLimit_AreReceivedAsForwardedRequests()
+    public async Task MigratedRequests_UseOrdinaryPerRequestOverloadAdmission()
     {
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
             silo.Configure<SiloMessagingOptions>(options => options.MaxEnqueuedRequestsHardLimit = 1)));
@@ -874,12 +874,10 @@ public sealed class RetirementHandoffTests
         var accepting = migrationManager.AcceptMigratingGrains([package], Cancellation).AsTask();
         try
         {
-            // Ordinary delivery admits two requests to an activation with a hard limit of one, so the new activation does not queue the batch of three ahead of others.
-            // It receives them as it receives forwarded requests, admitting two and rejecting the one which overloads it.
+            // Ordinary admission admits two requests with a hard limit of one and rejects the third.
             await state.ActivationHeld.Task.WaitAsync(Timeout, Cancellation);
             var activation = Assert.IsType<ActivationData>(FindActivation(silo, grainId));
-            await WaitUntilAsync(() => activation.WaitingCount == 2);
-            await Task.Delay(TimeSpan.FromMilliseconds(200), Cancellation);
+            // Admission finishes before activation is scheduled, so the held activation provides the observation barrier.
             Assert.Equal(2, activation.WaitingCount);
         }
         finally
@@ -890,29 +888,131 @@ public sealed class RetirementHandoffTests
         await accepting.WaitAsync(Timeout, Cancellation);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MigratedRequests_UseOrdinaryAdmissionForAnExistingActivation(bool deactivating)
+    {
+        var arrived = new TaskCompletionSource<GrainMigrationPackage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseAcceptance = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
+        {
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
+            {
+                arrived.TrySetResult(Assert.Single((List<GrainMigrationPackage>)context.Request.GetArgument(0)!));
+                await releaseAcceptance.Task;
+            }
+
+            await context.Invoke();
+        })));
+        var caller = cluster.Silos[0];
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+        await PlaceOnAsync(source, () => grain.GetLocation());
+        var running = grain.Block().AsTask();
+        await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
+        Task migrated;
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, caller.SiloAddress);
+        try
+        {
+            // If the destination deactivates, ordinary forwarding places this request on the third silo.
+            migrated = grain.Record("migrated").AsTask();
+        }
+        finally
+        {
+            RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+        }
+
+        await WaitUntilAsync(() => GetWaitingCount(source, grain.GetGrainId()) == 1);
+        state.HoldActivationOn = target.SiloAddress;
+        try
+        {
+            await grain.MigrateOnIdleTo(target.SiloAddress);
+            state.ReleaseBlock.TrySetResult();
+            await running.WaitAsync(Timeout, Cancellation);
+            var package = await arrived.Task.WaitAsync(Timeout, Cancellation);
+
+            // Create the destination independently before the package is delivered, retaining the original package's context.
+            Assert.True(package.MigrationContext.TryGetValue(ActivationData.GrainAddressMigrationContextKey, out GrainAddress? previous));
+            var context = new MigrationContext(target.ServiceProvider.GetRequiredService<SerializerSessionPool>());
+            Assert.True(context.TryAddValue(ActivationData.GrainAddressMigrationContextKey, previous));
+            var activation = Assert.IsType<ActivationData>(target.ServiceProvider.GetRequiredService<Catalog>()
+                .GetOrCreateActivation(package.GrainId, null, new GrainMigrationPackage { GrainId = package.GrainId, MigrationContext = context }));
+            await state.ActivationHeld.Task.WaitAsync(Timeout, Cancellation);
+
+            var local = target.ServiceProvider.GetRequiredService<IGrainFactory>()
+                .GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+            var direct = local.Record("direct").AsTask();
+            await WaitUntilAsync(() => activation.WaitingCount == 1);
+
+            if (deactivating)
+            {
+                state.ReleaseActivation.TrySetResult();
+                await direct.WaitAsync(Timeout, Cancellation);
+                var holding = local.HoldThenGetLocation().AsTask();
+                await state.HoldEntered.Task.WaitAsync(Timeout, Cancellation);
+                activation.Deactivate(new DeactivationReason(DeactivationReasonCode.ActivationIdle, "Test ordinary admission during deactivation"), Cancellation);
+                Assert.Equal(ActivationState.Deactivating, activation.State);
+                releaseAcceptance.TrySetResult();
+                await WaitUntilAsync(() => activation.WaitingCount == 1);
+                state.ReleaseHold.TrySetResult();
+                await holding.WaitAsync(Timeout, Cancellation);
+                await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+            }
+            else
+            {
+                releaseAcceptance.TrySetResult();
+                await WaitUntilAsync(() => activation.WaitingCount == 2);
+                state.ReleaseActivation.TrySetResult();
+                await direct.WaitAsync(Timeout, Cancellation);
+            }
+
+            await migrated.WaitAsync(Timeout, Cancellation);
+            Assert.Equal(["direct", "migrated"], state.Calls);
+            Assert.Equal(deactivating ? caller.SiloAddress : target.SiloAddress, await grain.GetLocation().AsTask().WaitAsync(Timeout, Cancellation));
+        }
+        finally
+        {
+            releaseAcceptance.TrySetResult();
+            state.ReleaseBlock.TrySetResult();
+            state.ReleaseActivation.TrySetResult();
+            state.ReleaseHold.TrySetResult();
+        }
+    }
+
     [Fact]
-    public async Task MigratedRequests_AreDeclinedByAnActivationWhichHasLeftCreation()
+    public async Task MigratedRequests_AreRejectedWhenDestinationActivationFails()
     {
         await using var cluster = await DeployAsync();
-        var silo = cluster.Silos[1];
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
         var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
         var key = Guid.NewGuid();
-        RetirementHandoffState.Create(key);
+        var state = RetirementHandoffState.Create(key);
         var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
-        await PlaceOnAsync(silo, () => grain.GetLocation());
-        var activation = Assert.IsType<ActivationData>(FindActivation(silo, grain.GetGrainId()));
-
-        // The catalog publishes a new activation before queuing its migrated requests, so another operation, such as retirement, can advance it first.
-        // An activation which has left creation declines the requests without queuing any of them, so the source keeps and forwards them.
-        using var request = new Message
+        await PlaceOnAsync(source, () => grain.GetLocation());
+        state.FailActivationOn = target.SiloAddress;
+        var running = grain.Block().AsTask();
+        await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
+        var queued = grain.Record("queued").AsTask();
+        await WaitUntilAsync(() => GetWaitingCount(source, grain.GetGrainId()) == 1);
+        try
         {
-            Direction = Message.Directions.Request,
-            Id = new CorrelationId(1),
-            SendingGrain = GrainId.Create("test", "caller"),
-            TargetGrain = grain.GetGrainId(),
-        };
-        Assert.False(activation.TryEnqueueMigratedRequests([request], previousAddress: null));
-        Assert.Equal(0, activation.WaitingCount);
+            await grain.MigrateOnIdleTo(target.SiloAddress);
+            state.ReleaseBlock.TrySetResult();
+            await running.WaitAsync(Timeout, Cancellation);
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => queued.WaitAsync(Timeout, Cancellation));
+            Assert.Equal("Destination activation failed.", error.Message);
+            Assert.Empty(state.Calls);
+        }
+        finally
+        {
+            state.ReleaseBlock.TrySetResult();
+        }
     }
 
     [Fact]
@@ -1110,7 +1210,7 @@ public sealed class RetirementHandoffTests
             state.ReleaseActivation.TrySetResult();
         }
 
-        // The migrated request was queued before the activation could receive any other request, so it runs first.
+        // The carried request was admitted before directory registration, so this later direct request follows it.
         await Task.WhenAll(queued, direct).WaitAsync(Timeout, Cancellation);
         Assert.Equal(["queued", "direct"], state.Calls);
     }
@@ -2112,6 +2212,11 @@ public class RetirementHandoffGrain : Grain, IRetirementHandoffGrain
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
+        if (State.FailActivationOn is { } failingSilo && failingSilo.Equals(GrainContext.Address.SiloAddress))
+        {
+            throw new InvalidOperationException("Destination activation failed.");
+        }
+
         if (State.HoldActivationOn is { } silo && silo.Equals(GrainContext.Address.SiloAddress))
         {
             State.ActivationHeld.TrySetResult();
@@ -2202,6 +2307,7 @@ public sealed class RetirementHandoffState
     public TaskCompletionSource ReleaseActivation { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public ConcurrentQueue<string> Calls { get; } = new();
     public SiloAddress? HoldActivationOn { get; set; }
+    public SiloAddress? FailActivationOn { get; set; }
     public int HoldCount;
 
     public static RetirementHandoffState Create(Guid key) => States[key] = new();

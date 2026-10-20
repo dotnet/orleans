@@ -36,8 +36,8 @@ internal interface IActivationMigrationManagerSystemTarget : ISystemTarget
     /// <param name="migratingGrains">The migrating grains.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <remarks>
-    /// This silo takes ownership of the requests when it accepts the call. A grain's new activation queues its requests before it can receive any other request.
-    /// When the grain's activation is not new, or cannot queue the requests ahead of others, this silo delivers them as it delivers forwarded requests.
+    /// This silo takes ownership of the requests when it accepts the call. The activation receives them through ordinary FIFO admission.
+    /// A new activation receives the requests before it registers in the grain directory.
     /// </remarks>
     [Alias("29E9E63F")]
     ValueTask AcceptMigratingGrains(
@@ -351,33 +351,20 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             var package = migratingGrains[i];
             var requests = TakeRequests(package, Silo);
 
-            // The new activation reads its previous address when it rehydrates, which happens after it queues the requests, so it is read here.
-            GrainAddress? previousAddress = null;
+            var context = _catalog.GetOrCreateActivation(package.GrainId, requestContextData: null, package);
             if (requests is not null)
             {
-                package.MigrationContext.TryGetValue(ActivationData.GrainAddressMigrationContextKey, out previousAddress);
-            }
-
-            // If the activation does not exist, create it and provide it with the migration context and queued requests while doing so.
-            // If the activation already exists or cannot be created, it is too late to perform migration, so ignore the request.
-            var context = _catalog.GetOrCreateActivation(package.GrainId, requestContextData: null, package.MigrationContext, requests, previousAddress, out var accepted);
-            if (!accepted && requests is not null)
-            {
-                // The requests reach the grain as forwarded requests do.
                 foreach (var request in requests)
                 {
-                    if (previousAddress is not null && context is not null)
+                    if (context is null)
                     {
-                        request.AddToCacheInvalidationHeader(previousAddress, context.Address);
-
-                        // As when a one-way request is forwarded, its caller receives the cache update, since it receives no response.
-                        if (request.Direction is Message.Directions.OneWay)
-                        {
-                            MessageCenter.SendRejectionResponse(request, Message.RejectionTypes.CacheInvalidation, "One-way request migrated to an existing activation", exception: null);
-                        }
+                        MessageCenter.ReceiveMessage(request);
                     }
-
-                    MessageCenter.ReceiveMessage(request);
+                    else if (request.Direction is Message.Directions.OneWay && request.HasCacheInvalidationHeader)
+                    {
+                        // Publish the new route after admission so the caller's next request follows this one.
+                        MessageCenter.SendRejectionResponse(request, Message.RejectionTypes.CacheInvalidation, "One-way request migrated", exception: null);
+                    }
                 }
             }
 

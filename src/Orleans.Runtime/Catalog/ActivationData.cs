@@ -2387,7 +2387,7 @@ internal sealed partial class ActivationData :
 
                 OnDehydrate(context.MigrationContext);
 
-                // Send the dehydration context to the target host. The migration takes ownership of the queued requests, which the new activation runs before any other request.
+                // Send the dehydration context and queued requests to the target host, which admits them through its ordinary request queue.
                 // This activation remains in the catalog until the migration completes, so that the requests which reach this silo for the grain reach it.
                 // Cancellation stops a migration which has not been sent. One which has been sent completes when the target responds.
                 migration = migrationManager.StartMigration(ForwardingAddress, Address, context.MigrationContext, TakeRequestsForMigration(), cancellationToken);
