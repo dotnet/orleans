@@ -488,7 +488,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                 foreach (var handler in @try.Catches)
                 {
                     if (CatchesCancellation(handler.ExceptionType)
-                        && !(handler.Filter is { } filter && ReferencesIsTaskCancellationRequested(filter))
+                        && !(handler.Filter is { } filter && (ReferencesIsTaskCancellationRequested(filter) || ExcludesCancellation(filter)))
                         && !OperationsOutsideNestedFunctions(handler.Handler).OfType<IThrowOperation>().Any()
                         && handler.Syntax is CatchClauseSyntax clause)
                     {
@@ -496,6 +496,52 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Returns whether a filter excludes every <c>OperationCanceledException</c>, such as
+        /// <c>e is not OperationCanceledException</c> or <c>!(e is OperationCanceledException)</c>, alone or as an operand of
+        /// <c>&amp;&amp;</c>, so the handler never runs for a cancellation.
+        /// </summary>
+        private bool ExcludesCancellation(IOperation filter)
+        {
+            switch (DurableTaskSymbols.Unwrap(filter))
+            {
+                case IBinaryOperation { OperatorKind: BinaryOperatorKind.ConditionalAnd } and:
+                    return ExcludesCancellation(and.LeftOperand) || ExcludesCancellation(and.RightOperand);
+                case IIsPatternOperation { Pattern: INegatedPatternOperation { Pattern: var excluded } }:
+                    return MatchesEveryCancellation(excluded);
+                case IUnaryOperation { OperatorKind: UnaryOperatorKind.Not, Operand: var operand }:
+                    return DurableTaskSymbols.Unwrap(operand) switch
+                    {
+                        IIsTypeOperation isType => CoversCancellation(isType.TypeOperand),
+                        IIsPatternOperation isPattern => MatchesEveryCancellation(isPattern.Pattern),
+                        _ => false,
+                    };
+                default:
+                    return false;
+            }
+
+            bool MatchesEveryCancellation(IPatternOperation pattern) => pattern switch
+            {
+                ITypePatternOperation type => CoversCancellation(type.MatchedType),
+                IDeclarationPatternOperation { MatchedType: var type } => CoversCancellation(type),
+                _ => false,
+            };
+        }
+
+        /// <summary>Returns whether a type is <c>OperationCanceledException</c> or one of its base types.</summary>
+        private bool CoversCancellation(ITypeSymbol? type)
+        {
+            for (var current = symbols.OperationCanceledException; current is not null; current = current.BaseType)
+            {
+                if (SymbolEqualityComparer.Default.Equals(current, type))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private bool CatchesCancellation(ITypeSymbol? type)
