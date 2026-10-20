@@ -58,6 +58,7 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<string> InvokeInner() => _target.LongRunningMethod(arg0);
+        public override bool MayHaveGrainCancellationToken => false;
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]

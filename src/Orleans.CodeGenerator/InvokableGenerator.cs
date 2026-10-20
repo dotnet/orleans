@@ -151,7 +151,8 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                 GenerateInvokeInnerMethod(method, fieldDescriptions, targetField),
                 GenerateGetCancellationTokenMethod(method, fieldDescriptions),
                 GenerateTryCancelMethod(method, fieldDescriptions),
-                GenerateIsCancellableProperty(method));
+                GenerateIsCancellableProperty(method),
+                GenerateMayHaveGrainCancellationTokenProperty(method, baseClassType));
 
         if (method.AllTypeParameters.Count > 0)
         {
@@ -401,6 +402,33 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
             .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword));
         return member;
+    }
+
+    private MemberDeclarationSyntax? GenerateMayHaveGrainCancellationTokenProperty(InvokableMethodDescription method, INamedTypeSymbol baseClassType)
+    {
+        // The runtime scans the arguments of a request for GrainCancellationToken instances unless the request opts out.
+        // Opt out when no argument can hold one, so that the runtime does not box value-type arguments on every call.
+        // Methods without parameters are skipped since the scan is already free for them.
+        if (LibraryTypes.GrainCancellationTokenOrDefault is not { } grainCancellationToken
+            || LibraryTypes.RequestBaseOrDefault is not { } requestBase
+            || method.Method.Parameters.Length == 0
+            || !baseClassType.HasBaseType(requestBase)
+            || method.Method.Parameters.Any(parameter => CanHoldGrainCancellationToken(parameter.Type)))
+        {
+            return null;
+        }
+
+        // C#: public override bool MayHaveGrainCancellationToken => false;
+        return PropertyDeclaration(PredefinedType(Token(SyntaxKind.BoolKeyword)), "MayHaveGrainCancellationToken")
+            .WithExpressionBody(ArrowExpressionClause(LiteralExpression(SyntaxKind.FalseLiteralExpression)))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword));
+
+        // A type parameter may be instantiated as GrainCancellationToken, and any type which GrainCancellationToken
+        // converts to (such as object or an interface it implements) may hold an instance at runtime.
+        bool CanHoldGrainCancellationToken(ITypeSymbol type)
+            => type is ITypeParameterSymbol
+                || LibraryTypes.Compilation.HasImplicitConversion(grainCancellationToken, type);
     }
 
     private static MemberDeclarationSyntax? GenerateTryCancelMethod(InvokableMethodDescription method, List<InvokerFieldDescription> fields)

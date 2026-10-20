@@ -61,6 +61,11 @@ namespace Orleans.Runtime
             IGrainContext target,
             IInvokable request)
         {
+            if (request is RequestBase { MayHaveGrainCancellationToken: false })
+            {
+                return;
+            }
+
             var argumentCount = request.GetArgumentCount();
             for (var i = 0; i < argumentCount; i++)
             {
