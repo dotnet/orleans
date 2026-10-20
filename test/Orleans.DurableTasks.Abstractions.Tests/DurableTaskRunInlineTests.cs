@@ -440,7 +440,7 @@ public class DurableTaskRunInlineTests
 
         // Each failure is the effect's recorded outcome, so a replay observes it without running the effect, and the
         // failed operations took no identifiers: the unnamed effect which follows them is the first.
-        Assert.All(first.Failures, static failure => Assert.Contains("RunInline effect runs once", failure, StringComparison.Ordinal));
+        Assert.All(first.Failures, static failure => Assert.Contains("ORLEANS0227", failure, StringComparison.Ordinal));
         Assert.Equal(first.Failures, replayed.Failures);
         Assert.Equal((1, 1), (first.Next, replayed.Next));
         Assert.Equal(1, runs);

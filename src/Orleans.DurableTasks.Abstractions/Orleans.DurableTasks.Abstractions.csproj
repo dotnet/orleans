@@ -25,6 +25,8 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <!-- The host enters covered regions (DurableTaskContext.EnterCoveredRegion, RunInCoveredFlowAsync), which stay internal. -->
+    <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks" />
   </ItemGroup>
 
   <ItemGroup>
