@@ -672,7 +672,7 @@ public sealed class MessagingRecipeTests : IDisposable
     }
     private (IInboxHandlerContext Context, List<OutboxMessage> Output, List<string> Events) CreateContext<T>(T body, MessageId key)
     {
-        var message = Type<T>().Create(key, Receiver, body).ToInboxMessage();
+        var message = Type<T>().Create(key, Receiver, body).ToInboxMessage(DateTimeOffset.UnixEpoch);
         var context = Substitute.For<IInboxHandlerContext>();
         var output = new List<OutboxMessage>();
         var events = new List<string>();
