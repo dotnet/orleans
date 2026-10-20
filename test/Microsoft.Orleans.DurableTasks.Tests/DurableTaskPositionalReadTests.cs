@@ -23,7 +23,8 @@ public sealed class DurableTaskPositionalReadTests
 {
     private static readonly TaskId Execution = TaskId.CreateRoot("positional-reads");
     private static readonly string[] Keys = ["a", "b", "c"];
-    private static readonly string[] Values = ["x", "y", "z"];
+    // Reads of a value record positions from PositionalResults.MinimumLength characters: two values reach it, one doesn't.
+    private static readonly string[] Values = [Large("x"), Large("y"), "z"];
 
     public static TheoryData<string> Formats => DurableTaskJournalHarness.Formats;
 
@@ -89,6 +90,8 @@ public sealed class DurableTaskPositionalReadTests
         List<object?> observed;
         await using (var first = await harness.ActivateAsync())
         {
+            first.Dictionary["a"] = Large("a");
+            await first.Manager.WriteStateAsync(Cancellation);
             observed = await first.RunAsync([Read(1, 0), Write(1, 0, 1), Read(1, 0), Read(4, 0)], replaying: false);
             Assert.True(first.CountPositionalRecords() > 0);
             harness.Storage.RequestCompaction = true;
@@ -117,7 +120,10 @@ public sealed class DurableTaskPositionalReadTests
         List<object?> observed;
         await using (var first = await harness.ActivateAsync())
         {
+            first.Value.Value = Large("v");
+            await first.Manager.WriteStateAsync(Cancellation);
             observed = await first.RunAsync([Read(0, 0), Write(0, 0, 2), Read(0, 0), Read(6, 0)], replaying: false);
+            Assert.True(first.CountPositionalRecords() > 0);
             harness.Storage.RequestCompaction = true;
             for (var i = 0; i < JournalPositionTracker.MaxDeferredSnapshots; i++)
             {
@@ -143,6 +149,8 @@ public sealed class DurableTaskPositionalReadTests
         await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
         await using (var first = await harness.ActivateAsync())
         {
+            first.Dictionary["a"] = Large("a");
+            await first.Manager.WriteStateAsync(Cancellation);
             var log = first.CreateLog();
             first.Run(log, static activation => _ = activation.Dictionary.TryGetValue("a", out _));
             log.Flush();
@@ -168,6 +176,8 @@ public sealed class DurableTaskPositionalReadTests
         {
             storage = binary.Inner.StorageProvider;
             await using var first = await binary.ActivateAsync();
+            first.Dictionary["a"] = Large("a");
+            await first.Manager.WriteStateAsync(Cancellation);
             observed = await first.RunAsync([Read(1, 0), Write(1, 0, 0), Read(1, 0), Read(3, 1)], replaying: false);
             Assert.True(first.CountPositionalRecords() > 0);
         }
@@ -194,8 +204,8 @@ public sealed class DurableTaskPositionalReadTests
         var observed = new List<object?>();
         await using (var first = await harness.ActivateAsync())
         {
-            first.Dictionary["a"] = "a-before";
-            first.Dictionary["b"] = "b-before";
+            first.Dictionary["a"] = Large("a-before");
+            first.Dictionary["b"] = Large("b-before");
             await first.Manager.WriteStateAsync(Cancellation);
             var log = first.CreateLog();
 
@@ -217,7 +227,7 @@ public sealed class DurableTaskPositionalReadTests
 
             // While history is read, the attempt stages that read and records another of the same size into the same buffer.
             log.Flush();
-            first.Dictionary["a"] = "a-after";
+            first.Dictionary["a"] = Large("a-after");
             first.Run(log, activation => observed.Add(activation.Dictionary["b"]));
             harness.Storage.RequestCompaction = false;
             gate.SetResult();
@@ -237,7 +247,7 @@ public sealed class DurableTaskPositionalReadTests
             replayed.Add(activation.Dictionary["a"]);
             replayed.Add(activation.Dictionary["b"]);
         });
-        Assert.Equal(["b-before", "a-before", "b-before"], observed);
+        Assert.Equal([Large("b-before"), Large("a-before"), Large("b-before")], observed);
         Assert.Equal(observed, replayed);
     }
 
@@ -246,7 +256,7 @@ public sealed class DurableTaskPositionalReadTests
     {
         await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
         await using var activation = await harness.ActivateAsync();
-        activation.Dictionary["a"] = "x";
+        activation.Dictionary["a"] = Large("x");
         await activation.Manager.WriteStateAsync(Cancellation);
         var log = activation.CreateLog();
         activation.Run(log, static activation => _ = activation.Dictionary["a"]);
@@ -265,7 +275,7 @@ public sealed class DurableTaskPositionalReadTests
     {
         await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
         await using var activation = await harness.ActivateAsync();
-        activation.Dictionary["a"] = "x";
+        activation.Dictionary["a"] = Large("x");
         await activation.Manager.WriteStateAsync(Cancellation);
         var log = activation.CreateLog();
         activation.Run(log, static activation => _ = activation.Dictionary["a"]);
@@ -295,7 +305,7 @@ public sealed class DurableTaskPositionalReadTests
     {
         await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
         await using var activation = await harness.ActivateAsync();
-        activation.Dictionary["a"] = "x";
+        activation.Dictionary["a"] = Large("x");
         await activation.Manager.WriteStateAsync(Cancellation);
         harness.Storage.RequestCompaction = true;
         for (var window = 0; window < 2; window++)
@@ -327,7 +337,7 @@ public sealed class DurableTaskPositionalReadTests
     {
         await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
         await using var activation = await harness.ActivateAsync();
-        activation.Value.Value = "0";
+        activation.Value.Value = Large("0");
         await activation.Manager.WriteStateAsync(Cancellation);
         Assert.True(activation.Manager.Positions.TryGetPosition(out var before));
 
@@ -345,16 +355,17 @@ public sealed class DurableTaskPositionalReadTests
         Assert.Equal(before, after);
         log.Flush();
         Assert.Single(DurableTaskAccessLog.FindPositionalRecords(activation.Storage.GetAccessLog(Execution), [])!);
-        Assert.Equal("0++++++++++", activation.Value.Value);
+        Assert.Equal(Large("0") + "++++++++++", activation.Value.Value);
         log.Close();
     }
 
     [Fact]
-    public async Task AttemptRecordsValuesAfterAForcedResolution()
+    public async Task ExecutionRecordsValuesAfterAForcedResolution()
     {
         await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
         await using var activation = await harness.ActivateAsync();
-        activation.Dictionary["a"] = "x";
+        activation.Dictionary["a"] = Large("x");
+        activation.Dictionary["b"] = Large("y");
         await activation.Manager.WriteStateAsync(Cancellation);
         var log = activation.CreateLog();
         activation.Run(log, static activation => _ = activation.Dictionary["a"]);
@@ -373,12 +384,102 @@ public sealed class DurableTaskPositionalReadTests
         activation.Run(log, static activation => _ = activation.Dictionary.TryGetValue("a", out _));
         Assert.Null(DurableTaskAccessLog.FindPositionalRecords(log.PendingRecords, log.PendingStates));
         Assert.False(activation.Manager.Positions.HasBarriers);
+        log.Flush();
+        log.Close();
 
-        // Another attempt records positions.
+        // So does the execution's next attempt, after replaying the records.
+        var next = activation.CreateLog();
+        activation.Run(next, static activation =>
+        {
+            _ = activation.Dictionary["a"];
+            _ = activation.Dictionary.TryGetValue("a", out _);
+            _ = activation.Dictionary["b"];
+        });
+        Assert.False(next.IsReplaying);
+        Assert.Null(DurableTaskAccessLog.FindPositionalRecords(next.PendingRecords, next.PendingStates));
+        Assert.False(activation.Manager.Positions.HasBarriers);
+        next.Close();
+
+        // Another execution records positions.
         var other = activation.CreateLog(TaskId.CreateRoot("other"));
         activation.Run(other, static activation => _ = activation.Dictionary.TryGetValue("a", out _));
         Assert.NotNull(DurableTaskAccessLog.FindPositionalRecords(other.PendingRecords, other.PendingStates));
         other.Close();
+    }
+
+    [Fact]
+    public async Task ExecutionRecordsValuesAfterARecoveryResolvedItsPositions()
+    {
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
+        await using (var first = await harness.ActivateAsync())
+        {
+            first.Dictionary["a"] = Large("x");
+            await first.Manager.WriteStateAsync(Cancellation);
+            var log = first.CreateLog();
+            first.Run(log, static activation => _ = activation.Dictionary["a"]);
+            log.Flush();
+            await first.Manager.WriteStateAsync(Cancellation);
+            Assert.Equal(1, first.CountPositionalRecords());
+        }
+
+        await using var recovered = await harness.ActivateAsync();
+        Assert.Equal(0, recovered.CountPositionalRecords());
+        Assert.False(recovered.Manager.Positions.HasBarriers);
+
+        // The execution's next attempt replays the resolved read, then records its later reads as values.
+        var attempt = recovered.CreateLog();
+        recovered.Run(attempt, static activation =>
+        {
+            _ = activation.Dictionary["a"];
+            _ = activation.Dictionary.TryGetValue("a", out _);
+        });
+        Assert.False(attempt.IsReplaying);
+        Assert.Null(DurableTaskAccessLog.FindPositionalRecords(attempt.PendingRecords, attempt.PendingStates));
+        Assert.False(recovered.Manager.Positions.HasBarriers);
+        attempt.Close();
+
+        // Another execution records positions.
+        var other = recovered.CreateLog(TaskId.CreateRoot("other"));
+        recovered.Run(other, static activation => _ = activation.Dictionary.TryGetValue("a", out _));
+        Assert.NotNull(DurableTaskAccessLog.FindPositionalRecords(other.PendingRecords, other.PendingStates));
+        other.Close();
+    }
+
+    [Theory]
+    [InlineData(PositionalResults.MinimumLength - 1, false)]
+    [InlineData(PositionalResults.MinimumLength, true)]
+    public async Task StringReadsRecordPositionsFromTheMinimumLength(int length, bool positional)
+    {
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
+        await using var activation = await harness.ActivateAsync();
+        activation.Dictionary["a"] = new string('x', length);
+        await activation.Manager.WriteStateAsync(Cancellation);
+        var log = activation.CreateLog();
+        activation.Run(log, static activation =>
+        {
+            _ = activation.Dictionary["a"];
+            _ = activation.Dictionary.TryGetValue("a", out _);
+        });
+
+        Assert.Equal(positional ? 2 : 0, DurableTaskAccessLog.FindPositionalRecords(log.PendingRecords, log.PendingStates)?.Count ?? 0);
+        Assert.Equal(positional, activation.Manager.Positions.HasBarriers);
+        log.Close();
+    }
+
+    [Theory]
+    [InlineData(PositionalResults.MinimumLength - 1, false)]
+    [InlineData(PositionalResults.MinimumLength, true)]
+    public async Task ArrayReadsRecordPositionsFromTheMinimumLength(int length, bool positional)
+    {
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
+        await using var activation = await harness.ActivateAsync();
+        activation.Bytes.Value = new byte[length];
+        await activation.Manager.WriteStateAsync(Cancellation);
+        var log = activation.CreateLog();
+        activation.Run(log, static activation => _ = activation.Bytes.Value);
+
+        Assert.Equal(positional ? 1 : 0, DurableTaskAccessLog.FindPositionalRecords(log.PendingRecords, log.PendingStates)?.Count ?? 0);
+        Assert.Equal(positional, activation.Manager.Positions.HasBarriers);
         log.Close();
     }
 
@@ -387,7 +488,7 @@ public sealed class DurableTaskPositionalReadTests
     {
         await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
         var activation = await harness.ActivateAsync();
-        activation.Dictionary["a"] = "x";
+        activation.Dictionary["a"] = Large("x");
         await activation.Manager.WriteStateAsync(Cancellation);
         var log = activation.CreateLog();
         activation.Run(log, static activation => _ = activation.Dictionary["a"]);
@@ -413,7 +514,7 @@ public sealed class DurableTaskPositionalReadTests
     {
         await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
         await using var first = await harness.ActivateAsync();
-        first.Dictionary["a"] = "first";
+        first.Dictionary["a"] = Large("first");
         await first.Manager.WriteStateAsync(Cancellation);
         var log = first.CreateLog();
         first.Run(log, static activation => _ = activation.Dictionary["a"]);
@@ -465,6 +566,9 @@ public sealed class DurableTaskPositionalReadTests
         Assert.Contains("position of the journal", divergence.Message, StringComparison.Ordinal);
     }
 
+    // A text which reaches the length from which reads record positions.
+    private static string Large(string text) => text.PadRight(PositionalResults.MinimumLength, '.');
+
     private static Step Read(int operation, int key) => new(StepKind.Read, operation, key, 0);
 
     private static Step Write(int operation, int key, int value) => new(StepKind.Write, operation, key, value);
@@ -511,12 +615,13 @@ public sealed class DurableTaskPositionalReadTests
                 var dictionary = (DurableDictionary<string, string>)services.GetRequiredKeyedService<IDurableDictionary<string, string>>("dictionary");
                 var value = (DurableValue<string>)services.GetRequiredKeyedService<IDurableValue<string>>("value");
                 var list = (DurableList<string>)services.GetRequiredKeyedService<IDurableList<string>>("list");
+                var bytes = (DurableValue<byte[]>)services.GetRequiredKeyedService<IDurableValue<byte[]>>("bytes");
                 var storage = services.GetRequiredService<DurableTaskGrainStorage>();
                 var manager = (JournaledStateManager)services.GetRequiredService<IJournaledStateManager>();
                 var provider = new Provider();
                 manager.ContextProvider = provider;
                 await storage.ReadAsync(Cancellation);
-                return new(scope, this, manager, storage, provider, dictionary, value, list, services.GetRequiredService<Serializer>());
+                return new(scope, this, manager, storage, provider, dictionary, value, list, bytes, services.GetRequiredService<Serializer>());
             }
             catch
             {
@@ -537,6 +642,7 @@ public sealed class DurableTaskPositionalReadTests
         DurableDictionary<string, string> dictionary,
         DurableValue<string> value,
         DurableList<string> list,
+        DurableValue<byte[]> bytes,
         Serializer serializer) : IAsyncDisposable
     {
         public JournaledStateManager Manager => manager;
@@ -546,6 +652,8 @@ public sealed class DurableTaskPositionalReadTests
         public DurableDictionary<string, string> Dictionary => dictionary;
 
         public DurableValue<string> Value => value;
+
+        public DurableValue<byte[]> Bytes => bytes;
 
         public DurableTaskAccessLog CreateLog(TaskId? taskId = null) =>
             new(new TestDurableTaskAttempt(taskId ?? Execution), storage, serializer, TaskScheduler.Current, static exception => new DurableTaskAttemptCanceledException(exception.Message, exception));

@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using Orleans.Journaling;
 using Orleans.Serialization;
@@ -55,14 +56,16 @@ namespace Orleans.DurableTasks.Runtime;
 /// <para>
 /// A pure read of a state which the log's own journal holds can record the journal's position instead of its value, with
 /// the read's argument (<see cref="JournaledStateOperations.IsPositional"/>): the read observed the state as the journal's
-/// entries before that position leave it. It does so only when a replay provably returns what this read observed: the
-/// journal's codecs reproduce values exactly, the state has no change waiting for a write, the result is a value type or a
-/// sealed class (or an array of value types) and isn't small, and an argument compares by value. Writing a position costs
-/// a few bytes and no encoding of the value. While any execution's log holds such a record, the journal holds a compaction
-/// barrier, so its history stays. A recovery whose journal holds the barrier replays the history and replaces each
-/// position with the value which the read observed, before any attempt replays; a snapshot which must pass the barrier does
-/// the same first, after which the running attempts record values. A replay therefore meets values, and stalls as a
-/// divergence on a position which couldn't be resolved.
+/// entries before that position leave it. It does so only when the value is large and a replay provably returns what this
+/// read observed: the result is a string or an array of at least <see cref="PositionalResults.MinimumLength"/> characters
+/// or elements, alone or as the value which a <c>Try</c> read found; the journal's codecs reproduce values exactly; the
+/// state has no change waiting for a write; the result's type is a value type or a sealed class (or an array of value
+/// types); and an argument compares by value. Writing a position costs a few bytes and no encoding of the value. While any
+/// execution's log holds such a record, the journal holds a compaction barrier, so its history stays. A recovery whose
+/// journal holds the barrier replays the history and replaces each position with the value which the read observed,
+/// before any attempt replays; a snapshot which must pass the barrier does the same first. Once the journal resolves an
+/// execution's positions, either way, the execution's reads record values for the rest of the activation. A replay
+/// therefore meets values, and stalls as a divergence on a position which couldn't be resolved.
 /// </para>
 /// <para>
 /// Each record has this format:
@@ -124,9 +127,6 @@ internal sealed class DurableTaskAccessLog(
     // registered its pending records with it.
     private readonly Storage.DurableTaskAccessLogs? _positionHolder = storage.PositionHolder;
     private bool _holdsPositions;
-
-    // Whether the attempt's reads can record positions: until the journal resolves positional reads while it runs.
-    private bool _recordsPositions = storage.PositionHolder is not null;
 
     // The size of the table of states when the pending records began.
     private int _pendingStateBase;
@@ -350,7 +350,7 @@ internal sealed class DurableTaskAccessLog(
             result = operation(state);
 
             // A pure read can record the journal's position instead of its value.
-            if (apply is null && access.Kind is JournaledStateAccessKind.Read && IsOpen && TryRecordPosition<TArgument, TResult>(access, argumentHash, argument))
+            if (apply is null && access.Kind is JournaledStateAccessKind.Read && IsOpen && TryRecordPosition(access, argumentHash, argument, result))
             {
                 return result;
             }
@@ -417,7 +417,7 @@ internal sealed class DurableTaskAccessLog(
             repeats = typed?.Repeats(argument, result, stamp) is true;
 
             // A pure read can record the journal's position instead of its value.
-            if (!repeats && !(positional = IsOpen && TryRecordPosition<TArgument, TResult>(access, argumentHash, argument)))
+            if (!repeats && !(positional = IsOpen && TryRecordPosition(access, argumentHash, argument, result)))
             {
                 encoded = Encode(result);
             }
@@ -950,17 +950,18 @@ internal sealed class DurableTaskAccessLog(
     }
 
     // Records a pure read of a state in the log's own journal as the journal's position, with the read's argument and its
-    // hash, when the journal offers positions and the serializer encodes the read's argument and result types; otherwise
-    // the caller records the read's value. A replay checks the argument hash of the value record which resolution makes
-    // of it, as of any record.
-    private bool TryRecordPosition<TArgument, TResult>(in JournaledStateAccess access, int? argumentHash, TArgument argument)
+    // hash, when the journal offers positions, the serializer encodes the read's argument and result types, the result is
+    // large, and the journal hasn't resolved the execution's positional reads; otherwise the caller records the read's
+    // value. A replay checks the argument hash of the value record which resolution makes of it, as of any record.
+    private bool TryRecordPosition<TArgument, TResult>(in JournaledStateAccess access, int? argumentHash, TArgument argument, TResult result)
     {
         var target = access.Target;
-        if (!_recordsPositions
-            || _positionHolder!.Journal is not { } journal
+        if (_positionHolder?.Journal is not { } journal
             || !ReferenceEquals(target.Manager, journal)
             || !JournaledStateOperations.IsPositional(access.Operation)
             || !PositionalTypes<TArgument, TResult>.IsSupported(_serializer)
+            || PositionalResults.GetLength(result) < PositionalResults.MinimumLength
+            || _positionHolder.HasResolvedReads(_taskId)
             || !journal.Positions.TryGetPosition(target, out var position))
         {
             // The journal up to a position reproduces the read only when the state has no change pending a write, so a
@@ -1008,12 +1009,11 @@ internal sealed class DurableTaskAccessLog(
     {
         // Reads which compare their argument with the state's content need an argument whose default equality compares
         // values, so the decoded argument finds what the live one did. Results are re-encoded from the journal, so they
-        // must be exactly the types which the live read returned; small results record values, which cost no more than a
-        // position and hold no barrier.
+        // must be exactly the types which the live read returned, and of a type whose length is known without encoding.
         private static readonly bool s_eligible =
             (typeof(TArgument) == typeof(JournaledStateAccessNoArgument) || ValueEquality<TArgument>.IsSupported)
             && PositionalResults.IsExact(typeof(TResult))
-            && !PositionalResults.IsSmall(typeof(TResult));
+            && PositionalResults.HasLength(typeof(TResult));
 
         private static Entry? s_entry;
 
@@ -1038,11 +1038,8 @@ internal sealed class DurableTaskAccessLog(
         private sealed record Entry(Serializer Serializer, bool IsSupported);
     }
 
-    /// <summary>
-    /// Makes the attempt's later reads record values: the journal resolved positional reads while it ran, which a
-    /// long-lived attempt would otherwise make it repeat at every compaction.
-    /// </summary>
-    internal void StopRecordingPositions() => _recordsPositions = false;
+    /// <summary>Gets the execution whose access log this attempt records.</summary>
+    internal TaskId ExecutionId => _taskId;
 
     /// <summary>Gets the records which this attempt made and hasn't staged.</summary>
     internal ReadOnlyMemory<byte> PendingRecords => _pending is { } pending ? pending.WrittenMemory : default;
@@ -1488,17 +1485,54 @@ internal static class PositionalResults
     }
 
     /// <summary>
-    /// Gets whether a result of <paramref name="type"/> is small and of fixed size, such as a count, a flag, or an index, so
-    /// its value is no larger than a position.
+    /// The least length of a result which a read records as a position: characters of a string, or elements of an array.
     /// </summary>
-    public static bool IsSmall(Type type)
-    {
-        if (type.IsPrimitive || type.IsEnum)
-        {
-            return true;
-        }
+    /// <remarks>
+    /// <para>
+    /// Each character or element encodes to at least one byte, so a result of this length takes at least 512 bytes as a
+    /// value, against about 18 bytes for a position with a short argument: each such read saves at least ~490 bytes, and
+    /// 1 KiB values save 98% of the records' bytes and much of the encoding time. A smaller result saves too little to
+    /// pay for what positions cost on other paths. 32-character values save ~28 bytes per read, while a recovery which
+    /// resolves positions takes 1.4–2.1× the CPU, allocates twice as much and journals the values anyway, and a snapshot
+    /// which must resolve them reads and replays the whole journal: 7–41 ms for 0.8–4 MiB, and 35–200 ms instead of 10 ms
+    /// on storage with 10 ms per call (the P3 sweep of <c>Journaling.PositionResolution</c>).
+    /// </para>
+    /// <para>
+    /// Only results whose length is known without encoding them qualify (<see cref="HasLength"/>); the counts are lower
+    /// bounds of their encoded sizes, as elements and characters encode in a variable number of bytes.
+    /// </para>
+    /// </remarks>
+    internal const int MinimumLength = 512;
 
-        return IsPairOrNullable(type) && type.GetGenericArguments().All(IsSmall);
+    /// <summary>
+    /// Gets whether the length of a result of <paramref name="type"/> is known without encoding it: a string, an array, or
+    /// the pair of whether a <c>Try</c> read found its value and the value, of those.
+    /// </summary>
+    public static bool HasLength(Type type) =>
+        type == typeof(string)
+        || type.IsSZArray
+        || (type.IsGenericType
+            && type.GetGenericTypeDefinition() == typeof(ValueTuple<,>)
+            && type.GetGenericArguments() is [var found, var value]
+            && found == typeof(bool)
+            && (value == typeof(string) || value.IsSZArray));
+
+    /// <summary>
+    /// Returns the length of <paramref name="result"/>, a type which <see cref="HasLength"/> accepts, in characters or
+    /// elements: <c>0</c> when it holds none.
+    /// </summary>
+    public static int GetLength<T>(T result)
+    {
+        Debug.Assert(HasLength(typeof(T)), "Only results whose length is known are measured.");
+
+        // A pair holds a flag and a string or an array, as a pair of a flag and an object does.
+        var value = typeof(T).IsValueType ? Unsafe.As<T, ValueTuple<bool, object?>>(ref result).Item2 : result;
+        return value switch
+        {
+            string text => text.Length,
+            Array array => array.Length,
+            _ => 0,
+        };
     }
 
     /// <summary>Gets whether the default equality of <paramref name="type"/> is known to compare values.</summary>

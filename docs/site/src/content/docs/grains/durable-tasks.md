@@ -217,12 +217,14 @@ The order workflow changes its status this way:
   references share one record, so a loop which reads unchanged values adds a few bytes
   rather than a value per iteration. In the binary journal format, another pure read of
   the grain's journaled state, such as `TryGetValue` or a value's `Value`, records the
-  journal's position rather than its value when the journal holds exactly what the read
-  observed. The journal keeps its history after a recorded position while the execution
-  runs, and a recovery replays that history to supply the value which the read observed,
-  before the execution replays. Every other read, including small results such as counts
-  and flags, and reads of state with a change waiting for a write, records its value, so
-  a replay returns what each read observed when it ran. A workflow which loops indefinitely
+  journal's position rather than its value when its result is a string or an array of at
+  least 512 characters or elements and the journal holds exactly what the read observed.
+  The journal keeps its history after a recorded position while the execution runs, and
+  a recovery replays that history to supply the value which the read observed, before
+  the execution replays; from then on, the execution's reads record values. Every other
+  read, including smaller results, and reads of state with a change waiting for a write,
+  records its value, so a replay returns what each read observed when it ran. A workflow
+  which loops indefinitely
   bounds its history as
   [Replay-safety rules](durable-tasks-replay-rules.md#rules-which-the-analyzers-dont-check)
   describes.
