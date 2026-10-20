@@ -40,8 +40,8 @@ public static class MessagingEvents
     }
 
     /// <summary>
-    /// Event payload for a delivery attempt which reached a grain's inbox and isn't a duplicate, before the inbox stages
-    /// anything for the message.
+    /// Event payload for a new delivery which passed the inbox's deduplication and admission fence, before the inbox
+    /// stages message effects.
     /// </summary>
     /// <param name="grainContext">The receiving activation.</param>
     /// <param name="message">The delivered message.</param>

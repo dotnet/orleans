@@ -1,4 +1,6 @@
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Messaging.Configuration;
+using Orleans.Serialization;
 using Xunit;
 
 namespace Orleans.Messaging.Tests.Contracts;
@@ -45,6 +47,7 @@ public sealed class DeliveryAndOptionsContractTests
         var handlerMissing = DeliveryResult.HandlerNotFound();
         var deadLettered = DeliveryResult.DeadLettered("poison body");
         var coded = DeliveryResult.DeadLettered("duplicate order", "orders/duplicate");
+        var expired = DeliveryResult.Expired();
 
         Assert.Equal(DeliveryStatus.Accepted, DeliveryResult.Accepted().Status);
         Assert.Equal(DeliveryStatus.Duplicate, DeliveryResult.Duplicate().Status);
@@ -56,6 +59,22 @@ public sealed class DeliveryAndOptionsContractTests
         Assert.Null(deadLettered.Code);
         Assert.Equal("duplicate order", coded.Message);
         Assert.Equal("orders/duplicate", coded.Code);
+        Assert.Equal(DeliveryStatus.Expired, expired.Status);
+        Assert.Equal("The message's admission cutoff is fenced; its earlier delivery outcome is unknown.", expired.Message);
+        Assert.Null(expired.Code);
+    }
+
+    [Fact]
+    public void DeliveryResult_Expired_RoundTripsStatusAndPayload()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<DeliveryResult>>();
+
+        var decoded = serializer.Deserialize(serializer.SerializeToArray(DeliveryResult.Expired()));
+
+        Assert.Equal(DeliveryStatus.Expired, decoded.Status);
+        Assert.Equal("The message's admission cutoff is fenced; its earlier delivery outcome is unknown.", decoded.Message);
+        Assert.Null(decoded.Code);
     }
 
     [Fact]
@@ -67,10 +86,11 @@ public sealed class DeliveryAndOptionsContractTests
                 DeliveryStatus.Duplicate,
                 DeliveryStatus.Backpressured,
                 DeliveryStatus.HandlerNotFound,
-                DeliveryStatus.DeadLettered
+                DeliveryStatus.DeadLettered,
+                DeliveryStatus.Expired
             ],
             Enum.GetValues<DeliveryStatus>());
-        Assert.Equal([1, 2, 3, 4, 5], Enum.GetValues<DeliveryStatus>().Select(static value => (int)value));
+        Assert.Equal([1, 2, 3, 4, 5, 6], Enum.GetValues<DeliveryStatus>().Select(static value => (int)value));
         Assert.False(Enum.IsDefined(default(DeliveryResult).Status));
     }
 
@@ -98,10 +118,12 @@ public sealed class DeliveryAndOptionsContractTests
         {
             (nameof(DurableMessagingOptions.MaxCapacity), options => options.MaxCapacity = 0),
             (nameof(DurableMessagingOptions.DeduplicationWindow), options => options.DeduplicationWindow = TimeSpan.Zero),
+            (nameof(DurableMessagingOptions.DeduplicationWindow), options => options.DeduplicationWindow = TimeSpan.FromTicks(-1)),
             (nameof(DurableMessagingOptions.RetryInitialInterval), options => options.RetryInitialInterval = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.RetryInitialInterval), options => options.RetryInitialInterval = TimeSpan.MaxValue),
             (nameof(DurableMessagingOptions.InboxRetryTimeout), options => options.InboxRetryTimeout = TimeSpan.FromTicks(-1)),
             (nameof(DurableMessagingOptions.OutboxRetryTimeout), options => options.OutboxRetryTimeout = TimeSpan.Zero),
+            (nameof(DurableMessagingOptions.OutboxRetryTimeout), options => options.OutboxRetryTimeout = TimeSpan.FromTicks(-1)),
             (nameof(DurableMessagingOptions.DeadLetterRetentionPeriod), options => options.DeadLetterRetentionPeriod = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.MaxRetainedDeadLetters), options => options.MaxRetainedDeadLetters = 0),
             (nameof(DurableMessagingOptions.InboxBatchSize), options => options.InboxBatchSize = 0),
@@ -117,21 +139,18 @@ public sealed class DeliveryAndOptionsContractTests
         }
     }
 
-
-    [Fact]
-    public void Validate_OutboxRetryTimeoutNotLessThanDeduplicationWindow_FailsAtBoundaryAndAbove()
+    [Theory]
+    [InlineData(1, 2)]
+    [InlineData(1, 1)]
+    [InlineData(2, 1)]
+    public void Validate_RetryTimeoutAndDeduplicationWindow_AreIndependentPositiveDurations(long retryTimeoutTicks, long deduplicationWindowTicks)
     {
-        foreach (var retryTimeout in new[] { TimeSpan.FromHours(2), TimeSpan.FromHours(3) })
+        var options = new DurableMessagingOptions
         {
-            var options = new DurableMessagingOptions
-            {
-                DeduplicationWindow = TimeSpan.FromHours(2),
-                OutboxRetryTimeout = retryTimeout,
-            };
+            DeduplicationWindow = TimeSpan.FromTicks(deduplicationWindowTicks),
+            OutboxRetryTimeout = TimeSpan.FromTicks(retryTimeoutTicks),
+        };
 
-            var exception = Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
-            Assert.Equal(nameof(DurableMessagingOptions.OutboxRetryTimeout), exception.ParamName);
-            Assert.Contains("less than DeduplicationWindow", exception.Message, StringComparison.Ordinal);
-        }
+        Assert.Null(Record.Exception(options.Validate));
     }
 }

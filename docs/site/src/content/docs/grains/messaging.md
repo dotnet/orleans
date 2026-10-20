@@ -207,15 +207,23 @@ source or an inbox sink keeps that state as the only journaled copy:
     message.
   - **Retire.** When the message retires, the outbox calls
     <xref:Orleans.Messaging.IOutboxMessageSource.OnRetired*> while it stages the
-    removal, so the source's release commits in the same journal write. The
+    removal, so the source's release, application terminal outcome, and follow-up
+    work commit in the same journal write. The
     <xref:Orleans.Messaging.OutboxMessageRetirement> struct carries a `Status`, a
     `Reason`, and a `Code`. Its status is `Delivered` when the receiver accepted the
     message or reported it as a duplicate, `Rejected` when the receiver dead-lettered
-    it, and `DeadLettered` when the outbox dead-lettered it after its retry timeout or
-    a source failure. `Reason` is the dead letter's reason, and `Code` is the
+    it durably, and `DeadLettered` when the outbox dead-lettered it after its retry
+    timeout, a source failure, or a receiver admission fence. `DeadLettered`
+    leaves earlier receiver acceptance unknown. `Reason` is the dead letter's reason, and `Code` is the
     application-defined code that the receiver reported with a rejection. An outbox
     dead letter receives its own copy of the materialized message first, so the
-    source can release its payload in `OnRetired`.
+    source can release its payload in `OnRetired`. Stage a self-addressed
+    follow-up message there to run application recovery work through the inbox's
+    durable wake-up and handler path. A failure before commit recovers the pending
+    outbox entry and invokes the callback again; a committed retirement recovers
+    the outcome and follow-up together. A callback exception fails the activation
+    so its uncommitted changes are discarded. Perform external I/O in the
+    follow-up handler's preparation phase.
   - **Fail.** After the send, when the owning source throws, returns an invalid
     message, or returns `false` for its message, the outbox dead-letters only that
     entry and retires it as `DeadLettered` in the same journal write; the grain keeps
@@ -262,8 +270,8 @@ source or an inbox sink keeps that state as the only journaled copy:
 
 Register sources, sinks, and work sources during construction or activation setup, before journal
 recovery. A recovered source-provided message fails the activation when no source is
-registered. A sink is offered a message again once its processed record
-leaves the deduplication window, so sinks must be idempotent.
+registered. The inbox deduplicates a tracked identity before offering it to a sink,
+and fences a compacted identity's original cutoff before any sink effects.
 
 ## Commit and delivery guarantees
 
@@ -290,17 +298,18 @@ leaves the deduplication window, so sinks must be idempotent.
   together and persist in one journal write.
 - Transport is **at-least-once**. If the sender loses its activation after the
   receiver accepts a message and before the outbox records the delivery, the outbox
-  sends the message again. Effects apply once per message ID within
-  <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>;
+  sends the message again using its original admission cutoff. Effects apply once
+  per logical send through retained completion records and a durable admission floor;
   a handler can execute more than once for the same message, so its preparation must
   tolerate repetition.
 - The receiver deduplicates by exact `MessageId`. A repeat of a pending message
   returns <xref:Orleans.Messaging.DeliveryStatus.Duplicate> when its subject,
   payload, and `DeliverAt` time match, and fails when they differ. A repeat of a
-  completed message returns `Duplicate` while the completion record is within
-  `DeduplicationWindow`, or the original `DeadLettered` reason and code when an
-  inbox sink rejected it and no later completion of that ID is recorded. After the
-  window ends, the same ID is accepted and processed again.
+  completed message returns `Duplicate` while the completion record is retained,
+  or the original `DeadLettered` reason and code when an inbox sink rejected it.
+  Both pending and completed repeats require the original admission cutoff.
+  Once the record is compacted, the durable floor fences its original cutoff
+  with `Expired`, whose earlier acceptance outcome is unknown.
 - A message with <xref:Orleans.Messaging.Envelope.DeliverAt> is delivered and
   accepted immediately, then processed once its acceptance is durable and the
   Durable Jobs clock reaches `DeliverAt`. A message the grain sends to itself is
@@ -443,27 +452,25 @@ The outbox removes a message when the receiver reports `Accepted`, `Duplicate`, 
 as one from a newer receiver, leaves the outcome unknown and schedules a durable retry
 with the same backoff while other messages continue:
 
-- `Backpressured` retries until the receiver takes the message.
+- `Backpressured` retries within the original absolute delivery budget.
 - `HandlerNotFound` logs an error, and retries give a deployment time to register the handler.
 - Other failures, such as calls which fail without an answer during an infrastructure outage,
   retry like `HandlerNotFound`.
 
 <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.OutboxRetryTimeout> starts
-when the message is sent, with its expiration journaled together with the send, and
-restarts at the start of each attempt which the receiver answers with `Backpressured`.
+when the message is sent, with its immutable expiration journaled together with the send.
 No attempt starts after the timeout elapses; the outbox then moves the message to its
-dead letters with a reason stating that the retry timeout elapsed. A receiver checks its
-deduplication records before answering, and each attempt carries its
-<xref:Orleans.Messaging.InboxMessage.RedeliveryDeadline>: the time its retries end
-plus the grain call response timeout. A receiver accepts a new message only when its
-`DeduplicationWindow` covers that deadline, so every redelivery reaches it while it
-still recognizes the message, including when a sender fails to record a delivery and
-recovers late. Otherwise the receiver records nothing and answers `DeadLettered` with
-<xref:Orleans.Messaging.DeliveryResult.DeduplicationWindowExceededCode>, and the
-outbox keeps the message as a dead letter and retires it as `Rejected`. Configure
-`OutboxRetryTimeout` shorter than `DeduplicationWindow`, uniformly across the cluster,
-with margin for the response timeout; the check assumes clock skew between silos is
-much smaller than the window. The Durable Jobs clock governs retry times and timeouts.
+dead letters with a reason stating that the retry timeout elapsed. Each attempt
+carries that same expiration as its
+<xref:Orleans.Messaging.InboxMessage.RedeliveryDeadline> admission cutoff.
+The receiver checks pending and completed identities first. For an untracked
+identity, a cutoff at or below its non-decreasing admission floor returns
+<xref:Orleans.Messaging.DeliveryStatus.Expired> before any sink or handler runs.
+The outbox retains that message as a dead letter and retires it as `DeadLettered`:
+earlier acceptance may have succeeded with a lost acknowledgement. Stage durable
+application reconciliation through the source callback before authorizing another
+send. The Durable Jobs clock governs retry scheduling and candidate floor
+advancement; the journaled cutoff and floor preserve safety across clock changes.
 
 Inspect dead letters through <xref:Orleans.Messaging.IMessagingDiagnostics> and remove
 handled records with <xref:Orleans.Messaging.IMessagingDiagnostics.RemoveInboxDeadLetter*>
@@ -471,8 +478,11 @@ or <xref:Orleans.Messaging.IMessagingDiagnostics.RemoveOutboxDeadLetter*>. Remov
 becomes durable with the next journal write. Retention settings bound both
 collections; see [Capacity, retries, and retention](messaging-operations.md#capacity-retries-and-retention).
 
-Duplicate checks apply the deduplication window exactly. Expired processed IDs are
-dropped from storage when the journal writes a snapshot.
+Snapshots advance the admission floor to the later of its current value and
+observed Durable Jobs time minus `DeduplicationWindow`, and compact completed
+records whose cutoff that floor fences. The floor and compacted history persist
+atomically, and in-memory records remain until acknowledgement. Null-cutoff
+completion records remain permanent.
 
 ## State, recovery, and deletion
 
@@ -528,5 +538,6 @@ Use shared, production-grade storage for multi-silo deployments. In-memory Durab
 Jobs and journal storage support development and tests.
 
 Monitor inbox and outbox depth, retry and dead-letter outcomes, and the age of
-pending messages. Keep the deduplication window longer than the outbox retry timeout.
+pending messages. Size admission-floor lag and retry budgets for the workload's
+availability and retained-history costs.
 For metric names and diagnostics, see [Operate messaging](messaging-operations.md).

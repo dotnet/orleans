@@ -153,8 +153,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         return true;
     }
 
-    // Retries end OutboxRetryTimeout after the send on the Durable Jobs clock, so every attempt starts within the
-    // timeout of any acceptance by the receiver.
+    // The sending write fixes both the absolute retry budget and the admission cutoff for every attempt and recovery.
     private OutboxMessageState CreateState() =>
         new() { ExpirationTime = MessagingTime.AddClamped(JobTimeProvider.GetUtcNow(), Options.OutboxRetryTimeout) };
 
@@ -268,6 +267,11 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
         foreach (var (key, entry) in _messages)
         {
+            if (entry.State.ExpirationTime is null)
+            {
+                throw new InvalidOperationException("A recovered outbox entry requires its immutable retry expiration and admission cutoff.");
+            }
+
             if (entry.Message is { } message)
             {
                 if (entry.Reference is not null)
@@ -371,8 +375,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 error = exception;
             }
 
-            // No attempt starts once the retry timeout elapses, which keeps redeliveries within the receiver's
-            // deduplication window of any acceptance.
+            // Backpressure and failed attempts share the absolute retry budget established by the sending write.
             if (entry.State.ExpirationTime <= now) (unavailable ??= []).Add(new(entry, UnavailableKind.Expired, message, error));
             else if (error is not null) (unavailable ??= []).Add(new(entry, UnavailableKind.Failed, null, error));
             else if (message is { } candidate) (candidates ??= []).Add((entry, candidate));
@@ -386,23 +389,22 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
     private async Task<DeliveryOutcome> DeliverAsync(OutboxEntry entry, OutboxMessage message, CancellationToken cancellationToken)
     {
-        var startedAt = JobTimeProvider.GetUtcNow();
         var start = Stopwatch.GetTimestamp();
         try
         {
-            // No attempt starts after the expiration, and none reaches the receiver more than MaxAttemptDuration after it
-            // starts, so the receiver can reject a message whose redeliveries would outlast its deduplication record.
+            // A receiver fences forgotten sends using this immutable cutoff, even if a delayed attempt arrives after
+            // sender expiry or either clock moves backward. Transport timing is not part of the safety contract.
             var delivery = new InboxMessage
             {
                 Envelope = message.Envelope,
-                RedeliveryDeadline = MessagingTime.AddClamped(entry.State.ExpirationTime!.Value, Shared.MaxAttemptDuration)
+                RedeliveryDeadline = entry.State.ExpirationTime!.Value
             };
             var result = await Shared.Transport.DeliverAsync(message.ReceiverId, delivery, cancellationToken).ConfigureAwait(true);
-            return new(entry, message, result, null, Stopwatch.GetElapsedTime(start), startedAt);
+            return new(entry, message, result, null, Stopwatch.GetElapsedTime(start));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return new(entry, message, null, "Delivery was canceled.", Stopwatch.GetElapsedTime(start), startedAt);
+            return new(entry, message, null, "Delivery was canceled.", Stopwatch.GetElapsedTime(start));
         }
         catch (Exception exception)
         {
@@ -410,7 +412,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             {
                 LogDeliveryError(Logger, exception, message.Envelope.MessageId, message.ReceiverId);
             }
-            return new(entry, message, null, exception.ToString(), Stopwatch.GetElapsedTime(start), startedAt);
+            return new(entry, message, null, exception.ToString(), Stopwatch.GetElapsedTime(start));
         }
     }
 
@@ -481,17 +483,15 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 if (!_messages.TryGetValue(id, out var current) || !ReferenceEquals(current, outcome.Entry)) continue;
 
                 var status = outcome.Result?.Status;
-                if (status == DeliveryStatus.DeadLettered && outcome.Result!.Value.Code == DeliveryResult.DeduplicationWindowExceededCode)
+                if (status == DeliveryStatus.Expired)
                 {
-                    // The receiver keeps nothing for this rejection, so the outbox keeps the message, which can be sent
-                    // again under its ID once the receiver's window covers the sender's retries.
-                    var reason = outcome.Result.Value.Message ?? "The receiver's deduplication window doesn't cover the message's redeliveries.";
+                    // Fencing proves no new admission, not that an earlier attempt was never accepted.
+                    var reason = outcome.Result!.Value.Message ?? "The receiver fenced the message's admission cutoff; its earlier delivery outcome is unknown.";
                     StageDeadLetter(
                         current,
                         current.Reference is null ? outcome.Message : CopySourceMessage(outcome.Message),
                         reason,
-                        checked(current.State.AttemptCount + 1),
-                        OutboxMessageRetirement.Rejected(reason, DeliveryResult.DeduplicationWindowExceededCode));
+                        checked(current.State.AttemptCount + 1));
                 }
                 else if (status is DeliveryStatus.Accepted or DeliveryStatus.Duplicate or DeliveryStatus.DeadLettered)
                 {
@@ -543,13 +543,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     /// </summary>
     private OutboxMessageState? PrepareRetry(DeliveryOutcome outcome, int attemptCount, string error)
     {
-        // A receiver checks its deduplication records before it answers, so a Backpressured answer proves that it had not
-        // accepted the message when the attempt started. Only later attempts can be accepted, so the timeout restarts
-        // then; otherwise it runs from the send.
         var now = JobTimeProvider.GetUtcNow();
-        var expirationTime = outcome.Result?.Status is DeliveryStatus.Backpressured
-            ? MessagingTime.AddClamped(outcome.StartedAt, Options.OutboxRetryTimeout)
-            : outcome.Entry.State.ExpirationTime!.Value;
+        var expirationTime = outcome.Entry.State.ExpirationTime!.Value;
         if (expirationTime <= now) return null;
 
         // The next attempt runs no later than the timeout, when the outbox dead-letters the message instead.
@@ -657,6 +652,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             DeliveryStatus.DeadLettered => "deadlettered",
             DeliveryStatus.Backpressured => "backpressured",
             DeliveryStatus.HandlerNotFound => "handler_not_found",
+            DeliveryStatus.Expired => "expired",
             null => "error",
             _ => status.Value.ToString().ToLowerInvariant()
         };
@@ -667,6 +663,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             case DeliveryStatus.Accepted:
             case DeliveryStatus.Duplicate:
             case DeliveryStatus.DeadLettered:
+            case DeliveryStatus.Expired:
                 if (Logger.IsEnabled(LogLevel.Debug))
                 {
                     LogMessageDelivered(Logger, message.Envelope.MessageId, message.ReceiverId, status.Value);
@@ -775,8 +772,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         OutboxMessage Message,
         DeliveryResult? Result,
         string? Error,
-        TimeSpan Duration,
-        DateTimeOffset StartedAt);
+        TimeSpan Duration);
 
     private enum UnavailableKind { Expired, Failed, Unclaimed }
 

@@ -245,7 +245,7 @@ public sealed class EnvelopeContractTests
         Assert.Null(typeof(Envelope).Assembly.GetType("Orleans.Messaging.EnvelopeBuilder"));
         Assert.Equal(typeof(void), typeof(IInboxHandlerContext).GetMethod("Fail")!.ReturnType);
         Assert.Equal(typeof(string), Assert.Single(typeof(IInboxHandlerContext).GetMethod("Fail")!.GetParameters()).ParameterType);
-        Assert.Equal(new[] { "Accepted:1", "Backpressured:3", "DeadLettered:5", "Duplicate:2", "HandlerNotFound:4" },
+        Assert.Equal(new[] { "Accepted:1", "Backpressured:3", "DeadLettered:5", "Duplicate:2", "Expired:6", "HandlerNotFound:4" },
             Enum.GetNames<DeliveryStatus>().Select(name => $"{name}:{(int)Enum.Parse<DeliveryStatus>(name)}").Order(StringComparer.Ordinal));
         AssertIds(typeof(DeliveryResult), ("Status", 0u), ("Message", 1u), ("Code", 2u));
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();

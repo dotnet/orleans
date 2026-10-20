@@ -25,15 +25,19 @@ internal static class InboxTestAccess
 
     public static HashSet<MessageId> GetProcessedKeys(Inbox inbox) => [.. GetProcessed(inbox).Keys];
 
-    public static bool TryGetProcessedAt(Inbox inbox, MessageId messageId, out DateTimeOffset processedAt) =>
-        GetProcessed(inbox).TryGetValue(messageId, out processedAt);
-
-    public static void SetProcessedAt(Inbox inbox, MessageId messageId, DateTimeOffset processedAt) =>
-        GetProcessed(inbox)[messageId] = processedAt;
+    public static void AddProcessed(Inbox inbox, MessageId messageId) =>
+        GetProcessed(inbox).Add(messageId, new() { MessageId = messageId });
 
     public static IReadOnlyDictionary<MessageId, InboxEntry> GetPendingMessages(Inbox inbox) => inbox.MessageState;
 
-    public static IReadOnlyDictionary<MessageId, DateTimeOffset> GetProcessedMessages(Inbox inbox) => GetProcessed(inbox);
+    public static DateTimeOffset? GetProcessedCutoff(Inbox inbox, MessageId messageId) =>
+        GetProcessed(inbox)[messageId].RedeliveryDeadline;
+
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_admissionFloor")]
+    public static extern ref DateTimeOffset AdmissionFloor(Inbox inbox);
+
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_durableAdmissionFloor")]
+    public static extern ref DateTimeOffset DurableAdmissionFloor(Inbox inbox);
 
     public static InboxMessageState GetMessageState(Inbox inbox, MessageId messageId) =>
         inbox.MessageState[messageId].State;
@@ -51,5 +55,5 @@ internal static class InboxTestAccess
     private static extern ref Dictionary<MessageId, InboxEntry> GetMessages(Inbox inbox);
 
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_processed")]
-    private static extern ref Dictionary<MessageId, DateTimeOffset> GetProcessed(Inbox inbox);
+    private static extern ref Dictionary<MessageId, InboxProcessedEntry> GetProcessed(Inbox inbox);
 }

@@ -14,8 +14,10 @@ namespace Orleans.Messaging;
 /// The outbox calls <see cref="TryGetMessage"/> when the message is sent and before every delivery attempt. The first
 /// registered source which returns the message owns it for the activation's lifetime; for an entry recovered from the
 /// journal, the first source which returns the message or throws owns it. When the entry retires, the outbox calls the
-/// owner's <see cref="OnRetired"/> exactly once, synchronously, while it stages the entry's removal, so changes the
-/// source stages in its journaled state commit in the same journal write as that removal.
+/// owner's <see cref="OnRetired"/> once for that entry in the current activation, synchronously, while it stages the
+/// entry's removal. The source's journaled changes and the removal commit in the same journal write. If the activation
+/// fails before that write commits, recovery restores the pending entry and the source's prior journaled state, and
+/// retiring the recovered entry invokes <see cref="OnRetired"/> again.
 /// </para>
 /// <para>
 /// A source withdraws a pending message through <see cref="IOutbox.Withdraw"/>, for example after the application times
@@ -60,15 +62,27 @@ public interface IOutboxMessageSource
     /// </remarks>
     bool TryGetMessage(MessageId messageId, out OutboxMessage message);
 
-    /// <summary>Notifies the source that the outbox retired a message, so the source can release its payload.</summary>
+    /// <summary>Notifies the source that the outbox is staging a message's retirement, so the source can release its payload.</summary>
     /// <param name="messageId">The ID of the retired reference entry.</param>
     /// <param name="retirement">How the message retired, and the dead letter's reason for a dead-lettered message.</param>
     /// <remarks>
-    /// Stage the release synchronously in journaled state; it commits in the journal write which removes the entry.
+    /// <para>
+    /// Stage the release and other durable effects synchronously in journaled state; they commit atomically with the
+    /// entry's removal. This callback runs once for the entry in the current activation. Recovery can invoke it again
+    /// when the retirement write has not committed, starting from the source's recovered journaled state.
+    /// Make any effects outside that journal write idempotent across repeated calls.
+    /// Stage a durable application outcome or follow-up work here for
+    /// <see cref="OutboxMessageRetirementStatus.DeadLettered"/> and
+    /// <see cref="OutboxMessageRetirementStatus.Rejected"/>, so recovery preserves the application's response even
+    /// after diagnostic dead letters are compacted. A dead-lettered send can have been accepted by an earlier attempt;
+    /// reconcile that uncertain outcome using application-level idempotency.
+    /// </para>
+    /// <para>
     /// Before this call, the outbox copies a dead-lettered message's payload and header values into its dead letter,
     /// unless the source failed to provide the message, so the source can release or reuse its buffers here. Don't depend
     /// on decoding the payload here: this call also retires a message whose payload the source can no longer provide. An
     /// exception fails the activation's messaging, which deactivates the grain.
+    /// </para>
     /// </remarks>
     void OnRetired(MessageId messageId, OutboxMessageRetirement retirement);
 }
@@ -123,14 +137,13 @@ public enum OutboxMessageRetirementStatus
 
     /// <summary>
     /// The outbox dead-lettered the message: its delivery attempts didn't succeed before its retry limits elapsed, or its
-    /// source failed to provide it.
+    /// source failed to provide it, or the receiver fenced its admission cutoff. The receiver's earlier delivery
+    /// outcome is unknown: an earlier attempt can have been durably accepted.
     /// </summary>
     DeadLettered = 2,
 
     /// <summary>
-    /// The receiver dead-lettered the message, with the reason and code which it reported. For
-    /// <see cref="DeliveryResult.DeduplicationWindowExceededCode"/>, the receiver keeps nothing and the outbox keeps the
-    /// message as a dead letter.
+    /// The receiver durably rejected the message, with the reason and code which it reported.
     /// </summary>
     Rejected = 3
 }

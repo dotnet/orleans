@@ -346,7 +346,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task ExpiredIdentityCanAcceptChangedSenderSubjectAndBodyAtExactBoundary()
+    public async Task LegacyNullIdentityNeverReacceptsChangedSenderSubjectAndBodyAtExactBoundary()
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
@@ -361,11 +361,11 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         Fixture.Clock.Advance(TimeSpan.FromMinutes(10) - TimeSpan.FromTicks(1));
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, repeated)).Status);
         Fixture.Clock.Advance(TimeSpan.FromTicks(1));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, repeated)).Status);
-        var completed = await Fixture.WaitForEffectCountAsync(rig.Receiver, 2);
-        Assert.Equal(2, Assert.Single(completed.Effects).Count);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, repeated)).Status);
+        var completed = await rig.Receiver.GetSnapshotAsync();
+        Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal(1, completed.ProcessedMessageCount);
-        Assert.Equal(2, handler.Calls);
+        Assert.Equal(1, handler.Calls);
     }
 
     private async Task<Rig> CreateAsync()
@@ -432,7 +432,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         MessagingTestGrain Grain, IdentityHandler Handler, IJournaledStateManager Manager, Inbox Inbox)
     {
         public IReadOnlyDictionary<MessageId, InboxEntry> Pending => InboxTestAccess.GetPendingMessages(Inbox);
-        public IReadOnlyDictionary<MessageId, DateTimeOffset> Processed => InboxTestAccess.GetProcessedMessages(Inbox);
+        public IReadOnlySet<MessageId> Processed => InboxTestAccess.GetProcessedKeys(Inbox);
     }
 
     private sealed class IdentityHandler : IInboxHandler, IDisposable

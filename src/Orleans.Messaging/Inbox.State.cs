@@ -11,18 +11,21 @@ namespace Orleans.Messaging;
 internal sealed partial class Inbox
 {
     private readonly Dictionary<MessageId, InboxEntry> _messages = [];
-    private readonly Dictionary<MessageId, DateTimeOffset> _processed = [];
-
-    // The rejections which sinks reported on delivery, by processed message, so a duplicate receives the same answer.
-    private readonly Dictionary<MessageId, InboxRejection> _rejections = [];
+    private readonly Dictionary<MessageId, InboxProcessedEntry> _processed = [];
     private readonly Dictionary<MessageId, InboxDeadLetter> _deadLetters = [];
     private JournalStreamWriter _writer;
+
+    // Forgetting an identity requires a durable fence against every later delivery of its immutable cutoff.
+    private DateTimeOffset _admissionFloor = DateTimeOffset.MinValue;
+    private DateTimeOffset _capturedAdmissionFloor = DateTimeOffset.MinValue;
+    private DateTimeOffset _durableAdmissionFloor = DateTimeOffset.MinValue;
 
     // Acceptances and completions are durable once a completed write captured their sequence number.
     private long _lastSequence;
     private long _capturedSequence;
     private long _durableSequence;
     private long _lastCompletionSequence;
+    private bool _capturedSnapshot;
 
     // The earliest due time, on the Durable Jobs clock, of accepted or retrying messages staged since the last capture.
     private DateTimeOffset? _stagedWakeup;
@@ -56,16 +59,39 @@ internal sealed partial class Inbox
         return dueTime is { } due ? _pump.EnsureWakeupAsync(due, cancellationToken) : ValueTask.CompletedTask;
     }
 
-    private void OnWriteCaptured()
+    private void OnWriteCaptured(bool snapshot = false)
     {
         _capturedSequence = _lastSequence;
+        _capturedAdmissionFloor = _admissionFloor;
+        _capturedSnapshot = snapshot;
         _stagedWakeup = null;
     }
 
     void IStateMachine.OnWriteCompleted()
     {
         _durableSequence = _capturedSequence;
+        _durableAdmissionFloor = _capturedAdmissionFloor;
+        // Floor-only appends stay constant-time; snapshots reclaim history after their fence is durable.
+        if (_capturedSnapshot) CompactProcessed();
         _pump.Signal();
+    }
+
+    private DateTimeOffset GetAdmissionFloor()
+    {
+        var nowTicks = Shared.JobTimeProvider.GetUtcNow().UtcTicks;
+        var candidate = new DateTimeOffset(Math.Max(0, nowTicks - Options.DeduplicationWindow.Ticks), TimeSpan.Zero);
+        return candidate > _admissionFloor ? candidate : _admissionFloor;
+    }
+
+    private static bool IsFenced(InboxProcessedEntry entry, DateTimeOffset floor) =>
+        entry.RedeliveryDeadline is { } cutoff && cutoff <= floor;
+
+    private void CompactProcessed()
+    {
+        foreach (var (key, entry) in _processed)
+        {
+            if (entry.Sequence <= _durableSequence && IsFenced(entry, _durableAdmissionFloor)) _processed.Remove(key);
+        }
     }
 
     private void Emit(InboxCommand command)
@@ -87,9 +113,10 @@ internal sealed partial class Inbox
         _writer = writer;
         _messages.Clear();
         _processed.Clear();
-        _rejections.Clear();
         _deadLetters.Clear();
+        _admissionFloor = _capturedAdmissionFloor = _durableAdmissionFloor = DateTimeOffset.MinValue;
         _stagedWakeup = null;
+        _capturedSnapshot = false;
         _lastSequence = _capturedSequence = _durableSequence = _lastCompletionSequence = 0;
     }
 
@@ -117,39 +144,30 @@ internal sealed partial class Inbox
         }
 
         _capturedSequence = _durableSequence = _lastSequence;
+        _capturedAdmissionFloor = _durableAdmissionFloor = _admissionFloor;
+        CompactProcessed();
     }
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer) => OnWriteCaptured();
 
     void IStateMachine.WriteSnapshot(JournalStreamWriter writer)
     {
-        // Snapshots compact deduplication history, so retained history grows with the journal.
-        var now = TimeProvider.GetUtcNow();
-        foreach (var (key, processedAt) in _processed)
-        {
-            if (MessagingTime.IsExpired(now, processedAt, Options.DeduplicationWindow))
-            {
-                _processed.Remove(key);
-                _rejections.Remove(key);
-            }
-        }
-
+        // The floor and compacted history commit atomically. Keep the in-memory records until acknowledgement, so
+        // an interleaving delivery still deduplicates while the snapshot's fence is not yet durable.
+        var floor = GetAdmissionFloor();
         Shared.InboxCodec.WriteSet(new()
         {
             Kind = InboxCommandKind.Snapshot,
             Snapshot = new()
             {
                 Messages = _messages.Values.ToArray(),
-                Processed = _processed.Select(pair => new InboxProcessedEntry
-                {
-                    MessageId = pair.Key,
-                    ProcessedAt = pair.Value,
-                    Rejection = _rejections.GetValueOrDefault(pair.Key)
-                }).ToArray(),
-                DeadLetters = _deadLetters.Values.ToArray()
+                Processed = _processed.Values.Where(entry => !IsFenced(entry, floor)).ToArray(),
+                DeadLetters = _deadLetters.Values.ToArray(),
+                AdmissionFloor = floor
             }
         }, writer);
-        OnWriteCaptured();
+        _admissionFloor = floor;
+        OnWriteCaptured(snapshot: true);
     }
 
     void IDurableValueCommandHandler<InboxCommand>.ApplySet(InboxCommand command) => Apply(command);
@@ -162,7 +180,6 @@ internal sealed partial class Inbox
                 var message = command.Message ?? throw new InvalidOperationException("An accept command requires its message.");
                 _messages.Add(message.Envelope.MessageId, new InboxEntry { Message = message, State = new(), Sequence = ++_lastSequence });
                 _processed.Remove(message.Envelope.MessageId);
-                _rejections.Remove(message.Envelope.MessageId);
                 ReportDepth(1);
                 break;
             case InboxCommandKind.Retry:
@@ -171,22 +188,28 @@ internal sealed partial class Inbox
             case InboxCommandKind.Complete:
                 if (_messages.Remove(command.MessageId)) ReportDepth(-1);
 
-                _processed[command.MessageId] = command.ProcessedAt;
                 _lastCompletionSequence = ++_lastSequence;
-                // A completion replaces any earlier rejection of the ID, so a duplicate learns the latest outcome.
-                if (command.Rejection is { } rejection) _rejections[command.MessageId] = rejection;
-                else _rejections.Remove(command.MessageId);
+                _processed[command.MessageId] = new()
+                {
+                    MessageId = command.MessageId,
+                    RedeliveryDeadline = command.RedeliveryDeadline,
+                    Rejection = command.Rejection,
+                    Sequence = _lastSequence
+                };
                 if (command.DeadLetter is { } letter) _deadLetters[command.MessageId] = letter;
+                break;
+            case InboxCommandKind.AdvanceAdmissionFloor:
+                AdvanceAdmissionFloor(command.AdmissionFloor);
                 break;
             case InboxCommandKind.RemoveDeadLetters:
                 foreach (var key in command.RemovedKeys!) _deadLetters.Remove(key);
                 break;
             case InboxCommandKind.Snapshot:
                 var snapshot = command.Snapshot ?? throw new InvalidOperationException("A snapshot command requires its state.");
+                AdvanceAdmissionFloor(snapshot.AdmissionFloor);
                 var previousCount = _messages.Count;
                 _messages.Clear();
                 _processed.Clear();
-                _rejections.Clear();
                 _deadLetters.Clear();
                 foreach (var restored in snapshot.Messages) _messages.Add(restored.Message.Envelope.MessageId, restored);
 
@@ -194,8 +217,7 @@ internal sealed partial class Inbox
 
                 foreach (var processed in snapshot.Processed)
                 {
-                    _processed.Add(processed.MessageId, processed.ProcessedAt);
-                    if (processed.Rejection is { } restoredRejection) _rejections.Add(processed.MessageId, restoredRejection);
+                    _processed.Add(processed.MessageId, processed);
                 }
 
                 foreach (var restored in snapshot.DeadLetters) _deadLetters.Add(restored.Message.Envelope.MessageId, restored);
@@ -203,6 +225,12 @@ internal sealed partial class Inbox
             default:
                 throw new NotSupportedException($"Inbox command '{command.Kind}' is not supported.");
         }
+    }
+
+    private void AdvanceAdmissionFloor(DateTimeOffset floor)
+    {
+        if (floor < _admissionFloor) throw new InvalidOperationException("The inbox admission floor cannot move backward.");
+        _admissionFloor = floor;
     }
 }
 
@@ -212,7 +240,8 @@ internal enum InboxCommandKind
     Retry = 2,
     Complete = 3,
     RemoveDeadLetters = 4,
-    Snapshot = 6
+    Snapshot = 6,
+    AdvanceAdmissionFloor = 7
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand")]
@@ -222,11 +251,12 @@ internal sealed class InboxCommand
     [Id(1)] public InboxMessage? Message { get; init; }
     [Id(2)] public MessageId MessageId { get; init; }
     [Id(3)] public InboxMessageState? State { get; init; }
-    [Id(4)] public DateTimeOffset ProcessedAt { get; init; }
     [Id(5)] public InboxDeadLetter? DeadLetter { get; init; }
     [Id(6)] public MessageId[]? RemovedKeys { get; init; }
     [Id(7)] public InboxSnapshot? Snapshot { get; init; }
     [Id(8)] public InboxRejection? Rejection { get; init; }
+    [Id(9)] public DateTimeOffset? RedeliveryDeadline { get; init; }
+    [Id(10)] public DateTimeOffset AdmissionFloor { get; init; }
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxSnapshot")]
@@ -235,14 +265,17 @@ internal sealed class InboxSnapshot
     [Id(0)] public InboxEntry[] Messages { get; init; } = [];
     [Id(1)] public InboxProcessedEntry[] Processed { get; init; } = [];
     [Id(2)] public InboxDeadLetter[] DeadLetters { get; init; } = [];
+    [Id(3)] public DateTimeOffset AdmissionFloor { get; init; } = DateTimeOffset.MinValue;
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxProcessedEntry")]
 internal sealed class InboxProcessedEntry
 {
     [Id(0)] public MessageId MessageId { get; init; }
-    [Id(1)] public DateTimeOffset ProcessedAt { get; init; }
     [Id(2)] public InboxRejection? Rejection { get; init; }
+    [Id(3)] public DateTimeOffset? RedeliveryDeadline { get; init; }
+    [field: NonSerialized]
+    [JsonIgnore] public long Sequence { get; init; }
 }
 
 /// <summary>The answer which an inbox sink gave when it rejected a message on delivery.</summary>

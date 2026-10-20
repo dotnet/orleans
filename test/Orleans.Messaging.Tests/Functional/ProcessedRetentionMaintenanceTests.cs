@@ -15,7 +15,10 @@ public sealed class ProcessedRetentionMaintenanceTests : MessagingBehaviorTestBa
     public async Task SnapshotWrite_PrunesExpiredProcessedIdsAndRecoveryRetainsCurrentOnes()
     {
         var receiver = NewGrain();
-        var old = CreateEnvelope(receiver, NewMessage(120, "old"));
+        var old = CreateEnvelope(receiver, NewMessage(120, "old")) with
+        {
+            RedeliveryDeadline = Fixture.Clock.GetUtcNow() + TimeSpan.FromSeconds(1)
+        };
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, old)).Status);
         await Fixture.WaitForEffectCountAsync(receiver, 1);
         Fixture.Clock.Advance(TimeSpan.FromMinutes(6));
@@ -37,12 +40,14 @@ public sealed class ProcessedRetentionMaintenanceTests : MessagingBehaviorTestBa
         await ReactivateAsync(receiver);
         var recovered = await GetProcessedAsync(receiver);
         Assert.True(processed.SetEquals(recovered));
+        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, old)).Status);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, current)).Status);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, fresh)).Status);
+        Assert.All((await receiver.GetSnapshotAsync()).Effects, static effect => Assert.Equal(1, effect.Count));
     }
 
     [Fact]
-    public async Task ExpiredProcessedId_IsAcceptedAgainWhileUnexpiredIdsDeduplicate()
+    public async Task LegacyNullCutoff_NeverExpiresEvenAfterSnapshotAndRecovery()
     {
         var receiver = NewGrain();
         var message = CreateEnvelope(receiver, NewMessage(130, "expiring"));
@@ -53,8 +58,12 @@ public sealed class ProcessedRetentionMaintenanceTests : MessagingBehaviorTestBa
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
 
         Fixture.Clock.Advance(TimeSpan.FromTicks(1));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, message)).Status);
-        await Fixture.WaitForEffectCountAsync(receiver, 2);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
+        Fixture.Storage.RequestSnapshot(JournalId.FromGrainId(receiver.GetGrainId()));
+        await receiver.RetryWriteStateAsync();
+        await ReactivateAsync(receiver);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
+        Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
     private Task<HashSet<MessageId>> GetProcessedAsync(IMessagingTestGrain receiver)

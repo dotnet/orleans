@@ -86,6 +86,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         {
             if (IsDuplicate(message, out var pending))
             {
+                var rejection = pending is null ? _processed[key].Rejection : null;
                 // The sender may retire its copy once this returns, so the acceptance or the processed record must be
                 // durable. A completion staged by a handler or a sink can still be in flight.
                 if (pending is null ? !AreCompletionsDurable : !IsDurable(pending)) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
@@ -94,25 +95,29 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                 Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "duplicate");
 
                 // A sender whose answer was lost delivers again, so it receives the rejection which a sink first answered.
-                return pending is null && _rejections.TryGetValue(key, out var rejection)
+                return rejection is not null
                     ? DeliveryResult.DeadLettered(rejection.Reason, rejection.Code)
                     : DeliveryResult.Duplicate();
             }
 
-            MessagingEvents.EmitInboxMessageReceiving(GrainContext, message);
-
-            // The processed record recognizes redeliveries only for DeduplicationWindow, so a message whose sender may
-            // deliver it again later is rejected before anything records it. The answer doesn't depend on inbox state, so
-            // every redelivery receives it too.
-            if (message.RedeliveryDeadline is { } deadline
-                && deadline > MessagingTime.AddClamped(Shared.JobTimeProvider.GetUtcNow(), Options.DeduplicationWindow))
+            // Deduplication precedes the fence: a lost acknowledgement may belong to a pending or completed message.
+            // Only a durable, non-decreasing floor permits forgetting that evidence, regardless of later clock motion.
+            var floor = GetAdmissionFloor();
+            if (message.RedeliveryDeadline is { } cutoff && cutoff <= floor)
             {
-                Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "dead_lettered");
-                LogDeduplicationWindowExceeded(Logger, key, GrainContext.GrainId, deadline, Options.DeduplicationWindow);
-                return DeliveryResult.DeadLettered(
-                    $"The message's redelivery deadline {deadline:O} is later than the receiver's deduplication window of {Options.DeduplicationWindow} covers.",
-                    DeliveryResult.DeduplicationWindowExceededCode);
+                var stagedBeforeFence = _pump.StagedChangeCount;
+                if (cutoff > _admissionFloor)
+                {
+                    Emit(new() { Kind = InboxCommandKind.AdvanceAdmissionFloor, AdmissionFloor = floor });
+                    ExcludeFromHandlerAttempt(stagedBeforeFence);
+                }
+                if (_admissionFloor > _durableAdmissionFloor) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
+                Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "expired");
+                LogAdmissionFenced(Logger, key, GrainContext.GrainId, cutoff, _admissionFloor);
+                return DeliveryResult.Expired();
             }
+
+            MessagingEvents.EmitInboxMessageReceiving(GrainContext, message);
 
             // Sink-owned messages never occupy inbox capacity and need no handler. A sink's duplicate can still be staged,
             // so every outcome except backpressure is reported once the write is durable.
@@ -190,6 +195,15 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     /// </exception>
     internal void StageLocal(InboxMessage message)
     {
+        // A repeated local send has no transport cutoff of its own. Reuse the tracked send's cutoff, including a
+        // legacy null cutoff, instead of giving the same logical send a new admission interval.
+        var key = message.Envelope.MessageId;
+        message = message with
+        {
+            RedeliveryDeadline = _messages.TryGetValue(key, out var pending) ? pending.Message.RedeliveryDeadline
+                : _processed.TryGetValue(key, out var processed) ? processed.RedeliveryDeadline
+                : CreateLocalCutoff()
+        };
         if (IsDuplicate(message, out _))
         {
             Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "duplicate");
@@ -220,6 +234,14 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
         Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "accepted");
         LogMessageAccepted(Logger, message.Envelope.MessageId, GrainContext.GrainId);
+    }
+
+    private DateTimeOffset CreateLocalCutoff()
+    {
+        var now = Shared.JobTimeProvider.GetUtcNow();
+        var cutoff = MessagingTime.AddClamped(now > _admissionFloor ? now : _admissionFloor, Options.OutboxRetryTimeout);
+        if (cutoff <= _admissionFloor) throw new InvalidOperationException("The inbox admission floor leaves no representable cutoff for a new local message.");
+        return cutoff;
     }
 
     /// <summary>
@@ -256,7 +278,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             {
                 if (accepted)
                 {
-                    StageCompletion(key, deadLetter: null);
+                    StageCompletion(message, deadLetter: null);
                 }
                 else
                 {
@@ -283,23 +305,23 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     }
 
     /// <summary>
-    /// Returns whether the message was completed within the deduplication window or is pending, and rejects a pending
-    /// command which differs from it.
+    /// Returns whether the message has a retained completion or is pending, and enforces the logical send's cutoff.
     /// </summary>
     /// <param name="message">The received message.</param>
     /// <param name="pending">The pending entry, or <see langword="null"/> when the message was completed or is new.</param>
     private bool IsDuplicate(InboxMessage message, out InboxEntry? pending)
     {
         var key = message.Envelope.MessageId;
-        if (_processed.TryGetValue(key, out var processedAt)
-            && !MessagingTime.IsExpired(TimeProvider.GetUtcNow(), processedAt, Options.DeduplicationWindow))
+        if (_processed.TryGetValue(key, out var processed))
         {
+            ValidateCutoff(processed.RedeliveryDeadline, message);
             pending = null;
             return true;
         }
 
         if (_messages.TryGetValue(key, out pending))
         {
+            ValidateCutoff(pending.Message.RedeliveryDeadline, message);
             if (!EnvelopeEquivalence.AreSameCommand(pending.Message, message))
             {
                 throw new InvalidOperationException(
@@ -310,6 +332,15 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         }
 
         return false;
+    }
+
+    private static void ValidateCutoff(DateTimeOffset? cutoff, InboxMessage message)
+    {
+        if (cutoff != message.RedeliveryDeadline)
+        {
+            throw new InvalidOperationException(
+                $"The inbox already contains a different admission cutoff for message ID '{message.Envelope.MessageId}'.");
+        }
     }
 
     /// <summary>
@@ -455,12 +486,12 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     private bool IsCurrent(InboxEntry entry) =>
         _messages.TryGetValue(entry.Message.Envelope.MessageId, out var current) && ReferenceEquals(current, entry);
 
-    private void StageCompletion(MessageId messageId, InboxDeadLetter? deadLetter, InboxRejection? rejection = null) =>
+    private void StageCompletion(InboxMessage message, InboxDeadLetter? deadLetter, InboxRejection? rejection = null) =>
         Emit(new()
         {
             Kind = InboxCommandKind.Complete,
-            MessageId = messageId,
-            ProcessedAt = TimeProvider.GetUtcNow(),
+            MessageId = message.Envelope.MessageId,
+            RedeliveryDeadline = message.RedeliveryDeadline,
             DeadLetter = deadLetter,
             Rejection = rejection
         });
@@ -470,7 +501,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         var now = TimeProvider.GetUtcNow();
         var key = message.Envelope.MessageId;
         CompactDeadLetters(now, reservedCapacity: _deadLetters.ContainsKey(key) ? 0 : 1);
-        StageCompletion(key, new InboxDeadLetter
+        StageCompletion(message, new InboxDeadLetter
         {
             Message = message,
             DeadLetteredAt = now,
@@ -632,7 +663,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
             try
             {
-                owner.StageCompletion(entry.Message.Envelope.MessageId, deadLetter: null);
+                owner.StageCompletion(entry.Message, deadLetter: null);
                 Completed = true;
             }
             catch (Exception exception)
@@ -693,8 +724,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     [LoggerMessage(Level = LogLevel.Error, Message = "Inbox command staging failed.")]
     private static partial void LogStagingFailed(ILogger logger, Exception exception);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Inbox for {ReceiverId} rejected message {MessageId}: its redelivery deadline {RedeliveryDeadline} is later than the deduplication window {DeduplicationWindow} covers. Configure OutboxRetryTimeout shorter than DeduplicationWindow.")]
-    private static partial void LogDeduplicationWindowExceeded(ILogger logger, MessageId messageId, GrainId receiverId, DateTimeOffset redeliveryDeadline, TimeSpan deduplicationWindow);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Inbox for {ReceiverId} fenced message {MessageId}: its admission cutoff {AdmissionCutoff} is at or below the durable admission floor {AdmissionFloor}. Its earlier delivery outcome is unknown.")]
+    private static partial void LogAdmissionFenced(ILogger logger, MessageId messageId, GrainId receiverId, DateTimeOffset admissionCutoff, DateTimeOffset admissionFloor);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "No inbox handler registered for message {MessageId} to {ReceiverId}")]
     private static partial void LogHandlerNotFound(ILogger logger, MessageId messageId, GrainId receiverId);
