@@ -986,6 +986,7 @@ public abstract class MessageSourceAndSinkFixture(string journalFormatKey) : IAs
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(byte[]))]
 [JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(MessageEffect))]
 internal sealed partial class SourceSinkJsonContext : JsonSerializerContext;
 
 public enum SinkMode

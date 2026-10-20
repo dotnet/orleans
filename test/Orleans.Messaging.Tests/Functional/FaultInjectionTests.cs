@@ -891,8 +891,8 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         Assert.Equal(floor, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.DurableAdmissionFloor(inbox)));
         foreach (var delta in new[] { -1L, 0L })
         {
-            var fenced = CreateEnvelope(receiver, NewMessage(81, "fenced")) with { SentAt = floor.AddTicks(delta) };
-            Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, fenced)).Status);
+            var expiredMessage = CreateEnvelope(receiver, NewMessage(81, "expired-by-floor")) with { SentAt = floor.AddTicks(delta) };
+            Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, expiredMessage)).Status);
         }
 
         var available = CreateEnvelope(receiver, NewMessage(82, "above-floor")) with { SentAt = floor.AddTicks(1) };
@@ -984,7 +984,7 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         }).ToArray();
         var future = new InboxMessage
         {
-            Envelope = new() { MessageId = NewSourceMessageId("unfenced-finite"), Payload = [16], Subject = SourceSinkGrain.Subject },
+            Envelope = new() { MessageId = NewSourceMessageId("retained-recent"), Payload = [16], Subject = SourceSinkGrain.Subject },
             SentAt = _cluster.JobClock.GetUtcNow()
         };
         foreach (var message in recent.Append(future))
@@ -1124,9 +1124,9 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
             Envelope = new() { MessageId = id, Payload = payload, Subject = realSink ? SourceSinkGrain.Subject : Route },
             SentAt = started
         };
-        var fenced = await receiver.AsReference<IMessagingExtension>().DeliverAsync(replay, TestContext.Current.CancellationToken);
-        Assert.Equal(DeliveryStatus.Expired, fenced.Status);
-        Assert.Null(fenced.Code);
+        var expired = await receiver.AsReference<IMessagingExtension>().DeliverAsync(replay, TestContext.Current.CancellationToken);
+        Assert.Equal(DeliveryStatus.Expired, expired.Status);
+        Assert.Null(expired.Code);
         if (realSink)
         {
             Assert.Equal(payload, (await OnSinkAsync(receiver, static grain => grain.GetState())).Received[id.ToString()]);
@@ -1383,40 +1383,177 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
             InboxTestAccess.GetProcessedSentAt(inbox, original.Envelope.MessageId)));
     }
 
-    [Fact]
-    public async Task ProcessedSentAt_ExtensionAfterSnapshotCaptureSurvivesUntilItsOwnDurability()
+    [Theory]
+    [InlineData("orleans-binary", false, false)]
+    [InlineData("orleans-binary", false, true)]
+    [InlineData("orleans-binary", true, false)]
+    [InlineData("orleans-binary", true, true)]
+    [InlineData("json", false, false)]
+    [InlineData("json", false, true)]
+    [InlineData("json", true, false)]
+    [InlineData("json", true, true)]
+    public async Task ProcessedSentAt_ExtensionAfterSnapshotCaptureSurvivesUntilItsOwnDurability(
+        string format, bool aboveFloor, bool rejected)
     {
-        var receiver = NewGrain();
-        var original = CreateEnvelope(receiver, NewMessage(93, "captured-retention-update"));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, original)).Status);
-        await Fixture.WaitForInboxCountAsync(receiver, 0);
-        await receiver.RetryWriteStateAsync();
-        _cluster.JobClock.Advance(TimeSpan.FromDays(2));
+        await using var alternate = format == "json" ? new FaultInjectionClusterFixture("json") : null;
+        if (alternate is not null) await alternate.InitializeAsync();
+        var cluster = alternate ?? _cluster;
+        IAddressable receiver = rejected
+            ? cluster.Client.GetGrain<ISourceSinkGrain>(Guid.NewGuid())
+            : cluster.Client.GetGrain<IMessagingTestGrain>(Guid.NewGuid());
+        var sentAt = cluster.JobClock.GetUtcNow();
+        var sessions = cluster.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>();
+        var original = rejected
+            ? new InboxMessage
+            {
+                Envelope = new() { MessageId = NewSourceMessageId("captured-rejection"), Payload = [93], Subject = SourceSinkGrain.Subject },
+                SentAt = sentAt
+            }
+            : TestApplicationProtocol.CreateInbox(sessions, GrainId.Create("replay-test-sender", "ordinary"), Route,
+                NewMessage(93, "captured-retention-update"), sentAt);
+        if (rejected) cluster.SourceSinkProbe.For(receiver).Mode = SinkMode.DeadLetter;
+        var extension = receiver.AsReference<IMessagingExtension>();
+        var initial = await extension.DeliverAsync(original, TestContext.Current.CancellationToken);
+        Assert.Equal(rejected ? DeliveryStatus.DeadLettered : DeliveryStatus.Accepted, initial.Status);
+        if (!rejected)
+        {
+            await cluster.WaitForEffectCountAsync((IMessagingTestGrain)receiver, 1);
+            await cluster.WaitForInboxCountAsync((IMessagingTestGrain)receiver, 0);
+            await ((IMessagingTestGrain)receiver).RetryWriteStateAsync();
+        }
+        else
+        {
+            Assert.Equal(SourceSinkGrain.Rejection, initial.Message);
+            Assert.Equal(SourceSinkGrain.RejectionCode, initial.Code);
+            cluster.SourceSinkProbe.For(receiver).Mode = SinkMode.Accept;
+        }
+        var oldContext = cluster.GetGrainContext(receiver);
+        var inbox = oldContext.ActivationServices.GetRequiredService<Inbox>();
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
-        Fixture.Storage.RequestSnapshot(journal);
-        using var snapshotAck = Fixture.Storage.BlockAcknowledgement(journal);
-        var snapshot = receiver.RetryWriteStateAsync();
+        var appends = cluster.Storage.GetSuccessfulAppendCount(journal);
+        var snapshots = cluster.Storage.GetSuccessfulSnapshotCount(journal);
+        cluster.JobClock.Advance(TimeSpan.FromDays(2));
+        var floor = cluster.JobClock.GetUtcNow() - TimeSpan.FromDays(1);
+        Assert.True(original.SentAt <= floor);
+        cluster.Storage.RequestSnapshot(journal);
+        using var snapshotAck = cluster.Storage.BlockAcknowledgement(journal);
+        var snapshot = WriteAsync();
         await snapshotAck.WaitUntilEnteredAsync();
-        _cluster.JobClock.Advance(original.SentAt + TimeSpan.FromHours(1) - _cluster.JobClock.GetUtcNow());
-        var newer = original with { SentAt = _cluster.JobClock.GetUtcNow() };
-        var inbox = Fixture.GetInbox(receiver);
-        using var updateWrite = Fixture.Storage.BlockWrite(journal);
-        var updating = await Fixture.OnGrainAsync(receiver, () => inbox.DeliverAsync(newer, TestContext.Current.CancellationToken).AsTask());
+        Assert.Equal(snapshots + 1, cluster.Storage.GetSuccessfulSnapshotCount(journal));
+        Assert.Contains(original.Envelope.MessageId, await cluster.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox)));
+        var newerTime = floor.AddTicks(aboveFloor ? 1 : -1);
+        cluster.JobClock.Advance(newerTime - cluster.JobClock.GetUtcNow());
+        var newer = original with { SentAt = cluster.JobClock.GetUtcNow() };
+        using var extensionWrite = cluster.Storage.BlockWrite(journal);
+        var updating = await cluster.OnGrainAsync(receiver, () => inbox.DeliverAsync(newer, TestContext.Current.CancellationToken).AsTask());
         Assert.False(updating.IsCompleted);
         snapshotAck.Release();
         await snapshot;
-        await updateWrite.WaitUntilEnteredAsync();
-        Assert.Contains(original.Envelope.MessageId, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox)));
-        Assert.Equal(newer.SentAt, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedSentAt(inbox, original.Envelope.MessageId)));
-        var olderReply = await Fixture.OnGrainAsync(receiver, () => inbox.DeliverAsync(original, TestContext.Current.CancellationToken).AsTask());
+        await extensionWrite.WaitUntilEnteredAsync();
+        Assert.False(updating.IsCompleted);
+        Assert.Equal(appends, cluster.Storage.GetSuccessfulAppendCount(journal));
+        Assert.Equal(floor, await cluster.OnGrainAsync(receiver, () => InboxTestAccess.DurableAdmissionFloor(inbox)));
+        Assert.Contains(original.Envelope.MessageId, await cluster.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox)));
+        Assert.Equal(newer.SentAt, await cluster.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedSentAt(inbox, original.Envelope.MessageId)));
+        var olderReply = await cluster.OnGrainAsync(receiver, () => inbox.DeliverAsync(original, TestContext.Current.CancellationToken).AsTask());
         Assert.False(olderReply.IsCompleted);
-        updateWrite.Release();
-        Assert.Equal(DeliveryStatus.Duplicate, (await updating).Status);
-        Assert.Equal(DeliveryStatus.Duplicate, (await olderReply).Status);
-        Fixture.Storage.RequestSnapshot(journal);
-        await receiver.RetryWriteStateAsync();
-        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, newer)).Status);
-        Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
+        extensionWrite.Release();
+        AssertKnown(await updating);
+        AssertKnown(await olderReply);
+        Assert.Equal(appends + 1, cluster.Storage.GetSuccessfulAppendCount(journal));
+        Assert.Equal(snapshots + 1, cluster.Storage.GetSuccessfulSnapshotCount(journal));
+
+        // Crash in the replay gap: the old snapshot omitted the identity and only this APPEND can restore it.
+        // Taking another snapshot here would mask a delta which cannot replay without its missing base record.
+        await cluster.CrashAsync(receiver);
+        Assert.Equal(snapshots + 1, cluster.Storage.GetSuccessfulSnapshotCount(journal));
+        if (rejected) Assert.Equal(0, await ((ISourceSinkGrain)receiver).GetOutboxCountAsync());
+        else _ = await ((IMessagingTestGrain)receiver).GetSnapshotAsync();
+        Assert.NotSame(oldContext, cluster.GetGrainContext(receiver));
+        inbox = cluster.GetGrainContext(receiver).ActivationServices.GetRequiredService<Inbox>();
+        Assert.Equal(floor, await cluster.OnGrainAsync(receiver, () => InboxTestAccess.DurableAdmissionFloor(inbox)));
+        var recoveredResult = await extension.DeliverAsync(newer, TestContext.Current.CancellationToken);
+        if (aboveFloor)
+        {
+            AssertKnown(recoveredResult);
+            Assert.Equal(newer.SentAt, await cluster.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedSentAt(inbox, original.Envelope.MessageId)));
+        }
+        else
+        {
+            Assert.Equal(DeliveryStatus.Expired, recoveredResult.Status);
+            Assert.Null(recoveredResult.Code);
+            Assert.DoesNotContain(original.Envelope.MessageId, await cluster.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox)));
+        }
+        Assert.Equal(snapshots + 1, cluster.Storage.GetSuccessfulSnapshotCount(journal));
+        if (rejected)
+        {
+            var diagnostics = cluster.GetGrainContext(receiver).ActivationServices.GetRequiredService<IMessagingDiagnostics>();
+            var rejection = Assert.Single(diagnostics.InboxDeadLetters);
+            Assert.Equal(SourceSinkGrain.Rejection, rejection.Reason);
+            Assert.Equal(SourceSinkGrain.RejectionCode, rejection.Code);
+            Assert.Equal(1, cluster.SourceSinkProbe.For(receiver).SinkOffers);
+            Assert.Equal(0, cluster.SourceSinkProbe.For(receiver).SinkAcceptances);
+        }
+        else
+        {
+            var effect = Assert.Single((await ((IMessagingTestGrain)receiver).GetSnapshotAsync()).Effects);
+            Assert.Equal("captured-retention-update", effect.Value);
+            Assert.Equal(1, effect.Count);
+        }
+
+        Task WriteAsync() => rejected
+            ? ((ISourceSinkGrain)receiver).WriteAsync()
+            : ((IMessagingTestGrain)receiver).RetryWriteStateAsync();
+
+        void AssertKnown(DeliveryResult result)
+        {
+            Assert.Equal(rejected ? DeliveryStatus.DeadLettered : DeliveryStatus.Duplicate, result.Status);
+            Assert.Equal(rejected ? SourceSinkGrain.RejectionCode : null, result.Code);
+            if (rejected) Assert.Equal(SourceSinkGrain.Rejection, result.Message);
+        }
+    }
+
+    [Fact]
+    public async Task PendingSentAt_ExtensionDuringPreparationDoesNotTurnAnUnmutatedHandlerErrorIntoPumpFailure()
+    {
+        var receiver = NewGrain();
+        var before = await receiver.GetSnapshotAsync();
+        var context = Fixture.GetGrainContext(receiver);
+        var grain = Assert.IsType<MessagingTestGrain>(context.GrainInstance);
+        const string route = "messages/retention-excluded-from-handler";
+        using var preparation = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route + "/application-preparation");
+        var original = CreateEnvelope(receiver, NewMessage(95, "no-handler-mutation") with { ThrowOnceDuringPreparation = true }, route);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, original)).Status);
+        await preparation.WaitUntilEnteredAsync();
+        _cluster.JobClock.Advance(TimeSpan.FromHours(2));
+        var newer = original with { SentAt = _cluster.JobClock.GetUtcNow() };
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, newer)).Status);
+        var inbox = Fixture.GetInbox(receiver);
+        Assert.Equal(newer.SentAt, await Fixture.OnGrainAsync(receiver, () =>
+            InboxTestAccess.GetPendingMessages(inbox)[original.Envelope.MessageId].Message.SentAt));
+        Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
+        var completed = Fixture.SnapshotProbe.WaitAsync(receiver.GetGrainId(),
+            snapshot => snapshot.InboxCount == 0 && snapshot.InboxDeadLetters.Count == 1);
+        preparation.Release();
+        Assert.Same(completed, await Task.WhenAny(completed, grain.DeactivationFailure.Task));
+        var result = await completed;
+        var letter = Assert.Single(result.InboxDeadLetters);
+        Assert.Contains($"Injected handler preparation failure for {original.Envelope.MessageId}", letter.Reason, StringComparison.Ordinal);
+        Assert.Equal(1, letter.AttemptCount);
+        Assert.Empty(result.Effects);
+        Assert.Equal(0, result.OutboxCount);
+        Assert.Equal(before.ActivationId, result.ActivationId);
+        Assert.Same(context, Fixture.GetGrainContext(receiver));
+        Assert.False(context.Deactivated.IsCompleted);
+        Assert.False(grain.DeactivationFailure.Task.IsCompleted);
+        Assert.False(grain.ApplyAttempted.Task.IsCompleted);
+        Assert.False(Fixture.GetPump(receiver).ShutdownToken.IsCancellationRequested);
+        Assert.Equal(newer.SentAt, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedSentAt(inbox, original.Envelope.MessageId)));
+        var diagnostic = Assert.Single(await Fixture.OnGrainAsync(receiver, () =>
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().InboxDeadLetters.ToArray()));
+        Assert.Equal(newer.SentAt, diagnostic.Message.SentAt);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, newer)).Status);
+        Assert.Equal(before.ActivationId, (await receiver.GetSnapshotAsync()).ActivationId);
     }
 
     [Theory]
@@ -1544,7 +1681,7 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         if (outcome == TerminalOutcome.Rejected) _cluster.SourceSinkProbe.For(receiver).Mode = SinkMode.DeadLetter;
         if (outcome == TerminalOutcome.Expired)
         {
-            // The receiver has durably fenced this sender's cutoff, then its clock moves backward.
+            // The receiver has durably advanced its admission floor past this send time, then its clock moves backward.
             _cluster.JobClock.Advance(TimeSpan.FromDays(2));
             var stale = new InboxMessage
             {

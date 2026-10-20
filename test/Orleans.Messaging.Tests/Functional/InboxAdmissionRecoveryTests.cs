@@ -43,7 +43,7 @@ public sealed class InboxAdmissionRecoveryTests
         if (snapshot) fixture.Storage.RequestSnapshot(JournalId.FromGrainId(receiver.GetGrainId()));
         // A journal command (or its snapshot) durably advances the same floor.
         Assert.Equal(DeliveryStatus.Expired,
-            (await DeliverAsync(receiver, Message("fenced", floor))).Status);
+            (await DeliverAsync(receiver, Message("expired-by-floor", floor))).Status);
         await fixture.CrashAsync(receiver);
         fixture.JobClock.Advance(started - fixture.JobClock.GetUtcNow());
         Assert.Equal(0, await receiver.GetOutboxCountAsync());
@@ -111,6 +111,7 @@ public sealed class InboxAdmissionRecoveryTests
     [Fact]
     public void PersistedAdmissionFields_UseAdditiveStableFieldIds()
     {
+        Assert.Equal(8, (int)InboxCommandKind.ExtendSentAt);
         Assert.Equal(3U, typeof(InboxProcessedEntry).GetProperty(nameof(InboxProcessedEntry.SentAt))!.GetCustomAttribute<IdAttribute>()!.Id);
         Assert.Equal(3U, typeof(OutboxMessageState).GetProperty(nameof(OutboxMessageState.SentAt))!.GetCustomAttribute<IdAttribute>()!.Id);
         Assert.Null(typeof(OutboxMessageState).GetProperty("ExpirationTime"));
