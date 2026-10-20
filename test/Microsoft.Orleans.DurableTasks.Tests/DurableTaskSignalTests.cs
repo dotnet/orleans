@@ -732,6 +732,7 @@ public sealed partial class DurableTaskSignalTests
         public DurableTaskResponse? Result { get; set; }
         public HashSet<DurableTaskSubscriber> CompletionDestinations { get; } = [];
         public IDurableTaskRequest? Request { get; set; }
+        public bool HasRequest => Request is not null;
         public DateTimeOffset? CompletedAt { get; set; }
         public DateTimeOffset? CancellationRequestedAt { get; set; }
         public string? CancellationReason { get; set; }

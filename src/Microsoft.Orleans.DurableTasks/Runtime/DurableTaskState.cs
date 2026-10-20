@@ -24,7 +24,8 @@ namespace Orleans.DurableTasks.Runtime;
 /// <para>
 /// The owning storage binds each state to its <see cref="Serializer"/> before exposing it. <see cref="Request"/> and
 /// <see cref="Result"/> decode their payload on first access and cache the decoded value, so recovery does not decode
-/// every payload and later updates reuse the stored payloads.
+/// every payload and later updates reuse the stored payloads. A payload which no longer decodes throws on each access and
+/// stays stored unchanged, so code which decodes it, such as a later deployment's, reads it.
 /// </para>
 /// <para>
 /// JSON journals omit unset grain identities, so they recover as <see langword="default"/>.
@@ -100,6 +101,10 @@ internal class DurableTaskState : IDurableTaskState
     public IDurableTaskRequest? Request => _request ??= _requestPayload is { } payload
         ? GetSerializer().Deserialize<IDurableTaskRequest>(payload)
         : null;
+
+    /// <inheritdoc cref="IDurableTaskState.HasRequest"/>
+    [JsonIgnore]
+    public bool HasRequest => _requestPayload is not null;
 
     /// <inheritdoc cref="IDurableTaskState.CompletedAt"/>
     [Id(3)]

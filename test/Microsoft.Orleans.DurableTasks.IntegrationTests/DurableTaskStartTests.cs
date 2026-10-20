@@ -3,6 +3,7 @@ using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
 using Orleans.Journaling;
+using Orleans.Serialization;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
@@ -196,6 +197,28 @@ public abstract class DurableTaskStartTests(string journalFormatKey) : IAsyncLif
         Assert.Equal(DurableTaskStatus.Canceled, response.Status);
     }
 
+    [Fact]
+    public async Task TaskWhoseOutcomeDoesNotSerializeFailsAndItsGrainKeepsCommitting()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var starter = _fixture.Client.GetGrain<IDurableTaskStartingGrain>(Guid.NewGuid());
+
+        // An outcome which can't be stored faults its task with the serialization failure, which commits like any result.
+        var result = await starter.ReturnUnserializableAsync().WithId("unserializable-result").ScheduleAsync(cancellationToken);
+        var resultResponse = await result.GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken);
+        Assert.Equal(DurableTaskStatus.Failed, resultResponse.Status);
+        Assert.Contains(typeof(UnserializableValue).FullName!, Assert.IsType<SerializerException>(resultResponse.Exception).Message, StringComparison.Ordinal);
+
+        var exception = await starter.ThrowUnserializableAsync().WithId("unserializable-exception").ScheduleAsync(cancellationToken);
+        var exceptionResponse = await exception.GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken);
+        Assert.Equal(DurableTaskStatus.Failed, exceptionResponse.Status);
+        Assert.Contains(typeof(InvalidOperationException).FullName!, Assert.IsType<SerializerException>(exceptionResponse.Exception).Message, StringComparison.Ordinal);
+
+        // The grain keeps committing its other work.
+        var later = await starter.TripleAsync(2).WithId("later").ScheduleAsync(cancellationToken);
+        Assert.Equal(6, await later.WaitAsync(Timeout, cancellationToken));
+    }
+
     /// <summary>
     /// Derives the root ID of a detached task which <paramref name="host"/>'s execution <paramref name="executionId"/> starts
     /// as its operation <paramref name="segment"/>: one segment holding <c>{HostId}/{Id}/{segment}</c>, each part escaped.
@@ -239,6 +262,12 @@ public interface IDurableTaskStartingGrain : IGrainWithGuidKey
 
     DurableTask<int> TripleAsync(int value);
 
+    /// <summary>Completes with a value of a type which has no codec.</summary>
+    DurableTask<object> ReturnUnserializableAsync();
+
+    /// <summary>Fails with an exception whose data holds a value of a type which has no codec.</summary>
+    DurableTask<int> ThrowUnserializableAsync();
+
     DurableTask PostEchoInWorkflowAsync(Guid workerKey, int value, string rootId);
 
     DurableTask<int> AwaitDetachedEchoesAsync(Guid workerKey, int value);
@@ -266,6 +295,9 @@ public sealed record TargetTaskIds(
     [property: Id(4)] TaskId Call,
     [property: Id(5)] TaskId CallTarget);
 
+/// <summary>A value of a type which has no codec, so it doesn't serialize.</summary>
+public sealed class UnserializableValue;
+
 [GrainType("durable-task-starting-test")]
 public sealed class DurableTaskStartingGrain(IDurableTaskManager tasks, DurableTaskMessagingProbe probe)
     : DurableGrain, IDurableTaskStartingGrain
@@ -285,6 +317,13 @@ public sealed class DurableTaskStartingGrain(IDurableTaskManager tasks, DurableT
     }
 
     public DurableTask<int> TripleAsync(int value) => DurableTask.FromResult(value * 3);
+
+    public DurableTask<object> ReturnUnserializableAsync() => DurableTask.FromResult<object>(new UnserializableValue());
+
+    public DurableTask<int> ThrowUnserializableAsync() => DurableTask.Run(static _ => ThrowUnserializable());
+
+    private static int ThrowUnserializable() =>
+        throw new InvalidOperationException("The order was rejected.") { Data = { ["order"] = new UnserializableValue() } };
 
     public DurableTask PostEchoInWorkflowAsync(Guid workerKey, int value, string rootId) =>
         DurableTask.Run(cancellationToken =>

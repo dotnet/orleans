@@ -16,6 +16,7 @@ using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Journaling;
 using Orleans.Messaging;
+using Orleans.Serialization;
 
 namespace Orleans.DurableTasks.Runtime;
 
@@ -297,7 +298,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var fingerprint = GetCompletionDecisionFingerprint(candidates);
         if (decision is not null)
         {
-            if (decision.Request is not null
+            if (decision.HasRequest
                 || !decision.RemoteTarget.IsDefault
                 || decision.RemoteRequestFingerprint is not null
                 || !decision.CallerId.IsDefault
@@ -575,9 +576,8 @@ internal sealed partial class DurableTaskGrainRuntime(
             return;
         }
 
-        var existingCaller = !state.CallerId.IsDefault
-            ? state.CallerId
-            : state.Request?.Context?.CallerId ?? default;
+        // Storage records the caller of every invocation from another grain, so the check decodes no request.
+        var existingCaller = state.CallerId;
         if (!existingCaller.IsDefault && existingCaller != callerId)
         {
             throw new DurableTaskConflictException(
@@ -770,11 +770,31 @@ internal sealed partial class DurableTaskGrainRuntime(
         return state;
     }
 
-    /// <summary>Stages a task's terminal result.</summary>
-    private void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
+    /// <summary>Stages a task's terminal result, and returns the result which it staged.</summary>
+    /// <remarks>
+    /// Storage serializes the result before it stages anything, and throws when the result doesn't serialize, such as a
+    /// value or an exception of a type which has no codec. The task then faults with a <see cref="SerializerException"/>
+    /// which names the type, which commits like any result, so the task ends rather than holding a result which no write
+    /// can commit.
+    /// </remarks>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A result which can't be stored is stored as that failure.")]
+    private DurableTaskResponse SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
     {
-        _storage.SetResponse(taskId, state, response);
+        try
+        {
+            _storage.SetResponse(taskId, state, response);
+        }
+        catch (Exception exception)
+        {
+            var (kind, value) = response.Exception is { } failure ? ("exception", (object)failure) : ("result", response.Result);
+            _shared.Logger.LogWarning(exception, "{Id} the {Kind} of durable task '{TaskId}' doesn't serialize.", GrainId, kind, taskId);
+            response = DurableTaskResponse.FromException(new SerializerException(
+                $"The {kind} of durable task '{taskId}', of type '{value?.GetType()}', can't be stored because it doesn't serialize: {exception.GetType().Name}: {exception.Message}"));
+            _storage.SetResponse(taskId, state, response);
+        }
+
         DurableTaskEvents.EmitTaskCompleted(GrainContext, taskId, response);
+        return response;
     }
 
     /// <summary>Stages a new terminal record of an execution, such as an effect's outcome or a version decision.</summary>
@@ -812,7 +832,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var method = IDurableTaskRequest.GetMethod(request);
         if (_storage.TryGetTask(taskId, out var state))
         {
-            if (state.Request is not null
+            if (state.HasRequest
                 || state.RequestFingerprint is not null
                 || !state.CallerId.IsDefault
                 || state.DueTime is not null
@@ -1214,7 +1234,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         foreach (var (taskId, state) in tasks)
         {
             if (!HasStoredResult(state)
-                && state.Request is not null
+                && state.HasRequest
                 && state.DueTime is null
                 && (!state.CancellationRequestedAt.HasValue || !IsCancellationLeaf(taskId, state)))
             {
@@ -1243,7 +1263,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 continue;
             }
 
-            if (state.Request is null
+            if (!state.HasRequest
                 || IsRequestRunning(taskId))
             {
                 continue;
@@ -1380,7 +1400,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         ValidateCaller(taskId, state, requestContext.CallerId);
-        if (state.Request is null
+        if (!state.HasRequest
             && state.RequestFingerprint is null
             && state.CancellationRequestedAt is null)
         {
@@ -1430,7 +1450,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             && IsCancellationLeaf(taskId, state))
         {
             // A cancellation which preceded the invocation recorded no request.
-            if (state.Request is null)
+            if (!state.HasRequest)
             {
                 _storage.SetRequest(taskId, state, request);
             }
@@ -1513,7 +1533,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             return;
         }
 
-        if (state.Request is not { } committedRequest)
+        if (!TryReadRequest(taskId, state, out var committedRequest))
         {
             return;
         }
@@ -1522,6 +1542,41 @@ internal sealed partial class DurableTaskGrainRuntime(
         _ = GetOrCreateRunningTaskHandle(taskId);
         committedRequest.SetTarget(GrainContext);
         StartInvocation(taskId, static value => value.CreateTask(), committedRequest, executionContext);
+    }
+
+    /// <summary>
+    /// Returns the request which <paramref name="taskId"/> stores, or quarantines the task when its request no longer
+    /// decodes.
+    /// </summary>
+    /// <remarks>
+    /// A quarantined task stays pending with its stored request unchanged, and stalls: the runtime reports it once per
+    /// activation with <see cref="DurableTaskAttemptCancellationReason.Diverged"/> and keeps the grain's slow wake-up, so
+    /// a later activation, such as one whose code decodes the request, starts it. The grain's other tasks are unaffected,
+    /// and polls report the task as pending. Aborting the task ends it.
+    /// </remarks>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Any decoding failure quarantines only the task which stores the request.")]
+    private bool TryReadRequest(TaskId taskId, IDurableTaskState state, [NotNullWhen(true)] out IDurableTaskRequest? request)
+    {
+        try
+        {
+            request = state.Request;
+            return request is not null;
+        }
+        catch (Exception exception)
+        {
+            request = null;
+            if (_stalledExecutions.Add(taskId))
+            {
+                ReportStall(
+                    taskId,
+                    DurableTaskAttemptCancellationReason.Diverged,
+                    new DurableTaskDivergenceException(
+                        $"The request which durable task '{taskId}' stores no longer decodes: {exception.GetType().Name}: {exception.Message} The task stays pending with its stored request, and code which decodes the request runs it.",
+                        exception));
+            }
+
+            return false;
+        }
     }
 
     /// <summary>
@@ -1583,7 +1638,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         foreach (var (_, state) in _storage.Tasks)
         {
-            if (!HasStoredResult(state) && state.Request is not null && state.DueTime is null)
+            if (!HasStoredResult(state) && state.HasRequest && state.DueTime is null)
             {
                 return true;
             }
@@ -1945,7 +2000,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             var method = IDurableTaskRequest.GetMethod(remoteRequest);
             if (state is not null)
             {
-                if (state.Request is not null
+                if (state.HasRequest
                     || state.RequestFingerprint is not null
                     || !state.CallerId.IsDefault
                     || state.DueTime is not null
@@ -2353,7 +2408,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         // The outbox reads each completion from the stored result, so the result is staged first. A subscriber on this
         // grain retires as it receives the result, so the destinations are copied first.
-        StoreResult(taskId, state, response);
+        response = StoreResult(taskId, state, response);
         foreach (var destination in state.CompletionDestinations.ToArray())
         {
             SendCompletion(taskId, destination);
@@ -2369,9 +2424,10 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// Whether the result of a subscription child is the subscribed task's outcome. A subscription child which ends
     /// otherwise, such as a canceled or aborted one, ends its subscription.
     /// </param>
-    private void StoreResult(TaskId taskId, IDurableTaskState state, DurableTaskResponse response, bool subscribed = false)
+    /// <returns>The stored result: <paramref name="response"/>, or the failure which replaced a result that doesn't serialize.</returns>
+    private DurableTaskResponse StoreResult(TaskId taskId, IDurableTaskState state, DurableTaskResponse response, bool subscribed = false)
     {
-        SetResponse(taskId, state, response);
+        response = SetResponse(taskId, state, response);
         if (!subscribed && TryGetSubscription(state, out var target, out var subscribedTaskId))
         {
             Unsubscribe(target, subscribedTaskId, taskId);
@@ -2381,6 +2437,8 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             TrackExpiry(GetRetentionExpiry(state));
         }
+
+        return response;
     }
 
     private void QueueBackgroundWrite()
@@ -2837,7 +2895,14 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (!_storage.TryGetTask(taskId, out var taskState))
         {
-            // The cancellation can precede its invocation, which this record cancels on arrival.
+            // Only a caller's cancellation of its own child, which the inbox delivers, can overtake the child's
+            // invocation: the record cancels the invocation when it arrives. A direct request names a task which this
+            // grain retains, so a request for another task stages nothing.
+            if (callerId.IsDefault)
+            {
+                throw new DurableTaskNotFoundException(taskId);
+            }
+
             taskState = GetOrCreateTask(taskId, DurableTaskRecordKind.EarlyCancellation, request: null);
             StageCaller(taskId, taskState, callerId);
             _storage.RequestCancellation(taskId, taskState, reason);

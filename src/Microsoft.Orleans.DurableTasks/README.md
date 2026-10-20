@@ -400,9 +400,11 @@ synchronously on the activation which makes them, when the runtime stages them: 
   running execution is signaled after that write and its result discarded. A
   deleted execution's further scheduling throws `OperationCanceledException`.
   Completions and delay resumes which arrive for deleted tasks, or for an earlier run
-  of a root ID which runs again, are ignored. A
-  cancellation which arrives before its invocation is recorded, so the invocation
-  terminalizes as canceled when it arrives, and the record is deleted with its tree. The
+  of a root ID which runs again, are ignored. A caller's
+  cancellation of its child on another grain which arrives before the child's invocation is recorded, so the invocation
+  terminalizes as canceled when it arrives, and the record is deleted with its tree. A
+  direct cancellation, from a client, a grain method, or `IDurableTaskManager.CancelAsync`, of a task which the grain
+  doesn't retain throws `DurableTaskNotFoundException` and stores nothing. The
   grain admits an invocation until Messaging's `DeduplicationWindow` has elapsed since its
   sender first staged it, and dead-letters a later one with the `durable-rpc/expired` code,
   so a record whose invocation doesn't arrive within that window is deleted.
@@ -413,6 +415,19 @@ synchronously on the activation which makes them, when the runtime stages them: 
   Activation doesn't decode stored results, so the grain keeps processing other
   work; operations which read that result, such as polling it, surface the decoding
   error to their caller.
+- A stored request which no longer decodes, for example after a deployment removes a type
+  which its arguments hold, quarantines only its task. Activation classifies tasks by their
+  record kind and whether they store a request, without decoding requests, so the grain
+  activates and runs its other tasks. Starting the task decodes its request; when that fails,
+  the task stays pending with its stored request unchanged and stalls: the runtime logs a
+  warning and raises `ExecutionStalled` with `DurableTaskAttemptCancellationReason.Diverged`
+  and the decoding error, once per activation, and keeps the grain's
+  `StalledExecutionRetryInterval` wake-up, so a later activation whose code decodes the
+  request runs the task. Polls report the task as pending, and aborting it ends it.
+- A result or failure which doesn't serialize, such as a value or an exception of a type
+  which has no codec, can't be stored. The task faults instead with a `SerializerException`
+  which names the type and the serialization error, and the fault commits like any result,
+  so the task ends and the grain keeps committing its other work.
 - Cancellation is cooperative, monotonic, and idempotent. A cancellation request commits before it
   propagates: it cancels the durable token of each running execution in the task's tree, stages a
   cancellation to each pending call to another grain, whose callee applies the same rules to its own

@@ -33,7 +33,17 @@ internal interface IDurableTaskState
     /// <summary>
     /// The invokable request.
     /// </summary>
+    /// <exception cref="Exception">The stored request no longer decodes, for example because its type was removed.</exception>
     public IDurableTaskRequest? Request { get; }
+
+    /// <summary>
+    /// Gets whether the task stores a request, without decoding it.
+    /// </summary>
+    /// <remarks>
+    /// The runtime classifies tasks by this and by their kind, so a stored request which no longer decodes affects only
+    /// the operations which decode it, such as starting its task.
+    /// </remarks>
+    public bool HasRequest { get; }
 
     /// <summary>
     /// The time at which the task completed.

@@ -782,12 +782,15 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     [Fact]
     public Task CancellationBeforeInvocationPreventsExecution() => ActivationScheduler.RunAsync(async () =>
     {
-        var (runtime, storage, _, _) = CreateRuntime();
+        var (runtime, storage, manager, _) = CreateRuntime();
         var request = CreateRequest(1);
-        var taskId = TaskId.Parse("root");
+        var caller = request.Context!.CallerId;
+        var taskId = CallerScope.GetTaskId(caller, TaskId.Parse("starter/call"));
 
-        await runtime.SignalCancellationAsync(taskId, TestContext.Current.CancellationToken);
-        var response = await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request, TestContext.Current.CancellationToken);
+        // A caller's cancellation of its child can overtake the child's invocation through the inbox.
+        runtime.SignalCancellationFromInbox(taskId, caller, reason: null);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        var response = runtime.ScheduleFromInbox(taskId, request);
 
         Assert.Equal(DurableTaskStatus.Canceled, response.Status);
         Assert.Equal(0, request.CreateTaskCallCount);
@@ -1255,6 +1258,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var (runtime, storage, manager, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/cancellation-retry");
         storage.GetOrCreate(taskId);
+        storage.GetOrCreate(TaskId.Parse("root/other"));
         manager.BeforeWrite = () =>
         {
             manager.BeforeWrite = null;
@@ -4685,10 +4689,23 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     /// </summary>
     private sealed class TestTaskState : IDurableTaskState
     {
+        private IDurableTaskRequest? _request;
+
         public DurableTaskRecordKind Kind { get; set; }
         public DurableTaskResponse? Result { get; set; }
         public HashSet<DurableTaskSubscriber> CompletionDestinations { get; set; } = [];
-        public IDurableTaskRequest? Request { get; set; }
+
+        /// <summary>Gets or sets the stored request, which throws <see cref="RequestDecodeFailure"/> when that is set.</summary>
+        public IDurableTaskRequest? Request
+        {
+            get => RequestDecodeFailure is { } failure ? throw failure : _request;
+            set => _request = value;
+        }
+
+        /// <summary>Gets or sets the failure which decoding the stored request throws, as a request which no longer decodes does.</summary>
+        public Exception? RequestDecodeFailure { get; set; }
+
+        public bool HasRequest => _request is not null;
         public DateTimeOffset? CompletedAt { get; set; }
         public DateTimeOffset? CancellationRequestedAt { get; set; }
         public string? CancellationReason { get; set; }

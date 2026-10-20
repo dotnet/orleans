@@ -115,7 +115,7 @@ see
 | Reason | Cause | Inner exception |
 | --- | --- | --- |
 | `UnsupportedVersion` | The execution recorded a version outside the range which the running code supports. | A `DurableTaskVersionException`, which names the change, the recorded version, and the supported range |
-| `Diverged` | The replay requested another operation under a recorded ID, or a recorded outcome no longer decodes. See [Diagnose replay divergence](durable-tasks-operations.md#diagnose-replay-divergence). | An `InvalidOperationException` which names the recorded and the requested operations, or the decoding failure |
+| `Diverged` | The replay requested another operation under a recorded ID, a recorded outcome no longer decodes, or the task's stored request no longer decodes. See [Diagnose replay divergence](durable-tasks-operations.md#diagnose-replay-divergence). | An `InvalidOperationException` which names the recorded and the requested operations, or the decoding failure |
 
 The runtime:
 

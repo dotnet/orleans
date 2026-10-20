@@ -38,7 +38,11 @@ internal interface IDurableTaskServer : IGrainExtension
     /// <see langword="null"/> for none.
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
-    /// <remarks>The first cancellation request determines the reason.</remarks>
+    /// <remarks>
+    /// The first cancellation request determines the reason. A request for a task which this grain doesn't retain throws
+    /// <see cref="DurableTaskNotFoundException"/> and stores nothing.
+    /// </remarks>
+    /// <exception cref="DurableTaskNotFoundException">This grain doesn't retain the task.</exception>
     [Alias("CancelWithReasonAsync"), AlwaysInterleave]
     ValueTask CancelAsync(TaskId taskId, string? reason, CancellationToken cancellationToken = default);
 
