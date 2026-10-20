@@ -33,7 +33,7 @@ public sealed class DurableTaskStorageTests
         await using (var activation = await harness.ActivateAsync(cancellationToken))
         {
             var storage = activation.Storage;
-            var state = storage.GetOrCreateTask(taskId, request: null);
+            var state = storage.GetOrCreateTask(taskId, DurableTaskRecordKind.LocalStep, request: null);
             storage.SetResponse(taskId, state, new CanceledDurableTaskResponse(exception));
             await storage.WriteAsync(cancellationToken);
         }
@@ -59,8 +59,8 @@ public sealed class DurableTaskStorageTests
         var storage = CreateStorage();
         var firstId = TaskId.Parse("root/first");
         var secondId = TaskId.Parse("root/second");
-        var firstState = storage.GetOrCreateTask(firstId, request: null);
-        var secondState = storage.GetOrCreateTask(secondId, request: null);
+        var firstState = storage.GetOrCreateTask(firstId, DurableTaskRecordKind.LocalStep, request: null);
+        var secondState = storage.GetOrCreateTask(secondId, DurableTaskRecordKind.LocalStep, request: null);
 
         var exception = Assert.Throws<ArgumentException>(
             () => storage.SetResponse(secondId, firstState, DurableTaskResponse.Completed));
@@ -79,8 +79,8 @@ public sealed class DurableTaskStorageTests
         var first = CreateStorage();
         var second = CreateStorage();
         var taskId = TaskId.Parse("root/owned");
-        var firstState = first.GetOrCreateTask(taskId, request: null);
-        var secondState = second.GetOrCreateTask(taskId, request: null);
+        var firstState = first.GetOrCreateTask(taskId, DurableTaskRecordKind.LocalStep, request: null);
+        var secondState = second.GetOrCreateTask(taskId, DurableTaskRecordKind.LocalStep, request: null);
 
         var exception = Assert.Throws<ArgumentException>(
             () => second.SetResponse(taskId, firstState, DurableTaskResponse.Completed));
@@ -95,7 +95,7 @@ public sealed class DurableTaskStorageTests
     {
         var storage = CreateStorage();
         var taskId = TaskId.Parse("root/missing-context");
-        var state = storage.GetOrCreateTask(taskId, request: null);
+        var state = storage.GetOrCreateTask(taskId, DurableTaskRecordKind.LocalStep, request: null);
         var request = Substitute.For<IDurableTaskRequest>();
 
         var exception = Assert.Throws<InvalidOperationException>(
@@ -111,7 +111,7 @@ public sealed class DurableTaskStorageTests
         var storage = CreateStorage();
         var taskId = TaskId.Parse("root/cached");
         var request = CreateRequest();
-        var state = storage.GetOrCreateTask(taskId, request);
+        var state = storage.GetOrCreateTask(taskId, DurableTaskRecordKind.Invocation, request);
         var response = DurableTaskResponse.FromResult(42);
 
         storage.SetResponse(taskId, state, response);
@@ -136,7 +136,7 @@ public sealed class DurableTaskStorageTests
         var storage = CreateStorage();
         var taskId = TaskId.Parse("root/undecodable");
         var destination = new DurableTaskSubscriber(GrainId.Create("caller", "undecodable"), taskId);
-        var state = storage.GetOrCreateTask(taskId, request: null);
+        var state = storage.GetOrCreateTask(taskId, DurableTaskRecordKind.LocalStep, request: null);
         storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
         storage.AddCompletionDestination(taskId, state, destination);
 
@@ -165,7 +165,7 @@ public sealed class DurableTaskStorageTests
         var nestedOperationChildId = TaskId.Parse("root/$when-all-2/0/leaf");
         foreach (var taskId in new[] { grandchildId, rootId, childId, operationChildId, nestedOperationChildId, TaskId.Parse("other") })
         {
-            storage.GetOrCreateTask(taskId, request: null);
+            storage.GetOrCreateTask(taskId, DurableTaskRecordKind.LocalStep, request: null);
         }
 
         // Identifiers between a task and its nearest stored descendants, such as a combinator's operation, aren't stored.
@@ -199,9 +199,9 @@ public sealed class DurableTaskStorageTests
         await using (var activation = await harness.ActivateAsync(cancellationToken))
         {
             var storage = activation.Storage;
-            storage.GetOrCreateTask(rootId, request: null);
-            storage.GetOrCreateTask(retainedId, request: null);
-            var state = storage.GetOrCreateTask(deletedId, CreateRequest());
+            storage.GetOrCreateTask(rootId, DurableTaskRecordKind.LocalStep, request: null);
+            storage.GetOrCreateTask(retainedId, DurableTaskRecordKind.LocalStep, request: null);
+            var state = storage.GetOrCreateTask(deletedId, DurableTaskRecordKind.Invocation, CreateRequest());
             storage.SetRemoteRequest(deletedId, state, remoteTarget, "remote-fingerprint");
             storage.SetResponse(deletedId, state, DurableTaskResponse.Completed);
             await storage.WriteAsync(cancellationToken);
@@ -239,7 +239,7 @@ public sealed class DurableTaskStorageTests
         await using (var activation = await harness.ActivateAsync(cancellationToken))
         {
             var storage = activation.Storage;
-            var state = storage.GetOrCreateTask(taskId, request: null);
+            var state = storage.GetOrCreateTask(taskId, DurableTaskRecordKind.RemoteCall, request: null);
             storage.SetRequestFingerprint(taskId, state, "request-fingerprint-v1");
             storage.SetRemoteRequest(taskId, state, remoteTarget, "remote-fingerprint-v2");
             storage.SetCallerId(taskId, state, caller);
@@ -257,6 +257,7 @@ public sealed class DurableTaskStorageTests
         await using var recovery = await harness.ActivateAsync(cancellationToken);
         Assert.True(recovery.Storage.TryGetTask(taskId, out var recovered));
 
+        Assert.Equal(DurableTaskRecordKind.RemoteCall, recovered.Kind);
         Assert.Null(recovered.Request);
         Assert.Equal(createdAt, recovered.CreatedAt);
         Assert.Equal(createdAt.AddMinutes(3), recovered.CompletedAt);
@@ -292,15 +293,15 @@ public sealed class DurableTaskStorageTests
         await using (var activation = await harness.ActivateAsync(cancellationToken))
         {
             var storage = activation.Storage;
-            storage.GetOrCreateTask(pendingId, request);
-            var succeeded = storage.GetOrCreateTask(succeededId, request: null);
+            storage.GetOrCreateTask(pendingId, DurableTaskRecordKind.Invocation, request);
+            var succeeded = storage.GetOrCreateTask(succeededId, DurableTaskRecordKind.LocalStep, request: null);
             storage.SetRequest(succeededId, succeeded, CreateRequest(caller, target));
             storage.SetResponse(succeededId, succeeded, DurableTaskResponse.FromResult("typed result"));
             await storage.WriteAsync(cancellationToken);
 
-            var failed = storage.GetOrCreateTask(failedId, request: null);
+            var failed = storage.GetOrCreateTask(failedId, DurableTaskRecordKind.LocalStep, request: null);
             storage.SetResponse(failedId, failed, DurableTaskResponse.FromException(failure));
-            var canceled = storage.GetOrCreateTask(canceledId, request: null);
+            var canceled = storage.GetOrCreateTask(canceledId, DurableTaskRecordKind.LocalStep, request: null);
             storage.SetResponse(canceledId, canceled, new CanceledDurableTaskResponse(cancellation));
             await storage.WriteAsync(cancellationToken);
         }
@@ -356,7 +357,7 @@ public sealed class DurableTaskStorageTests
         await using (var activation = await harness.ActivateAsync(cancellationToken))
         {
             var storage = activation.Storage;
-            var state = storage.GetOrCreateTask(taskId, CreateRequest(caller, GrainId.Create("target", "payloads")));
+            var state = storage.GetOrCreateTask(taskId, DurableTaskRecordKind.Invocation, CreateRequest(caller, GrainId.Create("target", "payloads")));
             storage.SetCallerId(taskId, state, caller);
             storage.SetRequestFingerprint(taskId, state, "fingerprint");
             storage.AddCompletionDestination(taskId, state, new(caller, taskId));
@@ -391,6 +392,31 @@ public sealed class DurableTaskStorageTests
 
     [Theory]
     [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public async Task EarlyCancellationRecordRecoversAsTheInvocationWhichArrivedAfterIt(string journalFormatKey)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var harness = new DurableTaskJournalHarness(journalFormatKey);
+        var taskId = TaskId.Parse("$caller/caller/one/run/call");
+        await using (var activation = await harness.ActivateAsync(cancellationToken))
+        {
+            var storage = activation.Storage;
+            var state = storage.GetOrCreateTask(taskId, DurableTaskRecordKind.EarlyCancellation, request: null);
+            storage.RequestCancellation(taskId, state);
+            await storage.WriteAsync(cancellationToken);
+            Assert.Equal(DurableTaskRecordKind.EarlyCancellation, state.Kind);
+
+            storage.SetInvocation(taskId, state);
+            await storage.WriteAsync(cancellationToken);
+        }
+
+        await using var recovery = await harness.ActivateAsync(cancellationToken);
+        Assert.True(recovery.Storage.TryGetTask(taskId, out var recovered));
+        Assert.Equal(DurableTaskRecordKind.Invocation, recovered.Kind);
+        Assert.NotNull(recovered.CancellationRequestedAt);
+    }
+
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
     public async Task RecordJournalsItsCompleteStateOnce(string journalFormatKey)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -399,7 +425,7 @@ public sealed class DurableTaskStorageTests
         byte[] resultPayload;
         await using (var activation = await harness.ActivateAsync(cancellationToken))
         {
-            var state = activation.Storage.AddRecord(recordId, "$record-kind", DurableTaskResponse.FromResult(3));
+            var state = activation.Storage.AddRecord(recordId, DurableTaskRecordKind.Version, "$record-kind", DurableTaskResponse.FromResult(3));
             await activation.Storage.WriteAsync(cancellationToken);
             resultPayload = Assert.IsType<DurableTaskState>(state).ResultPayload!;
         }
@@ -411,6 +437,7 @@ public sealed class DurableTaskStorageTests
 
         await using var recovery = await harness.ActivateAsync(cancellationToken);
         Assert.True(recovery.Storage.TryGetTask(recordId, out var recovered));
+        Assert.Equal(DurableTaskRecordKind.Version, recovered.Kind);
         Assert.Equal("$record-kind", recovered.RequestFingerprint);
         Assert.Equal(3, recovered.Result!.GetResult<int>());
         Assert.NotNull(recovered.CompletedAt);

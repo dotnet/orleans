@@ -297,7 +297,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await using (var activation = await harness.ActivateAsync(cancellationToken))
         {
             var storage = activation.Storage;
-            var state = storage.GetOrCreateTask(taskId, request: null);
+            var state = storage.GetOrCreateTask(taskId, DurableTaskRecordKind.LocalStep, request: null);
 
             storage.Shield(taskId, state);
             storage.RequestCancellation(taskId, state, "buyer");

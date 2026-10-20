@@ -8,6 +8,11 @@ namespace Orleans.DurableTasks.Protocol;
 internal interface IDurableTaskState
 {
     /// <summary>
+    /// Gets the kind of operation which the task records, which the runtime sets when it creates the record.
+    /// </summary>
+    public DurableTaskRecordKind Kind { get; }
+
+    /// <summary>
     /// The result of the task, which will be <see langword="null"/> if the task has not yet completed.
     /// </summary>
     public DurableTaskResponse? Result { get; }

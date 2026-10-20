@@ -71,7 +71,7 @@ internal sealed partial class DurableTaskGrainRuntime
             MessageTransport.SendSubscription(GrainId, subscription.Target, subscription.Id, GetWireId(taskId));
         }
 
-        return new(StageSubscriptionRecord(taskId, fingerprint, shielded, response), RequiresWrite: true);
+        return new(StageSubscriptionRecord(taskId, DurableTaskRecordKind.Subscription, fingerprint, shielded, response), RequiresWrite: true);
     }
 
     /// <summary>
@@ -125,9 +125,9 @@ internal sealed partial class DurableTaskGrainRuntime
     /// Stages the record of a subscription child, completing it with <paramref name="response"/> when the subscribed task
     /// is of this grain and has a result, and returns its handle.
     /// </summary>
-    private IScheduledTaskHandle StageSubscriptionRecord(TaskId taskId, string fingerprint, bool shielded, DurableTaskResponse? response)
+    private IScheduledTaskHandle StageSubscriptionRecord(TaskId taskId, DurableTaskRecordKind kind, string fingerprint, bool shielded, DurableTaskResponse? response)
     {
-        var state = GetOrCreateTask(taskId, request: null);
+        var state = GetOrCreateTask(taskId, kind, request: null);
         _storage.SetRequestFingerprint(taskId, state, fingerprint);
         MarkShielded(taskId, state, shielded);
         var handle = GetOrCreateRunningTaskHandle(taskId);
