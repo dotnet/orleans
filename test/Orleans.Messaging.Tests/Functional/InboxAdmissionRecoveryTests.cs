@@ -52,6 +52,8 @@ public sealed class InboxAdmissionRecoveryTests
         Assert.DoesNotContain(original.Envelope.MessageId,
             await fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox)));
         Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, original)).Status);
+        // The recent record was staged two days later; restore a legitimate receiver clock before replaying it.
+        fixture.JobClock.Advance(retained.SentAt - fixture.JobClock.GetUtcNow());
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, retained)).Status);
         Assert.Equal(retained.SentAt, await fixture.OnGrainAsync(receiver, () =>
             InboxTestAccess.GetProcessedSentAt(inbox, retained.Envelope.MessageId)));
