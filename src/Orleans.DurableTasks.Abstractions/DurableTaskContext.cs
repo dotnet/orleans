@@ -22,17 +22,22 @@ namespace Orleans.DurableTasks;
 public abstract class DurableTaskContext
 {
     private const char GeneratedSegmentPrefix = '$';
-    private const string OperationInEffectMessage =
-        "A DurableTask.RunInline effect runs once and records only its outcome, so it can't run durable operations: a replay "
-        + "returns the outcome without running them, which shifts the identifiers of the body's later operations. Run the "
-        + "operation in the body, before or after the effect.";
+    private const string OperationInCoveredRegionMessage =
+        "A DurableTask.RunInline effect, and other code whose outcome one record covers, such as a host's operation on "
+        + "journaled state or a transaction's body, runs once: a replay returns the record without running the code. A "
+        + "durable operation there would be missing from the replay, and the identifiers of the body's later operations "
+        + "would shift. Run the operation in the body, before or after the covered code (ORLEANS0227).";
 
-    private static readonly AsyncLocal<DurableTaskContext?> AmbientContext = new();
-    private static readonly AsyncLocal<DurableTaskContext?> ShieldedContext = new();
-private const string OffSchedulerMessage =
+    private const string OffSchedulerMessage =
         "Durable task code ran off the scheduler which runs its execution, such as its grain activation's scheduler, for "
         + "example after ConfigureAwait(false). The execution orders and records its operations on that scheduler. Await "
         + "without ConfigureAwait(false) in durable task bodies and steps (ORLEANS0226).";
+
+    private static readonly AsyncLocal<DurableTaskContext?> AmbientContext = new();
+    private static readonly AsyncLocal<DurableTaskContext?> ShieldedContext = new();
+
+    // Marks the asynchronous flows which RunInCoveredFlowAsync covers, for the execution which it names.
+    private static readonly AsyncLocal<DurableTaskContext?> CoveredFlow = new();
 
     private readonly TaskScheduler _scheduler = TaskScheduler.Current;
 
@@ -47,8 +52,11 @@ private const string OffSchedulerMessage =
     private DurableTaskAttemptCancellationReason? _attemptCancellationReason;
     private long _nextChildId;
     private Dictionary<string, int>? _nameOccurrences;
-    private bool _runningEffect;
 
+    // Covered regions: the depth of the synchronous ones, which run without awaiting, and the number of asynchronous
+    // flows which run covered, whose flows CoveredFlow marks.
+    private int _coveredDepth;
+    private int _coveredFlows;
     /// <summary>Initializes an attempt of the durable task <paramref name="taskId"/>.</summary>
     /// <param name="taskId">The stable identifier of the task which this attempt runs.</param>
     /// <remarks>
@@ -249,19 +257,22 @@ private const string OffSchedulerMessage =
     internal void ThrowIfCannotRunOperation()
     {
         ThrowIfOffScheduler();
-        ThrowIfRunningEffect();
+        ThrowIfInCoveredRegion();
         if (IsAttemptCanceled)
         {
             throw CreateAttemptCanceledException(innerException: null);
         }
     }
 
-    /// <summary>Throws <see cref="InvalidOperationException"/> inside an effect, whose record holds only its outcome.</summary>
-    private void ThrowIfRunningEffect()
+    /// <summary>
+    /// Throws <see cref="InvalidOperationException"/> within a covered region of this execution, whose record covers the
+    /// code which runs there, so a replay doesn't run it.
+    /// </summary>
+    internal void ThrowIfInCoveredRegion()
     {
-        if (_runningEffect)
+        if (IsInCoveredRegion)
         {
-            throw new InvalidOperationException(OperationInEffectMessage);
+            throw new InvalidOperationException(OperationInCoveredRegionMessage);
         }
     }
 
@@ -617,7 +628,7 @@ private const string OffSchedulerMessage =
         }
 
         ThrowIfOffScheduler();
-        ThrowIfRunningEffect();
+        ThrowIfInCoveredRegion();
         return Id.Child($"$child-{(++_nextChildId).ToString(CultureInfo.InvariantCulture)}");
     }
 
@@ -681,7 +692,7 @@ private const string OffSchedulerMessage =
     private int NextOccurrence(string key)
     {
         ThrowIfOffScheduler();
-        ThrowIfRunningEffect();
+        ThrowIfInCoveredRegion();
         _nameOccurrences ??= new(StringComparer.Ordinal);
         _nameOccurrences.TryGetValue(key, out var occurrence);
         _nameOccurrences[key] = ++occurrence;
@@ -700,28 +711,86 @@ private const string OffSchedulerMessage =
         }
     }
 
-    /// <summary>Gets whether the calling code runs in a <see cref="DurableTask.RunInline{TResult}(Func{TResult})"/> effect.</summary>
-    internal bool IsRunningEffect => _runningEffect;
+    /// <summary>
+    /// Gets whether the calling code runs within a covered region of this execution: code whose outcome one record of the
+    /// execution covers, so a replay returns the record without running the code.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Covered regions are the one mechanism which keeps code that a record covers out of the execution's history:
+    /// <see cref="DurableTask.RunInline{TResult}(string, Func{TResult})"/> effects, which run synchronously, and a host's
+    /// covered code, such as an operation on journaled state together with the callbacks which it runs, or an
+    /// asynchronous body whose outcome one record covers across its awaits, such as a transaction's.
+    /// </para>
+    /// <para>
+    /// Within a region, a nested effect runs directly, as part of the region, without an identifier or a record of its
+    /// own, and every other durable operation, such as a start, a delay, a signal wait, a combinator, or a version check,
+    /// throws <see cref="InvalidOperationException"/> before it takes an identifier. A host doesn't record the region's
+    /// accesses to state as the execution's own.
+    /// </para>
+    /// </remarks>
+    internal bool IsInCoveredRegion => _coveredDepth > 0 || (_coveredFlows > 0 && ReferenceEquals(CoveredFlow.Value, this));
 
     /// <summary>
-    /// Runs an effect's body with this execution's durable operations disabled: the effect's record holds only its outcome,
-    /// so an operation which the effect ran would be missing from a replay, and the identifiers of the body's later
-    /// operations would shift.
+    /// Enters a synchronous covered region of this execution, which ends when the returned value is disposed, in the same
+    /// synchronous run of code on the execution's scheduler.
     /// </summary>
+    internal CoveredRegion EnterCoveredRegion()
+    {
+        AssertOnScheduler();
+        _coveredDepth++;
+        return new(this);
+    }
+
+    /// <summary>Runs an effect's delegate in a synchronous covered region.</summary>
     internal TResult RunAsEffect<TState, TResult>(TState state, Func<TState, TResult> body)
     {
-        // DurableTask.RunInline allocates the effect's identifier first, which rejects code off the scheduler.
-        Debug.Assert(!_runningEffect, "A nested effect runs as part of its enclosing effect.");
+        using var region = EnterCoveredRegion();
+        return body(state);
+    }
+
+    /// <summary>
+    /// Runs the asynchronous <paramref name="body"/> as a covered region of this execution for its whole flow, including
+    /// the continuations of its awaits, until its task completes.
+    /// </summary>
+    /// <remarks>
+    /// The body starts on the execution's scheduler, and the region ends when this method resumes there after the body's
+    /// task completes. Other flows of the execution, which the body doesn't start, aren't covered.
+    /// </remarks>
+    internal async Task<TResult> RunInCoveredFlowAsync<TResult>(Func<Task<TResult>> body)
+    {
         AssertOnScheduler();
-        _runningEffect = true;
+        _coveredFlows++;
         try
         {
-            return body(state);
+            return await StartCovered(body);
         }
         finally
         {
-            _runningEffect = false;
+            _coveredFlows--;
         }
+
+        // The mark flows into the body's asynchronous flow, and this method's flow restores it once the body returns.
+        Task<TResult> StartCovered(Func<Task<TResult>> body)
+        {
+            var previous = CoveredFlow.Value;
+            CoveredFlow.Value = this;
+            try
+            {
+                return body();
+            }
+            finally
+            {
+                CoveredFlow.Value = previous;
+            }
+        }
+    }
+
+    /// <summary>Ends a synchronous covered region which <see cref="EnterCoveredRegion"/> entered.</summary>
+    internal readonly struct CoveredRegion(DurableTaskContext context) : IDisposable
+    {
+        /// <inheritdoc/>
+        public void Dispose() => context._coveredDepth--;
     }
 
     /// <summary>

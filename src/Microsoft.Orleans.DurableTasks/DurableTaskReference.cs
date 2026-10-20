@@ -123,7 +123,7 @@ public sealed class DurableTaskReference<TResult> : DurableTask<TResult>, IDurab
         Handle.AbortAsync(reason, cancellationToken);
 
     /// <inheritdoc/>
-    protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context) =>
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context) =>
         throw new InvalidOperationException(
             "A durable task reference is scheduled by the durable task runtime of a grain, which subscribes to the referenced task.");
 }

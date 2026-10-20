@@ -308,13 +308,12 @@ public abstract partial class DurableTask
     }
 
     /// <summary>
-    /// Records <paramref name="effect"/>'s outcome under its identifier, or runs it as part of the enclosing effect when the
-    /// calling code already runs in one.
+    /// Records <paramref name="effect"/>'s outcome under its identifier, or runs it as part of the enclosing covered region,
+    /// such as another effect, when the calling code runs in one.
     /// </summary>
     /// <remarks>
-    /// The enclosing effect's record holds the nested effect's outcome, so the nested effect takes no identifier: a replay
-    /// returns the enclosing effect's outcome without running either, and the body's later operations keep their
-    /// identifiers.
+    /// The region's record holds the nested effect's outcome, so the nested effect takes no identifier: a replay returns the
+    /// region's record without running either, and the body's later operations keep their identifiers.
     /// </remarks>
     private static DurableTaskResponse RunEffect<TEffect>(
         DurableTaskContext context,
@@ -322,7 +321,7 @@ public abstract partial class DurableTask
         TEffect effect,
         Func<TEffect, DurableTaskResponse> run)
     {
-        if (context.IsRunningEffect)
+        if (context.IsInCoveredRegion)
         {
             return run(effect);
         }

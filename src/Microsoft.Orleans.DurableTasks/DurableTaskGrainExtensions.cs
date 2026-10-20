@@ -286,6 +286,6 @@ internal sealed class AttachedScheduledTask<TResult>(
         CancellationToken cancellationToken) =>
         _handle.PollAsync(options, cancellationToken);
 
-    protected override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) =>
+    protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) =>
         _handle.WaitAsync(cancellationToken);
 }

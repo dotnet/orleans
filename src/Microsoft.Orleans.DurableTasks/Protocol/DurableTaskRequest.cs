@@ -217,7 +217,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
             : shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(target);
 
     /// <inheritdoc/>
-    protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext) =>
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext) =>
         RunRemoteAsync(_shared, this, executionContext);
 
     /// <summary>
@@ -400,7 +400,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     IScheduledTaskHandle ISchedulableTask.Post(TaskId taskId) => DurableTaskRequest.PostRoot(_shared, this, taskId);
 
     /// <inheritdoc/>
-    protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext) =>
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext) =>
         DurableTaskRequest.RunRemoteAsync(_shared, this, executionContext);
     /// <inheritdoc/>
     ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
