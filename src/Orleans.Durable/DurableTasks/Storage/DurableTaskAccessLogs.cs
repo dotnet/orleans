@@ -52,6 +52,11 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IDurableDictionaryC
     // positional reads too.
     private readonly HashSet<DurableTaskAccessLog> _recorders = [];
 
+    // The executions whose positional reads the journal resolved, at recovery or before a snapshot, until they're removed:
+    // their reads record values, as an execution which met one resolution would likely meet the next. The set belongs to this
+    // activation, so an execution meets at most one resolution per activation; a later activation's recovery resolves it again.
+    private readonly HashSet<TaskId> _resolvedExecutions = [];
+
     /// <summary>Creates the access logs of <paramref name="manager"/>'s activation, which journal through it.</summary>
     /// <param name="manager">The manager which journals the logs.</param>
     /// <param name="codec">The codec of the logs' entries.</param>
@@ -144,6 +149,12 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IDurableDictionaryC
         _pendingSources.Clear();
     }
 
+    /// <summary>
+    /// Gets whether the journal resolved positional reads of <paramref name="executionId"/> in this activation, so its
+    /// reads record values.
+    /// </summary>
+    public bool HasResolvedReads(TaskId executionId) => _resolvedExecutions.Contains(executionId);
+
     /// <summary>Notes that the open attempt <paramref name="recorder"/> records positional reads.</summary>
     /// <remarks>The logs collect and resolve its pending records until it closes or is discarded.</remarks>
     public void OnRecorderOpened(DurableTaskAccessLog recorder)
@@ -173,6 +184,7 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IDurableDictionaryC
         }
 
         _appended.Remove(taskId);
+        _resolvedExecutions.Remove(taskId);
         if (log.JournaledLength > 0)
         {
             _removed.Add(taskId);
@@ -185,6 +197,7 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IDurableDictionaryC
         _logs.Clear();
         _appended.Clear();
         _removed.Clear();
+        _resolvedExecutions.Clear();
     }
 
     void IStateMachine.Reset(JournalStreamWriter writer)
@@ -192,6 +205,7 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IDurableDictionaryC
         _logs.Clear();
         _appended.Clear();
         _removed.Clear();
+        _resolvedExecutions.Clear();
         _cleared = false;
     }
 
@@ -229,11 +243,11 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IDurableDictionaryC
 
     void IJournalPositionHolder.ApplyResolvedReads(JournalPositionalReads reads)
     {
-        // An attempt which outlives a resolution would likely meet the next one too: it records values from now on, which
-        // bounds the cost of a long-lived execution to one resolution.
+        // An execution which met a resolution, at recovery or before a snapshot, would likely meet the next one too: its
+        // reads record values from now on, which bounds the cost of a long-lived execution to one resolution.
         foreach (var recorder in _recorders)
         {
-            recorder.StopRecordingPositions();
+            _resolvedExecutions.Add(recorder.ExecutionId);
         }
 
         // A read's outcome depends only on its position, state, operation, and argument, so records are matched by those,
@@ -264,6 +278,7 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IDurableDictionaryC
 
         foreach (var (taskId, log, records) in rewrittenLogs ?? [])
         {
+            _resolvedExecutions.Add(taskId);
             _logs[taskId] = new Log(records);
             if (log.JournaledLength > 0)
             {
