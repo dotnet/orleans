@@ -1145,6 +1145,7 @@ namespace Orleans
     }
 
     public delegate System.Threading.Tasks.Task GrainCallFilterDelegate(IGrainCallContext context);
+    [System.Obsolete("Use CancellationToken instead.")]
     [Immutable]
     public sealed partial class GrainCancellationToken : System.IDisposable
     {
@@ -1155,6 +1156,7 @@ namespace Orleans
         public void Dispose() { }
     }
 
+    [System.Obsolete("Use CancellationTokenSource instead.")]
     public sealed partial class GrainCancellationTokenSource : System.IDisposable
     {
         public bool IsCancellationRequested { get { throw null; } }

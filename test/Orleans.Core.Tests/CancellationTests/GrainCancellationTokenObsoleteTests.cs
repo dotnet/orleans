@@ -13,11 +13,12 @@ public class GrainCancellationTokenObsoleteTests
         var token = assembly.GetType("Orleans.GrainCancellationToken", throwOnError: true)!;
         var tokenSource = assembly.GetType("Orleans.GrainCancellationTokenSource", throwOnError: true)!;
 
-        Assert.Equal(
-            "Use CancellationToken instead.",
-            Assert.IsType<ObsoleteAttribute>(token.GetCustomAttribute<ObsoleteAttribute>()).Message);
-        Assert.Equal(
-            "Use CancellationTokenSource instead.",
-            Assert.IsType<ObsoleteAttribute>(tokenSource.GetCustomAttribute<ObsoleteAttribute>()).Message);
+        var tokenObsolete = Assert.IsType<ObsoleteAttribute>(token.GetCustomAttribute<ObsoleteAttribute>());
+        var tokenSourceObsolete = Assert.IsType<ObsoleteAttribute>(tokenSource.GetCustomAttribute<ObsoleteAttribute>());
+
+        Assert.Equal("Use CancellationToken instead.", tokenObsolete.Message);
+        Assert.False(tokenObsolete.IsError);
+        Assert.Equal("Use CancellationTokenSource instead.", tokenSourceObsolete.Message);
+        Assert.False(tokenSourceObsolete.IsError);
     }
 }
