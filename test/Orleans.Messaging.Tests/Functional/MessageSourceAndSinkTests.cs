@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
-using Orleans.DurableJobs;
 using Orleans.Hosting;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
