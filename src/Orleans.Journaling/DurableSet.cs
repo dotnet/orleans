@@ -75,7 +75,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsSta
     }
 
     public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.SetCount, this, static self => self._items.Count)
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.SetCount, this, static self => self._items.Count)
         : _items.Count;
 
     public bool IsReadOnly => false;
@@ -190,7 +190,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IReportsSta
 
     // A context records the items which the code enumerates, so a replay enumerates the same items.
     private T[] ReadSnapshot(JournaledStateContext context) =>
-        context.Read(_accessTarget, JournaledStateOperation.SetSnapshot, this, static self => self._items.ToArray());
+        context.ReadWhole(_accessTarget, JournaledStateOperation.SetSnapshot, this, static self => self._items.ToArray());
 
     private bool ApplyAdd(T item)
     {

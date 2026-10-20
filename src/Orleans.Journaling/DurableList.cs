@@ -93,7 +93,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IReportsS
     }
 
     public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.ListCount, this, static self => self._items.Count)
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.ListCount, this, static self => self._items.Count)
         : _items.Count;
 
     bool ICollection<T>.IsReadOnly => false;
@@ -251,7 +251,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IReportsS
 
     // A context records the items which the code enumerates, so a replay enumerates the same items.
     private T[] ReadSnapshot(JournaledStateContext context) =>
-        context.Read(_accessTarget, JournaledStateOperation.ListSnapshot, this, static self => self._items.ToArray());
+        context.ReadWhole(_accessTarget, JournaledStateOperation.ListSnapshot, this, static self => self._items.ToArray());
 
     internal IAsyncEnumerable<ListChange<T>> WatchAsync(DurableWatchMode mode, int capacity, CancellationToken cancellationToken) =>
         DurableStateObservation.WatchChanges<DurableList<T>, ListChange<T>>(_manager, this, mode, capacity, cancellationToken);

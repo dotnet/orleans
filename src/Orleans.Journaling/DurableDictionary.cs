@@ -92,15 +92,15 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     }
 
     public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.DictionaryCount, this, static self => self._items.Count)
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.DictionaryCount, this, static self => self._items.Count)
         : _items.Count;
 
     public ICollection<TKey> Keys => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.DictionaryKeys, this, static self => self._items.Keys.ToArray())
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.DictionaryKeys, this, static self => self._items.Keys.ToArray())
         : _items.Keys;
 
     public ICollection<TValue> Values => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
-        ? context.Read(_accessTarget, JournaledStateOperation.DictionaryValues, this, static self => self._items.Values.ToArray())
+        ? context.ReadWhole(_accessTarget, JournaledStateOperation.DictionaryValues, this, static self => self._items.Values.ToArray())
         : _items.Values;
 
     public bool IsReadOnly => ((ICollection<KeyValuePair<TKey, TValue>>)_items).IsReadOnly;
@@ -317,7 +317,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
     // A context records the entries which the code enumerates, so a replay enumerates the same entries.
     private KeyValuePair<TKey, TValue>[] ReadSnapshot(JournaledStateContext context) =>
-        context.Read(_accessTarget!, JournaledStateOperation.DictionarySnapshot, this, static self => self._items.ToArray());
+        context.ReadWhole(_accessTarget!, JournaledStateOperation.DictionarySnapshot, this, static self => self._items.ToArray());
 
     internal IAsyncEnumerable<DictionaryChange<TKey, TValue>> WatchAsync(DurableWatchMode mode, int capacity, CancellationToken cancellationToken) =>
         DurableStateObservation.WatchChanges<DurableDictionary<TKey, TValue>, DictionaryChange<TKey, TValue>>(_manager, this, mode, capacity, cancellationToken);

@@ -35,8 +35,12 @@ internal abstract class JournaledStateContext
         return context is not null;
     }
 
-    /// <summary>Reads <paramref name="target"/> through this context, with a read whose result depends only on the state.</summary>
-    public TResult Read<TState, TResult>(
+    /// <summary>
+    /// Reads <paramref name="target"/> through this context, with a read whose result depends on the state's content
+    /// alone, such as a count or a snapshot. A read whose result also depends on a key, an index or another value uses
+    /// <see cref="Read{TArgument, TState, TResult}"/>, which passes that value.
+    /// </summary>
+    public TResult ReadWhole<TState, TResult>(
         JournaledStateAccessTarget target,
         JournaledStateOperation operation,
         TState state,
