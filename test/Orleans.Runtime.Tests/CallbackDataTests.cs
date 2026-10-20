@@ -117,7 +117,8 @@ public class CallbackDataTests
         var shared = CreateSharedCallbackData(
             _ => { },
             new HighFrequencyTimeProvider(),
-            TimeSpan.Zero);
+            TimeSpan.Zero,
+            CreateInstruments(serviceProvider));
 
         Assert.Equal(long.MaxValue, shared.GetTimestampTicks(TimeSpan.MaxValue));
         Assert.Equal(long.MinValue, shared.GetTimestampTicks(TimeSpan.MinValue));
@@ -162,6 +163,32 @@ public class CallbackDataTests
         callback.OnHostShutdown();
 
         Assert.Equal(0.125, Assert.Single(collector.GetMeasurementSnapshot()).Value);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void SharedInstrumentsRecordEachCallbacksLatencyOnce()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var meterFactory = serviceProvider.GetRequiredService<IMeterFactory>();
+        using var collector = new MetricCollector<double>(meterFactory, "Microsoft.Orleans", InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM);
+        var timeProvider = new FakeTimeProvider();
+        var shared = CreateSharedCallbackData(_ => { }, timeProvider, TimeSpan.FromMinutes(1), CreateInstruments(serviceProvider));
+        var first = new CallbackData(shared, new TestResponseCompletionSource(), new Message());
+        var second = new CallbackData(shared, new TestResponseCompletionSource(), new Message());
+
+        timeProvider.Advance(TimeSpan.FromMilliseconds(5));
+        first.OnHostShutdown();
+        timeProvider.Advance(TimeSpan.FromMilliseconds(5));
+        second.OnHostShutdown();
+        first.OnHostShutdown();
+        second.OnHostShutdown();
+
+        var measurements = collector.GetMeasurementSnapshot();
+        Assert.Collection(measurements,
+            measurement => Assert.Equal(5, measurement.Value),
+            measurement => Assert.Equal(10, measurement.Value));
     }
 
     [TestSuite("BVT")]
@@ -385,7 +412,8 @@ public class CallbackDataTests
             TimeSpan.FromMinutes(1),
             cancelOnTimeout,
             waitForCancellationAcknowledgement,
-            cancellationManager);
+            cancellationManager,
+            instruments);
         var message = new Message
         {
             Direction = Message.Directions.Request,
@@ -396,7 +424,7 @@ public class CallbackDataTests
             BodyObject = new CancellableInvokable(),
         };
 
-        return new CallbackData(shared, completion, message, instruments);
+        return new CallbackData(shared, completion, message);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -420,14 +448,16 @@ public class CallbackDataTests
         var shared = CreateSharedCallbackData(
             unregister,
             timeProvider ?? TimeProvider.System,
-            responseTimeout ?? TimeSpan.FromMinutes(1));
-        return new CallbackData(shared, completion, new Message(), instruments);
+            responseTimeout ?? TimeSpan.FromMinutes(1),
+            instruments);
+        return new CallbackData(shared, completion, new Message());
     }
 
     private static SharedCallbackData CreateSharedCallbackData(
         Action<Message> unregister,
         TimeProvider timeProvider,
-        TimeSpan responseTimeout)
+        TimeSpan responseTimeout,
+        ApplicationRequestInstruments instruments)
         => new(
             unregister,
             logger: NullLogger<CallbackData>.Instance,
@@ -435,7 +465,8 @@ public class CallbackDataTests
             responseTimeout,
             cancelOnTimeout: false,
             waitForCancellationAcknowledgement: false,
-            cancellationManager: null);
+            cancellationManager: null,
+            instruments);
 
     private static ServiceProvider CreateServiceProvider()
     {

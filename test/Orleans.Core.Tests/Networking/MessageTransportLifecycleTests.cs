@@ -675,8 +675,9 @@ public class MessageTransportLifecycleTests
         var completion = new DiagnosticResponseCompletion();
         var callback = new CallbackData(
             new SharedCallbackData(_ => { }, loggerFactory.CreateLogger<CallbackData>(), TimeProvider.System, TimeSpan.FromSeconds(1),
-                cancelOnTimeout: false, waitForCancellationAcknowledgement: false, cancellationManager: null),
-            completion, message, new ApplicationRequestInstruments(services.GetRequiredService<OrleansInstruments>()));
+                cancelOnTimeout: false, waitForCancellationAcknowledgement: false, cancellationManager: null,
+                new ApplicationRequestInstruments(services.GetRequiredService<OrleansInstruments>())),
+            completion, message);
         var first = shared.GetSendMessageHandler(connection);
         first.WriteMessage(message);
         first.CompleteWriting();

@@ -60,10 +60,10 @@ public class HostedClientDrainTests
                 TimeSpan.FromMinutes(1),
                 cancelOnTimeout: false,
                 waitForCancellationAcknowledgement: false,
-                cancellationManager: null),
+                cancellationManager: null,
+                fixture.ApplicationRequests),
             completion,
-            request,
-            fixture.ApplicationRequests);
+            request);
         try
         {
             using var response = new BufferedResponse(fixture.Runtime.ServiceProvider, request.Id, request.SendingGrain, malformed);
@@ -121,10 +121,10 @@ public class HostedClientDrainTests
                 TimeSpan.FromMinutes(1),
                 cancelOnTimeout: false,
                 waitForCancellationAcknowledgement: false,
-                cancellationManager: null),
+                cancellationManager: null,
+                fixture.ApplicationRequests),
             completion,
-            request,
-            fixture.ApplicationRequests);
+            request);
         try
         {
             using var response = new BufferedResponse(fixture.Runtime.ServiceProvider, new Message
@@ -236,8 +236,9 @@ public class HostedClientDrainTests
                 TimeSpan.FromMinutes(1),
                 cancelOnTimeout: false,
                 waitForCancellationAcknowledgement: false,
-                cancellationManager: Substitute.For<IGrainCallCancellationManager>());
-            callback = new CallbackData(shared, completion, outgoing, fixture.ApplicationRequests);
+                cancellationManager: Substitute.For<IGrainCallCancellationManager>(),
+                fixture.ApplicationRequests);
+            callback = new CallbackData(shared, completion, outgoing);
             Assert.True(callbacks.TryAdd(key, callback), fixture.DescribeState());
             Assert.False(callback.IsCompleted);
             Assert.Equal(0, completion.CompletionCount);

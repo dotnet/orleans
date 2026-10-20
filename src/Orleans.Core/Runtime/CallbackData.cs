@@ -19,7 +19,6 @@ namespace Orleans.Runtime
         // The request's invocation describes its cancellation and response timeout. The message's body can change after it is sent:
         // a retried message holds its serialized body, which is released once the retry is sent.
         private readonly IInvokable? _invokable;
-        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private readonly long _startTimestamp;
         private int _state;
         private StatusResponse? lastKnownStatus;
@@ -28,14 +27,12 @@ namespace Orleans.Runtime
         public CallbackData(
             SharedCallbackData shared,
             IResponseCompletionSource ctx,
-            Message msg,
-            ApplicationRequestInstruments applicationRequestInstruments)
+            Message msg)
         {
             this.shared = shared;
             this.context = ctx;
             this.Message = msg;
             _invokable = msg.BodyObject as IInvokable;
-            _applicationRequestInstruments = applicationRequestInstruments;
             _startTimestamp = shared.TimeProvider.GetTimestamp();
         }
 
@@ -195,7 +192,7 @@ namespace Orleans.Runtime
             RecordElapsedTime();
             SignalCancellation();
             shared.Unregister(Message);
-            _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
+            shared.ApplicationRequests.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
             DisposeCancellationRegistration();
@@ -218,7 +215,7 @@ namespace Orleans.Runtime
 
             this.shared.Unregister(this.Message);
             DisposeCancellationRegistration();
-            _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
+            shared.ApplicationRequests.OnAppRequestsTimedOut(GetTargetGrainType());
 
             OrleansCallBackDataEvent.Instance.OnTimeout(this.Message);
 
@@ -294,10 +291,10 @@ namespace Orleans.Runtime
 
         private void RecordElapsedTime()
         {
-            if (_applicationRequestInstruments.AppRequestsLatencyEnabled)
+            if (shared.ApplicationRequests.AppRequestsLatencyEnabled)
             {
                 var elapsedMilliseconds = shared.TimeProvider.GetElapsedTime(_startTimestamp).TotalMilliseconds;
-                _applicationRequestInstruments.OnAppRequestsEnd(elapsedMilliseconds);
+                shared.ApplicationRequests.OnAppRequestsEnd(elapsedMilliseconds);
             }
         }
 

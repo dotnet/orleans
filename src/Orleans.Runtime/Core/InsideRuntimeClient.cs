@@ -42,7 +42,6 @@ namespace Orleans.Runtime
         private MessageCenter messageCenter = null!;
         private List<IIncomingGrainCallFilter> grainCallFilters = null!;
         private readonly DeepCopier _deepCopier;
-        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private IGrainCallCancellationManager _cancellationManager = null!;
         private Func<SiloAddress, bool> _isDeadSilo = null!;
         private HostedClient hostedClient = null!;
@@ -72,7 +71,7 @@ namespace Orleans.Runtime
             TimeProvider = timeProvider;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
             this._deepCopier = deepCopier;
-            this._applicationRequestInstruments = new(orleansInstruments);
+            var applicationRequestInstruments = new ApplicationRequestInstruments(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
             this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
@@ -95,7 +94,8 @@ namespace Orleans.Runtime
                 this.messagingOptions.ResponseTimeout,
                 this.messagingOptions.CancelRequestOnTimeout,
                 this.messagingOptions.WaitForCancellationAcknowledgement,
-                cancellationManager: null!);
+                cancellationManager: null!,
+                applicationRequestInstruments);
 
             this.systemSharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
@@ -104,7 +104,8 @@ namespace Orleans.Runtime
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
                 waitForCancellationAcknowledgement: this.messagingOptions.WaitForCancellationAcknowledgement,
-                cancellationManager: null!);
+                cancellationManager: null!,
+                applicationRequestInstruments);
         }
 
         public IServiceProvider ServiceProvider { get; }
@@ -198,7 +199,7 @@ namespace Orleans.Runtime
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                callbackData = new CallbackData(sharedData, context, message);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
