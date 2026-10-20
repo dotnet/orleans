@@ -76,8 +76,10 @@ Application result-query retention serves business query and audit needs indepen
 
 `Expired` means that earlier acceptance is unknown: an acknowledgement may have
 been lost before the receiver compacted its completion record. Reconcile business
-state using the original ID before authorizing another command. Preserve the
-original `SentAt` when replaying a logical send. A fresh submission after an
+state using the original ID before authorizing another command. Automatic outbox
+retries and recovery preserve the original `SentAt`; direct delivery callers
+likewise reuse it. A new outbox submission after retirement receives a new staging
+time. A fresh submission after an
 identity's retention ends can be processed again when its new send time is
 admitted; reconcile the original outcome before authorizing it.
 
