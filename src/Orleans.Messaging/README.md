@@ -168,8 +168,8 @@ construction or activation setup, before journal recovery.
   until `OutboxRetryTimeout`, and a self-sent message fails its `Send`.
   Sink-owned messages never occupy capacity and have no inbox retry lifecycle; the
   sink honors their `DeliverAt`. Declined messages follow the handler path once
-  `DeliverAt` passes. The admission fence prevents a compacted logical send from
-  reaching the sink again.
+  `DeliverAt` passes. After its processed record is removed, a message at or below
+  the durable admission floor receives `Expired` before reaching the sink.
 - `IInbox.Register(IInboxWorkSource)` adds a work source: a component, such as a
   sink, that holds durable work in the grain's journal. `GetWakeupDelay` returns how
   soon a deactivated grain must wake to resume that work, or `null` when none is
