@@ -75,7 +75,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
             .GetNearestStoredDescendants(parentId, _isStored)
             .Select(id => (id, (IDurableTaskState)Expose(id, _items[id])));
 
-    public IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request)
+    public IDurableTaskState GetOrCreateTask(TaskId taskId, DurableTaskRecordKind kind, IDurableTaskRequest? request)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (_items.TryGetValue(taskId, out var result))
@@ -88,7 +88,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
             ValidateRequest(request);
         }
 
-        result = new DurableTaskState { CreatedAt = _timeProvider.GetUtcNow() }.Bind(_serializer);
+        result = new DurableTaskState { Kind = kind, CreatedAt = _timeProvider.GetUtcNow() }.Bind(_serializer);
         result.SetRequest(request);
         _items.Add(taskId, result);
         _hierarchy?.Add(taskId);
@@ -135,6 +135,14 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items[taskId] = typedState;
     }
 
+    public void SetInvocation(TaskId taskId, IDurableTaskState state)
+    {
+        var typedState = GetState(taskId, state);
+        Debug.Assert(typedState.Kind == DurableTaskRecordKind.EarlyCancellation, "Only an early cancellation record becomes its invocation.");
+        typedState.Kind = DurableTaskRecordKind.Invocation;
+        _items[taskId] = typedState;
+    }
+
     public void SetIncarnation(TaskId taskId, IDurableTaskState state, Guid incarnation)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(incarnation, Guid.Empty);
@@ -163,14 +171,14 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
     /// The record's state is complete before it is added, so the journal holds one entry for the state and one for the
     /// result's payload. A result which doesn't serialize throws before anything is staged.
     /// </remarks>
-    public IDurableTaskState AddRecord(TaskId taskId, string fingerprint, DurableTaskResponse response)
+    public IDurableTaskState AddRecord(TaskId taskId, DurableTaskRecordKind kind, string fingerprint, DurableTaskResponse response)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
         ArgumentNullException.ThrowIfNull(response);
         Debug.Assert(!_items.ContainsKey(taskId), "A record is added once.");
         var now = _timeProvider.GetUtcNow();
-        var state = new DurableTaskState { CreatedAt = now, RequestFingerprint = fingerprint }.Bind(_serializer);
+        var state = new DurableTaskState { Kind = kind, CreatedAt = now, RequestFingerprint = fingerprint }.Bind(_serializer);
         state.SetRequest(null);
         state.SetResult(response);
         state.CompletedAt = now;

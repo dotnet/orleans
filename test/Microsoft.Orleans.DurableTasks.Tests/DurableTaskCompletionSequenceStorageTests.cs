@@ -1,4 +1,5 @@
 using Orleans.DurableTasks;
+using Orleans.DurableTasks.Protocol;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
@@ -22,9 +23,9 @@ public sealed class DurableTaskCompletionSequenceStorageTests
         await using (var activation = await harness.ActivateAsync(cancellationToken))
         {
             var storage = activation.Storage;
-            storage.SetResponse(first, storage.GetOrCreateTask(first, request: null), DurableTaskResponse.FromResult(1));
-            storage.SetResponse(second, storage.GetOrCreateTask(second, request: null), DurableTaskResponse.FromResult(2));
-            _ = storage.GetOrCreateTask(pending, request: null);
+            storage.SetResponse(first, storage.GetOrCreateTask(first, DurableTaskRecordKind.LocalStep, request: null), DurableTaskResponse.FromResult(1));
+            storage.SetResponse(second, storage.GetOrCreateTask(second, DurableTaskRecordKind.LocalStep, request: null), DurableTaskResponse.FromResult(2));
+            _ = storage.GetOrCreateTask(pending, DurableTaskRecordKind.LocalStep, request: null);
             await storage.WriteAsync(cancellationToken);
         }
 
@@ -36,7 +37,7 @@ public sealed class DurableTaskCompletionSequenceStorageTests
         Assert.Equal(2, recoveredSecond.CompletionSequence);
         Assert.Equal(0, recoveredPending.CompletionSequence);
 
-        var state = recovery.Storage.GetOrCreateTask(later, request: null);
+        var state = recovery.Storage.GetOrCreateTask(later, DurableTaskRecordKind.LocalStep, request: null);
         recovery.Storage.SetResponse(later, state, DurableTaskResponse.Completed);
         Assert.Equal(3, state.CompletionSequence);
     }

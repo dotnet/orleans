@@ -333,7 +333,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
 
         // The target exists by the replay, which returns the recorded result instead of signaling it.
-        var target = storage.GetOrCreateTask(targetId, CreateRequest(2));
+        var target = storage.GetOrCreateTask(targetId, DurableTaskRecordKind.Invocation, CreateRequest(2));
         storage.SetRequestFingerprint(targetId, target, "target-fingerprint");
         var (replacement, _, _, _) = CreateRuntime(storage, manager);
         Volatile.Write(ref current, replacement);

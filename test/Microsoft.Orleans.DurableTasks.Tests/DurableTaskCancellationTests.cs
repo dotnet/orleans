@@ -356,7 +356,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var (_, storage, manager, _) = CreateRuntime();
         var rootId = TaskId.Parse("root");
         var request = CreateRequest(1);
-        var state = storage.GetOrCreateTask(rootId, request);
+        var state = storage.GetOrCreateTask(rootId, DurableTaskRecordKind.Invocation, request);
         storage.RequestCancellation(rootId, state);
         var (recovered, _, _, _) = CreateRuntime(storage, manager);
 

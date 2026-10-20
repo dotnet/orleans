@@ -494,7 +494,11 @@ synchronously on the activation which makes them, when the runtime stages them: 
   stalls: the runtime cancels the attempt with
   `DurableTaskAttemptCancellationReason.Diverged`, as it does with `UnsupportedVersion`
   for an unsupported version, discards its result, keeps the task pending, and raises
-  `ExecutionStalled` with the reason and the divergence. The grain wakes every
+  `ExecutionStalled` with the reason and the divergence. Each record stores the kind of
+  operation which created it, such as a call, a step, a delay, an effect, or a cancellation
+  which arrived before its invocation, so a replay which requests a delay where a step was
+  recorded, a step where a delay was recorded, or a delay where a call was recorded stalls
+  without observing or changing the other operation's record. The grain wakes every
   `DurableTaskOptions.StalledExecutionRetryInterval`, so a later activation replays the
   execution with the code it runs. A caller whose start conflicts with a different
   request under the same root identifier still receives `DurableTaskConflictException`.

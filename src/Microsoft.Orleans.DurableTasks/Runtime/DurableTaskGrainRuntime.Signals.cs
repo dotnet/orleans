@@ -156,7 +156,7 @@ internal sealed partial class DurableTaskGrainRuntime
             MessageTransport.SendSignal(GrainId, target, taskId, name, value, payloadFingerprint, GetIncarnation(markerId));
         }
 
-        var marker = GetOrCreateTask(markerId, request: null);
+        var marker = GetOrCreateTask(markerId, DurableTaskRecordKind.SignalSend, request: null);
         _storage.SetRequestFingerprint(markerId, marker, markerFingerprint);
         SetResponse(
             markerId,
@@ -289,7 +289,7 @@ internal sealed partial class DurableTaskGrainRuntime
             }
         }
 
-        record = GetOrCreateTask(recordId, request: null);
+        record = GetOrCreateTask(recordId, DurableTaskRecordKind.SignalValue, request: null);
         _storage.SetRequestFingerprint(recordId, record, payloadFingerprint);
         SetResponse(recordId, record, value);
         _pendingHandleResponses[recordId] = value;
@@ -302,9 +302,7 @@ internal sealed partial class DurableTaskGrainRuntime
     }
 
     /// <summary>Returns whether a task records a signal's value.</summary>
-    private static bool IsSignalRecord(IDurableTaskState state) =>
-        state.RequestFingerprint is { } fingerprint
-        && fingerprint.StartsWith(SignalFingerprintPrefix, StringComparison.Ordinal);
+    private static bool IsSignalRecord(IDurableTaskState state) => state.Kind == DurableTaskRecordKind.SignalValue;
 
     /// <summary>Returns when a signal which arrived before its invocation is deleted unless the invocation arrives.</summary>
     private DateTimeOffset GetEarlySignalExpiry(IDurableTaskState record) =>

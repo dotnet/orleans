@@ -332,7 +332,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
         else
         {
-            decision = GetOrCreateTask(decisionId, request: null);
+            decision = GetOrCreateTask(decisionId, DurableTaskRecordKind.Selection, request: null);
             _storage.SetRequestFingerprint(decisionId, decision, fingerprint);
         }
 
@@ -349,7 +349,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                     continue;
                 }
 
-                decision = GetOrCreateTask(decisionId, request: null);
+                decision = GetOrCreateTask(decisionId, DurableTaskRecordKind.Selection, request: null);
                 StoreResult(decisionId, decision, DurableTaskResponse.FromResult(candidate));
                 await WriteStateAsync(cancellationToken);
                 return candidate;
@@ -442,6 +442,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         { RemoteTarget.IsDefault: false } => $"a call to grain '{state.RemoteTarget}' ({AbbreviateFingerprint(state.RemoteRequestFingerprint)})",
         { DueTime: { } dueTime } => $"a delay due at {dueTime:O}",
+        { Kind: DurableTaskRecordKind.Delay } => "a delay",
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(CompletionDecisionFingerprintPrefix, StringComparison.Ordinal) => "a selection of the first task to complete",
         _ when TryGetDetachedTask(state, out var target, out var rootId) => DescribeDetachedStart(target, rootId),
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalSendFingerprintPrefix, StringComparison.Ordinal) => "a signal's send",
@@ -450,7 +451,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         { RequestFingerprint: EffectFingerprint } => "a DurableTask.RunInline effect",
         { RequestFingerprint: VersionFingerprint } => "a version decision",
         { RequestFingerprint: { } fingerprint } => $"a request ({AbbreviateFingerprint(fingerprint)})",
-        { CancellationRequestedAt: not null, CompletedAt: null } => "a cancellation which arrived before its request",
+        { Kind: DurableTaskRecordKind.EarlyCancellation } => "a cancellation which arrived before its request",
         _ => "a local child task",
     };
 
@@ -746,10 +747,10 @@ internal sealed partial class DurableTaskGrainRuntime(
     private ValueTask WriteStateAsync(CancellationToken cancellationToken) => _storage.WriteAsync(cancellationToken);
 
     /// <summary>Returns a task's state, staging the state of a task which doesn't exist.</summary>
-    private IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request)
+    private IDurableTaskState GetOrCreateTask(TaskId taskId, DurableTaskRecordKind kind, IDurableTaskRequest? request)
     {
         var reportCreation = DurableTaskEvents.IsTaskCreatedEnabled && !_storage.TryGetTask(taskId, out _);
-        var state = _storage.GetOrCreateTask(taskId, request);
+        var state = _storage.GetOrCreateTask(taskId, kind, request);
         if (reportCreation)
         {
             DurableTaskEvents.EmitTaskCreated(GrainContext, taskId);
@@ -766,9 +767,9 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     /// <summary>Stages a new terminal record of an execution, such as an effect's outcome or a version decision.</summary>
-    private void AddRecord(TaskId taskId, string fingerprint, DurableTaskResponse response)
+    private void AddRecord(TaskId taskId, DurableTaskRecordKind kind, string fingerprint, DurableTaskResponse response)
     {
-        _storage.AddRecord(taskId, fingerprint, response);
+        _storage.AddRecord(taskId, kind, fingerprint, response);
         DurableTaskEvents.EmitTaskCreated(GrainContext, taskId);
         DurableTaskEvents.EmitTaskCompleted(GrainContext, taskId, response);
     }
@@ -820,7 +821,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
         }
 
-        state ??= GetOrCreateTask(taskId, request: null);
+        state ??= GetOrCreateTask(taskId, DurableTaskRecordKind.RemoteCall, request: null);
         MarkShielded(taskId, state, shielded);
         if (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)
         {
@@ -843,8 +844,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     // Fingerprints of operations in an execution tree begin with '$', so they never equal a hexadecimal request fingerprint.
     private const string EffectFingerprint = "$effect";
 
-    private static bool IsEffectRecord(IDurableTaskState state) =>
-        string.Equals(state.RequestFingerprint, EffectFingerprint, StringComparison.Ordinal);
+    private static bool IsEffectRecord(IDurableTaskState state) => state.Kind == DurableTaskRecordKind.Effect;
 
     /// <summary>
     /// Returns the outcome which <paramref name="effectId"/> records, or runs <paramref name="effect"/> and stages a
@@ -889,12 +889,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         var response = effect(state);
         try
         {
-            AddRecord(effectId, EffectFingerprint, response);
+            AddRecord(effectId, DurableTaskRecordKind.Effect, EffectFingerprint, response);
         }
         catch (Exception exception) when (response.Exception is null)
         {
             response = DurableTaskResponse.FromException(exception);
-            AddRecord(effectId, EffectFingerprint, response);
+            AddRecord(effectId, DurableTaskRecordKind.Effect, EffectFingerprint, response);
         }
 
         return response;
@@ -921,8 +921,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 var decision = ReadRecordedResult(execution.Child(segment), recorded);
                 Debug.Assert(
-                    string.Equals(recorded.RequestFingerprint, VersionFingerprint, StringComparison.Ordinal)
-                    && decision is { IsCompleted: true },
+                    IsVersionRecord(recorded) && decision is { IsCompleted: true },
                     "Only version decisions are recorded under version segments.");
                 return decision!.GetResult<int>();
             }
@@ -934,13 +933,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         var recordId = executionId.Child(segment);
-        AddRecord(recordId, VersionFingerprint, DurableTaskResponse.FromResult(version));
+        AddRecord(recordId, DurableTaskRecordKind.Version, VersionFingerprint, DurableTaskResponse.FromResult(version));
         DurableTaskEvents.EmitVersionRecorded(GrainContext, executionId, name, version);
         return version;
     }
 
-    private static bool IsVersionRecord(IDurableTaskState state) =>
-        string.Equals(state.RequestFingerprint, VersionFingerprint, StringComparison.Ordinal);
+    private static bool IsVersionRecord(IDurableTaskState state) => state.Kind == DurableTaskRecordKind.Version;
 
     void IDurableTaskGrainRuntime.ThrowIfRecordedAsEffect(TaskId operationId, TaskId effectId, string requested)
     {
@@ -1027,6 +1025,17 @@ internal sealed partial class DurableTaskGrainRuntime(
         var transport = MessageTransport;
         if (_storage.TryGetTask(taskId, out var state))
         {
+            // A delay replays only from a delay's record, or from the record of the invoked task whose body is the delay:
+            // another operation's outcome or state is never the delay's.
+            if (state.Kind != DurableTaskRecordKind.Delay
+                && !(state.Kind == DurableTaskRecordKind.Invocation && TryGetExecutionContext(taskId, out _)))
+            {
+                throw CreateDivergenceException(
+                    $"Durable delay '{taskId}' is already associated with another operation.",
+                    state,
+                    $"a delay due at {dueTime:O}");
+            }
+
             if (ReadRecordedResult(taskId, state) is { IsCompleted: true } completed)
             {
                 return completed;
@@ -1052,7 +1061,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
         }
 
-        state ??= GetOrCreateTask(taskId, request: null);
+        state ??= GetOrCreateTask(taskId, DurableTaskRecordKind.Delay, request: null);
         var generation = checked(state.ResumeGeneration + 1);
         _storage.SetDelay(taskId, state, dueTime, generation);
 
@@ -1341,7 +1350,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var fingerprint = IDurableTaskRequest.GetFingerprint(request, _shared.Serializer);
         if (!_storage.TryGetTask(taskId, out var state))
         {
-            state = GetOrCreateTask(taskId, request);
+            state = GetOrCreateTask(taskId, DurableTaskRecordKind.Invocation, request);
             StageCaller(taskId, state, requestContext.CallerId);
             _storage.SetRequestFingerprint(taskId, state, fingerprint);
             _storage.SetIncarnation(taskId, state, Guid.NewGuid());
@@ -1403,7 +1412,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         // A run's incarnation is minted when its invocation is first stored, which a record of an earlier cancellation
-        // precedes.
+        // precedes. That record becomes the invocation's.
+        if (state.Kind == DurableTaskRecordKind.EarlyCancellation)
+        {
+            _storage.SetInvocation(taskId, state);
+        }
+
         if (state.Incarnation == Guid.Empty)
         {
             _storage.SetIncarnation(taskId, state, Guid.NewGuid());
@@ -1955,17 +1969,12 @@ internal sealed partial class DurableTaskGrainRuntime(
                 }
             }
         }
-        else if (state is not null
-            && (state.Request is not null
-                || state.RequestFingerprint is not null
-                || !state.CallerId.IsDefault
-                || !state.RemoteTarget.IsDefault
-                || state.RemoteRequestFingerprint is not null))
+        else if (state is not null && state.Kind != GetLocalKind(durableTask))
         {
             throw CreateDivergenceException(
                 $"Durable child task '{taskId}' is already associated with a different request.",
                 state,
-                "a local child task");
+                GetLocalKind(durableTask) == DurableTaskRecordKind.Delay ? "a delay" : "a local child task");
         }
 
         // A requested cancellation terminalizes a leaf, such as a delay or a child whose body hasn't started. A remote
@@ -2010,8 +2019,8 @@ internal sealed partial class DurableTaskGrainRuntime(
         // Otherwise, the task must be a local method invocation. Its state is staged and commits with the next write,
         // such as the first durable operation of its body or its result, so a synchronous step costs one write. A step's
         // identity and inputs follow from its parent's inputs and earlier results, so a replay which finds no record
-        // runs the step again.
-        state ??= GetOrCreateTask(taskId, null);
+        // runs the step again. A delay is a local child whose body records the delay under the child's own identifier.
+        state ??= GetOrCreateTask(taskId, GetLocalKind(durableTask), request: null);
         MarkShielded(taskId, state, shielded);
 
         var executionContext = CreateExecutionContext(taskId);
@@ -2022,6 +2031,17 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <summary>A staged start's handle, and whether the start staged changes which a write commits.</summary>
     private readonly record struct StagedChild(IScheduledTaskHandle Handle, bool RequiresWrite);
+
+    // The definitions which DurableTask.Delay and DurableTask.DelayUntil create, whose bodies record a delay under their
+    // child's own identifier.
+    private static readonly Type DelayType = DurableTask.Delay(TimeSpan.Zero).GetType();
+    private static readonly Type DelayUntilType = DurableTask.DelayUntil(DateTimeOffset.MinValue).GetType();
+
+    /// <summary>Returns the kind of the record of a local child which runs <paramref name="durableTask"/>.</summary>
+    private static DurableTaskRecordKind GetLocalKind(DurableTask durableTask) =>
+        durableTask.GetType() is var type && (type == DelayType || type == DelayUntilType)
+            ? DurableTaskRecordKind.Delay
+            : DurableTaskRecordKind.LocalStep;
 
     private StagedChild StageRemoteChild(TaskId taskId, IDurableTaskRequest request, bool shielded)
     {
@@ -2544,11 +2564,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <summary>Returns whether a task records only a cancellation which arrived before its invocation.</summary>
     private static bool IsCancellationRecord(IDurableTaskState state) =>
-        state.CancellationRequestedAt.HasValue
-        && state.RequestFingerprint is null
-        && state.RemoteRequestFingerprint is null
-        && state.DueTime is null
-        && state.Request is null;
+        state.Kind == DurableTaskRecordKind.EarlyCancellation;
 
     private bool HasStoredAncestor(TaskId taskId)
     {
@@ -2822,7 +2838,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (!_storage.TryGetTask(taskId, out var taskState))
         {
             // The cancellation can precede its invocation, which this record cancels on arrival.
-            taskState = GetOrCreateTask(taskId, request: null);
+            taskState = GetOrCreateTask(taskId, DurableTaskRecordKind.EarlyCancellation, request: null);
             StageCaller(taskId, taskState, callerId);
             _storage.RequestCancellation(taskId, taskState, reason);
             TrackExpiry(AddSaturating(taskState.CreatedAt, _shared.InvocationAdmissionWindow));

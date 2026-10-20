@@ -376,7 +376,7 @@ public sealed partial class DurableTaskSignalTests
         var target = GrainId.Create("target", "one");
         var markerId = WorkflowId.Child("$child-1");
         var value = DurableTaskResponse.FromResult("ada");
-        var workflow = harness.Storage.GetOrCreateTask(WorkflowId, request: null);
+        var workflow = harness.Storage.GetOrCreateTask(WorkflowId, DurableTaskRecordKind.Invocation, request: null);
         harness.Storage.SetRequestFingerprint(WorkflowId, workflow, "0123456789ABCDEF");
         harness.Storage.SetIncarnation(WorkflowId, workflow, Guid.NewGuid());
 
@@ -630,16 +630,18 @@ public sealed partial class DurableTaskSignalTests
         public IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId task) =>
             _hierarchy.GetNearestStoredDescendants(task, _states.ContainsKey).Select(id => (id, (IDurableTaskState)_states[id]));
 
-        public IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request)
+        public IDurableTaskState GetOrCreateTask(TaskId taskId, DurableTaskRecordKind kind, IDurableTaskRequest? request)
         {
             if (!_states.TryGetValue(taskId, out var state))
             {
-                _states.Add(taskId, state = new State { Request = request, CreatedAt = timeProvider.GetUtcNow() });
+                _states.Add(taskId, state = new State { Kind = kind, Request = request, CreatedAt = timeProvider.GetUtcNow() });
                 _hierarchy.Add(taskId);
             }
 
             return state;
         }
+
+        public void SetInvocation(TaskId taskId, IDurableTaskState state) => ((State)state).Kind = DurableTaskRecordKind.Invocation;
 
         public void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request) => ((State)state).Request = request;
 
@@ -718,6 +720,7 @@ public sealed partial class DurableTaskSignalTests
 
     private sealed class State : IDurableTaskState
     {
+        public DurableTaskRecordKind Kind { get; set; }
         public DurableTaskResponse? Result { get; set; }
         public HashSet<DurableTaskSubscriber> CompletionDestinations { get; } = [];
         public IDurableTaskRequest? Request { get; set; }

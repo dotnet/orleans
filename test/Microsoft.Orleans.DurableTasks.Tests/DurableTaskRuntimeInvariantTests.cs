@@ -3165,7 +3165,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var (runtime, storage, _, transport) = CreateRuntime();
         var childId = TaskId.Parse("root/step");
         var target = GrainId.Create("target", "one");
-        storage.SetRemoteRequest(childId, storage.GetOrCreate(childId), target, "0123456789ABCDEF0123");
+        storage.SetRemoteRequest(childId, storage.GetOrCreate(childId, DurableTaskRecordKind.RemoteCall), target, "0123456789ABCDEF0123");
 
         // The workflow changed: a replay schedules a local step where the first execution recorded a grain call.
         var exception = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
@@ -4534,7 +4534,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         public TestTaskState Get(TaskId id) => _states[id];
         public bool Contains(TaskId id) => _states.ContainsKey(id);
-        public TestTaskState GetOrCreate(TaskId id) => (TestTaskState)GetOrCreateTask(id, null);
+        public TestTaskState GetOrCreate(TaskId id, DurableTaskRecordKind kind = DurableTaskRecordKind.LocalStep) =>
+            (TestTaskState)GetOrCreateTask(id, kind, null);
 
         /// <summary>
         /// Stores a pending invoked task whose execution tree holds the nodes which a test records beneath it, as a durable
@@ -4542,7 +4543,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         /// </summary>
         public TestTaskState AddInvoked(TaskId id)
         {
-            var state = GetOrCreate(id);
+            var state = GetOrCreate(id, DurableTaskRecordKind.Invocation);
             state.RequestFingerprint = "0123456789ABCDEF";
             state.Incarnation = Guid.NewGuid();
             return state;
@@ -4553,12 +4554,13 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 .GetNearestStoredDescendants(task, _states.ContainsKey)
                 .Select(id => (id, (IDurableTaskState)_states[id]));
 
-        public IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request)
+        public IDurableTaskState GetOrCreateTask(TaskId taskId, DurableTaskRecordKind kind, IDurableTaskRequest? request)
         {
             if (!_states.TryGetValue(taskId, out var state))
             {
                 state = new TestTaskState
                 {
+                    Kind = kind,
                     Request = request,
                     CreatedAt = _timeProvider.GetUtcNow(),
                 };
@@ -4568,6 +4570,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
             return state;
         }
+
+        public void SetInvocation(TaskId taskId, IDurableTaskState state) =>
+            ((TestTaskState)state).Kind = DurableTaskRecordKind.Invocation;
 
         public void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request) =>
             ((TestTaskState)state).Request = request;
@@ -4662,6 +4667,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     /// </summary>
     private sealed class TestTaskState : IDurableTaskState
     {
+        public DurableTaskRecordKind Kind { get; set; }
         public DurableTaskResponse? Result { get; set; }
         public HashSet<DurableTaskSubscriber> CompletionDestinations { get; set; } = [];
         public IDurableTaskRequest? Request { get; set; }

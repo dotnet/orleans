@@ -14,7 +14,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every persisted member is a primitive, timestamp, string, <see cref="GrainId"/>, or set of subscribers, each a grain
+/// Every persisted member is a primitive, enumeration, timestamp, string, <see cref="GrainId"/>, or set of subscribers, each a grain
 /// identity and a task identifier, so every journal format can store the state. The request and the result are
 /// polymorphic Orleans-serializable values, held as
 /// opaque Orleans-serialized payloads in <see cref="RequestPayload"/> and <see cref="ResultPayload"/>. The payloads are
@@ -84,6 +84,10 @@ internal class DurableTaskState : IDurableTaskState
     public DurableTaskResponse? Result => _result ??= _resultPayload is { } payload
         ? GetSerializer().Deserialize<DurableTaskResponse>(payload)
         : null;
+
+    /// <inheritdoc cref="IDurableTaskState.Kind"/>
+    [Id(23)]
+    public DurableTaskRecordKind Kind { get; set; }
 
     /// <inheritdoc cref="IDurableTaskState.CompletionDestinations"/>
     [Id(6)]

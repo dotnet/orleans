@@ -44,7 +44,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     {
         var (runtime, storage, _, transport) = CreateRuntime();
         var taskId = TaskId.Parse("root/local");
-        ((IDurableTaskGrainStorage)storage).AddRecord(TaskId.Parse("root/local/charge"), "$effect", DurableTaskResponse.FromResult(1));
+        ((IDurableTaskGrainStorage)storage).AddRecord(TaskId.Parse("root/local/charge"), DurableTaskRecordKind.Effect, "$effect", DurableTaskResponse.FromResult(1));
         using var stalls = new StallRecorder(taskId);
 
         var handle = await runtime.ScheduleChildAsync(
@@ -86,7 +86,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     {
         var (runtime, storage, _, transport) = CreateRuntime();
         var taskId = TaskId.Parse("root/local");
-        ((IDurableTaskGrainStorage)storage).AddRecord(TaskId.Parse("root/local/wait"), "$effect", DurableTaskResponse.FromResult(1));
+        ((IDurableTaskGrainStorage)storage).AddRecord(TaskId.Parse("root/local/wait"), DurableTaskRecordKind.Effect, "$effect", DurableTaskResponse.FromResult(1));
         using var stalls = new StallRecorder(taskId);
 
         var handle = await runtime.ScheduleChildAsync(
