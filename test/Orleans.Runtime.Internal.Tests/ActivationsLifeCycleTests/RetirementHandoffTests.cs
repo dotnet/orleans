@@ -1645,15 +1645,17 @@ public sealed class RetirementHandoffTests
         };
     }
 
-    [Fact]
-    public async Task QueuedRequestsTooLargeToMigrateTogether_AreForwardedToTheMigratedActivation()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task QueuedRequestsTooLargeToMigrateTogether_AreForwardedToTheMigratedActivation(bool localCaller)
     {
         const int MaxMessageBodySize = 1024 * 1024;
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
             silo.Configure<SiloMessagingOptions>(options => options.MaxMessageBodySize = MaxMessageBodySize)));
         var source = cluster.Silos[1];
         var target = cluster.Silos[2];
-        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var grainFactory = (localCaller ? source : cluster.Silos[0]).ServiceProvider.GetRequiredService<IGrainFactory>();
         var key = Guid.NewGuid();
         var state = RetirementHandoffState.Create(key);
         var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
@@ -1743,13 +1745,14 @@ public sealed class RetirementHandoffTests
 
     [Theory]
     [InlineData("serialization")]
+    [InlineData("preparation")]
     [InlineData("before-message")]
     [InlineData("discard")]
     public async Task FailedOutgoingMigration_ReleasesCarriedRequests(string failure)
     {
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddOutgoingGrainCallFilter(async context =>
         {
-            if (failure != "serialization" && context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
+            if (failure is "before-message" or "discard" && context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
             {
                 if (failure == "discard")
                 {
@@ -1779,6 +1782,10 @@ public sealed class RetirementHandoffTests
         {
             request.RequestContextData = new() { ["unserializable"] = new UnserializableValue() };
         }
+        else if (failure == "preparation")
+        {
+            request.BodyObject = new UnserializableValue();
+        }
 
         var migrationContext = new MigrationContext(source.ServiceProvider.GetRequiredService<SerializerSessionPool>());
         Assert.True(migrationContext.TryAddValue("marker", new byte[20_000]));
@@ -1798,7 +1805,14 @@ public sealed class RetirementHandoffTests
         migration.Deliver(laterRequests: null);
         // Callback completion can precede the send worker's failure cleanup.
         await WaitUntilAsync(() => page.Version != pageVersion);
-        Assert.Null(request._bodyObject);
+        if (failure == "preparation")
+        {
+            Assert.IsType<UnserializableValue>(request._bodyObject);
+        }
+        else
+        {
+            Assert.Null(request._bodyObject);
+        }
         Assert.Null(later._bodyObject);
         Assert.Empty(migrationContext.Keys);
         Assert.NotEqual(pageVersion, page.Version);
@@ -2045,11 +2059,13 @@ public sealed class RetirementHandoffTests
         }
     }
 
-    [Fact]
-    public async Task Migration_AccountsForEachEmbeddedFramesCodecOverhead()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Migration_AccountsForCurrentHeadersAndEachEmbeddedFramesCodecOverhead(bool previouslyMigrated)
     {
         const int BodyLimit = 1024 * 1024;
-        const int FrameLength = 1047;
+        var frameLength = previouslyMigrated ? 950 : 1047;
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
             silo.Configure<SiloMessagingOptions>(options => options.MaxMessageBodySize = BodyLimit)));
         var source = cluster.Silos[1];
@@ -2062,31 +2078,49 @@ public sealed class RetirementHandoffTests
             .GetGrain<IRetirementHandoffGrain>(Guid.NewGuid(), typeof(RetirementHandoffGrain).FullName).GetGrainId();
         var requests = new List<Message>();
         using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
         try
         {
             using var buffer = new Orleans.Serialization.Buffers.ArcBufferWriter();
             var request = CreateRequest(cluster, grainId, 1, new byte[900]);
             Orleans.Runtime.Messaging.MessageFrames.Write(serializer, buffer, request);
-            var payloadLength = FrameLength - (buffer.Length - 900);
+            var payloadLength = frameLength - (buffer.Length - 900);
             buffer.Reset();
             for (var i = 0; i < 1000; i++)
             {
                 request = CreateRequest(cluster, grainId, i, new byte[payloadLength]);
                 Orleans.Runtime.Messaging.MessageFrames.Write(serializer, buffer, request);
-                Assert.Equal(FrameLength, buffer.Length);
-                requests.Add(Orleans.Runtime.Messaging.MessageFrames.Read(shared, buffer));
+                Assert.Equal(frameLength, buffer.Length);
+                var received = Orleans.Runtime.Messaging.MessageFrames.Read(shared, buffer);
+                if (previouslyMigrated)
+                {
+                    received.AddToCacheInvalidationHeader(CreateSourceAddress(cluster.Silos[0], grainId), CreateSourceAddress(source, grainId));
+                }
+
+                requests.Add(received);
                 buffer.Reset();
             }
 
             // The frames fit before codec tags and length prefixes are included, but the serialized list alone exceeds the limit.
-            Assert.True(FrameLength * requests.Count < BodyLimit - 1024);
+            Assert.True(frameLength * requests.Count < BodyLimit - 1024);
             var serialized = services.GetRequiredService<Orleans.Serialization.Serializer>().SerializeToArray(requests);
             Assert.True(serialized.Length > BodyLimit);
-            var migration = manager.StartMigration(target.SiloAddress, CreateSourceAddress(source, grainId),
-                new MigrationContext(services.GetRequiredService<SerializerSessionPool>()), requests, cancellation.Token);
-            Assert.Null(migration.Package.Requests);
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => migration.Completion);
+            ActivationMigration? migration = null;
+            await manager.RunOrQueueTask(() =>
+            {
+                try
+                {
+                    migration = manager.StartMigration(target.SiloAddress, CreateSourceAddress(source, grainId),
+                        new MigrationContext(services.GetRequiredService<SerializerSessionPool>()), requests, cancellation.Token);
+                    Assert.Null(migration.Package.Requests);
+                }
+                finally
+                {
+                    cancellation.Cancel();
+                }
+
+                return Task.CompletedTask;
+            });
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => migration!.Completion);
         }
         finally
         {

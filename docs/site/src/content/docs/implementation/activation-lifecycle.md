@@ -61,6 +61,8 @@ Each migration RPC owns its batch while outbound serialization completes, includ
 
 The destination releases requests and contexts which remain unadmitted when validation, cancellation, or activation creation fails. Admitted requests remain owned by their activation. Canceling an unsent source migration releases its dehydration context while retaining its requests for ordinary forwarding.
 
+Before batching, the source retains local request bodies as owned serialized bytes and bounds each request's current headers, including cache updates from earlier migrations. Arbitrary request-context values use the configured maximum header size as a conservative bound, so sizing leaves those values untouched. Requests which do not fit with their migration state are forwarded individually using the retained body bytes.
+
 ```mermaid
 sequenceDiagram
     participant Source as Source activation

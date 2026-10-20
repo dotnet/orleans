@@ -78,7 +78,8 @@ internal struct GrainMigrationPackage
     /// The requests which were queued for the grain when it migrated, if any.
     /// </summary>
     /// <remarks>
-    /// The requests are serialized when the package is sent, as messages are, so the destination decodes their bodies only when it invokes them.
+    /// Requests retain serialized bodies. Their current headers and body bytes are written when the package is sent,
+    /// and the destination decodes each body only when it invokes the request.
     /// </remarks>
     [Id(2)]
     public List<Message>? Requests { get; set; }
@@ -124,7 +125,7 @@ internal interface IActivationMigrationManager
     /// <summary>
     /// Starts migrating an activation to the specified target, together with the requests which were queued for it.
     /// </summary>
-    /// <param name="target">The migration target.</param>
+    /// <param name="target">The other silo which receives the migration.</param>
     /// <param name="source">The address of the migrating activation.</param>
     /// <param name="migrationContext">Information about the grain being migrated, which will be consumed by the new activation.</param>
     /// <param name="requests">The requests which were queued for the activation, if any. The migration takes ownership of them.</param>
@@ -339,10 +340,6 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private const int MessageBodyFramingAllowance = 1_024;
     private const int PackageFramingAllowance = 64;
 
-    // Requests are serialized when their package is sent, so a package's size is estimated: a request which this silo received has a known serialized size,
-    // and other requests are assumed to be small.
-    private const int RequestSizeEstimate = 1_024;
-
     private readonly ConcurrentDictionary<SiloAddress, (Task PumpTask, Channel<ActivationMigration> WorkItemChannel)> _workers = new();
     private readonly CancellationTokenSource _shuttingDownCts = new();
     private readonly ILogger<ActivationMigrationManager> _logger;
@@ -544,35 +541,67 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
 
     public ActivationMigration StartMigration(SiloAddress targetSilo, GrainAddress source, MigrationContext migrationContext, List<Message>? requests, CancellationToken cancellationToken)
     {
+        Debug.Assert(!targetSilo.Equals(source.SiloAddress));
         var grainId = source.GrainId;
         var package = new GrainMigrationPackage { GrainId = grainId, MigrationContext = migrationContext };
 
         // Serializing the migration context releases its buffer, so the package's size is bounded using the context's size bound rather than measured.
         var size = PackageFramingAllowance + migrationContext.GetMaxSerializedSize() + grainId.Type.AsSpan().Length + grainId.Key.AsSpan().Length;
         List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes = null;
+        Exception? preparationError = null;
         if (requests is { Count: > 0 } && AcceptsMigratedRequests(targetSilo))
         {
-            var requestsSize = 0L;
-            foreach (var request in requests)
+            package.Requests = requests;
+            routes = GetRoutes(targetSilo, requests);
+            if (!cancellationToken.IsCancellationRequested)
             {
-                requestsSize += MessageCodec.MaxFramingSize
-                    + (request._bodyObject is MessageReadRequest received ? received.PayloadLength + Message.LENGTH_HEADER_SIZE : RequestSizeEstimate);
-            }
+                var shared = _runtimeClient.ServiceProvider.GetRequiredService<MessageHandlerShared>();
+                var serializer = shared.GetMessageSerializer();
+                try
+                {
+                    using var buffer = new Orleans.Serialization.Buffers.ArcBufferWriter();
+                    var requestsSize = 0L;
+                    foreach (var request in requests)
+                    {
+                        requestsSize += serializer.PrepareRequestBody(shared, buffer, request)
+                            + serializer.GetHeaderSizeBound(buffer, request) + Message.LENGTH_HEADER_SIZE + MessageCodec.MaxFramingSize;
+                        if (size + requestsSize > MaxBatchBodySize)
+                        {
+                            break;
+                        }
+                    }
 
-            if (size + requestsSize <= MaxBatchBodySize)
-            {
-                package.Requests = requests;
-                size += requestsSize;
-                routes = GetRoutes(targetSilo, requests);
-            }
-            else
-            {
-                // The requests are forwarded instead.
-                LogDebugMigratedRequestsTooLarge(requests.Count, grainId, targetSilo);
+                    if (size + requestsSize <= MaxBatchBodySize)
+                    {
+                        size += requestsSize;
+                    }
+                    else
+                    {
+                        package.Requests = null;
+                        routes = null;
+                        LogDebugMigratedRequestsTooLarge(requests.Count, grainId, targetSilo);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    preparationError = exception;
+                }
+                finally
+                {
+                    shared.Return(serializer);
+                }
             }
         }
 
         var migration = new ActivationMigration(this, source, targetSilo, package, requests, routes, size, cancellationToken);
+        if (preparationError is not null)
+        {
+            // Serialization has consumed values. Fail this migration and reject its requests instead of forwarding partially serialized objects.
+            migration.TrySend();
+            migration.Complete(preparationError);
+            return migration;
+        }
+
         migration.RegisterCancellation();
         if (!GetOrCreateWorker(targetSilo).TryWrite(migration))
         {
@@ -989,7 +1018,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "{Count} queued requests for migrating grain {GrainId} do not fit in a message, so they are forwarded instead of migrating with it to {SiloAddress}."
+        Message = "The size bound for {Count} queued requests for migrating grain {GrainId} exceeds the migration message budget, so they are forwarded to {SiloAddress}."
     )]
     private partial void LogDebugMigratedRequestsTooLarge(int count, GrainId grainId, SiloAddress siloAddress);
 

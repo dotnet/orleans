@@ -218,6 +218,66 @@ public sealed class MessageFramesTests : IDisposable
 
     private List<Message> RoundTrip(List<Message> messages) => _serializer.Deserialize<List<Message>>(_serializer.SerializeToArray(messages))!;
 
+    [Fact]
+    public void PreparedRequestBody_SurvivesNonConsumingContextSizingAndForwarding()
+    {
+        var shared = _services.GetRequiredService<MessageHandlerShared>();
+        var serializer = shared.GetMessageSerializer();
+        var payload = Enumerable.Repeat((byte)0x5A, 20_000).ToArray();
+        var contextPayload = Enumerable.Repeat((byte)0x2B, 30_000).ToArray();
+        using var message = CreateRequest(1, timeToLive: null);
+        message.BodyObject = CreatePooledBuffer(payload);
+        var contextBuffer = CreatePooledBuffer(contextPayload);
+        message.RequestContextData = new() { ["pooled"] = contextBuffer };
+        try
+        {
+            using var scratch = new ArcBufferWriter();
+            var length = serializer.PrepareRequestBody(shared, scratch, message);
+            var body = Assert.IsType<MessageReadRequest>(message._bodyObject);
+            Assert.Equal(body.BodyLength, length);
+            Assert.Equal(length, serializer.PrepareRequestBody(shared, scratch, message));
+            Assert.Same(body, message._bodyObject);
+            Assert.Equal(new SiloMessagingOptions().MaxMessageHeaderSize, serializer.GetHeaderSizeBound(scratch, message));
+            Assert.Equal(contextPayload, contextBuffer.ToArray());
+
+            using var frame = new ArcBufferWriter();
+            MessageFrames.Write(serializer, frame, message);
+            using var received = MessageFrames.Read(shared, frame);
+            using var receivedBody = Assert.IsType<PooledBuffer>(received.BodyObject);
+            using var receivedContext = Assert.IsType<PooledBuffer>(received.RequestContextData!["pooled"]);
+            Assert.Equal(payload, receivedBody.ToArray());
+            Assert.Equal(contextPayload, receivedContext.ToArray());
+        }
+        finally
+        {
+            shared.Return(serializer);
+        }
+    }
+
+    [Fact]
+    public void HeaderSizeBound_UsesCurrentCacheUpdatesAndAllowsAddressGrowth()
+    {
+        var shared = _services.GetRequiredService<MessageHandlerShared>();
+        var serializer = shared.GetMessageSerializer();
+        using var message = Assert.Single(RoundTrip([CreateRequest(1, timeToLive: null)]));
+        var updateGrain = GrainId.Create("test", new string('k', 4096));
+        message.AddToCacheInvalidationHeader(new GrainAddress { GrainId = updateGrain }, validAddress: null);
+        try
+        {
+            using var buffer = new ArcBufferWriter();
+            var bound = serializer.GetHeaderSizeBound(buffer, message);
+            Assert.True(bound > 4096);
+            message.SendingSilo = SiloAddress.New(System.Net.IPAddress.IPv6Loopback, 65535, int.MaxValue);
+            message.TargetSilo = SiloAddress.New(System.Net.IPAddress.IPv6Loopback, 65534, int.MinValue);
+            var (headerLength, _) = MessageFrames.Write(serializer, buffer, message);
+            Assert.InRange((long)headerLength, 4097, bound);
+        }
+        finally
+        {
+            shared.Return(serializer);
+        }
+    }
+
     private static Message CreateRequest(long id, TimeSpan? timeToLive) => new()
     {
         Direction = Message.Directions.Request,
