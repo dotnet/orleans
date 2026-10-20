@@ -16,8 +16,9 @@ internal interface IDurableTaskState
     /// The tasks of other grains, or of this grain, which must receive the result of this task.
     /// </summary>
     /// <remarks>
-    /// The invoker subscribes under this task's own identifier, and a durable execution which awaits this task with
-    /// <c>GetDurableTask</c> subscribes under its own child's identifier. Each subscriber of a terminal task on another
+    /// The invoker subscribes under the identifier which it addresses this task by, and a durable execution which awaits
+    /// this task with <c>GetDurableTask</c> subscribes under its own child's identifier; a subscriber on another grain
+    /// names its task by its wire identifier. Each subscriber of a terminal task on another
     /// grain has a completion pending in the outbox until the outbox retires it, and the task is retained until then;
     /// a subscriber on this grain receives the result in the write which stores it. Local nested tasks have no
     /// subscribers.

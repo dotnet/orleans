@@ -105,7 +105,7 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
         {
             // The worker retains each canceled child's terminal state under the caller's scope until the caller's inbox
             // accepts its completion, then deletes it.
-            var childId = CallerScope.GetTaskId(coordinator.GetGrainId(), TaskId.CreateRoot("fan-out").Child($"wait-{index}"));
+            var childId = await events.WaitForCallerChildAsync(workerId, coordinator.GetGrainId(), TaskId.CreateRoot("fan-out").Child($"wait-{index}"));
             Assert.Equal(DurableTaskStatus.Canceled, (await events.WaitForCompletedAsync(workerId, childId)).Status);
             await events.WaitForDeletedAsync(workerId, childId);
         }

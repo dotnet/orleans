@@ -407,13 +407,13 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var rootId = TaskId.Parse("root");
         var childId = TaskId.Parse("root/remote");
         var request = CreateRemoteRequest(1);
-        storage.GetOrCreate(rootId);
+        storage.AddInvoked(rootId);
         var handle = await runtime.ScheduleChildAsync(childId, new TestStateManager.TestRemoteDurableTask(request), TestContext.Current.CancellationToken);
 
         await runtime.SignalCancellationAsync(rootId, TestContext.Current.CancellationToken);
 
         var cancellation = Assert.Single(transport.Cancellations);
-        Assert.Equal(childId, cancellation.TaskId);
+        Assert.Equal(runtime.GetWireId(childId), cancellation.TaskId);
         Assert.False((await handle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, TestContext.Current.CancellationToken)).IsCompleted);
         runtime.AcceptResponseFromInbox(childId, DurableTaskResponse.FromResult(4), request.Context!.TargetId);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -472,7 +472,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Assert.All(resultsAtWrite!, result => AssertAborted(result, "operator"));
         Assert.Equal(1, abortsAtWrite);
-        Assert.Equal((treeIds[2], remoteTarget, "operator"), transport.Aborts.Select(static abort => (abort.TaskId, abort.Target, abort.Reason)).Single());
+        Assert.Equal((treeIds[2], remoteTarget, "operator"), transport.Aborts.Select(static abort => (GetNodeId(abort.TaskId), abort.Target, abort.Reason)).Single());
         AssertAborted(await WaitForResponseAsync(runtime, rootId), "operator");
 
         // The running attempt observes host abort, not durable cancellation, and its result is discarded.

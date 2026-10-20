@@ -9,8 +9,9 @@ namespace Orleans.DurableTasks.Runtime;
 /// <param name="Target">The grain on which the invocation starts a task.</param>
 /// <param name="Payload">The encoded invocation message.</param>
 /// <param name="RecordId">
-/// The task which records the start and its outcome: a call's own task, or a detached task's subscription record. A root
-/// task which an ordinary grain method posted has none.
+/// The wire identifier of the task which records the start and its outcome: a call's own task, or a detached task's
+/// subscription record. A root task which an ordinary grain method posted has none. A retirement which names an earlier
+/// run of the record's tree, which was deleted, changes nothing.
 /// </param>
 /// <param name="SentAt">
 /// When the runtime first staged the invocation, on the Durable Jobs clock. The receiver admits the invocation until

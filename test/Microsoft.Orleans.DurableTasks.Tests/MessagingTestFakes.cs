@@ -78,11 +78,11 @@ internal static class MessagingTestHelpers
         }.ToInboxMessage();
     }
 
-    public static InboxMessage CreateResumeMessage(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime) =>
+    public static InboxMessage CreateResumeMessage(GrainId grainId, TaskId taskId, Guid incarnation, long generation, DateTimeOffset dueTime) =>
         MessageTypes.Resume.Create(
-            DurableTaskMessageTransport.CreateResumeMessageId(grainId, taskId, generation, dueTime),
+            DurableTaskMessageTransport.CreateResumeMessageId(grainId, taskId, incarnation, generation, dueTime),
             grainId,
-            new DurableTaskResumeMessage { TaskId = taskId, Generation = generation, Sender = grainId },
+            new DurableTaskResumeMessage { TaskId = taskId, Incarnation = incarnation, Generation = generation, Sender = grainId },
             dueTime).ToInboxMessage();
 
     public static IInboxHandlerContext CreateHandlerContext(InboxMessage message)

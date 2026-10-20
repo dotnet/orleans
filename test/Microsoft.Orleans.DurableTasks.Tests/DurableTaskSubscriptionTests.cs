@@ -56,7 +56,7 @@ public sealed class DurableTaskSubscriptionTests
         await subscriber.WriteAsync(TestCancellation);
 
         // The subscription is a child of the relay, recorded with its subscription.
-        Assert.Equal(new RecordedSubscription(SubscriberGrain, OperationGrain, OperationId, SubscriptionChildId, Unsubscribe: false), subscription);
+        Assert.Equal(new RecordedSubscription(SubscriberGrain, OperationGrain, OperationId, subscriber.Runtime.GetWireId(SubscriptionChildId), Unsubscribe: false), subscription);
         Assert.StartsWith("$subscribe:", subscriber.Get(SubscriptionChildId).RequestFingerprint, StringComparison.Ordinal);
         Assert.Equal(
             $"a subscription to task 'op' on grain '{OperationGrain}'",
@@ -65,7 +65,7 @@ public sealed class DurableTaskSubscriptionTests
         // The operation's grain adds the subscriber to the operation's completion destinations; a redelivery changes nothing.
         await operation.DeliverAsync(subscription.ToInboxMessage(), TestCancellation);
         await operation.DeliverAsync(subscription.ToInboxMessage(), TestCancellation);
-        Assert.Equal(new DurableTaskSubscriber(SubscriberGrain, SubscriptionChildId), Assert.Single(operation.Subscribers(OperationId)));
+        Assert.Equal(new DurableTaskSubscriber(SubscriberGrain, subscription.SubscriberId), Assert.Single(operation.Subscribers(OperationId)));
         Assert.Empty(operation.Transport.Completions);
 
         await operation.Tasks.SignalAsync(OperationId, Release, "done", TestCancellation);
@@ -73,7 +73,7 @@ public sealed class DurableTaskSubscriptionTests
         var completion = Assert.Single(operation.Transport.Completions);
         Assert.Equal((OperationGrain, SubscriberGrain, OperationId), (completion.Sender, completion.Target, completion.TaskId));
         var message = completion.Materialize(operation.Runtime);
-        Assert.Equal((OperationId, SubscriptionChildId, "done"), (message.TaskId, message.SubscriberId, message.Response.GetResult<string>()));
+        Assert.Equal((OperationId, (TaskId?)subscription.SubscriberId, "done"), (message.TaskId, message.SubscriberId, message.Response.GetResult<string>()));
 
         await subscriber.DeliverAsync(operation.CreateInboxMessage(completion), TestCancellation);
         Assert.Equal("done", (await subscriber.GetResponseAsync(RelayId, TestCancellation)).GetResult<string>());
@@ -243,13 +243,14 @@ public sealed class DurableTaskSubscriptionTests
         await operation.DeliverAsync(subscription.ToInboxMessage(), TestCancellation);
 
         var resume = await subscriber.WaitForResumeAsync();
-        subscriber.Runtime.ResumeDelayFromInbox(resume.TaskId, resume.Generation, SubscriberGrain);
+        subscriber.Runtime.ResumeDelayFromInbox(resume.TaskId, resume.Incarnation, resume.Generation, SubscriberGrain);
         await subscriber.WriteAsync(TestCancellation);
 
         Assert.Equal("timed out", (await subscriber.GetResponseAsync(RelayId, TestCancellation)).GetResult<string>());
         var unsubscription = await subscriber.Transport.WaitForSubscriptionAsync(2);
         Assert.Equal(subscription with { Unsubscribe = true }, unsubscription);
-        Assert.Equal(DurableTaskStatus.Canceled, subscriber.Get(subscription.SubscriberId).Result!.Status);
+        Assert.True(CallerScope.TryParseWireId(subscription.SubscriberId, out _, out var subscriptionId));
+        Assert.Equal(DurableTaskStatus.Canceled, subscriber.Get(subscriptionId).Result!.Status);
 
         // The subscription ends; the task continues and completes without a completion for the subscriber.
         await operation.DeliverAsync(unsubscription.ToInboxMessage(), TestCancellation);
@@ -366,9 +367,9 @@ public sealed class DurableTaskSubscriptionTests
         // A completion which arrives for the ended subscription changes nothing.
         await subscriber.DeliverAsync(
             MessagingTestHelpers.MessageTypes.Completion.Create(
-                DurableTaskMessageTransport.CreateMessageId(OperationGrain, SubscriberGrain, OperationId, DurableTaskMessageTypes.CompletionSubject, SubscriptionChildId.ToString()),
+                DurableTaskMessageTransport.CreateMessageId(OperationGrain, SubscriberGrain, OperationId, DurableTaskMessageTypes.CompletionSubject, subscription.SubscriberId.ToString()),
                 SubscriberGrain,
-                new DurableTaskCompletionMessage { TaskId = OperationId, Response = DurableTaskResponse.FromResult("late"), Sender = OperationGrain, SubscriberId = SubscriptionChildId }).ToInboxMessage(),
+                new DurableTaskCompletionMessage { TaskId = OperationId, Response = DurableTaskResponse.FromResult("late"), Sender = OperationGrain, SubscriberId = subscription.SubscriberId }).ToInboxMessage(),
             TestCancellation);
         Assert.IsType<DurableTaskAbortedException>(subscriber.Get(SubscriptionChildId).Result!.Exception);
     });
@@ -380,7 +381,7 @@ public sealed class DurableTaskSubscriptionTests
         subscriberHost.Workflows["relay"] = static () => AwaitTaskShielded(new GrainAddress(OperationGrain), "op");
         await using var subscriber = await subscriberHost.ActivateAsync(TestCancellation);
         await subscriber.ScheduleAsync(RelayId, "relay", TestCancellation);
-        await subscriber.Transport.WaitForSubscriptionAsync(1);
+        var subscription = await subscriber.Transport.WaitForSubscriptionAsync(1);
         await subscriber.WriteAsync(TestCancellation);
 
         // The cancellation doesn't end the shielded subscription, so the operation's result completes the relay.
@@ -389,9 +390,9 @@ public sealed class DurableTaskSubscriptionTests
         Assert.Null(subscriber.Get(SubscriptionChildId).Result);
         await subscriber.DeliverAsync(
             MessagingTestHelpers.MessageTypes.Completion.Create(
-                DurableTaskMessageTransport.CreateMessageId(OperationGrain, SubscriberGrain, OperationId, DurableTaskMessageTypes.CompletionSubject, SubscriptionChildId.ToString()),
+                DurableTaskMessageTransport.CreateMessageId(OperationGrain, SubscriberGrain, OperationId, DurableTaskMessageTypes.CompletionSubject, subscription.SubscriberId.ToString()),
                 SubscriberGrain,
-                new DurableTaskCompletionMessage { TaskId = OperationId, Response = DurableTaskResponse.FromResult("done"), Sender = OperationGrain, SubscriberId = SubscriptionChildId }).ToInboxMessage(),
+                new DurableTaskCompletionMessage { TaskId = OperationId, Response = DurableTaskResponse.FromResult("done"), Sender = OperationGrain, SubscriberId = subscription.SubscriberId }).ToInboxMessage(),
             TestCancellation);
 
         Assert.Equal("done|True", (await subscriber.GetResponseAsync(RelayId, TestCancellation)).GetResult<string>());
@@ -651,7 +652,7 @@ public sealed class DurableTaskSubscriptionTests
             return states;
         }
 
-        public async Task<(GrainId GrainId, TaskId TaskId, long Generation, DateTimeOffset DueTime)> WaitForResumeAsync()
+        public async Task<(GrainId GrainId, TaskId TaskId, long Generation, DateTimeOffset DueTime, Guid Incarnation)> WaitForResumeAsync()
         {
             await transport.ResumeSent.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
             return Assert.Single(transport.Resumes);

@@ -93,7 +93,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await manager.WriteStateAsync(cancellationToken);
         await canceling.WaitAsync(CancellationTestTimeout, cancellationToken);
 
-        Assert.Equal([quoteIds[0], quoteIds[2]], transport.Cancellations.Select(static cancellation => cancellation.TaskId).OrderBy(static id => id.ToString(), StringComparer.Ordinal));
+        Assert.Equal([quoteIds[0], quoteIds[2]], transport.Cancellations.Select(static cancellation => GetNodeId(cancellation.TaskId)).OrderBy(static id => id.ToString(), StringComparer.Ordinal));
         Assert.Equal([RaceLostReason, RaceLostReason], transport.CancellationReasons);
 
         // The race waits until every other call settles: one ends canceled, and the other completes anyway.
@@ -156,7 +156,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         transport.BeforeSendCancellation = (_, _, canceled) =>
         {
-            if (canceled == taskId)
+            if (GetNodeId(canceled) == taskId)
             {
                 sent.TrySetResult();
             }
@@ -176,6 +176,13 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             }
         };
         return sent.Task;
+    }
+
+    /// <summary>Returns the node of this grain's execution tree which the wire identifier <paramref name="wireId"/> names.</summary>
+    private static TaskId GetNodeId(TaskId wireId)
+    {
+        Assert.True(global::Orleans.DurableTasks.Runtime.CallerScope.TryParseWireId(wireId, out _, out var nodeId));
+        return nodeId;
     }
 
     private static Task ObserveInvocations(RecordingDurableTaskMessageTransport transport, int count)

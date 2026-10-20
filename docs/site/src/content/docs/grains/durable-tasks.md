@@ -127,10 +127,11 @@ place-order-{orderId}/ship
   `DurableTask.WhenAll(...).WithId("reserve")` identifies its inputs as `reserve/0`,
   `reserve/1`, and so on, in input order.
 - A call to another grain runs on that grain under the caller's scope,
-  `$caller/{callerGrainId}/{taskId}`: the order's record of the call
-  `place-order-{orderId}/reserve/0` is the catalog grain's task
-  `$caller/order/{orderId}/place-order-{orderId}/reserve/0`. Each caller has its own
-  scope, so callers whose workflows share a root ID never share a callee's task. A
+  `$caller/{callerGrainId}/{incarnation}/{taskId}`, where `{incarnation}` identifies the caller's run: the
+  order's record of the call `place-order-{orderId}/reserve/0` is the catalog grain's task
+  `$caller/order/{orderId}/{incarnation}/place-order-{orderId}/reserve/0`. Each caller has its own
+  scope, so callers whose workflows share a root ID never share a callee's task, and each run of a
+  root ID has its own incarnation, so a run after the earlier one was deleted calls new tasks. A
   root task, such as a detached start, keeps its root ID on its grain, and the root ID
   `$caller` is reserved.
 - Scheduling a task ID again with the same request reattaches to the existing task and

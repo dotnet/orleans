@@ -16,15 +16,18 @@ namespace Orleans.DurableTasks.Runtime;
 /// <remarks>
 /// The outbox is resolved on first use so that activations which never send messages do not require messaging state.
 /// Each message identity is derived from its sender, receiver, task, and subject, so replaying a send coalesces with the
-/// pending message and the receiver deduplicates a redelivery. Completions and invocations are reference sends: the
+/// pending message and the receiver deduplicates a redelivery. A message which names a node of the sender's execution
+/// tree, such as an attached child or a subscriber, names it by its wire identifier, which covers the run's incarnation
+/// (see <see cref="CallerScope"/>), so each run of a root task ID sends messages with their own identities, which
+/// Messaging's deduplication keeps apart from an earlier run's. Completions and invocations are reference sends: the
 /// runtime provides a completion from the task's stored result, and an invocation from its journaled table of pending
 /// invocations, as an <see cref="IOutboxMessageSource"/>, so each payload is journaled once, and the outbox reports each
 /// one's retirement to the runtime. A delay resume is a message the grain sends to itself
 /// with <see cref="Envelope.DeliverAt"/> set to the delay's due time, which the grain's own inbox accepts in the delay's
-/// journal write; its identity also covers the delay generation and due time. A signal's identity also covers its name
-/// and value. A subscription's, an unsubscription's, and a subscriber's completion's identities also cover the subscribing
-/// task, so each subscription of a task has its own messages. The runtime derives readiness from journaled state, so
-/// duplicate and stale resumes are harmless.
+/// journal write; its identity also covers the delay's incarnation, generation, and due time. A signal's identity also
+/// covers its name, its value, and the sending run's incarnation. A subscription's, an unsubscription's, and a
+/// subscriber's completion's identities also cover the subscribing task, so each subscription of a task has its own
+/// messages. The runtime derives readiness from journaled state, so duplicate and stale resumes are harmless.
 /// </remarks>
 internal sealed class DurableTaskMessageTransport(
     Lazy<IOutbox> outbox,
@@ -200,7 +203,7 @@ internal sealed class DurableTaskMessageTransport(
 
     private const string AbortDiscriminator = "abort";
 
-    public void SendResume(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime)
+    public void SendResume(GrainId grainId, TaskId taskId, Guid incarnation, long generation, DateTimeOffset dueTime)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(generation);
         Send(
@@ -208,24 +211,31 @@ internal sealed class DurableTaskMessageTransport(
             grainId,
             grainId,
             taskId,
-            new DurableTaskResumeMessage { TaskId = taskId, Generation = generation, Sender = grainId },
-            CreateResumeMessageId(grainId, taskId, generation, dueTime),
+            new DurableTaskResumeMessage { TaskId = taskId, Incarnation = incarnation, Generation = generation, Sender = grainId },
+            CreateResumeMessageId(grainId, taskId, incarnation, generation, dueTime),
             dueTime);
     }
 
     /// <summary>Creates the identity of one delay resume.</summary>
     /// <remarks>
-    /// A delay's generation and due time are stable across replays, so a replayed resume coalesces. Covering the due
-    /// time keeps the identity distinct if a removed delay's task ID is reused while its earlier resume is still
-    /// recorded as processed.
+    /// A delay's incarnation, generation, and due time are stable across replays, so a replayed resume coalesces. Covering
+    /// the incarnation keeps the identity distinct when a later run of the delay's tree records a delay with the same task
+    /// ID and generation, and covering the due time keeps it distinct if a removed delay's task ID is reused while its
+    /// earlier resume is still recorded as processed.
     /// </remarks>
-    internal static MessageId CreateResumeMessageId(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime) =>
+    internal static MessageId CreateResumeMessageId(
+        GrainId grainId,
+        TaskId taskId,
+        Guid incarnation,
+        long generation,
+        DateTimeOffset dueTime) =>
         new(CreateMessageId(
                 grainId,
                 grainId,
                 taskId,
                 DurableTaskMessageTypes.ResumeSubject,
-                dueTime.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                dueTime.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                incarnation.ToString("N"))
             .Key.CreateChildKey(generation.ToString(System.Globalization.CultureInfo.InvariantCulture)));
 
     public void SendSignal(
@@ -234,29 +244,37 @@ internal sealed class DurableTaskMessageTransport(
         TaskId taskId,
         string name,
         DurableTaskResponse value,
-        string payloadFingerprint) =>
+        string payloadFingerprint,
+        Guid incarnation) =>
         Send(
             messageTypes.Signal,
             sender,
             target,
             taskId,
             new DurableTaskSignalMessage { TaskId = taskId, Name = name, Value = value, Sender = sender },
-            CreateSignalMessageId(sender, target, taskId, name, payloadFingerprint),
+            CreateSignalMessageId(sender, target, taskId, name, payloadFingerprint, incarnation),
             deliverAt: null);
 
-    /// <summary>Creates the identity of one signal value.</summary>
+    /// <summary>Creates the identity of one signal value which a run of an execution tree sends.</summary>
     /// <remarks>
     /// A replayed send of the same value coalesces, and the receiver deduplicates its redelivery. Covering the value
-    /// gives a conflicting value its own message, which the receiver rejects. The fingerprint has a fixed length, so it
-    /// precedes the name unambiguously.
+    /// gives a conflicting value its own message, which the receiver rejects, and covering the sending run's
+    /// <paramref name="incarnation"/> gives each run of the sending tree its own message. The fingerprint and the
+    /// incarnation have fixed lengths, so they precede the name unambiguously.
     /// </remarks>
     internal static MessageId CreateSignalMessageId(
         GrainId sender,
         GrainId target,
         TaskId taskId,
         string name,
-        string payloadFingerprint) =>
-        CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.SignalSubject, $"{payloadFingerprint}:{name}");
+        string payloadFingerprint,
+        Guid incarnation) =>
+        CreateMessageId(
+            sender,
+            target,
+            taskId,
+            DurableTaskMessageTypes.SignalSubject,
+            $"{incarnation:N}:{payloadFingerprint}:{name}");
 
     private void Send<T>(MessageType<T> messageType, GrainId sender, GrainId target, TaskId taskId, T body) =>
         Send(messageType, sender, target, taskId, body, messageId: default, deliverAt: null);

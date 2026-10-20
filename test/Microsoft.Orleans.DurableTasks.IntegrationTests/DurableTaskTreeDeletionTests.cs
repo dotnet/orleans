@@ -37,15 +37,15 @@ public abstract class DurableTaskTreeDeletionTests : IAsyncLifetime
         var ownerId = owner.GetGrainId();
         var workerId = worker.GetGrainId();
         var startId = TaskId.CreateRoot("start");
-        var ownedId = CallerScope.GetTaskId(starter.GetGrainId(), startId.Child(TreeDeletionStarterGrain.CallId));
-        var localId = ownedId.Child(TreeDeletionOwnerGrain.LocalId);
-        var remoteId = ownedId.Child(TreeDeletionOwnerGrain.RemoteId);
-        var workerTaskId = CallerScope.GetTaskId(ownerId, remoteId);
         using var events = DurableTaskEventBarriers.Collect();
 
         // The owner's task starts a local child and a call to the worker, and completes without observing either.
         var start = await starter.StartAsync(owner.GetPrimaryKey(), worker.GetPrimaryKey()).WithId("start").ScheduleAsync(cancellationToken);
         Assert.Equal(TreeDeletionOwnerGrain.Returned, (await start.GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken)).GetResult<string>());
+        var ownedId = await events.WaitForCallerChildAsync(ownerId, starter.GetGrainId(), startId.Child(TreeDeletionStarterGrain.CallId));
+        var localId = ownedId.Child(TreeDeletionOwnerGrain.LocalId);
+        var remoteId = ownedId.Child(TreeDeletionOwnerGrain.RemoteId);
+        var workerTaskId = await events.WaitForCallerChildAsync(workerId, ownerId, remoteId);
 
         // The starter accepts the owner's completion, which deletes the owner's tree with the work which is still running.
         await events.WaitForDeletedAsync(ownerId, ownedId);
