@@ -469,7 +469,15 @@ and changes nothing. The request commits before it propagates through the task's
   `OperationCanceledException`. The task is canceled when that exception escapes the
   body; a body which catches it completes with its own result or failure.
 - Completed children keep their recorded results, and a replay of a canceled task
-  observes the request from the start, so the body takes the same path.
+  observes the request at the same point as the run which it replays, so the body takes
+  the same path. That point is the start of one of the body's durable operations, such as
+  a child's start, a `DurableTask.RunInline` effect, or a wait for a task or a signal: a
+  running body observes the request at its current operation, which for a body waiting
+  durably is that wait, and the runtime records the point with the task. A replay keeps
+  the durable token uncanceled until it reaches the recorded point. A replay of a run
+  whose point didn't commit observes the request where it reaches the last operation
+  which the earlier run recorded, and records that point. A replay which ends before its
+  recorded point [stalls](durable-tasks-versioning.md#stalled-executions) as diverged.
 
 The first request's reason is durable:
 <xref:Orleans.DurableTasks.DurableTaskContext.TaskCancellationReason?displayProperty=nameWithType>

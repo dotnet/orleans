@@ -38,7 +38,8 @@ public interface IFaultWorkflowGrain : IFaultInjectedGrain
 
     /// <summary>
     /// Races a call to the partner's hold against a local gate which waits for the hold's signal and a delay, so the hold
-    /// loses after its body started and compensates through a shielded child; then times out a signal wait.
+    /// loses after its body started and compensates through a shielded child; then times out a signal wait. The hold's
+    /// cancellation lands mid-run, and its compensation checks that every replay observed it at the same point.
     /// </summary>
     DurableTask<string> RaceAsync(Guid partnerKey, string rootId);
 
@@ -350,16 +351,26 @@ public sealed class FaultPartnerGrain(
 
     public async DurableTask<string> HoldAsync(Guid workflowKey, string rootId)
     {
+        var stage = "send";
         try
         {
             // The workflow can cancel the hold as soon as the signal arrives, which can precede the send's own completion.
             await Workflow(workflowKey).SignalDurableTaskAsync(TaskId.CreateRoot(rootId), FaultWorkflowGrain.Held, "held");
+            stage = DurableTask.Current.IsTaskCancellationRequested ? "signaled" : "hold";
             await DurableTask.Run(static async cancellationToken => await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken))
                 .WithId("hold");
             return "released";
         }
         catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
         {
+            // The first run records the stage at which it observed the cancellation. A replay observes it at the same
+            // cancellation point, so it compensates from the same stage; one which observed it elsewhere, such as at its
+            // start, records an effect which the scenario doesn't expect.
+            if (DurableTask.RunInline("observed", () => stage) != stage)
+            {
+                DurableTask.RunInline("observed-elsewhere", () => Increment("observed-elsewhere"));
+            }
+
             var compensation = await DurableTask.Run(_ => DurableTask.RunInline("compensate", () => Increment("compensate")))
                 .WithId("compensate")
                 .Shielded();

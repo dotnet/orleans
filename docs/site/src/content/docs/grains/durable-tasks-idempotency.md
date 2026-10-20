@@ -124,7 +124,7 @@ number in the request, and skips the change when it finds one.
 | Guarantee | Scope |
 | --- | --- |
 | Exactly once | Journaled state changes in effects, steps' final code, and tails; operation records; grain-to-grain messages; task starts under one ID while the grain retains the task. |
-| Same value in every replay | Recorded results, signal values, logical time, cancellation state and reason. |
+| Same value in every replay | Recorded results, signal values, logical time, cancellation state and reason, and the operation at which the body observes its cancellation. |
 | At least once | External calls in steps and tails; ordinary grain calls; logs outside a replay-safe logger. |
 | Deduplicated by the receiver | Whatever the receiver keys: durable tasks by task ID, external systems by the key which the task supplies. |
 

@@ -51,12 +51,12 @@ that every execution reaches it with the operations which its version expects.
 - A decision applies to the execution which records it and to the steps beneath it. A
   step which checks a change before its parent does records its own decision, which
   doesn't bind the parent: the parent's later check decides from the parent's history.
-- A task whose cancellation was requested replays with the request in place from its
-  start, so its body takes its compensation path at once. A check which only
-  compensation reaches, and which no earlier run recorded, finds the operations which the
-  earlier run recorded ahead of it and decides `0`. Check the change before the body
-  branches on cancellation, such as at the start of the body, when compensation depends on
-  the version.
+- A task whose cancellation was requested replays the request at the point where its
+  body first observed it, so its body takes its compensation path where the earlier run
+  took it. A check which only compensation reaches, and which no earlier run recorded,
+  finds the operations which the earlier run recorded ahead of it and decides `0`. Check
+  the change before the body branches on cancellation, such as at the start of the body,
+  when compensation depends on the version.
 - The check runs on the activation's scheduler, as `DurableTask.RunInline` does. Outside a
   durable task, it returns `maxSupported`.
 - Names follow the rules for operation names: they're non-empty and don't contain `$`.
@@ -115,7 +115,7 @@ see
 | Reason | Cause | Inner exception |
 | --- | --- | --- |
 | `UnsupportedVersion` | The execution recorded a version outside the range which the running code supports. | A `DurableTaskVersionException`, which names the change, the recorded version, and the supported range |
-| `Diverged` | The replay requested another operation under a recorded ID, a recorded outcome no longer decodes, or the task's stored request no longer decodes. See [Diagnose replay divergence](durable-tasks-operations.md#diagnose-replay-divergence). | An `InvalidOperationException` which names the recorded and the requested operations, or the decoding failure |
+| `Diverged` | The replay requested another operation under a recorded ID, a recorded outcome no longer decodes, the task's stored request no longer decodes, or the body ended before the point where an earlier run observed the task's cancellation. See [Diagnose replay divergence](durable-tasks-operations.md#diagnose-replay-divergence). | An `InvalidOperationException` which names the recorded and the requested operations, the decoding failure, or the unreached cancellation point |
 
 The runtime:
 

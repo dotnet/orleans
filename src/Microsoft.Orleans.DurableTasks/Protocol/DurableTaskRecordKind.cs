@@ -51,4 +51,7 @@ internal enum DurableTaskRecordKind : byte
 
     /// <summary>A start of a detached task, which subscribes to the task's result.</summary>
     DetachedStart,
+
+    /// <summary>The cancellation point at which a durable execution's body first observed its task's cancellation.</summary>
+    CancellationObserved,
 }
