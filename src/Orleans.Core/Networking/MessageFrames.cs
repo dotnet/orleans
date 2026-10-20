@@ -44,19 +44,33 @@ internal static class MessageFrames
     /// <summary>
     /// Reads the single frame which <paramref name="buffer"/> holds, leaving the message's body serialized.
     /// </summary>
+    public static Message Read(MessageHandlerShared shared, ArcBufferWriter buffer)
+    {
+        using var frame = buffer.ConsumeSlice(buffer.Length);
+        return Read(shared, frame);
+    }
+
+    /// <summary>
+    /// Reads a frame, retaining independent slices for the message while the caller keeps ownership of <paramref name="buffer"/>.
+    /// </summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Reliability",
         "CA2000:Dispose objects before losing scope",
         Justification = "The read request is owned by the message, or reset, as when a connection receives the message.")]
-    public static Message Read(MessageHandlerShared shared, ArcBufferWriter buffer)
+    public static Message Read(MessageHandlerShared shared, in ArcBuffer buffer)
     {
         var serializer = shared.GetMessageSerializer();
         try
         {
             Span<byte> lengths = stackalloc byte[Message.LENGTH_HEADER_SIZE];
-            if (buffer.Peek(lengths) != lengths.Length)
+            if (buffer.Length < lengths.Length)
             {
                 throw new InvalidMessageFrameException("The frame is incomplete.");
+            }
+
+            using (var framing = buffer.Slice(0, lengths.Length))
+            {
+                framing.CopyTo(lengths);
             }
 
             var headerLength = BinaryPrimitives.ReadInt32LittleEndian(lengths);
@@ -67,9 +81,10 @@ internal static class MessageFrames
                 throw new InvalidMessageFrameException("The frame's length does not match its contents.");
             }
 
-            buffer.AdvanceReader(Message.LENGTH_HEADER_SIZE);
             var readRequest = shared.GetReceiveMessageHandler();
-            readRequest.Initialize(buffer.ConsumeSlice(headerLength), buffer.ConsumeSlice(bodyLength));
+            readRequest.Initialize(
+                buffer.Slice(Message.LENGTH_HEADER_SIZE, headerLength),
+                buffer.Slice(Message.LENGTH_HEADER_SIZE + headerLength, bodyLength));
             Message message;
             try
             {
@@ -151,11 +166,23 @@ internal sealed class MessageCodec(IServiceProvider serviceProvider) : IFieldCod
         }
 
         field.EnsureWireType(WireType.LengthPrefixed);
-        var length = (int)reader.ReadVarUInt32();
-        using var frame = new ArcBufferWriter();
-        var output = frame;
-        reader.ReadBytes(ref output, length);
-        var message = MessageFrames.Read(Shared, frame);
+        var length = checked((int)reader.ReadVarUInt32());
+        Message message;
+        if (reader.TryReadSlice(length, out var frame))
+        {
+            using (frame)
+            {
+                message = MessageFrames.Read(Shared, frame);
+            }
+        }
+        else
+        {
+            using var buffer = new ArcBufferWriter();
+            var output = buffer;
+            reader.ReadBytes(ref output, length);
+            message = MessageFrames.Read(Shared, buffer);
+        }
+
         ReferenceCodec.RecordObject(reader.Session, message);
         return message;
     }

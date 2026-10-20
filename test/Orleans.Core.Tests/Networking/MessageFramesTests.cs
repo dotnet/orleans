@@ -156,6 +156,66 @@ public sealed class MessageFramesTests : IDisposable
         Assert.Equal("value", messages[0].BodyObject);
     }
 
+    [Theory]
+    [InlineData(100, 100)]
+    [InlineData(10, 20_000)]
+    public void EmbeddedMessages_SharePagesAndOutliveTheEnclosingMessage(int count, int payloadSize)
+    {
+        var shared = _services.GetRequiredService<MessageHandlerShared>();
+        var requests = Enumerable.Range(0, count).Select(i =>
+        {
+            var message = CreateRequest(i, timeToLive: null);
+            message.BodyObject = Enumerable.Repeat((byte)i, payloadSize).ToArray();
+            return message;
+        }).ToList();
+        var enclosing = CreateRequest(count, timeToLive: null);
+        enclosing.BodyObject = requests;
+        List<Message> received;
+        var pages = new HashSet<byte[]>();
+        using (var buffer = new ArcBufferWriter())
+        {
+            var serializer = shared.GetMessageSerializer();
+            try
+            {
+                MessageFrames.Write(serializer, buffer, enclosing);
+            }
+            finally
+            {
+                shared.Return(serializer);
+            }
+
+            using var copy = MessageFrames.Read(shared, buffer);
+            var body = Assert.IsType<MessageReadRequest>(copy._bodyObject);
+            foreach (var segment in body.Body.ArraySegments)
+            {
+                pages.Add(segment.Array!);
+            }
+
+            received = Assert.IsType<List<Message>>(copy.BodyObject);
+        }
+
+        try
+        {
+            Assert.Equal(count, received.Count);
+            for (var i = 0; i < count; i++)
+            {
+                var message = received[i];
+                var body = Assert.IsType<MessageReadRequest>(message._bodyObject);
+                foreach (var segment in body.Body.ArraySegments)
+                {
+                    Assert.Contains(segment.Array!, pages);
+                }
+
+                Assert.Equal(new CorrelationId(i), message.Id);
+                Assert.Equal(Enumerable.Repeat((byte)i, payloadSize), Assert.IsType<byte[]>(message.BodyObject));
+            }
+        }
+        finally
+        {
+            DisposeAll(received);
+        }
+    }
+
     private List<Message> RoundTrip(List<Message> messages) => _serializer.Deserialize<List<Message>>(_serializer.SerializeToArray(messages))!;
 
     private static Message CreateRequest(long id, TimeSpan? timeToLive) => new()

@@ -435,7 +435,7 @@ namespace Orleans.Runtime.Messaging
             "Reliability",
             "CA2000:Dispose objects before losing scope",
             Justification = "Ownership of the response message is transferred to the local message dispatcher.")]
-        private void OnMessageSerializationFailure(Message message, Exception exception)
+        internal void OnMessageSerializationFailure(Message message, Exception exception)
         {
             LogErrorExceptionSerializingMessage(Log, exception, message, this);
 

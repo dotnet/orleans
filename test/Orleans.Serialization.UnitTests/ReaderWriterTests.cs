@@ -377,6 +377,72 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Theory]
+        [InlineData(0, 0)]
+        [InlineData(0, ArcPageSize)]
+        [InlineData(1, ArcPageSize - 1)]
+        [InlineData(ArcPageSize - 1, 2)]
+        public void TryReadSlice_ForkedArcBuffer_PreservesPositionAndIndependentOwnership(int offset, int length)
+        {
+            var expected = CreateArcBufferData();
+            ArcBuffer retained;
+            using (var writer = new ArcBufferWriter())
+            {
+                WriteArcBufferData(writer, expected);
+                using var buffer = writer.PeekSlice(expected.Length);
+                var reader = Reader.Create(buffer, session: null!);
+                reader.ForkFrom(offset, out var forked);
+                Assert.True(forked.TryReadSlice(length, out retained));
+                Assert.Equal(offset + length, forked.Position);
+                Assert.Equal(expected.Length - offset - length, forked.Remaining);
+                Assert.Equal(expected[offset + length], forked.ReadByte());
+                Assert.Equal(0, reader.Position);
+            }
+
+            using (retained)
+            {
+                Assert.Equal(expected.AsSpan(offset, length).ToArray(), retained.ToArray());
+            }
+        }
+
+        [Theory]
+        [InlineData(-1)]
+        [InlineData(ArcPageSize + 3)]
+        public void TryReadSlice_InvalidLength_PreservesTheCursor(int length)
+        {
+            using var writer = new ArcBufferWriter();
+            var expected = CreateArcBufferData();
+            WriteArcBufferData(writer, expected);
+            using var buffer = writer.PeekSlice(expected.Length);
+            var reader = Reader.Create(buffer, session: null!);
+            Exception? error = null;
+            try
+            {
+                reader.TryReadSlice(length, out var slice);
+                slice.Dispose();
+            }
+            catch (ArgumentOutOfRangeException exception)
+            {
+                error = exception;
+            }
+
+            Assert.IsType<ArgumentOutOfRangeException>(error);
+            Assert.Equal(0, reader.Position);
+            Assert.Equal(expected.Length, reader.Remaining);
+            Assert.Equal(expected[0], reader.ReadByte());
+        }
+
+        [Fact]
+        public void TryReadSlice_SpanInput_LeavesCopyingToTheCaller()
+        {
+            byte[] expected = [1, 2, 3];
+            var reader = Reader.Create(expected, session: null!);
+            Assert.False(reader.TryReadSlice(2, out var slice));
+            Assert.True(slice.IsEmpty);
+            Assert.Equal(0, reader.Position);
+            Assert.Equal(expected, reader.ReadBytes((uint)expected.Length));
+        }
+
+        [Theory]
         [InlineData(ArcPageSize + 2L)]
         [InlineData(ArcPageSize + 3L)]
         public void Skip_ArcBuffer_ExactEndOrInsufficientData_HasExpectedContract(long count)

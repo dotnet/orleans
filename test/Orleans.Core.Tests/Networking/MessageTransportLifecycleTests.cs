@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Linq;
 using System.Reflection;
 using System.Net;
@@ -536,55 +537,167 @@ public class MessageTransportLifecycleTests
         Assert.Throws<InvalidMessageFrameException>(() => serializer.ValidateFrameLengths(int.MaxValue, int.MaxValue));
     }
 
-    [Fact]
-    public async Task MessageWriteRequest_RetriedMessage_KeepsItsSerializedBody()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MessageWriteRequest_RetriedMessages_PreservePayloadsAfterTransportConsumption(bool refuseEnqueue)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var serviceProvider = CreateServiceProvider();
         using var shared = CreateMessageHandlerShared(serviceProvider);
-        await using var transport = new CancelableTransport();
+        await using var transport = new CapturingTransport();
         var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(serviceProvider, shared), shared.MessageCenter);
         var payload = Enumerable.Repeat((byte)0x5A, 20_000).ToArray();
-        var body = new PooledBuffer();
-        body.Write(payload);
-        using var message = new Message { Direction = Message.Directions.Request, BodyObject = body };
-        var request = shared.GetSendMessageHandler(connection);
-        request.WriteMessage(message);
-        request.CompleteWriting();
-        Assert.True(transport.EnqueueWrite(request));
+        using var requestMessage = new Message { Direction = Message.Directions.Request, BodyObject = CreateBuffer() };
+        using var response = new Message { Direction = Message.Directions.Response, BodyObject = Orleans.Serialization.Invocation.Response.FromResult(42) };
+        using var bodyless = new Message { Direction = Message.Directions.Response };
+        Message[] messages = [requestMessage, response, bodyless];
+        foreach (var message in messages)
+        {
+            message.RequestContextData = new() { ["payload"] = CreateBuffer() };
+            message.TimeToLive = TimeSpan.FromHours(1);
+        }
 
-        // Serializing the message released its pooled buffer's storage. The write fails, and the message keeps its serialized body for its retry,
-        // so it is not serialized again.
-        await transport.CloseAsync(new ConnectionClosedException(), cancellationToken);
-        var retried = await connection.Retries.Reader.ReadAsync(cancellationToken);
-        Assert.Same(message, retried.Message);
-        Assert.IsType<MessageReadRequest>(message._bodyObject);
-        Assert.Equal(payload, ((PooledBuffer)message.BodyObject!).ToArray());
+        var target = SiloAddress.New(IPAddress.Loopback, 12345, 1);
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            await using var failingTransport = new CancelableTransport();
+            var write = WriteMessages();
+            foreach (var message in messages)
+            {
+                message.TargetSilo = target;
+                message.ForwardCount++;
+                message.TimeToLive = TimeSpan.FromMinutes(1);
+            }
+
+            if (refuseEnqueue)
+            {
+                await failingTransport.CloseAsync(null, cancellationToken);
+                Assert.False(failingTransport.EnqueueWrite(write));
+                write.RerouteMessages(error: null);
+            }
+            else
+            {
+                Assert.True(failingTransport.EnqueueWrite(write));
+                // Real transports consume and release the buffers before reporting a failed write.
+                write.Buffers.ConsumeSlice(write.Buffers.Length).Dispose();
+                Assert.Equal(0, write.Buffers.Length);
+                await failingTransport.CloseAsync(new ConnectionClosedException(), cancellationToken);
+            }
+
+            var retries = new List<Message>();
+            foreach (var _ in messages)
+            {
+                retries.Add((await connection.Retries.Reader.ReadAsync(cancellationToken)).Message);
+            }
+
+            Assert.All(messages, message => Assert.Single(retries, retry => ReferenceEquals(message, retry)));
+            Assert.All(messages, message => Assert.InRange(message.TimeToLive!.Value, TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(1)));
+            Assert.False(connection.Retries.Reader.TryRead(out _));
+            Assert.IsType<MessageReadRequest>(requestMessage._bodyObject);
+            Assert.IsType<MessageReadRequest>(response._bodyObject);
+            Assert.Null(bodyless._bodyObject);
+        }
+
+        // Retransmit without decoding any body locally, then read the frames as their destination does.
+        Assert.True(transport.EnqueueWrite(WriteMessages()));
+        Assert.Equal(messages.Length, connection.SentMessageCount);
+        Assert.All(messages, message => Assert.Null(message._bodyObject));
+        var offset = 0;
+        for (var i = 0; i < messages.Length; i++)
+        {
+            var bytes = transport.Written!.AsSpan(offset);
+            var length = Message.LENGTH_HEADER_SIZE + BinaryPrimitives.ReadInt32LittleEndian(bytes) + BinaryPrimitives.ReadInt32LittleEndian(bytes[sizeof(int)..]);
+            using var frame = new ArcBufferWriter();
+            frame.Write(bytes[..length]);
+            using var received = MessageFrames.Read(shared, frame);
+            using var contextPayload = Assert.IsType<PooledBuffer>(Assert.IsType<Dictionary<string, object>>(received.RequestContextData)["payload"]);
+            Assert.Equal(payload, contextPayload.ToArray());
+            Assert.Equal(target, received.TargetSilo);
+            Assert.Equal(2, received.ForwardCount);
+            Assert.InRange(received.TimeToLive!.Value, TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(1));
+            if (i == 0)
+            {
+                using var receivedPayload = Assert.IsType<PooledBuffer>(received.BodyObject);
+                Assert.Equal(payload, receivedPayload.ToArray());
+            }
+            else if (i == 1)
+            {
+                Assert.Equal(42, Assert.IsAssignableFrom<Orleans.Serialization.Invocation.Response>(received.BodyObject).Result);
+            }
+            else
+            {
+                Assert.Null(received.BodyObject);
+            }
+
+            offset += length;
+        }
+
+        Assert.Equal(transport.Written!.Length, offset);
 
         await connection.CloseAsync(null).WaitAsync(cancellationToken);
+
+        PooledBuffer CreateBuffer()
+        {
+            var buffer = new PooledBuffer();
+            buffer.Write(payload);
+            return buffer;
+        }
+
+        MessageWriteRequest WriteMessages()
+        {
+            var write = shared.GetSendMessageHandler(connection);
+            foreach (var message in messages)
+            {
+                write.WriteMessage(message);
+            }
+
+            write.CompleteWriting();
+            return write;
+        }
     }
 
     [Fact]
-    public async Task MessageWriteRequest_RetriedSuccessResponse_DecodesItsSerializedBody()
+    public async Task MessageWriteRequest_UnreadableRetryContext_FailsOnlyTheAffectedMessage()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var serviceProvider = CreateServiceProvider();
         using var shared = CreateMessageHandlerShared(serviceProvider);
         await using var transport = new CancelableTransport();
         var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(serviceProvider, shared), shared.MessageCenter);
-        using var message = new Message { Direction = Message.Directions.Response, BodyObject = Orleans.Serialization.Invocation.Response.FromResult(42) };
-        var request = shared.GetSendMessageHandler(connection);
-        request.WriteMessage(message);
-        request.CompleteWriting();
-        Assert.True(transport.EnqueueWrite(request));
+        using var invalid = new Message
+        {
+            Direction = Message.Directions.Request,
+            Id = new CorrelationId(1),
+            RequestContextData = new() { ["invalid"] = new UnreadableContext() }
+        };
+        using var valid = new Message { Direction = Message.Directions.Request, BodyObject = 42 };
+        Message? failureResponse = null;
+        shared.MessageCenter.When(center => center.DispatchLocalMessage(Arg.Any<Message>()))
+            .Do(call => failureResponse = call.Arg<Message>());
+        var write = shared.GetSendMessageHandler(connection);
+        write.WriteMessage(invalid);
+        write.WriteMessage(valid);
+        write.CompleteWriting();
+        Assert.True(transport.EnqueueWrite(write));
+        write.Buffers.ConsumeSlice(write.Buffers.Length).Dispose();
 
-        // A successful response is serialized in its raw form, which the retried message decodes as a received response does.
         await transport.CloseAsync(new ConnectionClosedException(), cancellationToken);
-        var retried = await connection.Retries.Reader.ReadAsync(cancellationToken);
-        Assert.Same(message, retried.Message);
-        Assert.IsType<MessageReadRequest>(message._bodyObject);
-        Assert.Equal(42, Assert.IsAssignableFrom<Orleans.Serialization.Invocation.Response>(message.BodyObject).Result);
+        var retry = await connection.Retries.Reader.ReadAsync(cancellationToken);
+        Assert.Same(valid, retry.Message);
+        Assert.Equal(42, valid.BodyObject);
+        Assert.False(connection.Retries.Reader.TryRead(out _));
+        shared.MessageCenter.Received(1).DispatchLocalMessage(Arg.Any<Message>());
+        using var response = Assert.IsType<Message>(failureResponse);
+        Assert.Equal(invalid.Id, response.Id);
+        Assert.Equal(Message.ResponseTypes.Error, response.Result);
+        var error = Assert.IsAssignableFrom<Orleans.Serialization.Invocation.Response>(response.BodyObject).Exception;
+        Assert.Equal("Invalid retry context.", Assert.IsType<InvalidOperationException>(error).Message);
 
+        var reused = shared.GetSendMessageHandler();
+        Assert.Same(write, reused);
+        Assert.Equal(0, reused.MessageCount);
+        reused.Reset();
         await connection.CloseAsync(null).WaitAsync(cancellationToken);
     }
 
@@ -973,12 +1086,21 @@ public class MessageTransportLifecycleTests
     private static ServiceProvider CreateServiceProvider(SiloMessagingOptions? options = null) => new ServiceCollection()
         .AddMetrics()
         .AddSerializer()
+        .AddSingleton<UnreadableContextCallbacks>()
         .AddSingleton<OrleansInstruments>()
         .AddSingleton<MessagingInstruments>()
         .AddSingleton<NetworkingInstruments>()
         .AddSingleton<MessagingProcessingInstruments>()
         .AddTransient(sp => new MessageSerializer(sp.GetRequiredService<SerializerSessionPool>(), options ?? new SiloMessagingOptions()))
         .BuildServiceProvider();
+
+    [GenerateSerializer, SerializationCallbacks(typeof(UnreadableContextCallbacks))]
+    public sealed class UnreadableContext;
+
+    public sealed class UnreadableContextCallbacks
+    {
+        public void OnDeserialized(UnreadableContext value) => throw new InvalidOperationException("Invalid retry context.");
+    }
 
     private static MessageHandlerShared CreateMessageHandlerShared(IServiceProvider serviceProvider, ILoggerFactory? loggerFactory = null)
     {

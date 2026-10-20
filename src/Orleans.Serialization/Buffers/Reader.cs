@@ -530,6 +530,22 @@ namespace Orleans.Serialization.Buffers
         }
 
         /// <summary>
+        /// Reads an independently owned slice when the input supports reference-counted ownership.
+        /// The caller disposes the slice after use.
+        /// </summary>
+        internal bool TryReadSlice(int length, out ArcBuffer slice)
+        {
+            if (!IsArcBufferInput)
+            {
+                slice = default;
+                return false;
+            }
+
+            slice = ReadOwnedBuffer(length);
+            return true;
+        }
+
+        /// <summary>
         /// Skips the specified number of bytes.
         /// </summary>
         /// <param name="count">The number of bytes to skip.</param>

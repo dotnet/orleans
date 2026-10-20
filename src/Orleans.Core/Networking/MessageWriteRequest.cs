@@ -1,6 +1,5 @@
 using System;
 using Orleans.Serialization.Buffers;
-using System.Buffers.Binary;
 using Orleans.Connections.Transport;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
@@ -65,43 +64,47 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
     /// Sends the messages in this request again, after the request could not be written.
     /// </summary>
     /// <remarks>
-    /// Serializing a message can consume some of its values, such as <see cref="PooledBuffer"/> arguments, so each message keeps its serialized body,
-    /// as a received message does, and is sent again with that body rather than being serialized again.
+    /// Serializing a message can consume values such as <see cref="PooledBuffer"/> arguments or request-context entries.
+    /// Each message keeps its serialized body and restores its request context from the written headers before retrying.
     /// </remarks>
     public void RerouteMessages(Exception? error)
     {
         var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
-        foreach (var (message, offset, totalLength, headerLength) in _messages)
+        try
         {
-            KeepSerializedBody(message, offset, totalLength, headerLength);
-            connection.RerouteMessage(message, error);
-        }
+            foreach (var (message, offset, totalLength, _) in _messages)
+            {
+                try
+                {
+                    KeepSerializedPayload(message, offset, totalLength);
+                }
+                catch (Exception exception)
+                {
+                    connection.OnMessageSerializationFailure(message, exception);
+                    continue;
+                }
 
-        Reset();
+                connection.RerouteMessage(message, error);
+            }
+        }
+        finally
+        {
+            Reset();
+        }
     }
 
-    private void KeepSerializedBody(Message message, int offset, int totalLength, int headerLength)
+    private void KeepSerializedPayload(Message message, int offset, int totalLength)
     {
-        var bodyLength = totalLength - headerLength;
-        if (bodyLength == 0 || message._bodyObject is MessageReadRequest)
+        using var frame = _written.Slice(offset, Message.LENGTH_HEADER_SIZE + totalLength);
+        using var original = MessageFrames.Read(_shared, frame);
+        message.RequestContextData = original.RequestContextData;
+        if (message._bodyObject is not MessageReadRequest && original._bodyObject is MessageReadRequest body)
         {
-            return;
+            // Transfer the serialized body while retaining the message's current routing and expiry.
+            original._bodyObject = null;
+            message.SetMessageReadRequest(body);
+            message.Result = original.Result;
         }
-
-        // The serialized headers record the response type which describes the serialized body.
-        Span<byte> fields = stackalloc byte[sizeof(uint)];
-        using (var headerFields = _written.Slice(offset + Message.LENGTH_HEADER_SIZE, sizeof(uint)))
-        {
-            headerFields.CopyTo(fields);
-        }
-
-        var readRequest = _shared.GetReceiveMessageHandler();
-        readRequest.Initialize(default, _written.Slice(offset + Message.LENGTH_HEADER_SIZE + headerLength, bodyLength));
-        readRequest._originalResponseType = ((Message.PackedHeaders)BinaryPrimitives.ReadUInt32LittleEndian(fields)).ResponseType;
-        message.SetMessageReadRequest(readRequest);
-
-        // As for a received message, the response type indicates how to decode the body.
-        message.Result = readRequest._originalResponseType;
     }
 
     private void ReturnSerializer()

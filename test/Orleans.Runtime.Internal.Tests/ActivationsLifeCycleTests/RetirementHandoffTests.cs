@@ -440,11 +440,16 @@ public sealed class RetirementHandoffTests
         await activation.Deactivated.WaitAsync(Timeout, Cancellation);
         Assert.Equal(0, activation.GetRequestCount());
 
-        // The request runs once, on the target. Its caller, which was not retargeted, receives the rejection or the response, whichever arrives first.
-        Assert.Equal(target.SiloAddress, await state.HoldEntered.Task.WaitAsync(Timeout, Cancellation));
-        state.ReleaseHold.TrySetResult();
-        var error = await Record.ExceptionAsync(() => queued.WaitAsync(Timeout, Cancellation));
-        Assert.True(error is null or OrleansMessageRejectionException, error?.ToString());
+        try
+        {
+            // The target has begun execution, but cannot respond yet, so the source's rejection must complete the call.
+            Assert.Equal(target.SiloAddress, await state.HoldEntered.Task.WaitAsync(Timeout, Cancellation));
+            await Assert.ThrowsAsync<OrleansMessageRejectionException>(() => queued.WaitAsync(Timeout, Cancellation));
+        }
+        finally
+        {
+            state.ReleaseHold.TrySetResult();
+        }
 
         // A request which the source forwarded would travel to the target ahead of a later call from the source, and would run first.
         var fromSource = source.ServiceProvider.GetRequiredService<IGrainFactory>().GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
@@ -908,30 +913,159 @@ public sealed class RetirementHandoffTests
     [Fact]
     public async Task MigratedRequestWhichExpiredInTransit_IsDroppedAndTheOthersAreAccepted()
     {
-        await using var cluster = await DeployAsync();
-        var silo = cluster.Silos[1];
-        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
-        var migrationManager = silo.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
-        var key = Guid.NewGuid();
-        RetirementHandoffState.Create(key);
-        var grainId = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName).GetGrainId();
-
-        // The expired request's caller has already timed out, so the new activation drops it and takes the other request.
-        var expired = CreateRequest(cluster, grainId, 1, new List<string> { "value" });
-        expired.TimeToLive = TimeSpan.FromSeconds(-1);
-        var live = CreateRequest(cluster, grainId, 2, new List<string> { "value" });
-        GrainMigrationPackage package = new()
+        var received = new TaskCompletionSource<(Message Expired, Message Live)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
         {
-            GrainId = grainId,
-            MigrationContext = new MigrationContext(silo.ServiceProvider.GetRequiredService<SerializerSessionPool>()),
-            Requests = [expired, live],
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
+            {
+                var package = Assert.Single((List<GrainMigrationPackage>)context.Request.GetArgument(0)!);
+                var requests = Assert.IsType<List<Message>>(package.Requests);
+                Assert.Equal(2, requests.Count);
+                requests[0].TimeToLive = TimeSpan.FromSeconds(-1);
+                received.TrySetResult((requests[0], requests[1]));
+            }
+
+            await context.Invoke();
+        })));
+        var caller = cluster.Silos[0];
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+        await PlaceOnAsync(source, () => grain.GetLocation());
+        var running = grain.Block().AsTask();
+        await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
+        var expiredCall = grain.Record("expired").AsTask();
+        await WaitUntilAsync(() => GetWaitingCount(source, grain.GetGrainId()) == 1);
+        var expiredCallback = FindPendingCallback(caller, grain.GetGrainId(), nameof(IRetirementHandoffGrain.Record));
+        var liveCall = grain.Record("live").AsTask();
+        await WaitUntilAsync(() => GetWaitingCount(source, grain.GetGrainId()) == 2);
+
+        try
+        {
+            await grain.MigrateOnIdleTo(target.SiloAddress);
+            state.ReleaseBlock.TrySetResult();
+            await running.WaitAsync(Timeout, Cancellation);
+            var requests = await received.Task.WaitAsync(Timeout, Cancellation);
+            expiredCallback.OnTimeout();
+            await Assert.ThrowsAsync<TimeoutException>(() => expiredCall.WaitAsync(Timeout, Cancellation));
+            await liveCall.WaitAsync(Timeout, Cancellation);
+            Assert.Null(requests.Expired._bodyObject);
+            Assert.Equal(0, requests.Expired.ForwardCount);
+            Assert.Equal(1, requests.Live.ForwardCount);
+            Assert.Equal(["live"], state.Calls);
+            Assert.Equal(target.SiloAddress, await grain.GetLocation().AsTask().WaitAsync(Timeout, Cancellation));
+        }
+        finally
+        {
+            state.ReleaseBlock.TrySetResult();
+        }
+    }
+
+    [Fact]
+    public async Task MigrationBatch_OutlivesItsTimeoutWithoutBeingReusedByTheNextInvocation()
+    {
+        var firstSubmitted = new TaskCompletionSource<List<GrainMigrationPackage>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondSubmitted = new TaskCompletionSource<List<GrainMigrationPackage>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var serializing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseSerialization = new ManualResetEventSlim();
+        var invocationCount = 0;
+        var gate = new MigrationSerializationGate
+        {
+            BeforeSerialization = () =>
+            {
+                serializing.TrySetResult();
+                releaseSerialization.Wait(Cancellation);
+            }
         };
-        await migrationManager.AcceptMigratingGrainsWithRequests([package], Cancellation);
-        Assert.Null(expired._bodyObject);
-        Assert.Equal(0, expired.ForwardCount);
-        Assert.Equal(1, live.ForwardCount);
-        var activation = Assert.IsType<ActivationData>(FindActivation(silo, grainId));
-        await WaitUntilAsync(() => activation.GetRequestCount() == 0);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
+        {
+            silo.Services.AddSingleton<MigrationSerializationCallbacks>();
+            silo.AddOutgoingGrainCallFilter(async context =>
+            {
+                if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrainsWithRequests))
+                {
+                    var batch = (List<GrainMigrationPackage>)context.Request.GetArgument(0)!;
+                    switch (Interlocked.Increment(ref invocationCount))
+                    {
+                        case 1:
+                            firstSubmitted.TrySetResult(batch);
+                            // Block the headers before the RPC's batch argument can be serialized.
+                            RequestContext.Set("migration-serialization-gate", gate);
+                            try
+                            {
+                                await context.Invoke();
+                            }
+                            finally
+                            {
+                                RequestContext.Remove("migration-serialization-gate");
+                            }
+
+                            return;
+                        case 2:
+                            secondSubmitted.TrySetResult(batch);
+                            break;
+                    }
+                }
+
+                await context.Invoke();
+            });
+        }));
+        var caller = cluster.Silos[0];
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
+        var firstKey = Guid.NewGuid();
+        var secondKey = Guid.NewGuid();
+        var firstState = RetirementHandoffState.Create(firstKey);
+        var secondState = RetirementHandoffState.Create(secondKey);
+        var first = grainFactory.GetGrain<IRetirementHandoffGrain>(firstKey, typeof(RetirementHandoffGrain).FullName);
+        var second = grainFactory.GetGrain<IRetirementHandoffGrain>(secondKey, typeof(RetirementHandoffGrain).FullName);
+        await PlaceOnAsync(source, () => first.GetLocation());
+        await PlaceOnAsync(source, () => second.GetLocation());
+        var firstRunning = first.Block().AsTask();
+        var secondRunning = second.Block().AsTask();
+        await Task.WhenAll(firstState.BlockEntered.Task, secondState.BlockEntered.Task).WaitAsync(Timeout, Cancellation);
+        var firstCall = first.Record("first").AsTask();
+        var secondCall = second.Record("second").AsTask();
+        await WaitUntilAsync(() => GetWaitingCount(source, first.GetGrainId()) == 1 && GetWaitingCount(source, second.GetGrainId()) == 1);
+
+        try
+        {
+            await first.MigrateOnIdleTo(target.SiloAddress);
+            firstState.ReleaseBlock.TrySetResult();
+            await firstRunning.WaitAsync(Timeout, Cancellation);
+            var firstBatch = await firstSubmitted.Task.WaitAsync(Timeout, Cancellation);
+            await serializing.Task.WaitAsync(Timeout, Cancellation);
+
+            // Trigger the caller's timeout while its outbound writer still owns the unsent invocation.
+            var remote = source.ServiceProvider.GetRequiredService<IInternalGrainFactory>()
+                .GetSystemTarget<IActivationMigrationManagerSystemTarget>(Constants.ActivationMigratorType, target.SiloAddress);
+            FindPendingCallback(source, remote.GetGrainId()).OnTimeout();
+            await Assert.ThrowsAsync<OrleansMessageRejectionException>(() => firstCall.WaitAsync(Timeout, Cancellation));
+
+            await second.MigrateOnIdleTo(target.SiloAddress);
+            secondState.ReleaseBlock.TrySetResult();
+            await secondRunning.WaitAsync(Timeout, Cancellation);
+            var secondBatch = await secondSubmitted.Task.WaitAsync(Timeout, Cancellation);
+            Assert.NotSame(firstBatch, secondBatch);
+            Assert.Equal(first.GetGrainId(), Assert.Single(firstBatch).GrainId);
+            Assert.Equal(second.GetGrainId(), Assert.Single(secondBatch).GrainId);
+        }
+        finally
+        {
+            releaseSerialization.Set();
+            firstState.ReleaseBlock.TrySetResult();
+            secondState.ReleaseBlock.TrySetResult();
+        }
+
+        await secondCall.WaitAsync(Timeout, Cancellation);
+        Assert.Equal(target.SiloAddress, await first.GetLocation().AsTask().WaitAsync(Timeout, Cancellation));
+        Assert.Equal(["first"], firstState.Calls);
+        Assert.Equal(["second"], secondState.Calls);
+        Assert.Equal(2, Volatile.Read(ref invocationCount));
     }
 
     [Fact]
@@ -1697,11 +1831,17 @@ public sealed class RetirementHandoffTests
 
     private static (GrainId Sender, CorrelationId Id) FindPendingCall(InProcessSiloHandle silo, GrainId target)
     {
+        var message = FindPendingCallback(silo, target).Message;
+        return (message.SendingGrain, message.Id);
+    }
+
+    private static CallbackData FindPendingCallback(InProcessSiloHandle silo, GrainId target, string? methodName = null)
+    {
         var callbacks = (ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>)typeof(InsideRuntimeClient)
             .GetField("callbacks", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
             .GetValue(silo.ServiceProvider.GetRequiredService<InsideRuntimeClient>())!;
-        var pending = Assert.Single(callbacks, entry => entry.Value.Message.TargetGrain == target);
-        return pending.Key;
+        return Assert.Single(callbacks.Values, callback => callback.Message.TargetGrain == target
+            && (methodName is null || callback.Message.BodyObject is Orleans.Serialization.Invocation.IInvokable request && request.GetMethodName() == methodName));
     }
 
     private static Message CreateOneWayRequest(GrainId grainId, long id) => new()
@@ -1728,6 +1868,18 @@ public sealed class RetirementHandoffTests
             await Task.Delay(10, timeout.Token);
         }
     }
+}
+
+[GenerateSerializer, Immutable, SerializationCallbacks(typeof(MigrationSerializationCallbacks))]
+public sealed class MigrationSerializationGate
+{
+    [NonSerialized]
+    public Action? BeforeSerialization;
+}
+
+public sealed class MigrationSerializationCallbacks
+{
+    public void OnSerializing(MigrationSerializationGate value) => value.BeforeSerialization?.Invoke();
 }
 
 public interface IRetirementHandoffGrain : IGrainWithGuidKey

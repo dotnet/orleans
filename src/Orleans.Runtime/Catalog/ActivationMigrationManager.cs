@@ -642,10 +642,11 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
 
             var maxBatchSize = MaxBatchBodySize;
             var items = new List<ActivationMigration>();
-            var batch = new List<GrainMigrationPackage>();
             var reader = workItems.Reader;
             while (await reader.WaitToReadAsync())
             {
+                // The invocation owns its batch even if it times out before the transport serializes it.
+                var batch = new List<GrainMigrationPackage>();
                 try
                 {
                     // Collect a batch of work items within the message size limit.
@@ -712,7 +713,6 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                 finally
                 {
                     items.Clear();
-                    batch.Clear();
                 }
             }
 
