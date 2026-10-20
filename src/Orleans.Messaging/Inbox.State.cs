@@ -25,6 +25,7 @@ internal sealed partial class Inbox
     private long _capturedSequence;
     private long _durableSequence;
     private long _lastCompletionSequence;
+    private bool _capturedSnapshot;
 
     // The earliest due time, on the Durable Jobs clock, of accepted or retrying messages staged since the last capture.
     private DateTimeOffset? _stagedWakeup;
@@ -58,21 +59,20 @@ internal sealed partial class Inbox
         return dueTime is { } due ? _pump.EnsureWakeupAsync(due, cancellationToken) : ValueTask.CompletedTask;
     }
 
-    private void OnWriteCaptured()
+    private void OnWriteCaptured(bool snapshot = false)
     {
         _capturedSequence = _lastSequence;
         _capturedAdmissionFloor = _admissionFloor;
+        _capturedSnapshot = snapshot;
         _stagedWakeup = null;
     }
 
     void IStateMachine.OnWriteCompleted()
     {
         _durableSequence = _capturedSequence;
-        if (_capturedAdmissionFloor > _durableAdmissionFloor)
-        {
-            _durableAdmissionFloor = _capturedAdmissionFloor;
-            CompactProcessed();
-        }
+        _durableAdmissionFloor = _capturedAdmissionFloor;
+        // Floor-only appends stay constant-time; snapshots reclaim history after their fence is durable.
+        if (_capturedSnapshot) CompactProcessed();
         _pump.Signal();
     }
 
@@ -116,6 +116,7 @@ internal sealed partial class Inbox
         _deadLetters.Clear();
         _admissionFloor = _capturedAdmissionFloor = _durableAdmissionFloor = DateTimeOffset.MinValue;
         _stagedWakeup = null;
+        _capturedSnapshot = false;
         _lastSequence = _capturedSequence = _durableSequence = _lastCompletionSequence = 0;
     }
 
@@ -166,7 +167,7 @@ internal sealed partial class Inbox
             }
         }, writer);
         _admissionFloor = floor;
-        OnWriteCaptured();
+        OnWriteCaptured(snapshot: true);
     }
 
     void IDurableValueCommandHandler<InboxCommand>.ApplySet(InboxCommand command) => Apply(command);
@@ -191,7 +192,6 @@ internal sealed partial class Inbox
                 _processed[command.MessageId] = new()
                 {
                     MessageId = command.MessageId,
-                    ProcessedAt = command.ProcessedAt,
                     RedeliveryDeadline = command.RedeliveryDeadline,
                     Rejection = command.Rejection,
                     Sequence = _lastSequence
@@ -251,7 +251,6 @@ internal sealed class InboxCommand
     [Id(1)] public InboxMessage? Message { get; init; }
     [Id(2)] public MessageId MessageId { get; init; }
     [Id(3)] public InboxMessageState? State { get; init; }
-    [Id(4)] public DateTimeOffset ProcessedAt { get; init; }
     [Id(5)] public InboxDeadLetter? DeadLetter { get; init; }
     [Id(6)] public MessageId[]? RemovedKeys { get; init; }
     [Id(7)] public InboxSnapshot? Snapshot { get; init; }
@@ -273,7 +272,6 @@ internal sealed class InboxSnapshot
 internal sealed class InboxProcessedEntry
 {
     [Id(0)] public MessageId MessageId { get; init; }
-    [Id(1)] public DateTimeOffset ProcessedAt { get; init; }
     [Id(2)] public InboxRejection? Rejection { get; init; }
     [Id(3)] public DateTimeOffset? RedeliveryDeadline { get; init; }
     [field: NonSerialized]
