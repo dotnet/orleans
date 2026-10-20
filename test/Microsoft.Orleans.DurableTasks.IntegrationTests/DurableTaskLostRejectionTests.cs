@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
 using Orleans.DurableTasks;
 using Orleans.Journaling;
 using Orleans.Messaging;
@@ -6,8 +7,6 @@ using Orleans.Messaging.Configuration;
 using Orleans.Messaging.Diagnostics;
 using Orleans.Runtime;
 using Orleans.TestingHost.Diagnostics;
-using Polly;
-using Polly.Timeout;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
@@ -17,7 +16,7 @@ namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
 /// rejection and delivers the invocation again.
 /// </summary>
 /// <remarks>
-/// A <see cref="LostRejectionStrategy"/> in the delivery pipeline lets the target reject the invocation, then fails the
+/// A <see cref="LostRejectionFilter"/> on the starter's delivery calls lets the target reject the invocation, then fails the
 /// starter's call, as a call whose answer is lost does, so the starter's outbox retries the delivery on the Durable Jobs
 /// clock, which the test advances. The retry reaches the target's inbox, which already processed the invocation.
 /// </remarks>
@@ -26,15 +25,14 @@ public abstract class DurableTaskLostRejectionTests : IAsyncLifetime
     private const string TakenRootId = "taken";
     private static readonly TimeSpan RetryDelay = TimeSpan.FromHours(1);
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
-    private readonly LostRejectionStrategy _deliveries = new();
+    private readonly LostRejectionFilter _deliveries = new();
     private readonly DurableTaskRecoveryFixture _fixture;
 
     protected DurableTaskLostRejectionTests(string journalFormatKey)
     {
-        _fixture = new(journalFormatKey, silo => silo.Services.Configure<DurableMessagingOptions>(options =>
+        _fixture = new(journalFormatKey, silo => silo.AddOutgoingGrainCallFilter(_deliveries).Services.Configure<DurableMessagingOptions>(options =>
         {
             options.RetryInitialInterval = RetryDelay;
-            options.DeliveryResiliencePipeline = _deliveries.CreatePipeline();
         }));
     }
 
@@ -89,12 +87,12 @@ public abstract class DurableTaskLostRejectionTests : IAsyncLifetime
     /// Fails the starter's call after the target's first rejection, as a call whose answer is lost does, and records
     /// every rejection which the target answers.
     /// </summary>
-    private sealed class LostRejectionStrategy : ResilienceStrategy
+    private sealed class LostRejectionFilter : IOutgoingGrainCallFilter
     {
         private readonly TaskCompletionSource<DeliveryResult> _lost = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly List<DeliveryResult> _answers = [];
 
-        /// <summary>Gets the rejection whose answer the strategy hid from the starter.</summary>
+        /// <summary>Gets the rejection whose answer the filter hid from the starter.</summary>
         public Task<DeliveryResult> Lost => _lost.Task;
 
         /// <summary>Gets the rejections which the target answered, whether or not the starter received them.</summary>
@@ -106,27 +104,19 @@ public abstract class DurableTaskLostRejectionTests : IAsyncLifetime
             }
         }
 
-        public ResiliencePipeline CreatePipeline() => new ResiliencePipelineBuilder().AddStrategy(_ => this, new Options()).Build();
-
-        protected override async ValueTask<Outcome<TResult>> ExecuteCore<TResult, TState>(
-            Func<ResilienceContext, TState, ValueTask<Outcome<TResult>>> callback,
-            ResilienceContext context,
-            TState state)
+        public async Task Invoke(IOutgoingGrainCallContext context)
         {
-            var outcome = await callback(context, state).ConfigureAwait(context.ContinueOnCapturedContext);
-            if (outcome.Result is DeliveryResult { Status: DeliveryStatus.DeadLettered } answer)
+            await context.Invoke();
+            if (context.InterfaceMethod?.DeclaringType == typeof(IMessagingExtension)
+                && context.Result is DeliveryResult { Status: DeliveryStatus.DeadLettered } answer)
             {
                 lock (_answers) _answers.Add(answer);
                 if (_lost.TrySetResult(answer))
                 {
-                    return Outcome.FromException<TResult>(new TimeoutRejectedException("Injected loss of the receiver's answer."));
+                    throw new TimeoutException("Injected loss of the receiver's answer.");
                 }
             }
-
-            return outcome;
         }
-
-        private sealed class Options : ResilienceStrategyOptions;
     }
 }
 

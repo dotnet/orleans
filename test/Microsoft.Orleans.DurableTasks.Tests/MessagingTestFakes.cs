@@ -36,6 +36,8 @@ internal sealed class RecordingOutbox : IOutbox
     public void Send(MessageId messageId) => _sourceSends.Add(messageId);
 
     public IOutbox Register(IOutboxMessageSource source) => throw new NotSupportedException();
+
+    public bool Withdraw(MessageId messageId) => throw new NotSupportedException();
 }
 
 internal static class MessagingTestHelpers
