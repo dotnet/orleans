@@ -38,6 +38,15 @@ command even when producers and consumers are deployed at different times.
 
 ## Transport deduplication
 
+An incoming delivery's `SentAt` must be at or before the receiver's Durable Jobs
+time plus
+<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>.
+The boundary itself is admitted. A later time throws
+<xref:System.ArgumentOutOfRangeException> before deduplication, with no staged
+change or sink offer. This also protects already-tracked records from a
+far-future retention extension. The sender retries within its original budget,
+so diagnose and correct clock skew or an incorrectly stamped direct caller.
+
 Each receiver checks the exact `MessageId`, which identifies one command at that
 receiver regardless of sender or subject. A parent and its child are independent
 commands. A pending duplicate refers to the already-accepted work and carries the
