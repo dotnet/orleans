@@ -15,10 +15,7 @@ public sealed class ProcessedRetentionMaintenanceTests : MessagingBehaviorTestBa
     public async Task SnapshotWrite_PrunesExpiredProcessedIdsAndRecoveryRetainsCurrentOnes()
     {
         var receiver = NewGrain();
-        var old = CreateEnvelope(receiver, NewMessage(120, "old")) with
-        {
-            RedeliveryDeadline = Fixture.Clock.GetUtcNow() + TimeSpan.FromSeconds(1)
-        };
+        var old = CreateEnvelope(receiver, NewMessage(120, "old"));
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, old)).Status);
         await Fixture.WaitForEffectCountAsync(receiver, 1);
         Fixture.Clock.Advance(TimeSpan.FromMinutes(6));
@@ -47,7 +44,7 @@ public sealed class ProcessedRetentionMaintenanceTests : MessagingBehaviorTestBa
     }
 
     [Fact]
-    public async Task LegacyNullCutoff_NeverExpiresEvenAfterSnapshotAndRecovery()
+    public async Task SentAt_ExpiresOnlyAfterSnapshotAndRecoveryPreserveTheFloor()
     {
         var receiver = NewGrain();
         var message = CreateEnvelope(receiver, NewMessage(130, "expiring"));
@@ -62,7 +59,7 @@ public sealed class ProcessedRetentionMaintenanceTests : MessagingBehaviorTestBa
         Fixture.Storage.RequestSnapshot(JournalId.FromGrainId(receiver.GetGrainId()));
         await receiver.RetryWriteStateAsync();
         await ReactivateAsync(receiver);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
+        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, message)).Status);
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 

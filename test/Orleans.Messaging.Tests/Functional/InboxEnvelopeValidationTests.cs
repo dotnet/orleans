@@ -20,12 +20,12 @@ public sealed class InboxEnvelopeValidationTests : MessagingBehaviorTestBase
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
         // External deserialization can materialize invalid default fields before admission.
-        var malformed = new InboxMessage { Envelope = default };
+        var malformed = new InboxMessage { Envelope = default, SentAt = Fixture.JobNow };
         var context = Fixture.GetGrainContext(receiver);
         if (existingKey)
         {
             var processedInbox = Fixture.GetInbox(receiver);
-            await OnTurnAsync(context, () => InboxTestAccess.AddProcessed(processedInbox, malformed.Envelope.MessageId));
+            await OnTurnAsync(context, () => InboxTestAccess.AddProcessed(processedInbox, malformed.Envelope.MessageId, malformed.SentAt));
         }
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);

@@ -20,7 +20,7 @@ public sealed class DedupeExpiryClusterCollection : ICollectionFixture<DedupeExp
 public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture)
 {
     [Fact]
-    public async Task LegacyNullCutoff_AtDeduplicationBoundary_RemainsDuplicateWithoutCompactionTrigger()
+    public async Task TrackedSentAt_RemainsDuplicateUntilSnapshotCommitsItsRetentionFloor()
     {
         var receiver = fixture.Client.GetGrain<IMessagingTestGrain>(Guid.NewGuid());
         var original = new TestMessage(TestApplicationProtocol.NewMessageId(), 15, "expires");
@@ -39,10 +39,14 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
         var state = await receiver.GetSnapshotAsync();
 
         Assert.Equal(1, state.Effects.Single(effect => effect.LogicalId == original.LogicalId).Count);
+        fixture.Storage.RequestSnapshot(JournalId.FromGrainId(receiver.GetGrainId()));
+        await receiver.RetryWriteStateAsync();
+        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, first)).Status);
+        Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
     [Fact]
-    public async Task LegacyNullCutoff_SnapshotFailureAndRecoveryNeverForgetTheCompletedMessage()
+    public async Task FailedSnapshot_PreservesSentAtEvidenceUntilTheRetentionFloorIsDurable()
     {
         var receiver = fixture.Client.GetGrain<IMessagingTestGrain>(Guid.NewGuid());
         var envelope = CreateEnvelope(
@@ -66,7 +70,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
         Assert.Equal(1, Assert.Single(failed.Effects).Count);
         var replayed = Assert.IsType<MessagingTestGrain>(fixture.GetGrainContext(receiver).GrainInstance).ReplayedSnapshot;
         Assert.Equal(1, Assert.IsType<EndpointSnapshot>(replayed).ProcessedMessageCount);
-        // A legacy record has no finite cutoff which a floor could fence.
+        // The failed snapshot did not durably advance the floor, so journal replay retains the accepted send time.
         Assert.Equal(1, failed.ProcessedMessageCount);
 
         await receiver.RequestDeactivationAsync();
@@ -98,7 +102,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
     {
         var sessions = fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var sender = GrainId.Create("expiry-test-sender", "stable");
-        var built = TestApplicationProtocol.CreateInbox(sessions, sender, "messages/expiry", message);
+        var built = TestApplicationProtocol.CreateInbox(sessions, sender, "messages/expiry", message, fixture.JobNow);
         if (messageId is { } id)
         {
             built = TestApplicationProtocol.With(built, sessions, messageId: id);

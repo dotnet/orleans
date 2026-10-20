@@ -63,7 +63,7 @@ public sealed class JournaledTestOutboxBehaviorTests : MessagingBehaviorTestBase
             "receiver" => original with { ReceiverId = GrainId.Create("other-receiver", "1") },
             _ => original with
             {
-                Envelope = TestApplicationProtocol.With(original.ToInboxMessage(), Sessions,
+                Envelope = TestApplicationProtocol.With(original.ToInboxMessage(Fixture.JobNow), Sessions,
                 payload: CreateOutput(owner, changed: true).Envelope.Payload).Envelope
             }
         };

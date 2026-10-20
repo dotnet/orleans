@@ -78,6 +78,6 @@ public abstract class MessagingBehaviorTestBase : IAsyncLifetime
     {
         var sessions = Fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var sender = GrainId.Create("external-test-sender", Guid.NewGuid().ToString("N"));
-        return TestApplicationProtocol.CreateInbox(sessions, sender, route, body);
+        return TestApplicationProtocol.CreateInbox(sessions, sender, route, body, Fixture.JobNow);
     }
 }

@@ -113,7 +113,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         var key = MessageId.Create("tenant", "orders", "1044", "reserve");
         var original = Create(rig, key, "inventory.reserve.v1", "original");
         var repeated = Create(rig, key, "completely.changed.subject.v2", "different-body",
-            GrainId.Create("forwarder", "new-owner"));
+            GrainId.Create("forwarder", "new-owner")) with { SentAt = original.SentAt };
         handler.Release.TrySetResult();
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
         await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
@@ -346,7 +346,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task LegacyNullIdentityNeverReacceptsChangedSenderSubjectAndBodyAtExactBoundary()
+    public async Task RetainedIdentityNeverReappliesChangedSenderSubjectAndBodyAtExactBoundary()
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
@@ -354,7 +354,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         var key = MessageId.Create("tenant", "orders", "1047", "reserve");
         var original = Create(rig, key, "inventory.reserve.v1", "original");
         var repeated = Create(rig, key, "inventory.reserve.v2", "changed",
-            GrainId.Create("forwarder", "new"));
+            GrainId.Create("forwarder", "new")) with { SentAt = original.SentAt };
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
         await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
         await Fixture.WaitForInboxCountAsync(rig.Receiver, 0);
@@ -387,7 +387,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
     private InboxMessage Create(Rig rig, MessageId key, string subject, string value, GrainId sender = default) =>
         TestApplicationProtocol.CreateInbox(Sessions,
             sender.IsDefault ? GrainId.Create("producer", "first") : sender,
-            subject, new TestMessage(key, 610, value), key);
+            subject, new TestMessage(key, 610, value), Fixture.JobNow, key);
 
     private int Writes(Rig rig) => Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(rig.Context.GrainId));
 

@@ -63,7 +63,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         var grain = Assert.IsType<MessagingTestGrain>(context.GrainInstance);
         var key = MessageId.Create("custom", Guid.NewGuid().ToString("N"));
         var original = Raw(key, [1, 2, 3], "original");
-        var changed = Raw(key, [1, 2, 3], "changed");
+        var changed = Raw(key, [1, 2, 3], "changed") with { SentAt = original.SentAt };
         using var handler = new RawHandler(context);
         await OnTurnAsync(context, () => grain.HandlerOverride = handler);
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, original)).Status);
@@ -177,7 +177,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         if (completed)
         {
             await OnTurnAsync(context, () =>
-                InboxTestAccess.AddProcessed(context.ActivationServices.GetRequiredService<Inbox>(), key));
+                InboxTestAccess.AddProcessed(context.ActivationServices.GetRequiredService<Inbox>(), key, message.SentAt));
         }
         message = message with
         {
@@ -200,11 +200,11 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         Assert.Empty(snapshot.Effects);
     }
 
-    private static InboxMessage Raw(MessageId key, byte[] payload, string? trace = null)
+    private InboxMessage Raw(MessageId key, byte[] payload, string? trace = null)
     {
         Dictionary<string, byte[]>? headers = null;
         if (trace is not null) (headers ??= new(StringComparer.Ordinal))["custom.trace"] = Encoding.UTF8.GetBytes(trace);
-        return new() { Envelope = new() { MessageId = key, Payload = payload, Headers = headers } };
+        return new() { Envelope = new() { MessageId = key, Payload = payload, Headers = headers }, SentAt = Fixture.JobNow };
     }
 
     private static Task OnTurnAsync(IGrainContext context, Action action) =>
