@@ -88,7 +88,8 @@ internal sealed class DurableTaskAccessLog(
     IDurableTaskAccessLogStorage storage,
     Serializer serializer,
     TaskScheduler scheduler,
-    Func<DurableTaskDivergenceException, Exception> diverge) : JournaledStateContext, IDurableTaskPendingAccessRecords
+    Func<DurableTaskDivergenceException, Exception> diverge,
+    Func<JournaledStateConflictException, Exception>? conflict = null) : JournaledStateContext, IDurableTaskPendingAccessRecords
 {
     private const byte KindMask = 0x03;
     private const byte HasValue = 0x04;
@@ -111,6 +112,10 @@ internal sealed class DurableTaskAccessLog(
     private readonly Serializer _serializer = serializer;
     private readonly TaskScheduler _scheduler = scheduler;
     private readonly Func<DurableTaskDivergenceException, Exception> _diverge = diverge;
+
+    // Stalls the attempt when a recorded access meets state which an open transaction holds, and returns the exception which
+    // the access throws; without it, the conflict propagates unrecorded.
+    private readonly Func<JournaledStateConflictException, Exception>? _conflict = conflict;
 
     // The holder of positional reads, when the log's reads can record positions of its journal; and whether this attempt
     // registered its pending records with it.
@@ -153,6 +158,12 @@ internal sealed class DurableTaskAccessLog(
 
     /// <summary>Gets whether the runtime still records the attempt's accesses.</summary>
     public bool IsOpen => _state is AccessLogState.Recording;
+
+    /// <remarks>
+    /// While the log records, an access to state which an open transaction holds conflicts, reads included, so no record
+    /// holds an uncommitted value. Replayed accesses return their records without running, so they never conflict.
+    /// </remarks>
+    internal override bool RecordsAccesses => IsOpen;
 
     /// <summary>
     /// Gets whether the attempt's accesses run through this log: while it records them, while it returns the records which
@@ -322,6 +333,10 @@ internal sealed class DurableTaskAccessLog(
                 apply(state, result);
             }
         }
+        catch (JournaledStateConflictException conflict) when (IsOpen)
+        {
+            throw Conflict(conflict);
+        }
         catch (Exception exception) when (IsOpen && IsRecordable(exception))
         {
             RecordAndThrowException(access, argumentHash, exception);
@@ -347,6 +362,10 @@ internal sealed class DurableTaskAccessLog(
 
     // The cancellation of the attempt ends it, so it's no outcome of the access which every later attempt observes.
     private static bool IsRecordable(Exception exception) => exception is not DurableTaskAttemptCanceledException;
+
+    // A conflict with an open transaction isn't the access's outcome: it depends on when the attempt ran, so the access
+    // records nothing, and the attempt stalls, so a later attempt runs the access again.
+    private Exception Conflict(JournaledStateConflictException conflict) => _conflict?.Invoke(conflict) ?? conflict;
 
     private TResult Replay<TResult>(in JournaledStateAccess access, int? argumentHash)
     {

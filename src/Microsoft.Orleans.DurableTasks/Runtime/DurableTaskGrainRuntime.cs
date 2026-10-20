@@ -1814,8 +1814,14 @@ internal sealed partial class DurableTaskGrainRuntime(
     void IDurableTaskGrainRuntime.StallAttempt(GrainDurableTaskContext context, DurableTaskAttemptCancellationReason reason, Exception exception)
     {
         Debug.Assert(
-            reason is DurableTaskAttemptCancellationReason.UnsupportedVersion or DurableTaskAttemptCancellationReason.Diverged,
-            "An attempt stalls when the running code can't replay its execution.");
+            reason is DurableTaskAttemptCancellationReason.UnsupportedVersion or DurableTaskAttemptCancellationReason.Diverged or DurableTaskAttemptCancellationReason.TransactionConflict,
+            "An attempt stalls when the running code can't replay its execution, or when it meets an open transaction.");
+        if (reason is DurableTaskAttemptCancellationReason.TransactionConflict)
+        {
+            RestartAfterConflict(context, (JournaledStateConflictException)exception);
+            return;
+        }
+
         if (!CancelAttempt(context, reason))
         {
             return;
@@ -1823,6 +1829,105 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         _stalledExecutions.Add(context.Id);
         ReportStall(context.Id, reason, exception);
+    }
+
+    /// <summary>
+    /// Discards the attempts of the execution tree of the task which <paramref name="context"/>'s execution belongs to, and
+    /// starts the task again once the transaction which the attempt met has ended.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The conflicting access recorded nothing, so the task's records end before it, and a new attempt replays them and
+    /// then runs the access live, against committed state. The invoked task, the nearest ancestor which stores its request,
+    /// restarts rather than the execution itself, because a local child's definition comes from its parent's body: the
+    /// parent's new attempt starts the child again. The tree's other attempts are discarded with it, as deactivation
+    /// discards them, so none of them waits for a child which no attempt runs any more.
+    /// </para>
+    /// <para>
+    /// The task restarts in this activation, once every discarded attempt has settled and no transaction holds the state.
+    /// Meanwhile the restart counts as background work, so the grain's wake-up keeps the task running across a crash.
+    /// </para>
+    /// </remarks>
+    private void RestartAfterConflict(GrainDurableTaskContext context, JournaledStateConflictException conflict)
+    {
+        if (!CancelAttempt(context, DurableTaskAttemptCancellationReason.TransactionConflict))
+        {
+            // The attempt already ended, as part of its tree's restart or for another reason.
+            return;
+        }
+
+        if (FindInvokedTask(context.Id) is not { } invokedId)
+        {
+            // Every execution belongs to a task which stores its request; one which doesn't stalls as diverged.
+            _stalledExecutions.Add(context.Id);
+            ReportStall(context.Id, DurableTaskAttemptCancellationReason.TransactionConflict, conflict);
+            return;
+        }
+
+        List<Task>? settled = null;
+        foreach (var (id, execution) in _executionContexts.ToList())
+        {
+            if (id != invokedId && !id.IsDescendantOf(invokedId))
+            {
+                continue;
+            }
+
+            _executionContexts.Remove(id);
+            CancelAttempt(execution, DurableTaskAttemptCancellationReason.TransactionConflict);
+            if (_runningRequests.Remove(id, out var running))
+            {
+                (settled ??= []).Add(running.Context.Settled);
+                DurableTaskEvents.EmitExecutionStopped(GrainContext, id);
+            }
+
+            // A local child's handle stays, for the attempts which await it; the parent's new attempt starts the child again.
+            if (id != invokedId && _taskHandles.TryGetValue(id, out var handle) && handle is TaskHandle localHandle)
+            {
+                localHandle.IsRunning = false;
+            }
+        }
+
+        if (_shared.Logger.IsEnabled(LogLevel.Debug))
+        {
+            _shared.Logger.LogDebug(conflict, "{Id} durable task '{TaskId}' met an open transaction and restarts once it ends.", GrainId, invokedId);
+        }
+
+        DurableTaskEvents.EmitExecutionStalled(GrainContext, context.Id, DurableTaskAttemptCancellationReason.TransactionConflict, conflict);
+
+        // The restart runs outside the discarded attempt's flow, as the runtime's own work.
+        Task restart;
+        using (ExecutionContext.SuppressFlow())
+        {
+            restart = RestartAsync(invokedId, settled, conflict);
+        }
+
+        TrackBackgroundTask(restart, "restarting a durable task after a transaction conflict");
+
+        async Task RestartAsync(TaskId taskId, List<Task>? attempts, JournaledStateConflictException conflict)
+        {
+            await Task.Yield();
+            await conflict.WaitForReleaseAsync(_deactivationCts.Token);
+            if (attempts is not null)
+            {
+                await Task.WhenAll(attempts);
+            }
+
+            StartRequest(taskId);
+        }
+    }
+
+    /// <summary>Returns the task whose stored request runs <paramref name="executionId"/>'s execution tree.</summary>
+    private TaskId? FindInvokedTask(TaskId executionId)
+    {
+        for (var id = executionId; !id.IsDefault; id = id.Parent())
+        {
+            if (_storage.TryGetTask(id, out var state) && state.HasRequest)
+            {
+                return id;
+            }
+        }
+
+        return null;
     }
 
     private void ReportStall(TaskId taskId, DurableTaskAttemptCancellationReason reason, Exception exception)
@@ -2464,7 +2569,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         Func<DurableTaskDivergenceException, Exception> diverge)
     {
         Debug.Assert(_accessLogStorage is not null, "Attempts start once the runtime is bound to its activation.");
-        return new(attempt, _accessLogStorage, _shared.Serializer, scheduler, diverge);
+        return new(attempt, _accessLogStorage, _shared.Serializer, scheduler, diverge, attempt is GrainDurableTaskContext context ? context.StallForConflict : null);
     }
 
     private sealed record RunningRequest(
