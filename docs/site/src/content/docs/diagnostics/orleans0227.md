@@ -27,7 +27,7 @@ The runtime throws `InvalidOperationException` for a durable operation inside an
 
 A `DurableTask.RunInline` call inside an effect runs as part of the enclosing effect, and its outcome is part of the enclosing effect's outcome.
 
-For effects, see [Recorded effects](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#recorded-effects).
+For effects, see [Effects and steps](../grains/durable-tasks.md#effects-and-steps).
 
 ## How to fix violations
 

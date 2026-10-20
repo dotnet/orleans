@@ -27,7 +27,7 @@ In the example, the points effect is `$child-1` in the executions of repeat orde
 
 A name identifies the operation by its call site. A call site which runs more than once in one run, such as one in a loop, keeps one name, and later occurrences take `name$2`, `name$3`, and so on by their order.
 
-For identifiers, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows), and for unnamed effects, see [Recorded effects](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#recorded-effects).
+For identifiers, see [Stability across replays and deployments](../grains/durable-tasks-identity.md#stability-across-replays-and-deployments), and for unnamed effects, see [Effects and steps](../grains/durable-tasks.md#effects-and-steps).
 
 ## How to fix violations
 

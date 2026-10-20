@@ -30,7 +30,7 @@ Task cancellation is recorded with the task, so `IsTaskCancellationRequested` st
 
 The rule inspects the code of the region itself. Lambdas and local functions in the region can run in another task's context, such as a step's, so the rule skips them.
 
-For the two tokens, see [Execution model](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#execution-model), and for cleanup, see [Compensating canceled work](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#compensating-canceled-work).
+For the two tokens, see [Task cancellation and attempt cancellation](../grains/durable-tasks-structured-concurrency.md#task-cancellation-and-attempt-cancellation), and for cleanup, see [Compensate inline when the workflow is canceled](../grains/durable-tasks-recipes.md#compensate-inline-when-the-workflow-is-canceled).
 
 ## How to fix violations
 

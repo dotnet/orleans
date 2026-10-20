@@ -27,7 +27,7 @@ The runtime throws `NotSupportedException` for a poll inside a durable task, so 
 
 An await, or a wait with a durable timeout, records its outcome, and every replay observes the same one. `ScheduledTask.GetResponseAsync` without `PollingOptions` waits for the terminal response like an await. Code outside durable task bodies, such as a client, polls.
 
-For handles and timeouts, see [Scheduled task handles](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#scheduled-task-handles) and [Combinators](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#combinators).
+For handles and timeouts, see [Combinators and handles](../grains/durable-tasks.md#combinators-and-handles).
 
 ## How to fix violations
 
