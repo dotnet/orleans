@@ -40,6 +40,9 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
     // Allocated by the first draft.
     private DraftTable? _drafts;
 
+    // The log which an aborted transaction left, while the manager rebuilds it from the journal.
+    private AbortedLog? _aborted;
+
     public DurableLog(
         [ServiceKey] string key,
         IJournaledStateManager manager,
@@ -309,21 +312,10 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
 
     // A replayed commit returns its recorded sequence without committing again, so its outcome is the retained commit record
     // of its draft. A trimmed record precedes every retained one, so the latest record's durability implies its durability.
-    private DraftOutcome GetCommittedOutcome(LogDraftId draftId, long sequence, int count)
-    {
-        if (_draftCommits is { } commits)
-        {
-            for (var i = commits.Count - 1; i >= 0; i--)
-            {
-                if (commits[i].Commit.DraftId == draftId)
-                {
-                    return DraftOutcome.Committed(_epoch, commits[i]);
-                }
-            }
-        }
-
-        return DraftOutcome.Committed(_epoch, new(new(draftId, sequence, count), _draftCommitCount));
-    }
+    private DraftOutcome GetCommittedOutcome(LogDraftId draftId, long sequence, int count) =>
+        TryGetDraftCommit(draftId, out var commit)
+            ? DraftOutcome.Committed(_epoch, commit)
+            : DraftOutcome.Committed(_epoch, new(new(draftId, sequence, count), _draftCommitCount));
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
@@ -342,9 +334,90 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
         SignalAllReaders();
     }
 
-    // An aborted transaction's rebuild keeps open drafts, which other code owns. A reader whose cursor passed the rebuilt
-    // end resynchronizes on its own, as after any shortening of the log.
-    void IJournaledStateRollback.ResetForRollback(JournalStreamWriter writer) => ClearJournaledContent(writer);
+    // An aborted transaction's rebuild keeps open drafts, which other code owns. The log which the transaction left, with its
+    // draft commits, is kept for OnRollbackCompleted to compare with the rebuilt log.
+    void IJournaledStateRollback.ResetForRollback(JournalStreamWriter writer)
+    {
+        Debug.Assert(_aborted is null, "One rebuild runs at a time.");
+        _aborted = new(Current, _draftCommits, _committed.DraftCommitCount);
+        _draftCommits = null;
+        ClearJournaledContent(writer);
+    }
+
+    // Readers may have read the aborted transaction's entries, whose sequences later appends reuse. When the rebuild changed
+    // the log's boundaries, the log begins a new history: a snapshot entry journals its content under a new epoch, so every
+    // reader starts again from the rebuilt log once the transaction's end wakes it, as after a deletion. The rebuilt log holds
+    // none of the draft commits which the transaction made, which are recorded as abandoned by its abort.
+    void IJournaledStateRollback.OnRollbackCompleted()
+    {
+        var aborted = _aborted;
+        Debug.Assert(aborted is not null, "The rebuild began with ResetForRollback.");
+        _aborted = null;
+        var hasNewHistory = _epoch != 0 && Current with { DraftCommitCount = 0 } != aborted.Boundary with { DraftCommitCount = 0 };
+        if (hasNewHistory)
+        {
+            var epoch = Random.Shared.NextInt64(1, long.MaxValue);
+            _codec.WriteSnapshot(epoch, _firstSequence, _resetSequence, _isSealed, _items, _draftCommits is { Count: > 0 } rebuiltCommits ? rebuiltCommits.ConvertAll(static record => record.Commit) : [], GetWriter());
+            ApplyEpoch(epoch);
+        }
+
+        // A transaction's commits follow the log's entries from before it, and the rebuilt log ends where it began, so they
+        // are the aborted log's commits at or after the rebuilt end which the rebuilt log doesn't hold.
+        if (aborted.DraftCommits is { } commits && _drafts is { } drafts)
+        {
+            for (var i = commits.Count - 1; i >= 0 && commits[i].Commit.Sequence >= NextSequenceCore; i--)
+            {
+                var id = commits[i].Commit.DraftId;
+                if (id.InstanceId == drafts.InstanceId && !IsRetainedAtEnd(id))
+                {
+                    drafts.RecordAbandonment(id.Number, DraftOutcome.Abandoned(LogDraftAbandonReason.TransactionAborted, message: null));
+                }
+            }
+        }
+
+        if (!hasNewHistory)
+        {
+            RestoreCommitNumbers(aborted);
+        }
+
+        // The rebuilt log's commits at its end commit no entries.
+        bool IsRetainedAtEnd(LogDraftId id)
+        {
+            if (_draftCommits is { } rebuilt)
+            {
+                for (var i = rebuilt.Count - 1; i >= 0 && rebuilt[i].Commit.Sequence >= NextSequenceCore; i--)
+                {
+                    if (rebuilt[i].Commit.DraftId == id)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+    }
+
+    // The rebuild numbered the draft commit records anew, but the outcomes which drafts and their readers hold carry the
+    // aborted log's numbers, which their durability compares with the committed boundary's count. Under the same history,
+    // the rebuilt records are the aborted log's records before the transaction's commits, so they keep their numbers, and
+    // the committed boundary, which storage's content set, counts them as it did before the transaction.
+    private void RestoreCommitNumbers(AbortedLog aborted)
+    {
+        if (_draftCommits is { Count: > 0 } rebuilt)
+        {
+            var commits = aborted.DraftCommits;
+            Debug.Assert(commits is not null && commits.Count >= rebuilt.Count, "The rebuilt records precede the transaction's.");
+            for (var i = 0; i < rebuilt.Count; i++)
+            {
+                Debug.Assert(rebuilt[i].Commit == commits[i].Commit, "The rebuilt records are the aborted log's.");
+                rebuilt[i] = commits[i];
+            }
+        }
+
+        Debug.Assert(_captured == _committed, "No write is in flight while the rebuild runs.");
+        _captured = _committed = _committed with { DraftCommitCount = aborted.CommittedDraftCommitCount };
+    }
 
     private void ClearJournaledContent(JournalStreamWriter writer)
     {
@@ -640,15 +713,9 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
             }
         }
 
-        if (_draftCommits is { } commits)
+        if (TryGetDraftCommit(id, out var commit))
         {
-            for (var i = commits.Count - 1; i >= 0; i--)
-            {
-                if (commits[i].Commit.DraftId == id)
-                {
-                    return new(id, DraftOutcome.Committed(_epoch, commits[i]));
-                }
-            }
+            return new(id, DraftOutcome.Committed(_epoch, commit));
         }
 
         if (drafts is null)
@@ -659,6 +726,45 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
         return new(id, drafts.TryGetAbandonment(id.Number, out var outcome)
             ? outcome
             : DraftOutcome.Abandoned(LogDraftAbandonReason.Unknown, message: null));
+    }
+
+    private bool TryGetDraftCommit(LogDraftId id, out DraftCommitRecord commit)
+    {
+        if (_draftCommits is { } commits)
+        {
+            for (var i = commits.Count - 1; i >= 0; i--)
+            {
+                if (commits[i].Commit.DraftId == id)
+                {
+                    commit = commits[i];
+                    return true;
+                }
+            }
+        }
+
+        commit = default;
+        return false;
+    }
+
+    // The log is the authority for commits. A followed draft's commit stands unless the abort of the transaction which made
+    // it abandoned it, or the history changed: deleting the journal discards every commit, and an aborted transaction's
+    // rebuild begins a new history which retains the commits made before the transaction.
+    private DraftOutcome ResolveCommit(LogDraftId id, DraftOutcome outcome)
+    {
+        Debug.Assert(outcome.IsCommitted);
+        if (_drafts is { } drafts && drafts.InstanceId == id.InstanceId && drafts.TryGetAbandonment(id.Number, out var abandoned))
+        {
+            return abandoned;
+        }
+
+        if (outcome.Epoch == _epoch)
+        {
+            return outcome;
+        }
+
+        return TryGetDraftCommit(id, out var commit)
+            ? DraftOutcome.Committed(_epoch, commit)
+            : DraftOutcome.Abandoned(LogDraftAbandonReason.JournalDeleted, message: null);
     }
 
     private Reader CreateReader(JournaledStateObservers hub, long fromSequence, long epoch, DurableWatchMode mode, LogDraftId? resumeDraftId)
@@ -840,10 +946,9 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
                 continue;
             }
 
-            if (outcome.IsCommitted && outcome.Epoch != _epoch)
+            if (outcome.IsCommitted)
             {
-                // Deleting the journal discarded the committed entries, along with the rest of their history.
-                outcome = DraftOutcome.Abandoned(LogDraftAbandonReason.JournalDeleted, message: null);
+                outcome = ResolveCommit(followedDraft.Id, outcome);
             }
 
             if (outcome.IsCommitted)
@@ -939,6 +1044,12 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
     /// A draft commit retained by the log, and its number among this instance's commit records.
     /// </summary>
     private readonly record struct DraftCommitRecord(LogDraftCommit Commit, long Index);
+
+    /// <summary>
+    /// The log which an aborted transaction left: its boundaries, its draft commits, in sequence order, and the number of
+    /// the last draft commit record which storage held.
+    /// </summary>
+    private sealed record AbortedLog(Boundary Boundary, List<DraftCommitRecord>? DraftCommits, long CommittedDraftCommitCount);
 
     /// <summary>
     /// How a draft closed: the range of entries which replaced it, or why it was abandoned.

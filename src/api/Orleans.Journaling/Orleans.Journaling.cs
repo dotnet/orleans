@@ -811,7 +811,8 @@ namespace Orleans.Journaling
         JournalDeleted = 3,
         PreviousActivation = 4,
         Unknown = 5,
-        Sealed = 6
+        Sealed = 6,
+        TransactionAborted = 7
     }
 
     public readonly partial struct LogDraftCommit : System.IEquatable<LogDraftCommit>
