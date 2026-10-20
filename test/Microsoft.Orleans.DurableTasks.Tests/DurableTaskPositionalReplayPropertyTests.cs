@@ -111,12 +111,18 @@ public sealed class DurableTaskPositionalReplayPropertyTests
         Assert.False(PositionalResults.IsExact(typeof((bool, ReplayShape))));
         Assert.False(PositionalResults.IsExact(typeof(object)));
 
-        Assert.True(PositionalResults.IsSmall(typeof(int)));
-        Assert.True(PositionalResults.IsSmall(typeof(bool)));
-        Assert.True(PositionalResults.IsSmall(typeof(DayOfWeek)));
-        Assert.True(PositionalResults.IsSmall(typeof((bool, long))));
-        Assert.False(PositionalResults.IsSmall(typeof((bool, string))));
-        Assert.False(PositionalResults.IsSmall(typeof(string)));
+        Assert.True(PositionalResults.HasLength(typeof(string)));
+        Assert.True(PositionalResults.HasLength(typeof(long[])));
+        Assert.True(PositionalResults.HasLength(typeof((bool, string))));
+        Assert.True(PositionalResults.HasLength(typeof((bool, long[]))));
+        Assert.False(PositionalResults.HasLength(typeof(int)));
+        Assert.False(PositionalResults.HasLength(typeof((bool, long))));
+        Assert.False(PositionalResults.HasLength(typeof(ReplayRecord)));
+        Assert.False(PositionalResults.HasLength(typeof(DurableTaskCompletionSourceState<string>)));
+        Assert.Equal(3, PositionalResults.GetLength("abc"));
+        Assert.Equal(2, PositionalResults.GetLength(new long[2]));
+        Assert.Equal(3, PositionalResults.GetLength((true, "abc")));
+        Assert.Equal(0, PositionalResults.GetLength((false, (string?)null)));
 
         Assert.True(ValueEquality<string>.IsSupported);
         Assert.True(ValueEquality<int>.IsSupported);
@@ -508,23 +514,31 @@ public sealed class DurableTaskPositionalReplayPropertyTests
 
         private int NextValue() => _outside ? 1_000 + _createdOutside++ : _created++;
 
+        // A distinct text, which reaches the length from which reads record positions for the last argument, and is short,
+        // so its reads record values, for the others.
+        private string NextText(string text, int argument)
+        {
+            var value = $"{text}{NextValue()}";
+            return argument == Texts.Length - 1 ? value.PadRight(PositionalResults.MinimumLength, '.') : value;
+        }
+
         private string Write(Step step)
         {
             var text = Texts[step.Argument];
             switch (step.State, step.Operation % 2)
             {
                 case (0, 0):
-                    _dictionary[text] = $"{text}{NextValue()}";
+                    _dictionary[text] = NextText(text, step.Argument);
                     return "set";
                 case (0, _):
                     return Show(_dictionary.Remove(text));
                 case (1, 0):
-                    _keyedByReference.Add(new ReplayKey { Name = text }, $"{text}{NextValue()}");
+                    _keyedByReference.Add(new ReplayKey { Name = text }, NextText(text, step.Argument));
                     return "added";
                 case (1, _):
                     return _keyedByReference.Keys.FirstOrDefault() is { } key ? Show(_keyedByReference.Remove(key)) : "empty";
                 case (2, _):
-                    _text.Value = $"{text}{NextValue()}";
+                    _text.Value = NextText(text, step.Argument);
                     return "set";
                 case (3, _):
                     _number.Value = step.Argument + NextValue();
@@ -539,13 +553,13 @@ public sealed class DurableTaskPositionalReplayPropertyTests
                     _time.Value = new DateTime(2026, 10, 19, 13, step.Argument, NextValue() % 60, (DateTimeKind)step.Argument);
                     return "set";
                 case (6, 0):
-                    _list.Add(text);
+                    _list.Add(NextText(text, step.Argument));
                     return "added";
                 case (6, _):
                     _list.RemoveAt(0);
                     return "removed";
                 case (7, 0):
-                    _queue.Enqueue(text);
+                    _queue.Enqueue(NextText(text, step.Argument));
                     return "enqueued";
                 case (7, _):
                     return Show(_set.Add(text));

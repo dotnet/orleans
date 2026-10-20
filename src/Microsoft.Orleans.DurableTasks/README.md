@@ -592,15 +592,17 @@ synchronously on the activation which makes them, when the runtime stages them: 
   journal format, another pure read of state in the activation's journal, such as a
   dictionary's indexer or `TryGetValue`, a list's indexer, or a value's `Value`, records
   the journal's position and the read's argument hash instead of its value when the
-  journal holds exactly what the read observed: the state has no change waiting for a
-  write, the result is a value type or a sealed class (or an array of value types), and
-  an argument compares by value. Counts, flags, indexes and other small results record
-  values. While an execution holds such records, the journal keeps the history after
-  them, and a recovery replays that history to replace each position with the value
-  which the read observed before the execution replays. A snapshot, whether storage or
-  the application requests it, is deferred up to 16 times and then resolves the
-  positions first; an attempt which outlives that resolution records values from then
-  on, and a discarded attempt's unstaged positions hold no history. Every other read
+  value is large and the journal holds exactly what the read observed: the result is a
+  string of at least 512 characters or an array of at least 512 elements (alone, or as
+  the value which a `Try` read found), the state has no change waiting for a write, the
+  result's type is exact (a sealed or value type, or an array of value types), and an
+  argument compares by value. While an execution holds such records, the journal keeps
+  the history after them, and a recovery replays that history to replace each position
+  with the value which the read observed before the execution replays. A snapshot,
+  whether storage or the application requests it, is deferred up to 16 times and then
+  resolves the positions first. Once the journal resolves an execution's positions, at
+  recovery or before a snapshot, its reads record values for the rest of the activation,
+  and a discarded attempt's unstaged positions hold no history. Every other read
   records its value, so a replay returns what each read observed when it ran. Live
   observations, `IDurableTaskCompletionSource<T>.Task`,
   `IDurableLog<T>.ReadAsync`, and `WatchAsync`, run unrecorded. The runtime's own state
