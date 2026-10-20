@@ -405,15 +405,19 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
     }
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task AttemptWithoutOutcomeAfterStaging_DiscardsItsChangesAndRunsAgainAfterRecovery(bool throws)
+    [InlineData(true, "mutate")]
+    [InlineData(false, "mutate")]
+    [InlineData(true, "self-send")]
+    public async Task AttemptWithoutOutcomeAfterStaging_DiscardsItsChangesAndRunsAgainAfterRecovery(bool throws, string change)
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
+        var selfSent = CreateEnvelope(rig.Receiver, NewMessage(503, "handler-self-send"));
         handler.Body = (self, _) =>
         {
-            self.Mutate();
+            // A message which the handler sends to itself is the attempt's change, like its other effects.
+            if (change == "mutate") self.Mutate();
+            else rig.InboxState.StageLocal(selfSent);
             if (throws) throw new InvalidOperationException("A downstream call failed after staging.");
             return ValueTask.CompletedTask;
         };
@@ -437,6 +441,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
     [Theory]
     [InlineData("delivery")]
     [InlineData("request")]
+    [InlineData("self-send")]
     public async Task AttemptFailure_WhileAnotherTurnStagesChanges_DoesNotTreatThemAsItsOwn(string turn)
     {
         var rig = await CreateAsync();
@@ -454,6 +459,9 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
                 break;
             case "request":
                 await OnTurnAsync(rig.Context, () => rig.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "interleaved");
+                break;
+            case "self-send":
+                await OnTurnAsync(rig.Context, () => rig.InboxState.StageLocal(interleaved));
                 break;
         }
 
