@@ -42,8 +42,7 @@ public sealed class InboxAdmissionRecoveryTests
         DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, retained));
         if (snapshot) fixture.Storage.RequestSnapshot(JournalId.FromGrainId(receiver.GetGrainId()));
         // A journal command (or its snapshot) durably advances the same floor.
-        Assert.Equal(DeliveryStatus.Expired,
-            (await DeliverAsync(receiver, Message("fenced", floor))).Status);
+        DeliveryResultAssert.IsCase<DeliveryResult.Expired>(await DeliverAsync(receiver, Message("expired-by-floor", floor)));
         await fixture.CrashAsync(receiver);
         fixture.JobClock.Advance(started - fixture.JobClock.GetUtcNow());
         Assert.Equal(0, await receiver.GetOutboxCountAsync());

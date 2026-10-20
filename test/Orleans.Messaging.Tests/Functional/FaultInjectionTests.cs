@@ -874,8 +874,8 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         Assert.Equal(floor, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.DurableAdmissionFloor(inbox)));
         foreach (var delta in new[] { -1L, 0L })
         {
-            var fenced = CreateEnvelope(receiver, NewMessage(81, "fenced")) with { SentAt = floor.AddTicks(delta) };
-            Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, fenced)).Status);
+            var expiredMessage = CreateEnvelope(receiver, NewMessage(81, "expired-by-floor")) with { SentAt = floor.AddTicks(delta) };
+            DeliveryResultAssert.IsCase<DeliveryResult.Expired>(await DeliverAsync(receiver, expiredMessage));
         }
 
         var available = CreateEnvelope(receiver, NewMessage(82, "above-floor")) with { SentAt = floor.AddTicks(1) };
@@ -967,7 +967,7 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         }).ToArray();
         var future = new InboxMessage
         {
-            Envelope = new() { MessageId = NewSourceMessageId("unfenced-finite"), Payload = [16], Subject = SourceSinkGrain.Subject },
+            Envelope = new() { MessageId = NewSourceMessageId("retained-recent"), Payload = [16], Subject = SourceSinkGrain.Subject },
             SentAt = _cluster.JobClock.GetUtcNow()
         };
         foreach (var message in recent.Append(future))
@@ -1107,9 +1107,8 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
             Envelope = new() { MessageId = id, Payload = payload, Subject = realSink ? SourceSinkGrain.Subject : Route },
             SentAt = started
         };
-        var fenced = await receiver.AsReference<IMessagingExtension>().DeliverAsync(replay, TestContext.Current.CancellationToken);
-        Assert.Equal(DeliveryStatus.Expired, fenced.Status);
-        Assert.Null(fenced.Code);
+        var expired = await receiver.AsReference<IMessagingExtension>().DeliverAsync(replay, TestContext.Current.CancellationToken);
+        DeliveryResultAssert.IsCase<DeliveryResult.Expired>(expired);
         if (realSink)
         {
             Assert.Equal(payload, (await OnSinkAsync(receiver, static grain => grain.GetState())).Received[id.ToString()]);
@@ -1336,7 +1335,7 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         if (outcome == TerminalOutcome.Rejected) _cluster.SourceSinkProbe.For(receiver).Mode = SinkMode.DeadLetter;
         if (outcome == TerminalOutcome.Expired)
         {
-            // The receiver has durably fenced this sender's cutoff, then its clock moves backward.
+            // The receiver has durably advanced its admission floor past this send time, then its clock moves backward.
             _cluster.JobClock.Advance(TimeSpan.FromDays(2));
             var stale = new InboxMessage
             {
