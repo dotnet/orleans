@@ -1,3 +1,5 @@
+#pragma warning disable CS0618 // This verifies serialization compatibility for the legacy cancellation token.
+
 using CsCheck;
 #if NET8_0_OR_GREATER
 using Orleans;

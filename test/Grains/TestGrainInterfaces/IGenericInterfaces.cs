@@ -1,3 +1,5 @@
+#pragma warning disable CS0618 // Preserve grain contracts used to test legacy token behavior.
+
 using Orleans.Concurrency;
 
 namespace UnitTests.GrainInterfaces

@@ -1,3 +1,5 @@
+#pragma warning disable CS0618 // Preserve serialization support for the legacy cancellation token.
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;

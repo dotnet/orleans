@@ -1,3 +1,5 @@
+#pragma warning disable CS0618 // Preserve the legacy token benchmark implementation.
+
 using System.Collections.Concurrent;
 using BenchmarkGrainInterfaces.MapReduce;
 

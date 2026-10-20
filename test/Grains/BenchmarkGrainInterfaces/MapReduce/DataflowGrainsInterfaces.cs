@@ -1,3 +1,5 @@
+#pragma warning disable CS0618 // Preserve the legacy token benchmark contract.
+
 namespace BenchmarkGrainInterfaces.MapReduce
 {
     public interface IDataflowGrain : IGrain

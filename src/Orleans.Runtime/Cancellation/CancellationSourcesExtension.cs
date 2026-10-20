@@ -1,3 +1,5 @@
+#pragma warning disable CS0618 // Preserve distributed cancellation support for the legacy token.
+
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;

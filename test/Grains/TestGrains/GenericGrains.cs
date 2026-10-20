@@ -1,3 +1,5 @@
+#pragma warning disable CS0618 // Preserve grain implementations used to test legacy token behavior.
+
 using System.Globalization;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;

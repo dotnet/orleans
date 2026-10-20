@@ -2,6 +2,8 @@ using Orleans.CodeGeneration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Serialization.Invocation;
+#pragma warning disable CS0618 // Preserve runtime propagation for the legacy cancellation token.
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
