@@ -29,10 +29,10 @@ public abstract class DurableTaskContext
 
     private static readonly AsyncLocal<DurableTaskContext?> AmbientContext = new();
     private static readonly AsyncLocal<DurableTaskContext?> ShieldedContext = new();
-private const string OffSchedulerMessage =
-        "Durable task code ran off the scheduler which runs its execution, such as its grain activation's scheduler, for "
-        + "example after ConfigureAwait(false). The execution orders and records its operations on that scheduler. Await "
-        + "without ConfigureAwait(false) in durable task bodies and steps (ORLEANS0226).";
+    private const string OffSchedulerMessage =
+            "Durable task code ran off the scheduler which runs its execution, such as its grain activation's scheduler, for "
+            + "example after ConfigureAwait(false). The execution orders and records its operations on that scheduler. Await "
+            + "without ConfigureAwait(false) in durable task bodies and steps (ORLEANS0226).";
 
     private readonly TaskScheduler _scheduler = TaskScheduler.Current;
 
