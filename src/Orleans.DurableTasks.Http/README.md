@@ -249,8 +249,9 @@ keyed service, and returns the builder of the `HttpClient` which it sends reques
 with. Each of its methods which returns a durable task records its responses as steps
 of the calling task, so a replay reads them without sending the requests again. Each
 step's unsafe requests carry an `Idempotency-Key` derived from the service, the grain,
-and the step's identifier, so a step which runs again after a failure or a
-deactivation reaches the same server-side work. The key handler precedes the
+the step's identifier, and the task's run, `DurableTaskContext.Incarnation`, so a step
+which runs again after a failure or a deactivation reaches the same server-side work,
+and a later run of the same task identifier, after its deletion, sends new keys. The key handler precedes the
 handlers which the builder adds, so their retries carry the key.
 
 - `SendAsync` sends a request and returns the recorded `DurableHttpResponse`.

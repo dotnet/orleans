@@ -25,8 +25,10 @@ public sealed class DurableIdempotencyKeyHandlerTests(DurableHttpFixture fixture
         var result = (await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken)).GetResult<string[]>();
 
         Assert.Equal("send-key/send", result[0]);
+        var incarnation = Guid.ParseExact(result[3], "N");
+        Assert.NotEqual(Guid.Empty, incarnation);
         Assert.Equal(
-            DurableIdempotencyKeyHandler.CreateKey(fixture.ServiceId, grain.GetGrainId(), TaskId.Parse(result[0])),
+            DurableIdempotencyKeyHandler.CreateKey(fixture.ServiceId, grain.GetGrainId(), TaskId.Parse(result[0]), incarnation),
             result[1]);
 
         // A GET is idempotent by definition, so it carries no key.
@@ -34,17 +36,23 @@ public sealed class DurableIdempotencyKeyHandlerTests(DurableHttpFixture fixture
     }
 
     [Fact]
-    public void KeysDistinguishServicesGrainsAndTasks()
+    public void KeysDistinguishServicesGrainsTasksAndRuns()
     {
         var grain = GrainId.Create("durable-http-test", "a");
         var task = TaskId.CreateRoot("root").Child("send");
-        var key = DurableIdempotencyKeyHandler.CreateKey("service", grain, task);
+        var run = Guid.Parse("0f8fad5b-d9cb-469f-a165-70867728950e");
+        var key = DurableIdempotencyKeyHandler.CreateKey("service", grain, task, run);
 
         Assert.Equal(43, key.Length);
-        Assert.Equal(key, DurableIdempotencyKeyHandler.CreateKey("service", grain, task));
-        Assert.NotEqual(key, DurableIdempotencyKeyHandler.CreateKey("other-service", grain, task));
-        Assert.NotEqual(key, DurableIdempotencyKeyHandler.CreateKey("service", GrainId.Create("durable-http-test", "b"), task));
-        Assert.NotEqual(key, DurableIdempotencyKeyHandler.CreateKey("service", grain, TaskId.CreateRoot("root").Child("send$2")));
+        Assert.Equal(key, DurableIdempotencyKeyHandler.CreateKey("service", grain, task, run));
+        Assert.NotEqual(key, DurableIdempotencyKeyHandler.CreateKey("other-service", grain, task, run));
+        Assert.NotEqual(key, DurableIdempotencyKeyHandler.CreateKey("service", GrainId.Create("durable-http-test", "b"), task, run));
+        Assert.NotEqual(key, DurableIdempotencyKeyHandler.CreateKey("service", grain, TaskId.CreateRoot("root").Child("send$2"), run));
+
+        // A later run of the same task identifier, after its deletion, sends new keys, so a server which still holds
+        // the earlier run's keys doesn't answer it with the earlier run's responses.
+        Assert.NotEqual(key, DurableIdempotencyKeyHandler.CreateKey("service", grain, task, Guid.Parse("7c9e6679-7425-40de-944b-e07fc1f90ae7")));
+        Assert.Equal("_eSTqCNKOAQzDa_FdwbVJxUFr7n9QDTjB2QwCu-2cIU", key);
     }
 
     [Fact]

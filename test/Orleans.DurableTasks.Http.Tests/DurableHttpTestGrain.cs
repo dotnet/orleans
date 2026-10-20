@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Http;
 using Orleans.Journaling;
+using Orleans.Runtime;
 
 namespace Orleans.DurableTasks.Http.Tests;
 
@@ -44,6 +45,19 @@ public sealed class DurableHttpTestGrain(
     public static readonly DurableSignal<string> Approved = new("approved");
     public static readonly DurableSignal<string> Shipped = new("shipped");
     public static readonly DurableSignal<bool> Confirmed = new("confirmed");
+
+    /// <summary>Gets the current activations of the grain, by identity, which tests deactivate while they run a step.</summary>
+    /// <remarks>
+    /// A step runs as a non-interleaving request, so a deactivation which a grain call requests waits for it. Deactivating
+    /// the activation directly, as a silo which shuts down does, aborts the step instead.
+    /// </remarks>
+    public static System.Collections.Concurrent.ConcurrentDictionary<GrainId, IGrainContext> Activations { get; } = new();
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        Activations[GrainContext.GrainId] = GrainContext;
+        return base.OnActivateAsync(cancellationToken);
+    }
 
     public DurableTask<string> EchoAsync(string value) => DurableTask.FromResult(value);
 
@@ -157,18 +171,19 @@ public sealed class DurableHttpTestGrain(
             Content = JsonContent.Create(new ApprovalRequest("widget")),
         });
     /// <summary>
-    /// Sends a <c>POST</c> and a <c>GET</c> request from a step, and returns the step's identifier and the idempotency keys
-    /// which the server received.
+    /// Sends a <c>POST</c> and a <c>GET</c> request from a step, and returns the step's identifier, the idempotency keys
+    /// which the server received, and the step's incarnation.
     /// </summary>
     public async DurableTask<string[]> SendIdempotencyKeyAsync() =>
         await DurableTask.Run(async cancellationToken =>
         {
             var client = httpClients.CreateClient(DurableHttpFixture.RawClientName);
             var taskId = DurableTask.Current.Id.ToString();
+            var incarnation = DurableTask.Current.Incarnation.ToString("N");
             using var post = await client.PostAsync("/echo-idempotency-key", content: null, cancellationToken);
             var postKey = await post.Content.ReadAsStringAsync(cancellationToken);
             var getKey = await client.GetStringAsync("/echo-idempotency-key", cancellationToken);
-            return new[] { taskId, postKey, getKey };
+            return new[] { taskId, postKey, getKey, incarnation };
         }).WithId("send");
 }
 

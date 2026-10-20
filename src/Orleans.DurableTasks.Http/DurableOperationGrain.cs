@@ -119,7 +119,7 @@ internal sealed class DurableOperationGrain(
         ScheduledTask root;
         try
         {
-            root = await call.Detached().WithId(this.GetPrimaryKeyString()).ScheduleAsync();
+            root = await call.Detached(this.GetPrimaryKeyString()).ScheduleAsync();
         }
         catch (Exception exception) when (exception is DurableTaskRejectedException or DurableTaskConflictException or DurableTaskDeliveryException)
         {
