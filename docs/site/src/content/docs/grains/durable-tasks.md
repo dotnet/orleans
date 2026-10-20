@@ -134,9 +134,11 @@ place-order-{orderId}/ship
   root ID has its own incarnation, so a run after the earlier one was deleted calls new tasks. A
   root task, such as a detached start, keeps its root ID on its grain, and the root ID
   `$caller` is reserved.
-- Scheduling a task ID again with the same request reattaches to the existing task and
-  its recorded result. Scheduling it with a different interface, method, or argument
-  fails, so a task ID deduplicates schedules while the grain retains the task.
+- Scheduling a task ID again with the same method, from the same caller, reattaches to
+  the existing task and its recorded result, whatever the arguments, so a retry whose
+  arguments serialize differently reaches the task. Scheduling it with a different
+  interface or method fails, so a task ID deduplicates schedules while the grain retains
+  the task.
 
 A durable task calls its own grain's durable methods directly, as local steps, such as
 `await RefreshPricesAsync().WithId("refresh")`. A durable call through a reference to the
@@ -526,7 +528,7 @@ when the caller continues:
   which address it with `GetDurableTask`. The target acknowledges the
   invocation, and the caller's outbox retires it, once the target's journal write stores
   the task. A start which the target rejects, because the task ID already identifies
-  another request, throws `DurableTaskConflictException`. Other failures to accept the
+  another method, throws `DurableTaskConflictException`. Other failures to accept the
   start, such as a request which the target can't decode, are retried, and a start which
   isn't accepted before Messaging's `OutboxRetryTimeout` throws
   `DurableTaskDeliveryException`. Awaiting the task throws the same failure. See [Dead letters](durable-tasks-operations.md#dead-letters).
@@ -541,7 +543,7 @@ when the caller continues:
 - Inside a durable task, the record of a detached task, `$detach:{target}:{rootId}`,
   commits with the start, so a replay which reaches the record starts nothing. The
   starter holds the invocation, which carries the request, until its target accepts it,
-  so the start survives the deletion of the starter's tree. Starting the same request under the same root ID again leaves the task unchanged.
+  so the start survives the deletion of the starter's tree. Starting the same method under the same root ID again leaves the task unchanged.
 - Outside a durable task, every task is a root task, so `.Detached()` leaves the call
   unchanged. `WithId` supplies the root ID and makes a start safe to retry: a caller which
   retries a start after an ambiguous failure, such as a timeout, reaches the same task. A
@@ -649,8 +651,9 @@ describes which tasks have addresses and how long they resolve.
 
 ## Commit model and guarantees
 
-- `(grain, TaskId)` identifies one execution. A stable request fingerprint detects reuse
-  of a task ID with a different interface, method, argument type, or argument value.
+- `(grain, TaskId)` identifies one execution. A task ID's reuse is the same request when
+  it invokes the same interface method from the same caller; arguments aren't compared,
+  and reuse with a different interface or method conflicts.
 - Request identity, task state, caller subscription, and inbox completion commit before
   execution begins.
 - Task state and outgoing messages share the grain's journal commit boundary with the

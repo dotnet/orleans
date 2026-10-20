@@ -202,7 +202,7 @@ public sealed class DurableTaskStorageTests
             storage.GetOrCreateTask(rootId, DurableTaskRecordKind.LocalStep, request: null);
             storage.GetOrCreateTask(retainedId, DurableTaskRecordKind.LocalStep, request: null);
             var state = storage.GetOrCreateTask(deletedId, DurableTaskRecordKind.Invocation, CreateRequest());
-            storage.SetRemoteRequest(deletedId, state, remoteTarget, "remote-fingerprint");
+            storage.SetRemoteRequest(deletedId, state, remoteTarget, "method", "remote-fingerprint");
             storage.SetResponse(deletedId, state, DurableTaskResponse.Completed);
             await storage.WriteAsync(cancellationToken);
         }
@@ -241,7 +241,7 @@ public sealed class DurableTaskStorageTests
             var storage = activation.Storage;
             var state = storage.GetOrCreateTask(taskId, DurableTaskRecordKind.RemoteCall, request: null);
             storage.SetRequestFingerprint(taskId, state, "request-fingerprint-v1");
-            storage.SetRemoteRequest(taskId, state, remoteTarget, "remote-fingerprint-v2");
+            storage.SetRemoteRequest(taskId, state, remoteTarget, "remote-method", "remote-fingerprint-v2");
             storage.SetCallerId(taskId, state, caller);
             storage.AddCompletionDestination(taskId, state, completionDestination);
             storage.SetDelay(taskId, state, createdAt.AddMinutes(10), generation: 3);
@@ -267,6 +267,7 @@ public sealed class DurableTaskStorageTests
         Assert.Equal(4, recovered.ResumeGeneration);
         Assert.Equal("request-fingerprint-v1", recovered.RequestFingerprint);
         Assert.Equal(remoteTarget, recovered.RemoteTarget);
+        Assert.Equal("remote-method", recovered.Method);
         Assert.Equal("remote-fingerprint-v2", recovered.RemoteRequestFingerprint);
         Assert.Equal(caller, recovered.CallerId);
         Assert.Equal(completionDestination, Assert.Single(recovered.CompletionDestinations));

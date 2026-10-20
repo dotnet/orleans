@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,8 +13,8 @@ namespace Orleans.DurableTasks.Runtime;
 
 /// <remarks>
 /// <para>
-/// A durable execution starts a detached task by recording a subscription child, whose fingerprint names the task's grain,
-/// root identifier, and request, and staging the task's invocation in the same journal write. The invocation names the
+/// A durable execution starts a detached task by recording a subscription child, whose fingerprint names the task's grain
+/// and root identifier, and whose method names the request's method, and staging the task's invocation in the same journal write. The invocation names the
 /// child as a subscriber, so the task's grain adds the child to the task's completion destinations when it stores the
 /// task, without a separate subscription. The child observes the task as other subscriptions do: its cancellation ends
 /// only the subscription. A detached task of the same grain is staged directly in task state.
@@ -38,8 +39,9 @@ namespace Orleans.DurableTasks.Runtime;
 /// </remarks>
 internal sealed partial class DurableTaskGrainRuntime
 {
-    // A detached task's record is a subscription child whose fingerprint also covers the detached request, so a replay
-    // which starts another request under the same root identifier diverges.
+    // A detached task's record is a subscription child whose fingerprint names the task's grain and root identifier, and
+    // the diagnostic fingerprint of the detached request. The record's method identifies the request, so a replay which
+    // starts another method under the same root identifier diverges, and one whose arguments serialize differently doesn't.
     private const string DetachedFingerprintPrefix = "$detach:";
 
     // The starts which await their target's acceptance, by the identifier of their record. Each is signaled when the record
@@ -103,18 +105,15 @@ internal sealed partial class DurableTaskGrainRuntime
         }
 
         PrepareDetachedInvocation(request);
-        SendInvocation(MessageTransport.CreateDetachedInvocation(GrainId, target, rootId, request, subscriberId: null), recordId: null);
+        SendInvocation(MessageTransport.CreateDetachedInvocation(GrainId, target, rootId, request, subscriberId: null), request, recordId: null);
     }
 
     private IScheduledTaskHandle StageDetached(TaskId recordId, TaskId rootId, IDurableTaskRequest request, bool shielded)
     {
         Debug.Assert(rootId.Parent().IsDefault, "A detached task is a root task.");
         var target = request.Context?.TargetId ?? throw new InvalidOperationException("The durable task request has no target.");
-        var fingerprint = FormatIdentity(
-            $"{DetachedFingerprintPrefix}{IDurableTaskRequest.GetFingerprint(request, _shared.Serializer)}:",
-            target,
-            rootId);
-        if (TryGetRecordedSubscription(recordId, fingerprint, DescribeDetachedStart(target, rootId)) is { } recorded)
+        var method = IDurableTaskRequest.GetMethod(request);
+        if (TryGetRecordedSubscription(recordId, DurableTaskRecordKind.DetachedStart, target, rootId, method, DescribeDetachedStart(target, rootId, method)) is { } recorded)
         {
             return recorded.Handle;
         }
@@ -132,10 +131,15 @@ internal sealed partial class DurableTaskGrainRuntime
             var recordWireId = GetWireId(recordId);
             SendInvocation(
                 MessageTransport.CreateDetachedInvocation(GrainId, target, rootId, request, recordWireId),
+                request,
                 recordWireId);
         }
 
-        var handle = StageSubscriptionRecord(recordId, DurableTaskRecordKind.DetachedStart, fingerprint, shielded, response);
+        var fingerprint = FormatIdentity(
+            $"{DetachedFingerprintPrefix}{IDurableTaskRequest.GetFingerprint(request, _shared.Serializer)}:",
+            target,
+            rootId);
+        var handle = StageSubscriptionRecord(recordId, DurableTaskRecordKind.DetachedStart, fingerprint, shielded, response, method);
 
         // A canceled starter still starts the task, which its cancellation doesn't reach, and ends only its subscription.
         if (response is null && IsStartRefusedByAncestorCancellation(recordId, state: null, shielded))
@@ -170,8 +174,8 @@ internal sealed partial class DurableTaskGrainRuntime
         return separator > 0 && TryParseIdentity(fingerprint[..(separator + 1)], fingerprint, out target, out rootId);
     }
 
-    private static string DescribeDetachedStart(GrainId target, TaskId rootId) =>
-        $"a start of detached task '{rootId}' on grain '{target}'";
+    private static string DescribeDetachedStart(GrainId target, TaskId rootId, string? method) =>
+        $"a start of detached task '{rootId}' on grain '{target}' for {DescribeMethod(method)}";
 
     /// <summary>
     /// Returns why the grain rejects an invocation of <paramref name="taskId"/> which its sender first staged at
@@ -243,18 +247,20 @@ internal sealed partial class DurableTaskGrainRuntime
     /// <remarks>
     /// A pending invocation with the same identity coalesces: the replay of a start which recovery restored stages nothing.
     /// The identity of a start which a record makes covers the record's wire identifier, so each run of a tree sends its
-    /// own. A pending invocation which carries another request under the same identity, which an earlier post of the same
-    /// root task sent, fails the start.
+    /// own. The pending invocation keeps the request which it journaled, so a replay whose arguments serialize differently
+    /// still coalesces. A pending invocation which invokes another method under the same identity, which an earlier post
+    /// of the same root task sent, fails the start.
     /// </remarks>
-    private void SendInvocation(OutboxMessage invocation, TaskId? recordId)
+    private void SendInvocation(OutboxMessage invocation, IDurableTaskRequest request, TaskId? recordId)
     {
         var messageId = invocation.Envelope.MessageId;
         if (_invocations.TryGetValue(messageId, out var pending))
         {
-            if (!pending.Payload.AsSpan().SequenceEqual(invocation.Envelope.Payload))
+            if (!pending.Payload.AsSpan().SequenceEqual(invocation.Envelope.Payload)
+                && !IsSameMethod(pending, request))
             {
                 throw new InvalidOperationException(
-                    $"An invocation of grain '{pending.Target}' with message ID '{messageId}' is still pending with a different request.");
+                    $"An invocation of grain '{pending.Target}' with message ID '{messageId}' is still pending with a request for another method than {DescribeMethod(IDurableTaskRequest.GetMethod(request))}.");
             }
 
             return;
@@ -262,6 +268,22 @@ internal sealed partial class DurableTaskGrainRuntime
 
         _invocations.Add(messageId, new(invocation.ReceiverId, invocation.Envelope.Payload, recordId, UtcNow));
         MessageTransport.Send(messageId);
+    }
+
+    /// <summary>Returns whether the pending invocation invokes the method which <paramref name="request"/> invokes.</summary>
+    /// <remarks>A pending invocation whose request no longer decodes can't be shown to invoke the same method.</remarks>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A request which doesn't decode isn't the same method.")]
+    private bool IsSameMethod(PendingInvocation pending, IDurableTaskRequest request)
+    {
+        try
+        {
+            return _shared.Serializer.Deserialize<DurableTaskInvocationMessage>(pending.Payload)?.Request is { } pendingRequest
+                && string.Equals(IDurableTaskRequest.GetMethod(pendingRequest), IDurableTaskRequest.GetMethod(request), StringComparison.Ordinal);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     /// <summary>

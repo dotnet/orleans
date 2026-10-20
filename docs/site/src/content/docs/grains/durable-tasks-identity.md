@@ -168,6 +168,19 @@ is stable when every run computes it from the same inputs:
 | A derived detached root ID | The starting execution's ID and its `$child-{n}` count before the start are unchanged. |
 | A caller-scoped ID | The caller's child ID is unchanged. |
 
+The ID locates a record; the record's operation decides whether a replay matches it. A
+replay matches when it requests the same kind of operation with the same target: a call
+to the same interface method on the same grain, a detached start of the same method under
+the same root ID, a subscription to the same task, a delay, a step, or an effect. The
+runtime identifies a method by its generated invokable type and doesn't compare
+arguments, so a deployment which changes how an argument serializes, such as by adding an
+optional field or upgrading a serializer, replays the same operations, and a replay which
+passes different arguments reads the outcome recorded for the original call. A retry of a
+root task under its ID matches likewise: the same method from the same caller reaches the
+stored task, whatever its arguments, and another method or caller conflicts. Each record
+also stores a fingerprint of its request's serialized arguments, which divergence and
+conflict messages report.
+
 Changes between deployments affect pending executions as follows:
 
 - **Renaming a `WithId` name** gives the operation a new ID. A replay finds no record
@@ -175,8 +188,11 @@ Changes between deployments affect pending executions as follows:
   the tree until the tree is deleted.
 - **Adding an unnamed operation** before existing unnamed ones shifts their generated
   IDs. A replay then finds another operation's record under a shifted ID: a call to
-  another grain with another request diverges and stalls the execution, and a local step returns the
+  another method or grain diverges and stalls the execution, a call to the same method
+  on the same grain returns the other call's outcome, and a local step returns the
   other step's result.
+- **Changing an argument's serialized form**, or the arguments which a call passes,
+  leaves every operation's identity unchanged.
 - **Adding a named operation** with a new name leaves every other ID unchanged.
 - **Adding or removing an occurrence of a repeated name** before existing ones renumbers
   the later occurrences; see [ORLEANS0208](../diagnostics/orleans0208.md).

@@ -41,6 +41,24 @@ public interface IDurableTaskRequest : IRequest
     /// <returns>A string representation of the request.</returns>
     public string ToMethodCallString() => ToMethodCallString(this);
 
+    /// <summary>
+    /// Returns the identity of the interface method which <paramref name="request"/> invokes: the formatted type of its
+    /// invokable, which the code generator emits once per interface method.
+    /// </summary>
+    /// <remarks>
+    /// A replay of an operation, and a retry of a root task under its identifier, are the same operation when they invoke
+    /// the same method on the same target. The identity doesn't cover the arguments, so a deployment which changes how
+    /// the arguments serialize, such as by adding an optional field, replays the same operations.
+    /// </remarks>
+    internal static string GetMethod(IDurableTaskRequest request) => RuntimeTypeNameFormatter.Format(request.GetType());
+
+    /// <summary>
+    /// Returns a hash of <paramref name="request"/>'s invokable type and serialized arguments, which diagnostics report.
+    /// </summary>
+    /// <remarks>
+    /// The hash changes whenever the serialized form of an argument changes, so it never decides whether two requests
+    /// are the same operation: <see cref="GetMethod"/> does.
+    /// </remarks>
     internal static string GetFingerprint(IDurableTaskRequest request, Serializer serializer)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);

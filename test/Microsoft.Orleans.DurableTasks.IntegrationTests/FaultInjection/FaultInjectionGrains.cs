@@ -76,6 +76,9 @@ public interface IFaultPartnerGrain : IFaultInjectedGrain
 
     DurableTask<int> EchoAsync(int value);
 
+    /// <summary>Echoes like <see cref="EchoAsync"/> through another method, so its task conflicts with an echo under the same root ID.</summary>
+    DurableTask<int> EchoAgainAsync(int value);
+
     DurableTask<string> HoldAsync(Guid workflowKey, string rootId);
 
     /// <summary>Records an effect, then throws <see cref="FaultApplicationException"/>.</summary>
@@ -342,6 +345,8 @@ public sealed class FaultPartnerGrain(
 
     public DurableTask<int> EchoAsync(int value) =>
         DurableTask.Run(_ => value + DurableTask.RunInline("echo", () => Increment("echo")));
+
+    public DurableTask<int> EchoAgainAsync(int value) => EchoAsync(value);
 
     public async DurableTask<string> HoldAsync(Guid workflowKey, string rootId)
     {

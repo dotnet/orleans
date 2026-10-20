@@ -382,8 +382,16 @@ public sealed partial class DurableTaskSignalTests
 
         await harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, value, throwOnRejection: true, TestCancellation);
         await harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, value, throwOnRejection: true, TestCancellation);
+
+        // The marker's identifier names the send, so a replay whose value differs, such as one which serializes
+        // differently, reads the recorded send rather than sending again.
+        Assert.Equal(
+            DurableSignalResult.Accepted,
+            await harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, DurableTaskResponse.FromResult("grace"), throwOnRejection: true, TestCancellation));
+        var otherId = WorkflowId.Child("$child-2");
+        harness.Storage.GetOrCreateTask(otherId, DurableTaskRecordKind.LocalStep, request: null);
         var reuse = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
-            () => harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, DurableTaskResponse.FromResult("grace"), throwOnRejection: true, TestCancellation).AsTask());
+            () => harness.Runtime.SendSignalAsync(otherId, target, TaskId.CreateRoot("order"), Approved.Name, value, throwOnRejection: true, TestCancellation).AsTask());
 
         Assert.Contains("another operation", reuse.Message, StringComparison.Ordinal);
         var sent = Assert.Single(harness.Transport.Signals);
@@ -645,11 +653,11 @@ public sealed partial class DurableTaskSignalTests
 
         public void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request) => ((State)state).Request = request;
 
-        public void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint) =>
-            ((State)state).RequestFingerprint = fingerprint;
+        public void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint, string? method = null) =>
+            (((State)state).RequestFingerprint, ((State)state).Method) = (fingerprint, method ?? ((State)state).Method);
 
-        public void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string fingerprint) =>
-            (((State)state).RemoteTarget, ((State)state).RemoteRequestFingerprint) = (target, fingerprint);
+        public void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string method, string fingerprint) =>
+            (((State)state).RemoteTarget, ((State)state).Method, ((State)state).RemoteRequestFingerprint) = (target, method, fingerprint);
 
         public void SetCallerId(TaskId taskId, IDurableTaskState state, GrainId callerId) => ((State)state).CallerId = callerId;
 
@@ -733,6 +741,7 @@ public sealed partial class DurableTaskSignalTests
         public DateTimeOffset? DueTime { get; set; }
         public long ResumeGeneration { get; set; }
         public string? RequestFingerprint { get; set; }
+        public string? Method { get; set; }
         public DateTimeOffset? RetainedSince { get; set; }
         public GrainId RemoteTarget { get; set; }
         public string? RemoteRequestFingerprint { get; set; }

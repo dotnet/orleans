@@ -173,9 +173,9 @@ var placement = await order.PlaceOrderAsync(request).WithId(PlaceOrderTaskId(ord
   the target recovers the root task from the call's serialized request, so detaching any other
   `ISchedulableTask` fails the operation with `NotSupportedException` before anything is recorded or
   sent. The execution records it under
-  `{taskId}/$detach:{target}:{rootId}`, whose fingerprint covers the root ID and the request, so a
-  replay which reaches the record doesn't start the task again and one which starts another request
-  under the same record diverges. The invocation carries the request and names the record
+  `{taskId}/$detach:{target}:{rootId}`, which records the root ID and the request's method, so a
+  replay which reaches the record doesn't start the task again, whatever the request's arguments,
+  and one which starts another method under the same record diverges. The invocation carries the request and names the record
   as a subscriber, and the target adds the record to the task's completion destinations when it stores
   the task.
   The record observes the task like a `GetDurableTask` subscription: the task's result completes it,
@@ -257,7 +257,8 @@ await tasks.SignalAsync(workflowId, Shipped, shipment);
   invocation finds it. When no invocation arrives within the window, the grain deletes the value
   and logs a warning.
 - In a durable task, the send and a marker in the execution's tree commit in one journal write,
-  like a posted start, so a replay which reaches the marker doesn't send it again. The marker is
+  like a posted start, so a replay which reaches the marker doesn't send it again, whatever value
+  it passes. The marker is
   `{taskId}/$send:{target}:{task}:{name}`, and repeated sends of one signal in an execution,
   such as retries after `TaskNotFound`, are numbered `$send:...$2`, and so on, so each sends
   again and the target reports an equal value as `Duplicate`. A signal to
@@ -300,10 +301,15 @@ synchronously on the activation which makes them, when the runtime stages them: 
 
 ## Runtime guarantees
 
-- `(target GrainId, TaskId)` identifies one execution. A stable request
-  fingerprint detects reuse with a different interface, method, argument type,
-  or argument value: such a schedule throws `DurableTaskConflictException`, an
-  `InvalidOperationException`, and leaves the existing task unchanged.
+- `(target GrainId, TaskId)` identifies one execution. A request's identity is its
+  caller and the interface method which it invokes, identified by the method's
+  generated invokable type; its arguments aren't compared. Scheduling a task ID
+  again with the same method, from the same caller, reaches the existing task even
+  when the arguments differ or serialize differently, such as after a deployment
+  adds an optional field. A schedule with another method or caller throws
+  `DurableTaskConflictException`, an `InvalidOperationException`, and leaves the
+  existing task unchanged. Each task also stores a fingerprint of its request's
+  serialized arguments, which diagnostics report and nothing compares.
 - Request identity, task state, caller subscription, inbox completion, and
   recovery ownership commit before execution begins.
 - Task state and outgoing messages share the grain's Journaling commit boundary,
@@ -443,8 +449,8 @@ synchronously on the activation which makes them, when the runtime stages them: 
   nothing, and an abort which arrives before its invocation is recorded as a cancellation.
 - A detached task is a root on its target with no caller. Durable cancellation and abort of its
   starter don't reach it, and deleting the starter's execution tree deletes only the record which
-  observed it. Starting the same request under the same root ID again leaves the task unchanged.
-  Another request under that ID fails like other task ID reuse: the target dead-letters the invocation,
+  observed it. Starting the same method under the same root ID again leaves the task unchanged.
+  Another method under that ID fails like other task ID reuse: the target dead-letters the invocation,
   and the starter's record fails with the rejection. A detached task which an ordinary grain method posts
   has no record, so its target's dead letter holds the rejected invocation.
 - Delays persist their logical due time and generation. Each delay sends a
@@ -498,14 +504,18 @@ synchronously on the activation which makes them, when the runtime stages them: 
   stalls: the runtime cancels the attempt with
   `DurableTaskAttemptCancellationReason.Diverged`, as it does with `UnsupportedVersion`
   for an unsupported version, discards its result, keeps the task pending, and raises
-  `ExecutionStalled` with the reason and the divergence. Each record stores the kind of
+  `ExecutionStalled` with the reason and the divergence. An operation's identity is its
+  record's kind, its identifier, and its target: a call's grain and method, a detached
+  start's root ID and method, or a subscription's task. Arguments aren't compared, so a
+  replay whose call passes other arguments, or arguments which serialize differently,
+  reads the call's recorded outcome. Each record stores the kind of
   operation which created it, such as a call, a step, a delay, an effect, or a cancellation
   which arrived before its invocation, so a replay which requests a delay where a step was
   recorded, a step where a delay was recorded, or a delay where a call was recorded stalls
   without observing or changing the other operation's record. The grain wakes every
   `DurableTaskOptions.StalledExecutionRetryInterval`, so a later activation replays the
-  execution with the code it runs. A caller whose start conflicts with a different
-  request under the same root identifier still receives `DurableTaskConflictException`.
+  execution with the code it runs. A caller whose start conflicts with another method
+  under the same root identifier still receives `DurableTaskConflictException`.
 - `DurableTask.GetVersion(name, minSupported, maxSupported)` records the version of a
   change which an execution follows as a terminal entry of its tree,
   `{taskId}/$version:{name}`, at the execution's first check of the name, staged like

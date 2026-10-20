@@ -154,12 +154,29 @@ public abstract class DurableTaskStartTests(string journalFormatKey) : IAsyncLif
         var worker = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey);
         await worker.EchoAsync(1).WithId("taken").ScheduleAsync(cancellationToken);
 
-        var workflow = await starter.ScheduleConflictingEchoAsync(workerKey, "taken").WithId("workflow").ScheduleAsync(cancellationToken);
+        var workflow = await starter.ScheduleConflictingStartAsync(workerKey, "taken").WithId("workflow").ScheduleAsync(cancellationToken);
 
         Assert.Contains("different request", await workflow.WaitAsync(Timeout, cancellationToken), StringComparison.Ordinal);
 
         // The worker rejected the conflicting invocation permanently, and its dead letter records the conflict's code.
         Assert.Equal([DurableTaskRejectionCodes.Conflict], await worker.GetInboxDeadLetterCodesAsync());
+    }
+
+    [Fact]
+    public async Task WorkflowStartOfTheSameMethodWithOtherArgumentsReachesTheExistingTask()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var starter = _fixture.Client.GetGrain<IDurableTaskStartingGrain>(Guid.NewGuid());
+        var workerKey = Guid.NewGuid();
+        var worker = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey);
+        await worker.EchoAsync(1).WithId("taken").ScheduleAsync(cancellationToken);
+
+        // A task's identity is its method, not its arguments, so the start reaches the stored task.
+        var workflow = await starter.ScheduleEchoAsync(workerKey, "taken", 2).WithId("workflow").ScheduleAsync(cancellationToken);
+
+        Assert.Equal("echoed 1", await workflow.WaitAsync(Timeout, cancellationToken));
+        Assert.Equal(1, (await worker.GetDurableTask<int>("taken").GetResponseAsync(cancellationToken)).GetResult<int>());
+        Assert.Empty(await worker.GetInboxDeadLetterCodesAsync());
     }
 
     [Fact]
@@ -226,7 +243,11 @@ public interface IDurableTaskStartingGrain : IGrainWithGuidKey
 
     DurableTask<int> AwaitDetachedEchoesAsync(Guid workerKey, int value);
 
-    DurableTask<string> ScheduleConflictingEchoAsync(Guid workerKey, string rootId);
+    /// <summary>Starts the worker's <c>WaitForCancellationAsync</c> under <paramref name="rootId"/>, which a test takes with another method.</summary>
+    DurableTask<string> ScheduleConflictingStartAsync(Guid workerKey, string rootId);
+
+    /// <summary>Starts the worker's echo of <paramref name="value"/> under <paramref name="rootId"/>, and awaits it.</summary>
+    DurableTask<string> ScheduleEchoAsync(Guid workerKey, string rootId, int value);
 
     DurableTask<TargetTaskIds> ReportTargetTaskIdsAsync(Guid workerKey);
 
@@ -279,17 +300,23 @@ public sealed class DurableTaskStartingGrain(IDurableTaskManager tasks, DurableT
         return awaited + await scheduled;
     }
 
-    public async DurableTask<string> ScheduleConflictingEchoAsync(Guid workerKey, string rootId)
+    public async DurableTask<string> ScheduleConflictingStartAsync(Guid workerKey, string rootId)
     {
         try
         {
-            await GrainFactory.GetGrain<IDurableTaskWorkerGrain>(workerKey).EchoAsync(2).Detached(rootId).ScheduleAsync();
+            await GrainFactory.GetGrain<IDurableTaskWorkerGrain>(workerKey).WaitForCancellationAsync(2).Detached(rootId).ScheduleAsync();
             return "accepted";
         }
         catch (DurableTaskConflictException conflict)
         {
             return conflict.Message;
         }
+    }
+
+    public async DurableTask<string> ScheduleEchoAsync(Guid workerKey, string rootId, int value)
+    {
+        var echo = await GrainFactory.GetGrain<IDurableTaskWorkerGrain>(workerKey).EchoAsync(value).Detached(rootId).ScheduleAsync();
+        return $"echoed {await echo}";
     }
 
     public async DurableTask<TargetTaskIds> ReportTargetTaskIdsAsync(Guid workerKey)

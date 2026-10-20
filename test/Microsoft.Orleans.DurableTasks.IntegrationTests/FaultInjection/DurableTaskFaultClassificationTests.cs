@@ -98,7 +98,7 @@ public abstract class DurableTaskFaultClassificationTests(string journalFormatKe
         var workflow = _harness.Client.GetGrain<IFaultWorkflowGrain>(Guid.NewGuid());
         var partnerKey = Guid.NewGuid();
         var partner = _harness.Client.GetGrain<IFaultPartnerGrain>(partnerKey);
-        await _harness.RunAsync<int>(partner, "taken", token => partner.EchoAsync(1).WithId("taken").ScheduleAsync(token), CancellationToken);
+        await _harness.RunAsync<int>(partner, "taken", token => partner.EchoAgainAsync(1).WithId("taken").ScheduleAsync(token), CancellationToken);
 
         var result = await RunForResultAsync(workflow, "start", token => workflow.StartDetachedEchoAsync(partnerKey, "taken", 2).WithId("start").ScheduleAsync(token));
 

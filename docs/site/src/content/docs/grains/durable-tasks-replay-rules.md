@@ -142,7 +142,9 @@ These rules depend on data or deployment history which the analyzers can't obser
   diagnostics. A run which ended before its work committed is replayed, so code which
   runs only while `IsReplaying` is `false` can run twice or never.
 - **Version by addition or by branch.** Keep existing operations, names, and arguments
-  while executions are pending; add new operations with new names after existing ones,
+  while executions are pending: a replayed call matches its record by method and target,
+  not arguments, and returns the outcome recorded for its original arguments. Add new
+  operations with new names after existing ones,
   branch changes to operations which pending executions passed on
   `DurableTask.GetVersion`, and add new workflow shapes as new methods. See
   [Version durable tasks](durable-tasks-versioning.md).

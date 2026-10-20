@@ -67,7 +67,27 @@ internal interface IDurableTaskState
 
     public long ResumeGeneration { get; }
 
+    /// <summary>
+    /// Gets the fingerprint which the record stores: a hash of an invoked request's invokable type and serialized
+    /// arguments, or, for a record of an execution's own operation, its kind and identity, such as a detached start's
+    /// target and root task.
+    /// </summary>
+    /// <remarks>
+    /// A request's argument hash is a diagnostic: it changes with the arguments' serialized form, so the runtime never
+    /// compares it to decide whether a replay or a retry is the same operation. <see cref="Method"/> decides that.
+    /// </remarks>
     public string? RequestFingerprint { get; }
+
+    /// <summary>
+    /// Gets the identity of the interface method which the task invokes, which its call to another grain invokes, or which
+    /// its detached start invokes, or <see langword="null"/> for a record which invokes no method.
+    /// </summary>
+    /// <remarks>
+    /// The identity is the formatted type of the method's invokable. A replay which reaches the record, or a retry which
+    /// schedules a root task under its identifier, is the same operation when it has the record's kind, target, and
+    /// method; the arguments aren't compared.
+    /// </remarks>
+    public string? Method { get; }
 
     /// <summary>
     /// Gets when the terminal result's retention restarted because its completion was dead-lettered, or
@@ -77,6 +97,11 @@ internal interface IDurableTaskState
 
     public GrainId RemoteTarget { get; }
 
+    /// <summary>
+    /// Gets the hash of the invokable type and serialized arguments of the record's call to <see cref="RemoteTarget"/>,
+    /// which diagnostics report.
+    /// </summary>
+    /// <remarks>The call's identity is its target and <see cref="Method"/>, not this hash.</remarks>
     public string? RemoteRequestFingerprint { get; }
 
     /// <summary>

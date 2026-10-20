@@ -47,7 +47,7 @@ public abstract class DurableTaskLostRejectionTests : IAsyncLifetime
         var target = _fixture.Client.GetGrain<ILostRejectionTargetGrain>(Guid.NewGuid());
         var starterId = starter.GetGrainId();
         using var events = new DiagnosticEventCollector(MessagingEvents.ListenerName);
-        await target.EchoAsync(1).WithId(TakenRootId).ScheduleAsync(cancellationToken);
+        await target.EchoAgainAsync(1).WithId(TakenRootId).ScheduleAsync(cancellationToken);
 
         var workflow = await starter.StartAsync(target.GetPrimaryKey(), TakenRootId).WithId("workflow").ScheduleAsync(cancellationToken);
         var outcome = workflow.GetResponseAsync(cancellationToken);
@@ -142,6 +142,9 @@ public interface ILostRejectionStarterGrain : IGrainWithGuidKey
 public interface ILostRejectionTargetGrain : IGrainWithGuidKey
 {
     DurableTask<int> EchoAsync(int value);
+
+    /// <summary>Echoes through another method, so its task conflicts with an echo under the same root ID.</summary>
+    DurableTask<int> EchoAgainAsync(int value);
 }
 
 [GrainType("durable-task-lost-rejection-starter-test")]
@@ -165,4 +168,6 @@ public sealed class LostRejectionStarterGrain : DurableGrain, ILostRejectionStar
 public sealed class LostRejectionTargetGrain : DurableGrain, ILostRejectionTargetGrain
 {
     public DurableTask<int> EchoAsync(int value) => DurableTask.FromResult(value);
+
+    public DurableTask<int> EchoAgainAsync(int value) => DurableTask.FromResult(value);
 }

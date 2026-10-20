@@ -54,22 +54,23 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         var stalled = await stalls.Stalled.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(DurableTaskAttemptCancellationReason.Diverged, stalled.Reason);
-        Assert.Contains("It records a DurableTask.RunInline effect, and this attempt requested a call to grain", stalled.Exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a DurableTask.RunInline effect, and this attempt requested a call to method", stalled.Exception.Message, StringComparison.Ordinal);
         Assert.False(storage.Get(taskId).Result is { IsCompleted: true });
         Assert.Empty(transport.Invocations);
     });
 
     [Fact]
-    public Task CallWithOtherArgumentsUnderARecordedCallStallsTheAttempt() => ActivationScheduler.RunAsync(async () =>
+    public Task CallOfAnotherMethodUnderARecordedCallStallsTheAttempt() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, transport) = CreateRuntime();
         var taskId = TaskId.Parse("root/local");
         var callId = TaskId.Parse("root/local/charge");
         var recorded = storage.GetOrCreate(callId);
-        ((IDurableTaskGrainStorage)storage).SetRemoteRequest(callId, recorded, GrainId.Create("target", "one"), "recorded-fingerprint");
+        var target = GrainId.Create("target", "one");
+        ((IDurableTaskGrainStorage)storage).SetRemoteRequest(callId, recorded, target, IDurableTaskRequest.GetMethod(new RuntimeTestOtherMethodRequest()), "recorded-fingerprint");
         using var stalls = new StallRecorder(taskId);
 
-        // A deployment changed the call's arguments, so the replay requests another call under the recorded identifier.
+        // A deployment changed the call's method, so the replay requests another operation under the recorded identifier.
         _ = await runtime.ScheduleChildAsync(
             taskId,
             DurableTask.Run(async () => await CreateRemoteChild(2).WithId("charge")),

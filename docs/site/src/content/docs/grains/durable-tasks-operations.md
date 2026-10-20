@@ -137,32 +137,43 @@ delivery faults; see [Observe progress and size the system](messaging-operations
 
 ## Diagnose replay divergence
 
-A replay must schedule the same operation, with the same arguments, under each recorded
-ID, and must decode each recorded outcome. When it schedules a different operation, or
-a recorded outcome no longer decodes, the execution stalls: the runtime cancels the
+A replay must schedule the same operation under each recorded ID, and must decode each
+recorded outcome. An operation is the same when it has the same kind and target: a call
+invokes the same interface method on the same grain, whatever its arguments, so a call
+whose arguments changed or serialize differently returns its recorded outcome. When a
+replay schedules a different operation, or a recorded outcome no longer decodes, the
+execution stalls: the runtime cancels the
 attempt with `DurableTaskAttemptCancellationReason.Diverged`, discards its result, and
 keeps the task pending. The runtime logs a warning and raises `ExecutionStalled`, whose
 `Exception` describes the divergence, such as:
 
 ```text
 Durable task 'place-order-…/authorize-payment' is already associated with a different request.
-It records a call to grain 'payment/…' (fingerprint 3F2A9C01B7E4), and this attempt requested a
-call to grain 'payment/…' (fingerprint 91C0D4E2A6B8). A replay schedules the same operation, with the
-same arguments, under each identifier; new workflow steps use new identifiers.
+It records a call to method '…Invokable_IPaymentGrain_…_Authorize…' on grain 'payment/…'
+(fingerprint 3F2A9C01B7E4), and this attempt requested a call to method
+'…Invokable_IPaymentGrain_…_Capture…' on grain 'payment/…' (fingerprint 91C0D4E2A6B8). A replay
+schedules the same operation under each identifier: a call or request invokes the same method on
+the same target, whatever its arguments; new workflow steps use new identifiers.
 ```
 
 The message names the recorded operation, such as a call to a grain, a delay, a
 `WhenAny` decision, a `DurableTask.RunInline` effect, a detached task's start, or a signal,
-and the requested one. Typical causes:
+and the requested one. A call names its method by its generated invokable type, and its
+fingerprint is a hash of its serialized arguments, which tells calls apart in diagnostics
+but doesn't decide whether they match. Typical causes:
 
-- Code between children reads a value which differs on replay, such as
-  `DateTime.UtcNow`, a random number, or mutable grain state, and passes it to a child.
-  `DurableTask.RunInline` records such a value, so every replay passes the same one.
-- A deployment changed a step's arguments, reordered unnamed children, or added an
-  unnamed child or combinator before existing ones. Branch such changes on
-  `DurableTask.GetVersion`, so pending executions keep their recorded operations.
+- A deployment replaced a step's call with a call to another method or grain, reordered
+  unnamed children, or added an unnamed child or combinator before existing ones. Branch
+  such changes on `DurableTask.GetVersion`, so pending executions keep their recorded
+  operations.
 - A loop or condition schedules children under IDs which depend on a nondeterministic
   value.
+
+Code between children which reads a value which differs on replay, such as
+`DateTime.UtcNow`, a random number, or mutable grain state, and passes it to a child
+doesn't diverge: the replay reads the recorded outcome of the call which the first run
+made with the first value. `DurableTask.RunInline` records such a value, so every run
+passes the same one to the code which follows.
 
 The body observes the divergence as the attempt's `DurableTaskAttemptCanceledException`,
 whose inner exception is the divergence, and the attempt's later durable operations
@@ -178,7 +189,9 @@ executions.
 When a deployment changes a workflow while executions are pending, those executions
 replay under the new code:
 
-- Keep existing steps, `RunInline` effects, and detached starts, with their IDs and arguments. A
+- Keep existing steps, `RunInline` effects, and detached starts, with their IDs, methods,
+  and targets. A call or detached start whose arguments a deployment changes returns, in
+  executions which recorded it, the outcome recorded for its original arguments. A
   changed `RunInline` delegate doesn't affect executions which recorded it: they return the
   recorded result. An effect and a step with the same name share an ID, so turning a
   recorded step into an effect, or the reverse, diverges; branch that change on

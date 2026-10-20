@@ -436,27 +436,38 @@ internal sealed partial class DurableTaskGrainRuntime(
         new(taskId, DescribeDivergence(message, recorded, requested));
 
     private static string DescribeDivergence(string message, IDurableTaskState recorded, string requested) =>
-        $"{message} It records {DescribeOperation(recorded)}, and this attempt requested {requested}. A replay schedules the same operation, with the same arguments, under each identifier; new workflow steps use new identifiers.";
+        $"{message} It records {DescribeOperation(recorded)}, and this attempt requested {requested}. A replay schedules the same operation under each identifier: a call or request invokes the same method on the same target, whatever its arguments; new workflow steps use new identifiers.";
 
     private static string DescribeOperation(IDurableTaskState state) => state switch
     {
-        { RemoteTarget.IsDefault: false } => $"a call to grain '{state.RemoteTarget}' ({AbbreviateFingerprint(state.RemoteRequestFingerprint)})",
+        { RemoteTarget.IsDefault: false } => DescribeCall(state.RemoteTarget, state.Method, state.RemoteRequestFingerprint),
         { DueTime: { } dueTime } => $"a delay due at {dueTime:O}",
         { Kind: DurableTaskRecordKind.Delay } => "a delay",
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(CompletionDecisionFingerprintPrefix, StringComparison.Ordinal) => "a selection of the first task to complete",
-        _ when TryGetDetachedTask(state, out var target, out var rootId) => DescribeDetachedStart(target, rootId),
+        _ when TryGetDetachedTask(state, out var target, out var rootId) => DescribeDetachedStart(target, rootId, state.Method),
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalSendFingerprintPrefix, StringComparison.Ordinal) => "a signal's send",
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalFingerprintPrefix, StringComparison.Ordinal) => "a signal's value",
         { RequestFingerprint: { } fingerprint } when TryParseIdentity(SubscriptionFingerprintPrefix, fingerprint, out var target, out var subscribed) => DescribeSubscription(target, subscribed),
         { RequestFingerprint: EffectFingerprint } => "a DurableTask.RunInline effect",
         { RequestFingerprint: VersionFingerprint } => "a version decision",
+        { Method: { } method } => $"a request for {DescribeMethod(method)} ({AbbreviateFingerprint(state.RequestFingerprint)})",
         { RequestFingerprint: { } fingerprint } => $"a request ({AbbreviateFingerprint(fingerprint)})",
         { Kind: DurableTaskRecordKind.EarlyCancellation } => "a cancellation which arrived before its request",
         _ => "a local child task",
     };
 
-    private static string DescribeRequest(IDurableTaskRequest request, string fingerprint) =>
-        $"{request.GetInterfaceName()}.{request.GetMethodName()} ({AbbreviateFingerprint(fingerprint)})";
+    /// <summary>Describes a request for diagnostics: its method, and the fingerprint of its arguments.</summary>
+    private string DescribeRequest(IDurableTaskRequest request) =>
+        $"a request for {DescribeMethod(IDurableTaskRequest.GetMethod(request))} ({AbbreviateFingerprint(IDurableTaskRequest.GetFingerprint(request, _shared.Serializer))})";
+
+    /// <summary>Describes a call to another grain for diagnostics: its target, its method, and the fingerprint of its arguments.</summary>
+    private string DescribeCall(GrainId target, IDurableTaskRequest request) =>
+        DescribeCall(target, IDurableTaskRequest.GetMethod(request), IDurableTaskRequest.GetFingerprint(request, _shared.Serializer));
+
+    private static string DescribeCall(GrainId target, string? method, string? fingerprint) =>
+        $"a call to {DescribeMethod(method)} on grain '{target}' ({AbbreviateFingerprint(fingerprint)})";
+
+    private static string DescribeMethod(string? method) => method is null ? "an unrecorded method" : $"method '{method}'";
 
     // WhenAny, Race, timeouts, and signal deadlines record their selections alike, so the description names none of them.
     private static string DescribeSelection(int candidateCount) =>
@@ -798,7 +809,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 $"Durable task '{taskId}' cannot invoke its owning grain '{GrainId}' through durable messaging.");
         }
 
-        var fingerprint = IDurableTaskRequest.GetFingerprint(request, _shared.Serializer);
+        var method = IDurableTaskRequest.GetMethod(request);
         if (_storage.TryGetTask(taskId, out var state))
         {
             if (state.Request is not null
@@ -806,13 +817,12 @@ internal sealed partial class DurableTaskGrainRuntime(
                 || !state.CallerId.IsDefault
                 || state.DueTime is not null
                 || (!state.RemoteTarget.IsDefault && state.RemoteTarget != context.TargetId)
-                || (state.RemoteRequestFingerprint is { } existing
-                    && !string.Equals(existing, fingerprint, StringComparison.Ordinal)))
+                || (state.Method is { } recordedMethod && !string.Equals(recordedMethod, method, StringComparison.Ordinal)))
             {
                 throw CreateDivergenceException(
                     $"Durable task '{taskId}' is already associated with a different request.",
                     state,
-                    $"a call to grain '{context.TargetId}' ({AbbreviateFingerprint(fingerprint)})");
+                    DescribeCall(context.TargetId, request));
             }
 
             if (ReadRecordedResult(taskId, state) is { IsCompleted: true } completed)
@@ -823,9 +833,9 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         state ??= GetOrCreateTask(taskId, DurableTaskRecordKind.RemoteCall, request: null);
         MarkShielded(taskId, state, shielded);
-        if (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)
+        if (state.RemoteTarget.IsDefault || state.Method is null)
         {
-            _storage.SetRemoteRequest(taskId, state, context.TargetId, fingerprint);
+            _storage.SetRemoteRequest(taskId, state, context.TargetId, method, IDurableTaskRequest.GetFingerprint(request, _shared.Serializer));
         }
 
         context.CallerId = GrainId;
@@ -835,7 +845,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (state.Accepted is null)
         {
             var wireId = GetWireId(taskId);
-            SendInvocation(transport.CreateInvocation(GrainId, context.TargetId, wireId, request), recordId: wireId);
+            SendInvocation(transport.CreateInvocation(GrainId, context.TargetId, wireId, request), request, recordId: wireId);
         }
 
         return DurableTaskResponse.Pending;
@@ -1347,12 +1357,12 @@ internal sealed partial class DurableTaskGrainRuntime(
                 $"Durable task '{taskId}' cannot be invoked by its owning grain '{GrainId}' through durable messaging.");
         }
 
-        var fingerprint = IDurableTaskRequest.GetFingerprint(request, _shared.Serializer);
+        var method = IDurableTaskRequest.GetMethod(request);
         if (!_storage.TryGetTask(taskId, out var state))
         {
             state = GetOrCreateTask(taskId, DurableTaskRecordKind.Invocation, request);
             StageCaller(taskId, state, requestContext.CallerId);
-            _storage.SetRequestFingerprint(taskId, state, fingerprint);
+            _storage.SetRequestFingerprint(taskId, state, IDurableTaskRequest.GetFingerprint(request, _shared.Serializer), method);
             _storage.SetIncarnation(taskId, state, Guid.NewGuid());
             var subscribedNew = requestContext.SupportsDurableCompletion
                 && TryRegisterCompletionDestination(taskId, state, GetInvoker(requestContext.CallerId, taskId));
@@ -1366,7 +1376,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 taskId,
                 $"Durable task '{taskId}' is already associated with a remote child request.",
                 state,
-                DescribeRequest(request, fingerprint));
+                DescribeRequest(request));
         }
 
         ValidateCaller(taskId, state, requestContext.CallerId);
@@ -1378,37 +1388,27 @@ internal sealed partial class DurableTaskGrainRuntime(
                 taskId,
                 $"Durable task '{taskId}' is already associated with a non-request operation.",
                 state,
-                DescribeRequest(request, fingerprint));
+                DescribeRequest(request));
         }
 
-        if (state.RequestFingerprint is { } existingFingerprint
-            && !string.Equals(existingFingerprint, fingerprint, StringComparison.Ordinal))
+        // A request is the same operation as the stored task when it invokes the same method for the same caller, which
+        // ValidateCaller checked: a retry whose arguments serialize differently reaches the stored task. A record of an
+        // execution's own operation, such as an effect, has a fingerprint but invokes no method.
+        if (state.Method is { } recordedMethod
+                ? !string.Equals(recordedMethod, method, StringComparison.Ordinal)
+                : state.RequestFingerprint is not null)
         {
             throw CreateScheduleConflictException(
                 taskId,
                 $"Durable task '{taskId}' is already associated with a different request.",
                 state,
-                DescribeRequest(request, fingerprint));
-        }
-
-        if (state.RequestFingerprint is null
-            && state.Request is { } existingRequest
-            && !string.Equals(
-                IDurableTaskRequest.GetFingerprint(existingRequest, _shared.Serializer),
-                fingerprint,
-                StringComparison.Ordinal))
-        {
-            throw CreateScheduleConflictException(
-                taskId,
-                $"Durable task '{taskId}' is already associated with a different request.",
-                state,
-                DescribeRequest(request, fingerprint));
+                DescribeRequest(request));
         }
 
         StageCaller(taskId, state, requestContext.CallerId);
-        if (state.RequestFingerprint is null)
+        if (state.Method is null)
         {
-            _storage.SetRequestFingerprint(taskId, state, fingerprint);
+            _storage.SetRequestFingerprint(taskId, state, IDurableTaskRequest.GetFingerprint(request, _shared.Serializer), method);
         }
 
         // A run's incarnation is minted when its invocation is first stored, which a record of an earlier cancellation
@@ -1942,7 +1942,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             var target = remoteRequest.Context?.TargetId
                 ?? throw new InvalidOperationException("The durable task request has no target.");
-            var fingerprint = IDurableTaskRequest.GetFingerprint(remoteRequest, _shared.Serializer);
+            var method = IDurableTaskRequest.GetMethod(remoteRequest);
             if (state is not null)
             {
                 if (state.Request is not null
@@ -1952,20 +1952,20 @@ internal sealed partial class DurableTaskGrainRuntime(
                     || (existingScheduledHandle is TaskHandle existingTaskHandle
                         && existingTaskHandle.RemoteTarget.IsDefault)
                     || (!state.RemoteTarget.IsDefault && state.RemoteTarget != target)
-                    || (state.RemoteRequestFingerprint is { } existing
-                        && !string.Equals(existing, fingerprint, StringComparison.Ordinal))
+                    || (state.Method is { } recordedMethod
+                        && !string.Equals(recordedMethod, method, StringComparison.Ordinal))
                     || (handle is not null
-                        && (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)))
+                        && (state.RemoteTarget.IsDefault || state.Method is null)))
                 {
                     throw CreateDivergenceException(
                         $"Durable child task '{taskId}' is already associated with a different request.",
                         state,
-                        $"a call to grain '{target}' ({AbbreviateFingerprint(fingerprint)})");
+                        DescribeCall(target, remoteRequest));
                 }
 
-                if (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)
+                if (state.RemoteTarget.IsDefault || state.Method is null)
                 {
-                    _storage.SetRemoteRequest(taskId, state, target, fingerprint);
+                    _storage.SetRemoteRequest(taskId, state, target, method, IDurableTaskRequest.GetFingerprint(remoteRequest, _shared.Serializer));
                 }
             }
         }

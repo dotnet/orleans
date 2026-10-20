@@ -30,7 +30,7 @@ which matches how long they last, and handle permanent failures as outcomes:
 | A rejection, such as a declined payment, a conflict, or a validation error | Nowhere | Return it from the step as a value, or catch its exception, and compensate or report it. |
 
 Messaging treats only explicit rejections as permanent: a start whose task ID already
-names another request fails with `DurableTaskConflictException`, and a target which
+names another method fails with `DurableTaskConflictException`, and a target which
 rejects a request with its own code fails it with `DurableTaskRejectedException`.
 
 ## Call a payment API with an idempotency key
@@ -195,7 +195,7 @@ succeed.
 
 :::code source="../snippets/compiled/Grains/DurableTaskIntegrationSnippets.cs" id="durable_tasks_rejections" language="csharp":::
 
-- `DurableTaskConflictException` reports that the ID already names another request. Every
+- `DurableTaskConflictException` reports that the ID already names another method. Every
   retry under the same ID reaches the same conflict, so the workflow resolves it, for
   example by reading the existing task, or by choosing another ID.
 - `DurableTaskRejectedException` reports a target which rejected the request with its own
@@ -206,6 +206,7 @@ succeed.
 - Application outcomes, such as a declined card or an out-of-stock line, are values which
   steps and grain methods return, so the workflow branches on them instead of retrying.
 
-**Verify:** a second start under the same ID with different arguments throws
+**Verify:** a second start under the same ID with the same method and different
+arguments reaches the first task, and a start under that ID with another method throws
 `DurableTaskConflictException`, and the target's dead letters record the
 `durable-rpc/conflict` code; see [Dead letters](durable-tasks-operations.md#dead-letters).
