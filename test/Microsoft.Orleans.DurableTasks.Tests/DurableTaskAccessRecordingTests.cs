@@ -133,6 +133,135 @@ public sealed class DurableTaskAccessRecordingTests
     }
 
     [Fact]
+    public Task EffectWithinAStateOperationRunsAsPartOfItAndShiftsNoIdentifier() => ActivationScheduler.RunAsync(async () =>
+    {
+        await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await CommitAtGateAsync(activation);
+            Assert.Equal([7, 7], activation.Grain.List);
+        }
+
+        // The replay returns AddRange's record without enumerating its source, so the nested effects don't run, and the
+        // unnamed effect and step after it keep the identifiers which the first run gave them.
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        replay.Grain.OpenGate();
+        Assert.Equal(52, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<int>());
+        Assert.Equal([7, 7], replay.Grain.List);
+        Assert.Equal(2, harness.EffectRuns);
+
+        static async DurableTask<int> Workflow(ReplayGrain grain)
+        {
+            grain.List.AddRange(Enumerable.Range(0, 2).Select(_ => DurableTask.RunInline(() =>
+            {
+                grain.Harness.CountEffectRun();
+                return 7;
+            })));
+            var effect = DurableTask.RunInline(static () => 42);
+            var step = await DurableTask.Run(static _ => 10);
+            await grain.WaitAtGateAsync();
+            return effect + step;
+        }
+    });
+
+    [Theory]
+    [InlineData("state-operation")]
+    [InlineData("effect")]
+    public Task DurableOperationWithinACoveredRegionThrowsAndReplaysTheSameOutcome(string region) => ActivationScheduler.RunAsync(async () =>
+    {
+        string? firstOutcome = null;
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, region, outcome => firstOutcome ??= outcome));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await CommitAtGateAsync(activation);
+            Assert.Contains("(ORLEANS0227)", firstOutcome, StringComparison.Ordinal);
+        }
+
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        replay.Grain.OpenGate();
+        Assert.Equal(firstOutcome, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<string>());
+        Assert.False(replay.Storage.TryGetTask(WorkflowId.Child("posted"), out _));
+
+        static async DurableTask<string> Workflow(ReplayGrain grain, string region, Action<string> observe)
+        {
+            string outcome;
+            try
+            {
+                if (region == "effect")
+                {
+                    DurableTask.RunInline("effect", static () => { _ = DurableTask.Run(static _ => { }).WithId("posted").Post(); });
+                }
+                else
+                {
+                    grain.List.AddRange(Post());
+                }
+
+                outcome = "posted";
+            }
+            catch (InvalidOperationException exception)
+            {
+                outcome = exception.Message;
+            }
+
+            observe(outcome);
+            await DurableTask.Run(static _ => { }).WithId("after");
+            await grain.WaitAtGateAsync();
+            return outcome;
+        }
+
+        static IEnumerable<int> Post()
+        {
+            _ = DurableTask.Run(static _ => { }).WithId("posted").Post();
+            yield return 1;
+        }
+    });
+
+    [Fact]
+    public Task CoveredFlowRunsItsAwaitsUnrecordedAndRejectsDurableOperations() => ActivationScheduler.RunAsync(async () =>
+    {
+        await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
+        await using var activation = await harness.ActivateAsync(TestCancellation);
+        await activation.ScheduleAsync(WorkflowId, TestCancellation);
+        await activation.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+
+        // The covered body's increment and effect ran directly: the attempt's log holds only the body's own read after it.
+        var counter = new JournaledStateAccessTarget("counter", Substitute.For<IJournaledStateManager>()).Id;
+        Assert.Equal(1, activation.Grain.Counter.Value);
+        Assert.Equal([(JournaledStateAccessKind.Read, JournaledStateOperation.ValueGet, counter)], ParseHeaders(activation.Storage.GetAccessLog(WorkflowId)));
+        activation.Grain.OpenGate();
+        Assert.Equal("1 7 rejected", (await activation.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<string>());
+
+        static async DurableTask<string> Workflow(ReplayGrain grain)
+        {
+            var attempt = (GrainDurableTaskContext)DurableTask.Current;
+            var (effect, rejected) = await attempt.RunCoveredAsync(async () =>
+            {
+                await Task.Yield();
+                grain.Counter.Value++;
+                var effect = DurableTask.RunInline(static () => 7);
+                var rejected = Record.Exception(static () => DurableTask.Run(static _ => { }).WithId("covered").Post()) is InvalidOperationException;
+                return (effect, rejected);
+            });
+
+            var value = grain.Counter.Value;
+            await DurableTask.Run(static _ => { }).WithId("after");
+            await grain.WaitAtGateAsync();
+            return $"{value} {effect} {(rejected ? "rejected" : "posted")}";
+        }
+    });
+
+    private static async Task CommitAtGateAsync(ReplayActivation activation)
+    {
+        await activation.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        activation.Grain.RequestUnrelatedWrite();
+        await activation.Grain.UnrelatedWrites;
+    }
+
+    [Fact]
     public void TransportSendsThroughTheOutboxAsTheJournaledStateHostsWork()
     {
         var host = new CountingHost();

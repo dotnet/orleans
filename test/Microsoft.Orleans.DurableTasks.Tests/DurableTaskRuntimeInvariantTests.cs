@@ -4441,7 +4441,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
 
         // The probe hosts no journaled state.
-        public DurableTaskAccessLog? CreateAccessLog(TaskId executionId, TaskScheduler scheduler, Func<DurableTaskDivergenceException, Exception> diverge) => null;
+        public DurableTaskAccessLog? CreateAccessLog(DurableTaskContext attempt, TaskScheduler scheduler, Func<DurableTaskDivergenceException, Exception> diverge) => null;
         public Task<CancellationToken> SchedulingStarted => _schedulingStarted.Task;
 
         public ValueTask<DurableTaskResponse> ScheduleDelayAsync(
@@ -4524,7 +4524,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
 
         // The probe hosts no journaled state.
-        public DurableTaskAccessLog? CreateAccessLog(TaskId executionId, TaskScheduler scheduler, Func<DurableTaskDivergenceException, Exception> diverge) => null;
+        public DurableTaskAccessLog? CreateAccessLog(DurableTaskContext attempt, TaskScheduler scheduler, Func<DurableTaskDivergenceException, Exception> diverge) => null;
         public int SchedulerInvocationCount => Volatile.Read(ref _schedulerInvocationCount);
 
         public ValueTask<IScheduledTaskHandle> ScheduleChildAsync(
