@@ -137,7 +137,7 @@ construction or activation setup, before journal recovery.
   Sink-owned messages never occupy capacity and have no inbox retry lifecycle; the
   sink honors their `DeliverAt`. Declined messages follow the handler path once
   `DeliverAt` passes. Retained completion records deduplicate before a sink runs;
-  the durable admission floor fences a compacted logical send's original cutoff.
+  the durable admission floor expires an untracked message's old send time.
 - `IInbox.Register(IInboxWorkSource)` adds a work source: a component, such as a
   sink, that holds durable work in the grain's journal. `GetWakeupDelay` returns how
   soon a deactivated grain must wake to resume that work, or `null` when none is
@@ -173,19 +173,23 @@ reuses it. `OutboxRetryTimeout`, six hours by default, bounds delivery attempts
 after that time, including while the receiver is backpressured.
 
 The inbox retains each processed record for `DeduplicationWindow`, seven days by
-default, after the message's `SentAt`, and then removes it. Before removing records,
+default, after the latest observed `SentAt`, and then makes it eligible for removal. Before removing records,
 the inbox journals an admission floor: its clock minus `DeduplicationWindow`, which
 only advances. Pending and processed records determine known outcomes first. A
 message the inbox no longer tracks whose `SentAt` is at or below the floor receives
-`Expired` before any sink or handler runs. Recovery and migration preserve the floor.
-The inbox never stores a `SentAt` later than its clock plus `DeduplicationWindow`.
+`Expired` before any sink or handler runs. Recovery preserves the floor.
+The inbox never stores a new `SentAt` later than its clock plus `DeduplicationWindow`.
 It rejects such a delivery with `ArgumentOutOfRangeException`, staging nothing, when
 the message is untracked and above the admission floor, or the time would extend its
 record, so the sender retries it within its retry budget. A tracked message with an
 equal or earlier `SentAt` still receives its recorded outcome, including after the
 receiver's clock steps backward, and an untracked message at or below the floor
-still receives `Expired`. Every record therefore becomes eligible for removal within
-twice the window.
+still receives `Expired`. Completed
+records become eligible for removal within twice the window of the receiver's
+clock after their latest observation.
+
+A later `SentAt` extends a tracked pending or completed record. The receiver
+persists that update before returning `Duplicate` or the original durable rejection.
 
 A forward clock jump can expire undelivered work early; a backward jump can delay
 cleanup and prolong retries. The journaled floor keeps removed messages expired in
@@ -227,8 +231,9 @@ with the JSON and Orleans binary journal formats. It persists alongside the grai
 other journaled state. After the grain's state is deleted, it starts empty and
 continues working.
 
-Completed message IDs remain until their immutable cutoff is durably fenced.
-Null-cutoff deliveries retain their completion records permanently. Dead letters are
+Completed message IDs become eligible for removal after `DeduplicationWindow`
+from their latest observed `SentAt`. Acknowledged snapshots and recovery reclaim
+eligible records once the admission floor covers their send time. Dead letters are
 retained up to `DeadLetterRetentionPeriod` and `MaxRetainedDeadLetters`.
 
 ## Diagnostics
