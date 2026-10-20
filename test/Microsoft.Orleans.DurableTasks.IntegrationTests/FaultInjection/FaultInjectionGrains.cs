@@ -69,6 +69,19 @@ public interface IFaultWorkflowGrain : IFaultInjectedGrain
 
     /// <summary>Starts a detached echo on a <see cref="IFaultFencedGrain"/>, and records what the start observed.</summary>
     DurableTask<string> StartDetachedFencedEchoAsync(Guid fencedKey, string detachedRootId, int value);
+
+    /// <summary>
+    /// Runs one run of a root which runs again once retention deleted its earlier run: records the run's number as an
+    /// effect, calls the partner's process, which signals <see cref="FaultWorkflowGrain.Ready"/> back, waits for that signal,
+    /// and races the partner's gated step for this run against the <see cref="FaultWorkflowGrain.Go"/> signal and a delay of
+    /// <see cref="FaultWorkflowGrain.RunDeadline"/>.
+    /// </summary>
+    /// <remarks>
+    /// Every run sends the same request and the same signal values, so only the run's own incarnation tells its messages
+    /// apart from an earlier run's. The partner's step waits for the gate <see cref="FaultWorkflowGrain.GetGateKey"/> names
+    /// for the run.
+    /// </remarks>
+    DurableTask<string> RunAgainAsync(Guid partnerKey, string rootId);
 }
 
 public interface IFaultPartnerGrain : IFaultInjectedGrain
@@ -90,6 +103,12 @@ public interface IFaultPartnerGrain : IFaultInjectedGrain
 
     /// <summary>Runs a local step which waits for the partner's <see cref="FaultTestGates"/> gate.</summary>
     DurableTask<int> GatedStepAsync(int value);
+
+    /// <summary>
+    /// Runs a local step which waits for the gate <paramref name="gateKey"/>, and returns <paramref name="value"/> plus the
+    /// number of gated steps which completed.
+    /// </summary>
+    DurableTask<int> StepThroughGateAsync(Guid gateKey, int value);
 }
 
 /// <summary>A reentrant grain whose journal a test fences while a delivery to it is in progress.</summary>
@@ -188,6 +207,19 @@ public sealed class FaultWorkflowGrain(
     public static readonly DurableSignal<int> Ready = new("ready");
     public static readonly DurableSignal<string> Held = new("held");
     public static readonly DurableSignal<string> Never = new("never");
+    public static readonly DurableSignal<int> Go = new("go");
+
+    /// <summary>Gets the delay which each run of <see cref="RunAgainAsync"/> races, far beyond a run's duration.</summary>
+    public static readonly TimeSpan RunDeadline = TimeSpan.FromHours(1);
+
+    /// <summary>Returns the gate which the partner's step waits for in run <paramref name="run"/> of a workflow.</summary>
+    public static Guid GetGateKey(Guid workflowKey, int run)
+    {
+        Span<byte> bytes = stackalloc byte[16];
+        workflowKey.TryWriteBytes(bytes);
+        bytes[15] ^= checked((byte)run);
+        return new(bytes);
+    }
 
     public async DurableTask<string> PipelineAsync(Guid partnerKey, string rootId)
     {
@@ -307,6 +339,24 @@ public sealed class FaultWorkflowGrain(
         }
     }
 
+    public async DurableTask<string> RunAgainAsync(Guid partnerKey, string rootId)
+    {
+        var partner = Partner(partnerKey);
+        var run = DurableTask.RunInline("run", () => Increment("run"));
+        var processed = await partner.ProcessAsync(10, this.GetPrimaryKey(), rootId).WithId("process");
+        var ready = await Ready.WaitAsync();
+        var (winner, outcome) = await DurableTask.Race(
+            [partner.StepThroughGateAsync(GetGateKey(this.GetPrimaryKey(), run), run), Go.WaitAsync(), ExpireAsync()])
+            .WithId("race");
+        return $"run={run};processed={processed};ready={ready};winner={winner};outcome={outcome}";
+    }
+
+    private static async DurableTask<int> ExpireAsync()
+    {
+        await DurableTask.Delay(RunDeadline).WithId("deadline");
+        return -1;
+    }
+
     private static async DurableTask<string> GateAsync()
     {
         var held = await Held.WaitAsync();
@@ -328,11 +378,13 @@ public sealed class FaultPartnerGrain(
     DurableTaskMessagingProbe probe)
     : FaultInjectedGrain(inbox, diagnostics, effects, injector, grainContext), IFaultPartnerGrain
 {
-    public async DurableTask<int> GatedStepAsync(int value) =>
+    public DurableTask<int> GatedStepAsync(int value) => StepThroughGateAsync(this.GetPrimaryKey(), value);
+
+    public async DurableTask<int> StepThroughGateAsync(Guid gateKey, int value) =>
         await DurableTask.Run(async cancellationToken =>
         {
-            probe.RecordStarted(this.GetPrimaryKey());
-            await gates.WaitAsync(this.GetPrimaryKey(), cancellationToken);
+            probe.RecordStarted(gateKey);
+            await gates.WaitAsync(gateKey, cancellationToken);
             return value + DurableTask.RunInline("gated", () => Increment("gated"));
         }).WithId("gated");
 

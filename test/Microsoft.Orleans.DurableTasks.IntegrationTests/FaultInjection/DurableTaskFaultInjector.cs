@@ -2,6 +2,7 @@ using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.DurableJobs;
+using Orleans.DurableTasks.Runtime;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Messaging;
@@ -55,6 +56,40 @@ public enum FaultPoint
     /// The receiver admits a delivery call and holds it, before the inbox sees the message, until the test releases it.
     /// </summary>
     DeliveryHeldAtReceiver,
+
+    /// <summary>
+    /// An outbox delivery call reaches the receiver, and the network keeps a copy of it, which the test delivers again
+    /// later with <see cref="InjectedFault.Duplicate"/>.
+    /// </summary>
+    DeliveryDuplicated,
+
+    /// <summary>
+    /// The activation requests its own deactivation as it admits a durable task segment, so it stops while the segment's
+    /// code runs.
+    /// </summary>
+    /// <remarks>
+    /// The segment points count the same operations, the segments which the activations of the target grain admit, so an
+    /// occurrence index names the same segment at each of them.
+    /// </remarks>
+    SegmentStartDeactivates,
+
+    /// <summary>
+    /// The activation requests its own deactivation once a durable task segment ends, so it stops while the segment's
+    /// attempt is parked between segments, or after the attempt ended.
+    /// </summary>
+    SegmentEndDeactivates,
+
+    /// <summary>
+    /// The silo which hosts the activation crashes as the activation admits a durable task segment, before the segment's
+    /// code runs.
+    /// </summary>
+    SegmentStartCrashesSilo,
+
+    /// <summary>
+    /// The silo which hosts the activation crashes once a durable task segment ends, before the activation admits another
+    /// request which excludes the segment.
+    /// </summary>
+    SegmentEndCrashesSilo,
 }
 
 /// <summary>One armed fault: it fires on the <see cref="Occurrence"/>th operation which matches it, counting from zero.</summary>
@@ -112,6 +147,14 @@ public sealed class InjectedFault
     /// <summary>Releases a <see cref="FaultPoint.DeliveryHangs"/> fault's call, which then times out.</summary>
     public void Release() => _released.TrySetResult();
 
+    /// <summary>
+    /// Gets the copy of the delivered message which a <see cref="FaultPoint.DeliveryDuplicated"/> fault kept for its
+    /// <see cref="Target"/>, once the fault fired.
+    /// </summary>
+    public InboxMessage? Duplicate { get; private set; }
+
+    internal void KeepDuplicate(InboxMessage message) => Duplicate = message;
+
     /// <summary>Returns a task which completes once <paramref name="count"/> operations matched the fault.</summary>
     public Task WaitForMatchesAsync(int count)
     {
@@ -155,18 +198,25 @@ public sealed class InjectedFault
 }
 
 /// <summary>
-/// Injects infrastructure faults into journal storage, outbox delivery, inbox sinks and handlers, and Durable Jobs wake-ups
-/// of the grains which a test targets.
+/// Injects infrastructure faults into journal storage, outbox delivery, inbox sinks and handlers, Durable Jobs wake-ups,
+/// and the durable task segments of the grains which a test targets.
 /// </summary>
 /// <remarks>
 /// Each fault fires once, on the operation which it counts to, so a test enumerates the fault points of a run by their
 /// occurrence indexes. A counter is a fault which never fires. The journal decorator wraps the silo's journal storage, the
-/// grain call filter intercepts outbox deliveries and messaging wake-ups, and grains register a
+/// outgoing grain call filter intercepts outbox deliveries and messaging wake-ups, the incoming grain call filter
+/// intercepts deliveries and the segment requests which run durable task attempts, and grains register a
 /// <see cref="FaultInjectingInboxParticipant"/> ahead of the durable task runtime's sink and handler.
 /// </remarks>
 public sealed class DurableTaskFaultInjector
 {
     private readonly List<InjectedFault> _faults = [];
+
+    /// <summary>
+    /// Gets or sets the crash of the silo at an address, which a segment crash fault starts on the silo's scheduler and
+    /// doesn't wait for.
+    /// </summary>
+    public Action<SiloAddress>? CrashSilo { get; set; }
 
     /// <summary>Registers the injector's journal storage decorator, grain call filter, and services on a silo.</summary>
     /// <remarks>Call after the silo's journal storage provider is registered.</remarks>
@@ -336,6 +386,7 @@ public sealed class DurableTaskFaultInjector
             var thrown = injector.OnOperation(FaultPoint.DeliveryThrows, target, subject);
             var lost = injector.OnOperation(FaultPoint.DeliveryResponseLost, target, subject);
             var hung = injector.OnOperation(FaultPoint.DeliveryHangs, target, subject);
+            injector.OnOperation(FaultPoint.DeliveryDuplicated, target, subject)?.KeepDuplicate(message);
             if (thrown is not null)
             {
                 throw new InjectedFaultException($"the delivery call failed ({thrown}).");
@@ -365,11 +416,24 @@ public sealed class DurableTaskFaultInjector
     }
 }
 
-/// <summary>Holds admitted delivery calls at their receiver.</summary>
+/// <summary>
+/// Holds admitted delivery calls at their receiver, and deactivates or crashes an activation at the start or end of a
+/// durable task segment.
+/// </summary>
+/// <remarks>
+/// Segments are local requests whose interface is <see cref="IDurableTaskSegment"/>, so the activation's incoming call
+/// filters observe them as they observe grain calls, and a fault needs no seam in the runtime.
+/// </remarks>
 internal sealed class FaultInjectingReceiverFilter(DurableTaskFaultInjector injector) : IIncomingGrainCallFilter
 {
     public async Task Invoke(IIncomingGrainCallContext context)
     {
+        if (context.Request is IDurableTaskSegment)
+        {
+            await InvokeSegmentAsync(context);
+            return;
+        }
+
         if (context.InterfaceMethod?.DeclaringType == typeof(IMessagingExtension)
             && context.Request.GetArgument(0) is InboxMessage message
             && injector.OnOperation(FaultPoint.DeliveryHeldAtReceiver, context.TargetId.ToString(), message.Envelope.Subject) is { } hold)
@@ -378,6 +442,48 @@ internal sealed class FaultInjectingReceiverFilter(DurableTaskFaultInjector inje
         }
 
         await context.Invoke();
+    }
+
+    private async Task InvokeSegmentAsync(IIncomingGrainCallContext context)
+    {
+        // Every segment point counts each segment, so an occurrence index names the same segment at each of them.
+        var target = context.TargetId.ToString();
+        var activation = context.TargetContext;
+        var crashAtStart = injector.OnOperation(FaultPoint.SegmentStartCrashesSilo, target);
+        var deactivateAtStart = injector.OnOperation(FaultPoint.SegmentStartDeactivates, target);
+        var crashAtEnd = injector.OnOperation(FaultPoint.SegmentEndCrashesSilo, target);
+        var deactivateAtEnd = injector.OnOperation(FaultPoint.SegmentEndDeactivates, target);
+        if (crashAtStart is not null)
+        {
+            await CrashAsync(activation, crashAtStart);
+        }
+
+        if (deactivateAtStart is not null)
+        {
+            // The activation stops once its running requests, this segment among them, end. Its shutdown cancels the
+            // segment's attempt, whose code runs until it observes the cancellation.
+            activation.Deactivate(new(DeactivationReasonCode.ApplicationRequested, InjectedFaultException.MessagePrefix + deactivateAtStart));
+        }
+
+        await context.Invoke();
+        if (deactivateAtEnd is not null)
+        {
+            activation.Deactivate(new(DeactivationReasonCode.ApplicationRequested, InjectedFaultException.MessagePrefix + deactivateAtEnd));
+        }
+
+        if (crashAtEnd is not null)
+        {
+            await CrashAsync(activation, crashAtEnd);
+        }
+    }
+
+    /// <summary>Crashes the activation's silo, and holds the segment's request, which never completes on it.</summary>
+    private async Task CrashAsync(IGrainContext activation, InjectedFault fault)
+    {
+        var crash = injector.CrashSilo ?? throw new InvalidOperationException($"The harness doesn't crash silos ({fault}).");
+        crash(activation.Address.SiloAddress!);
+        await fault.Released;
+        throw new InjectedFaultException($"the silo crashed ({fault}).");
     }
 }
 

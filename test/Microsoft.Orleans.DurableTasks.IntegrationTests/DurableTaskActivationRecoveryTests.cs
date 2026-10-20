@@ -573,13 +573,147 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
 /// A clock which follows real time plus an offset that tests can advance.
 /// </summary>
 /// <remarks>
-/// Timers and timestamps follow real time, so Durable Jobs keeps running; advancing moves due times into the past.
+/// Timers and timestamps follow real time, so Durable Jobs keeps running; advancing moves due times into the past, and a
+/// timer whose due time an advance passes fires at once. Durable Jobs waits for a shard's next due job with such a timer,
+/// so a job which was already waiting runs once the clock passes its due time.
 /// </remarks>
 public sealed class AdvanceableTimeProvider : TimeProvider
 {
+    private readonly HashSet<AdvanceableTimer> _timers = [];
     private long _offsetTicks;
 
     public override DateTimeOffset GetUtcNow() => base.GetUtcNow().AddTicks(Interlocked.Read(ref _offsetTicks));
 
-    public void Advance(TimeSpan delta) => Interlocked.Add(ref _offsetTicks, delta.Ticks);
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        var timer = new AdvanceableTimer(this, callback, state);
+        lock (_timers)
+        {
+            _timers.Add(timer);
+        }
+
+        timer.Change(dueTime, period);
+        return timer;
+    }
+
+    public void Advance(TimeSpan delta)
+    {
+        Interlocked.Add(ref _offsetTicks, delta.Ticks);
+        AdvanceableTimer[] timers;
+        lock (_timers)
+        {
+            timers = [.. _timers];
+        }
+
+        foreach (var timer in timers)
+        {
+            timer.Rearm();
+        }
+    }
+
+    private void Remove(AdvanceableTimer timer)
+    {
+        lock (_timers)
+        {
+            _timers.Remove(timer);
+        }
+    }
+
+    /// <summary>A timer whose due time is a time on its provider's clock, which an advance can pass.</summary>
+    /// <remarks>
+    /// A real one-shot timer waits for the time remaining until the due time, and is re-armed whenever the clock advances
+    /// or a periodic timer fires. A firing whose due time the clock hasn't reached, which a re-arm can leave behind, waits
+    /// again instead.
+    /// </remarks>
+    private sealed class AdvanceableTimer : ITimer
+    {
+        private readonly AdvanceableTimeProvider _provider;
+        private readonly TimerCallback _callback;
+        private readonly object? _state;
+        private readonly ITimer _timer;
+        private readonly object _lock = new();
+        private DateTimeOffset? _dueAt;
+        private TimeSpan _period = Timeout.InfiniteTimeSpan;
+        private bool _disposed;
+
+        public AdvanceableTimer(AdvanceableTimeProvider provider, TimerCallback callback, object? state)
+        {
+            _provider = provider;
+            _callback = callback;
+            _state = state;
+            _timer = TimeProvider.System.CreateTimer(static timer => ((AdvanceableTimer)timer!).Fire(), this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        }
+
+        public bool Change(TimeSpan dueTime, TimeSpan period)
+        {
+            lock (_lock)
+            {
+                if (_disposed)
+                {
+                    return false;
+                }
+
+                _period = period == TimeSpan.Zero ? Timeout.InfiniteTimeSpan : period;
+                _dueAt = dueTime == Timeout.InfiniteTimeSpan ? null : _provider.GetUtcNow() + dueTime;
+                return ArmLocked();
+            }
+        }
+
+        public void Rearm()
+        {
+            lock (_lock)
+            {
+                if (!_disposed)
+                {
+                    ArmLocked();
+                }
+            }
+        }
+
+        private void Fire()
+        {
+            lock (_lock)
+            {
+                if (_disposed || _dueAt is not { } dueAt)
+                {
+                    return;
+                }
+
+                if (_provider.GetUtcNow() < dueAt)
+                {
+                    ArmLocked();
+                    return;
+                }
+
+                _dueAt = _period == Timeout.InfiniteTimeSpan ? null : _provider.GetUtcNow() + _period;
+                ArmLocked();
+            }
+
+            _callback(_state);
+        }
+
+        private bool ArmLocked()
+        {
+            var remaining = _dueAt is { } dueAt ? dueAt - _provider.GetUtcNow() : Timeout.InfiniteTimeSpan;
+            return _timer.Change(remaining < TimeSpan.Zero && _dueAt is not null ? TimeSpan.Zero : remaining, Timeout.InfiniteTimeSpan);
+        }
+
+        public void Dispose()
+        {
+            lock (_lock)
+            {
+                _disposed = true;
+                _dueAt = null;
+            }
+
+            _timer.Dispose();
+            _provider.Remove(this);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return default;
+        }
+    }
 }

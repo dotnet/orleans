@@ -35,10 +35,11 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
     public static readonly TimeSpan WorkflowDelay = TimeSpan.FromMilliseconds(10);
     private const int MaxClientAttempts = 20;
     private readonly MessagingWakeupTracker _wakeups = new();
+    private Task _crash = Task.CompletedTask;
 
     public DurableTaskFaultHarness(string journalFormatKey, Action<ISiloBuilder>? configureSilo = null)
     {
-        Injector = new();
+        Injector = new() { CrashSilo = OnCrashSilo };
         Gates = new();
         Fixture = new(journalFormatKey, silo =>
         {
@@ -55,6 +56,15 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
     public DurableTaskRecoveryFixture Fixture { get; }
     public IClusterClient Client => Fixture.Client;
 
+    /// <summary>
+    /// Gets the crash of the silo which a fault crashed last, which completes once the cluster has declared it dead.
+    /// </summary>
+    /// <remarks>
+    /// The client's calls which fail meanwhile are retried once the crash completes. A cluster which crashes silos sets
+    /// Durable Jobs' <c>ShardCheckInterval</c> short, so a remaining silo adopts the crashed silo's wake-ups promptly.
+    /// </remarks>
+    public Task Crash => Volatile.Read(ref _crash);
+
     public async ValueTask InitializeAsync()
     {
         Fixture.JobClock.Advance(JobClockLead);
@@ -64,6 +74,7 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         Injector.Reset();
+        await Crash;
         await Fixture.DisposeAsync();
         _wakeups.Dispose();
     }
@@ -117,7 +128,8 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
         catch (TimeoutException exception)
         {
             throw new TimeoutException(
-                $"Timed out after {RunTimeout} waiting for the grains to hold no messaging work. Outstanding wake-up jobs: "
+                $"Timed out after {RunTimeout} waiting for the grains to hold no messaging work, at "
+                + $"{Fixture.JobClock.GetUtcNow():O} on the Durable Jobs clock. Outstanding wake-up jobs: "
                 + _wakeups.DescribeOutstanding(targets),
                 exception);
         }
@@ -132,7 +144,7 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
         return result;
     }
 
-    private static async Task RetryAsync(Func<CancellationToken, Task> call, List<string> failures, CancellationToken cancellationToken)
+    private async Task RetryAsync(Func<CancellationToken, Task> call, List<string> failures, CancellationToken cancellationToken)
     {
         for (var attempt = 1; ; attempt++)
         {
@@ -146,9 +158,21 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
                 && attempt < MaxClientAttempts)
             {
                 failures.Add(exception.GetType().Name + ": " + exception.Message);
+
+                // A call which a crashing silo failed reaches the grain's next activation once the cluster declared the
+                // silo dead.
+                await Crash;
             }
         }
     }
+
+    private void OnCrashSilo(SiloAddress address) =>
+        Volatile.Write(ref _crash, Task.Run(async () =>
+        {
+            var silo = Fixture.Cluster.Silos.Single(silo => silo.SiloAddress.Equals(address));
+            await Fixture.Cluster.KillSiloAsync(silo, CancellationToken.None);
+            await Fixture.Cluster.WaitForLivenessToStabilizeAsync(didKill: true);
+        }));
 
     /// <summary>
     /// Tracks the messaging wake-up jobs which Durable Jobs holds for each grain, through the Durable Jobs activities.
@@ -168,11 +192,13 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
         private const string JobNameTag = "orleans.durable_job.name";
         private const string TargetTag = "orleans.durable_job.target_grain_id";
         private const string StatusTag = "orleans.durable_job.status";
+        private const string DueTimeTag = "orleans.durable_job.due_time";
         private const string MessagingPumpJobName = "orleans.messaging.pump";
 
         private readonly ActivityListener _listener;
         private readonly Dictionary<string, HashSet<string>> _outstanding = new(StringComparer.Ordinal);
         private readonly HashSet<string> _ended = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, List<string>> _transitions = new(StringComparer.Ordinal);
         private readonly List<(HashSet<string> Grains, TaskCompletionSource Idle)> _waiters = [];
 
         public MessagingWakeupTracker()
@@ -213,6 +239,15 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
 
             lock (_outstanding)
             {
+                if (!_transitions.TryGetValue(jobId, out var transitions))
+                {
+                    _transitions[jobId] = transitions = [];
+                }
+
+                // A stall's diagnostics describe each outstanding job's activities.
+                transitions.Add(
+                    $"{activity.OperationName} due {activity.GetTagItem(DueTimeTag)} ended {activity.StartTimeUtc + activity.Duration:O}: "
+                    + $"{activity.GetTagItem(StatusTag) ?? activity.Status.ToString()}");
                 if (activity.OperationName == ScheduleActivity)
                 {
                     if (!_ended.Contains(jobId))
@@ -246,7 +281,8 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
             lock (_outstanding)
             {
                 return string.Join("; ", grains.Select(grain =>
-                    $"{grain}: [{string.Join(", ", _outstanding.TryGetValue(grain.ToString(), out var jobs) ? jobs : [])}]"));
+                    $"{grain}: [{string.Join(", ", (_outstanding.TryGetValue(grain.ToString(), out var jobs) ? jobs : [])
+                        .Select(job => $"{job} ({string.Join(" -> ", _transitions[job])})"))}]"));
             }
         }
 

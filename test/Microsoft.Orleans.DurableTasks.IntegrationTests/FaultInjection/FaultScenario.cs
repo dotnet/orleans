@@ -28,10 +28,14 @@ public sealed record FaultSpec(FaultPoint Point, FaultRole Role, int Occurrence,
 }
 
 /// <summary>
-/// The outcome of a scenario run: whether its faults fired, the writes each grain performed, and every violation of the
-/// contract, including a stall.
+/// The outcome of a scenario run: whether its faults fired, the journal writes and durable task segments of each grain,
+/// and every violation of the contract, including a stall.
 /// </summary>
-public sealed record FaultRunOutcome(bool Fired, Dictionary<FaultRole, int> Writes, List<string> Violations);
+public sealed record FaultRunOutcome(
+    bool Fired,
+    Dictionary<FaultRole, int> Writes,
+    Dictionary<FaultRole, int> Segments,
+    List<string> Violations);
 
 /// <summary>
 /// Runs a representative workflow on fresh grains with faults armed, and checks the contract: the fault-free result, each
@@ -53,6 +57,9 @@ internal static class FaultScenario
         var writes = grains.ToDictionary(
             static pair => pair.Key,
             pair => harness.Injector.Count(FaultPoint.JournalWriteBeforeDurable, pair.Value.GetGrainId()));
+        var segments = grains.ToDictionary(
+            static pair => pair.Key,
+            pair => harness.Injector.Count(FaultPoint.SegmentStartDeactivates, pair.Value.GetGrainId()));
         var armed = faults
             .Select(fault => harness.Injector.Arm(fault.Point, grains[fault.Role].GetGrainId(), fault.Occurrence, fault.Subject))
             .ToList();
@@ -83,7 +90,9 @@ internal static class FaultScenario
                 violations.Add($"result '{result}', expected '{expected}'");
             }
 
-            // Completions retire and records are deleted after the result, so the run's last writes follow it.
+            // Completions retire and records are deleted after the result, so the run's last writes follow it. A crashed
+            // silo's wake-ups move to a remaining silo once the cluster has declared it dead.
+            await harness.Crash.WaitAsync(DurableTaskFaultHarness.RunTimeout, cancellationToken);
             await harness.SettleAsync(grains.Values.Select(static grain => grain.GetGrainId()), cancellationToken);
             foreach (var (role, grain) in grains)
             {
@@ -104,6 +113,7 @@ internal static class FaultScenario
         return new(
             armed.All(static fault => fault.HasFired),
             writes.ToDictionary(static pair => pair.Key, static pair => pair.Value.Matches),
+            segments.ToDictionary(static pair => pair.Key, static pair => pair.Value.Matches),
             violations);
     }
 
