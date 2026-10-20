@@ -82,10 +82,11 @@ public sealed class InboxAdmissionRecoveryTests
         {
             var node = JsonSerializer.SerializeToNode(new InboxSnapshot
             {
-                Processed = [new() { MessageId = message.Envelope.MessageId, ProcessedAt = DateTimeOffset.MinValue }]
+                Processed = [new() { MessageId = message.Envelope.MessageId }]
             }, InboxJsonContext.Default.InboxSnapshot)!;
             node.AsObject().Remove("AdmissionFloor");
             node["Processed"]![0]!.AsObject().Remove("RedeliveryDeadline");
+            node["Processed"]![0]!["ProcessedAt"] = JsonSerializer.SerializeToNode(DateTimeOffset.MaxValue);
             historical = JsonSerializer.Deserialize(node.ToJsonString(), InboxJsonContext.Default.InboxSnapshot)!;
         }
         else
@@ -94,7 +95,7 @@ public sealed class InboxAdmissionRecoveryTests
             var currentSerializer = fixture.Client.ServiceProvider.GetRequiredService<Serializer<InboxSnapshot>>();
             historical = currentSerializer.Deserialize(oldSerializer.SerializeToArray(new LegacyInboxSnapshot
             {
-                Processed = [new() { MessageId = message.Envelope.MessageId, ProcessedAt = DateTimeOffset.MinValue }]
+                Processed = [new() { MessageId = message.Envelope.MessageId, ProcessedAt = DateTimeOffset.MaxValue }]
             }))!;
         }
         Assert.Equal(DateTimeOffset.MinValue, historical.AdmissionFloor);
@@ -119,6 +120,65 @@ public sealed class InboxAdmissionRecoveryTests
         Assert.Equal(0, fixture.SourceSinkProbe.For(receiver).SinkOffers);
     }
 
+    [Theory]
+    [InlineData("orleans-binary")]
+    [InlineData("json")]
+    public async Task LegacyCompletionCommand_IgnoresRetiredTimestampAndPreservesItsCutoff(string format)
+    {
+        await using var fixture = new FaultInjectionClusterFixture(format);
+        await fixture.InitializeAsync();
+        var receiver = fixture.Client.GetGrain<ISourceSinkGrain>(Guid.NewGuid());
+        _ = await receiver.GetOutboxCountAsync();
+        var started = fixture.JobClock.GetUtcNow();
+        var cutoff = started + TimeSpan.FromHours(1);
+        var message = Message("legacy-complete") with { RedeliveryDeadline = cutoff };
+        InboxCommand historical;
+        if (format == "json")
+        {
+            var node = JsonSerializer.SerializeToNode(new InboxCommand
+            {
+                Kind = InboxCommandKind.Complete,
+                MessageId = message.Envelope.MessageId,
+                RedeliveryDeadline = cutoff
+            }, InboxJsonContext.Default.InboxCommand)!;
+            node["ProcessedAt"] = JsonSerializer.SerializeToNode(DateTimeOffset.MaxValue);
+            historical = JsonSerializer.Deserialize(node.ToJsonString(), InboxJsonContext.Default.InboxCommand)!;
+        }
+        else
+        {
+            var oldSerializer = fixture.Client.ServiceProvider.GetRequiredService<Serializer<LegacyInboxCompletionCommand>>();
+            var currentSerializer = fixture.Client.ServiceProvider.GetRequiredService<Serializer<InboxCommand>>();
+            historical = currentSerializer.Deserialize(oldSerializer.SerializeToArray(new LegacyInboxCompletionCommand
+            {
+                Kind = InboxCommandKind.Complete,
+                MessageId = message.Envelope.MessageId,
+                ProcessedAt = DateTimeOffset.MaxValue,
+                RedeliveryDeadline = cutoff
+            }))!;
+        }
+        Assert.Equal(InboxCommandKind.Complete, historical.Kind);
+        Assert.Equal(message.Envelope.MessageId, historical.MessageId);
+        Assert.Equal(cutoff, historical.RedeliveryDeadline);
+        var inbox = fixture.GetGrainContext(receiver).ActivationServices.GetRequiredService<Inbox>();
+        await fixture.OnGrainAsync(receiver, () => ((IDurableValueCommandHandler<InboxCommand>)inbox).ApplySet(historical));
+        var journal = JournalId.FromGrainId(receiver.GetGrainId());
+        fixture.Storage.RequestSnapshot(journal);
+        await receiver.WriteAsync();
+        await fixture.CrashAsync(receiver);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
+
+        // The historical MaxValue completion timestamp cannot prolong retention beyond the finite cutoff's fence.
+        fixture.JobClock.Advance(TimeSpan.FromDays(2));
+        fixture.Storage.RequestSnapshot(journal);
+        await receiver.WriteAsync();
+        await fixture.CrashAsync(receiver);
+        fixture.JobClock.Advance(started - fixture.JobClock.GetUtcNow());
+        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, message)).Status);
+        inbox = fixture.GetGrainContext(receiver).ActivationServices.GetRequiredService<Inbox>();
+        Assert.DoesNotContain(message.Envelope.MessageId, await fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox)));
+        Assert.Equal(0, fixture.SourceSinkProbe.For(receiver).SinkOffers);
+    }
+
     [Fact]
     public void PersistedAdmissionFields_UseAdditiveStableFieldIds()
     {
@@ -127,6 +187,12 @@ public sealed class InboxAdmissionRecoveryTests
         Assert.Equal(9U, typeof(InboxCommand).GetProperty(nameof(InboxCommand.RedeliveryDeadline))!.GetCustomAttribute<IdAttribute>()!.Id);
         Assert.Equal(10U, typeof(InboxCommand).GetProperty(nameof(InboxCommand.AdmissionFloor))!.GetCustomAttribute<IdAttribute>()!.Id);
         Assert.Null(typeof(InboxProcessedEntry).GetProperty(nameof(InboxProcessedEntry.Sequence))!.GetCustomAttribute<IdAttribute>());
+        Assert.Null(typeof(InboxProcessedEntry).GetProperty("ProcessedAt"));
+        Assert.Null(typeof(InboxCommand).GetProperty("ProcessedAt"));
+        Assert.DoesNotContain(typeof(InboxProcessedEntry).GetMembers().SelectMany(static member => member.GetCustomAttributes<IdAttribute>()),
+            static attribute => attribute.Id == 1);
+        Assert.DoesNotContain(typeof(InboxCommand).GetMembers().SelectMany(static member => member.GetCustomAttributes<IdAttribute>()),
+            static attribute => attribute.Id == 4);
     }
 
     private static InboxMessage Message(string name) => new()
@@ -152,6 +218,15 @@ public sealed class InboxAdmissionRecoveryTests
     {
         [Id(0)] public MessageId MessageId { get; init; }
         [Id(1)] public DateTimeOffset ProcessedAt { get; init; }
+    }
+
+    [GenerateSerializer]
+    internal sealed class LegacyInboxCompletionCommand
+    {
+        [Id(0)] public InboxCommandKind Kind { get; init; }
+        [Id(2)] public MessageId MessageId { get; init; }
+        [Id(4)] public DateTimeOffset ProcessedAt { get; init; }
+        [Id(9)] public DateTimeOffset? RedeliveryDeadline { get; init; }
     }
 
     private static async Task<DeliveryResult> DeliverAsync(ISourceSinkGrain receiver, InboxMessage message) =>
