@@ -373,7 +373,8 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
             throw new InvalidOperationException("Pinned pages can only be appended to an empty writer.");
         }
 
-        input.Pin();
+        // The writer releases pages directly, independently of codec ownership rollback.
+        input = input.Slice(0);
 
         ArcBufferPage? tail = null;
         foreach (var segment in input.PageSegments)

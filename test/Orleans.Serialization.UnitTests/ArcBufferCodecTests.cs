@@ -187,15 +187,15 @@ public sealed class ArcBufferCodecTests
             case "Untyped": return untyped.Deserialize<ArcContainer>(input);
             case "UntypedSession": return untyped.Deserialize<ArcContainer>(input, session);
             case "TypedReader":
-            {
-                var reader = Reader.Create(input, session);
-                return typed.Deserialize(ref reader);
-            }
+                {
+                    var reader = Reader.Create(input, session);
+                    return typed.Deserialize(ref reader);
+                }
             case "UntypedReader":
-            {
-                var reader = Reader.Create(input, session);
-                return untyped.Deserialize<ArcContainer, ArcBufferReaderInput>(ref reader);
-            }
+                {
+                    var reader = Reader.Create(input, session);
+                    return untyped.Deserialize<ArcContainer, ArcBufferReaderInput>(ref reader);
+                }
             default: throw new ArgumentOutOfRangeException(nameof(path));
         }
     }
@@ -738,6 +738,90 @@ public sealed class ArcBufferCodecTests
     }
 
     [Theory]
+    [InlineData(false, "Dispose")]
+    [InlineData(true, "Dispose")]
+    [InlineData(false, "Advance")]
+    [InlineData(true, "Advance")]
+    [InlineData(false, "Reset")]
+    [InlineData(true, "Reset")]
+    [InlineData(false, "Retain")]
+    [InlineData(true, "Retain")]
+    public void FailedOperation_AppendPinnedWriterOwnsIndependentPins(bool copy, string cleanup)
+    {
+        var codec = new AcquiringThrowingCodec();
+        var copier = new NestedThrowingMemberCopier();
+        var registrations = new ServiceCollection().AddSerializer();
+        registrations.Configure<TypeManifestOptions>(options => options.AddSerializer<ArcCopyFailureMember>(
+            _ => codec, _ => copier));
+        using var services = registrations.BuildServiceProvider();
+        using var source = new ArcBufferWriter();
+        var expected = Bytes(50037);
+        source.Write(expected);
+        using var original = source.PeekSlice(source.Length);
+        using var wire = new ArcBufferWriter();
+        wire.Write(services.GetRequiredService<Serializer<ArcBuffer>>().SerializeToArray(original));
+        using var input = wire.PeekSlice(wire.Length);
+        var pages = (copy ? original : input).Pages.ToArray();
+        var before = pages.Select(page => page.ReferenceCount).ToArray();
+        using var pinned = new ArcBufferWriter();
+        void AppendAndRelease(ArcBuffer acquired)
+        {
+            Assert.Equal(before.Select(count => count + 1), pages.Select(page => page.ReferenceCount));
+            pinned.AppendPinned(acquired);
+            Assert.Equal(before.Select(count => count + 2), pages.Select(page => page.ReferenceCount));
+            switch (cleanup)
+            {
+                case "Dispose":
+                    pinned.Dispose();
+                    break;
+                case "Advance":
+                    pinned.AdvanceReader(pinned.Length);
+                    Assert.Equal(before.Select((count, index) => count + (index == pages.Length - 1 ? 2 : 1)),
+                        pages.Select(page => page.ReferenceCount));
+                    pinned.Dispose();
+                    break;
+                case "Reset":
+                    pinned.Reset();
+                    break;
+                case "Retain":
+                    return;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(cleanup));
+            }
+
+            Assert.Equal(before.Select(count => count + 1), pages.Select(page => page.ReferenceCount));
+        }
+
+        codec.OnAcquired = AppendAndRelease;
+        copier.OnCopied = AppendAndRelease;
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        if (copy)
+        {
+            var value = new ArcCopyFailureMember { Buffer = original };
+            Assert.Throws<IOException>(() => services.GetRequiredService<DeepCopier<ArcCopyFailureMember>>().Copy(value));
+        }
+        else
+        {
+            Assert.Throws<IOException>(() => services.GetRequiredService<Serializer<ArcCopyFailureMember>>()
+                .Deserialize(input, session));
+        }
+
+        Assert.Equal(1, copy ? copier.Calls : codec.Calls);
+        Assert.Equal(before.Select(count => count + (cleanup == "Retain" ? 1 : 0)),
+            pages.Select(page => page.ReferenceCount));
+        if (cleanup == "Retain")
+        {
+            using var retained = pinned.PeekSlice(pinned.Length);
+            Assert.Equal(expected, retained.ToArray());
+        }
+
+        pinned.Dispose();
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+        Assert.Equal(expected, original.ToArray());
+        Assert.Equal(services.GetRequiredService<Serializer<ArcBuffer>>().SerializeToArray(original), input.ToArray());
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void GeneratedCopyFailure_ReleasesOnlyOwnedEmptyPins(bool pageBacked)
@@ -1133,12 +1217,13 @@ public sealed class ArcBufferCodecTests
 
         using var emptyWriter = new ArcBufferWriter();
         var empty = emptyWriter.PeekSlice(0);
+        var emptyPage = Assert.IsType<ArcBufferPage>(empty.First);
+        var beforeEmptyCopy = emptyPage.ReferenceCount;
         using var emptyCopy = services.GetRequiredService<DeepCopier>().Copy(empty);
         Assert.Same(empty.First, emptyCopy.First);
-        var emptyPage = Assert.IsType<ArcBufferPage>(empty.First);
-        Assert.Equal(3, emptyPage.ReferenceCount);
+        Assert.Equal(beforeEmptyCopy + 1, emptyPage.ReferenceCount);
         empty.Dispose();
-        Assert.Equal(2, emptyPage.ReferenceCount);
+        Assert.Equal(beforeEmptyCopy, emptyPage.ReferenceCount);
     }
 
     [Fact]
@@ -1207,8 +1292,11 @@ public sealed class ArcBufferCodecTests
         var empty = emptyReader.ReadOwnedBuffer(0);
         Assert.Null(empty.First);
         empty.Dispose();
-        try { emptyReader.ReadOwnedBuffer(1); Assert.Fail("Truncated Arc input must throw."); }
-        catch (IndexOutOfRangeException) { }
+        Assert.Throws<IndexOutOfRangeException>(() =>
+        {
+            var truncatedReader = Reader.Create(default(ArcBuffer), session);
+            using var unexpected = truncatedReader.ReadOwnedBuffer(1);
+        });
     }
 
     [Theory]
