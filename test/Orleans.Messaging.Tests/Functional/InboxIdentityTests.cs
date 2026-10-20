@@ -113,7 +113,8 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         var key = MessageId.Create("tenant", "orders", "1044", "reserve");
         var original = Create(rig, key, "inventory.reserve.v1", "original");
         var repeated = Create(rig, key, "completely.changed.subject.v2", "different-body",
-            GrainId.Create("forwarder", "new-owner")) with { SentAt = original.SentAt };
+            GrainId.Create("forwarder", "new-owner")) with
+        { SentAt = original.SentAt };
         handler.Release.TrySetResult();
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
         await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
@@ -354,7 +355,8 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         var key = MessageId.Create("tenant", "orders", "1047", "reserve");
         var original = Create(rig, key, "inventory.reserve.v1", "original");
         var repeated = Create(rig, key, "inventory.reserve.v2", "changed",
-            GrainId.Create("forwarder", "new")) with { SentAt = original.SentAt };
+            GrainId.Create("forwarder", "new")) with
+        { SentAt = original.SentAt };
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
         await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
         await Fixture.WaitForInboxCountAsync(rig.Receiver, 0);
