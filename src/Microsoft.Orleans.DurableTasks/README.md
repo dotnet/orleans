@@ -360,13 +360,13 @@ synchronously on the activation which makes them, when the runtime stages them: 
 - Activation shutdown begins when deactivation starts, before the grain's
   `OnDeactivateAsync` runs. It stops new execution and cancels every running
   attempt with the reason `ActivationStopping`: from then on, the attempt's
-  durable operations throw `DurableTaskAttemptCanceledException`, and its `AttemptCancellationToken` and
-  `CancellationToken` are canceled. A parked attempt is discarded and runs no
-  further code; a running segment finishes, and its result is discarded. The
-  next activation replays committed work. Other grain work, such as
-  `OnDeactivateAsync` and the inbox, keeps committing while segments finish,
-  and the journaled state changes which a canceled segment's cleanup makes commit
-  with it. A poll or wait on
+  durable operations throw `DurableTaskAttemptCanceledException`, its changes
+  to journaled state apply directly and unrecorded, as other grain code's do,
+  and its `AttemptCancellationToken` and `CancellationToken` are canceled. A
+  parked attempt is discarded and runs no further code; a running segment
+  finishes, and its result is discarded. The next activation replays committed
+  work. Other grain work, such as `OnDeactivateAsync` and the inbox, keeps
+  committing while segments finish. A poll or wait on
   the activation fails with `DurableTaskAttemptCanceledException`, as a call
   which arrives while the runtime stops does, and the task continues in the next
   activation.

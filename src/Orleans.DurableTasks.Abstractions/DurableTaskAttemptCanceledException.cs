@@ -22,9 +22,9 @@ public enum DurableTaskAttemptCancellationReason
 
     /// <summary>
     /// The attempt diverged from what an earlier attempt of the task recorded: it requested another operation under a
-    /// recorded identifier, or a recorded outcome no longer decodes. The task stays pending until code which replays the
-    /// recorded execution runs it; the <see cref="DurableTaskAttemptCanceledException"/>'s inner exception describes the
-    /// divergence.
+    /// recorded identifier, accessed journaled state other than the recorded access, or a recorded outcome no longer
+    /// decodes. The task stays pending until code which replays the recorded execution runs it; the
+    /// <see cref="DurableTaskAttemptCanceledException"/>'s inner exception describes the divergence.
     /// </summary>
     Diverged,
 }

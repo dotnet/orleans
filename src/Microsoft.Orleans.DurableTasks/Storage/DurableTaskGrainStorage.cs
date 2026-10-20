@@ -31,11 +31,12 @@ namespace Orleans.DurableTasks.Storage;
 /// compare tasks of a running execution, which remain stored.
 /// </para>
 /// </remarks>
-internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
+internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurableTaskAccessLogStorage
 {
     private readonly IDurableDictionary<TaskId, DurableTaskState> _items;
     private readonly IDurableDictionary<TaskId, byte[]> _requests;
     private readonly IDurableDictionary<TaskId, byte[]> _results;
+    private readonly DurableTaskAccessLogs _accessLogs;
     private readonly IJournaledStateManager _stateManager;
     private readonly TimeProvider _timeProvider;
     private readonly Serializer _serializer;
@@ -49,7 +50,8 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         [FromKeyedServices("$task-results")] IDurableDictionary<TaskId, byte[]> results,
         IJournaledStateManager stateManager,
         [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider,
-        Serializer serializer)
+        Serializer serializer,
+        [FromKeyedServices(DurableTaskAccessLogs.StateMachineName)] DurableTaskAccessLogs accessLogs)
     {
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(requests);
@@ -57,6 +59,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         ArgumentNullException.ThrowIfNull(stateManager);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(serializer);
+        ArgumentNullException.ThrowIfNull(accessLogs);
 
         _items = items;
         _requests = requests;
@@ -65,6 +68,15 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _timeProvider = timeProvider;
         _serializer = serializer;
         _isStored = items.ContainsKey;
+        _accessLogs = accessLogs;
+    }
+
+    public byte[] GetAccessLog(TaskId taskId) => _accessLogs.Get(taskId);
+
+    public void AppendAccessLog(TaskId taskId, ReadOnlySpan<byte> records)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        _accessLogs.Append(taskId, records);
     }
 
     public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks =>
@@ -172,6 +184,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         }
         _items[taskId] = typedState;
         _results[taskId] = typedState.ResultPayload!;
+        _accessLogs.Remove(taskId);
     }
 
     /// <remarks>
@@ -292,6 +305,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
             "A pending completion retains its task's result.");
         _requests.Remove(taskId);
         _results.Remove(taskId);
+        _accessLogs.Remove(taskId);
         if (!_items.Remove(taskId))
         {
             return false;
@@ -306,6 +320,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items.Clear();
         _requests.Clear();
         _results.Clear();
+        _accessLogs.Clear();
         _hierarchy = null;
         _lastCompletionSequence = null;
     }

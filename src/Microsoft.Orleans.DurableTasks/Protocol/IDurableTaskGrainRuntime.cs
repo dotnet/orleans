@@ -243,6 +243,13 @@ internal interface IDurableTaskGrainRuntime
     /// <remarks>The caller owns the returned set.</remarks>
     HashSet<TaskId>? GetRecordedOperations(TaskId executionId) => null;
 
+    /// <summary>
+    /// Creates the log which records the journaled state accesses of an attempt of <paramref name="executionId"/> and
+    /// returns the outcomes which earlier attempts recorded, or <see langword="null"/> when the runtime doesn't record them.
+    /// </summary>
+    /// <param name="diverge">Stalls the attempt when its accesses diverge from their records, and returns the exception which the access throws.</param>
+    DurableTaskAccessLog? CreateAccessLog(TaskId executionId, TaskScheduler scheduler, Func<DurableTaskDivergenceException, Exception> diverge) => null;
+
     /// <summary>Notes that the attempt of <paramref name="executionId"/> which replayed its recorded operations runs live.</summary>
     void OnReplayEnded(TaskId executionId)
     {

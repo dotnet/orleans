@@ -262,7 +262,7 @@ public sealed class DurableTaskLogPublishingTests
     });
 
     [Fact]
-    public Task AppendBeforeAnAwaitInAStepCanCommitBeforeTheStepCompletesAndRunsAgainOnReplay() => ActivationScheduler.RunAsync(async () =>
+    public Task AppendBeforeAnAwaitInAStepCommitsWithItsRecordAndDoesNotRunAgainOnReplay() => ActivationScheduler.RunAsync(async () =>
     {
         var stepId = WorkflowId.Child("append");
         await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
@@ -271,8 +271,8 @@ public sealed class DurableTaskLogPublishingTests
             await activation.ScheduleAsync(WorkflowId, TestCancellation);
             await activation.Grain.AtGate.WaitAsync(WaitTimeout, TestCancellation);
 
-            // Unrelated grain work writes the journal while the step awaits; the write commits the entry without a record
-            // of the step.
+            // Unrelated grain work writes the journal while the step awaits; the write commits the entry with the step's
+            // record of the append, but without the step's result.
             activation.Grain.RequestUnrelatedWrite();
             await activation.Grain.UnrelatedWrites;
 
@@ -282,14 +282,14 @@ public sealed class DurableTaskLogPublishingTests
                 write => Assert.DoesNotContain(stepId, write.Completed));
         }
 
-        // The replay runs the step again, which appends the entry again.
+        // The replay runs the step again, which returns the recorded sequence without appending the entry again.
         await using var replay = await harness.ActivateAsync(TestCancellation);
         await replay.Grain.AtGate.WaitAsync(WaitTimeout, TestCancellation);
         Assert.Equal(2, harness.EffectRuns);
-        Assert.Equal([10, 10], replay.Grain.Log.ToArray());
+        Assert.Equal([10], replay.Grain.Log.ToArray());
         replay.Grain.OpenGate();
 
-        Assert.Equal(1L, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<long>());
+        Assert.Equal(0L, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<long>());
 
         static async DurableTask<long> Workflow(ReplayGrain grain) => await DurableTask.Run(async _ =>
         {

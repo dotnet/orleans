@@ -95,6 +95,8 @@ internal sealed class DurableTaskJournalHarness : IAsyncDisposable
     {
         public DurableTaskGrainStorage Storage { get; } = storage;
 
+        public IServiceProvider Services => scope.ServiceProvider;
+
         public ValueTask DisposeAsync() => scope.DisposeAsync();
     }
 

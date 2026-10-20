@@ -53,6 +53,76 @@ public sealed class DurableTaskStorageTests
         Assert.Equal(journalFormatKey, await harness.GetStoredJournalFormatKeyAsync(cancellationToken));
     }
 
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public async Task AccessLogRecoversFromJournalUntilTheTaskCompletes(string journalFormatKey)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var harness = new DurableTaskJournalHarness(journalFormatKey);
+        var taskId = TaskId.Parse("root/access-log");
+        await using (var activation = await harness.ActivateAsync(cancellationToken))
+        {
+            var storage = activation.Storage;
+            var logs = (IDurableTaskAccessLogStorage)storage;
+            _ = storage.GetOrCreateTask(taskId, DurableTaskRecordKind.LocalStep, request: null);
+            logs.AppendAccessLog(taskId, [1, 2, 3]);
+            await storage.WriteAsync(cancellationToken);
+
+            // Each write journals the records which earlier writes didn't.
+            logs.AppendAccessLog(taskId, [4]);
+            logs.AppendAccessLog(taskId, [5]);
+            await storage.WriteAsync(cancellationToken);
+        }
+
+        await using (var recovery = await harness.ActivateAsync(cancellationToken))
+        {
+            var logs = (IDurableTaskAccessLogStorage)recovery.Storage;
+            Assert.Equal([1, 2, 3, 4, 5], logs.GetAccessLog(taskId));
+            Assert.True(recovery.Storage.TryGetTask(taskId, out var state));
+            recovery.Storage.SetResponse(taskId, state, DurableTaskResponse.Completed);
+            Assert.Empty(logs.GetAccessLog(taskId));
+            await recovery.Storage.WriteAsync(cancellationToken);
+        }
+
+        await using var completed = await harness.ActivateAsync(cancellationToken);
+        Assert.Empty(((IDurableTaskAccessLogStorage)completed.Storage).GetAccessLog(taskId));
+    }
+
+    /// <summary>
+    /// The access logs report each change they stage, so Messaging can tell whether a failed handler attempt on a durable
+    /// task grain staged anything: each append, removal, and clear advances the staged change count, and a write which
+    /// captures them doesn't.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public async Task AccessLogsReportEachChangeTheyStage(string journalFormatKey)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var harness = new DurableTaskJournalHarness(journalFormatKey);
+        await using var activation = await harness.ActivateAsync(cancellationToken);
+        var manager = Assert.IsType<JournaledStateManager>(activation.Services.GetRequiredService<IJournaledStateManager>());
+        var logs = activation.Services.GetRequiredKeyedService<DurableTaskAccessLogs>(DurableTaskAccessLogs.StateMachineName);
+        var taskId = TaskId.Parse("root/access-log");
+        _ = activation.Storage.GetOrCreateTask(taskId, DurableTaskRecordKind.LocalStep, request: null);
+        await activation.Storage.WriteAsync(cancellationToken);
+
+        var start = manager.StagedChangeCount;
+        Assert.True(start >= 0, $"Staged change count {start} is unknown.");
+        logs.Append(taskId, [1, 2, 3]);
+        var afterAppend = manager.StagedChangeCount;
+        Assert.True(afterAppend > start);
+
+        await activation.Storage.WriteAsync(cancellationToken);
+        Assert.Equal(afterAppend, manager.StagedChangeCount);
+
+        logs.Remove(taskId);
+        var afterRemove = manager.StagedChangeCount;
+        Assert.True(afterRemove > afterAppend);
+
+        logs.Clear();
+        Assert.True(manager.StagedChangeCount > afterRemove);
+    }
+
     [Fact]
     public void MutationRejectsStateOwnedByDifferentTaskId()
     {
@@ -501,14 +571,22 @@ public sealed class DurableTaskStorageTests
         return request;
     }
 
-    private static DurableTaskGrainStorage CreateStorage() =>
-        new(
+    private static DurableTaskGrainStorage CreateStorage()
+    {
+        var manager = new TestStateManager();
+        var serializer = CreateSerializer();
+        var codecs = serializer.SessionPool.CodecProvider;
+        return new(
             new TestDurableDictionary<TaskId, DurableTaskState>(),
             new TestDurableDictionary<TaskId, byte[]>(),
             new TestDurableDictionary<TaskId, byte[]>(),
-            new TestStateManager(),
+            manager,
             TimeProvider.System,
-            CreateSerializer());
+            serializer,
+            new DurableTaskAccessLogs(
+                manager,
+                new OrleansBinaryDurableDictionaryCommandCodec<TaskId, byte[]>(codecs.GetCodec<TaskId>(), codecs.GetCodec<byte[]>(), serializer.SessionPool)));
+    }
 
     private static Serializer CreateSerializer()
     {
