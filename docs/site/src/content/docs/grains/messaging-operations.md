@@ -39,7 +39,7 @@ behavior through `AddMessaging`, and is validated at startup.
 | Setting | Default | Operational effect |
 | --- | --- | --- |
 | `MaxCapacity` | 1,000 | Bounds pending inbox messages. Every pending message, including a scheduled message waiting for its `DeliverAt` time, counts from its acceptance until it completes. New messages receive `Backpressured` at capacity; repeats of existing messages receive `Duplicate`. Messages a grain sends to itself are admitted regardless of the limit and count until they complete. |
-| `DeduplicationWindow` | 7 days | Retains completed identities until their latest observed `SentAt` is at or below the durable admission floor. The floor advances from observed Durable Jobs time minus this period; acknowledged snapshots and recovery reclaim eligible records. |
+| `DeduplicationWindow` | 7 days | Retains completed identities until their latest observed `SentAt` is at or below the durable admission floor. The floor advances from observed Durable Jobs time minus this period; acknowledged snapshots and recovery reclaim eligible records. Incoming times beyond receiver time plus this window are rejected before deduplication. |
 | `RetryInitialInterval` | 1 second | Delay before the first inbox processing retry or outbox delivery retry. Each retry doubles the delay, up to 64 times this interval. |
 | `InboxRetryTimeout` | 6 hours | Moves a message to the inbox dead letters when its handler attempts keep failing for this long after the first failure. The last attempt runs when the timeout elapses, and the retrying message keeps its place in `MaxCapacity`. `TimeSpan.Zero` dead-letters at the first failure. |
 | `OutboxRetryTimeout` | 6 hours | Bounds attempts until `SentAt + OutboxRetryTimeout`, including backpressure. The sending write journals `SentAt`, and every attempt and recovery preserves it. Must be shorter than `DeduplicationWindow`. |
@@ -57,6 +57,11 @@ An untracked send time at or below the floor returns `Expired`.
 The floor only advances and survives recovery. Clock jumps can expire new work
 early or retain more history, while the send time and durable floor preserve
 admission decisions for the original send.
+
+Future-time validation also applies to tracked identities. A `SentAt` greater than
+receiver time plus the window throws <xref:System.ArgumentOutOfRangeException>
+without a journal change or sink offer; a time exactly at that upper boundary is
+admitted. This bounds the future send time used to retain completed history.
 
 Dead-letter retention applies when an activation starts and whenever a new dead
 letter is added. A snapshot persists its admission floor and compacted history
@@ -115,6 +120,7 @@ end-to-end business confirmation.
 | Grain deactivates after a storage or staging failure | Messaging vetoes every later journal write of the activation, and the grain deactivates. The next activation recovers the committed journal and resumes pending work. |
 | Outbox dead letter whose reason states that the retry timeout elapsed | No terminal answer was recorded within the original send's `OutboxRetryTimeout`. Check receiver availability and handler registration, then reconcile the possibly accepted command before authorizing replay. |
 | Sender dead-letters with `Expired` and an unknown receiver outcome | Delivery was delayed past `SentAt + DeduplicationWindow`, or a forward receiver clock jump advanced its durable admission floor. Reconcile business state through the application, check sender/receiver clocks, and size `DeduplicationWindow` for tolerated delivery delays and clock variation. Keep `OutboxRetryTimeout` shorter than that window. |
+| Receiver warns that `SentAt` is too far ahead; sender retries `ArgumentOutOfRangeException` | The sender's clock is ahead of receiver time by more than `DeduplicationWindow`, or a direct caller stamped an invalid future time. Check both clocks and direct-caller timestamp creation. Preserve the original logical send time on retries; once its original retry budget ends, reconcile the dead-lettered send through the application before authorizing a new submission. |
 | Caller cancellation | An accepted write or delivery continues through its actual outcome. Query durable business status or retry with the same command ID. |
 
 Handlers follow a two-phase pattern: all asynchronous and fallible preparation uses
