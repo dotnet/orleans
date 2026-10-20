@@ -96,7 +96,7 @@ internal static class DurableTaskDiagnostics
         "Filter cancellation handlers by IsTaskCancellationRequested",
         "Add 'when (DurableTask.Current.IsTaskCancellationRequested)' to this handler: attempt cancellation, such as a stopping activation, also throws OperationCanceledException, and compensation which runs then runs again in the next attempt",
         DiagnosticSeverity.Warning,
-        "A durable task observes two kinds of cancellation through OperationCanceledException. Task cancellation is durable: a caller requests it, the host records it, and the body decides the task's outcome, for example by compensating. Attempt cancellation stops the current run, for example when its activation deactivates, and the run's later durable operations throw. A handler which filters by DurableTask.Current.IsTaskCancellationRequested, or which rethrows, compensates for task cancellation and lets a canceled attempt end.");
+        "A durable task observes two kinds of cancellation through OperationCanceledException. Task cancellation is durable: a caller requests it, the host records it, and the body decides the task's outcome, for example by compensating. Attempt cancellation stops the current run, for example when its activation deactivates, and the run's later durable operations throw. A handler which filters by DurableTask.Current.IsTaskCancellationRequested, or which rethrows, compensates for task cancellation and lets a canceled attempt end, and a handler whose filter excludes OperationCanceledException handles other failures only.");
 
     public static readonly DiagnosticDescriptor AsyncVoidInBody = Create(
         "ORLEANS0213",
