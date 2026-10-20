@@ -76,9 +76,9 @@ internal sealed partial class Inbox
         _pump.Signal();
     }
 
-    private DateTimeOffset GetAdmissionFloor()
+    private DateTimeOffset GetAdmissionFloor(DateTimeOffset now)
     {
-        var nowTicks = Shared.JobTimeProvider.GetUtcNow().UtcTicks;
+        var nowTicks = now.UtcTicks;
         var candidate = new DateTimeOffset(Math.Max(0, nowTicks - Options.DeduplicationWindow.Ticks), TimeSpan.Zero);
         return candidate > _admissionFloor ? candidate : _admissionFloor;
     }
@@ -159,7 +159,7 @@ internal sealed partial class Inbox
     {
         // The floor and compacted history commit atomically. Keep the in-memory records until acknowledgement, so
         // an interleaving delivery still deduplicates while the snapshot's admission floor is not yet durable.
-        var floor = GetAdmissionFloor();
+        var floor = GetAdmissionFloor(Shared.JobTimeProvider.GetUtcNow());
         Shared.InboxCodec.WriteSet(new()
         {
             Kind = InboxCommandKind.Snapshot,
