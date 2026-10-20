@@ -35,6 +35,12 @@ internal abstract class JournaledStateContext
         return context is not null;
     }
 
+    /// <summary>
+    /// Gets whether the context records the outcomes of the accesses which it runs, so a read through it which observed an
+    /// open transaction's uncommitted change would outlive the transaction's abort.
+    /// </summary>
+    internal virtual bool RecordsAccesses => false;
+
     /// <summary>Runs <see cref="Access"/> on this context, for a context which wraps another.</summary>
     internal TResult AccessThrough<TArgument, TState, TResult>(
         in JournaledStateAccess access,
