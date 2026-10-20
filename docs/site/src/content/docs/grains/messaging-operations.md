@@ -182,11 +182,12 @@ To replay an outbox dead letter:
 
 1. Repair the receiver availability, handler registration, or payload compatibility
    issue, and query participant business state by the original command ID.
-2. Reconcile the original outcome. A replay of the original logical send preserves
-   its ID, destination, subject, payload, and `SentAt`. Authorize a new revision ID
-   only when the business protocol permits another effect. Record its relationship
-   to the original send. A fresh send time extends a tracked record, and can
-   create a new admission opportunity after that identity's retention ends.
+2. Reconcile the original outcome, then authorize a new submission only when the
+   business protocol permits it. <xref:Orleans.Messaging.IOutbox.Send*> stamps a new staging time after
+   the original entry has retired. A tracked original ID answers with its known
+   outcome and extends retention; an admitted new send time can create another
+   effect after that identity's retention ends. Use a revision ID when authorizing
+   a corrected or repeated effect, and record its relationship to the original.
 3. Record the replay disposition and remove the record with
    <xref:Orleans.Messaging.IMessagingDiagnostics.RemoveOutboxDeadLetter*>. The
    disposition, removal, and replayed message persist in the next journal write.
