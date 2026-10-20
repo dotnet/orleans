@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using Orleans.DurableTasks;
@@ -104,6 +105,11 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     // doesn't support, or a divergence from the execution's record.
     private Exception? _stallException;
 
+    // In replay mode: the replay host's observer, and every operation which earlier attempts recorded, which the attempt
+    // keeps for the whole run so it tells recorded operations from new ones. Both are null in live execution.
+    private readonly IDurableTaskReplayObserver? _replayObserver;
+    private readonly HashSet<TaskId>? _replayRecorded;
+
     private Guid? _incarnation;
 
     public GrainDurableTaskContext(
@@ -121,7 +127,16 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         _unreached = runtime.GetRecordedOperations(taskId);
         _replaying = _unreached is not null;
         _cancellationPoint = runtime.GetCancellationPoint(taskId);
+        if (runtime.ReplayObserver is { } replayObserver)
+        {
+            _replayObserver = replayObserver;
+            _replayRecorded = _unreached is { } recorded ? [.. recorded] : [];
+            replayObserver.OnAttemptStarted(runtime.GrainId, taskId, _replayRecorded);
+        }
     }
+
+    /// <summary>Gets the exception which describes why the attempt ended, or <see langword="null"/> while it runs.</summary>
+    internal DurableTaskAttemptCanceledException? AttemptCancellation => IsAttemptEnded ? CreateAttemptEndedException() : null;
 
     /// <inheritdoc/>
     /// <remarks>The incarnation of the invoked task whose execution tree contains this execution, read once.</remarks>
@@ -348,6 +363,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             _parkedWaits++;
             (_awaited ??= []).UnionWith(awaited);
+            _replayObserver?.OnWaitStarted(_runtime.GrainId, Id, awaited);
             _ = wait.ContinueWith(
                 static (_, state) =>
                 {
@@ -360,6 +376,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
                 _scheduler);
             EndSegment();
             await gate.Task;
+            _replayObserver?.OnWaitEnded(_runtime.GrainId, Id, awaited);
             if (--_parkedWaits > 0)
             {
                 EndSegment();
@@ -409,10 +426,20 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// Whether the operation records itself under a new identifier, as scheduling does, rather than only looking up an
     /// existing one, as a handle lookup or a completion selection which the host derives from a durable order does.
     /// </param>
-    private void ObserveOperation(TaskId operationId, bool recordsOperation)
+    /// <param name="kind">Describes the kind of operation, for the replay host.</param>
+    /// <param name="subject">The operation's definition, such as a grain call, which the replay host describes.</param>
+    /// <exception cref="DurableTaskAttemptCanceledException">
+    /// In replay mode, the attempt starts an operation which no earlier attempt recorded, so the runtime stopped it.
+    /// </exception>
+    private void ObserveOperation(TaskId operationId, bool recordsOperation, string kind = "an operation", object? subject = null)
     {
         AssertOnScheduler();
         ReachCancellationPoint();
+        if (_replayObserver is { } replayObserver)
+        {
+            ObserveReplayedOperation(replayObserver, operationId, recordsOperation, kind, subject);
+        }
+
         if (_unreached is not { } unreached)
         {
             return;
@@ -447,6 +474,52 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         _runtime.OnReplayEnded(Id);
         DeliverPendingCancellation();
     }
+
+    /// <summary>
+    /// Reports a recorded operation which this attempt reached in replay mode, or stops the attempt before it starts an
+    /// operation which no earlier attempt recorded, which is the end of its recorded history.
+    /// </summary>
+    private void ObserveReplayedOperation(
+        IDurableTaskReplayObserver replayObserver,
+        TaskId operationId,
+        bool recordsOperation,
+        string kind,
+        object? subject)
+    {
+        Debug.Assert(_replayRecorded is not null, "Replay mode keeps the recorded operations.");
+        if (_replayRecorded.Contains(operationId))
+        {
+            replayObserver.OnOperationReached(_runtime.GrainId, Id, operationId);
+            return;
+        }
+
+        if (recordsOperation)
+        {
+            StopAtNewOperation(replayObserver, operationId, DescribeNewOperation(kind, subject));
+        }
+    }
+
+    /// <summary>
+    /// Stops this attempt in replay mode before it starts <paramref name="operationId"/>, which no earlier attempt recorded,
+    /// and which is therefore the end of its recorded history.
+    /// </summary>
+    /// <exception cref="DurableTaskAttemptCanceledException">Always: the runtime stopped the attempt.</exception>
+    [DoesNotReturn]
+    private void StopAtNewOperation(IDurableTaskReplayObserver replayObserver, TaskId operationId, string description)
+    {
+        replayObserver.OnNewOperation(_runtime.GrainId, Id, operationId, description);
+        _runtime.StopReplayAttempt(this);
+        throw CreateAttemptEndedException();
+    }
+
+    private static string DescribeNewOperation(string kind, object? subject) => subject switch
+    {
+        IDurableTaskRequest { Context.TargetId: var target } request =>
+            $"{kind}: a call to {request.GetInterfaceName()}.{request.GetMethodName()} on grain '{target}'",
+        IDurableTaskSubscription subscription =>
+            $"{kind}: a subscription to task '{subscription.Id}' on grain '{subscription.Target}'",
+        _ => kind,
+    };
 
     /// <summary>
     /// Gets this execution's logical time: when the task first ran, advanced to the recorded completion time of each
@@ -633,7 +706,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         bool waitForAcceptance,
         CancellationToken cancellationToken)
     {
-        ObserveOperation(taskId, recordsOperation: true);
+        ObserveOperation(taskId, recordsOperation: true, "a child task", task);
         try
         {
             ValidateChild(taskId, task);
@@ -686,7 +759,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
                 return CreateExecutionHandle(_runtime.PostDetached(recordId, taskId, request, shielded));
             }
 
-            ObserveOperation(taskId, recordsOperation: true);
+            ObserveOperation(taskId, recordsOperation: true, "a posted child task", task);
             ValidateChild(taskId, task);
             return CreateExecutionHandle(_runtime.PostChild(taskId, task, shielded));
         }
@@ -706,7 +779,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
 
         var recordId = Id.Child(CreateMarkerSegment("detach", [requestContext.TargetId.ToString(), rootId.ToString()]));
-        ObserveOperation(recordId, recordsOperation: true);
+        ObserveOperation(recordId, recordsOperation: true, "a detached task's start", request);
         return (recordId, request);
     }
 
@@ -756,8 +829,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         if (taskId != Id)
         {
-            ObserveOperation(taskId, recordsOperation: true);
+            ObserveOperation(taskId, recordsOperation: true, "a delay");
             ThrowIfNotChildTaskId(taskId);
+        }
+        else if (_replayObserver is { } replayObserver && !_runtime.HasRecordedDelay(taskId))
+        {
+            // A delay execution schedules itself, so its record is its own state rather than a child's.
+            StopAtNewOperation(replayObserver, taskId, "a delay");
         }
 
         ThrowIfAttemptCanceled();
@@ -771,7 +849,8 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// journal write as the journaled state that code changed, whichever operation requests that write. A body which
     /// completes on another scheduler has its response handled by the attempt, and a canceled attempt's response is
     /// discarded. A body which ended before the cancellation point at which an earlier attempt observed its task's
-    /// cancellation diverged, so its attempt stalls and stages nothing.
+    /// cancellation diverged, so its attempt stalls and stages nothing. In replay mode, the attempt reports the response
+    /// without staging it.
     /// </remarks>
     protected internal override void OnBodyCompleted(DurableTaskResponse response)
     {
@@ -781,7 +860,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
 
         VerifyCancellationPointReached();
-        if (IsAttemptEnded)
+        if (IsAttemptEnded || _replayObserver is not null)
         {
             return;
         }
@@ -814,7 +893,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
         ThrowIfNotChildTaskId(effectId);
         ThrowIfAttemptCanceled();
-        ObserveOperation(effectId, recordsOperation: true);
+        ObserveOperation(effectId, recordsOperation: true, "a DurableTask.RunInline effect");
         try
         {
             return _runtime.RunEffect(effectId, state, effect);
@@ -957,7 +1036,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         _signalSends.TryGetValue(signal, out var occurrence);
         _signalSends[signal] = ++occurrence;
         var markerId = Id.Child(occurrence == 1 ? signal : $"{signal}${occurrence.ToString(CultureInfo.InvariantCulture)}");
-        ObserveOperation(markerId, recordsOperation: true);
+        ObserveOperation(markerId, recordsOperation: true, "a signal's send");
         ThrowIfAttemptCanceled();
         using var operationCts = CreateOperationCancellationSource(cancellationToken);
         return await CompleteOperationAsync(_runtime.SendSignalAsync(markerId, target, taskId, name, value, throwOnRejection, operationCts.Token));

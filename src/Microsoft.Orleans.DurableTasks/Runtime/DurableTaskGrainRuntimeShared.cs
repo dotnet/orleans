@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -16,7 +18,8 @@ internal sealed class DurableTaskGrainRuntimeShared(
     ILogger<DurableTaskGrainRuntime> logger,
     IOptions<DurableTaskOptions> options,
     IOptions<DurableMessagingOptions> messagingOptions,
-    Serializer serializer)
+    Serializer serializer,
+    IEnumerable<IDurableTaskReplayObserver>? replayObservers = null)
 {
     public IGrainContextAccessor GrainContextAccessor { get; } = grainContextAccessor;
     /// <summary>
@@ -51,4 +54,10 @@ internal sealed class DurableTaskGrainRuntimeShared(
     public TimeSpan EarlyRecordRetention { get; } = 2 * messagingOptions.Value.DeduplicationWindow;
 
     public Serializer Serializer { get; } = serializer;
+
+    /// <summary>
+    /// Gets the observer which puts the silo's runtimes into replay mode, or <see langword="null"/> for live execution.
+    /// </summary>
+    /// <remarks>Only the replay host of <c>Microsoft.Orleans.DurableTasks.Testing</c> registers one.</remarks>
+    public IDurableTaskReplayObserver? ReplayObserver { get; } = replayObservers?.SingleOrDefault();
 }
