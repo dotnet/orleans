@@ -973,6 +973,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     Task<T> IDurableTaskGrainRuntime.RunTransactionAsync<T>(
         TaskId effectId,
         Func<CancellationToken, Task<T>> body,
+        Func<bool> stagesRecord,
         Action<Exception> onAbort,
         CancellationToken cancellationToken)
     {
@@ -980,7 +981,13 @@ internal sealed partial class DurableTaskGrainRuntime(
         var manager = _stateManager as JournaledStateManager ?? throw new NotSupportedException("Durable transactions require the journaled state manager which Orleans.Journaling registers.");
         return manager.RunTransactionAsync(
             body,
-            onCommit: result => AddRecord(effectId, DurableTaskRecordKind.Effect, EffectFingerprint, DurableTaskResponse.FromResult(result)),
+            onCommit: result =>
+            {
+                if (stagesRecord())
+                {
+                    AddRecord(effectId, DurableTaskRecordKind.Effect, EffectFingerprint, DurableTaskResponse.FromResult(result));
+                }
+            },
             onAbort,
             cancellationToken);
     }

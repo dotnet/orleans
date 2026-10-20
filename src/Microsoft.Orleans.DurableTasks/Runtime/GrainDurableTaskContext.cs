@@ -888,29 +888,66 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     }
 
     /// <summary>
+    /// Gets whether a durable transaction which commits now stages its record: while the attempt records, including after a
+    /// recorded request to cancel the task, its record commits with its changes. Once the attempt's log is closed, because
+    /// the runtime aborted or deleted the task or its body completed, the task never replays and its later changes apply
+    /// live, so the transaction commits without a record.
+    /// </summary>
+    /// <exception cref="DurableTaskAttemptCanceledException">
+    /// The runtime discarded the attempt, which never resumes and whose writes throw, so the transaction aborts.
+    /// </exception>
+    private bool StagesTransactionRecord()
+    {
+        if (IsDiscarded)
+        {
+            throw CreateAttemptEndedException();
+        }
+
+        return AccessLog?.IsOpen ?? !IsAttemptEnded;
+    }
+
+    /// <summary>
     /// Returns the outcome which an earlier run recorded for the transaction named <paramref name="name"/>, or runs
     /// <paramref name="body"/> as a transaction over the grain's journaled state whose commit records the result together
     /// with the transaction's changes.
     /// </summary>
     /// <remarks>
     /// The transaction is an effect: it shares <c>RunInline</c>'s identifiers, and a replay returns the recorded result, or
-    /// throws the recorded exception, without running the body. The body's accesses aren't recorded, so it never replays
-    /// partially. The result's record commits with the transaction's changes, and the call returns once a journal write
-    /// holds both. A transaction which aborts cleanly, because its body or a nested transaction failed or its result doesn't
-    /// serialize, leaves no trace, and its failure is recorded. A failed journal records nothing: the next activation runs
-    /// the body again.
+    /// throws the recorded exception, without running the body. The body runs as a covered region: its accesses aren't
+    /// recorded and its durable operations throw, so it never replays partially. The result's record commits with the
+    /// transaction's changes, and the call returns once a journal write holds both. A transaction which aborts cleanly,
+    /// because its body, a durable operation in it or a nested transaction failed, or its result doesn't serialize, leaves no
+    /// trace, and its failure is recorded. A transaction whose attempt the runtime discarded meanwhile aborts and records
+    /// nothing, and a failed journal records nothing: the next attempt runs the body again. Once the task can't replay,
+    /// as in the cleanup of a task which the runtime aborted or deleted, a transaction commits its changes durably, without a
+    /// record, as the attempt's other writes then apply.
     /// </remarks>
-    /// <exception cref="InvalidOperationException">The caller isn't running on the activation's scheduler.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The caller isn't running on the activation's scheduler, or runs within a covered region, such as another
+    /// transaction's body or a <c>RunInline</c> effect.
+    /// </exception>
     internal async Task<T> RunTransactionAsync<T>(string name, Func<CancellationToken, Task<T>> body, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
+        ThrowIfInCoveredRegion();
         if (TaskScheduler.Current != _scheduler)
         {
             throw new InvalidOperationException(
                 $"A durable transaction runs on the scheduler of the grain activation which runs durable task '{Id}', so its record commits with its changes. Code which continues elsewhere, for example after ConfigureAwait(false), can't run one.");
         }
 
-        ThrowIfAttemptCanceled();
+        if (!StagesTransactionRecord())
+        {
+            // The task never replays, so the transaction applies live, as the attempt's other writes then do, and has no
+            // record to take an identifier for.
+            return await _runtime.RunTransactionAsync(
+                effectId: default,
+                cancellationToken => RunCoveredAsync(() => body(cancellationToken)),
+                static () => false,
+                static _ => { },
+                cancellationToken);
+        }
+
         var effectId = CreateChildTaskId(name);
         ObserveOperation(effectId, recordsOperation: true);
         Task<T> transaction;
@@ -928,19 +965,28 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
                 throw Diverge(divergence);
             }
 
-            transaction = _runtime.RunTransactionAsync(effectId, body, exception =>
-            {
-                if (exception is DurableTaskAttemptCanceledException || IsAttemptCanceled)
+            // The body runs as a covered region: the transaction's record covers it, so its durable operations throw rather
+            // than take identifiers which a replay, which skips the body, wouldn't take. The commit decides by the attempt's
+            // state then, since the runtime can cancel the attempt while the body runs.
+            transaction = _runtime.RunTransactionAsync(
+                effectId,
+                cancellationToken => RunCoveredAsync(() => body(cancellationToken)),
+                StagesTransactionRecord,
+                exception =>
                 {
-                    return;
-                }
+                    // A discarded attempt records nothing, and a closed log has no record to stage.
+                    if (exception is DurableTaskAttemptCanceledException || IsAttemptEnded || AccessLog is { IsOpen: false })
+                    {
+                        return;
+                    }
 
-                // The failure is the transaction's outcome, which a replay throws again.
-                using (EnterCoveredRegion())
-                {
-                    _runtime.RecordEffect(effectId, DurableTaskResponse.FromException(exception));
-                }
-            }, cancellationToken);
+                    // The failure is the transaction's outcome, which a replay throws again.
+                    using (EnterCoveredRegion())
+                    {
+                        _runtime.RecordEffect(effectId, DurableTaskResponse.FromException(exception));
+                    }
+                },
+                cancellationToken);
         }
 
         return await transaction;

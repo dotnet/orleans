@@ -296,11 +296,20 @@ internal interface IDurableTaskGrainRuntime
     /// </summary>
     /// <param name="effectId">The transaction's effect identifier.</param>
     /// <param name="body">The transaction's code.</param>
+    /// <param name="stagesRecord">
+    /// Runs in the transaction's commit and returns whether the commit stages the transaction's record with its changes; an
+    /// exception which it throws aborts the transaction.
+    /// </param>
     /// <param name="onAbort">
     /// Runs once the transaction has aborted cleanly, with the exception which the task throws, outside the transaction.
     /// </param>
     /// <param name="cancellationToken">The token passed to <paramref name="body"/>.</param>
-    Task<T> RunTransactionAsync<T>(TaskId effectId, Func<CancellationToken, Task<T>> body, Action<Exception> onAbort, CancellationToken cancellationToken) =>
+    Task<T> RunTransactionAsync<T>(
+        TaskId effectId,
+        Func<CancellationToken, Task<T>> body,
+        Func<bool> stagesRecord,
+        Action<Exception> onAbort,
+        CancellationToken cancellationToken) =>
         throw new NotSupportedException("The durable task runtime does not support transactions.");
 
     /// <summary>Stages a record of an effect's outcome under <paramref name="effectId"/>, without writing.</summary>
