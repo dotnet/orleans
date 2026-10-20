@@ -24,6 +24,7 @@ public sealed class DeliveryFaultInjector
     private readonly CountSignal _receiverCalls = new();
     private readonly CountSignal _answerCount = new();
     private readonly List<DeliveryStatus> _answers = [];
+    private readonly List<Exception> _receiverFailures = [];
     private readonly List<DateTimeOffset> _sentTimes = [];
     private Func<DeliveryFault>? _repeat;
 
@@ -48,6 +49,15 @@ public sealed class DeliveryFaultInjector
         get
         {
             lock (_sentTimes) return [.. _sentTimes];
+        }
+    }
+
+    /// <summary>Gets failures thrown by actual receiver calls, not failures fabricated by the scripted transport.</summary>
+    public IReadOnlyList<Exception> ReceiverFailures
+    {
+        get
+        {
+            lock (_receiverFailures) return [.. _receiverFailures];
         }
     }
 
@@ -147,6 +157,7 @@ public sealed class DeliveryFaultInjector
         }
         catch (Exception exception)
         {
+            lock (_receiverFailures) _receiverFailures.Add(exception);
             fault?.OnAnswered(exception);
             throw;
         }
