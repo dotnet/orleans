@@ -65,7 +65,7 @@ public partial class StateManagerTests : JournalingTestBase
     public async Task StagedChangeCount_AdvancesWhenStatesStageChangesAndNotWhenWritesCaptureThem()
     {
         var sut = CreateTestSystem();
-        var manager = sut.Manager;
+        var manager = Assert.IsType<JournaledStateManager>(sut.Manager);
         var codec = CodecProvider.GetCodec<int>();
         var dictionary = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(CodecProvider.GetCodec<string>(), codec, SessionPool));
         var value = new DurableValue<int>("value1", manager, new OrleansBinaryDurableValueCommandCodec<int>(codec, SessionPool));

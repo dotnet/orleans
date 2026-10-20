@@ -80,6 +80,11 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     public IJournaledStateManager StateManager { get; }
 
+    /// <summary>
+    /// Gets the state manager's count of staged changes, or a negative value when a replacement manager doesn't track them.
+    /// </summary>
+    public long StagedChangeCount => StateManager is JournaledStateManager manager ? manager.StagedChangeCount : -1;
+
     public MessagingShared Shared { get; }
 
     /// <summary>Gets the token which is canceled when messaging stops for this activation.</summary>

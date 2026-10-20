@@ -101,9 +101,22 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
             MessagingEvents.EmitInboxMessageReceiving(GrainContext, message);
 
+            // The processed record recognizes redeliveries only for DeduplicationWindow, so a message whose sender may
+            // deliver it again later is rejected before anything records it. The answer doesn't depend on inbox state, so
+            // every redelivery receives it too.
+            if (message.RedeliveryDeadline is { } deadline
+                && deadline > MessagingTime.AddClamped(Shared.JobTimeProvider.GetUtcNow(), Options.DeduplicationWindow))
+            {
+                Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "dead_lettered");
+                LogDeduplicationWindowExceeded(Logger, key, GrainContext.GrainId, deadline, Options.DeduplicationWindow);
+                return DeliveryResult.DeadLettered(
+                    $"The message's redelivery deadline {deadline:O} is later than the receiver's deduplication window of {Options.DeduplicationWindow} covers.",
+                    DeliveryResult.DeduplicationWindowExceededCode);
+            }
+
             // Sink-owned messages never occupy inbox capacity and need no handler. A sink's duplicate can still be staged,
             // so every outcome except backpressure is reported once the write is durable.
-            var stagedBefore = _pump.StateManager.StagedChangeCount;
+            var stagedBefore = _pump.StagedChangeCount;
             if (StageSinkAcceptance(message) is { } sinkResult)
             {
                 ExcludeFromHandlerAttempt(stagedBefore);
@@ -145,13 +158,13 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     /// </summary>
     private void ExcludeFromHandlerAttempt(long stagedBefore)
     {
-        if (_execution is { } execution) execution.StagedChanges += _pump.StateManager.StagedChangeCount - stagedBefore;
+        if (_execution is { } execution) execution.StagedChanges += _pump.StagedChangeCount - stagedBefore;
     }
 
     // Whether a state staged a change during the attempt which isn't a delivery's; a manager which doesn't track staged
     // changes may have.
     private bool StagedDuring(HandlerExecution execution) =>
-        _pump.StateManager.StagedChangeCount is var count && (count < 0 || count != execution.StagedChanges);
+        _pump.StagedChangeCount is var count && (count < 0 || count != execution.StagedChanges);
 
     /// <summary>
     /// Stages acceptance of a message which this grain sends to itself, for the caller's next journal write.
@@ -343,7 +356,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         }
 
         var start = Stopwatch.GetTimestamp();
-        var execution = new HandlerExecution(this, entry) { Active = true, StagedChanges = _pump.StateManager.StagedChangeCount };
+        var execution = new HandlerExecution(this, entry) { Active = true, StagedChanges = _pump.StagedChangeCount };
         _execution = execution;
         Exception? error = null;
         try
@@ -679,6 +692,9 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Inbox command staging failed.")]
     private static partial void LogStagingFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Inbox for {ReceiverId} rejected message {MessageId}: its redelivery deadline {RedeliveryDeadline} is later than the deduplication window {DeduplicationWindow} covers. Configure OutboxRetryTimeout shorter than DeduplicationWindow.")]
+    private static partial void LogDeduplicationWindowExceeded(ILogger logger, MessageId messageId, GrainId receiverId, DateTimeOffset redeliveryDeadline, TimeSpan deduplicationWindow);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "No inbox handler registered for message {MessageId} to {ReceiverId}")]
     private static partial void LogHandlerNotFound(ILogger logger, MessageId messageId, GrainId receiverId);

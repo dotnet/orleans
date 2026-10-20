@@ -189,7 +189,10 @@ stays in the receiver's journal until it is due. Each receiver returns a
   messages its grain sends to itself regardless of `MaxCapacity`.
 - `HandlerNotFound`: the receiver has no registered handlers.
 - `DeadLettered`: the receiver rejected the message permanently and moved it to its
-  dead letters, with a reason and an optional `Code`.
+  dead letters, with a reason and an optional `Code`. A receiver also answers
+  `DeadLettered` with `DeliveryResult.DeduplicationWindowExceededCode`, staging
+  nothing, when a message's `RedeliveryDeadline` is later than its
+  `DeduplicationWindow` covers.
 
 `Accepted`, `Duplicate`, and `DeadLettered` are terminal: the outbox removes the
 message. Any other outcome schedules a durable retry with exponential backoff, and

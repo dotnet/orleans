@@ -49,6 +49,7 @@ namespace Orleans.Messaging
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
+        public const string DeduplicationWindowExceededCode = "DeduplicationWindowExceeded";
         [Id(2)]
         public string? Code { get { throw null; } init { } }
 
@@ -245,8 +246,12 @@ namespace Orleans.Messaging
     [Alias("Orleans.Messaging.InboxMessage")]
     public readonly partial struct InboxMessage
     {
+        private readonly int _dummyPrimitive;
         [Id(0)]
         public required Envelope Envelope { get { throw null; } init { } }
+
+        [Id(1)]
+        public System.DateTimeOffset? RedeliveryDeadline { get { throw null; } init { } }
     }
 
     public partial interface IOutbox

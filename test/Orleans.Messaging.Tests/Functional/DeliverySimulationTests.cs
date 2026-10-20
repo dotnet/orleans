@@ -1,4 +1,4 @@
-﻿using CsCheck;
+using CsCheck;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Messaging.Tests.Support;
 using Xunit;
@@ -8,7 +8,7 @@ namespace Orleans.Messaging.Tests.Functional;
 /// <summary>
 /// Runs generated schedules of sends, delivery faults, crashes, and time against one sender and one receiver, and checks
 /// the end-to-end delivery contract: no fault ever applies a message's effect twice, and once faults stop, every message
-/// is processed exactly once in effect or, if its retries outlived <c>OutboxRetryTimeout</c>, dead-lettered at the sender.
+/// is processed exactly once in effect or, if its retries outlived <c>OutboxRetryTimeout</c> or a receiver whose window\n/// doesn't cover them rejected it, dead-lettered at the sender. A rejected message is never processed.
 /// </summary>
 [Collection(MessagingClusterCollection.Name)]
 [TestSuite("BVT")]
@@ -22,7 +22,7 @@ public sealed class DeliverySimulationTests : MessagingBehaviorTestBase
 
     private static readonly Gen<Step> GenStep = Gen.Frequency(
         (4, Gen.Const(new Step(StepKind.Send))),
-        (3, Gen.OneOfConst(DeliveryFaultKind.Throw, DeliveryFaultKind.TimeOut, DeliveryFaultKind.LoseResponse, DeliveryFaultKind.TimeOutInFlight)
+        (3, Gen.OneOfConst(DeliveryFaultKind.Throw, DeliveryFaultKind.TimeOut, DeliveryFaultKind.LoseResponse, DeliveryFaultKind.TimeOutInFlight, DeliveryFaultKind.ExtendDeadline)
             .Select(static fault => new Step(StepKind.Fault, fault))),
         (1, Gen.Const(new Step(StepKind.CrashSender))),
         (1, Gen.Const(new Step(StepKind.CrashReceiver))),
@@ -84,12 +84,18 @@ public sealed class DeliverySimulationTests : MessagingBehaviorTestBase
         var final = await sender.GetSnapshotAsync();
         Assert.Equal(0, final.OutboxCount);
         var deadLettered = final.OutboxDeadLetters.Select(static letter => letter.MessageId).ToHashSet();
+        var rejected = final.OutboxDeadLetters
+            .Where(static letter => letter.Reason.Contains("deduplication window", StringComparison.Ordinal))
+            .Select(static letter => letter.MessageId)
+            .ToHashSet();
         var received = await Fixture.WaitForInboxCountAsync(receiver, 0);
         Assert.Empty(received.InboxDeadLetters);
         foreach (var (id, message) in sent)
         {
             var count = received.Effects.Where(effect => effect.LogicalId == message.LogicalId).Sum(static effect => effect.Count);
-            if (deadLettered.Contains(id)) Assert.InRange(count, 0, 1);
+            // The receiver rejects only a message it hasn't recorded, and records nothing for it.
+            if (rejected.Contains(id)) Assert.Equal(0, count);
+            else if (deadLettered.Contains(id)) Assert.InRange(count, 0, 1);
             else Assert.Equal(1, count);
         }
     }
@@ -99,6 +105,8 @@ public sealed class DeliverySimulationTests : MessagingBehaviorTestBase
         DeliveryFaultKind.Throw => DeliveryFault.Throw(),
         DeliveryFaultKind.TimeOut => DeliveryFault.TimeOut(),
         DeliveryFaultKind.LoseResponse => DeliveryFault.LoseResponse(),
+        // A sender whose retry horizon is longer than the receiver's one-day window.
+        DeliveryFaultKind.ExtendDeadline => DeliveryFault.ExtendRedeliveryDeadline(TimeSpan.FromDays(2)),
         _ => DeliveryFault.TimeOutInFlight()
     };
 

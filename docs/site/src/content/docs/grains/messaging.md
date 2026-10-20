@@ -453,11 +453,17 @@ when the message is sent, with its expiration journaled together with the send, 
 restarts at the start of each attempt which the receiver answers with `Backpressured`.
 No attempt starts after the timeout elapses; the outbox then moves the message to its
 dead letters with a reason stating that the retry timeout elapsed. A receiver checks its
-deduplication records before answering, so every redelivery stays within the
-receiver's `DeduplicationWindow` of any acceptance, including when a sender fails to
-record a delivery and recovers late. Configure `OutboxRetryTimeout` shorter than
-`DeduplicationWindow`, uniformly across the cluster, with margin for the longest grain
-call and clock skew. The Durable Jobs clock governs retry times and timeouts.
+deduplication records before answering, and each attempt carries its
+<xref:Orleans.Messaging.InboxMessage.RedeliveryDeadline>: the time its retries end
+plus the grain call response timeout. A receiver accepts a new message only when its
+`DeduplicationWindow` covers that deadline, so every redelivery reaches it while it
+still recognizes the message, including when a sender fails to record a delivery and
+recovers late. Otherwise the receiver records nothing and answers `DeadLettered` with
+<xref:Orleans.Messaging.DeliveryResult.DeduplicationWindowExceededCode>, and the
+outbox keeps the message as a dead letter and retires it as `Rejected`. Configure
+`OutboxRetryTimeout` shorter than `DeduplicationWindow`, uniformly across the cluster,
+with margin for the response timeout; the check assumes clock skew between silos is
+much smaller than the window. The Durable Jobs clock governs retry times and timeouts.
 
 Inspect dead letters through <xref:Orleans.Messaging.IMessagingDiagnostics> and remove
 handled records with <xref:Orleans.Messaging.IMessagingDiagnostics.RemoveInboxDeadLetter*>

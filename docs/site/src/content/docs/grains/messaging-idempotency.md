@@ -59,9 +59,11 @@ loss, so its preparation must tolerate repetition.
 After the record expires, the same key can be admitted and handled again. Retain
 completion facts for the complete supported resubmission horizon, including outage
 recovery and operator replay delays. The outbox starts no delivery attempt later than
-`OutboxRetryTimeout` after the send or the last `Backpressured` answer, and
-configuration requires `OutboxRetryTimeout < DeduplicationWindow`, so outbox
-redeliveries stay within the window. Producer fleets configure both values uniformly.
+`OutboxRetryTimeout` after the send or the last `Backpressured` answer, and each
+attempt tells the receiver when its redeliveries end. A receiver whose window
+doesn't cover that time rejects the message with `DeduplicationWindowExceeded`
+before recording it, so outbox redeliveries stay within the window. Producer fleets
+configure both values uniformly.
 Permanent idempotency requires permanent or appropriately retained completion facts
 and an explicit storage budget. Application result-query retention serves the
 business's query and audit needs.

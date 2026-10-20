@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Xunit;
@@ -25,7 +25,8 @@ public sealed class WireFormatTests : IDisposable
         { "HierarchicalKey", "2040276F72646572732F345C2F322F72657365727665E0" },
         { "Envelope.Minimal", "202040276F72646572732F345C2F322F72657365727665E04101C101C101C101E0" },
         { "Envelope.Full", "202040276F72646572732F345C2F322F72657365727665E041070102034129696E76656E746F72792E726573657276652E7631210103410B747261636540050908E02180005444B1DC2DDF088100D088C310000000E0E0" },
-        { "InboxMessage", "20202040276F72646572732F345C2F322F72657365727665E041070102034129696E76656E746F72792E726573657276652E7631210103410B747261636540050908E02180005444B1DC2DDF088100D088C310000000E0E0E0" },
+        { "InboxMessage", "20202040276F72646572732F345C2F322F72657365727665E041070102034129696E76656E746F72792E726573657276652E7631210103410B747261636540050908E02180005444B1DC2DDF088100D088C310000000E0E0C101E0" },
+        { "InboxMessage.RedeliveryDeadline", "20202040276F72646572732F345C2F322F72657365727665E041070102034129696E76656E746F72792E726573657276652E7631210103410B747261636540050908E02180005444B1DC2DDF088100D088C310000000E0E021800014AEDBA52EDF088100D088C310000000E0E0" },
         { "OutboxMessage", "20202040276F72646572732F345C2F322F72657365727665E041070102034129696E76656E746F72792E726573657276652E7631210103410B747261636540050908E02180005444B1DC2DDF088100D088C310000000E0E021202060697CAED241117265636569766572E0E021605D5ABF1541057231E0E0E0" },
         { "DeliveryResult.Accepted", "20080305C101C101E0" },
         { "DeliveryResult.Duplicate", "20080309C101C101E0" },
@@ -44,7 +45,10 @@ public sealed class WireFormatTests : IDisposable
             case "HierarchicalKey": Check(Id.Key, hex); break;
             case "Envelope.Minimal": Check(new Envelope { MessageId = Id, Payload = [] }, hex, AssertEnvelope); break;
             case "Envelope.Full": Check(FullEnvelope(), hex, AssertEnvelope); break;
-            case "InboxMessage": Check(new InboxMessage { Envelope = FullEnvelope() }, hex, (e, a) => AssertEnvelope(e.Envelope, a.Envelope)); break;
+            case "InboxMessage": Check(new InboxMessage { Envelope = FullEnvelope() }, hex, AssertInboxMessage); break;
+            case "InboxMessage.RedeliveryDeadline":
+                Check(new InboxMessage { Envelope = FullEnvelope(), RedeliveryDeadline = DeliverAt.AddDays(1) }, hex, AssertInboxMessage);
+                break;
             case "OutboxMessage":
                 Check(new OutboxMessage { Envelope = FullEnvelope(), ReceiverId = Receiver }, hex, (e, a) =>
                 {
@@ -80,6 +84,13 @@ public sealed class WireFormatTests : IDisposable
         var decoded = serializer.Deserialize(Convert.FromHexString(hex));
         if (assertEqual is null) Assert.Equal(value, decoded);
         else assertEqual(value, decoded!);
+    }
+
+    private static void AssertInboxMessage(InboxMessage expected, InboxMessage actual)
+    {
+        AssertEnvelope(expected.Envelope, actual.Envelope);
+        Assert.Equal(expected.RedeliveryDeadline, actual.RedeliveryDeadline);
+        Assert.Equal(expected.RedeliveryDeadline?.Offset, actual.RedeliveryDeadline?.Offset);
     }
 
     private static void AssertEnvelope(Envelope expected, Envelope actual)

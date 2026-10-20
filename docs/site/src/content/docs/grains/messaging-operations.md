@@ -50,9 +50,17 @@ behavior through `AddMessaging`, and is validated at startup.
 
 Configure `OutboxRetryTimeout` and `DeduplicationWindow` uniformly across the cluster,
 with `OutboxRetryTimeout` shorter than `DeduplicationWindow` by a margin which covers
-the longest grain call and clock skew. Every outbox redelivery then reaches the
-receiver within its deduplication window of any acceptance. Retry times and timeouts
-follow the Durable Jobs clock.
+the grain call response timeout. Each delivery attempt carries its redelivery
+deadline: the time its retries end plus the response timeout. A receiver first
+accepting a message checks that its window covers that deadline, and otherwise
+answers `DeadLettered` with
+<xref:Orleans.Messaging.DeliveryResult.DeduplicationWindowExceededCode> and records
+nothing. The sender keeps such a message in its outbox dead letters, and the receiver
+logs an error. A window too short for the cluster's retries
+therefore stops deliveries visibly instead of risking a second processing. The
+check compares the sender's and the receiver's Durable Jobs clocks, so it relies on
+clock skew between silos being much smaller than the window. Retry times and
+timeouts follow the Durable Jobs clock.
 
 Dead-letter retention applies when an activation starts and whenever a new dead
 letter is added. Expired completed IDs are removed from storage when the journal
@@ -90,7 +98,7 @@ cost alongside other pending messages. The inbox depth counter includes them.
 | `Duplicate` | The receiver has this message ID pending or completed within retention. The outbox removes the message; business results come from a reply or query. A repeat of a message which an inbox sink rejected receives the original `DeadLettered` result instead. |
 | `Backpressured` | The receiver is at capacity. The outbox retries. Examine receiver depth, oldest message age, and handler latency. |
 | `HandlerNotFound` | The receiver has no registered handlers. The outbox logs an error and retries. Check handler registration during activation and deployment skew. |
-| `DeadLettered` | The receiver rejected the message permanently, with a reason and an optional application-defined code. The outbox removes the message, and a source-provided message retires as `Rejected` with that reason and code. |
+| `DeadLettered` | The receiver rejected the message permanently, with a reason and an optional application-defined code. The outbox removes the message, and a source-provided message retires as `Rejected` with that reason and code. For `DeduplicationWindowExceeded`, the receiver recorded nothing and the outbox also keeps the message as a dead letter. |
 | Any other status | The sender can't interpret the status, for example one from a newer receiver, so the outcome is unknown. The outbox retries until `OutboxRetryTimeout`. |
 
 `Accepted`, `Duplicate`, and `DeadLettered` are the terminal statuses.
@@ -112,6 +120,7 @@ end-to-end business confirmation.
 | Handler error logged after `Complete()` | The staged completion and outgoing messages persist. Diagnose the error using committed state. |
 | Grain deactivates after a storage or staging failure | Messaging vetoes every later journal write of the activation, and the grain deactivates. The next activation recovers the committed journal and resumes pending work. |
 | Outbox dead letter whose reason states that the retry timeout elapsed | No delivery attempt succeeded within `OutboxRetryTimeout` of the send or of the last `Backpressured` answer. Check receiver availability and handler registration, then follow the replay procedure. |
+| Outbox dead letters with `DeduplicationWindowExceeded`, and receiver errors naming the deduplication window | The receiver's `DeduplicationWindow` doesn't cover the sender's `OutboxRetryTimeout` plus the response timeout. Lengthen the window or shorten the timeout uniformly, then resend under the original IDs. |
 | Caller cancellation | An accepted write or delivery continues through its actual outcome. Query durable business status or retry with the same command ID. |
 
 Handlers follow a two-phase pattern: all asynchronous and fallible preparation uses
@@ -155,16 +164,21 @@ The receiver records every inbox dead letter's message ID as processed, so the
 original ID answers `Duplicate` within `DeduplicationWindow`. An outbox dead letter
 received no terminal answer: the receiver either never accepted it or accepted it
 with the answer lost, so resending the original ID delivers it or answers
-`Duplicate`. Replay each kind accordingly.
+`Duplicate`. An outbox dead letter with `DeduplicationWindowExceeded` reached a
+receiver which recorded nothing. Replay each kind accordingly.
 
 To replay an outbox dead letter:
 
-1. Repair the receiver availability, handler registration, or payload compatibility
-   issue.
+1. Repair the receiver availability, handler registration, payload compatibility, or
+   window configuration issue.
 2. Resend the message through an authorized grain method with its original message
-   ID, destination, subject, and payload. Within the receiver's
-   `DeduplicationWindow` of the original send, the receiver deduplicates it, so the
-   effect applies once; after that window, reconcile receiver state first.
+   ID, destination, subject, and payload. Resending under the original ID is safe
+   while the receiver's `DeduplicationWindow` covers the original send, because the
+   receiver deduplicates any earlier acceptance, and for a
+   `DeduplicationWindowExceeded` dead letter, which the receiver never recorded.
+   Otherwise, reconcile receiver state first: the resend carries a new redelivery
+   deadline, so the receiver can no longer recognize an acceptance whose record
+   expired.
 3. Record the replay disposition and remove the record with
    <xref:Orleans.Messaging.IMessagingDiagnostics.RemoveOutboxDeadLetter*>. The
    disposition, removal, and replayed message persist in the next journal write.
