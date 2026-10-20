@@ -211,13 +211,17 @@ source or an inbox sink keeps that state as the only journaled copy:
     <xref:Orleans.Messaging.IOutboxMessageSource.OnRetired*> while it stages the
     removal, so the source's release, application terminal outcome, and follow-up
     work commit in the same journal write. The
-    <xref:Orleans.Messaging.OutboxMessageRetirement> struct carries a `Status`, a
-    `Reason`, and a `Code`. Its status is `Delivered` when the receiver accepted the
-    message or reported it as a duplicate, `Rejected` when an inbox sink at the
-    receiver rejected it durably, and `DeadLettered` when the outbox dead-lettered it after its retry
-    timeout, a source failure, or a receiver admission fence. `DeadLettered`
-    leaves earlier receiver acceptance unknown. `Reason` is the dead letter's or rejection's reason, and `Code` is the
-    application-defined code that the receiver's sink reported with a rejection. An outbox
+    <xref:Orleans.Messaging.OutboxMessageRetirement> is one of three cases:
+    `OutboxMessageRetirement.Delivered` when the receiver accepted the message or
+    reported it as a duplicate; `OutboxMessageRetirement.Rejected` when an inbox sink
+    at the receiver rejected it durably, with the sink's `Reason` and
+    application-defined `Code`; and `OutboxMessageRetirement.DeadLettered` when the
+    outbox dead-lettered it after its retry timeout, a source failure, or an `Expired`
+    answer, with its `Reason`. `DeadLettered` leaves earlier receiver acceptance
+    unknown. `OutboxMessageRetirement` and `DeliveryResult` are C# unions whose cases
+    are classes, so match them with type and property patterns, such as
+    `retirement is OutboxMessageRetirement.Rejected { Code: var code }`.
+    An outbox
     dead letter receives its own copy of the materialized message first, so the
     source can release its payload in `OnRetired`. Stage a self-addressed
     follow-up message there to run application recovery work through the inbox's
