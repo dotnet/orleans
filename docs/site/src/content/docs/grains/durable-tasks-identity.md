@@ -45,8 +45,8 @@ A root task has no parent on its grain. The party which starts it chooses its ro
 | --- | --- | --- |
 | A client or an ordinary grain method, with `WithId(name)` | `name`, verbatim | `publish-q3` |
 | A client or an ordinary grain method, without `WithId` | A new GUID, formatted with `"N"` | `3f2a9c01b7e44d6b9a0c5e8f1d2b3a47` |
-| A durable task, with `.Detached().WithId(name)` | `name`, verbatim | `archive-q3` |
-| A durable task, with `.Detached()` and no name | `{grainId}/{taskId}:{segment}`: the starting grain, the starting execution's ID, and the generated segment of the execution's next unnamed operation | `report/q3/publish-q3:$child-2`, which `ToString()` formats as `report\/q3\/publish-q3:$child-2` |
+| A durable task, with `.Detached(name)` | `name`, verbatim | `archive-q3` |
+| A durable task, with `.Detached()` and no name | One segment, `{grainId}/{taskId}/{segment}`: the starting grain, the starting execution's ID, and the generated segment of the execution's next unnamed operation, each with its `/` and `\` escaped | `report\/q3/publish-q3/$child-2` |
 
 The root ID `$caller` is reserved for the caller scopes described below. Outside a
 durable task, `.Detached()` changes nothing, because every task which a client starts is

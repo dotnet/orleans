@@ -255,20 +255,22 @@ public sealed class DurableTaskWorkerGrain(DurableTaskMessagingProbe probe, IMes
         return DurableTask.FromResult(value * 2);
     }
 
-    public DurableTask<int> WaitForCancellationAsync(int value) =>
-        DurableTask.Run(async cancellationToken =>
-        {
-            probe.RecordStarted(this.GetPrimaryKey());
-            try
-            {
-                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                probe.RecordCanceled(this.GetPrimaryKey());
-                throw;
-            }
+    private static readonly DurableSignal<int> Never = new("never");
 
-            return value;
-        });
+    // Parks on a signal which never arrives, so its grain admits other requests until the task's cancellation ends the wait.
+    public async DurableTask<int> WaitForCancellationAsync(int value)
+    {
+        probe.RecordStarted(this.GetPrimaryKey());
+        try
+        {
+            await Never.WaitAsync();
+        }
+        catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
+        {
+            probe.RecordCanceled(this.GetPrimaryKey());
+            throw;
+        }
+
+        return value;
+    }
 }

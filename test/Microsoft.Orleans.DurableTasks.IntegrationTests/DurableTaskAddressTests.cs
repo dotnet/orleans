@@ -132,8 +132,8 @@ public sealed class DurableTaskAddressGrain(
     public async DurableTask<TaskAddresses> StartDetachedAsync(Guid workerKey)
     {
         var worker = GrainFactory.GetGrain<IDurableTaskAddressGrain>(workerKey);
-        var signaledTask = await worker.WaitForReleaseAsync().Detached().WithId("signaled").ScheduleAsync();
-        var canceledTask = await worker.WaitForReleaseAsync().Detached().WithId("canceled").ScheduleAsync();
+        var signaledTask = await worker.WaitForReleaseAsync().Detached("signaled").ScheduleAsync();
+        var canceledTask = await worker.WaitForReleaseAsync().Detached("canceled").ScheduleAsync();
         Assert.True(signaledTask.TryGetAddress(out var signaledAddress));
         Assert.True(canceledTask.TryGetAddress(out var canceledAddress));
         return new(signaledAddress, canceledAddress);

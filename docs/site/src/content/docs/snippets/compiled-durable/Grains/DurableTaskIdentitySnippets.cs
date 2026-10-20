@@ -67,7 +67,7 @@ public sealed class ReportGrain(IDurableTaskManager tasks) : DurableGrain, IRepo
 
         // A named detached task: the root "archive-{reportId}" on the archive grain. The execution records the start as
         // publish-{reportId}/$detach:{archiveGrainId}:archive-{reportId}, which the handle's Id reports.
-        var archive = await Archive().ArchiveAsync(ReportId, (int)version).Detached().WithId($"archive-{ReportId}")
+        var archive = await Archive().ArchiveAsync(ReportId, (int)version).Detached($"archive-{ReportId}")
             .ScheduleAsync();
 
         // An unnamed detached task: its root ID derives from this grain, this task, and the next unnamed operation,

@@ -193,7 +193,7 @@ public sealed class FaultWorkflowGrain(
         var processed = await partner.ProcessAsync(step, this.GetPrimaryKey(), rootId).WithId("process");
         var ready = await Ready.WaitAsync();
         await DurableTask.Delay(DurableTaskFaultHarness.WorkflowDelay).WithId("pause");
-        var echoed = await partner.EchoAsync(processed).Detached().WithId($"{rootId}-echo");
+        var echoed = await partner.EchoAsync(processed).Detached($"{rootId}-echo");
         return $"step={step};effect={effect};processed={processed};ready={ready};echoed={echoed}";
     }
 
@@ -278,7 +278,7 @@ public sealed class FaultWorkflowGrain(
     {
         try
         {
-            return $"echoed {await Partner(partnerKey).EchoAsync(value).Detached().WithId(detachedRootId)}";
+            return $"echoed {await Partner(partnerKey).EchoAsync(value).Detached(detachedRootId)}";
         }
         catch (Exception exception)
         {
@@ -295,7 +295,7 @@ public sealed class FaultWorkflowGrain(
     {
         try
         {
-            return $"echoed {await GrainFactory.GetGrain<IFaultFencedGrain>(fencedKey).EchoAsync(value).Detached().WithId(detachedRootId)}";
+            return $"echoed {await GrainFactory.GetGrain<IFaultFencedGrain>(fencedKey).EchoAsync(value).Detached(detachedRootId)}";
         }
         catch (Exception exception)
         {

@@ -320,8 +320,7 @@ public sealed class FollowUpGrain : DurableGrain, IFollowUpGrain
             // Messaging retries delivery of the start until the target accepts it, so the workflow doesn't retry it.
             var survey = await GrainFactory.GetGrain<IExpenseGrain>(orderId)
                 .SubmitAsync(new ExpenseClaim("survey", 0))
-                .Detached()
-                .WithId($"survey-{orderId:N}")
+                .Detached($"survey-{orderId:N}")
                 .ScheduleAsync();
             return survey.TargetTaskId.ToString();
         }

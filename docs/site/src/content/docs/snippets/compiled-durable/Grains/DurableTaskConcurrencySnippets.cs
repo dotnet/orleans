@@ -71,8 +71,7 @@ public sealed class TripGrain : DurableGrain, ITripGrain
         // A detached task is an independent root: it outlives the trip, and the trip's cancellation doesn't reach it.
         _ = GrainFactory.GetGrain<IItineraryGrain>(request.Traveler)
             .SendItineraryAsync(TripId, holds[0], holds[1])
-            .Detached()
-            .WithId($"itinerary-{TripId:N}")
+            .Detached($"itinerary-{TripId:N}")
             .Post();
         return new TripResult(true, holds[0], holds[1], null);
     }

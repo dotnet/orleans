@@ -594,8 +594,7 @@ public sealed class InvoiceGrain : DurableGrain, IInvoiceGrain
         // Starts the root task "receipt-{invoiceId}" on the notification grain, which commits with the invoice's result.
         _ = GrainFactory.GetGrain<INotificationGrain>(request.CustomerId)
             .SendReceiptAsync(this.GetPrimaryKey(), amount)
-            .Detached()
-            .WithId(ReceiptTaskId(this.GetPrimaryKey()))
+            .Detached(ReceiptTaskId(this.GetPrimaryKey()))
             .Post();
         return amount;
     }
