@@ -4,6 +4,21 @@ using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
+internal static class JournalStorageTestExtensions
+{
+    // Storage instances write only after reading the journal, as the journaled state manager does when it recovers.
+    public static async Task<T> ReadForWriteAsync<T>(this T storage) where T : IJournalStorage
+    {
+        await storage.ReadAsync(new DiscardingConsumer(), TestContext.Current.CancellationToken);
+        return storage;
+    }
+
+    private sealed class DiscardingConsumer : IJournalStorageConsumer
+    {
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata) => buffer.Skip(buffer.Length);
+    }
+}
+
 internal static class JournalStorageContractTests
 {
     public static async Task ObservedAbsenceFencesCompetingCreation(Func<IJournalStorage> create, string operation)
@@ -14,7 +29,7 @@ internal static class JournalStorageContractTests
         var history = Assert.IsAssignableFrom<IJournalHistoryStorage>(storage);
         Assert.Equal(JournalStorageVersion.Absent, history.WriteVersion);
 
-        await create().AppendAsync(new ReadOnlySequence<byte>([1]), token);
+        await (await create().ReadForWriteAsync()).AppendAsync(new ReadOnlySequence<byte>([1]), token);
 
         await Assert.ThrowsAsync<InconsistentStateException>(() => Mutate(storage, operation).AsTask());
         Assert.Equal(JournalStorageVersion.Absent, history.WriteVersion);
@@ -27,11 +42,11 @@ internal static class JournalStorageContractTests
     public static async Task MetadataPreservesStalePrecondition(Func<IJournalStorage> create, string operation)
     {
         var token = TestContext.Current.CancellationToken;
-        var storage = create();
+        var storage = await create().ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), token);
         var history = Assert.IsAssignableFrom<IJournalHistoryStorage>(storage);
         var version = history.WriteVersion;
-        await create().AppendAsync(new ReadOnlySequence<byte>([2]), token);
+        await (await create().ReadForWriteAsync()).AppendAsync(new ReadOnlySequence<byte>([2]), token);
 
         Assert.NotNull(await storage.GetMetadataAsync(token));
         Assert.False(await storage.CreateIfNotExistsAsync(cancellationToken: token));
@@ -58,6 +73,7 @@ internal static class JournalStorageContractTests
         Assert.Empty(absent.Bytes);
         Assert.True(absent.Completed);
 
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), token);
         var version = history.WriteVersion;
         var compaction = storage.IsCompactionRequested;

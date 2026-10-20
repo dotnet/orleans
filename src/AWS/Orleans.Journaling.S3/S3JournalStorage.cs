@@ -35,12 +35,11 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
     private string? _walETag;
     private WalProviderState _walProviderState;
 
-    // Set once this instance has read or written the WAL; a known WAL without an ETag was observed absent.
+    // Set once this instance has read or created the WAL; a known WAL without an ETag was observed absent.
     private bool _isWalKnown;
 
     private bool WalExists => _walETag is not null;
 
-    private bool IsWalObservedAbsent => _isWalKnown && !WalExists;
 
     JournalStorageVersion IJournalHistoryStorage.WriteVersion => _isWalKnown ? CreateVersion(_walETag, _walProviderState) : JournalStorageVersion.Unknown;
 
@@ -93,7 +92,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
                     IsConditionalRequestConflict(exception)
                     && attempt < MaxConditionalRequestConflictRetries)
                 {
-                    var current = await TryLoadWalStateAsync(expectedETag: null, cancellationToken, updateCache: false).ConfigureAwait(false);
+                    var current = await TryLoadWalStateAsync(expectedETag: null, cancellationToken).ConfigureAwait(false);
                     if (current is not null)
                     {
                         succeeded = true;
@@ -158,11 +157,11 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
 
                 var walState = CreateWalState(properties);
 
-                // Metadata operations never move an established content precondition: they follow the WAL only from the version this
-                // instance holds, and establish the precondition only for an instance which has none.
-                var holdsWalVersion = !_isWalKnown || (WalExists
+                // Metadata operations never establish or move the content precondition: they follow the WAL only from the version this
+                // instance holds.
+                var holdsWalVersion = WalExists
                     && IsSameLogicalWal(walState.ProviderState, _walProviderState)
-                    && (walState.ProviderState.Generation is not null || string.Equals(walState.ETag, _walETag, StringComparison.Ordinal)));
+                    && (walState.ProviderState.Generation is not null || string.Equals(walState.ETag, _walETag, StringComparison.Ordinal));
                 var metadata = CopyMetadata(properties.Metadata);
                 if (expectedETag is not null
                     && !string.Equals(expectedETag, CreateMetadataETag(properties.ETag, metadata), StringComparison.Ordinal))
@@ -284,11 +283,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
 
             for (var attempt = 0; ; attempt++)
             {
-                if (!WalExists)
-                {
-                    await EnsureWalAsync(cancellationToken).ConfigureAwait(false);
-                }
-
+                await EnsureWalAsync(nameof(AppendAsync), cancellationToken).ConfigureAwait(false);
                 ThrowIfCompactionRequired();
 
                 var expectedETag = _walETag!;
@@ -342,14 +337,19 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
         var succeeded = false;
         try
         {
+            if (!_isWalKnown)
+            {
+                throw JournalStorageVersion.CreateWriteBeforeReadException(nameof(DeleteAsync));
+            }
+
             var expectedETag = _walETag;
             var expectedProviderState = _walProviderState;
-            if (IsWalObservedAbsent)
+            if (!WalExists)
             {
                 // An instance which observed the journal absent deletes nothing, unless another writer has since created it.
-                if (await TryLoadWalStateAsync(expectedETag: null, cancellationToken, updateCache: false).ConfigureAwait(false) is not null)
+                if (await TryLoadWalStateAsync(expectedETag: null, cancellationToken).ConfigureAwait(false) is not null)
                 {
-                    ThrowIfCreatedAfterObservedAbsent(observedAbsent: true, exception: null);
+                    throw CreateConcurrentCreationException(exception: null);
                 }
 
                 succeeded = true;
@@ -361,12 +361,11 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
                 WalState? walState;
                 try
                 {
-                    // Only an instance without a precondition adopts the WAL it finds; a failed delete leaves an established precondition in place.
-                    walState = await TryLoadWalStateAsync(expectedETag, cancellationToken, updateCache: !_isWalKnown).ConfigureAwait(false);
+                    walState = await TryLoadWalStateAsync(expectedETag, cancellationToken).ConfigureAwait(false);
                 }
                 catch (AmazonS3Exception exception) when (IsWalMutationConflict(exception))
                 {
-                    walState = expectedETag is not null && attempt < _shared.Options.MaxMetadataOnlyConflictRetries
+                    walState = attempt < _shared.Options.MaxMetadataOnlyConflictRetries
                         ? await RetryAfterMetadataOnlyConflictAsync(attempt, expectedProviderState, cancellationToken).ConfigureAwait(false)
                         : null;
                     if (walState is null)
@@ -380,18 +379,12 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
 
                 if (walState is null)
                 {
-                    if (expectedETag is not null)
-                    {
-                        throw CreateInconsistentWalStateException(
-                            "S3 journal WAL changed while deleting the journal; recovery is required.",
-                            expectedETag);
-                    }
-
-                    succeeded = true;
-                    return;
+                    throw CreateInconsistentWalStateException(
+                        "S3 journal WAL changed while deleting the journal; recovery is required.",
+                        expectedETag);
                 }
 
-                if (expectedETag is not null && !IsSameLogicalWal(walState.Value.ProviderState, expectedProviderState))
+                if (!IsSameLogicalWal(walState.Value.ProviderState, expectedProviderState))
                 {
                     throw CreateInconsistentWalStateException(
                         "S3 journal WAL was replaced while deleting the journal; recovery is required.",
@@ -608,14 +601,14 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
                     $"Checkpoint length: {value.Length:N0} bytes.");
             }
 
-            await EnsureWalAsync(cancellationToken).ConfigureAwait(false);
+            await EnsureWalAsync(nameof(ReplaceAsync), cancellationToken).ConfigureAwait(false);
 
             var expectedWalETag = _walETag!;
             var expectedProviderState = _walProviderState;
             WalState? walState;
             try
             {
-                walState = await TryLoadWalStateAsync(expectedWalETag, cancellationToken, updateCache: false).ConfigureAwait(false);
+                walState = await TryLoadWalStateAsync(expectedWalETag, cancellationToken).ConfigureAwait(false);
                 if (walState is null)
                 {
                     throw CreateInconsistentWalStateException(
@@ -819,74 +812,46 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
             $"S3 Express One Zone supports at most {MaxAppendPartsPerObject:N0} parts before the object must be copied.");
     }
 
-    private async ValueTask EnsureWalAsync(CancellationToken cancellationToken)
+    private async ValueTask EnsureWalAsync(string operation, CancellationToken cancellationToken)
     {
-        // An instance which observed the WAL absent requires it to still be absent; one which never observed it adopts a racing creator's WAL.
-        var observedAbsent = IsWalObservedAbsent;
-        var conflictAttempt = 0;
-        while (!WalExists)
+        if (!_isWalKnown)
         {
-            try
-            {
-                var created = await CreateWalAsync(
-                    checkpointName: null,
-                    ifMatch: null,
-                    ifNoneMatch: true,
-                    cancellationToken).ConfigureAwait(false);
-                SetWal(created.Response.ETag, created.ProviderState, lastModified: null);
-                return;
-            }
-            catch (AmazonS3Exception exception) when (IsObjectAlreadyExists(exception))
-            {
-                ThrowIfCreatedAfterObservedAbsent(observedAbsent, exception);
-                await TryLoadWalStateAsync(expectedETag: null, cancellationToken).ConfigureAwait(false);
-            }
-            catch (AmazonS3Exception exception) when (
-                IsConditionalRequestConflict(exception)
-                && conflictAttempt < MaxConditionalRequestConflictRetries)
-            {
-                conflictAttempt++;
-                var current = await TryLoadWalStateAsync(expectedETag: null, cancellationToken, updateCache: !observedAbsent).ConfigureAwait(false);
-                if (current is not null)
-                {
-                    ThrowIfCreatedAfterObservedAbsent(observedAbsent, exception);
-                    return;
-                }
+            throw JournalStorageVersion.CreateWriteBeforeReadException(operation);
+        }
 
-                await DelayForRetryAsync(conflictAttempt - 1, cancellationToken).ConfigureAwait(false);
-            }
+        if (WalExists)
+        {
+            return;
+        }
 
-            if (!WalExists)
-            {
-                _shared.Instruments.OnRetry("metadata_conflict");
-            }
+        try
+        {
+            // This instance observed the WAL absent, so it creates the WAL only while the WAL is still absent.
+            var created = await CreateWalAsync(
+                checkpointName: null,
+                ifMatch: null,
+                ifNoneMatch: true,
+                cancellationToken).ConfigureAwait(false);
+            SetWal(created.Response.ETag, created.ProviderState, lastModified: null);
+        }
+        catch (AmazonS3Exception exception) when (IsObjectAlreadyExists(exception) || IsConditionalRequestConflict(exception))
+        {
+            // A conditional request conflict means another writer's conditional write to the WAL is in flight.
+            throw CreateConcurrentCreationException(exception);
         }
     }
 
-    private void ThrowIfCreatedAfterObservedAbsent(bool observedAbsent, Exception? exception)
-    {
-        if (observedAbsent)
-        {
-            throw CreateInconsistentWalStateException(
-                "S3 journal WAL was created by another writer after this instance observed it absent; recovery is required.",
-                _walETag,
-                exception);
-        }
-    }
+    private InconsistentStateException CreateConcurrentCreationException(Exception? exception)
+        => CreateInconsistentWalStateException(
+            "S3 journal WAL was created by another writer after this instance observed it absent; recovery is required.",
+            _walETag,
+            exception);
 
-    private async ValueTask<WalState?> TryLoadWalStateAsync(
-        string? expectedETag,
-        CancellationToken cancellationToken,
-        bool updateCache = true)
+    private async ValueTask<WalState?> TryLoadWalStateAsync(string? expectedETag, CancellationToken cancellationToken)
     {
         var walProperties = await GetPropertiesCoreAsync(expectedETag, cancellationToken).ConfigureAwait(false);
         if (walProperties is null)
         {
-            if (updateCache)
-            {
-                SetWal(eTag: null, providerState: default, lastModified: null);
-            }
-
             return null;
         }
 
@@ -895,13 +860,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
             walProperties.ContentLength,
             walProperties.PartsCount,
             cancellationToken).ConfigureAwait(false);
-        var walState = CreateWalState(walProperties, partsCount);
-        if (updateCache)
-        {
-            SetWal(walState.ETag, walState.ProviderState, walState.LastModified);
-        }
-
-        return walState;
+        return CreateWalState(walProperties, partsCount);
     }
 
     private async ValueTask<WalState?> RetryAfterMetadataOnlyConflictAsync(
@@ -954,7 +913,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
             return null;
         }
 
-        var walState = await TryLoadWalStateAsync(expectedETag: null, cancellationToken, updateCache: false).ConfigureAwait(false);
+        var walState = await TryLoadWalStateAsync(expectedETag: null, cancellationToken).ConfigureAwait(false);
         if (walState is null || !IsSameLogicalWal(walState.Value.ProviderState, expectedProviderState))
         {
             return null;
@@ -1123,10 +1082,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage, IJournalHistor
     {
         try
         {
-            var current = await TryLoadWalStateAsync(
-                expectedETag: null,
-                cancellationToken,
-                updateCache: false).ConfigureAwait(false);
+            var current = await TryLoadWalStateAsync(expectedETag: null, cancellationToken).ConfigureAwait(false);
             if (current is not null
                 && string.Equals(current.Value.Manifest.Checkpoint?.Name, checkpointName, StringComparison.Ordinal))
             {

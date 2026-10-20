@@ -66,7 +66,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     public async Task Append_ReadReturnsWholeSegmentsInWriteOrder()
     {
         var journalId = CreateJournalId();
-        var writer = CreateStorage(journalId);
+        var writer = await CreateWriterAsync(journalId);
         byte[][] segments = [Bytes(3, 1), Bytes(70_000, 2), Bytes(1, 3), Bytes(4_096, 4)];
         foreach (var segment in segments)
         {
@@ -81,7 +81,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     public async Task Append_MultiSegmentSequence_IsStoredAsOneSegment()
     {
         var journalId = CreateJournalId();
-        var writer = CreateStorage(journalId);
+        var writer = await CreateWriterAsync(journalId);
         var first = new SequenceSegment(Bytes(5, 1));
         var last = first.Append(Bytes(7, 2));
 
@@ -94,7 +94,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     public async Task Replace_FollowedByAppends_ReadReturnsReplacementThenAppends()
     {
         var journalId = CreateJournalId();
-        var writer = CreateStorage(journalId);
+        var writer = await CreateWriterAsync(journalId);
         await writer.AppendAsync(Sequence(10, 1), CancellationToken);
         await writer.AppendAsync(Sequence(20, 2), CancellationToken);
 
@@ -117,7 +117,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     {
         Assert.SkipUnless(MaxAppendBytes is not null, "The provider enforces no per-append limit of its own.");
         var journalId = CreateJournalId();
-        var writer = CreateStorage(journalId);
+        var writer = await CreateWriterAsync(journalId);
         await writer.AppendAsync(Sequence(16, 1), CancellationToken);
         var segment = LargeSequence(MaxAppendBytes!.Value, 2);
 
@@ -142,7 +142,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     {
         Assert.SkipUnless(MaxAppendBytes is not null, "The provider enforces no per-append limit of its own.");
         var journalId = CreateJournalId();
-        var writer = CreateStorage(journalId);
+        var writer = await CreateWriterAsync(journalId);
         await writer.AppendAsync(Sequence(16, 1), CancellationToken);
         var versionBefore = History(writer).WriteVersion;
 
@@ -159,7 +159,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     public async Task Write_AfterAnotherWriterAppended_ThrowsAndLeavesStorageUnchanged()
     {
         var journalId = CreateJournalId();
-        var writer = CreateStorage(journalId);
+        var writer = await CreateWriterAsync(journalId);
         await writer.AppendAsync(Sequence(4, 1), CancellationToken);
         var other = CreateStorage(journalId);
         await ReadContentAsync(other);
@@ -176,7 +176,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     public async Task Write_AfterAnotherWriterDeleted_ThrowsAndKeepsPrecondition()
     {
         var journalId = CreateJournalId();
-        var writer = CreateStorage(journalId);
+        var writer = await CreateWriterAsync(journalId);
         await writer.AppendAsync(Sequence(4, 1), CancellationToken);
         var writeVersion = History(writer).WriteVersion;
         var other = CreateStorage(journalId);
@@ -202,7 +202,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
         Assert.Empty(await ReadContentAsync(appender));
         Assert.Empty(await ReadContentAsync(replacer));
         Assert.Empty(await ReadContentAsync(deleter));
-        await CreateStorage(journalId).AppendAsync(Sequence(5, 1), CancellationToken);
+        await (await CreateWriterAsync(journalId)).AppendAsync(Sequence(5, 1), CancellationToken);
 
         await Assert.ThrowsAsync<InconsistentStateException>(() => appender.AppendAsync(Sequence(6, 2), CancellationToken).AsTask());
         await Assert.ThrowsAsync<InconsistentStateException>(() => replacer.ReplaceAsync(Sequence(6, 2), CancellationToken).AsTask());
@@ -215,11 +215,11 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     public async Task Write_AfterOwnDeleteAndAnotherWriterCreated_Throws()
     {
         var journalId = CreateJournalId();
-        var writer = CreateStorage(journalId);
+        var writer = await CreateWriterAsync(journalId);
         await writer.AppendAsync(Sequence(5, 1), CancellationToken);
         await writer.DeleteAsync(CancellationToken);
         Assert.Equal(JournalStorageVersion.Absent, History(writer).WriteVersion);
-        await CreateStorage(journalId).AppendAsync(Sequence(6, 2), CancellationToken);
+        await (await CreateWriterAsync(journalId)).AppendAsync(Sequence(6, 2), CancellationToken);
 
         await Assert.ThrowsAsync<InconsistentStateException>(() => writer.AppendAsync(Sequence(7, 3), CancellationToken).AsTask());
 
@@ -244,16 +244,39 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Write_BeforeReadingOrWriting_AdoptsCurrentVersion()
+    public async Task Write_BeforeReadOrCreate_ThrowsAndLeavesStorageUnchanged()
     {
         var journalId = CreateJournalId();
-        await CreateStorage(journalId).AppendAsync(Sequence(5, 1), CancellationToken);
+        var absent = CreateStorage(journalId);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => absent.AppendAsync(Sequence(4, 1), CancellationToken).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => absent.ReplaceAsync(Sequence(4, 1), CancellationToken).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => absent.DeleteAsync(CancellationToken).AsTask());
+        Assert.Equal(JournalStorageVersion.Absent, (await ReadHistoryAsync(CreateStorage(journalId))).Version);
+
+        await (await CreateWriterAsync(journalId)).AppendAsync(Sequence(5, 1), CancellationToken);
         var writer = CreateStorage(journalId);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => writer.AppendAsync(Sequence(6, 2), CancellationToken).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => writer.ReplaceAsync(Sequence(6, 2), CancellationToken).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => writer.DeleteAsync(CancellationToken).AsTask());
+
         Assert.Equal(JournalStorageVersion.Unknown, History(writer).WriteVersion);
+        Assert.Equal(Bytes(5, 1), await ReadContentAsync(CreateStorage(journalId)));
+    }
 
-        await writer.AppendAsync(Sequence(6, 2), CancellationToken);
+    [Fact]
+    public async Task CreateIfNotExists_WhenJournalExists_ReturnsFalseAndEstablishesNoPrecondition()
+    {
+        var journalId = CreateJournalId();
+        await (await CreateWriterAsync(journalId)).AppendAsync(Sequence(5, 1), CancellationToken);
+        var storage = CreateStorage(journalId);
 
-        Assert.Equal(Concat([Bytes(5, 1), Bytes(6, 2)]), await ReadContentAsync(CreateStorage(journalId)));
+        Assert.False(await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken));
+        Assert.NotNull(await storage.GetMetadataAsync(CancellationToken));
+        Assert.NotNull(await storage.UpdateMetadataAsync(new Dictionary<string, string> { ["conformance"] = "1" }, cancellationToken: CancellationToken));
+
+        Assert.Equal(JournalStorageVersion.Unknown, History(storage).WriteVersion);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => storage.AppendAsync(Sequence(6, 2), CancellationToken).AsTask());
+        Assert.Equal(Bytes(5, 1), await ReadContentAsync(CreateStorage(journalId)));
     }
 
     [Fact]
@@ -261,7 +284,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     {
         const int WriterCount = 4;
         var journalId = CreateJournalId();
-        await CreateStorage(journalId).AppendAsync(Sequence(8, 1), CancellationToken);
+        await (await CreateWriterAsync(journalId)).AppendAsync(Sequence(8, 1), CancellationToken);
         var writers = new IJournalStorage[WriterCount];
         for (var i = 0; i < writers.Length; i++)
         {
@@ -281,7 +304,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     public async Task MetadataOperations_DoNotMoveEstablishedPrecondition()
     {
         var journalId = CreateJournalId();
-        var writer = CreateStorage(journalId);
+        var writer = await CreateWriterAsync(journalId);
         await writer.AppendAsync(Sequence(4, 1), CancellationToken);
         var other = CreateStorage(journalId);
         await ReadContentAsync(other);
@@ -326,7 +349,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     public async Task ReadHistory_AfterOwnWrites_ReturnsWriteVersion()
     {
         var journalId = CreateJournalId();
-        var writer = CreateStorage(journalId);
+        var writer = await CreateWriterAsync(journalId);
         await ReadContentAsync(writer);
         await writer.AppendAsync(Sequence(5, 1), CancellationToken);
         await writer.AppendAsync(Sequence(6, 2), CancellationToken);
@@ -351,7 +374,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     public async Task ReadHistory_AfterAnotherWriter_ReturnsNewContentAndKeepsPrecondition()
     {
         var journalId = CreateJournalId();
-        var writer = CreateStorage(journalId);
+        var writer = await CreateWriterAsync(journalId);
         await writer.AppendAsync(Sequence(5, 1), CancellationToken);
         var writeVersion = History(writer).WriteVersion;
         var other = CreateStorage(journalId);
@@ -373,7 +396,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
         var journalId = CreateJournalId();
         var writer = CreateStorage(journalId);
         await ReadContentAsync(writer);
-        await CreateStorage(journalId).AppendAsync(Sequence(5, 1), CancellationToken);
+        await (await CreateWriterAsync(journalId)).AppendAsync(Sequence(5, 1), CancellationToken);
 
         var history = await ReadHistoryAsync(writer);
 
@@ -387,7 +410,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     {
         SkipUnlessSupported(JournalStorageFaultKind.AbortRequestBody);
         var journalId = CreateJournalId();
-        var writer = CreateFaultingStorage(journalId);
+        var writer = await CreateFaultingWriterAsync(journalId);
         await writer.AppendAsync(Sequence(16, 1), CancellationToken);
 
         Faults.Arm(JournalStorageFaultKind.AbortRequestBody, count: int.MaxValue);
@@ -409,7 +432,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     {
         SkipUnlessSupported(JournalStorageFaultKind.AbortRequestBody);
         var journalId = CreateJournalId();
-        var writer = CreateFaultingStorage(journalId);
+        var writer = await CreateFaultingWriterAsync(journalId);
         await writer.AppendAsync(Sequence(16, 1), CancellationToken);
 
         Faults.Arm(JournalStorageFaultKind.AbortRequestBody, count: 1);
@@ -426,7 +449,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     {
         SkipUnlessSupported(JournalStorageFaultKind.LoseResponse);
         var journalId = CreateJournalId();
-        var writer = CreateFaultingStorage(journalId);
+        var writer = await CreateFaultingWriterAsync(journalId);
         await writer.AppendAsync(Sequence(16, 1), CancellationToken);
 
         Faults.Arm(JournalStorageFaultKind.LoseResponse, count: 1);
@@ -451,7 +474,7 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
     {
         SkipUnlessSupported(JournalStorageFaultKind.AbortRequestBody);
         var journalId = CreateJournalId();
-        var writer = CreateFaultingStorage(journalId);
+        var writer = await CreateFaultingWriterAsync(journalId);
         await writer.AppendAsync(Sequence(16, 1), CancellationToken);
         await writer.AppendAsync(Sequence(17, 2), CancellationToken);
 
@@ -496,6 +519,8 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
         var journalId = CreateJournalId();
         var writer = CreateWriter();
         var model = new JournalModel();
+        Assert.Empty(await ReadContentAsync(writer));
+        model.Read(exists: false);
 
         foreach (var operation in operations)
         {
@@ -629,6 +654,21 @@ public abstract class JournalStorageConformanceTests : IAsyncLifetime
 
     protected IJournalStorage CreateFaultingStorage(JournalId journalId)
         => (_faultingProvider ?? throw new InvalidOperationException("The provider does not support fault injection.")).CreateStorage(journalId);
+
+    // Writers read the journal before writing, as the journaled state manager does when it recovers.
+    protected async Task<IJournalStorage> CreateWriterAsync(JournalId journalId)
+    {
+        var storage = CreateStorage(journalId);
+        await ReadContentAsync(storage);
+        return storage;
+    }
+
+    protected async Task<IJournalStorage> CreateFaultingWriterAsync(JournalId journalId)
+    {
+        var storage = CreateFaultingStorage(journalId);
+        await ReadContentAsync(storage);
+        return storage;
+    }
 
     protected virtual JournalId CreateJournalId() => new($"conformance/{Guid.NewGuid():N}");
 

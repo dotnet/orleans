@@ -86,7 +86,7 @@ The journal is the source of truth for durable state, so every <xref:Orleans.Jou
 - **Whole-call limit failures.** A segment which exceeds a provider limit fails the call with an exception, and nothing of it becomes visible.
 - **Unchanged storage after a rejected write.** A write which the provider rejects leaves the earlier content in place. A write with an indeterminate outcome, such as a timeout after the request was sent, applied its whole segment or none of it; the next read shows which.
 - **Whole, ordered reads.** A read returns one version of the journal: every segment written up to that version, whole and in write order.
-- **Write preconditions.** A write succeeds only if the journal is still at the version the storage instance last read or wrote, including an observed absence. Metadata operations never move that precondition.
+- **Write preconditions.** A storage instance writes after it reads or creates the journal, and a write through an instance which has done neither throws <xref:System.InvalidOperationException>. A write succeeds only if the journal is still at the version the storage instance last read or wrote; after an observed absence, the journal must still be absent. Metadata operations never establish or move that precondition.
 
 Each provider documents its limits:
 

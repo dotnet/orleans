@@ -77,7 +77,7 @@ Metadata-enabled catalog queries select the header's format and caller-owned met
 
 ## Optimistic concurrency
 
-Both providers condition append, replace, and delete operations on the last observed ETag. A storage instance which recovered an absent journal requires the journal to still be absent when it creates it. Metadata-only conflicts receive a bounded in-place refresh and retry. A journal-content conflict raises <xref:Orleans.Storage.InconsistentStateException>, which permanently fences the Journaling state manager and requests grain deactivation. A fresh activation replays the durable journal.
+Both providers condition append, replace, and delete operations on the last observed ETag. A storage instance which recovered an absent journal creates it only while it is still absent, so a concurrent creator makes the write fail. Metadata-only conflicts receive a bounded in-place refresh and retry. A journal-content conflict raises <xref:Orleans.Storage.InconsistentStateException>, which permanently fences the Journaling state manager and requests grain deactivation. A fresh activation replays the durable journal.
 
 Configure the metadata-only retry cap and backoff with the corresponding `MaxMetadataOnlyConflictRetries`, `MetadataOnlyConflictInitialBackoff`, and `MetadataOnlyConflictMaxBackoff` options.
 

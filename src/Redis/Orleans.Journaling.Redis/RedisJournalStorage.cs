@@ -24,7 +24,6 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
 
     private const int MissingStatus = 0;
     private const int SuccessStatus = 1;
-    private const int AppearedStatus = 2;
     private const int ConflictStatus = -1;
     private const int CollisionStatus = -2;
     private const int InvalidMetadataStatus = -3;
@@ -133,20 +132,20 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
     private const string AppendOrCreateScript =
         """
         if redis.call('EXISTS', KEYS[2]) == 0 then
-            if ARGV[1] == '1' then
+            if ARGV[1] ~= '' then
                 return { -1 }
             end
 
-            local appendLength = string.len(ARGV[4])
-            redis.call('SET', KEYS[1], ARGV[4])
+            local appendLength = string.len(ARGV[3])
+            redis.call('SET', KEYS[1], ARGV[3])
             redis.call(
                 'HSET',
                 KEYS[2],
-                '$etag', ARGV[3],
-                '$content-etag', ARGV[3],
-                '$journal-id', ARGV[6],
+                '$etag', ARGV[2],
+                '$content-etag', ARGV[2],
+                '$journal-id', ARGV[5],
                 '$append-length', appendLength,
-                '$format', ARGV[5],
+                '$format', ARGV[4],
                 '$schema-version', '1')
             return { 1, appendLength }
         end
@@ -177,23 +176,23 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
         if state[6] ~= '1' then
             return { -4 }
         end
-        if state[1] ~= ARGV[6] then
+        if state[1] ~= ARGV[5] then
             return { -2 }
         end
-        if ARGV[1] == '2' or (ARGV[1] == '1' and state[3] ~= ARGV[2]) then
+        if state[3] ~= ARGV[1] then
             return { -1 }
         end
 
-        redis.call('APPEND', KEYS[1], ARGV[4])
-        appendLength = appendLength + string.len(ARGV[4])
+        redis.call('APPEND', KEYS[1], ARGV[3])
+        appendLength = appendLength + string.len(ARGV[3])
         redis.call(
             'HSET',
             KEYS[2],
-            '$etag', ARGV[3],
-            '$content-etag', ARGV[3],
+            '$etag', ARGV[2],
+            '$content-etag', ARGV[2],
             '$append-length', appendLength)
-        if state[5] ~= ARGV[5] then
-            redis.call('HSET', KEYS[2], '$format', ARGV[5])
+        if state[5] ~= ARGV[4] then
+            redis.call('HSET', KEYS[2], '$format', ARGV[4])
         end
 
         return { 1, appendLength }
@@ -202,19 +201,19 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
     private const string ReplaceOrCreateScript =
         """
         if redis.call('EXISTS', KEYS[2]) == 0 then
-            if ARGV[1] == '1' then
+            if ARGV[1] ~= '' then
                 return { -1 }
             end
 
-            redis.call('SET', KEYS[1], ARGV[4])
+            redis.call('SET', KEYS[1], ARGV[3])
             redis.call(
                 'HSET',
                 KEYS[2],
-                '$etag', ARGV[3],
-                '$content-etag', ARGV[3],
-                '$journal-id', ARGV[6],
+                '$etag', ARGV[2],
+                '$content-etag', ARGV[2],
+                '$journal-id', ARGV[5],
                 '$append-length', 0,
-                '$format', ARGV[5],
+                '$format', ARGV[4],
                 '$schema-version', '1')
             return { 1, 0 }
         end
@@ -245,22 +244,22 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
         if state[6] ~= '1' then
             return { -4 }
         end
-        if state[1] ~= ARGV[6] then
+        if state[1] ~= ARGV[5] then
             return { -2 }
         end
-        if ARGV[1] == '2' or (ARGV[1] == '1' and state[3] ~= ARGV[2]) then
+        if state[3] ~= ARGV[1] then
             return { -1 }
         end
 
-        redis.call('SET', KEYS[1], ARGV[4])
+        redis.call('SET', KEYS[1], ARGV[3])
         redis.call(
             'HSET',
             KEYS[2],
-            '$etag', ARGV[3],
-            '$content-etag', ARGV[3],
+            '$etag', ARGV[2],
+            '$content-etag', ARGV[2],
             '$append-length', 0)
-        if state[5] ~= ARGV[5] then
-            redis.call('HSET', KEYS[2], '$format', ARGV[5])
+        if state[5] ~= ARGV[4] then
+            redis.call('HSET', KEYS[2], '$format', ARGV[4])
         end
 
         return { 1, 0 }
@@ -269,16 +268,16 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
     private const string DeleteScript =
         """
         if redis.call('EXISTS', KEYS[2]) == 0 then
-            if ARGV[2] == '0' then
-                redis.call('DEL', KEYS[1])
-                return { 1 }
+            if ARGV[1] ~= '' then
+                return { -1 }
             end
 
-            return { -1 }
+            redis.call('DEL', KEYS[1])
+            return { 1 }
         end
 
-        if ARGV[2] == '0' then
-            return { 2 }
+        if ARGV[1] == '' then
+            return { -1 }
         end
 
         local state = redis.call(
@@ -298,7 +297,7 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
         if state[4] ~= '1' then
             return { -4 }
         end
-        if state[1] ~= ARGV[3] then
+        if state[1] ~= ARGV[2] then
             return { -2 }
         end
         if state[3] ~= ARGV[1] then
@@ -396,7 +395,7 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
     private string? _contentETag;
     private long _appendLength;
 
-    // Set once this instance has read or written the journal; a known journal without a content ETag was observed absent.
+    // Set once this instance has read or created the journal; a known journal without a content ETag was observed absent.
     private bool _isStateKnown;
 
     public RedisJournalStorage(
@@ -463,26 +462,6 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
 
     public async ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
     {
-        var state = await GetStorageStateAsync(cancellationToken).ConfigureAwait(false);
-        if (state is { } current)
-        {
-            AdoptIfUnknown(current);
-        }
-
-        return state?.Metadata;
-    }
-
-    // Metadata operations never move an established content precondition; they establish it only for an instance which has none.
-    private void AdoptIfUnknown(StorageState state)
-    {
-        if (!_isStateKnown)
-        {
-            SetState(state);
-        }
-    }
-
-    private async ValueTask<StorageState?> GetStorageStateAsync(CancellationToken cancellationToken)
-    {
         cancellationToken.ThrowIfCancellationRequested();
         var result = await EvaluateArrayAsync(
             GetMetadataScript,
@@ -495,7 +474,7 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
         }
 
         ThrowForStatus(status, nameof(GetMetadataAsync), expectedETag: null);
-        return CreateStorageState(result, startIndex: 1, nameof(GetMetadataAsync));
+        return CreateStorageState(result, startIndex: 1, nameof(GetMetadataAsync)).Metadata;
     }
 
     public async ValueTask<IJournalMetadata?> UpdateMetadataAsync(
@@ -525,9 +504,7 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
         }
 
         ThrowForStatus(status, nameof(UpdateMetadataAsync), expectedETag);
-        var state = CreateStorageState(result, startIndex: 1, nameof(UpdateMetadataAsync));
-        AdoptIfUnknown(state);
-        return state.Metadata;
+        return CreateStorageState(result, startIndex: 1, nameof(UpdateMetadataAsync)).Metadata;
     }
 
     public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
@@ -578,6 +555,7 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
     public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ThrowIfWriteBeforeRead(nameof(AppendAsync));
         var expectedContentETag = _contentETag;
         var newETag = CreateETag();
         RedisValue payload = value.IsSingleSegment ? value.First : value.ToArray();
@@ -585,7 +563,6 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
             AppendOrCreateScript,
             _journalKeys,
             [
-                GetWriteMode(),
                 expectedContentETag ?? string.Empty,
                 newETag,
                 payload,
@@ -601,6 +578,7 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
     public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ThrowIfWriteBeforeRead(nameof(ReplaceAsync));
         var expectedContentETag = _contentETag;
         var newETag = CreateETag();
         RedisValue payload = value.IsSingleSegment ? value.First : value.ToArray();
@@ -608,7 +586,6 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
             ReplaceOrCreateScript,
             _journalKeys,
             [
-                GetWriteMode(),
                 expectedContentETag ?? string.Empty,
                 newETag,
                 payload,
@@ -624,48 +601,25 @@ internal sealed class RedisJournalStorage : IJournalStorage, IJournalHistoryStor
     public async ValueTask DeleteAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var wasStateKnown = _isStateKnown;
-        if (!wasStateKnown)
-        {
-            // An instance which has neither read nor written the journal establishes its precondition from the version it finds,
-            // so a rejected delete leaves that precondition in place.
-            if (await GetStorageStateAsync(cancellationToken).ConfigureAwait(false) is { } state)
-            {
-                SetState(state);
-            }
-            else
-            {
-                ClearState();
-            }
-        }
-
+        ThrowIfWriteBeforeRead(nameof(DeleteAsync));
         var expectedContentETag = _contentETag;
-        var expectedExists = expectedContentETag is not null;
         var result = await EvaluateArrayAsync(
             DeleteScript,
             _journalKeys,
-            [expectedContentETag ?? string.Empty, expectedExists ? "1" : "0", _encodedJournalId]).ConfigureAwait(false);
+            [expectedContentETag ?? string.Empty, _encodedJournalId]).ConfigureAwait(false);
         var status = GetStatus(result, nameof(DeleteAsync));
-        if (status == AppearedStatus)
-        {
-            // A fresh instance's no-op delete takes effect at the absence observation, before the competing creation.
-            if (wasStateKnown)
-            {
-                ThrowForStatus(ConflictStatus, nameof(DeleteAsync), expectedContentETag);
-            }
-
-            return;
-        }
-        else
-        {
-            ThrowForStatus(status, nameof(DeleteAsync), expectedContentETag);
-        }
-
+        ThrowForStatus(status, nameof(DeleteAsync), expectedContentETag);
         ClearState();
     }
 
-    // "1" requires the observed content ETag, "2" requires the observed absence, and "0" adopts the current journal.
-    private string GetWriteMode() => _contentETag is not null ? "1" : _isStateKnown ? "2" : "0";
+    // Write scripts take the content ETag this instance holds, or an empty string to require an absent journal.
+    private void ThrowIfWriteBeforeRead(string operation)
+    {
+        if (!_isStateKnown)
+        {
+            throw JournalStorageVersion.CreateWriteBeforeReadException(operation);
+        }
+    }
 
     internal static RedisKey GetMetadataKey(string keyPrefix, string keyName)
     {

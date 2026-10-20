@@ -36,12 +36,13 @@ namespace Orleans.Journaling;
 /// <item><description>
 /// <b>Write precondition.</b> Each storage instance holds a write precondition: the version of the journal it last read
 /// with <see cref="ReadAsync"/> or last wrote, including a journal it observed to be absent. <see cref="AppendAsync"/>,
-/// <see cref="ReplaceAsync"/>, and <see cref="DeleteAsync"/> succeed only if the journal is still at that version, and
-/// otherwise throw <see cref="Orleans.Storage.InconsistentStateException"/> without changing storage. A successful write,
-/// including creating the journal with <see cref="CreateIfNotExistsAsync"/>, advances the precondition to the version it
-/// produced. An instance which has neither read nor written the journal establishes its precondition from the version it
-/// first observes. Metadata operations never move an established precondition, and metadata-only updates never change the
-/// journal's content.
+/// <see cref="ReplaceAsync"/>, and <see cref="DeleteAsync"/> succeed only if the journal is still at that version, so a
+/// write after observing an absent journal requires the journal to still be absent. Otherwise they throw
+/// <see cref="Orleans.Storage.InconsistentStateException"/> without changing storage. A successful write, including creating
+/// the journal with <see cref="CreateIfNotExistsAsync"/>, advances the precondition to the version it produced. Callers read
+/// the journal, or create it, before writing through an instance: a write through an instance which has done neither throws
+/// <see cref="InvalidOperationException"/>. Metadata operations never establish or move the precondition, and metadata-only
+/// updates never change the journal's content.
 /// </description></item>
 /// </list>
 /// </remarks>
@@ -70,6 +71,8 @@ public interface IJournalStorage
     /// <remarks>
     /// Initial metadata is only applied when the storage instance is created. If the journal was
     /// already created by a write, this method returns <see langword="false"/> and does not update metadata.
+    /// Creating the journal makes the empty journal this instance's write precondition; finding an existing journal leaves the
+    /// precondition unchanged.
     /// </remarks>
     /// <param name="metadata">Initial caller-owned metadata properties.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
@@ -114,7 +117,8 @@ public interface IJournalStorage
     /// <remarks>
     /// The whole value becomes the journal's only segment, or the journal keeps its earlier content. A value which exceeds a
     /// provider limit fails the call. Implementations throw <see cref="Orleans.Storage.InconsistentStateException"/> when the
-    /// journal is no longer at this instance's write precondition.
+    /// journal is no longer at this instance's write precondition, and <see cref="InvalidOperationException"/> when this
+    /// instance has neither read nor created the journal.
     /// </remarks>
     /// <param name="value">The encoded journal bytes to write. The storage provider must not retain this buffer after the returned task completes.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
@@ -127,7 +131,8 @@ public interface IJournalStorage
     /// <remarks>
     /// The whole segment becomes visible after every earlier segment, or none of it does. A segment which exceeds a provider
     /// limit fails the call. Implementations throw <see cref="Orleans.Storage.InconsistentStateException"/> when the journal
-    /// is no longer at this instance's write precondition.
+    /// is no longer at this instance's write precondition, and <see cref="InvalidOperationException"/> when this instance has
+    /// neither read nor created the journal.
     /// </remarks>
     /// <param name="value">The encoded journal bytes to append. The storage provider must not retain this buffer after the returned task completes.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
@@ -139,7 +144,8 @@ public interface IJournalStorage
     /// </summary>
     /// <remarks>
     /// Implementations throw <see cref="Orleans.Storage.InconsistentStateException"/> when the journal is no longer at this
-    /// instance's write precondition. After a successful delete, the precondition is an absent journal.
+    /// instance's write precondition, and <see cref="InvalidOperationException"/> when this instance has neither read nor
+    /// created the journal. After a successful delete, the precondition is an absent journal.
     /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>

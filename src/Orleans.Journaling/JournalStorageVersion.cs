@@ -15,7 +15,7 @@ internal readonly record struct JournalStorageVersion
     private JournalStorageVersion(string value) => Value = value;
 
     /// <summary>
-    /// Gets the version of a storage instance which has neither read nor written the journal.
+    /// Gets the version of a storage instance which has neither read nor created the journal. Such an instance cannot write.
     /// </summary>
     public static JournalStorageVersion Unknown => default;
 
@@ -44,6 +44,13 @@ internal readonly record struct JournalStorageVersion
         return new(token);
     }
 
+    /// <summary>
+    /// Creates the exception which a write throws when its storage instance has neither read nor created the journal.
+    /// </summary>
+    /// <param name="operation">The name of the rejected write operation.</param>
+    public static InvalidOperationException CreateWriteBeforeReadException(string operation)
+        => new($"{operation} requires the journal storage instance to read the journal with {nameof(IJournalStorage.ReadAsync)} or create it with {nameof(IJournalStorage.CreateIfNotExistsAsync)} first.");
+
     /// <inheritdoc/>
     public override string ToString() => Value switch
     {
@@ -71,7 +78,7 @@ internal interface IJournalHistoryStorage
     /// </summary>
     /// <remarks>
     /// The value is <see cref="JournalStorageVersion.Unknown"/> until this instance reads the journal with
-    /// <see cref="IJournalStorage.ReadAsync"/> or writes it. Read it while no write through this instance is in flight.
+    /// <see cref="IJournalStorage.ReadAsync"/> or creates it. Read it while no write through this instance is in flight.
     /// </remarks>
     JournalStorageVersion WriteVersion { get; }
 

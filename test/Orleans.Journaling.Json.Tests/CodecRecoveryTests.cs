@@ -440,6 +440,7 @@ public class CodecRecoveryTests : JournalingTestBase
         CancellationToken cancellationToken)
     {
         var storage = CreateJsonStorage();
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(jsonLines)), cancellationToken);
         return storage;
     }
@@ -480,10 +481,12 @@ public class CodecRecoveryTests : JournalingTestBase
         public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             => inner.ReplaceAsync(value, cancellationToken);
 
-        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
 
+            // The inner storage reads too, which establishes its write precondition.
+            await inner.ReadForWriteAsync();
             var metadata = storedJournalFormatKey is null
                 ? JournalMetadata.Empty
                 : new JournalMetadata(storedJournalFormatKey);
@@ -495,8 +498,6 @@ public class CodecRecoveryTests : JournalingTestBase
             {
                 consumer.Read(ReadSegments(cancellationToken), metadata, complete: true);
             }
-
-            return default;
         }
 
         private IEnumerable<ReadOnlyMemory<byte>> ReadSegments(CancellationToken cancellationToken)

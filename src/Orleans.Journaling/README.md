@@ -308,7 +308,7 @@ The journal is the source of truth for durable state. Every `IJournalStorage` im
 - A segment which exceeds a provider limit fails the whole call with an exception, and nothing of it becomes visible.
 - A write which the provider rejects leaves the earlier content in place. A write with an indeterminate outcome, such as a timeout after the request was sent, applied its whole segment or none of it; the next read shows which.
 - `ReadAsync` returns one version of the journal: every segment written up to that version, whole and in write order.
-- Each storage instance holds a write precondition: the version it last read or wrote, including an observed absence. `AppendAsync`, `ReplaceAsync`, and `DeleteAsync` succeed only at that version and otherwise throw `InconsistentStateException`. Metadata operations never move the precondition.
+- Each storage instance holds a write precondition: the version it last read or wrote, including an observed absence. `AppendAsync`, `ReplaceAsync`, and `DeleteAsync` succeed only at that version and otherwise throw `InconsistentStateException`. An instance writes after it reads the journal or creates it with `CreateIfNotExistsAsync`; a write through an instance which has done neither throws `InvalidOperationException`. Metadata operations never establish or move the precondition.
 
 The provider conformance suite (`JournalStorageConformanceTests` in `test/Orleans.Journaling.Tests/Conformance`) verifies these guarantees with limit, concurrency, fault-injection, and model-based tests. Each provider in this repository runs it.
 

@@ -58,11 +58,12 @@ public sealed class AzureTableJournalStorageTests
         var token = TestContext.Current.CancellationToken;
         var store = new FakeTableStore();
         var storage = CreateStorage(store, compactionRowCountThreshold: 1);
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), token);
         var history = (IJournalHistoryStorage)storage;
         var version = history.WriteVersion;
         Assert.True(storage.IsCompactionRequested);
-        await CreateStorage(store).ReplaceAsync(new ReadOnlySequence<byte>([9]), token);
+        await (await CreateStorage(store).ReadForWriteAsync()).ReplaceAsync(new ReadOnlySequence<byte>([9]), token);
 
         Assert.NotEqual(version, await history.ReadHistoryAsync(new CapturingJournalStorageConsumer(), token));
         Assert.Equal(version, history.WriteVersion);
@@ -103,6 +104,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store, journalFormatKey: "binary");
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         await storage.AppendAsync(new ReadOnlySequence<byte>([2, 3]), CancellationToken.None);
@@ -122,6 +124,7 @@ public sealed class AzureTableJournalStorageTests
         var store = new FakeTableStore();
         var journalId = new JournalId(new string('~', 512));
         var storage = CreateStorage(store, journalId: journalId);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2]), TestContext.Current.CancellationToken);
         var consumer = new CapturingJournalStorageConsumer();
@@ -140,6 +143,7 @@ public sealed class AzureTableJournalStorageTests
         var journalId = new JournalId("café/😀\0");
         static void Configure(AzureTableJournalStorageOptions options) => options.GetPartitionKey = _ => "custom";
         var storage = CreateStorage(store, journalId: journalId, configure: Configure);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2]), TestContext.Current.CancellationToken);
         var consumer = new CapturingJournalStorageConsumer();
@@ -156,6 +160,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
 
         // One byte beyond a full row forces a second data row within the same transaction.
         var payload = CreatePayload(15 * 64 * 1024 + 1);
@@ -199,9 +204,10 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
-        await CreateStorage(store).AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
+        await (await CreateStorage(store).ReadForWriteAsync()).AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
             () => storage.AppendAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None).AsTask());
@@ -220,6 +226,7 @@ public sealed class AzureTableJournalStorageTests
         using var metrics = new AzureJournalStorageMetricsFixture("azure_table");
         var store = new FakeTableStore();
         var storage = CreateStorage(store, instruments: metrics.Table);
+        await storage.ReadForWriteAsync();
         var catalogStorage = CreateStorage(store);
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
@@ -248,6 +255,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         Assert.NotNull(await storage.UpdateMetadataAsync(
@@ -267,6 +275,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         store.PutEntity(TestPartitionKey, AzureTableJournalStorage.HeaderRowKey, new Dictionary<string, object>
@@ -356,19 +365,19 @@ public sealed class AzureTableJournalStorageTests
     }
 
     [Fact]
-    public async Task AppendAsync_WithoutPriorRead_LoadsExistingJournal()
+    public async Task AppendAsync_WithoutPriorRead_ThrowsWithoutWriting()
     {
         var store = new FakeTableStore();
-        var first = CreateStorage(store);
+        var first = await CreateStorage(store).ReadForWriteAsync();
         await first.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var second = CreateStorage(store);
-        await second.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => second.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None).AsTask());
 
-        Assert.Contains(store.GetCalls, static call => call.RowKey == AzureTableJournalStorage.HeaderRowKey);
         var consumer = new CapturingJournalStorageConsumer();
         await CreateStorage(store).ReadAsync(consumer, CancellationToken.None);
-        Assert.Equal([1, 2], consumer.Bytes.ToArray());
+        Assert.Equal([1], consumer.Bytes.ToArray());
     }
 
     [Fact]
@@ -406,6 +415,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore { PageSize = 1 };
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         await storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
@@ -423,6 +433,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         await storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
@@ -441,6 +452,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var writer = CreateStorage(store);
+        await writer.ReadForWriteAsync();
         await writer.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         await writer.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
 
@@ -457,6 +469,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store, compactionSizeThreshold: 4);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
         Assert.False(storage.IsCompactionRequested);
@@ -470,6 +483,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store, journalFormatKey: "json-lines", compactionRowCountThreshold: 2);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         await storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
@@ -509,6 +523,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store, compactionRowCountThreshold: 2, compactionSizeThreshold: 3);
+        await storage.ReadForWriteAsync();
 
         await storage.ReplaceAsync(new ReadOnlySequence<byte>([1, 2, 3, 4]), CancellationToken.None);
 
@@ -526,7 +541,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
 
-        await CreateStorage(store, journalFormatKey: "binary").ReplaceAsync(
+        await (await CreateStorage(store, journalFormatKey: "binary").ReadForWriteAsync()).ReplaceAsync(
             new ReadOnlySequence<byte>([4, 5]),
             CancellationToken.None);
 
@@ -545,6 +560,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store, deleteOldGenerations: false);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
@@ -560,9 +576,10 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
-        await CreateStorage(store).AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
+        await (await CreateStorage(store).ReadForWriteAsync()).AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
             () => storage.ReplaceAsync(new ReadOnlySequence<byte>([9]), CancellationToken.None).AsTask());
@@ -579,6 +596,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         await storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
@@ -620,6 +638,7 @@ public sealed class AzureTableJournalStorageTests
         Assert.Equal([1, 2, 8], consumer.Bytes.ToArray());
 
         var freshStorage = CreateStorage(store);
+        await freshStorage.ReadForWriteAsync();
         await freshStorage.ReplaceAsync(new ReadOnlySequence<byte>([7]), CancellationToken.None);
         var replacedConsumer = new CapturingJournalStorageConsumer();
         await CreateStorage(store).ReadAsync(replacedConsumer, CancellationToken.None);
@@ -635,6 +654,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
         var catalogStorage = CreateStorage(store);
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
@@ -658,6 +678,7 @@ public sealed class AzureTableJournalStorageTests
         using var metrics = new AzureJournalStorageMetricsFixture("azure_table");
         var store = new FakeTableStore();
         var storage = CreateStorage(store, instruments: metrics.Table);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         store.FailNextTransaction = true;
@@ -677,6 +698,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         await storage.DeleteAsync(CancellationToken.None);
@@ -693,9 +715,10 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
 
-        await CreateStorage(store).DeleteAsync(CancellationToken.None);
+        await (await CreateStorage(store).ReadForWriteAsync()).DeleteAsync(CancellationToken.None);
 
-        Assert.Single(store.GetCalls);
+        // The read observes the absent journal, and the delete confirms that it is still absent.
+        Assert.Equal(2, store.GetCalls.Count);
         Assert.Empty(store.DeleteCalls);
         Assert.Empty(store.TransactionCalls);
         Assert.True(store.IsEmpty);
@@ -706,6 +729,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         await storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
@@ -726,9 +750,10 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
-        await CreateStorage(store).AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
+        await (await CreateStorage(store).ReadForWriteAsync()).AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
             () => storage.DeleteAsync(CancellationToken.None).AsTask());
@@ -744,6 +769,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
         var catalogStorage = CreateStorage(store);
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
@@ -879,6 +905,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store, journalFormatKey: "json-lines");
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         Assert.NotNull(await storage.UpdateMetadataAsync(
@@ -1405,7 +1432,7 @@ public sealed class AzureTableJournalStorageTests
         var store = new FakeTableStore();
         var payload = CreatePayload((int)AzureTableJournalStorage.MaxAppendBytes);
 
-        await CreateStorage(store).AppendAsync(new ReadOnlySequence<byte>(payload), CancellationToken.None);
+        await (await CreateStorage(store).ReadForWriteAsync()).AppendAsync(new ReadOnlySequence<byte>(payload), CancellationToken.None);
 
         var transaction = Assert.Single(store.TransactionCalls);
         Assert.Equal(4, transaction.Count);
@@ -1438,7 +1465,7 @@ public sealed class AzureTableJournalStorageTests
         var store = new FakeTableStore();
         var payload = CreatePayload(length);
 
-        await CreateStorage(store).AppendAsync(new ReadOnlySequence<byte>(payload), CancellationToken.None);
+        await (await CreateStorage(store).ReadForWriteAsync()).AppendAsync(new ReadOnlySequence<byte>(payload), CancellationToken.None);
 
         var transaction = Assert.Single(store.TransactionCalls);
         var dataRows = transaction.Skip(1).ToList();
@@ -1460,6 +1487,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store, journalFormatKey: "binary");
+        await storage.ReadForWriteAsync();
 
         await storage.AppendAsync(ReadOnlySequence<byte>.Empty, CancellationToken.None);
 
@@ -1482,6 +1510,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
         var oldGeneration = Assert.IsType<string>(
             store.GetProperty(TestPartitionKey, AzureTableJournalStorage.HeaderRowKey, AzureTableJournalStorage.GenerationPropertyName));
@@ -1508,7 +1537,7 @@ public sealed class AzureTableJournalStorageTests
         var sequence = CreateMultiSegmentSequence(payload, 17, 65_530, 6);
         Assert.False(sequence.IsSingleSegment);
 
-        await CreateStorage(store).AppendAsync(sequence, CancellationToken.None);
+        await (await CreateStorage(store).ReadForWriteAsync()).AppendAsync(sequence, CancellationToken.None);
 
         var dataRow = Assert.Single(Assert.Single(store.TransactionCalls).Skip(1));
         Assert.Equal(2, dataRow.Properties.Count);
@@ -1528,7 +1557,7 @@ public sealed class AzureTableJournalStorageTests
         var sequence = CreateMultiSegmentSequence(payload, 17, 100_000, 880_000, 3_060);
         Assert.False(sequence.IsSingleSegment);
 
-        await CreateStorage(store).AppendAsync(sequence, CancellationToken.None);
+        await (await CreateStorage(store).ReadForWriteAsync()).AppendAsync(sequence, CancellationToken.None);
 
         var dataRows = Assert.Single(store.TransactionCalls).Skip(1).ToList();
         Assert.Equal(2, dataRows.Count);
@@ -1544,6 +1573,7 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([9]), CancellationToken.None);
         var payload = CreatePayload((int)AzureTableJournalStorage.MaxAppendBytes + 1);
 

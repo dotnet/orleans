@@ -408,8 +408,13 @@ public sealed class VolatileJournalStorage : IJournalStorage, IJournalHistorySto
     // Callers hold the store lock.
     private void ThrowIfVersionChanged(string operation)
     {
+        if (_writeVersion == JournalStorageVersion.Unknown)
+        {
+            throw JournalStorageVersion.CreateWriteBeforeReadException(operation);
+        }
+
         var current = _store.ContentVersion;
-        if (_writeVersion.Value is not null && _writeVersion != current)
+        if (_writeVersion != current)
         {
             throw new InconsistentStateException(
                 $"Version conflict ({operation}): the volatile journal '{_store}' changed since this storage instance last read or wrote it.",

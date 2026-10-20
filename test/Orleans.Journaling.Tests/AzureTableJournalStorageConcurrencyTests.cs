@@ -224,6 +224,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var seed = CreateStorage(store);
+        await seed.ReadForWriteAsync();
         await seed.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var originalGeneration = store.HeaderGeneration;
         var blockedWriter = CreateStorage(store, maxRetries: 3);
@@ -343,6 +344,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var storage = CreateStorage(store, maxRetries: 2);
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var oldGeneration = store.HeaderGeneration;
         store.BeforeUpdateAsync = (attempt, entity, _, _, _) =>
@@ -375,6 +377,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var storage = CreateStorage(store, maxRetries: 2);
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         store.BeforeDeleteAsync = (attempt, _, _, _) =>
         {
@@ -422,6 +425,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var replacement = CreateStorage(store, maxRetries: 3);
+        await replacement.ReadForWriteAsync();
         await replacement.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var originalGeneration = store.HeaderGeneration;
         var appender = CreateStorage(store, maxRetries: 3);
