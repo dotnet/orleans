@@ -84,7 +84,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         try
         {
             var stagedBeforeDuplicate = _pump.StagedChangeCount;
-            if (IsDuplicate(message, out var pending))
+            if (TryStageDuplicate(message, out var pending))
             {
                 var rejection = pending is null ? _processed[key].Rejection : null;
                 ExcludeFromHandlerAttempt(stagedBeforeDuplicate);
@@ -101,20 +101,20 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                     : DeliveryResult.Duplicate();
             }
 
-            // Deduplication precedes the fence: a lost acknowledgement may belong to a pending or completed message.
+            // Retained identities precede expiration: a lost acknowledgement may belong to pending or completed work.
             // Only a durable, non-decreasing floor permits forgetting that evidence, regardless of later clock motion.
             var floor = GetAdmissionFloor();
             if (message.SentAt <= floor)
             {
-                var stagedBeforeFence = _pump.StagedChangeCount;
+                var stagedBeforeExpiration = _pump.StagedChangeCount;
                 if (message.SentAt > _admissionFloor)
                 {
                     Emit(new() { Kind = InboxCommandKind.AdvanceAdmissionFloor, AdmissionFloor = floor });
-                    ExcludeFromHandlerAttempt(stagedBeforeFence);
+                    ExcludeFromHandlerAttempt(stagedBeforeExpiration);
                 }
                 if (_admissionFloor > _durableAdmissionFloor) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
                 Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "expired");
-                LogAdmissionFenced(Logger, key, GrainContext.GrainId, message.SentAt, _admissionFloor);
+                LogMessageExpired(Logger, key, GrainContext.GrainId, message.SentAt, _admissionFloor);
                 return DeliveryResult.Expired();
             }
 
@@ -200,7 +200,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             if (_admissionFloor == DateTimeOffset.MaxValue) throw new InvalidOperationException("The inbox admission floor leaves no representable send time for a new local message.");
             message = message with { SentAt = _admissionFloor.AddTicks(1) };
         }
-        if (IsDuplicate(message, out _))
+        if (TryStageDuplicate(message, out _))
         {
             Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "duplicate");
             return;
@@ -293,16 +293,16 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     }
 
     /// <summary>
-    /// Returns whether the identity has a retained completion or is pending, retaining its latest observed send time.
+    /// Recognizes a retained or pending identity and stages any extension of its observed send time.
     /// </summary>
     /// <param name="message">The received message.</param>
     /// <param name="pending">The pending entry, or <see langword="null"/> when the message was completed or is new.</param>
-    private bool IsDuplicate(InboxMessage message, out InboxEntry? pending)
+    private bool TryStageDuplicate(InboxMessage message, out InboxEntry? pending)
     {
         var key = message.Envelope.MessageId;
         if (_processed.TryGetValue(key, out var processed))
         {
-            UpdateSentAt(message, processed.SentAt);
+            ExtendSentAt(message, processed.SentAt);
             pending = null;
             return true;
         }
@@ -315,19 +315,27 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                     $"The inbox already contains a different command with message ID '{key}'.");
             }
 
-            UpdateSentAt(message, pending.Message.SentAt);
+            ExtendSentAt(message, pending.Message.SentAt);
             return true;
         }
 
         return false;
     }
 
-    private void UpdateSentAt(InboxMessage message, DateTimeOffset sentAt)
+    private void ExtendSentAt(InboxMessage message, DateTimeOffset recordedSentAt)
     {
-        if (message.SentAt <= sentAt) return;
+        if (message.SentAt <= recordedSentAt) return;
         try
         {
-            Emit(new() { Kind = InboxCommandKind.UpdateSentAt, MessageId = message.Envelope.MessageId, SentAt = message.SentAt });
+            if (_processed.TryGetValue(message.Envelope.MessageId, out var processed))
+            {
+                // An in-flight snapshot can omit the old record, so replay needs the complete decision, not a delta.
+                StageCompletion(message, deadLetter: null, rejection: processed.Rejection);
+            }
+            else
+            {
+                Emit(new() { Kind = InboxCommandKind.ExtendSentAt, MessageId = message.Envelope.MessageId, SentAt = message.SentAt });
+            }
         }
         catch (Exception exception)
         {
@@ -719,7 +727,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     private static partial void LogStagingFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Inbox for {ReceiverId} expired message {MessageId}: its send time {SentAt} is at or below the durable admission floor {AdmissionFloor}. Its earlier delivery outcome is unknown.")]
-    private static partial void LogAdmissionFenced(ILogger logger, MessageId messageId, GrainId receiverId, DateTimeOffset sentAt, DateTimeOffset admissionFloor);
+    private static partial void LogMessageExpired(ILogger logger, MessageId messageId, GrainId receiverId, DateTimeOffset sentAt, DateTimeOffset admissionFloor);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "No inbox handler registered for message {MessageId} to {ReceiverId}")]
     private static partial void LogHandlerNotFound(ILogger logger, MessageId messageId, GrainId receiverId);
