@@ -12,7 +12,7 @@ public enum DeliveryStatus
     Accepted = 1,
 
     /// <summary>
-    /// The inbox already holds the message, or processed it within the deduplication window.
+    /// The inbox already holds the message or retains its processed record.
     /// </summary>
     /// <remarks>
     /// A duplicate of a message which an inbox message sink rejected receives that rejection instead: the original
@@ -36,5 +36,14 @@ public enum DeliveryStatus
     /// <remarks>
     /// A redelivery of the message within the deduplication window receives the same result.
     /// </remarks>
-    DeadLettered = 5
+    DeadLettered = 5,
+
+    /// <summary>
+    /// The receiver's durable admission floor fences the message's cutoff, and it retains no outcome for the message.
+    /// </summary>
+    /// <remarks>
+    /// This attempt stages no message effects. An earlier attempt can have been accepted, so the sender treats the
+    /// delivery outcome as unknown and retires the message as <see cref="OutboxMessageRetirementStatus.DeadLettered"/>.
+    /// </remarks>
+    Expired = 6
 }

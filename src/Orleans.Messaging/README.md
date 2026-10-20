@@ -20,7 +20,8 @@ typed message bindings, delivery results, and options.
   with `DeliverAt` counts toward `MaxCapacity` from its acceptance until it completes.
 
 `OutboxMessage` pairs an envelope with its receiver. `InboxMessage` carries the same
-envelope at the receiver. Keep published payload and header arrays unchanged.
+envelope and the send's immutable `RedeliveryDeadline` admission cutoff at the
+receiver. Keep published payload and header arrays unchanged.
 
 `MessageId` wraps a `HierarchicalKey`. Create one with `new MessageId(key)` or
 `MessageId.Create(segments)`, and read the key through `Key`. `HierarchicalKey` wraps
@@ -112,15 +113,52 @@ Each receiver returns a `DeliveryResult`:
 
 - `Accepted`: the message is durable in the inbox, or, for a message an inbox sink
   accepted, in the sink's state together with its processed record.
-- `Duplicate`: the message ID is pending or completed within `DeduplicationWindow`. A
+- `Duplicate`: the message ID is pending or has a retained processed record. A
   duplicate of a message that a sink rejected receives that rejection instead.
 - `Backpressured`: the inbox holds `MaxCapacity` pending messages.
 - `HandlerNotFound`: the receiver has no registered handlers.
-- `DeadLettered`: the receiver rejected the message permanently and moved it to its
-  dead letters, with a reason and an optional `Code`. A receiver also answers
-  `DeadLettered` with `DeliveryResult.DeduplicationWindowExceededCode`, staging
-  nothing, when a message's `RedeliveryDeadline` is later than its
-  `DeduplicationWindow` covers.
+- `DeadLettered`: the receiver durably rejected the message and moved it to its
+  dead letters, with a reason and an optional `Code`.
+- `Expired`: the receiver's durable admission floor fences the send's cutoff and
+  it retains no outcome for the message. This attempt stages no message effects;
+  an earlier attempt can have been accepted, so the delivery outcome is unknown.
 
 `DurableMessagingOptions` configures capacity, batch sizes, retries, deduplication,
 and dead-letter retention.
+
+## Clock-independent deduplication
+
+The outbox journals one admission cutoff and an absolute retry expiration when it
+stages a send. Every delivery and recovery preserves them. `OutboxRetryTimeout`
+defaults to six hours and bounds delivery attempts, including backpressure.
+
+The inbox journals an admission floor which only advances. Its clock minus
+`DeduplicationWindow` proposes floor advancements; the default interval is seven
+days. Pending and processed records determine known outcomes first. An untracked
+send with a cutoff at or below the floor receives `Expired` before any sink or
+handler effects. Processed records can be compacted once the durable floor fences
+their cutoffs. Recovery and migration preserve that fence.
+
+A forward clock jump can fence undelivered work early; a backward jump can delay
+cleanup and prolong retries. Durable fencing preserves deduplication in both cases.
+Direct callers preserve the original cutoff across retries. A null cutoff retains
+the processed record permanently.
+
+## Recoverable terminal outcomes
+
+Applications which need to respond durably to expired or rejected sends register
+an `IOutboxMessageSource` and stage those sends through `IOutbox.Send(messageId)`.
+In `OnRetired`, stage the application's terminal outcome and any pending follow-up
+work in journaled state, alongside releasing the source's payload. That work commits
+atomically with outbox retirement and is recovered with the grain after a crash.
+The application resumes pending follow-up work from its recovered state.
+
+`Delivered` means the receiver durably accepted the message or recognized it as a
+duplicate. `Rejected` carries the receiver's durable rejection. `DeadLettered`
+means the outbox stopped delivering and the receiver's earlier outcome is unknown,
+including when it received `Expired`. Reconcile uncertain outcomes using the
+application's idempotency protocol before initiating a new send. Preserve the
+original cutoff for retries of the same logical send.
+
+Dead-letter retention limits control diagnostic history. The application-owned
+outcome and follow-up work have the lifetime the application gives them.
