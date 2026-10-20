@@ -661,7 +661,7 @@ public sealed partial class DurableTaskSignalTests
 
         public void SetCallerId(TaskId taskId, IDurableTaskState state, GrainId callerId) => ((State)state).CallerId = callerId;
 
-    public void SetIncarnation(TaskId taskId, IDurableTaskState state, Guid incarnation) => ((State)state).Incarnation = incarnation;
+        public void SetIncarnation(TaskId taskId, IDurableTaskState state, Guid incarnation) => ((State)state).Incarnation = incarnation;
 
         public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
         {

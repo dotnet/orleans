@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Collections.Concurrent;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Diagnostics;
