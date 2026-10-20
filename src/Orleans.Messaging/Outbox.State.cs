@@ -70,7 +70,7 @@ internal sealed partial class Outbox
         {
             case OutboxCommandKind.Enqueue:
                 var state = command.State ?? throw new InvalidOperationException("An enqueue command requires its delivery state.");
-                if (state.ExpirationTime is null) throw new InvalidOperationException("An enqueue command requires its retry expiration time.");
+                if (state.SentAt is null) throw new InvalidOperationException("An enqueue command requires its send time.");
                 var entry = new OutboxEntry { Message = command.Message, Reference = command.Reference, State = state, Sequence = ++_lastSequence };
                 _messages.Add(entry.MessageId, entry);
                 ReportDepth(1);
