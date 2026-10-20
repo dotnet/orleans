@@ -958,6 +958,96 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
+    [Fact]
+    public async Task ProcessedHistory_FloorOnlyAndOrdinaryAcksRetainItUntilAnUnchangedFloorSnapshotCommits()
+    {
+        var receiver = NewSinkGrain();
+        var started = _cluster.JobClock.GetUtcNow();
+        var finite = Enumerable.Range(0, 8).Select(index => new InboxMessage
+        {
+            Envelope = new() { MessageId = NewSourceMessageId($"finite-{index}"), Payload = [(byte)index], Subject = SourceSinkGrain.Subject },
+            RedeliveryDeadline = started + RetryTimeout + TimeSpan.FromMinutes(index)
+        }).ToArray();
+        var legacy = Enumerable.Range(0, 8).Select(index => new InboxMessage
+        {
+            Envelope = new() { MessageId = NewSourceMessageId($"null-{index}"), Payload = [(byte)(index + 8)], Subject = SourceSinkGrain.Subject }
+        }).ToArray();
+        var future = new InboxMessage
+        {
+            Envelope = new() { MessageId = NewSourceMessageId("unfenced-finite"), Payload = [16], Subject = SourceSinkGrain.Subject },
+            RedeliveryDeadline = started + TimeSpan.FromDays(10)
+        };
+        var extension = receiver.AsReference<IMessagingExtension>();
+        foreach (var message in finite.Concat(legacy).Append(future))
+        {
+            Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(message, TestContext.Current.CancellationToken)).Status);
+        }
+
+        var inbox = Fixture.GetGrainContext(receiver).ActivationServices.GetRequiredService<Inbox>();
+        var retained = finite.Concat(legacy).Append(future).Select(static message => message.Envelope.MessageId).ToHashSet();
+        var journal = JournalId.FromGrainId(receiver.GetGrainId());
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
+        _cluster.JobClock.Advance(TimeSpan.FromDays(2));
+        DateTimeOffset floor = default;
+        for (var index = 0; index < 32; index++)
+        {
+            _cluster.JobClock.Advance(TimeSpan.FromTicks(1));
+            floor = _cluster.JobClock.GetUtcNow() - TimeSpan.FromDays(1);
+            var stale = new InboxMessage
+            {
+                Envelope = new() { MessageId = NewSourceMessageId($"floor-only-{index}"), Payload = [], Subject = SourceSinkGrain.Subject },
+                RedeliveryDeadline = floor
+            };
+            Assert.Equal(DeliveryStatus.Expired, (await extension.DeliverAsync(stale, TestContext.Current.CancellationToken)).Status);
+            Assert.Equal(writes + index + 1, Fixture.Storage.GetSuccessfulWriteCount(journal));
+            Assert.Equal(floor, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.DurableAdmissionFloor(inbox)));
+            // These finite records are already eligible. Their continued presence proves scalar acks did not compact.
+            Assert.True(retained.SetEquals(await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox))));
+        }
+
+        var ordinary = new InboxMessage
+        {
+            Envelope = new() { MessageId = NewSourceMessageId("ordinary-append"), Payload = [17], Subject = SourceSinkGrain.Subject }
+        };
+        Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(ordinary, TestContext.Current.CancellationToken)).Status);
+        retained.Add(ordinary.Envelope.MessageId);
+        Assert.Equal(writes + 33, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.True(retained.SetEquals(await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox))));
+
+        // The floor is already durable. This snapshot must reclaim history even though its candidate cannot advance.
+        _cluster.JobClock.Advance(started - _cluster.JobClock.GetUtcNow());
+        Fixture.Storage.RequestSnapshot(journal);
+        using var acknowledgement = Fixture.Storage.BlockAcknowledgement(journal);
+        var snapshot = receiver.WriteAsync();
+        await acknowledgement.WaitUntilEnteredAsync();
+        Assert.False(snapshot.IsCompleted);
+        Assert.Equal(writes + 34, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.Equal(floor, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.AdmissionFloor(inbox)));
+        Assert.Equal(floor, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.DurableAdmissionFloor(inbox)));
+        Assert.True(retained.SetEquals(await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox))));
+        acknowledgement.Release();
+        await snapshot;
+
+        retained.ExceptWith(finite.Select(static message => message.Envelope.MessageId));
+        Assert.True(retained.SetEquals(await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox))));
+        Assert.Equal(floor, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.DurableAdmissionFloor(inbox)));
+        await _cluster.CrashAsync(receiver);
+        Assert.Equal(0, await receiver.GetOutboxCountAsync());
+        inbox = Fixture.GetGrainContext(receiver).ActivationServices.GetRequiredService<Inbox>();
+        Assert.Equal(floor, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.DurableAdmissionFloor(inbox)));
+        Assert.True(retained.SetEquals(await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox))));
+        foreach (var message in finite)
+        {
+            Assert.Equal(DeliveryStatus.Expired, (await extension.DeliverAsync(message, TestContext.Current.CancellationToken)).Status);
+        }
+        foreach (var message in legacy.Append(future).Append(ordinary))
+        {
+            Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(message, TestContext.Current.CancellationToken)).Status);
+        }
+        Assert.Equal(18, _cluster.SourceSinkProbe.For(receiver).SinkOffers);
+        Assert.Equal(18, _cluster.SourceSinkProbe.For(receiver).SinkAcceptances);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
