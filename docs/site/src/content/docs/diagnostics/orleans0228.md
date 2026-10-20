@@ -25,7 +25,7 @@ A detached task is an independent root task. Its host stores the task and runs i
 
 A step, an `async DurableTask` method, and a combinator are code of the starting execution: a replay of that execution re-creates them, and nothing else can. Starting one detached throws `InvalidOperationException`, before the start takes an identifier of the execution.
 
-For attached and detached starts, see [Starting and observing tasks](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#starting-and-observing-tasks).
+For attached and detached starts, see [Starting and observing tasks](../grains/durable-tasks.md#starting-and-observing-tasks).
 
 ## How to fix violations
 

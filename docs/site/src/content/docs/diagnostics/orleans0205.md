@@ -25,7 +25,7 @@ The C# compiler also reports CS4014 for some of these statements in `async` meth
 
 A durable task is cold: calling its method creates a definition, and configuring the definition returns a configuration of it. Neither starts the task. The task runs when the definition is awaited, scheduled with `ScheduleAsync`, or started with `Post`. A discarded definition never runs, so the receipt in the example is never sent, and no error reports it.
 
-For the ways to start a task, see [Starting and observing tasks](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#starting-and-observing-tasks).
+For the ways to start a task, see [Starting and observing tasks](../grains/durable-tasks.md#starting-and-observing-tasks).
 
 ## How to fix violations
 

@@ -25,7 +25,7 @@ A replay runs the code before the body's last durable operation again, including
 
 A logger which `ReplaySafe()` returns skips events while the task replays: from the start of a run which finds recorded operations, until the run reaches an operation which no earlier run recorded. Each event is then logged once.
 
-For replay-safe logging, see [Replay diagnostics and logging](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#replay-diagnostics-and-logging).
+For replay-safe logging, see [Replay diagnostics and logging](../grains/durable-tasks.md#replay-diagnostics-and-logging).
 
 ## How to fix violations
 

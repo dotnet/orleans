@@ -31,7 +31,7 @@ An await which continues without its captured context resumes the body on the th
 
 ORLEANS0014 reports `ConfigureAwait(false)` in grain code in general.
 
-For the body's tail, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
+For the body's tail, see [Writing replay-safe workflows](../grains/durable-tasks.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 

@@ -23,7 +23,7 @@ The durable task method builder defers the method body. The durable task host ru
 
 :::code source="snippets/durable-tasks/Orleans0224.cs" id="orleans0224_step" language="csharp":::
 
-For the execution model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
+For the execution model, see [Writing replay-safe workflows](../grains/durable-tasks.md#writing-replay-safe-workflows).
 
 The `Microsoft.Orleans.DurableTasks.Abstractions` package carries the suppressor with the other durable task analyzers, so it applies to every project which references the package. The suppressor matches the return type by its fully qualified metadata name. CS1998 remains reported for other task-like return types, including `Task`, `ValueTask`, and types named `DurableTask` in other namespaces.
 

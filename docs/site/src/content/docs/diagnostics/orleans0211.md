@@ -25,7 +25,7 @@ A durable task body awaits `Task.Delay` or calls `Thread.Sleep` at a point from 
 
 A durable delay records its due time in the execution's logical time. The grain can deactivate while it waits, the runtime reactivates it when the delay is due, and a replay resumes the recorded delay instead of starting another.
 
-For delays and timeouts, see [Combinators](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#combinators).
+For delays and timeouts, see [Combinators](../grains/durable-tasks.md#combinators).
 
 ## How to fix violations
 

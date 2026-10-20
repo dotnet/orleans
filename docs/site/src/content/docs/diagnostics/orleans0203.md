@@ -25,7 +25,7 @@ A step's result is staged in the work item which runs its final synchronous code
 
 When the run then ends before the result commits, for example because the activation deactivates, the next run runs the step again: it counts the notice a second time and sends the email again. The task's record shows one notice, and the grain's state shows two.
 
-For the commit model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
+For the commit model, see [Writing replay-safe workflows](../grains/durable-tasks.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 

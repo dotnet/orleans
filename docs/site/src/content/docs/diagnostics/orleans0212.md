@@ -30,7 +30,7 @@ An unfiltered handler treats both alike. When the host cancels the attempt durin
 
 `DurableTask.Current.IsTaskCancellationRequested` is `true` only for task cancellation, in the canceled attempt and in every later attempt.
 
-For compensation, see [Compensating canceled work](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#compensating-canceled-work).
+For compensation, see [Compensating canceled work](../grains/durable-tasks.md#compensating-canceled-work).
 
 ## How to fix violations
 

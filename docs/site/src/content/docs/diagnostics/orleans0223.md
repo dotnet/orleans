@@ -27,7 +27,7 @@ A change made in place to an object which the state holds bypasses the API. The 
 
 Value types, records whose members are init-only, and immutable collections change through assignment, which the API records, so the rule reports none of them.
 
-For replay-safe state, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
+For replay-safe state, see [Writing replay-safe workflows](../grains/durable-tasks.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 
