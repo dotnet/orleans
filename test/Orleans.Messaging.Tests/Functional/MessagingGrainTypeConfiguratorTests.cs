@@ -102,6 +102,8 @@ public class MessagingGrainTypeConfiguratorTests : MessagingBehaviorTestBase
 
         var delivered = Delivery.WaitForOutputAsync(grain.GetGrainId());
         var drained = Delivery.WaitForDrainAsync(grain.GetGrainId());
+        var cutoff = await Fixture.OnGrainAsync(grain, () =>
+            new OutboxStateTestAccess(recovered.Outbox!).Attempt(output.Envelope.MessageId).ExpirationTime);
         Delivery.Release();
         var receipt = await delivered;
         await drained;
@@ -110,7 +112,8 @@ public class MessagingGrainTypeConfiguratorTests : MessagingBehaviorTestBase
         Assert.Empty(recovered.Outbox!.Messages());
         var sink = Fixture.Client.GetGrain<IBootstrapOutputGrain>("capture");
         Assert.Equal(1, await sink.GetMessageCountAsync());
-        Assert.Equal(DeliveryStatus.Duplicate, (await sink.AsReference<IMessagingExtension>().DeliverAsync(output.ToInboxMessage(), Cancellation)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await sink.AsReference<IMessagingExtension>()
+            .DeliverAsync(output.ToInboxMessage() with { RedeliveryDeadline = cutoff }, Cancellation)).Status);
         Assert.Equal(1, await sink.GetMessageCountAsync());
     }
 
