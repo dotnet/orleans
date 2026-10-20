@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Messaging.Configuration;
@@ -25,7 +24,6 @@ internal sealed class MessagingShared
         JobTimeProvider = services.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs);
         JobManager = services.GetRequiredService<ILocalDurableJobManager>();
         Transport = services.GetRequiredService<IOutboxTransport>();
-        MaxAttemptDuration = services.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.ResponseTimeout;
         Instruments = services.GetRequiredService<MessagingInstruments>();
         var loggers = services.GetRequiredService<ILoggerFactory>();
         InboxLogger = loggers.CreateLogger<Inbox>();
@@ -38,12 +36,6 @@ internal sealed class MessagingShared
 
 
     public DurableMessagingOptions Options { get; }
-
-    /// <summary>
-    /// Gets the longest time between the start of a delivery attempt and the receiver's answer: Orleans drops a grain call
-    /// older than its response timeout instead of invoking it.
-    /// </summary>
-    public TimeSpan MaxAttemptDuration { get; }
 
     public TimeProvider TimeProvider { get; }
 
