@@ -78,7 +78,9 @@ public sealed class MessagingCommandSerializationTests
             new() { Kind = InboxCommandKind.Retry, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom" } },
             new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), SentAt = Now, DeadLetter = deadLetter },
             new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "dead"), SentAt = Now, DeadLetter = deadLetter, Rejection = rejection },
-            new() { Kind = InboxCommandKind.UpdateSentAt, MessageId = MessageId.Create("orders", "done"), SentAt = Now.AddHours(1) },
+            new() { Kind = InboxCommandKind.ExtendSentAt, MessageId = MessageId.Create("orders", "accept"), SentAt = Now.AddHours(1) },
+            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), SentAt = Now.AddHours(1) },
+            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "dead"), SentAt = Now.AddHours(1), Rejection = rejection },
             new() { Kind = InboxCommandKind.RemoveDeadLetters, RemovedKeys = [MessageId.Create("orders", "dead")] },
             new()
             {

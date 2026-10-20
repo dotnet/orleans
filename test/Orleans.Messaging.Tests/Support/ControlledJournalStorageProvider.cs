@@ -14,6 +14,8 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
     private readonly ConcurrentDictionary<JournalId, WritePlan> _postWritePlans = new();
     private readonly ConcurrentDictionary<JournalId, byte> _postDeleteFailures = new();
     private readonly ConcurrentDictionary<JournalId, int> _successfulWrites = new();
+    private readonly ConcurrentDictionary<JournalId, int> _successfulAppends = new();
+    private readonly ConcurrentDictionary<JournalId, int> _successfulSnapshots = new();
     private readonly ConcurrentDictionary<JournalId, int> _reads = new();
     private readonly ConcurrentDictionary<JournalId, int> _readFailures = new();
     private readonly ConcurrentDictionary<JournalId, int> _creations = new();
@@ -125,6 +127,12 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
     public int GetSuccessfulWriteCount(JournalId journalId) =>
         _successfulWrites.TryGetValue(journalId, out var count) ? count : 0;
 
+    public int GetSuccessfulAppendCount(JournalId journalId) =>
+        _successfulAppends.TryGetValue(journalId, out var count) ? count : 0;
+
+    public int GetSuccessfulSnapshotCount(JournalId journalId) =>
+        _successfulSnapshots.TryGetValue(journalId, out var count) ? count : 0;
+
     public int GetCreationCount(JournalId journalId) => _creations.TryGetValue(journalId, out var count) ? count : 0;
     public int GetReadCount(JournalId journalId) => _reads.TryGetValue(journalId, out var count) ? count : 0;
     public int GetInitializationCount(JournalId journalId) => _initializations.TryGetValue(journalId, out var count) ? count : 0;
@@ -168,8 +176,12 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         await plan.Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private void OnWriteSucceeded(JournalId journalId) =>
+    private void OnWriteSucceeded(JournalId journalId, bool snapshot)
+    {
         _successfulWrites.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
+        var counts = snapshot ? _successfulSnapshots : _successfulAppends;
+        counts.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
+    }
 
     private async ValueTask AfterWriteAsync(JournalId journalId, CancellationToken cancellationToken)
     {
@@ -258,7 +270,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
             await owner.BeforeWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
             await inner.ReplaceAsync(value, cancellationToken).ConfigureAwait(false);
             owner._snapshots.TryRemove(journalId, out _);
-            owner.OnWriteSucceeded(journalId);
+            owner.OnWriteSucceeded(journalId, snapshot: true);
             await owner.AfterWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
             if (captured is not null) grain!.PublishStoredSnapshot(captured);
             if (namedSnapshot is not null) named!.PublishStoredSnapshot(namedSnapshot);
@@ -273,7 +285,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
             var namedSnapshot = named?.CaptureStorageWrite();
             await owner.BeforeWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
             await inner.AppendAsync(value, cancellationToken).ConfigureAwait(false);
-            owner.OnWriteSucceeded(journalId);
+            owner.OnWriteSucceeded(journalId, snapshot: false);
             await owner.AfterWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
             if (captured is not null) grain!.PublishStoredSnapshot(captured);
             if (namedSnapshot is not null) named!.PublishStoredSnapshot(namedSnapshot);
