@@ -175,8 +175,9 @@ public abstract class DurableTaskStartTests(string journalFormatKey) : IAsyncLif
         // A task's identity is its method, not its arguments, so the start reaches the stored task.
         var workflow = await starter.ScheduleEchoAsync(workerKey, "taken", 2).WithId("workflow").ScheduleAsync(cancellationToken);
 
-        Assert.Equal("echoed 1", await workflow.WaitAsync(Timeout, cancellationToken));
-        Assert.Equal(1, (await worker.GetDurableTask<int>("taken").GetResponseAsync(cancellationToken)).GetResult<int>());
+        // The echo doubles its argument, so the result is the stored task's, which echoed 1.
+        Assert.Equal("echoed 2", await workflow.WaitAsync(Timeout, cancellationToken));
+        Assert.Equal(2, (await worker.GetDurableTask<int>("taken").GetResponseAsync(cancellationToken)).GetResult<int>());
         Assert.Empty(await worker.GetInboxDeadLetterCodesAsync());
     }
 
