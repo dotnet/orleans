@@ -117,7 +117,7 @@ internal sealed record TransactionActivation(
 /// <summary>
 /// Storage which holds appends at a gate, fails the next append, requests compaction on demand, and counts its operations.
 /// </summary>
-internal sealed class ControlledJournalStorage(string formatKey) : IJournalStorage
+internal sealed class ControlledJournalStorage : IJournalStorage
 {
     private readonly object _lock = new();
     private TaskCompletionSource? _gate;
@@ -126,9 +126,22 @@ internal sealed class ControlledJournalStorage(string formatKey) : IJournalStora
     private int _appends;
     private int _replaces;
 
-    public VolatileJournalStorage Inner { get; } = new(formatKey);
+    private static readonly JournalId Journal = new("transaction-tests");
+    private readonly VolatileJournalStorageProvider _provider;
+
+    public ControlledJournalStorage(string formatKey)
+    {
+        _provider = new(Options.Create(new JournaledStateManagerOptions { JournalFormatKey = formatKey }));
+        Inner = (VolatileJournalStorage)_provider.CreateStorage(Journal);
+    }
+
+    public VolatileJournalStorage Inner { get; }
+
+    /// <summary>Creates another writer of the same journal, whose write precondition is its own.</summary>
+    public IJournalStorage CreateOtherWriter() => _provider.CreateStorage(Journal);
 
     public bool RequestCompaction { get; set; }
+
 
     /// <summary>Gets the number of appends which reached storage.</summary>
     public int Appends => Volatile.Read(ref _appends);
