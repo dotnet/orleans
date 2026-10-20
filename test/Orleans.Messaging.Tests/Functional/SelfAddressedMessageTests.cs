@@ -299,38 +299,32 @@ public sealed class SelfAddressedMessageTests() : MessagingBehaviorTestBase(new 
             {
                 Kind = OutboxCommandKind.Enqueue,
                 Message = message,
-                State = new() { ExpirationTime = DateTimeOffset.MaxValue }
+                State = new() { SentAt = JobClock.GetUtcNow() }
             });
             ((IStateMachine)outbox).OnRecoveryCompleted();
         }));
         Assert.Contains("addressed to its own grain", error.Message, StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task SelfSend_ReusesFiniteOrLegacyCutoffAcrossClockMotionSnapshotAndRecovery(bool legacyNull)
+    [Fact]
+    public async Task SelfSend_StagesAndExtendsSentAtAcrossClockMotionSnapshotAndRecovery()
     {
         var grain = NewGrain();
         var started = JobClock.GetUtcNow();
         var due = started + Delay;
-        var output = WithDeliverAt(SelfMessage(grain, NewMessage(61, "fixed-local-cutoff"), "messages/self-cutoff"), due);
-        if (legacyNull)
-        {
-            Assert.Equal(DeliveryStatus.Accepted,
-                (await DeliverAsync(grain, new InboxMessage { Envelope = output.Envelope })).Status);
-        }
-        else
-        {
-            await grain.StageOutputAsync(output);
-            await grain.RetryWriteStateAsync();
-        }
+        var output = WithDeliverAt(SelfMessage(grain, NewMessage(61, "local-sent-time"), "messages/self-sent-time"), due);
+        await grain.StageOutputAsync(output);
+        await grain.RetryWriteStateAsync();
 
         var inbox = Fixture.GetInbox(grain);
-        var cutoff = await Fixture.OnGrainAsync(grain, () =>
-            InboxTestAccess.GetPendingMessages(inbox)[output.Envelope.MessageId].Message.RedeliveryDeadline);
-        if (legacyNull) Assert.Null(cutoff);
-        else Assert.Equal(started + TimeSpan.FromSeconds(3), cutoff);
+        Assert.Equal(started, await Fixture.OnGrainAsync(grain, () =>
+            InboxTestAccess.GetPendingMessages(inbox)[output.Envelope.MessageId].Message.SentAt));
+        JobClock.Advance(TimeSpan.FromMinutes(1));
+        await grain.StageOutputAsync(output);
+        await grain.RetryWriteStateAsync();
+        var sentAt = JobClock.GetUtcNow();
+        Assert.Equal(sentAt, await Fixture.OnGrainAsync(grain, () =>
+            InboxTestAccess.GetPendingMessages(inbox)[output.Envelope.MessageId].Message.SentAt));
 
         JobClock.Advance(-TimeSpan.FromDays(2));
         await grain.StageOutputAsync(output);
@@ -339,7 +333,7 @@ public sealed class SelfAddressedMessageTests() : MessagingBehaviorTestBase(new 
         await ReactivateAsync(grain);
         inbox = Fixture.GetInbox(grain);
         var recovered = Assert.Single(await Fixture.OnGrainAsync(grain, () => InboxTestAccess.GetPendingMessages(inbox).Values.ToArray()));
-        Assert.Equal(cutoff, recovered.Message.RedeliveryDeadline);
+        Assert.Equal(sentAt, recovered.Message.SentAt);
         Assert.Equal(due, recovered.Message.Envelope.DeliverAt);
         Assert.Equal(0, (await grain.GetSnapshotAsync()).OutboxCount);
         await grain.StageOutputAsync(output);
@@ -348,31 +342,31 @@ public sealed class SelfAddressedMessageTests() : MessagingBehaviorTestBase(new 
         await Fixture.RunPumpAsync(grain);
         await Fixture.WaitForInboxCountAsync(grain, 0);
         var completed = await grain.GetSnapshotAsync();
-        Assert.Equal("fixed-local-cutoff", Assert.Single(completed.Effects).Value);
+        Assert.Equal("local-sent-time", Assert.Single(completed.Effects).Value);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal(0, completed.OutboxCount);
         Fixture.Storage.RequestSnapshot(JournalId.FromGrainId(grain.GetGrainId()));
         await grain.RetryWriteStateAsync();
-        var replay = new InboxMessage { Envelope = output.Envelope, RedeliveryDeadline = cutoff };
-        Assert.Equal(legacyNull ? DeliveryStatus.Duplicate : DeliveryStatus.Expired, (await DeliverAsync(grain, replay)).Status);
+        var replay = output.ToInboxMessage(sentAt);
+        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(grain, replay)).Status);
     }
 
     [Fact]
-    public async Task SelfSend_AfterClockRollback_StampsACutoffAboveTheDurableFloor()
+    public async Task SelfSend_AfterClockRollback_StampsSentAtAboveTheDurableFloor()
     {
         var grain = NewGrain();
         var original = JobClock.GetUtcNow();
         JobClock.Advance(TimeSpan.FromDays(2));
         var floor = JobClock.GetUtcNow() - TimeSpan.FromMinutes(10);
-        var stale = CreateEnvelope(grain, NewMessage(62, "floor")) with { RedeliveryDeadline = floor };
+        var stale = CreateEnvelope(grain, NewMessage(62, "floor")) with { SentAt = floor };
         Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(grain, stale)).Status);
         JobClock.Advance(original - JobClock.GetUtcNow());
         var output = WithDeliverAt(SelfMessage(grain, NewMessage(63, "after-rollback"), "messages/self-above-floor"), original + Delay);
         await grain.StageOutputAsync(output);
         var inbox = Fixture.GetInbox(grain);
-        var cutoff = await Fixture.OnGrainAsync(grain, () =>
-            InboxTestAccess.GetPendingMessages(inbox)[output.Envelope.MessageId].Message.RedeliveryDeadline);
-        Assert.True(cutoff > floor);
+        var sentAt = await Fixture.OnGrainAsync(grain, () =>
+            InboxTestAccess.GetPendingMessages(inbox)[output.Envelope.MessageId].Message.SentAt);
+        Assert.True(sentAt > floor);
         Assert.Equal(0, (await grain.GetSnapshotAsync()).OutboxCount);
         await grain.StageOutputAsync(output);
         await grain.RetryWriteStateAsync();

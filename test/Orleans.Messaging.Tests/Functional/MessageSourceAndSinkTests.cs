@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.DurableJobs;
 using Orleans.Hosting;
+using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using Orleans.Messaging.Configuration;
@@ -551,12 +552,12 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Contains("no outbox message source is registered", error.Message, StringComparison.Ordinal);
     }
 
-    private static void ApplyReference(Outbox outbox, MessageId messageId) =>
+    private void ApplyReference(Outbox outbox, MessageId messageId) =>
         ((IDurableValueCommandHandler<OutboxCommand>)outbox).ApplySet(new OutboxCommand
         {
             Kind = OutboxCommandKind.Enqueue,
             Reference = new() { MessageId = messageId },
-            State = new() { ExpirationTime = DateTimeOffset.MaxValue }
+            State = new() { SentAt = fixture.JobNow }
         });
 
     private static void AssertSourceFailureDeadLetter(DeadLetter<OutboxMessage> letter, MessageId messageId, SourceFault fault)
@@ -1026,6 +1027,7 @@ public sealed class SourceSinkProbe
         private int _retirementCallbacks;
 
         public volatile SinkMode Mode;
+        public volatile string? SubjectOverride;
 
         /// <summary>Makes the source share its payload array as a header value, and clear that array when the message retires.</summary>
         public volatile bool ReleaseBuffersOnRetired;
@@ -1205,7 +1207,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
             {
                 MessageId = messageId,
                 Payload = payload,
-                Subject = Subject,
+                Subject = _probe.SubjectOverride ?? Subject,
                 Headers = _probe.ReleaseBuffersOnRetired ? new() { [PayloadHeader] = payload } : null
             },
             ReceiverId = GrainId.Parse(_receivers[key])
