@@ -1524,16 +1524,6 @@ internal sealed partial class ActivationData :
                 }
 
                 grainMigrationParticipant?.OnRehydrate(context);
-
-                // Cache-hint failures must not interrupt restoration of the grain's state.
-                foreach (var (message, _) in _waitingRequests)
-                {
-                    if (message.Direction is Message.Directions.OneWay && message.HasCacheInvalidationHeader)
-                    {
-                        _shared.InternalRuntime.MessageCenter.SendRejectionResponse(
-                            message, Message.RejectionTypes.CacheInvalidation, "One-way request migrated", exception: null);
-                    }
-                }
             }
 
             LogRehydratedGrain(_shared.Logger);

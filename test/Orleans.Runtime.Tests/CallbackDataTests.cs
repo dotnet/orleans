@@ -229,6 +229,28 @@ public class CallbackDataTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public void RetargetDoesNotRestartTheCallersTimeout()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var time = new FakeTimeProvider();
+        var completion = new TestResponseCompletionSource();
+        var callback = CreateRequestCallback(completion, CreateInstruments(serviceProvider), out _, timeProvider: time);
+        time.Advance(CancellableInvokable.ResponseTimeout - TimeSpan.FromTicks(1));
+        Assert.False(callback.IsExpired(time.GetTimestamp()));
+
+        Assert.True(callback.TryRetarget(SiloAddress.New(IPAddress.Loopback, 30002, 1), forwardCount: 1, NotDead));
+        callback.Message.BodyObject = null;
+        time.Advance(TimeSpan.FromTicks(2));
+
+        Assert.True(callback.IsExpired(time.GetTimestamp()));
+        callback.OnTimeout();
+        Assert.True(callback.IsCompleted);
+        Assert.IsType<TimeoutException>(completion.Response.Exception);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public void RetargetsAreOrderedByForwardCount()
     {
         using var serviceProvider = CreateServiceProvider();

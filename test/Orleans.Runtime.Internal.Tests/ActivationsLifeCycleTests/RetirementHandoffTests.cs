@@ -810,7 +810,6 @@ public sealed class RetirementHandoffTests
                     var packages = (List<GrainMigrationPackage>)context.Request.GetArgument(0)!;
                     Assert.All(packages, package => Assert.Null(package.Requests));
                     Assert.All(packages, package => Assert.Null(package.RequestFrames));
-                    Assert.Null(RequestContext.Get(MigrationClock.RequestContextKey));
                 }
 
                 await context.Invoke();
@@ -848,17 +847,12 @@ public sealed class RetirementHandoffTests
     [InlineData(true)]
     public async Task MigratedRequestsForAnExistingActivation_UseOrdinaryAdmissionAndCacheRepair(bool invalidPreviousAddress)
     {
-        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
-        {
-            silo.Services.AddSingleton<OneWayCacheUpdateObserver>();
-            silo.Services.AddSingleton<IMessageStatisticsSink>(services => services.GetRequiredService<OneWayCacheUpdateObserver>());
-        }));
+        await using var cluster = await DeployAsync();
         var caller = cluster.Silos[0];
         var previous = cluster.Silos[2];
         var silo = cluster.Silos[1];
         var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
         var locator = caller.ServiceProvider.GetRequiredService<Orleans.Runtime.GrainDirectory.GrainLocator>();
-        var cacheUpdates = silo.ServiceProvider.GetRequiredService<OneWayCacheUpdateObserver>();
         var migrationManager = silo.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
         var key = Guid.NewGuid();
         var state = RetirementHandoffState.Create(key);
@@ -871,7 +865,6 @@ public sealed class RetirementHandoffTests
         // The caller's cache holds the migrating activation's address, which the migration replaces.
         var previousAddress = new GrainAddress { GrainId = grain.GetGrainId(), SiloAddress = previous.SiloAddress, ActivationId = ActivationId.NewId() };
         locator.UpdateCache(grain.GetGrainId(), previous.SiloAddress);
-        cacheUpdates.GrainId = grain.GetGrainId();
 
         // The migration arrives too late to create the activation, so the existing activation receives the request as it receives a forwarded request.
         var request = CreateOneWayRequest(grain.GetGrainId(), 1);
@@ -898,7 +891,6 @@ public sealed class RetirementHandoffTests
 
         Assert.Empty(context.Keys);
         Assert.Null(request.CacheInvalidationHeader);
-        Assert.False(cacheUpdates.Received.Task.IsCompleted);
 
         state.ReleaseBlock.TrySetResult();
         await running.WaitAsync(Timeout, Cancellation);
@@ -1577,8 +1569,6 @@ public sealed class RetirementHandoffTests
         var retargets = 0;
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
         {
-            silo.Services.AddSingleton<OneWayCacheUpdateObserver>();
-            silo.Services.AddSingleton<IMessageStatisticsSink>(services => services.GetRequiredService<OneWayCacheUpdateObserver>());
             silo.AddIncomingGrainCallFilter(async context =>
             {
                 if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.RetargetMigratedRequests))
@@ -1594,14 +1584,12 @@ public sealed class RetirementHandoffTests
         var target = cluster.Silos[2];
         var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
         var locator = caller.ServiceProvider.GetRequiredService<Orleans.Runtime.GrainDirectory.GrainLocator>();
-        var cacheUpdates = caller.ServiceProvider.GetRequiredService<OneWayCacheUpdateObserver>();
         var key = Guid.NewGuid();
         var state = RetirementHandoffState.Create(key);
         var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
         await PlaceOnAsync(source, () => grain.GetLocation());
         Assert.True(locator.TryLookupInCache(grain.GetGrainId(), out var cached));
         Assert.Equal(source.SiloAddress, cached.SiloAddress);
-        cacheUpdates.GrainId = grain.GetGrainId();
 
         var running = grain.Block().AsTask();
         await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
@@ -1627,8 +1615,8 @@ public sealed class RetirementHandoffTests
         Assert.NotEqual(source.SiloAddress, destination);
         if (!retireSource)
         {
-            // Keep the source alive so that only the migrated request's cache update corrects the caller's route.
-            await cacheUpdates.Received.Task.WaitAsync(Timeout, Cancellation);
+            // With the source still alive, the next ordinary call repairs the caller's stale route.
+            Assert.Equal(destination, await grain.GetLocation().AsTask().WaitAsync(Timeout, Cancellation));
             Assert.Equal(target.SiloAddress, destination);
             Assert.True(locator.TryLookupInCache(grain.GetGrainId(), out cached));
             Assert.Equal(destination, cached.SiloAddress);
@@ -1636,23 +1624,6 @@ public sealed class RetirementHandoffTests
 
         await stopping.WaitAsync(Timeout, Cancellation);
         Assert.Equal(0, Volatile.Read(ref retargets));
-    }
-
-    private sealed class OneWayCacheUpdateObserver : IMessageStatisticsSink
-    {
-        public GrainId GrainId { get; set; }
-        public TaskCompletionSource Received { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public Action<Message> GetMessageObserver() => message =>
-        {
-            if (message.Direction is Message.Directions.Response
-                && message.Result is Message.ResponseTypes.Rejection
-                && message.SendingGrain == GrainId
-                && message.HasCacheInvalidationHeader)
-            {
-                Received.TrySetResult();
-            }
-        };
     }
 
     [Theory]
@@ -1828,7 +1799,7 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
-    public async Task MigrationSnapshot_ReleasesSourceBuffersBeforeRpcAndPreservesExpiration()
+    public async Task MigrationSnapshot_ReleasesSourceBuffersBeforeRpcAndPreservesFramedExpiration()
     {
         await using var cluster = await DeployAsync();
         var source = cluster.Silos[1];
@@ -1843,7 +1814,7 @@ public sealed class RetirementHandoffTests
         Assert.True(context.TryAddValue("payload", payload));
         using var expired = CreateReceivedRequest(cluster, source, grainId, 1, 20_000);
         using var live = CreateReceivedRequest(cluster, source, grainId, 2, 20_000);
-        expired.TimeToLive = TimeSpan.FromMinutes(1);
+        expired.TimeToLive = TimeSpan.FromMinutes(-1);
         live.TimeToLive = TimeSpan.FromMinutes(5);
         var page = Assert.IsType<Orleans.Runtime.Messaging.MessageReadRequest>(live._bodyObject).Body.First!;
         var version = page.Version;
@@ -1851,8 +1822,7 @@ public sealed class RetirementHandoffTests
         var migration = new ActivationMigration(manager, CreateSourceAddress(source, grainId), target.SiloAddress,
             new() { GrainId = grainId, MigrationContext = context, Requests = requests }, requests, routes: null, size: 0, Cancellation);
         Assert.True(migration.TrySend());
-        var clock = MigrationClock.Start();
-        var snapshot = migration.CreateSnapshot(shared, clock);
+        var snapshot = migration.CreateSnapshot(shared);
         Assert.Null(expired._bodyObject);
         Assert.Null(live._bodyObject);
         Assert.Empty(context.Keys);
@@ -1861,11 +1831,10 @@ public sealed class RetirementHandoffTests
         // A timed-out call releases its source state while a late writer can still read the snapshot.
         migration.Complete(new TimeoutException("Acknowledgement lost."));
         await Assert.ThrowsAsync<TimeoutException>(() => migration.Completion);
-        clock.TimestampMilliseconds -= (long)TimeSpan.FromMinutes(2).TotalMilliseconds;
         for (var attempt = 0; attempt < 2; attempt++)
         {
             var received = serializer.Deserialize<GrainMigrationPackage>(serializer.SerializeToArray(snapshot));
-            received.UnpackRequests(shared, clock);
+            received.UnpackRequests(shared);
             try
             {
                 Assert.True(received.MigrationContext.TryGetValue("payload", out byte[]? actual));
@@ -1873,7 +1842,7 @@ public sealed class RetirementHandoffTests
                 Assert.Equal(2, received.Requests!.Count);
                 Assert.True(received.Requests[0].IsExpired);
                 Assert.False(received.Requests[1].IsExpired);
-                Assert.InRange(received.Requests[1].TimeToLive!.Value, TimeSpan.FromMinutes(2.5), TimeSpan.FromMinutes(3));
+                Assert.InRange(received.Requests[1].TimeToLive!.Value, TimeSpan.Zero, TimeSpan.FromMinutes(5));
                 Assert.All(received.Requests, request =>
                     Assert.Equal(new byte[20_000], Assert.IsType<Orleans.Runtime.Messaging.MessageReadRequest>(request._bodyObject).Body.ToArray()));
             }
@@ -2013,9 +1982,7 @@ public sealed class RetirementHandoffTests
     {
         var packages = (List<GrainMigrationPackage>)context.Request.GetArgument(0)!;
         var package = Assert.Single(packages);
-        package.UnpackRequests(
-            context.TargetContext.ActivationServices.GetRequiredService<Orleans.Runtime.Messaging.MessageHandlerShared>(),
-            (MigrationClock?)RequestContext.Get(MigrationClock.RequestContextKey));
+        package.UnpackRequests(context.TargetContext.ActivationServices.GetRequiredService<Orleans.Runtime.Messaging.MessageHandlerShared>());
         packages[0] = package;
         return package;
     }

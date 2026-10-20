@@ -306,26 +306,6 @@ namespace Orleans.Runtime
 
         internal long GetTimeToLiveMilliseconds() => -_timeToExpiry.ElapsedMilliseconds;
 
-        internal long? GetTimeToLiveMilliseconds(long referenceTimestamp)
-        {
-            if (_timeToExpiry.IsDefault)
-            {
-                return null;
-            }
-
-            return _timeToExpiry.IsRunning
-                ? _timeToExpiry.GetRawTimestamp() - referenceTimestamp
-                : -_timeToExpiry.ElapsedMilliseconds;
-        }
-
-        internal void SetTimeToLiveMilliseconds(long milliseconds, long referenceTimestamp)
-        {
-            _headers.SetFlag(MessageFlags.HasTimeToLive, true);
-            var timestamp = checked(referenceTimestamp + milliseconds);
-            // Zero is reserved for an infinite lifetime; a finite deadline at the clock's epoch has expired.
-            _timeToExpiry = CoarseStopwatch.FromTimestamp(timestamp == 0 ? -1 : timestamp);
-        }
-
         internal void SetTimeToLiveMilliseconds(long milliseconds)
         {
             _headers.SetFlag(MessageFlags.HasTimeToLive, true);
