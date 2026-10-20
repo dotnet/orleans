@@ -99,7 +99,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     [FromKeyedServices("$task-invocations")] IDurableDictionary<MessageId, PendingInvocation> invocations,
     DurableTaskGrainRuntimeShared shared,
     IEnumerable<IDurableTaskMessageTransport> messageTransports,
-    IJournaledStateManager? stateManager = null) :
+    IJournaledStateManager stateManager) :
     IDurableTaskGrainRuntime,
     IDurableTaskGrainExtension,
     IDurableTaskManager,
@@ -127,7 +127,10 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly Dictionary<long, Task> _backgroundTasks = [];
 
     // The activation's journaled state manager, whose context provider records the accesses of durable task bodies.
-    private readonly JournaledStateManager? _stateManager = stateManager as JournaledStateManager;
+    private readonly IJournaledStateManager _stateManager = stateManager;
+
+    // The storage of the access logs which record the accesses of durable task bodies, bound by InitializeForActivation.
+    private IDurableTaskAccessLogStorage? _accessLogStorage;
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
     private readonly IDurableDictionary<TaskId, DateTimeOffset> _logicalTimes = logicalTimes;
@@ -179,8 +182,39 @@ internal sealed partial class DurableTaskGrainRuntime(
     private IDurableTaskMessageTransport MessageTransport => _messageTransport ?? throw new InvalidOperationException(
         "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
 
-    /// <summary>Binds the runtime to <paramref name="grainContext"/>, the activation whose executions it runs.</summary>
-    internal void InitializeForActivation(IGrainContext grainContext) => _grainContext = grainContext;
+    /// <summary>
+    /// Binds the runtime to <paramref name="grainContext"/>, the activation whose executions it runs: it records the
+    /// accesses of durable task bodies to the activation's journaled state from now on, which every body's replay depends
+    /// on.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The task storage doesn't store access logs, the journaled state manager doesn't route its states' accesses through
+    /// a host's context, or another host's context already routes them.
+    /// </exception>
+    internal void InitializeForActivation(IGrainContext grainContext)
+    {
+        if (_storage is not IDurableTaskAccessLogStorage accessLogStorage)
+        {
+            throw new InvalidOperationException(
+                $"Durable task storage '{_storage.GetType()}' doesn't store the access logs which record durable task bodies' accesses to journaled state, so a replay would apply them again. Configure the journaled durable task storage which AddDurableTasks registers.");
+        }
+
+        if (_stateManager is not IJournaledStateContextHost host)
+        {
+            throw new InvalidOperationException(
+                $"Journaled state manager '{_stateManager.GetType()}' doesn't route its states' accesses through a host's context, so durable task bodies' accesses to journaled state can't be recorded. Use the journaled state manager which Orleans.Journaling registers.");
+        }
+
+        if (host.ContextProvider is { } installed and not DurableTaskAccessContextProvider)
+        {
+            throw new InvalidOperationException(
+                $"The accesses to the activation's journaled state already run through '{installed.GetType()}', so durable task bodies' accesses can't be recorded.");
+        }
+
+        host.ContextProvider = new DurableTaskAccessContextProvider(this);
+        _accessLogStorage = accessLogStorage;
+        _grainContext = grainContext;
+    }
 
     /// <summary>
     /// Recovers committed task state during the activation's lifecycle, deferring the recovered executions to
@@ -2369,19 +2403,13 @@ internal sealed partial class DurableTaskGrainRuntime(
         return DurableTaskRuntimeHelper.RunAsync(task, context);
     }
 
-    DurableTaskAccessLog? IDurableTaskGrainRuntime.CreateAccessLog(
+    DurableTaskAccessLog IDurableTaskGrainRuntime.CreateAccessLog(
         TaskId executionId,
         TaskScheduler scheduler,
         Func<DurableTaskDivergenceException, Exception> diverge)
     {
-        if (_stateManager is not { } manager || _storage is not IDurableTaskAccessLogStorage storage)
-        {
-            return null;
-        }
-
-        Debug.Assert(manager.ContextProvider is null or DurableTaskAccessContextProvider, "The durable task runtime supplies the context of its activation's journaled state.");
-        manager.ContextProvider ??= new DurableTaskAccessContextProvider(this);
-        return new(executionId, storage, _shared.Serializer, scheduler, diverge);
+        Debug.Assert(_accessLogStorage is not null, "Attempts start once the runtime is bound to its activation.");
+        return new(executionId, _accessLogStorage, _shared.Serializer, scheduler, diverge);
     }
 
     /// <summary>

@@ -95,9 +95,6 @@ internal sealed class DurableTaskAccessLog(
     /// <summary>Gets whether the attempt hasn't yet consumed every access which earlier attempts recorded.</summary>
     public bool IsReplaying => _position < _recorded.Length;
 
-    /// <summary>Gets the storage which holds the log, which identifies the activation whose state it records.</summary>
-    public IDurableTaskAccessLogStorage Storage => _storage;
-
     /// <summary>
     /// Marks the runtime's synchronous work on behalf of the attempt, such as starting a child, until the returned value is
     /// disposed: the accesses to journaled state which it makes belong to that operation.
