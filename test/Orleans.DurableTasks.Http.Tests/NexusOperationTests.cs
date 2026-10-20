@@ -97,7 +97,15 @@ public sealed class NexusOperationTests(DurableHttpFixture fixture)
         using var started = await StartAsync(new NexusApprovalInput(orderId, "widget"), requestId, cancellationToken);
         var token = (await ReadJsonAsync(started, cancellationToken)).GetProperty("token").GetString()!;
 
-        using (var conflict = await StartAsync(new NexusApprovalInput(orderId, "gadget"), requestId, cancellationToken))
+        // A retry whose input differs calls the same method on the same grain, so it reaches the operation; a call on
+        // another grain under the request identifier conflicts.
+        using (var changed = await StartAsync(new NexusApprovalInput(orderId, "gadget"), requestId, cancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.Created, changed.StatusCode);
+            Assert.Equal(token, (await ReadJsonAsync(changed, cancellationToken)).GetProperty("token").GetString());
+        }
+
+        using (var conflict = await StartAsync(new NexusApprovalInput(Guid.NewGuid().ToString("N"), "widget"), requestId, cancellationToken))
         {
             await AssertHandlerErrorAsync(conflict, HttpStatusCode.Conflict, "CONFLICT", cancellationToken);
         }

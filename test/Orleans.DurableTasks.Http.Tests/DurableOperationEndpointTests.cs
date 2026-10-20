@@ -50,7 +50,12 @@ public sealed class DurableOperationEndpointTests(DurableHttpFixture fixture)
         Assert.Equal("hello", operation.Result?.GetString());
         Assert.Null(operation.Error);
 
-        using var conflict = await StartAsync(path, new EchoRequest("goodbye"), key, wait: 30, cancellationToken);
+        // A retry whose arguments differ performs the same work, a call of the same method on the same grain, as the
+        // durable task runtime identifies operations, so it reaches the operation; other work under the key conflicts.
+        using var changed = await StartAsync(path, new EchoRequest("goodbye"), key, wait: 30, cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+        Assert.Equal("hello", await changed.Content.ReadFromJsonAsync<string>(cancellationToken));
+        using var conflict = await StartAsync($"{path}-later", new EchoRequest("hello"), key, wait: 30, cancellationToken);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, conflict.StatusCode);
         Assert.Equal("application/problem+json", conflict.Content.Headers.ContentType?.MediaType);
 
@@ -84,7 +89,7 @@ public sealed class DurableOperationEndpointTests(DurableHttpFixture fixture)
         Assert.Equal("grace's", (await GetOperationAsync(location, wait: 0, cancellationToken, user: "grace")).Result?.GetString());
         Assert.Equal("anonymous", (await GetOperationAsync(location, wait: 0, cancellationToken)).Result?.GetString());
 
-        using var conflict = await StartAsync(path, new EchoRequest("grace's"), key, wait: 30, cancellationToken, user: "ada");
+        using var conflict = await StartAsync($"{path}-later", new EchoRequest("ada's"), key, wait: 30, cancellationToken, user: "ada");
         Assert.Equal(HttpStatusCode.UnprocessableEntity, conflict.StatusCode);
     }
 
@@ -498,10 +503,10 @@ public sealed class DurableOperationEndpointTests(DurableHttpFixture fixture)
         var orderId = Guid.NewGuid().ToString("N");
         var key = Guid.NewGuid().ToString();
 
-        // The order's grain already holds other work under the root which the operation's work would use, so it rejects
-        // the operation's work.
+        // The order's grain already holds another method's task under the root which the operation's work would use, so
+        // it rejects the operation's work.
         var workRootId = TaskId.CreateRoot("orders").Child(orderId).Child("@").Child(key).ToString();
-        await fixture.Client.GetGrain<IDurableHttpTestGrain>(orderId).EchoAsync("other").WithId(workRootId).ScheduleAsync(cancellationToken);
+        await fixture.Client.GetGrain<IDurableHttpTestGrain>(orderId).EchoLaterAsync("other").WithId(workRootId).ScheduleAsync(cancellationToken);
 
         using var response = await StartAsync($"/orders/{orderId}/echo", new EchoRequest("hello"), key, wait: 30, cancellationToken);
 

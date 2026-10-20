@@ -198,7 +198,9 @@ durable grain call start an operation which performs it:
   `400 Bad Request`. The operation's key combines the group's scope, its route values,
   the caller's authorization scope, and the identifier, so a caller reaches only its
   own operations, and the call runs as a root task named by that key. A key which
-  another request used to start other work receives `422 Unprocessable Content`.
+  another request used to start other work, a call of another method or on another
+  grain, receives `422 Unprocessable Content`; a retry whose arguments differ reaches
+  the operation.
 - **The status monitor reports progress.** A start answers `200 OK` with the result when
   the operation completes, including within the wait which `Prefer: wait=N` requests,
   and otherwise `202 Accepted` with an `Operation-Location` header, the URL of
