@@ -871,6 +871,7 @@ internal sealed class DeliveryEventObserver : IObserver<MessagingEvents.Messagin
     private readonly MessageId _messageId;
     private readonly IDisposable _subscription;
     private readonly ConcurrentQueue<MessagingEvents.OutboxRetryScheduled> _retries = new();
+    private readonly TaskCompletionSource<MessagingEvents.OutboxRetryScheduled> _retryScheduled = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<MessagingEvents.OutboxMessageRetired> _retired = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _faults;
     private int _receivings;
@@ -882,6 +883,7 @@ internal sealed class DeliveryEventObserver : IObserver<MessagingEvents.Messagin
     }
 
     public Task<MessagingEvents.OutboxMessageRetired> Retired => _retired.Task;
+    public Task<MessagingEvents.OutboxRetryScheduled> RetryScheduled => _retryScheduled.Task;
     public IReadOnlyCollection<MessagingEvents.OutboxRetryScheduled> Retries => _retries;
     public int Receivings => Volatile.Read(ref _receivings);
 
@@ -900,6 +902,7 @@ internal sealed class DeliveryEventObserver : IObserver<MessagingEvents.Messagin
                 break;
             case MessagingEvents.OutboxRetryScheduled retry when retry.GrainContext.GrainId == _sender && retry.MessageId == _messageId:
                 _retries.Enqueue(retry);
+                _retryScheduled.TrySetResult(retry);
                 break;
             case MessagingEvents.OutboxMessageRetired retired when retired.GrainContext.GrainId == _sender && retired.MessageId == _messageId:
                 _retired.TrySetResult(retired);
