@@ -88,6 +88,7 @@ public static class DurableTaskHostingExtensions
         siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskServer), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());
 
         siloBuilder.Services.TryAddSingleton(TimeProvider.System);
+        siloBuilder.Services.TryAddKeyedScoped(DurableTaskAccessLogs.StateMachineName, static (services, _) => DurableTaskAccessLogs.Create(services));
         siloBuilder.Services.TryAddScoped<DurableTaskGrainStorage>();
         siloBuilder.Services.AddFromExisting<IDurableTaskGrainStorage, DurableTaskGrainStorage>();
         return siloBuilder;

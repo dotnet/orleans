@@ -60,8 +60,9 @@ internal sealed class DurableTaskReplayHarness(
             var invocations = services.GetRequiredKeyedService<IDurableDictionary<MessageId, PendingInvocation>>("$task-invocations");
             var counter = services.GetRequiredKeyedService<IDurableValue<int>>("counter");
             var log = services.GetRequiredKeyedService<IDurableLog<int>>("log");
+            var stock = services.GetRequiredKeyedService<IDurableDictionary<string, int>>("stock");
             var manager = services.GetRequiredService<IJournaledStateManager>();
-            var grain = new ReplayGrain(this, counter, log, manager);
+            var grain = new ReplayGrain(this, counter, log, stock, manager);
             var grainContext = Substitute.For<IGrainContext>();
             grainContext.GrainId.Returns(GrainId);
             grainContext.GetTarget().Returns(grain);
@@ -72,7 +73,7 @@ internal sealed class DurableTaskReplayHarness(
                 Microsoft.Extensions.Options.Options.Create(Options),
                 Microsoft.Extensions.Options.Options.Create(new DurableMessagingOptions()),
                 _journal.Serializer);
-            var runtime = new DurableTaskGrainRuntime(storage, logicalTimes, invocations, shared, [new RecordingDurableTaskMessageTransport()]);
+            var runtime = new DurableTaskGrainRuntime(storage, logicalTimes, invocations, shared, [new RecordingDurableTaskMessageTransport()], manager);
             var probe = new WriteProbe(() => (counter.Value, log.Count, CompletedTasks(storage)));
             manager.RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, runtime);
             manager.RegisterStateMachine("write-probe", probe);
@@ -149,6 +150,7 @@ internal sealed class ReplayGrain(
     DurableTaskReplayHarness harness,
     IDurableValue<int> counter,
     IDurableLog<int> log,
+    IDurableDictionary<string, int> stock,
     IJournaledStateManager manager)
 {
     private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -162,6 +164,9 @@ internal sealed class ReplayGrain(
 
     /// <summary>Gets the grain's journaled log, to which workflows publish their progress.</summary>
     public IDurableLog<int> Log { get; } = log;
+
+    /// <summary>Gets the grain's journaled stock levels, by item.</summary>
+    public IDurableDictionary<string, int> Stock { get; } = stock;
 
     /// <summary>Completes once the workflow waits at the gate.</summary>
     public Task AtGate => _atGate.Task;
