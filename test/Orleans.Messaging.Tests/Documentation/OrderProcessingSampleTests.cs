@@ -118,6 +118,7 @@ public sealed class OrderProcessingSampleTests : IAsyncLifetime
         var attempt = Substitute.For<IInboxHandlerContext>();
         attempt.Message.Returns(new InboxMessage
         {
+            SentAt = _fixture.JobNow,
             Envelope = new()
             {
                 MessageId = MessageId.Create("sample-test", "undated"),
@@ -338,7 +339,7 @@ public sealed class OrderProcessingSampleTests : IAsyncLifetime
     {
         var context = Substitute.For<IInboxHandlerContext>();
         context.Message.Returns(type.Create(MessageId.Create("sample-test", Guid.NewGuid().ToString("N")),
-            grain.GetGrainId(), body).ToInboxMessage());
+            grain.GetGrainId(), body).ToInboxMessage(_fixture.JobNow));
         return context;
     }
 

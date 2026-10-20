@@ -138,7 +138,7 @@ public sealed class MessagingSnippetTests : IDisposable
         var attempt = await CreateAsync(new Notify("prepared"));
         var unexpected = Type<NotificationReceived>().Create(
             Command, Receiver, new NotificationReceived("receipt", Command));
-        attempt.Context.Message.Returns(unexpected.ToInboxMessage());
+        attempt.Context.Message.Returns(unexpected.ToInboxMessage(DateTimeOffset.UnixEpoch));
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await attempt.Handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
@@ -304,7 +304,7 @@ public sealed class MessagingSnippetTests : IDisposable
             header => header.Key, header => header.Value.ToArray(), StringComparer.Ordinal);
         var copied = _services.GetRequiredService<DeepCopier<OutboxMessage>>().Copy(outgoing);
         var decoded = Serializer.Deserialize<OutboxMessage>(Serializer.SerializeToArray(outgoing));
-        var inbox = outgoing.ToInboxMessage();
+        var inbox = outgoing.ToInboxMessage(DateTimeOffset.UnixEpoch);
         var received = Serializer.Deserialize<InboxMessage>(Serializer.SerializeToArray(inbox));
         var copiedIncoming = _services.GetRequiredService<DeepCopier<InboxMessage>>().Copy(inbox);
         var traceSerializer = _services.GetRequiredService<Serializer<Guid>>();
@@ -362,7 +362,7 @@ public sealed class MessagingSnippetTests : IDisposable
             Assert.Equal(header.Value, outgoing.Envelope.Headers[header.Key]);
 
         var missingTrace = _messages.Shipment.Create(Command, Receiver,
-                new Shipment(new ReserveStock(3, Sender), emptyManifest ? [] : [1, 2, 255])).ToInboxMessage();
+                new Shipment(new ReserveStock(3, Sender), emptyManifest ? [] : [1, 2, 255])).ToInboxMessage(DateTimeOffset.UnixEpoch);
         Assert.Null(missingTrace.Envelope.Headers);
         var missingTraceBytes = missingTrace.Envelope.Payload.ToArray();
         var exception = Assert.Throws<InvalidOperationException>(() =>
@@ -451,6 +451,7 @@ public sealed class MessagingSnippetTests : IDisposable
         var attempt = await CreateAsync(new Notify("prepared"));
         var incoming = new InboxMessage
         {
+            SentAt = DateTimeOffset.UnixEpoch,
             Envelope = new Envelope
             {
                 MessageId = Command,
@@ -479,7 +480,7 @@ public sealed class MessagingSnippetTests : IDisposable
         var outbox = Substitute.For<IOutbox>();
         var context = Substitute.For<IInboxHandlerContext>();
         var input = Type<Notify>().Create(Command, Receiver, new Notify("prepared", Sender));
-        context.Message.Returns(input.ToInboxMessage());
+        context.Message.Returns(input.ToInboxMessage(DateTimeOffset.UnixEpoch));
         byte[] publishedReply = [];
         outbox.When(value => value.Send(Arg.Any<OutboxMessage>())).Do(call =>
         {
@@ -538,7 +539,7 @@ public sealed class MessagingSnippetTests : IDisposable
         var outbox = Substitute.For<IOutbox>();
         var context = Substitute.For<IInboxHandlerContext>();
         var input = Type<Notify>().Create(Command, Receiver, message);
-        context.Message.Returns(input.ToInboxMessage());
+        context.Message.Returns(input.ToInboxMessage(DateTimeOffset.UnixEpoch));
         var events = new List<string>();
         var output = new List<OutboxMessage>();
         var count = new TestCount(events);
