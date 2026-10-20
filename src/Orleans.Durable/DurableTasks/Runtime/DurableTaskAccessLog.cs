@@ -162,7 +162,6 @@ internal sealed class DurableTaskAccessLog(
         Action<TState, TResult>? apply)
     {
         Debug.Assert(TaskScheduler.Current == _scheduler, "A durable task body accesses journaled state on its activation's scheduler.");
-        Debug.Assert(!access.Target.Name.StartsWith("$task", StringComparison.Ordinal), "The runtime's own state belongs to its operations, not to the body's accesses.");
         Depth++;
         try
         {

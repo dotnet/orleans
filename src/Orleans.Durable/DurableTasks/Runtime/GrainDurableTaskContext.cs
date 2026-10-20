@@ -1086,15 +1086,10 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             AttemptCancellationToken);
 
     /// <summary>Runs an entry point's <paramref name="callback"/>, which the activation's scheduler runs.</summary>
-    /// <remarks>
-    /// The runtime's work on behalf of the attempt, such as recording a child's start, isn't the body's: its accesses to
-    /// journaled state aren't recorded.
-    /// </remarks>
     /// <exception cref="InvalidOperationException">The caller isn't running on the activation's scheduler.</exception>
     private static ValueTask RunOnScheduler(TaskScheduler scheduler, Func<ValueTask> callback)
     {
         ThrowIfOffScheduler(scheduler);
-        using var _ = DurableTaskHostFlow.Enter();
         return callback();
     }
 
@@ -1102,7 +1097,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     private static ValueTask<TResult> RunOnScheduler<TResult>(TaskScheduler scheduler, Func<ValueTask<TResult>> callback)
     {
         ThrowIfOffScheduler(scheduler);
-        using var _ = DurableTaskHostFlow.Enter();
         return callback();
     }
 
