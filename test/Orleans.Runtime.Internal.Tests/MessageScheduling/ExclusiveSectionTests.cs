@@ -137,12 +137,28 @@ public class ExclusiveSectionTests(ExclusiveSectionTests.Fixture fixture) : ICla
         await Run(grain.OpenSection("a", allowCallChainReentrancy: true));
 
         // The callback carries the call chain of a reentrant section which another request on this activation opened.
+        var releaseCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        log.CallbackRelease = releaseCallback;
         var call = grain.CallBackInReentrantSection(caller, "b");
-        await fixture.AssertHeldAsync(grain, log, "b");
+        try
+        {
+            // The outer interleaving request can queue before the callback exists. Wait until the caller receives it.
+            await Run(log.WaitAsync("b:received"));
+            await Run(grain.InterleavingPing("before-callback"));
+            Assert.Equal(0, fixture.GetActivation(grain).WaitingCount);
+            Assert.DoesNotContain("b", log.Snapshot());
 
-        await Run(grain.CloseSection("a"));
+            releaseCallback.TrySetResult();
+            await fixture.AssertHeldAsync(grain, log, "b");
+        }
+        finally
+        {
+            releaseCallback.TrySetResult();
+            await Run(grain.CloseSection("a"));
+        }
+
         await Run(call);
-        Assert.Equal(["a:open", "barrier:b", "a:closing", "b"], log.Snapshot());
+        Assert.Equal(["a:open", "b:received", "before-callback", "barrier:b", "a:closing", "b"], log.Snapshot());
     }
 
     [Fact]
@@ -232,6 +248,7 @@ public sealed class ExclusiveSectionProbe
 /// </summary>
 public sealed class ExclusiveSectionLog
 {
+    public TaskCompletionSource? CallbackRelease { get; set; }
     private readonly List<string> _events = [];
     private readonly ConcurrentDictionary<string, TaskCompletionSource> _recorded = new();
 
@@ -295,9 +312,19 @@ public interface IExclusiveSectionCallerGrain : IGrainWithGuidKey
     Task CallBack(IExclusiveSectionGrain target, string name);
 }
 
-public sealed class ExclusiveSectionCallerGrain : Grain, IExclusiveSectionCallerGrain
+public sealed class ExclusiveSectionCallerGrain(ExclusiveSectionProbe probe) : Grain, IExclusiveSectionCallerGrain
 {
-    public Task CallBack(IExclusiveSectionGrain target, string name) => target.Ping(name);
+    public async Task CallBack(IExclusiveSectionGrain target, string name)
+    {
+        var log = probe.GetLog(target.GetPrimaryKey());
+        if (log.CallbackRelease is { } release)
+        {
+            log.Record($"{name}:received");
+            await release.Task;
+        }
+
+        await target.Ping(name);
+    }
 }
 
 public sealed class ExclusiveSectionGrain(ExclusiveSectionProbe probe) : Grain, IExclusiveSectionGrain
