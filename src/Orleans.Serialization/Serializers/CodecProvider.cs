@@ -24,6 +24,7 @@ namespace Orleans.Serialization.Serializers
     {
         private static readonly Type ObjectType = typeof(object);
 
+
 #if NET9_0_OR_GREATER
         private readonly Lock _initializationLock = new();
 #else
@@ -37,6 +38,7 @@ namespace Orleans.Serialization.Serializers
         private readonly ConcurrentDictionary<Type, IDeepCopier> _typedCopiers = new();
 
         private readonly ConcurrentDictionary<Type, object> _serializerServices = new();
+        private readonly ConcurrentDictionary<Type, bool> _defaultServiceAdmission = new();
         // A null target groups array and bare-parameter patterns for shape matching.
         private readonly Dictionary<(Type Contract, Type? Target), List<(Type Implementation, SerializationContract Contract)>> _implementationCandidates = new();
         private readonly List<IGeneralizedCodec> _generalizedCodecs = new();
@@ -52,6 +54,7 @@ namespace Orleans.Serialization.Serializers
         private readonly VoidCopier _voidCopier = new();
         private readonly TypeManifestOptions _manifest;
         private readonly IServiceProvider _constructionServices;
+        private readonly IServiceProviderIsService? _serviceRegistrations;
         private bool _initialized;
 
         /// <summary>
@@ -64,11 +67,24 @@ namespace Orleans.Serialization.Serializers
             _serviceProvider = serviceProvider;
             _constructionServices = new ConstructionServiceProvider(this);
             _manifest = codecConfiguration.Value;
+            _serviceRegistrations = serviceProvider.GetService<IServiceProviderIsService>();
             ConsumeMetadata(codecConfiguration);
         }
 
         /// <inheritdoc/>
         public IServiceProvider Services => _manifest.SerializerServiceFactories.Count == 0 ? _serviceProvider : _constructionServices;
+
+        /// <summary>
+        /// Gets the selected raw response codec for a closed invocation result type which has a registered response serializer.
+        /// </summary>
+        /// <param name="resultType">The closed result type from the message field header.</param>
+        /// <param name="codec">The response codec selected for <see cref="Invocation.Response{TResult}"/>.</param>
+        /// <returns>Whether a registered response serializer supplies a raw response codec.</returns>
+        internal bool TryGetResponseCodec(Type resultType, [NotNullWhen(true)] out Invocation.ResponseCodec? codec)
+        {
+            codec = _manifest.ResponseTypes.TryGetValue(resultType, out var responseType) ? GetCodec(responseType) as Invocation.ResponseCodec : null;
+            return codec is not null;
+        }
 
         private void Initialize()
         {
@@ -218,8 +234,12 @@ namespace Orleans.Serialization.Serializers
                         var target = legacyDescription is { } shape
                             ? shape.Type
                             : genericArgument;
+                        var surrogateDescription = genericType == typeof(IConverter<,>)
+                            ? SerializationType.FromType(@interface.GetGenericArguments()[1], type.GetGenericArguments())
+                            : null;
                         candidates.Add((target, type,
-                            new SerializationContract(genericType, target, null, TargetDescription: legacyDescription), legacyOrders[i]));
+                            new SerializationContract(genericType, target, null,
+                                SurrogateDescription: surrogateDescription, TargetDescription: legacyDescription), legacyOrders[i]));
                     }
                 }
             }
@@ -229,7 +249,6 @@ namespace Orleans.Serialization.Serializers
         public IFieldCodec<TField>? TryGetCodec<TField>()
         {
             var fieldType = typeof(TField);
-            if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return (IFieldCodec<TField>)factory(this);
             if (TryGetCached(_typedCodecs, fieldType, out var existing))
                 return (IFieldCodec<TField>)existing;
 
@@ -257,7 +276,6 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IFieldCodec? TryGetCodec(Type fieldType)
         {
-            if (fieldType is not null && _manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return factory(this);
             // If the field type is unavailable, return the void codec which can at least handle references.
             return fieldType is null ? _voidCodec
                 : TryGetCached(_untypedCodecs, fieldType, out var existing) ? existing
@@ -272,7 +290,7 @@ namespace Orleans.Serialization.Serializers
 
         private IFieldCodec? TryCreateCodecInner(Type fieldType)
         {
-            if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return factory(this);
+            if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory) && IsDefaultServiceEligible(factory.ServiceType)) return factory.Factory(this);
             if (!_initialized) Initialize();
 
             ThrowIfUnsupportedType(fieldType);
@@ -414,7 +432,6 @@ namespace Orleans.Serialization.Serializers
         public IDeepCopier<T>? TryGetDeepCopier<T>()
         {
             var type = typeof(T);
-            if (_manifest.CopierFactories.TryGetValue(type, out var factory)) return (IDeepCopier<T>)factory(this);
             if (TryGetCached(_typedCopiers, type, out var existing))
                 return (IDeepCopier<T>)existing;
 
@@ -442,7 +459,6 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IDeepCopier? TryGetDeepCopier(Type fieldType)
         {
-            if (fieldType is not null && _manifest.CopierFactories.TryGetValue(fieldType, out var factory)) return factory(this);
             // If the field type is unavailable, return the void copier which can at least handle references.
             return fieldType is null ? _voidCopier
                 : TryGetCached(_untypedCopiers, fieldType, out var existing) ? existing
@@ -458,7 +474,7 @@ namespace Orleans.Serialization.Serializers
 
         private IDeepCopier? TryCreateCopierInner(Type fieldType)
         {
-            if (_manifest.CopierFactories.TryGetValue(fieldType, out var factory)) return factory(this);
+            if (_manifest.CopierFactories.TryGetValue(fieldType, out var factory) && IsDefaultServiceEligible(factory.ServiceType)) return factory.Factory(this);
             if (!_initialized) Initialize();
 
             ThrowIfUnsupportedType(fieldType);
@@ -671,9 +687,127 @@ namespace Orleans.Serialization.Serializers
             return result;
         }
 
+        // Inferred defaults preserve an automatic caller's DI boundary instead of starting a transaction inside it.
+        private bool IsDefaultServiceEligible(Type service)
+            => !_manifest.IsDefaultSerializerService(service)
+                || OrleansGeneratedCodeHelper.GetConstructionScope(this) is not { IsPending: false }
+                    && _defaultServiceAdmission.GetOrAdd(service, static (service, provider) => provider.IsDefaultServiceAdmitted(service), this);
+
+        // Admission depends only on the manifest, implementation candidates, and container registrations,
+        // which are fixed when the provider is constructed.
+        private bool IsDefaultServiceAdmitted(Type service)
+            => !IsContainerImplementation(service)
+                && IsDefaultImplementationEligible(service)
+                && (!_manifest.DefaultSerializerContracts.TryGetValue(service, out var contract) || IsDefaultContractEligible(contract, new HashSet<Type>()));
+
+        // Activation prefers a container registration of an implementation, so inferred defaults yield to it.
+        private bool IsContainerImplementation(Type type) => !type.IsInterface && _serviceRegistrations?.IsService(type) == true;
+
+        private bool IsDefaultImplementationEligible(Type implementation)
+        {
+            if (_manifest.DefaultSerializerImplementationServices.TryGetValue(implementation, out var services))
+            {
+                foreach (var service in services)
+                {
+                    if (!_manifest.IsDefaultSerializerService(service)) return false;
+                    if (_manifest.DefaultSerializerContracts.TryGetValue(service, out var contract)
+                        && !IsDefaultContractImplementationEligible(contract)) return false;
+                }
+            }
+            return true;
+        }
+
+        private bool IsProviderService(Type serviceType)
+            => serviceType != typeof(object)
+                && (serviceType == typeof(CodecProvider) || serviceType.IsInterface)
+                && serviceType.IsInstanceOfType(this);
+
+        private bool IsDefaultContractEligible(TypeManifestOptions.DefaultSerializerContract contract, HashSet<Type> visited)
+        {
+            if (!_manifest.IsDefaultSerializerService(contract.Service) || !visited.Add(contract.Service)) return true;
+            if (contract.Implementation is { } implementation && IsContainerImplementation(implementation)) return false;
+            if (!IsDefaultContractImplementationEligible(contract)) return false;
+            foreach (var dependency in contract.Dependencies)
+            {
+                if (IsContainerImplementation(dependency)) return false;
+                if (_manifest.SerializerServiceFactories.ContainsKey(dependency) && !_manifest.IsDefaultSerializerService(dependency))
+                    continue;
+                if (!IsDefaultImplementationEligible(dependency)) return false;
+                if (_manifest.DefaultSerializerContracts.TryGetValue(dependency, out var required))
+                {
+                    if (!IsDefaultContractEligible(required, visited)) return false;
+                }
+                else if (!_manifest.SerializerServiceFactories.ContainsKey(dependency)
+                    && !IsProviderService(dependency)
+                    && dependency != typeof(IServiceProvider)
+                    && dependency != typeof(IServiceProviderIsService)
+                    && !(dependency == typeof(IServiceProviderIsKeyedService) && _serviceProvider is IKeyedServiceProvider))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private bool IsDefaultContractImplementationEligible(TypeManifestOptions.DefaultSerializerContract contract)
+        {
+            var role = contract.Service.IsConstructedGenericType ? contract.Service.GetGenericTypeDefinition() : null;
+            var target = role is null ? contract.Service : contract.Service.GenericTypeArguments[0];
+            if (role is not null && contract.Implementation is { } implementation)
+            {
+                var searchType = target.IsConstructedGenericType ? target.GetGenericTypeDefinition() : target;
+                if (TrySelectImplementation(role, target, searchType, materializeImplementation: false, out var selected, out _, out var undetermined))
+                {
+                    if (!MatchesDefaultImplementation(selected, implementation, contract.CompatibleImplementation, target)) return false;
+                }
+                else if (undetermined)
+                {
+                    return false;
+                }
+                else if ((role == typeof(IFieldCodec<>) || role == typeof(IDeepCopier<>))
+                    && (TrySelectImplementation(typeof(IConverter<,>), target, searchType, materializeImplementation: false, out _, out _, out undetermined) || undetermined))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool MatchesDefaultImplementation(Type selected, Type expected, Type? compatible, Type target)
+        {
+            if (selected == expected || selected == compatible) return true;
+            if (!selected.IsGenericType) return false;
+            if (selected.IsGenericTypeDefinition)
+            {
+                if (expected.IsConstructedGenericType && selected == expected.GetGenericTypeDefinition()) return true;
+                if (compatible is { IsConstructedGenericType: true } && selected == compatible.GetGenericTypeDefinition()) return true;
+            }
+            if (target.IsConstructedGenericType && target.GetGenericTypeDefinition() == typeof(Invocation.Response<>)
+                && expected.IsConstructedGenericType && expected.GenericTypeArguments[0] == target.GenericTypeArguments[0]
+                && (!selected.IsConstructedGenericType || selected.GenericTypeArguments[0] == target.GenericTypeArguments[0]))
+            {
+                var selectedDefinition = selected.GetGenericTypeDefinition();
+                var definition = expected.GetGenericTypeDefinition();
+                return selectedDefinition == typeof(Invocation.ResponseCodec<>) && definition == typeof(Invocation.ResponseCodec<,>)
+                    || selectedDefinition == typeof(Invocation.ResponseCopier<>) && definition == typeof(Invocation.ResponseCopier<,>);
+            }
+            return false;
+        }
+
         internal bool TryGetSerializerService(Type type, [NotNullWhen(true)] out object? result)
         {
             if (!_manifest.SerializerServiceFactories.TryGetValue(type, out var factory))
+            {
+                result = null;
+                return false;
+            }
+
+            if ((_initialized || IsInitializationLockHeld) && TryGetCached(_serializerServices, type, out result))
+            {
+                return true;
+            }
+
+            if (!IsDefaultServiceEligible(type))
             {
                 result = null;
                 return false;
@@ -766,9 +900,11 @@ namespace Orleans.Serialization.Serializers
 #endif
         }
 
+        // Construction scopes publish under the lock using add-only updates, so a thread without a scope reads published values directly.
         private bool TryGetCached<TValue>(ConcurrentDictionary<Type, TValue> cache, Type key, [NotNullWhen(true)] out TValue? result) where TValue : class
         {
-            if (_manifest.SerializerServiceFactories.Count == 0) return cache.TryGetValue(key, out result);
+            if (_manifest.SerializerServiceFactories.Count == 0 || OrleansGeneratedCodeHelper.GetConstructionScope(this) is null)
+                return cache.TryGetValue(key, out result);
             lock (_serializerServices)
             {
                 var scope = OrleansGeneratedCodeHelper.GetConstructionScope(this);
@@ -798,10 +934,7 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
-        internal bool IsConstructionPending
-        {
-            get { lock (_serializerServices) return OrleansGeneratedCodeHelper.GetConstructionScope(this) is { IsPending: true }; }
-        }
+        internal bool IsConstructionPending => OrleansGeneratedCodeHelper.GetConstructionScope(this) is { IsPending: true };
 
         internal void RecordConstructionFailure(Exception exception)
         {
@@ -944,7 +1077,7 @@ namespace Orleans.Serialization.Serializers
                     {
                         if (serviceType == typeof(IServiceProvider) || serviceType == typeof(IServiceProviderIsService)
                             || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider) return this;
-                        if (IsProviderService(serviceType)) return owner;
+                        if (owner.IsProviderService(serviceType)) return owner;
                         if (owner._serializerServices.TryGetValue(serviceType, out var completed)) return completed;
                         if (scope.TryGetService(serviceType, out var constructed, requireInstance: false)) return constructed;
                         if (owner.TryGetSerializerService(serviceType, out var registered)) return registered;
@@ -1022,11 +1155,11 @@ namespace Orleans.Serialization.Serializers
                     scope?.ThrowIfFaulted();
                     if (scope is { IsPending: true })
                     {
-                        return IsProviderService(serviceType)
+                        return owner.IsProviderService(serviceType)
                             || serviceType == typeof(IServiceProvider)
                             || serviceType == typeof(IServiceProviderIsService)
                             || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider
-                            || owner._manifest.SerializerServiceFactories.ContainsKey(serviceType)
+                            || owner._manifest.SerializerServiceFactories.ContainsKey(serviceType) && owner.IsDefaultServiceEligible(serviceType)
                             || owner.IsRegisteredImplementation(serviceType)
                             || ServiceCollectionExtensions.GetServiceHolderType(serviceType) is not null;
                     }
@@ -1035,10 +1168,6 @@ namespace Orleans.Serialization.Serializers
                 return owner._serviceProvider.GetRequiredService<IServiceProviderIsService>().IsService(serviceType);
             }
 
-            private bool IsProviderService(Type serviceType)
-                => serviceType != typeof(object)
-                    && (serviceType == typeof(CodecProvider) || serviceType.IsInterface)
-                    && serviceType.IsInstanceOfType(owner);
         }
 
         [DoesNotReturn]
@@ -1102,43 +1231,17 @@ namespace Orleans.Serialization.Serializers
             return codecType != null ? (IFieldCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
         }
 
-#if NET5_0_OR_GREATER
-        [UnconditionalSuppressMessage("Trimming", "IL2070",
-            Justification = "Legacy converter registrations preserve implementation interfaces through AddConverter(Type). The selected implementation boundary erases that annotation; explicit contracts use their stored surrogate descriptions instead.")]
-        [UnconditionalSuppressMessage("Trimming", "IL2075",
-            Justification = "Legacy converter registrations preserve implementation interfaces through AddConverter(Type). Materialization erases the registration annotation; explicit contracts use their stored surrogate descriptions instead.")]
-#endif
         private bool TryGetSurrogateCodec(Type fieldType, Type searchType, [NotNullWhen(true)] out Type? surrogateCodecType, [NotNullWhen(true)] out object[]? constructorArguments)
         {
             if (TrySelectImplementation(typeof(IConverter<,>), fieldType, searchType, out var converterType, out var registration))
             {
-                Type? surrogate = null;
-                if (registration.RegistrationOrder is not null)
+                var arguments = converterType.IsGenericType ? converterType.GetGenericArguments() : Array.Empty<Type>();
+                var surrogate = registration.SurrogateDescription is { } description
+                    ? ResolveSerializationTypeCore(description, arguments, allowArrayShapes: registration.RegistrationOrder is null)
+                    : registration.SurrogateType!;
+                if (surrogate.IsGenericTypeDefinition)
                 {
-                    var arguments = converterType.IsGenericType ? converterType.GetGenericArguments() : Array.Empty<Type>();
-                    surrogate = registration.SurrogateDescription is { } description
-                        ? ResolveSerializationType(description, arguments)
-                        : registration.SurrogateType!;
-                    if (surrogate.IsGenericTypeDefinition)
-                    {
-                        surrogate = ConstructGenericImplementation(surrogate, arguments);
-                    }
-                }
-                else
-                {
-                    foreach (var @interface in converterType.GetInterfaces())
-                    {
-                        if (@interface.IsConstructedGenericType && @interface.GetGenericTypeDefinition() == typeof(IConverter<,>)
-                            && @interface.GenericTypeArguments[0] == fieldType)
-                        {
-                            surrogate = @interface.GenericTypeArguments[1];
-                        }
-                    }
-                }
-
-                if (surrogate is null)
-                {
-                    throw new InvalidOperationException($"A registered type converter {converterType} does not implement {typeof(IConverter<,>)}");
+                    surrogate = ConstructGenericImplementation(surrogate, arguments);
                 }
 
                 constructorArguments = new object[] { GetServiceOrCreateInstance(converterType) };
@@ -1167,15 +1270,40 @@ namespace Orleans.Serialization.Serializers
             Type searchType,
             [NotNullWhen(true)] out Type? implementation,
             out SerializationContract registration)
+            => TrySelectImplementation(contractType, targetType, searchType, materializeImplementation: true, out implementation, out registration, out _);
+
+        // A probe which does not materialize reports undetermined when constraint metadata is incomplete and dynamic code
+        // is unavailable, leaving the decision to the materializing resolution path.
+        private bool TrySelectImplementation(
+            Type contractType,
+            Type targetType,
+            Type searchType,
+            bool materializeImplementation,
+            [NotNullWhen(true)] out Type? implementation,
+            out SerializationContract registration,
+            out bool undetermined)
         {
-            if (targetType != searchType && TrySelect(targetType, out implementation, out registration))
+            undetermined = false;
+            if (targetType != searchType && TrySelect(targetType, out implementation, out registration, ref undetermined))
             {
                 return true;
             }
 
-            return TrySelect(searchType, out implementation, out registration) || TrySelect(null, out implementation, out registration);
+            if (!undetermined && TrySelect(searchType, out implementation, out registration, ref undetermined))
+            {
+                return true;
+            }
 
-            bool TrySelect(Type? key, [NotNullWhen(true)] out Type? result, out SerializationContract selected)
+            if (!undetermined && TrySelect(null, out implementation, out registration, ref undetermined))
+            {
+                return true;
+            }
+
+            implementation = null;
+            registration = default;
+            return false;
+
+            bool TrySelect(Type? key, [NotNullWhen(true)] out Type? result, out SerializationContract selected, ref bool undetermined)
             {
                 if (_implementationCandidates.TryGetValue((contractType, key), out var candidates))
                 {
@@ -1205,19 +1333,32 @@ namespace Orleans.Serialization.Serializers
                                 }
                             }
 
-                            if (arguments.Length != candidate.Implementation.GetGenericArguments().Length)
+                            if (arguments.Length != closed.GetGenericArguments().Length)
+                                ThrowResolutionFailure(new ArgumentException($"Serialization implementation {closed} has a different generic arity from target {targetType}."));
+                            var validation = GenericConstraintValidator.Validate(candidate.Implementation, arguments, _manifest.GenericArgumentMetadata);
+                            if (validation == GenericConstraintValidationResult.Invalid) continue;
+                            if (validation == GenericConstraintValidationResult.Unknown && !RuntimeFeature.IsDynamicCodeSupported)
                             {
-                                closed = ConstructGenericImplementation(candidate.Implementation, arguments);
+                                if (!materializeImplementation)
+                                {
+                                    undetermined = true;
+                                    break;
+                                }
+
+                                throw new NotSupportedException(
+                                    $"Cannot validate generic constraints for serialization implementation {closed} and target {targetType}. "
+                                    + "Register closed argument and constraint types using TypeManifestOptions.AddGenericArgumentMetadata(typeof(ClosedType)), including nested arguments and array elements.");
                             }
-                            else
+
+                            // With dynamic code, closing the implementation decides constraints which metadata leaves unknown.
+                            if (materializeImplementation || validation == GenericConstraintValidationResult.Unknown)
                             {
                                 try
                                 {
                                     closed = MaterializeGenericImplementation(candidate.Implementation, arguments);
                                 }
-                                catch (ArgumentException)
+                                catch (ArgumentException) when (validation == GenericConstraintValidationResult.Unknown)
                                 {
-                                    // The runtime rejected the bound arguments, including generic constraints.
                                     continue;
                                 }
                             }
@@ -1296,6 +1437,9 @@ namespace Orleans.Serialization.Serializers
         }
 
         private Type ResolveSerializationType(SerializationType description, Type[] parameters)
+            => ResolveSerializationTypeCore(description, parameters, allowArrayShapes: false);
+
+        private Type ResolveSerializationTypeCore(SerializationType description, Type[] parameters, bool allowArrayShapes)
         {
             if (description.ParameterIndex >= 0)
             {
@@ -1309,6 +1453,16 @@ namespace Orleans.Serialization.Serializers
 
             if (description.ArrayRank > 0)
             {
+                if (allowArrayShapes
+#if NET7_0_OR_GREATER
+                    && RuntimeFeature.IsDynamicCodeSupported
+#endif
+                    )
+                {
+                    var element = ResolveSerializationTypeCore(description.Arguments[0], parameters, allowArrayShapes);
+                    return description.ArrayRank == 1 ? element.MakeArrayType() : element.MakeArrayType(description.ArrayRank);
+                }
+
                 throw new NotSupportedException(
                     "Supply a source-known closed array type using SerializationType.Create(typeof(ClosedArray)) or an explicit closed converter registration when resolving executable serialization metadata. Array descriptions are structural matching patterns.");
             }
@@ -1322,7 +1476,7 @@ namespace Orleans.Serialization.Serializers
             var arguments = new Type[description.Arguments.Length];
             for (var i = 0; i < arguments.Length; i++)
             {
-                arguments[i] = ResolveSerializationType(description.Arguments[i], parameters);
+                arguments[i] = ResolveSerializationTypeCore(description.Arguments[i], parameters, allowArrayShapes);
             }
 
             return ConstructGenericImplementation(type, arguments);

@@ -1,5 +1,5 @@
-using System.Text;
 using System.Collections.Immutable;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -226,6 +226,13 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             .WithTrackingName(ProxyOutputsTrackingName);
 
         GeneratedSourceOutput.RegisterImplementationSourceOutputs(context, proxyOutputs);
+
+        var responseOutputs = preparedProxyOutputs
+            .Combine(compilationProvider)
+            .Combine(generatorOptions)
+            .SelectMany(static (input, ct) => RpcResponseGenerator.Generate(input.Left.Right, input.Left.Left, input.Right, ct));
+
+        GeneratedSourceOutput.RegisterImplementationSourceOutputs(context, responseOutputs);
 
         context.RegisterImplementationSourceOutput(assemblyNameProvider, static (productionContext, assemblyName) =>
         {

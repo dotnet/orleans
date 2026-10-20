@@ -1,8 +1,8 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator;
@@ -766,21 +766,24 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             {
                 var methodTypeArguments = GetTypesArray(method, method.MethodTypeParameters.Select(p => p.Parameter));
                 var parameterTypes = GetTypesArray(method, method.Method.Parameters.Select(p => p.Type));
+                var methodLookup = method.AllTypeParameters.Count == 0
+                    ? ParseExpression($"typeof({method.Method.ContainingType.ToTypeSyntax(method.TypeParameterSubstitutions)}).GetMethod({method.Method.Name.GetLiteralExpression()}, 0, global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Instance, null, {(method.Method.Parameters.Length == 0 ? "global::System.Type.EmptyTypes" : parameterTypes.ToString())}, null)")
+                    : InvocationExpression(
+                        IdentifierName("OrleansGeneratedCodeHelper").Member("GetMethodInfoOrDefault"),
+                        ArgumentList(SeparatedList(
+                        [
+                            Argument(TypeOfExpression(method.Method.ContainingType.ToTypeSyntax(method.TypeParameterSubstitutions))),
+                            Argument(method.Method.Name.GetLiteralExpression()),
+                            Argument(methodTypeArguments),
+                            Argument(parameterTypes),
+                        ])));
 
                 field = FieldDeclaration(
                     VariableDeclaration(
                         LibraryTypes.MethodInfo.ToTypeSyntax(),
                         SingletonSeparatedList(VariableDeclarator(description.FieldName)
                         .WithInitializer(EqualsValueClause(
-                            InvocationExpression(
-                                IdentifierName("OrleansGeneratedCodeHelper").Member("GetMethodInfoOrDefault"),
-                                ArgumentList(SeparatedList(
-                                [
-                                    Argument(TypeOfExpression(method.Method.ContainingType.ToTypeSyntax(method.TypeParameterSubstitutions))),
-                                    Argument(method.Method.Name.GetLiteralExpression()),
-                                    Argument(methodTypeArguments),
-                                    Argument(parameterTypes),
-                                ]))))))))
+                            methodLookup)))))
                     .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
             }
             else

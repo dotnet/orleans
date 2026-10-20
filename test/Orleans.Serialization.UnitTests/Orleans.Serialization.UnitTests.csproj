@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <IsTestProject>true</IsTestProject>
@@ -39,6 +39,8 @@
   <ItemGroup>
     <Protobuf Include="protobuf-model.proto" GrpcServices="None" />
     <Compile Include="..\Orleans.NativeAotSmoke\InterfaceCollections.Contracts.cs" Link="InterfaceCollections.Contracts.cs" />
+    <Compile Include="..\Orleans.NativeAotSmoke\RpcResponsesModels.cs" Link="RpcResponsesModels.cs" />
+    <Compile Include="..\Orleans.NativeAotSmoke\RpcResponses.Contracts.cs" Link="RpcResponses.Contracts.cs" />
   </ItemGroup>
 
   <Target
