@@ -142,7 +142,7 @@ the caller continues:
 
 ```csharp
 // In a workflow: start the order as an independent root task, in the same write as the basket's change.
-_ = order.PlaceOrderAsync(request).Detached().WithId(PlaceOrderTaskId(orderId)).Post();
+_ = order.PlaceOrderAsync(request).Detached(PlaceOrderTaskId(orderId)).Post();
 
 // Anywhere: return once the target holds the task, so its ID can be handed to other parties.
 var placement = await order.PlaceOrderAsync(request).WithId(PlaceOrderTaskId(orderId)).ScheduleAsync();

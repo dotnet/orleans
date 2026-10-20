@@ -256,7 +256,7 @@ public sealed class DurableTaskSubscriberGrain(DurableTaskMessagingProbe probe) 
     public async DurableTask<string> ScheduleAndSubscribeAsync(Guid operationKey, string rootId)
     {
         var operation = GrainFactory.GetGrain<IDurableTaskSubscribedGrain>(operationKey);
-        await operation.RunAsync().Detached().WithId(rootId).ScheduleAsync();
+        await operation.RunAsync().Detached(rootId).ScheduleAsync();
         return await operation.GetDurableTask<string>(rootId);
     }
 

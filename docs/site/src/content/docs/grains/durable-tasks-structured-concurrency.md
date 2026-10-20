@@ -214,7 +214,7 @@ runs, so a crash between the decision to start work and its start loses neither.
 | Bound work with a deadline | `call.WaitAsync(timeout)` or `WaitUntilAsync(dueTime)` |
 | Start work now and observe it later in the same workflow | `ScheduleAsync`, `Post`, or `ScheduleAll` |
 | Finish compensation after cancellation | `.Shielded()` |
-| Start work which outlives the workflow | `.Detached().WithId(name)` |
+| Start work which outlives the workflow | `.Detached(name)` |
 
 [Durable task recipes](durable-tasks-recipes.md) shows each of these in a complete
 workflow.

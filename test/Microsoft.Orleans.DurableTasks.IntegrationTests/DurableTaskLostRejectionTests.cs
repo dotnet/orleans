@@ -161,7 +161,7 @@ public sealed class LostRejectionStarterGrain : DurableGrain, ILostRejectionStar
     {
         try
         {
-            await GrainFactory.GetGrain<ILostRejectionTargetGrain>(targetKey).EchoAsync(2).Detached().WithId(rootId).ScheduleAsync();
+            await GrainFactory.GetGrain<ILostRejectionTargetGrain>(targetKey).EchoAsync(2).Detached(rootId).ScheduleAsync();
             return "accepted";
         }
         catch (DurableTaskConflictException conflict)

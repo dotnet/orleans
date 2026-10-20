@@ -258,14 +258,14 @@ public sealed class DurableTaskStartingGrain(IDurableTaskManager tasks, DurableT
     public DurableTask PostEchoInWorkflowAsync(Guid workerKey, int value, string rootId) =>
         DurableTask.Run(cancellationToken =>
         {
-            _ = GrainFactory.GetGrain<IDurableTaskWorkerGrain>(workerKey).EchoAsync(value).Detached().WithId(rootId).Post();
+            _ = GrainFactory.GetGrain<IDurableTaskWorkerGrain>(workerKey).EchoAsync(value).Detached(rootId).Post();
         });
 
     public async DurableTask<int> AwaitDetachedEchoesAsync(Guid workerKey, int value)
     {
         var worker = GrainFactory.GetGrain<IDurableTaskWorkerGrain>(workerKey);
         var awaited = await worker.EchoAsync(value).Detached();
-        var scheduled = await worker.EchoAsync(value + 1).Detached().WithId("scheduled-echo").ScheduleAsync();
+        var scheduled = await worker.EchoAsync(value + 1).Detached("scheduled-echo").ScheduleAsync();
         return awaited + await scheduled;
     }
 
@@ -273,7 +273,7 @@ public sealed class DurableTaskStartingGrain(IDurableTaskManager tasks, DurableT
     {
         try
         {
-            await GrainFactory.GetGrain<IDurableTaskWorkerGrain>(workerKey).EchoAsync(2).Detached().WithId(rootId).ScheduleAsync();
+            await GrainFactory.GetGrain<IDurableTaskWorkerGrain>(workerKey).EchoAsync(2).Detached(rootId).ScheduleAsync();
             return "accepted";
         }
         catch (DurableTaskConflictException conflict)

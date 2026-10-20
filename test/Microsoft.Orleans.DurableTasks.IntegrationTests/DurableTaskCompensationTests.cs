@@ -139,7 +139,7 @@ public sealed class DurableTaskCompensatingWorkflowGrain : DurableGrain, IDurabl
         {
             // Scheduling returns once the inventory holds the release, so the workflow's result shows that a caller can
             // look the release up by its root ID.
-            await inventory.ReleaseAsync(reserved).Detached().WithId(GetCompensationRootId(this.GetPrimaryKey())).ScheduleAsync();
+            await inventory.ReleaseAsync(reserved).Detached(GetCompensationRootId(this.GetPrimaryKey())).ScheduleAsync();
             return "compensated";
         }
     }

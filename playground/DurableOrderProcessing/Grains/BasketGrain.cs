@@ -82,8 +82,7 @@ public sealed class BasketGrain : DurableGrain, IBasketGrain
         // basket keeps no state for it.
         _ = GrainFactory.GetGrain<IOrderGrain>(orderId)
             .PlaceOrderAsync(new SubmitOrder(this.GetPrimaryKeyString(), lines, request.Address, request.CardNumber[^4..]))
-            .Detached()
-            .WithId(OrderGrain.PlaceOrderTaskId(orderId))
+            .Detached(OrderGrain.PlaceOrderTaskId(orderId))
             .Post();
         await WriteStateAsync();
         return orderId;
