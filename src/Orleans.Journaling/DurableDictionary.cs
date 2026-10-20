@@ -107,22 +107,17 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
     private void SetCore(TKey key, TValue value)
     {
-        OnChanged();
         WriteSet(key, value);
         ApplySet(key, value);
         PublishSet(key, value);
     }
 
-    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context)
-    {
-        OnChanged();
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
-    }
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
-        OnChanged();
-        _items.Clear();
+        ApplyClear();
         _writer = writer;
         _hasStagedEntries = false;
         DurableStateObservation.PublishDurableResync<DurableDictionary<TKey, TValue>, DictionaryChange<TKey, TValue>>(_manager, this);
@@ -156,7 +151,6 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
     private void ClearCore()
     {
-        OnChanged();
         _codec.WriteClear(GetWriter());
         _hasStagedEntries = true;
         ApplyClear();
@@ -179,7 +173,6 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
             return false;
         }
 
-        OnChanged();
         WriteRemove(key);
         ApplyRemove(key);
         PublishRemove(key);
@@ -204,12 +197,28 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
     private void ApplySet(TKey key, TValue value)
     {
+        OnChanged();
         _items[key] = value;
         OnSet(key, value);
     }
 
-    internal bool ApplyRemove(TKey key) => _items.Remove(key);
-    private void ApplyClear() => _items.Clear();
+    internal bool ApplyRemove(TKey key)
+    {
+        if (!_items.Remove(key))
+        {
+            return false;
+        }
+
+        OnChanged();
+        return true;
+    }
+
+    private void ApplyClear()
+    {
+        OnChanged();
+        _items.Clear();
+    }
+
     void IDurableDictionaryCommandHandler<TKey, TValue>.ApplySet(TKey key, TValue value) => ApplySet(key, value);
     void IDurableDictionaryCommandHandler<TKey, TValue>.ApplyRemove(TKey key) => ApplyRemove(key);
     void IDurableDictionaryCommandHandler<TKey, TValue>.ApplyClear() => ApplyClear();
@@ -219,6 +228,8 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         _items.EnsureCapacity(capacityHint);
     }
 
+    // State which a host owns, such as the manager's bookkeeping or the durable task runtime's, has no target by
+    // construction: no context reads it, so no stamp records its changes.
     private void OnChanged() => _accessTarget?.OnChanged();
 
     protected virtual JournalStreamWriter GetWriter()
@@ -245,10 +256,8 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
             ThrowDuplicateKey(key);
         }
 
-        OnChanged();
         WriteSet(key, value);
-        _items.Add(key, value);
-        OnSet(key, value);
+        ApplySet(key, value);
         PublishSet(key, value);
     }
 
@@ -300,9 +309,8 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
             return false;
         }
 
-        OnChanged();
         WriteRemove(item.Key);
-        _ = ((ICollection<KeyValuePair<TKey, TValue>>)_items).Remove(item);
+        _ = ApplyRemove(item.Key);
         PublishRemove(item.Key);
         return true;
     }
