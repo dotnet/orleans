@@ -14,7 +14,10 @@ namespace Benchmarks.Journaling;
 /// 32-character strings or instances of a record class (<see cref="ValueKind"/>). Bodies run as attempts of a task with a
 /// hierarchical identifier, through the runtime's context provider; see <see cref="AccessRecordingFixture"/>.
 /// </para>
-/// <para>Set <c>BENCH_FORMATS</c> to <c>binary</c> or <c>json</c> to run one journal format.</para>
+/// <para>
+/// Set <c>BENCH_FORMATS</c> to <c>binary</c> or <c>json</c> to run one journal format. Only the binary format records
+/// positions, so with <c>json</c> both values of <see cref="Positions"/> record values.
+/// </para>
 /// </remarks>
 [BenchmarkCategory("Journaling")]
 [MemoryDiagnoser(displayGenColumns: false)]
@@ -34,10 +37,14 @@ public class AccessRecordingBenchmarks
     [ParamsAllValues]
     public AccessRecordingValueKind ValueKind { get; set; }
 
+    /// <summary>Gets or sets whether pure reads record journal positions (P3) rather than values (P2).</summary>
+    [ParamsAllValues]
+    public bool Positions { get; set; }
+
     public static IEnumerable<string> Formats => AccessRecordingFixture.Formats;
 
     [GlobalSetup]
-    public void Setup() => _f = AccessRecordingFixture.Create(Format, ValueKind);
+    public void Setup() => _f = AccessRecordingFixture.Create(Format, ValueKind, Positions);
 
     [GlobalCleanup]
     public void Cleanup() => _f.Dispose();

@@ -243,8 +243,8 @@ internal static class AccessRecordingScenarios<TValue> where TValue : class
 /// <see cref="DurableTaskAccessContextProvider"/> finds the attempt's access log as it does in a grain.
 /// </para>
 /// <para>
-/// Pure reads record journal positions unless <c>BENCH_POSITIONS</c> is <c>off</c>, which records values as P2 does.
-/// Replays always consume value records: a recovery resolves positions into values before any attempt replays.
+/// With positions, pure reads record journal positions where the access log allows them; without, they record values,
+/// as P2 does. Replays always consume value records: a recovery resolves positions into values before any attempt replays.
 /// </para>
 /// </remarks>
 internal abstract class AccessRecordingFixture : IDisposable
@@ -256,13 +256,11 @@ internal abstract class AccessRecordingFixture : IDisposable
 
     public static IEnumerable<string> Formats => (Environment.GetEnvironmentVariable("BENCH_FORMATS") ?? "binary,json").Split(',');
 
-    /// <summary>Gets whether pure reads record journal positions.</summary>
-    public static bool Positions => Environment.GetEnvironmentVariable("BENCH_POSITIONS") is not "off";
 
-    public static AccessRecordingFixture Create(string format, AccessRecordingValueKind valueKind) => valueKind switch
+    public static AccessRecordingFixture Create(string format, AccessRecordingValueKind valueKind, bool positions) => valueKind switch
     {
-        AccessRecordingValueKind.String => new AccessRecordingFixture<string>(format, AccessRecordingBodies.OfStrings, static i => $"value-{i:D2}-{new string('x', 23)}"),
-        AccessRecordingValueKind.Record => new AccessRecordingFixture<AccessRecordingItem>(format, AccessRecordingBodies.OfRecords, static i => new($"value-{i:D2}-{new string('x', 23)}", i)),
+        AccessRecordingValueKind.String => new AccessRecordingFixture<string>(format, positions, AccessRecordingBodies.OfStrings, static i => $"value-{i:D2}-{new string('x', 23)}"),
+        AccessRecordingValueKind.Record => new AccessRecordingFixture<AccessRecordingItem>(format, positions, AccessRecordingBodies.OfRecords, static i => new($"value-{i:D2}-{new string('x', 23)}", i)),
         _ => throw new ArgumentOutOfRangeException(nameof(valueKind)),
     };
 
@@ -301,13 +299,14 @@ internal sealed class AccessRecordingFixture<TValue> : AccessRecordingFixture wh
     private readonly JournalBufferWriter _stateJournal;
     private readonly JournalBufferWriter _accessJournal;
     private readonly JournalStreamWriter _accessStream;
+    private readonly JournalStreamWriter _valueStream;
     private readonly Func<AccessRecordingFixture<TValue>, int>[] _bodies;
     private readonly AccessLogStorage[] _recorded;
     private readonly BodyTask _body;
     private readonly IJournalFormat _journalFormat;
     private readonly Func<IDurableDictionaryCommandCodec<string, string>> _barrierCodecFactory;
 
-    public AccessRecordingFixture(string format, Func<AccessRecordingScenario, Func<AccessRecordingFixture<TValue>, int>> getBody, Func<int, TValue> createValue)
+    public AccessRecordingFixture(string format, bool positions, Func<AccessRecordingScenario, Func<AccessRecordingFixture<TValue>, int>> getBody, Func<int, TValue> createValue)
     {
         var formatKey = format == "json" ? JsonLinesJournalFormat.JournalFormatKey : OrleansBinaryJournalFormat.JournalFormatKey;
         var services = new ServiceCollection();
@@ -342,7 +341,7 @@ internal sealed class AccessRecordingFixture<TValue> : AccessRecordingFixture wh
             "value",
             manager,
             JournalFormatServices.GetRequiredCommandCodec<IDurableValueCommandCodec<TValue>>(serviceProvider, formatKey));
-        _logs = new DurableTaskAccessLogs(manager, accessCodec, Positions ? serializer : null);
+        _logs = new DurableTaskAccessLogs(manager, accessCodec, positions ? serializer : null);
         _storage = new(_logs);
         manager.InitializeAsync().AsTask().GetAwaiter().GetResult();
         _body = new(this);
@@ -352,7 +351,8 @@ internal sealed class AccessRecordingFixture<TValue> : AccessRecordingFixture wh
         _accessJournal = journalFormat.CreateWriter();
         _accessStream = _accessJournal.CreateJournalStreamWriter(new JournalStreamId(3));
         ((IStateMachine)Dictionary).Reset(_stateJournal.CreateJournalStreamWriter(new JournalStreamId(1)));
-        ((IStateMachine)Value).Reset(_stateJournal.CreateJournalStreamWriter(new JournalStreamId(2)));
+        _valueStream = _stateJournal.CreateJournalStreamWriter(new JournalStreamId(2));
+        ((IStateMachine)Value).Reset(_valueStream);
         ((IStateMachine)_logs).Reset(_accessStream);
 
         Keys = [.. Enumerable.Range(0, 64).Select(i => $"key-{i:D2}")];
@@ -494,8 +494,11 @@ internal sealed class AccessRecordingFixture<TValue> : AccessRecordingFixture wh
         return journal.CommittedLength;
     }
 
+    // Journals the value's pending change, as the grain's next write does, so later reads find it reproducible from the
+    // journal; then empties the buffers.
     private void ResetJournals()
     {
+        ((IStateMachine)Value).WritePendingEntries(_valueStream);
         _stateJournal.Reset();
         _accessJournal.Reset();
     }
