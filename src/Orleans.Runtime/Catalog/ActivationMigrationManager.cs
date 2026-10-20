@@ -705,6 +705,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
 
             LogDebugStartingWorker(targetSilo);
 
+            var messageHandlers = _runtimeClient.ServiceProvider.GetRequiredService<MessageHandlerShared>();
             var maxBatchSize = MaxBatchBodySize;
             var items = new List<ActivationMigration>();
             var reader = workItems.Reader;
@@ -728,7 +729,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                         }
 
                         items.Add(workItem);
-                        batch.Add(workItem.CreateSnapshot(_runtimeClient.ServiceProvider.GetRequiredService<MessageHandlerShared>()));
+                        batch.Add(workItem.CreateSnapshot(messageHandlers));
                         batchSize += workItem.Size;
                     }
 
