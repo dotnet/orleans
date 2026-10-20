@@ -401,14 +401,14 @@ public sealed class DurableTaskVersionTests
             await CommitAtGateAsync(activation);
         }
 
-        // Code which raised the minimum supported version replays an execution which recorded version 0. The check and the
-        // step which the body starts after catching the cancellation report the attempt's cancellation for the
-        // unsupported version, and the body's state change succeeds.
+        // Code which raised the minimum supported version replays an execution which recorded version 0. The check, the step
+        // which the body starts after catching the cancellation, and the body's state change report the attempt's
+        // cancellation for the unsupported version: a later attempt reruns the body, so the stalled attempt changes nothing.
         harness.Workflow = grain => Handling(grain, failures.Enqueue);
         await using var replay = await harness.ActivateAsync(TestCancellation);
         await stalled.Task.WaitAsync(Timeout, TestCancellation);
 
-        Assert.Equal(2, failures.Count);
+        Assert.Equal(3, failures.Count);
         Assert.All(failures, static failure =>
         {
             var canceled = Assert.IsType<DurableTaskAttemptCanceledException>(failure);
@@ -416,7 +416,7 @@ public sealed class DurableTaskVersionTests
             var unsupported = Assert.IsType<DurableTaskVersionException>(canceled.InnerException);
             Assert.Equal(("change", 0, 1, 1), (unsupported.Name, unsupported.Version, unsupported.MinSupported, unsupported.MaxSupported));
         });
-        Assert.Equal(1, replay.Grain.Counter.Value);
+        Assert.Equal(0, replay.Grain.Counter.Value);
         Assert.Empty(replay.Storage.GetAccessLog(workflowId));
         Assert.True(replay.Storage.TryGetTask(workflowId, out var state));
         Assert.False(state.Result is { IsCompleted: true });
@@ -448,7 +448,14 @@ public sealed class DurableTaskVersionTests
                     observe(scheduleFailure);
                 }
 
-                grain.Counter.Value++;
+                try
+                {
+                    grain.Counter.Value++;
+                }
+                catch (Exception writeFailure)
+                {
+                    observe(writeFailure);
+                }
             }
 
             return "handled";

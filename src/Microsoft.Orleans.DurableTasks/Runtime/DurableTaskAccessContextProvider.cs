@@ -8,7 +8,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// journaled state, so the body's accesses are recorded and replayed.
 /// </summary>
 /// <remarks>
-/// The provider supplies no context outside a body, after the runtime closed the attempt's log, while the log runs an
+/// The provider supplies no context outside a body, once the attempt's log is inactive, while the log runs an
 /// access or the runtime runs one of the attempt's operations, and within the runtime's own work which a body's flow
 /// started, which <see cref="DurableTaskHostFlow"/> marks.
 /// </remarks>
@@ -16,9 +16,10 @@ internal sealed class DurableTaskAccessContextProvider(IDurableTaskGrainRuntime 
 {
     public override JournaledStateContext? Current =>
         DurableTaskContext.TryGetCurrent(out var current)
-        && current is GrainDurableTaskContext { AccessLog: { IsOpen: true, Depth: 0 } log } context
+        && current is GrainDurableTaskContext context
         && ReferenceEquals(context.Runtime, runtime)
         && !DurableTaskHostFlow.IsActive
+        && context.GetAccessLogForAccess() is { IsActive: true, Depth: 0 } log
             ? log
             : null;
 }

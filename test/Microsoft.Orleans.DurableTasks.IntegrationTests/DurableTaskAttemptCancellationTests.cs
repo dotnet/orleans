@@ -23,8 +23,9 @@ public sealed class JsonDurableTaskAttemptCancellationTests() : DurableTaskAttem
 public sealed class OrleansBinaryDurableTaskAttemptCancellationTests() : DurableTaskAttemptCancellationTests(DurableTaskRecoveryFixture.OrleansBinary);
 
 /// <summary>
-/// Tests that a canceled attempt of a durable task unwinds: its durable operations throw and its cleanup's state changes
-/// commit, while task cancellation records its compensation.
+/// Tests that a canceled attempt of a durable task unwinds: its durable operations throw, its cleanup's state changes
+/// commit when its task ends with the cancellation and throw when the attempt is discarded, while task cancellation
+/// records its compensation.
 /// </summary>
 public abstract class DurableTaskAttemptCancellationTests : IAsyncLifetime
 {
@@ -156,13 +157,14 @@ public abstract class DurableTaskAttemptCancellationTests : IAsyncLifetime
         await Probe.WaitAsync(grainId, AttemptCancellationProbe.Compensating, cancellationToken);
         Assert.True(_fixture.Cluster.TryGetGrainContext(grainId, out var activation));
 
-        // The compensation's external call observes the attempt's cancellation, and the state change which follows it
-        // succeeds.
+        // The compensation's external call observes the attempt's cancellation. The activation's stop discards the attempt,
+        // which the replay reruns, so the state change which follows throws the attempt's cancellation.
         await grain.RequestDeactivationAsync();
         await activation.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         var interrupted = Probe.GetOutcomes(grainId);
         Assert.IsType<TaskCanceledException>(interrupted["external-call"]);
-        Assert.Null(interrupted["after-external-call"]);
+        var discarded = Assert.IsType<DurableTaskAttemptCanceledException>(interrupted["after-external-call"]);
+        Assert.Equal(DurableTaskAttemptCancellationReason.ActivationStopping, discarded.Reason);
 
         // The replay finds the effect recorded and redoes the rest of the compensation.
         Probe.Signal(grainId, AttemptCancellationProbe.Release);
