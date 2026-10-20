@@ -19,16 +19,19 @@ public readonly struct InboxMessage
     /// Direct callers of <see cref="IMessagingExtension.DeliverAsync"/> likewise reuse it when retrying a command.
     /// </para>
     /// <para>
-    /// The receiving inbox retains each processed record for <c>DeduplicationWindow</c> after its send time. Before
-    /// removing records, it journals an admission floor, which only advances. The inbox answers a message it doesn't
-    /// track with <see cref="DeliveryStatus.Expired"/>, staging nothing for it, when the message's send time is at or
-    /// below that floor. Tracked messages receive their recorded outcome.
+    /// The receiving inbox retains each pending and processed record for <c>DeduplicationWindow</c> after the latest
+    /// send time it has observed for that message ID. A delivery of a tracked message receives its recorded outcome;
+    /// when its send time is later than the recorded one, the inbox durably extends the record to that time before
+    /// answering, and an earlier or equal send time leaves the record unchanged. Before removing records, the inbox
+    /// journals an admission floor, which only advances. It answers a message it doesn't track with
+    /// <see cref="DeliveryStatus.Expired"/>, staging nothing for it, when the message's send time is at or below that
+    /// floor.
     /// </para>
     /// <para>
     /// The floor survives recovery and migration, so a delayed retry of a removed message stays fenced even after a
     /// clock moves backward. Clock jumps and skew change when messages expire and how long records are retained.
-    /// Sending a command again with a new send time creates a new admission opportunity, so applications reconcile an
-    /// uncertain outcome before doing so.
+    /// Once a record is removed, sending its command again with a later send time is admitted as a new delivery, so
+    /// applications reconcile an uncertain outcome before doing so.
     /// </para>
     /// </remarks>
     [Id(1)]
