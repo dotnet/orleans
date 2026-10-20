@@ -87,7 +87,7 @@ internal struct GrainMigrationPackage
     public byte[]? RequestFrames { get; set; }
 
     // Each deadline is relative to the batch's header clock, independent of when its frame is written or read.
-    [Id(4)]
+    [Id(3)]
     public long?[]? RequestDeadlinesMilliseconds { get; set; }
 
     internal void UnpackRequests(MessageHandlerShared shared, MigrationClock? clock)

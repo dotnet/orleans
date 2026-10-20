@@ -126,6 +126,7 @@ namespace Orleans.Runtime
         /// <remarks>
         /// There is no guarantee about the validity of the activation which is returned.
         /// Activations are responsible for handling any messages which they receive.
+        /// Initialization failure deactivates a newly created activation through its ordinary lifecycle.
         /// </remarks>
         /// <param name="grainId">The grain identity.</param>
         /// <param name="requestContextData">Optional request context data.</param>
@@ -139,6 +140,7 @@ namespace Orleans.Runtime
         {
             Debug.Assert(migration is null || migration.Value.GrainId == grainId);
             var rehydrationContext = migration?.MigrationContext;
+            IGrainContext? createdActivation = null;
             try
             {
                 if (TryGetGrainContext(grainId, out var result))
@@ -151,7 +153,6 @@ namespace Orleans.Runtime
                     return null;
                 }
 
-                var created = false;
                 lock (GetStripedLock(grainId))
                 {
                     if (!TryGetGrainContext(grainId, out result) && _siloStatusOracle.CurrentStatus == SiloStatus.Active)
@@ -166,7 +167,7 @@ namespace Orleans.Runtime
 
                         result = this.grainActivator.CreateInstance(address);
                         activations.RecordNewTarget(result);
-                        created = true;
+                        createdActivation = result;
                     }
                 } // End lock
 
@@ -175,7 +176,7 @@ namespace Orleans.Runtime
                     return UnableToCreateActivation(this, grainId);
                 }
 
-                if (!created)
+                if (createdActivation is null)
                 {
                     // Admission can reject a request and synchronously complete a caller, so deliver outside the catalog lock.
                     ReceiveRequests(result, migration);
@@ -217,7 +218,7 @@ namespace Orleans.Runtime
                 result.Activate(requestContextData);
                 return result;
             }
-            catch
+            catch (Exception exception)
             {
                 if (migration?.Requests is { } requests)
                 {
@@ -229,6 +230,9 @@ namespace Orleans.Runtime
                     requests.Clear();
                 }
 
+                createdActivation?.Deactivate(
+                    new(DeactivationReasonCode.ActivationFailed, exception, "Failed to initialize activation."),
+                    CancellationToken.None);
                 throw;
             }
             finally

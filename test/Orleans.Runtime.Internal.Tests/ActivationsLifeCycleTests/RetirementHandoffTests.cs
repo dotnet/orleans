@@ -2071,9 +2071,9 @@ public sealed class RetirementHandoffTests
                 packages.Add(new() { GrainId = grainId, MigrationContext = context, Requests = [request] });
             }
 
-            control.OnCreate = grainId =>
+            control.OnCreate = context =>
             {
-                if (failure == "cancellation" && grainId == packages[0].GrainId)
+                if (failure == "cancellation" && context.GrainId == packages[0].GrainId)
                 {
                     cancellation.Cancel();
                 }
@@ -2121,6 +2121,118 @@ public sealed class RetirementHandoffTests
                 {
                     state.ReleaseActivation.TrySetResult();
                 }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task Catalog_AdmissionFailureDeactivatesNewContextsAndPreservesExistingOnes(bool existing, bool partiallyAdmitted)
+    {
+        var control = new MigrationAdmissionControl();
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
+            silo.Services.AddSingleton<IConfigureGrainContextProvider>(control)));
+        var destination = cluster.Silos[1];
+        var factory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        RetirementHandoffState.Create(key);
+        var grain = factory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+        var grainId = grain.GetGrainId();
+        IGrainContext? captured = null;
+        control.OnCreate = context =>
+        {
+            if (context.GrainId == grainId)
+            {
+                captured = context;
+            }
+        };
+
+        if (existing)
+        {
+            await PlaceOnAsync(destination, () => grain.GetLocation());
+        }
+
+        var messages = Enumerable.Range(0, 3).Select(id => CreateReceivedRequest(cluster, destination, grainId, id, 20_000)).ToArray();
+        using var migrationContext = new MigrationContext(destination.ServiceProvider.GetRequiredService<SerializerSessionPool>());
+        var package = new GrainMigrationPackage { GrainId = grainId, MigrationContext = migrationContext, Requests = [.. messages] };
+        if (partiallyAdmitted)
+        {
+            Assert.True(migrationContext.TryAddValue(ActivationData.GrainAddressMigrationContextKey, CreateSourceAddress(cluster.Silos[0], grainId)));
+            // The first request is admitted before cache-header processing fails on the second.
+            messages[1].CacheInvalidationHeader = [null!];
+        }
+        else
+        {
+            Assert.True(migrationContext.TryAddValue(ActivationData.GrainAddressMigrationContextKey, "not a grain address"));
+        }
+
+        using var events = new DiagnosticEventCollector(GrainLifecycleEvents.ListenerName);
+        var waitingAtFailure = -1;
+        var deactivating = existing ? null : events.WaitForEventAsync(nameof(GrainLifecycleEvents.Deactivating),
+            e =>
+            {
+                if (e.Payload is GrainLifecycleEvents.Deactivating transition && ReferenceEquals(transition.GrainContext, captured))
+                {
+                    waitingAtFailure = ((ActivationData)transition.GrainContext).WaitingCount;
+                    return true;
+                }
+
+                return false;
+            }, Timeout, Cancellation);
+        try
+        {
+            var catalog = destination.ServiceProvider.GetRequiredService<Catalog>();
+            var error = Record.Exception(() => catalog.GetOrCreateActivation(grainId, requestContextData: null, package));
+            Assert.NotNull(error);
+            var activation = Assert.IsType<ActivationData>(captured);
+            control.OnCreate = null;
+            Assert.Empty(package.Requests!);
+            Assert.Empty(migrationContext.Keys);
+
+            if (existing)
+            {
+                Assert.Equal(ActivationState.Valid, activation.State);
+                Assert.Same(activation, FindActivation(destination, grainId));
+                Assert.False(activation.Deactivated.IsCompleted);
+            }
+            else
+            {
+                Assert.NotEqual(ActivationState.Creating, activation.State);
+                var reason = Assert.IsType<GrainLifecycleEvents.Deactivating>((await deactivating!).Payload).Reason;
+                Assert.Equal(DeactivationReasonCode.ActivationFailed, reason.ReasonCode);
+                Assert.Same(error, reason.Exception);
+                Assert.Equal(partiallyAdmitted ? 1 : 0, waitingAtFailure);
+                await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+                Assert.Equal(ActivationState.Invalid, activation.State);
+                Assert.Equal(0, activation.WaitingCount);
+                Assert.Null(FindActivation(destination, grainId));
+            }
+
+            Assert.All(messages, request => Assert.Null(request._bodyObject));
+            await PlaceOnAsync(destination, () => grain.GetLocation());
+            if (existing)
+            {
+                Assert.Same(activation, FindActivation(destination, grainId));
+            }
+            else
+            {
+                Assert.NotSame(activation, FindActivation(destination, grainId));
+            }
+        }
+        finally
+        {
+            control.OnCreate = null;
+            if (captured is { } activation)
+            {
+                activation.Deactivate(new(DeactivationReasonCode.ActivationFailed, new InvalidOperationException("Test cleanup"), "Test cleanup"), CancellationToken.None);
+                await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+            }
+
+            foreach (var request in messages)
+            {
+                request.Dispose();
             }
         }
     }
@@ -2631,7 +2743,7 @@ public sealed class ImmovableRetirementHandoffGrain : RetirementHandoffGrain, II
 
 public sealed class MigrationAdmissionControl : IConfigureGrainContextProvider, IConfigureGrainContext
 {
-    public Action<GrainId>? OnCreate { get; set; }
+    public Action<IGrainContext>? OnCreate { get; set; }
 
     public bool TryGetConfigurator(GrainType grainType, GrainProperties properties, out IConfigureGrainContext configurator)
     {
@@ -2639,7 +2751,7 @@ public sealed class MigrationAdmissionControl : IConfigureGrainContextProvider, 
         return true;
     }
 
-    public void Configure(IGrainContext context) => OnCreate?.Invoke(context.GrainId);
+    public void Configure(IGrainContext context) => OnCreate?.Invoke(context);
 }
 
 public sealed class RetirementHandoffState
