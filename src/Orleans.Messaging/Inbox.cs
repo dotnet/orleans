@@ -488,7 +488,6 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         {
             Kind = InboxCommandKind.Complete,
             MessageId = message.Envelope.MessageId,
-            ProcessedAt = TimeProvider.GetUtcNow(),
             RedeliveryDeadline = message.RedeliveryDeadline,
             DeadLetter = deadLetter,
             Rejection = rejection
