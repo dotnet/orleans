@@ -843,8 +843,10 @@ public sealed class RetirementHandoffTests
         Assert.Equal([nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains)], calls);
     }
 
-    [Fact]
-    public async Task MigratedRequestsForAGrainWhichIsAlreadyActive_ReachItsActivation()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MigratedRequestsForAnExistingActivation_UseOrdinaryAdmissionAndCacheRepair(bool invalidPreviousAddress)
     {
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
         {
@@ -875,7 +877,14 @@ public sealed class RetirementHandoffTests
         var request = CreateOneWayRequest(grain.GetGrainId(), 1);
         request.SendingSilo = caller.SiloAddress;
         var context = new MigrationContext(silo.ServiceProvider.GetRequiredService<SerializerSessionPool>());
-        context.TryAddValue(ActivationData.GrainAddressMigrationContextKey, previousAddress);
+        if (invalidPreviousAddress)
+        {
+            context.TryAddValue(ActivationData.GrainAddressMigrationContextKey, "unused invalid address");
+        }
+        else
+        {
+            context.TryAddValue(ActivationData.GrainAddressMigrationContextKey, previousAddress);
+        }
         GrainMigrationPackage package = new()
         {
             GrainId = grain.GetGrainId(),
@@ -887,12 +896,18 @@ public sealed class RetirementHandoffTests
         Assert.Equal(1, activation.WaitingCount);
         Assert.Equal(1, request.ForwardCount);
 
-        // As for a forwarded one-way request, the silo sends the cache update to the request's caller, which receives no response.
-        await cacheUpdates.Received.Task.WaitAsync(Timeout, Cancellation);
-        await WaitUntilAsync(() => locator.TryLookupInCache(grain.GetGrainId(), out var cached) && silo.SiloAddress.Equals(cached.SiloAddress));
+        Assert.Empty(context.Keys);
+        Assert.Null(request.CacheInvalidationHeader);
+        Assert.False(cacheUpdates.Received.Task.IsCompleted);
 
         state.ReleaseBlock.TrySetResult();
         await running.WaitAsync(Timeout, Cancellation);
+
+        // The next ordinary call repairs the stale route through normal forwarding.
+        Assert.Equal(silo.SiloAddress, await grain.GetLocation().AsTask().WaitAsync(Timeout, Cancellation));
+        Assert.True(locator.TryLookupInCache(grain.GetGrainId(), out var cached));
+        Assert.Equal(silo.SiloAddress, cached.SiloAddress);
+        Assert.Same(activation, FindActivation(silo, grain.GetGrainId()));
     }
 
     [Fact]
@@ -2126,11 +2141,9 @@ public sealed class RetirementHandoffTests
     }
 
     [Theory]
-    [InlineData(false, "type")]
-    [InlineData(false, "grain")]
-    [InlineData(true, "type")]
-    [InlineData(true, "grain")]
-    public async Task Catalog_RejectsInvalidMigrationMetadataBeforeCreatingAnActivation(bool existing, string invalid)
+    [InlineData("type")]
+    [InlineData("grain")]
+    public async Task Activation_HandlesPreviousAddressMetadataDuringRehydration(string invalid)
     {
         var control = new MigrationAdmissionControl();
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
@@ -2138,7 +2151,8 @@ public sealed class RetirementHandoffTests
         var destination = cluster.Silos[1];
         var factory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
         var key = Guid.NewGuid();
-        RetirementHandoffState.Create(key);
+        var state = RetirementHandoffState.Create(key);
+        state.FailActivationOn = destination.SiloAddress;
         var grain = factory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
         var grainId = grain.GetGrainId();
         IGrainContext? captured = null;
@@ -2149,11 +2163,6 @@ public sealed class RetirementHandoffTests
                 captured = context;
             }
         };
-
-        if (existing)
-        {
-            await PlaceOnAsync(destination, () => grain.GetLocation());
-        }
 
         var messages = Enumerable.Range(0, 3).Select(id => CreateReceivedRequest(cluster, destination, grainId, id, 20_000)).ToArray();
         using var migrationContext = new MigrationContext(destination.ServiceProvider.GetRequiredService<SerializerSessionPool>());
@@ -2168,42 +2177,39 @@ public sealed class RetirementHandoffTests
             Assert.True(migrationContext.TryAddValue(ActivationData.GrainAddressMigrationContextKey, "not a grain address"));
         }
 
+        using var events = new DiagnosticEventCollector(GrainLifecycleEvents.ListenerName);
+        var deactivating = events.WaitForEventAsync(nameof(GrainLifecycleEvents.Deactivating),
+            e => e.Payload is GrainLifecycleEvents.Deactivating transition && ReferenceEquals(transition.GrainContext, captured), Timeout, Cancellation);
         try
         {
             var catalog = destination.ServiceProvider.GetRequiredService<Catalog>();
-            var error = Record.Exception(() => catalog.GetOrCreateActivation(grainId, requestContextData: null, package));
-            Assert.NotNull(error);
+            var activation = Assert.IsType<ActivationData>(catalog.GetOrCreateActivation(grainId, requestContextData: null, package));
+            Assert.Same(captured, activation);
             control.OnCreate = null;
             Assert.Empty(package.Requests!);
+
+            // Rehydration owns metadata errors, and its existing error handling still allows Activate to run.
+            var reason = Assert.IsType<GrainLifecycleEvents.Deactivating>((await deactivating).Payload).Reason;
+            Assert.Equal("Destination activation failed.", Assert.IsType<InvalidOperationException>(reason.Exception).Message);
+            await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+            Assert.Null(activation.PreviousRegistration);
+            Assert.Null(FindActivation(destination, grainId));
             Assert.Empty(migrationContext.Keys);
-
-            if (existing)
-            {
-                var activation = Assert.IsType<ActivationData>(captured);
-                Assert.Equal(ActivationState.Valid, activation.State);
-                Assert.Same(activation, FindActivation(destination, grainId));
-                Assert.False(activation.Deactivated.IsCompleted);
-            }
-            else
-            {
-                Assert.Null(captured);
-                Assert.Null(FindActivation(destination, grainId));
-            }
-
             Assert.All(messages, request => Assert.Null(request._bodyObject));
+
+            state.FailActivationOn = null;
             await PlaceOnAsync(destination, () => grain.GetLocation());
-            if (existing)
-            {
-                Assert.Same(captured, FindActivation(destination, grainId));
-            }
-            else
-            {
-                Assert.NotNull(FindActivation(destination, grainId));
-            }
+            Assert.NotSame(activation, FindActivation(destination, grainId));
         }
         finally
         {
             control.OnCreate = null;
+            if (captured is { } activation)
+            {
+                activation.Deactivate(new(DeactivationReasonCode.ActivationFailed, new InvalidOperationException("Test cleanup"), "Test cleanup"), CancellationToken.None);
+                await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+            }
+
             foreach (var request in messages)
             {
                 request.Dispose();
@@ -2214,11 +2220,17 @@ public sealed class RetirementHandoffTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Catalog_CallsActivateAndTheActivationOwnsAdmittedRequests(bool cacheHintFails)
+    public async Task Catalog_CallsActivateAndTheActivationOwnsAdmittedRequests(bool rejectResponseFails)
     {
         var control = new MigrationAdmissionControl();
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
-            silo.Services.AddSingleton<IConfigureGrainContextProvider>(control)));
+        {
+            silo.Services.AddSingleton<IConfigureGrainContextProvider>(control);
+            if (rejectResponseFails)
+            {
+                silo.Configure<SiloMessagingOptions>(options => options.MaxEnqueuedRequestsHardLimit = 1);
+            }
+        }));
         var silo = cluster.Silos[1];
         var key = Guid.NewGuid();
         var state = RetirementHandoffState.Create(key);
@@ -2238,12 +2250,6 @@ public sealed class RetirementHandoffTests
         var bodies = messages.Select(message => message._bodyObject).ToArray();
         using var migrationContext = new MigrationContext(silo.ServiceProvider.GetRequiredService<SerializerSessionPool>());
         var package = new GrainMigrationPackage { GrainId = grainId, MigrationContext = migrationContext, Requests = [.. messages] };
-        if (cacheHintFails)
-        {
-            messages[0].Direction = Message.Directions.OneWay;
-            messages[0].AddToCacheInvalidationHeader(CreateSourceAddress(cluster.Silos[0], grainId), validAddress: null);
-        }
-
         using var events = new DiagnosticEventCollector(GrainLifecycleEvents.ListenerName);
         var ownedCount = -1;
         object?[]? ownedBodies = null;
@@ -2263,14 +2269,14 @@ public sealed class RetirementHandoffTests
         {
             try
             {
-                if (cacheHintFails)
+                if (rejectResponseFails)
                 {
-                    RequestContext.Set("uncopyable-cache-hint-context", new UnserializableValue());
+                    RequestContext.Set("uncopyable-rejection-context", new UnserializableValue());
                 }
 
                 var error = Record.Exception(() => silo.ServiceProvider.GetRequiredService<Catalog>()
                     .GetOrCreateActivation(grainId, requestContextData: null, package));
-                if (cacheHintFails)
+                if (rejectResponseFails)
                 {
                     Assert.NotNull(error);
                 }
@@ -2281,13 +2287,13 @@ public sealed class RetirementHandoffTests
             }
             finally
             {
-                RequestContext.Remove("uncopyable-cache-hint-context");
+                RequestContext.Remove("uncopyable-rejection-context");
             }
 
             var reason = Assert.IsType<GrainLifecycleEvents.Deactivating>((await deactivating).Payload).Reason;
             Assert.Equal(DeactivationReasonCode.ActivationFailed, reason.ReasonCode);
             Assert.Equal("Destination activation failed.", Assert.IsType<InvalidOperationException>(reason.Exception).Message);
-            Assert.Equal(cacheHintFails ? 1 : 3, ownedCount);
+            Assert.Equal(rejectResponseFails ? 2 : 3, ownedCount);
             Assert.Equal(bodies.Take(ownedCount), ownedBodies);
             await activation!.Deactivated.WaitAsync(Timeout, Cancellation);
             Assert.Equal(ActivationState.Invalid, activation.State);

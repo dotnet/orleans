@@ -141,19 +141,9 @@ namespace Orleans.Runtime
             var rehydrationContext = migration?.MigrationContext;
             try
             {
-                GrainAddress? previousAddress = null;
-                if (migration is { Requests.Count: > 0 } package)
-                {
-                    package.MigrationContext.TryGetValue(ActivationData.GrainAddressMigrationContextKey, out previousAddress);
-                    if (previousAddress is not null && previousAddress.GrainId != grainId)
-                    {
-                        throw new ArgumentException("The migration's previous address must identify the migrating grain.", nameof(migration));
-                    }
-                }
-
                 if (TryGetGrainContext(grainId, out var result))
                 {
-                    ReceiveRequests(result, migration, previousAddress);
+                    ReceiveRequests(result, migration);
                     return result;
                 }
                 else if (grainId.IsSystemTarget())
@@ -188,7 +178,7 @@ namespace Orleans.Runtime
                 if (!created)
                 {
                     // Admission can reject a request and synchronously complete a caller, so deliver outside the catalog lock.
-                    ReceiveRequests(result, migration, previousAddress);
+                    ReceiveRequests(result, migration);
                     return result;
                 }
 
@@ -216,7 +206,7 @@ namespace Orleans.Runtime
                     _catalogInstruments.OnActivationCreated(GetGrainTypeMetricName(result));
 
                     // Admit requests before rehydration can dispose the context and activation can register in the directory.
-                    ReceiveRequests(result, migration, previousAddress);
+                    ReceiveRequests(result, migration);
                 }
                 finally
                 {
@@ -251,7 +241,7 @@ namespace Orleans.Runtime
                 rehydrationContext?.Dispose();
             }
 
-            void ReceiveRequests(IGrainContext destination, GrainMigrationPackage? migration, GrainAddress? previousAddress)
+            static void ReceiveRequests(IGrainContext destination, GrainMigrationPackage? migration)
             {
                 if (migration is not { Requests: { Count: > 0 } requests })
                 {
@@ -263,19 +253,9 @@ namespace Orleans.Runtime
                 {
                     foreach (var request in requests)
                     {
-                        if (previousAddress is not null)
-                        {
-                            request.AddToCacheInvalidationHeader(previousAddress, destination.Address);
-                        }
-
                         // ReceiveMessage takes ownership even if processing the request subsequently fails.
                         admitted++;
                         destination.ReceiveMessage(request);
-                        if (request.Direction is Message.Directions.OneWay && request.HasCacheInvalidationHeader)
-                        {
-                            serviceProvider.GetRequiredService<MessageCenter>().SendRejectionResponse(
-                                request, Message.RejectionTypes.CacheInvalidation, "One-way request migrated", exception: null);
-                        }
                     }
                 }
                 finally

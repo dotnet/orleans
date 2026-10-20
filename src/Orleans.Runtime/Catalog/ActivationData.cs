@@ -1499,10 +1499,20 @@ internal sealed partial class ActivationData :
                 if (context.TryGetValue(GrainAddressMigrationContextKey, out GrainAddress? previousRegistration) &&
                     previousRegistration is not null)
                 {
+                    if (previousRegistration.GrainId != GrainId)
+                    {
+                        throw new ArgumentException("The previous registration must identify the grain being rehydrated.", nameof(context));
+                    }
+
                     PreviousRegistration = previousRegistration;
                     LogPreviousActivationAddress(_shared.Logger, previousRegistration);
                     rehydrateSpan?.SetTag(ActivityTagKeys.RehydratePreviousRegistration,
                         previousRegistration.ToFullString());
+
+                    foreach (var (message, _) in _waitingRequests)
+                    {
+                        message.AddToCacheInvalidationHeader(previousRegistration, Address);
+                    }
                 }
 
                 if (_lifecycle is { } lifecycle)
@@ -1514,6 +1524,16 @@ internal sealed partial class ActivationData :
                 }
 
                 grainMigrationParticipant?.OnRehydrate(context);
+
+                // Cache-hint failures must not interrupt restoration of the grain's state.
+                foreach (var (message, _) in _waitingRequests)
+                {
+                    if (message.Direction is Message.Directions.OneWay && message.HasCacheInvalidationHeader)
+                    {
+                        _shared.InternalRuntime.MessageCenter.SendRejectionResponse(
+                            message, Message.RejectionTypes.CacheInvalidation, "One-way request migrated", exception: null);
+                    }
+                }
             }
 
             LogRehydratedGrain(_shared.Logger);
