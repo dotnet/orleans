@@ -1,11 +1,15 @@
 using System.Collections.Concurrent;
+using Documentation.Grains.DurableTasks.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Runtime;
 using Orleans.DurableTasks.Testing;
 using Orleans.Journaling;
+using Orleans.Messaging.Configuration;
+using Orleans.Messaging.Diagnostics;
 using Orleans.Runtime;
+using Orleans.TestingHost.Diagnostics;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
@@ -128,17 +132,45 @@ public sealed class DurableTaskReplayerTests(DurableTaskReplayFixture fixture) :
     }
 
     [Fact]
-    public async Task RecordedDelayKeepsTheReplayWaiting()
+    public async Task PastDueRecordedDelayKeepsTheReplayWaiting()
     {
         var (history, root) = await CaptureAsync("delay", ReplayWorkflowVersion.Paused);
 
         var result = await ReplayAsync(history, ReplayWorkflowVersion.Paused);
 
-        // The delay is recorded and pending, so the replay waits for it.
+        Assert.True(fixture.CaptureTime.GetUtcNow() + TimeSpan.FromMinutes(30) < history.CapturedAt);
         result.EnsureSucceeded();
         AssertOutcome(DurableTaskReplayOutcome.Waiting, result, root);
         Assert.Equal([root.Child("pause")], result[root].WaitingOn);
     }
+
+    [Fact]
+    public async Task ExpiredPendingInvocationKeepsTheReplayWaiting()
+    {
+        const string key = "expired-invocation";
+        fixture.CaptureCode.Version = ReplayWorkflowVersion.Unapproved;
+        var grain = fixture.Capture.Client.GetGrain<IReplayOrderGrain>(key);
+        var shipping = fixture.Capture.Client.GetGrain<IReplayShippingGrain>("main").GetGrainId();
+        var root = TaskId.CreateRoot(key);
+        using var failures = new DeliveryFaultInjector(receiving => receiving.GrainContext.GrainId == shipping, "Shipping is unavailable.");
+        using var events = new DiagnosticEventCollector(MessagingEvents.ListenerName);
+        await grain.FulfillAsync(key).WithId(key).ScheduleAsync(TestCancellation);
+        var retry = (MessagingEvents.OutboxRetryScheduled)(await events.WaitForEventAsync(
+            nameof(MessagingEvents.OutboxRetryScheduled),
+            evt => evt.Payload is MessagingEvents.OutboxRetryScheduled retry && retry.GrainContext.GrainId == grain.GetGrainId(),
+            TimeSpan.FromSeconds(30),
+            TestCancellation)).Payload!;
+        await grain.FlushAsync();
+        var history = await DurableTaskHistory.CaptureAsync(fixture.Capture.Storage, grain.GetGrainId(), TestCancellation);
+        Assert.True(retry.NextAttemptAt + TimeSpan.FromHours(6) < history.CapturedAt);
+
+        var result = await ReplayAsync(history, ReplayWorkflowVersion.Unapproved);
+
+        result.EnsureSucceeded();
+        AssertOutcome(DurableTaskReplayOutcome.Waiting, result, root);
+        Assert.Equal([root.Child("ship")], result[root].WaitingOn);
+    }
+
     [Fact]
     public async Task HistoryReplaysInTheJournalFormatWhichRecordedIt()
     {
@@ -161,6 +193,40 @@ public sealed class DurableTaskReplayerTests(DurableTaskReplayFixture fixture) :
         finally
         {
             await capture.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task DocumentationCaptureReplaysVersionZeroAtTheApprovalWait()
+    {
+        var path = Path.GetTempFileName();
+        var cluster = new DurableTaskRecoveryFixture(
+            DurableTaskRecoveryFixture.Json,
+            DurableTaskTestingSnippets.ConfigureCaptureSilo);
+        try
+        {
+            await cluster.InitializeAsync();
+            const string orderId = "documentation";
+            await DurableTaskTestingSnippets.CaptureAsync(cluster.Cluster, orderId, path);
+            await using var replayer = await DurableTaskReplayer.StartAsync(
+                silo => silo.Services.AddSingleton<FulfillmentCode>().AddSingleton<FulfillmentProgress>(),
+                TestCancellation);
+            var history = await DurableTaskHistory.LoadAsync(path, TestCancellation);
+
+            var result = await replayer.ReplayAsync(history, TestCancellation);
+
+            result.EnsureSucceeded();
+            var root = TaskId.CreateRoot($"fulfill-{orderId}");
+            AssertOutcome(DurableTaskReplayOutcome.Waiting, result, root);
+            Assert.Equal([root.Child("ship")], result[root].Reached);
+            Assert.Equal(0, result[root].Versions["carrier-booking"]);
+            Assert.Equal([root.Child("$signal:approved")], result[root].WaitingOn);
+            await DurableTaskTestingSnippets.ReplayVersionedChangeAsync(replayer, path, orderId);
+        }
+        finally
+        {
+            await cluster.DisposeAsync();
+            File.Delete(path);
         }
     }
 
@@ -215,7 +281,13 @@ public sealed class DurableTaskReplayFixture : IAsyncLifetime
 {
     public DurableTaskReplayFixture()
     {
-        Capture = new(DurableTaskRecoveryFixture.Json, silo => silo.Services.AddSingleton(CaptureCode).AddSingleton(CaptureProbe));
+        CaptureTime.Advance(-TimeSpan.FromDays(30));
+        Capture = new(DurableTaskRecoveryFixture.Json, silo =>
+        {
+            silo.Services.AddSingleton(CaptureCode).AddSingleton(CaptureProbe).AddSingleton<TimeProvider>(CaptureTime);
+            silo.Services.Configure<DurableMessagingOptions>(options => options.RetryInitialInterval = TimeSpan.FromHours(1));
+        });
+        Capture.JobClock.Advance(-TimeSpan.FromDays(30));
     }
 
     internal DurableTaskRecoveryFixture Capture { get; }
@@ -223,6 +295,8 @@ public sealed class DurableTaskReplayFixture : IAsyncLifetime
     internal ReplayWorkflowCode CaptureCode { get; } = new();
 
     internal ReplayWorkflowProbe CaptureProbe { get; } = new();
+
+    internal AdvanceableTimeProvider CaptureTime { get; } = new();
 
     internal ReplayWorkflowCode ReplayCode { get; } = new();
 
@@ -297,6 +371,8 @@ public sealed class ReplayWorkflowProbe
 public interface IReplayOrderGrain : IGrainWithStringKey
 {
     DurableTask<string> FulfillAsync(string orderId);
+
+    Task FlushAsync();
 }
 
 public interface IReplayShippingGrain : IGrainWithStringKey
@@ -311,6 +387,8 @@ public sealed class ReplayOrderGrain(ReplayWorkflowCode code, ReplayWorkflowProb
     public static readonly DurableSignal<string> Approved = new("approved");
 
     private IReplayShippingGrain Shipping => GrainFactory.GetGrain<IReplayShippingGrain>("main");
+
+    public Task FlushAsync() => StateManager.WriteStateAsync().AsTask();
 
     public async DurableTask<string> FulfillAsync(string orderId)
     {
