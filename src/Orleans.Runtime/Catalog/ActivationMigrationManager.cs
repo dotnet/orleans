@@ -124,8 +124,8 @@ internal interface IActivationMigrationManager
 /// <remarks>
 /// <para>
 /// The activation transfers its queued requests when it starts the migration, and remains in the catalog until the migration completes,
-/// so that requests which reach this silo for the grain reach it. It then leaves the catalog and transfers the requests which reached it meanwhile
-/// through <see cref="Deliver"/>. The activation does not access the requests afterwards.
+/// so that requests which reach this silo for the grain reach it. Once it leaves the catalog, it calls <see cref="Deliver"/>
+/// for that original handoff and handles its remaining queue through ordinary deactivation.
 /// </para>
 /// <para>
 /// Sending snapshots the payload into managed memory and releases the source's pooled request bodies before invoking the RPC.
@@ -280,14 +280,13 @@ internal sealed class ActivationMigration(
     }
 
     /// <summary>
-    /// Rejects or forwards the migration's requests, followed by <paramref name="laterRequests"/>, once the activation has left the catalog.
+    /// Rejects or forwards the migration's original requests once the activation has left the catalog.
     /// </summary>
-    /// <param name="laterRequests">The requests which reached the activation after the migration started, if any.</param>
     /// <remarks>The activation calls this once, after <see cref="Completion"/> has completed.</remarks>
-    public void Deliver(List<Message>? laterRequests)
+    public void Deliver()
     {
         Debug.Assert(Completion.IsCompleted, "The migration delivers its requests once its outcome is known.");
-        manager.DeliverRequests(source, target, carried: _stage != Stage.Queued && Package.Requests is not null, _stage == Stage.Accepted, requests, laterRequests);
+        manager.DeliverRequests(source, target, carried: _stage != Stage.Queued && Package.Requests is not null, _stage == Stage.Accepted, requests);
         requests = null;
     }
 
@@ -633,10 +632,14 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     /// <param name="carried">Whether the migration sent the requests.</param>
     /// <param name="accepted">Whether the target accepted the requests which the migration sent.</param>
     /// <param name="requests">The requests which were queued when the migration started.</param>
-    /// <param name="laterRequests">The requests which reached the activation after the migration started.</param>
-    internal void DeliverRequests(GrainAddress source, SiloAddress target, bool carried, bool accepted, List<Message>? requests, List<Message>? laterRequests)
+    internal void DeliverRequests(GrainAddress source, SiloAddress target, bool carried, bool accepted, List<Message>? requests)
     {
-        if (requests is not null && carried)
+        if (requests is not { Count: > 0 })
+        {
+            return;
+        }
+
+        if (carried)
         {
             foreach (var request in requests)
             {
@@ -650,25 +653,10 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                 // A one-way request has no caller to reject, so it is dropped, as one-way requests are when their delivery fails.
             }
 
-            requests = null;
+            return;
         }
 
-        if (laterRequests is { Count: > 0 })
-        {
-            if (requests is null)
-            {
-                requests = laterRequests;
-            }
-            else
-            {
-                requests.AddRange(laterRequests);
-            }
-        }
-
-        if (requests is { Count: > 0 })
-        {
-            MessageCenter.ProcessRequestsToInvalidActivation(requests, source, target, "The activation migrated.");
-        }
+        MessageCenter.ProcessRequestsToInvalidActivation(requests, source, target, "The activation migrated.");
     }
 
     private int MaxBatchBodySize => _maxMessageBodySize - MessageBodyFramingAllowance;

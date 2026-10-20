@@ -2339,31 +2339,32 @@ internal sealed partial class ActivationData :
             UnregisterMessageTarget();
             try
             {
-                List<Message>? queued;
-                lock (_lock)
-                {
-                    queued = TakeWaitingRequests();
-                }
-
                 if (migration is not null)
                 {
-                    // The migration forwards the requests which it did not send, followed by these.
-                    if (queued is not null)
-                    {
-                        RejectLocalOnlyRequests(queued);
-                    }
-
                     _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
-                    migration.Deliver(queued);
-                }
-                else if (queued is not null)
-                {
-                    RejectOrForwardRequests(queued);
+                    migration.Deliver();
                 }
             }
             finally
             {
-                GetDeactivationCompletionSource().TrySetResult(true);
+                try
+                {
+                    // Requests outside the original handoff remain owned by this activation.
+                    List<Message>? queued;
+                    lock (_lock)
+                    {
+                        queued = TakeWaitingRequests();
+                    }
+
+                    if (queued is not null)
+                    {
+                        RejectOrForwardRequests(queued);
+                    }
+                }
+                finally
+                {
+                    GetDeactivationCompletionSource().TrySetResult(true);
+                }
             }
 
             _workSignal.Signal();

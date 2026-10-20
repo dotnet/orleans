@@ -590,17 +590,22 @@ public sealed class RetirementHandoffTests
         Assert.Empty(context.Keys);
 
         // The requests remain with the migration until the activation stops receiving requests, and are then forwarded, unchanged.
-        migration.Deliver(laterRequests: null);
+        migration.Deliver();
         Assert.Same(original, Assert.Single(requests));
+        Assert.Same(requests, migration.Package.Requests);
+        Assert.Same(original, Assert.Single(migration.Package.Requests!));
         Assert.Equal(20_000, ((Orleans.Serialization.Buffers.PooledBuffer)original.BodyObject!).Length);
     }
 
-    [Fact]
-    public async Task RequestWhileTheMigrationOutcomeIsPending_WaitsForTheMigrationAndIsForwarded()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LateRequestsStayWithTheActivationAndFollowTheOriginalHandoff(bool acceptMigration)
     {
-        // The target holds the migration past the source activation's deactivation timeout, and then fails it.
+        // Hold the migration past the source activation's deactivation timeout.
         var acceptArrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseFailure = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseAcceptance = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        CorrelationId? carriedRequestId = null;
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
         {
             silo.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = DeactivationTimeout);
@@ -608,9 +613,24 @@ public sealed class RetirementHandoffTests
             {
                 if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
                 {
+                    var package = Assert.Single((List<GrainMigrationPackage>)context.Request.GetArgument(0)!);
+                    var shared = context.TargetContext.ActivationServices.GetRequiredService<Orleans.Runtime.Messaging.MessageHandlerShared>();
+                    var carried = Orleans.Runtime.Messaging.MessageFrames.ReadRequests(shared, package.RequestFrames!);
+                    try
+                    {
+                        carriedRequestId = Assert.Single(carried).Id;
+                    }
+                    finally
+                    {
+                        foreach (var request in carried) request.Dispose();
+                    }
+
                     acceptArrived.TrySetResult();
-                    await releaseFailure.Task;
-                    throw new InvalidOperationException("The migration fails.");
+                    await releaseAcceptance.Task;
+                    if (!acceptMigration)
+                    {
+                        throw new InvalidOperationException("The migration fails.");
+                    }
                 }
 
                 await context.Invoke();
@@ -626,35 +646,45 @@ public sealed class RetirementHandoffTests
 
         var running = grain.Block().AsTask();
         await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
-        var queued = grain.HoldThenGetLocation().AsTask();
+        var queued = grain.Record("migrated").AsTask();
         await WaitUntilAsync(() => GetWaitingCount(source, grain.GetGrainId()) == 1);
+        var requestId = FindPendingCallback(cluster.Silos[0], grain.GetGrainId(), nameof(IRetirementHandoffGrain.Record)).Message.Id;
 
         await grain.MigrateOnIdleTo(target.SiloAddress);
         state.ReleaseBlock.TrySetResult();
         await running.WaitAsync(Timeout, Cancellation);
 
-        Task<SiloAddress> later;
+        Task later;
         try
         {
             // After the source activation's deactivation timeout, a call from the source's silo reaches the source activation, which is still in the catalog,
             // rather than a new activation, and waits there while the migration awaits the target.
             await acceptArrived.Task.WaitAsync(Timeout, Cancellation);
+            Assert.Equal(requestId, carriedRequestId);
             await Task.Delay(DeactivationTimeout, Cancellation);
             var fromSource = source.ServiceProvider.GetRequiredService<IGrainFactory>().GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
-            later = fromSource.GetLocation().AsTask();
+            later = fromSource.Record("later").AsTask();
             await WaitUntilAsync(() => activation.WaitingCount == 1);
             Assert.Same(activation, FindActivation(source, grain.GetGrainId()));
             Assert.Null(FindActivation(target, grain.GetGrainId()));
         }
         finally
         {
-            releaseFailure.TrySetResult();
+            releaseAcceptance.TrySetResult();
         }
 
-        // Once the migration fails, the source rejects the request which the migration carried, and forwards the later call, which runs on a new activation.
-        await Assert.ThrowsAsync<OrleansMessageRejectionException>(() => queued.WaitAsync(Timeout, Cancellation));
+        if (acceptMigration)
+        {
+            await queued.WaitAsync(Timeout, Cancellation);
+        }
+        else
+        {
+            await Assert.ThrowsAsync<OrleansMessageRejectionException>(() => queued.WaitAsync(Timeout, Cancellation));
+        }
+
         await later.WaitAsync(Timeout, Cancellation);
-        Assert.Equal(0, state.HoldCount);
+        await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+        Assert.Equal(acceptMigration ? ["migrated", "later"] : new[] { "later" }, state.Calls);
     }
 
     [Fact]
@@ -1784,7 +1814,7 @@ public sealed class RetirementHandoffTests
 
         // Snapshotting releases pooled source bodies before any writer can access the outgoing invocation,
         // including requests which a failed snapshot never reached.
-        migration.Deliver(laterRequests: null);
+        migration.Deliver();
         if (failure == "preparation")
         {
             Assert.IsType<UnserializableValue>(request._bodyObject);
