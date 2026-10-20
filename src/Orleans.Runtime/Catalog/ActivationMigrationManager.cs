@@ -217,6 +217,11 @@ internal sealed class ActivationMigration(
                 return;
             }
 
+            if (_stage == Stage.Queued)
+            {
+                Package.MigrationContext.Dispose();
+            }
+
             // Unregister without waiting for a cancellation callback which may be waiting for this lock.
             _cancellation.Unregister();
             if (exception is null)
@@ -338,52 +343,82 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         List<GrainMigrationPackage> migratingGrains,
         CancellationToken cancellationToken = default)
     {
-        foreach (var package in migratingGrains)
+        var nextPackage = 0;
+        try
         {
-            ValidateRequests(package);
-        }
-
-        var activations = new List<ActivationData>();
-        var currentActivity = Activity.Current;
-        for (var i = 0; i < migratingGrains.Count; i++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var package = migratingGrains[i];
-            var requests = TakeRequests(package, Silo);
-
-            var context = _catalog.GetOrCreateActivation(package.GrainId, requestContextData: null, package);
-            if (requests is not null)
+            foreach (var package in migratingGrains)
             {
-                foreach (var request in requests)
+                ValidateRequests(package);
+            }
+
+            var activations = new List<ActivationData>();
+            var currentActivity = Activity.Current;
+            while (nextPackage < migratingGrains.Count)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var package = migratingGrains[nextPackage];
+                var requests = TakeRequests(package, Silo);
+
+                // The catalog owns the context and cleans up unadmitted requests on failure.
+                nextPackage++;
+                var context = _catalog.GetOrCreateActivation(package.GrainId, requestContextData: null, package);
+                if (context is null && requests is not null)
                 {
-                    if (context is null)
+                    var delivered = 0;
+                    try
                     {
-                        MessageCenter.ReceiveMessage(request);
+                        foreach (var request in requests)
+                        {
+                            delivered++;
+                            MessageCenter.ReceiveMessage(request);
+                        }
                     }
-                    else if (request.Direction is Message.Directions.OneWay && request.HasCacheInvalidationHeader)
+                    finally
                     {
-                        // Publish the new route after admission so the caller's next request follows this one.
-                        MessageCenter.SendRejectionResponse(request, Message.RejectionTypes.CacheInvalidation, "One-way request migrated", exception: null);
+                        for (var i = delivered; i < requests.Count; i++)
+                        {
+                            requests[i].Dispose();
+                        }
+
+                        requests.Clear();
                     }
                 }
+
+                if (context is ActivationData activation)
+                {
+                    activations.Add(activation);
+                }
+
+                Activity.Current = currentActivity;
             }
 
-            if (context is ActivationData activation)
+            // Wait for all activations to become active or reach a terminal state.
+            // This ensures that the activation has completed registration in the directory (or is abandoned) before we return.
+            // Otherwise, there could be a race where the original silo removes the activation from its catalog, receives a new message for that activation,
+            // and re-activates it before the new activation on this silo has been registered with the directory.
+            using var waitActivity = ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.WaitMigration);
+            foreach (var activation in activations)
             {
-                activations.Add(activation);
+                await activation.WaitForActivationReadyAsync(cancellationToken);
             }
-
-            Activity.Current = currentActivity;
         }
-
-        // Wait for all activations to become active or reach a terminal state.
-        // This ensures that the activation has completed registration in the directory (or is abandoned) before we return.
-        // Otherwise, there could be a race where the original silo removes the activation from its catalog, receives a new message for that activation,
-        // and re-activates it before the new activation on this silo has been registered with the directory.
-        using var waitActivity = ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.WaitMigration);
-        foreach (var activation in activations)
+        finally
         {
-            await activation.WaitForActivationReadyAsync(cancellationToken);
+            // Validation, cancellation, or a failed earlier package leaves the remainder owned by this invocation.
+            for (; nextPackage < migratingGrains.Count; nextPackage++)
+            {
+                var package = migratingGrains[nextPackage];
+                package.MigrationContext.Dispose();
+                if (package.Requests is { } requests)
+                {
+                    foreach (var request in requests)
+                    {
+                        request.Dispose();
+                    }
+
+                    requests.Clear();
+                }
+            }
         }
     }
 
@@ -455,7 +490,8 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             var requestsSize = 0L;
             foreach (var request in requests)
             {
-                requestsSize += request._bodyObject is MessageReadRequest received ? received.PayloadLength + Message.LENGTH_HEADER_SIZE : RequestSizeEstimate;
+                requestsSize += MessageCodec.MaxFramingSize
+                    + (request._bodyObject is MessageReadRequest received ? received.PayloadLength + Message.LENGTH_HEADER_SIZE : RequestSizeEstimate);
             }
 
             if (size + requestsSize <= MaxBatchBodySize)

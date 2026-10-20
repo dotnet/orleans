@@ -432,6 +432,73 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void TryReadSlice_AtPageEnd_StartsAtTheNextPage()
+        {
+            using var writer = new ArcBufferWriter();
+            var expected = CreateArcBufferData();
+            WriteArcBufferData(writer, expected);
+            using var buffer = writer.PeekSlice(expected.Length);
+            var reader = Reader.Create(buffer, session: null!);
+            Assert.True(reader.TryReadSlice(ArcPageSize, out var first));
+            using (first)
+            {
+                Assert.True(reader.TryReadSlice(2, out var next));
+                using (next)
+                {
+                    Assert.Same(buffer.First!.Next, next.First);
+                    Assert.Equal(0, next.Offset);
+                    Assert.Equal(expected.AsSpan(ArcPageSize).ToArray(), next.ToArray());
+                }
+            }
+        }
+
+        [Fact]
+        public void TryReadSlice_SequentialReadsPreservePageBoundariesAndOwnership()
+        {
+            const int Count = 200;
+            const int SliceLength = 2049;
+            var expected = new byte[Count * SliceLength + 7];
+            for (var i = 0; i < expected.Length; i++)
+            {
+                expected[i] = (byte)(i % 251);
+            }
+            var slices = new List<ArcBuffer>();
+            try
+            {
+                using (var writer = new ArcBufferWriter())
+                {
+                    WriteArcBufferData(writer, expected);
+                    using var buffer = writer.PeekSlice(expected.Length);
+                    var reader = Reader.Create(buffer, session: null!);
+                    reader.Skip(7);
+                    for (var i = 0; i < Count; i++)
+                    {
+                        Assert.True(reader.TryReadSlice(SliceLength, out var slice));
+                        slices.Add(slice);
+                        Assert.Equal(7 + (i + 1) * SliceLength, reader.Position);
+                    }
+
+                    Assert.Equal(0, reader.Remaining);
+                    Assert.True(reader.TryReadSlice(0, out var empty));
+                    Assert.True(empty.IsEmpty);
+                    empty.Dispose();
+                }
+
+                for (var i = 0; i < slices.Count; i++)
+                {
+                    Assert.Equal(expected.AsSpan(7 + i * SliceLength, SliceLength).ToArray(), slices[i].ToArray());
+                }
+            }
+            finally
+            {
+                foreach (var slice in slices)
+                {
+                    slice.Dispose();
+                }
+            }
+        }
+
+        [Fact]
         public void TryReadSlice_SpanInput_LeavesCopyingToTheCaller()
         {
             byte[] expected = [1, 2, 3];

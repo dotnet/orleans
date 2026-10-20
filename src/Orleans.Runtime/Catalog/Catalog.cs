@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Messaging;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Diagnostics;
@@ -129,7 +130,8 @@ namespace Orleans.Runtime
         /// <param name="grainId">The grain identity.</param>
         /// <param name="requestContextData">Optional request context data.</param>
         /// <param name="migration">Optional migration state and requests. The returned activation receives the requests through ordinary admission,
-        /// before a new activation begins rehydrating and activating. If this returns null, the caller retains the requests.</param>
+        /// before a new activation begins rehydrating and activating. Admission removes requests from the package.
+        /// If this returns null, the caller retains the requests. Failure disposes requests which were not admitted.</param>
         public IGrainContext? GetOrCreateActivation(
             in GrainId grainId,
             Dictionary<string, object>? requestContextData,
@@ -137,86 +139,104 @@ namespace Orleans.Runtime
         {
             Debug.Assert(migration is null || migration.Value.GrainId == grainId);
             var rehydrationContext = migration?.MigrationContext;
-            if (TryGetGrainContext(grainId, out var result))
+            try
             {
-                ReceiveRequests(result, migration);
-                rehydrationContext?.Dispose();
-                return result;
-            }
-            else if (grainId.IsSystemTarget())
-            {
-                rehydrationContext?.Dispose();
-                return null;
-            }
-
-            var created = false;
-            lock (GetStripedLock(grainId))
-            {
-                if (!TryGetGrainContext(grainId, out result) && _siloStatusOracle.CurrentStatus == SiloStatus.Active)
+                if (TryGetGrainContext(grainId, out var result))
                 {
-                    var address = new GrainAddress
+                    ReceiveRequests(result, migration);
+                    return result;
+                }
+                else if (grainId.IsSystemTarget())
+                {
+                    return null;
+                }
+
+                var created = false;
+                lock (GetStripedLock(grainId))
+                {
+                    if (!TryGetGrainContext(grainId, out result) && _siloStatusOracle.CurrentStatus == SiloStatus.Active)
                     {
-                        SiloAddress = Silo,
-                        GrainId = grainId,
-                        ActivationId = ActivationId.NewId(),
-                        MembershipVersion = MembershipVersion.MinValue,
-                    };
+                        var address = new GrainAddress
+                        {
+                            SiloAddress = Silo,
+                            GrainId = grainId,
+                            ActivationId = ActivationId.NewId(),
+                            MembershipVersion = MembershipVersion.MinValue,
+                        };
 
-                    result = this.grainActivator.CreateInstance(address);
-                    activations.RecordNewTarget(result);
-                    created = true;
+                        result = this.grainActivator.CreateInstance(address);
+                        activations.RecordNewTarget(result);
+                        created = true;
+                    }
+                } // End lock
+
+                if (result is null)
+                {
+                    return UnableToCreateActivation(this, grainId);
                 }
-            } // End lock
 
-            if (result is null)
-            {
-                rehydrationContext?.Dispose();
-                return UnableToCreateActivation(this, grainId);
-            }
+                if (!created)
+                {
+                    // Admission can reject a request and synchronously complete a caller, so deliver outside the catalog lock.
+                    ReceiveRequests(result, migration);
+                    return result;
+                }
 
-            if (!created)
-            {
-                // Admission can reject a request and synchronously complete a caller, so deliver outside the catalog lock.
+                // Start activation span with parent context from request if available
+                var parentContext = requestContextData.TryGetActivityContext();
+                var activationActivity = parentContext.HasValue
+                    ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
+                    : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
+                if (activationActivity is not null)
+                {
+                    activationActivity.SetTag(ActivityTagKeys.GrainId, grainId.ToString());
+                    activationActivity.SetTag(ActivityTagKeys.GrainType, grainId.Type.ToString());
+                    activationActivity.SetTag(ActivityTagKeys.SiloId, Silo.ToString());
+                    activationActivity.SetTag(ActivityTagKeys.ActivationCause, rehydrationContext is null ? "new" : "rehydrate");
+                    if (result is ActivationData act)
+                    {
+                        activationActivity.SetTag(ActivityTagKeys.ActivationId, act.ActivationId.ToString());
+                        act.SetActivationActivity(activationActivity);
+                        activationActivity.AddEvent(new ActivityEvent("creating"));
+                    }
+                }
+
+                _catalogInstruments.OnActivationCreated(GetGrainTypeMetricName(result));
+
+                // Admit requests before rehydration can dispose the context and activation can register in the directory.
                 ReceiveRequests(result, migration);
-                rehydrationContext?.Dispose();
+
+                // Rehydration occurs before activation.
+                if (rehydrationContext is not null)
+                {
+                    result.Rehydrate(rehydrationContext);
+                    rehydrationContext = null;
+                }
+
+                // Initialize the new activation asynchronously.
+                result.Activate(requestContextData);
                 return result;
             }
-
-            // Start activation span with parent context from request if available
-            var parentContext = requestContextData.TryGetActivityContext();
-            var activationActivity = parentContext.HasValue
-                ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
-                : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
-            if (activationActivity is not null)
+            catch
             {
-                activationActivity.SetTag(ActivityTagKeys.GrainId, grainId.ToString());
-                activationActivity.SetTag(ActivityTagKeys.GrainType, grainId.Type.ToString());
-                activationActivity.SetTag(ActivityTagKeys.SiloId, Silo.ToString());
-                activationActivity.SetTag(ActivityTagKeys.ActivationCause, rehydrationContext is null ? "new" : "rehydrate");
-                if (result is ActivationData act)
+                if (migration?.Requests is { } requests)
                 {
-                    activationActivity.SetTag(ActivityTagKeys.ActivationId, act.ActivationId.ToString());
-                    act.SetActivationActivity(activationActivity);
-                    activationActivity.AddEvent(new ActivityEvent("creating"));
+                    foreach (var request in requests)
+                    {
+                        request.Dispose();
+                    }
+
+                    requests.Clear();
                 }
+
+                throw;
             }
-
-            _catalogInstruments.OnActivationCreated(GetGrainTypeMetricName(result));
-
-            // Admit requests before rehydration can dispose the context and activation can register in the directory.
-            ReceiveRequests(result, migration);
-
-            // Rehydration occurs before activation.
-            if (rehydrationContext is not null)
+            finally
             {
-                result.Rehydrate(rehydrationContext);
+                rehydrationContext?.Dispose();
             }
 
-            // Initialize the new activation asynchronously.
-            result.Activate(requestContextData);
-            return result;
-
-            static void ReceiveRequests(IGrainContext destination, GrainMigrationPackage? migration)
+            void ReceiveRequests(IGrainContext destination, GrainMigrationPackage? migration)
             {
                 if (migration is not { Requests: { Count: > 0 } requests } package)
                 {
@@ -224,14 +244,30 @@ namespace Orleans.Runtime
                 }
 
                 package.MigrationContext.TryGetValue(ActivationData.GrainAddressMigrationContextKey, out GrainAddress? previousAddress);
-                foreach (var request in requests)
+                var admitted = 0;
+                try
                 {
-                    if (previousAddress is not null)
+                    foreach (var request in requests)
                     {
-                        request.AddToCacheInvalidationHeader(previousAddress, destination.Address);
-                    }
+                        if (previousAddress is not null)
+                        {
+                            request.AddToCacheInvalidationHeader(previousAddress, destination.Address);
+                        }
 
-                    destination.ReceiveMessage(request);
+                        // ReceiveMessage takes ownership even if processing the request subsequently fails.
+                        admitted++;
+                        destination.ReceiveMessage(request);
+                        if (request.Direction is Message.Directions.OneWay && request.HasCacheInvalidationHeader)
+                        {
+                            serviceProvider.GetRequiredService<MessageCenter>().SendRejectionResponse(
+                                request, Message.RejectionTypes.CacheInvalidation, "One-way request migrated", exception: null);
+                        }
+                    }
+                }
+                finally
+                {
+                    // Only the remaining suffix belongs to the package if admission fails partway through it.
+                    requests.RemoveRange(0, admitted);
                 }
             }
 

@@ -124,6 +124,9 @@ internal static class MessageFrames
 [RegisterSerializer]
 internal sealed class MessageCodec(IServiceProvider serviceProvider) : IFieldCodec<Message>
 {
+    // List<Message> supplies the expected type and field deltas 0 or 1: one tag plus at most five bytes for the frame length.
+    internal const int MaxFramingSize = 1 + 5;
+
     private MessageHandlerShared? _shared;
 
     // Resolved on first use, since the messaging services depend on the serializer.

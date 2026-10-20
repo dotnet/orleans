@@ -45,45 +45,6 @@ namespace Orleans.Runtime
             "Reliability",
             "CA2000:Dispose objects before losing scope",
             Justification = "The serializer is borrowed from and returned to MessageHandlerShared.")]
-        private object? GetBodyObjectSafe()
-        {
-            if (_bodyObject is MessageReadRequest readRequest)
-            {
-                var responseType = Result;
-                _bodyObject = null;
-                MessageSerializer? messageSerializer = null;
-                try
-                {
-                    messageSerializer = readRequest.Shared.GetMessageSerializer();
-                    messageSerializer.ReadBodyObject(this, readRequest);
-                }
-                catch (Exception exception)
-                {
-                    _bodyObject = readRequest;
-                    Result = responseType;
-                    return $"Unable to deserialize message body: {exception.Message}";
-                }
-                finally
-                {
-                    if (messageSerializer is not null)
-                    {
-                        readRequest.Shared.Return(messageSerializer);
-                    }
-
-                    if (!ReferenceEquals(_bodyObject, readRequest))
-                    {
-                        readRequest.Reset();
-                    }
-                }
-            }
-
-            return _bodyObject;
-        }
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage(
-            "Reliability",
-            "CA2000:Dispose objects before losing scope",
-            Justification = "The serializer is borrowed from and returned to MessageHandlerShared.")]
         private void DeserializeRequestBody(MessageReadRequest readRequest)
         {
             _bodyObject = null;
@@ -460,7 +421,8 @@ namespace Orleans.Runtime
             if (IsReadOnly && !Append(ref dst, "ReadOnly ")) goto grow;
             if (IsAlwaysInterleave && !Append(ref dst, "IsAlwaysInterleave ")) goto grow;
 
-            var bodyObject = GetBodyObjectSafe();
+            // Diagnostics can race transport serialization or completion. Only the body owner may decode or release its buffers.
+            var bodyObject = _bodyObject switch { MessageReadRequest => "<serialized>", var value => value };
             if (Direction == Directions.Response)
             {
                 switch (Result)

@@ -260,7 +260,7 @@ public class MessageTransportLifecycleTests
     [Theory]
     [InlineData((int)Message.Directions.Request, (int)Message.ResponseTypes.None)]
     [InlineData((int)Message.Directions.Response, (int)Message.ResponseTypes.Success)]
-    public void Message_FormattingFailure_PreservesLazyBodyAndResponseType(int directionValue, int responseTypeValue)
+    public void Message_Formatting_PreservesLazyBodyAndResponseType(int directionValue, int responseTypeValue)
     {
         var direction = (Message.Directions)directionValue;
         var responseType = (Message.ResponseTypes)responseTypeValue;
@@ -275,8 +275,8 @@ public class MessageTransportLifecycleTests
         using var message = new Message { Direction = direction, Result = responseType };
         message.SetMessageReadRequest(readRequest);
 
-        Assert.Contains("Unable to deserialize message body:", message.ToString());
-        Assert.Contains("Unable to deserialize message body:", message.ToString());
+        Assert.Contains("<serialized>", message.ToString());
+        Assert.Contains("<serialized>", message.ToString());
         Assert.Same(readRequest, message._bodyObject);
         Assert.Equal(responseType, message.Result);
         Assert.Equal([0xff], readRequest.Body.ToArray());
@@ -655,6 +655,112 @@ public class MessageTransportLifecycleTests
             write.CompleteWriting();
             return write;
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MessageWriteRequest_TimeoutDuringRetrySerialization_PreservesTheSerializedBody(bool loggingEnabled)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var services = CreateServiceProvider();
+        using var loggerFactory = new FormattingLoggerFactory(loggingEnabled);
+        using var shared = CreateMessageHandlerShared(services, loggerFactory);
+        await using var transport = new CapturingTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        var payload = Enumerable.Repeat((byte)0x5A, 20_000).ToArray();
+        var body = new PooledBuffer();
+        body.Write(payload);
+        using var message = new Message { Direction = Message.Directions.Request, BodyObject = body };
+        var completion = new DiagnosticResponseCompletion();
+        var callback = new CallbackData(
+            new SharedCallbackData(_ => { }, loggerFactory.CreateLogger<CallbackData>(), TimeProvider.System, TimeSpan.FromSeconds(1),
+                cancelOnTimeout: false, waitForCancellationAcknowledgement: false, cancellationManager: null),
+            completion, message, new ApplicationRequestInstruments(services.GetRequiredService<OrleansInstruments>()));
+        var first = shared.GetSendMessageHandler(connection);
+        first.WriteMessage(message);
+        first.CompleteWriting();
+        first.Buffers.ConsumeSlice(first.Buffers.Length).Dispose();
+        first.RerouteMessages(error: null);
+        Assert.Same(message, (await connection.Retries.Reader.ReadAsync(cancellationToken)).Message);
+        var savedBody = Assert.IsType<MessageReadRequest>(message._bodyObject);
+        var expectedBytes = savedBody.Body.ToArray();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        var gate = new RetrySerializationGate
+        {
+            OnWrite = () =>
+            {
+                entered.TrySetResult();
+                release.Wait(cancellationToken);
+            }
+        };
+        message.RequestContextData = new() { ["gate"] = gate };
+        var retry = shared.GetSendMessageHandler(connection);
+        var writing = Task.Run(() =>
+        {
+            retry.WriteMessage(message);
+            retry.CompleteWriting();
+        }, cancellationToken);
+        try
+        {
+            // The serializer captured the body handler before serializing this header.
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            callback.OnTimeout();
+            Assert.IsType<TimeoutException>(completion.Response.Exception);
+            if (loggingEnabled)
+            {
+                Assert.Contains(loggerFactory.Messages, text => text.Contains("Response did not arrive on time", StringComparison.Ordinal));
+            }
+
+            Assert.Same(savedBody, message._bodyObject);
+            Assert.Equal(expectedBytes, savedBody.Body.ToArray());
+        }
+        finally
+        {
+            release.Set();
+            await writing.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        }
+
+        Assert.True(transport.EnqueueWrite(retry));
+        using var frame = new ArcBufferWriter();
+        frame.Write(transport.Written!);
+        using var received = MessageFrames.Read(shared, frame);
+        using var receivedBody = Assert.IsType<PooledBuffer>(received.BodyObject);
+        Assert.Equal(payload, receivedBody.ToArray());
+        Assert.Null(message._bodyObject);
+        await connection.CloseAsync(null).WaitAsync(cancellationToken);
+    }
+
+    private sealed class FormattingLoggerFactory(bool enabled) : ILoggerFactory, ILogger
+    {
+        public System.Collections.Concurrent.ConcurrentQueue<string> Messages { get; } = new();
+        public ILogger CreateLogger(string categoryName) => this;
+        public void AddProvider(ILoggerProvider provider) => throw new NotSupportedException();
+        public void Dispose() { }
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => enabled;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            => Messages.Enqueue(formatter(state, exception));
+    }
+
+    private sealed class DiagnosticResponseCompletion : Orleans.Serialization.Invocation.IResponseCompletionSource
+    {
+        public Orleans.Serialization.Invocation.Response Response { get; private set; } = null!;
+        public void Complete(Orleans.Serialization.Invocation.Response response) => Response = response;
+        public void Complete() => Response = Orleans.Serialization.Invocation.Response.Completed;
+    }
+
+    [GenerateSerializer, SerializationCallbacks(typeof(RetrySerializationCallbacks))]
+    public sealed class RetrySerializationGate
+    {
+        [NonSerialized]
+        public Action? OnWrite;
+    }
+
+    public sealed class RetrySerializationCallbacks
+    {
+        public void OnSerializing(RetrySerializationGate value) => value.OnWrite?.Invoke();
     }
 
     [Fact]
@@ -1087,6 +1193,7 @@ public class MessageTransportLifecycleTests
         .AddMetrics()
         .AddSerializer()
         .AddSingleton<UnreadableContextCallbacks>()
+        .AddSingleton<RetrySerializationCallbacks>()
         .AddSingleton<OrleansInstruments>()
         .AddSingleton<MessagingInstruments>()
         .AddSingleton<NetworkingInstruments>()

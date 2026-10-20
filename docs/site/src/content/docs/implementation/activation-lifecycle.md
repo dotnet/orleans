@@ -59,6 +59,8 @@ The migration package also carries the requests which are queued for the source 
 
 Each migration RPC owns its batch while outbound serialization completes, including after the call times out. On the destination, queued request bodies retain reference-counted slices of the received package until invocation, sharing buffer pages across requests.
 
+The destination releases requests and contexts which remain unadmitted when validation, cancellation, or activation creation fails. Admitted requests remain owned by their activation. Canceling an unsent source migration releases its dehydration context while retaining its requests for ordinary forwarding.
+
 ```mermaid
 sequenceDiagram
     participant Source as Source activation
