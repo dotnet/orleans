@@ -738,6 +738,139 @@ public sealed class JournalTransactionTests
     }
 
     [Fact]
+    public Task AbortedLogChangesResetItsReadersAndAbandonTheDraftsItCommitted() => ObservationTestHelpers.RunOnActivationSchedulerAsync(async () =>
+    {
+        // The manager, the reader and the transaction share one scheduler, as on an activation.
+        using var host = new TransactionTestHost(Binary);
+        var storage = new ControlledJournalStorage(Binary);
+        var activation = await host.ActivateAsync(storage);
+        var log = activation.Log;
+        log.Append("a");
+        await activation.Manager.WriteStateAsync(Cancellation);
+        var epoch = log.Epoch;
+        var draft = log.BeginDraft();
+        draft.Write("drafted");
+        var view = new List<string>();
+        var sawAborted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sawNext = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reader = ReadAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => activation.Manager.RunTransactionAsync(async _ =>
+        {
+            log.Append("aborted");
+            Assert.Equal(2, draft.Commit("committed-draft"));
+
+            // Another flow's write wakes the reader, which reads staged entries, including the transaction's.
+            Task write;
+            using (ExecutionContext.SuppressFlow())
+            {
+                write = Task.Factory.StartNew(
+                    () =>
+                    {
+                        activation.Dictionary["other"] = "write";
+                        return activation.Manager.WriteStateAsync(Cancellation).AsTask();
+                    },
+                    CancellationToken.None,
+                    TaskCreationOptions.None,
+                    TaskScheduler.Current).Unwrap();
+            }
+
+            await write;
+
+            await sawAborted.Task.WaitAsync(Timeout, Cancellation);
+            throw new InvalidOperationException("abort");
+        }, Cancellation));
+
+        // The rebuild begins a new history, so the reader starts again from the rebuilt log. The next append reuses the
+        // aborted entry's sequence, and the reader sees it in its place.
+        Assert.NotEqual(epoch, log.Epoch);
+        Assert.Equal(1, log.Append("next"));
+        await activation.Manager.WriteStateAsync(Cancellation);
+        await sawNext.Task.WaitAsync(Timeout, Cancellation);
+        await reader.WaitAsync(Timeout, Cancellation);
+        Assert.Equal(["a", "next"], view);
+
+        await using var resumed = log.ReadAsync(0, mode: DurableWatchMode.Drafts, resumeDraftId: draft.Id, cancellationToken: Cancellation).GetAsyncEnumerator(Cancellation);
+        Assert.True(await resumed.MoveNextAsync());
+        Assert.Equal(LogEventKind.DraftAbandoned, resumed.Current.Kind);
+        Assert.Equal(LogDraftAbandonReason.TransactionAborted, resumed.Current.AbandonReason);
+
+        // The new history is durable: the next activation recovers it with the rebuilt entries.
+        var recovered = await host.ActivateAsync(storage);
+        Assert.Equal(log.Epoch, recovered.Log.Epoch);
+        Assert.Equal(["a", "next"], recovered.Log);
+
+        async Task ReadAsync()
+        {
+            await foreach (var logEvent in log.ReadAsync(0, mode: DurableWatchMode.Staged, cancellationToken: Cancellation))
+            {
+                switch (logEvent.Kind)
+                {
+                    case LogEventKind.Reset:
+                        view.RemoveRange((int)logEvent.Sequence, view.Count - (int)logEvent.Sequence);
+                        break;
+                    case LogEventKind.Entry:
+                        Assert.Equal(view.Count, logEvent.Sequence);
+                        view.Add(logEvent.Item!);
+                        if (logEvent.Item == "aborted")
+                        {
+                            sawAborted.TrySetResult();
+                        }
+
+                        if (logEvent.Item == "next")
+                        {
+                            sawNext.TrySetResult();
+                            return;
+                        }
+
+                        break;
+                }
+            }
+        }
+    });
+
+    /// <summary>
+    /// An abort whose rebuild leaves the log's history unchanged keeps the numbers of the draft commit records from before
+    /// the transaction, which the outcomes that readers follow carry: a draft which committed before the transaction is
+    /// reported committed once a write makes its record durable, not when the rebuild replays storage's records.
+    /// </summary>
+    [Fact]
+    public Task DraftCommittedBeforeAnAbortWhichKeepsTheHistoryIsReportedOnceItsRecordIsDurable() => ObservationTestHelpers.RunOnActivationSchedulerAsync(async () =>
+    {
+        using var host = new TransactionTestHost(Binary);
+        var activation = await host.ActivateAsync(new ControlledJournalStorage(Binary));
+        var log = activation.Log;
+        log.BeginDraft().Commit("durable");
+        await activation.Manager.WriteStateAsync(Cancellation);
+        var draft = log.BeginDraft();
+        Assert.Equal(1, draft.Commit("staged"));
+        var epoch = log.Epoch;
+        await using var resumed = log.ReadAsync(1, mode: DurableWatchMode.Committed | DurableWatchMode.Drafts, resumeDraftId: draft.Id, cancellationToken: Cancellation)
+            .GetAsyncEnumerator(Cancellation);
+        Assert.True(await resumed.MoveNextAsync());
+        Assert.Equal(LogEventKind.CaughtUp, resumed.Current.Kind);
+
+        // The transaction commits an empty draft, so its abort leaves the log's boundaries, and so its history, unchanged.
+        var empty = log.BeginDraft();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => activation.Manager.RunTransactionAsync(_ =>
+        {
+            empty.Commit();
+            throw new InvalidOperationException("abort");
+        }, Cancellation));
+        Assert.Equal(epoch, log.Epoch);
+        Assert.Equal(["durable", "staged"], log);
+
+        var next = resumed.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+        await activation.Manager.WriteStateAsync(Cancellation);
+        Assert.True(await next.AsTask().WaitAsync(Timeout, Cancellation));
+        Assert.Equal(LogEventKind.DraftCommitted, resumed.Current.Kind);
+        Assert.Equal(draft.Id, resumed.Current.DraftId);
+        Assert.Equal((1L, 1), (resumed.Current.Sequence, resumed.Current.Count));
+        Assert.Equal(DurableChangeStatus.Committed, resumed.Current.Status);
+    });
+
+    [Fact]
     public async Task WatchStartedDuringTransactionBeginsWithItsOutcome()
     {
         using var host = new TransactionTestHost(Binary);

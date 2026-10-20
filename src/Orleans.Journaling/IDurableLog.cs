@@ -432,6 +432,12 @@ public enum LogDraftAbandonReason : byte
     /// <see cref="IDurableLog{T}.Seal"/> ended the log while the draft was open.
     /// </summary>
     Sealed = 6,
+
+    /// <summary>
+    /// A transaction over the log's journaled state committed the draft and then aborted, which discarded the commit and its
+    /// entries.
+    /// </summary>
+    TransactionAborted = 7,
 }
 
 /// <summary>
