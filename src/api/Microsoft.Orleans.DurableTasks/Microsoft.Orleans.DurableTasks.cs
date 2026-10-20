@@ -178,7 +178,7 @@ namespace Orleans.DurableTasks
 
         public System.Threading.Tasks.Task<bool> IsCompletedAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        protected override System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context) { throw null; }
+        protected internal override System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context) { throw null; }
 
         public ConfiguredScheduledTaskAwaitable<TResult> WaitAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
@@ -350,7 +350,7 @@ namespace Orleans.DurableTasks.Protocol
 
         System.Threading.Tasks.ValueTask<Serialization.Invocation.Response> Serialization.Invocation.IInvokable.Invoke() { throw null; }
 
-        protected override System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext) { throw null; }
+        protected internal override System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext) { throw null; }
 
         public virtual void SetArgument(int index, object value) { }
 
@@ -423,7 +423,7 @@ namespace Orleans.DurableTasks.Protocol
 
         System.Threading.Tasks.ValueTask<Serialization.Invocation.Response> Serialization.Invocation.IInvokable.Invoke() { throw null; }
 
-        protected override System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext) { throw null; }
+        protected internal override System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext) { throw null; }
 
         public System.Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
