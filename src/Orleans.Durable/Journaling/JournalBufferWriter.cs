@@ -27,6 +27,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     private TaskCompletionSource? _activeEntryClosed;
     private bool _disposed;
     private IJournalEntryRedirect? _redirect;
+    private JournalTransaction? _transaction;
 
     /// <summary>
     /// Creates a writer for entries belonging to <paramref name="streamId"/>.
@@ -245,6 +246,17 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
         set => _redirect = value;
     }
 
+    /// <summary>Gets or sets the open transaction of the manager whose journal this writer buffers, or <see langword="null"/>.</summary>
+    /// <remarks>
+    /// While it is set, every entry which isn't redirected is reported to the transaction, which rejects entries from its own
+    /// flow: they would bypass its segment and survive its abort. Set by the manager.
+    /// </remarks>
+    internal JournalTransaction? Transaction
+    {
+        get => _transaction;
+        set => _transaction = value;
+    }
+
     /// <summary>
     /// Appends the committed entries of <paramref name="source"/>, which uses the same format, as committed entries of this
     /// writer, in one step.
@@ -294,6 +306,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             return redirect.GetEntryWriter(streamId).BeginEntry(streamId);
         }
 
+        _transaction?.OnUnredirectedEntry(streamId);
         lock (_lock)
         {
             ThrowIfDisposed();

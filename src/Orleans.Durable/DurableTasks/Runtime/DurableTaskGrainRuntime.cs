@@ -971,6 +971,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         return manager.RunTransactionAsync(
             body,
             onCommit: result => AddRecord(effectId, DurableTaskRecordKind.Effect, EffectFingerprint, DurableTaskResponse.FromResult(result)),
+            onAbort: null,
             cancellationToken);
     }
 

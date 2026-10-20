@@ -334,12 +334,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                             isSnapshot = workItem is WriteSnapshotWorkItem
                                 || _migrationSnapshotRequired
                                 || _storage.IsCompactionRequested;
-                            if (isSnapshot && _transaction is not null)
+                            if (isSnapshot && _transaction is { } openTransaction)
                             {
-                                // A snapshot would capture the open transaction's uncommitted changes. The transaction ends
-                                // with its request, and the journal needs no snapshot while it is open.
-                                Debug.Assert(!_migrationSnapshotRequired);
-                                isSnapshot = false;
+                                isSnapshot = DeferSnapshot(openTransaction);
                             }
 
                             if (isSnapshot)
@@ -384,11 +381,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                         }
                                     }
 
-                                    if (isSnapshot && _transaction is not null)
+                                    if (isSnapshot && _transaction is { } preparedTransaction)
                                     {
                                         // A transaction began while the states prepared.
-                                        Debug.Assert(!_migrationSnapshotRequired);
-                                        isSnapshot = false;
+                                        isSnapshot = DeferSnapshot(preparedTransaction);
                                     }
 
                                     var operationLabel = isSnapshot
@@ -425,6 +421,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                                             activeEntryClosed = _journalWriter.GetActiveEntryClosedTask();
                                             if (activeEntryClosed is null && isSnapshot)
                                             {
+                                                Debug.Assert(_transaction is null, "No snapshot captures an open transaction's uncommitted changes.");
                                                 using var snapshotWriter = _shared.JournalFormat.CreateWriter();
                                                 if (_retirementTracker.Count > 0)
                                                 {
@@ -731,7 +728,25 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                         // explicit retry and the manager continues.
                         LogStatePreparationFailed(_shared.Logger, exception.InnerException!);
                         storageActivity?.SetStatus(ActivityStatusCode.Error, "Journal state preparation failed.");
-                        workItem.SetException(new JournaledStatePreCommitException(exception.InnerException!));
+                        var failure = new JournaledStatePreCommitException(exception.InnerException!);
+                        if (workItem.CarriesCommit)
+                        {
+                            // A transaction which committed into the buffer waits for this write. Its call fails, so the buffer
+                            // must never reach storage: the failure fences the manager, as a failed write does, and the activation
+                            // recovers from the journal without the transaction.
+                            try
+                            {
+                                Fence(failure);
+                            }
+                            finally
+                            {
+                                workItem.SetException(failure);
+                            }
+
+                            return;
+                        }
+
+                        workItem.SetException(failure);
                     }
                     catch (Exception exception)
                     {
@@ -779,6 +794,14 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
                 return;
             }
         }
+    }
+
+    // A snapshot would capture the open transaction's uncommitted changes, so the write appends instead. A transaction which
+    // stays open past the bound is doomed, so storage which needs compaction gets it once the transaction aborts.
+    private static bool DeferSnapshot(JournalTransaction transaction)
+    {
+        transaction.DeferSnapshot();
+        return false;
     }
 
     /// <summary>
@@ -1210,11 +1233,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         {
             ThrowIfStateOperationsUnavailable();
             ThrowIfInTransaction();
-            var isSnapshot = _migrationSnapshotRequired || _storage.IsCompactionRequested;
-            operation = isSnapshot ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
-            pendingWrite = isSnapshot
-                ? EnqueueOrGetPendingWorkItem<WriteSnapshotWorkItem>(out didEnqueue)
-                : EnqueueOrGetPendingWorkItem<AppendJournalWorkItem>(out didEnqueue);
+            pendingWrite = EnqueueOrGetPendingWrite(out didEnqueue, out operation).Task;
         }
 
         if (didEnqueue)
@@ -1336,7 +1355,21 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         }
     }
 
+    // Called under the lock: joins the queued write which hasn't captured the journal yet, or queues one.
+    private WorkItem EnqueueOrGetPendingWrite(out bool didEnqueue, out string operation)
+    {
+        var isSnapshot = _migrationSnapshotRequired || _storage.IsCompactionRequested;
+        operation = isSnapshot ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
+        return isSnapshot
+            ? EnqueueOrGetPendingWorkItemCore<WriteSnapshotWorkItem>(out didEnqueue)
+            : EnqueueOrGetPendingWorkItemCore<AppendJournalWorkItem>(out didEnqueue);
+    }
+
     private Task EnqueueOrGetPendingWorkItem<TWorkItem>(out bool didEnqueue)
+        where TWorkItem : WorkItem, new()
+        => EnqueueOrGetPendingWorkItemCore<TWorkItem>(out didEnqueue).Task;
+
+    private TWorkItem EnqueueOrGetPendingWorkItemCore<TWorkItem>(out bool didEnqueue)
         where TWorkItem : WorkItem, new()
     {
         foreach (var workItem in _workQueue)
@@ -1355,7 +1388,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
             workItem.RecordTraceContext();
             workItem.AddCaller();
             didEnqueue = false;
-            return workItem.Task;
+            return (TWorkItem)workItem;
         }
 
         var newWorkItem = new TWorkItem();
@@ -1364,7 +1397,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         newWorkItem.RecordTraceContext();
         _workQueue.Enqueue(newWorkItem);
         didEnqueue = true;
-        return newWorkItem.Task;
+        return newWorkItem;
     }
 
     private void BindState(string name, uint id)
@@ -1451,7 +1484,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         {
             _shutdownCancellation.Dispose();
             _journalWriter.Dispose();
-            _idleTransactionWriter?.Dispose();
         }
     }
 
@@ -1472,6 +1504,12 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournale
         /// caller that originally enqueued it. Mutated under the manager lock.
         /// </summary>
         public int CallerCount { get; private set; } = 1;
+
+        /// <summary>
+        /// Gets or sets whether a committed transaction waits for this write, whose failure must then keep the journal buffer
+        /// from ever reaching storage. Mutated under the manager lock.
+        /// </summary>
+        public bool CarriesCommit { get; set; }
 
         protected WorkItem() : base(TaskCreationOptions.RunContinuationsAsynchronously)
         {

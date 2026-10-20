@@ -198,6 +198,16 @@ internal sealed class ReplayGrain(
         return _gate.Task.WaitAsync(DurableTask.Current.CancellationToken);
     }
 
+    /// <summary>Waits until the test opens the gate, from code which needn't run in a durable task.</summary>
+    public Task WaitAtPlainGateAsync()
+    {
+        _atGate.TrySetResult();
+        return _gate.Task;
+    }
+
+    /// <summary>Gets the grain's journaled state manager.</summary>
+    public JournaledStateManager Manager => (JournaledStateManager)manager;
+
     public void OpenGate() => _gate.TrySetResult();
 
     /// <summary>Requests a journal write which commits whatever is staged when it runs, as other grain work does.</summary>

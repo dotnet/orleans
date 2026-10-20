@@ -19,12 +19,12 @@ internal static class DurableTaskTransactions
     /// </param>
     /// <param name="body">The transaction's code, which awaits ordinary work, such as grain calls, but no durable operations.</param>
     /// <param name="cancellationToken">The token passed to <paramref name="body"/>.</param>
-    /// <returns>The body's result, once the transaction has committed.</returns>
+    /// <returns>The body's result, once a journal write holds the transaction's commit.</returns>
     /// <remarks>
     /// <para>
     /// The transaction is recorded as an effect, in the same journal write as its changes: a replay returns the recorded
-    /// result, or throws the recorded exception, without running the body. A run which ends before a write captures the
-    /// commit loses both, so the next run runs the body again.
+    /// result, or throws the recorded exception, without running the body. The call returns once that write has
+    /// completed. A write which fails fails the call and the grain's journal, so the next activation runs the body again.
     /// </para>
     /// <para>
     /// The body runs exclusively on the activation, as <c>JournaledStateManager.RunTransactionAsync</c> describes. Its
