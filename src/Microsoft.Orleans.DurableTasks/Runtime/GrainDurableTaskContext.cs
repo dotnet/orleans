@@ -122,7 +122,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         _unreached = runtime.GetRecordedOperations(taskId);
         _replaying = _unreached is not null;
         _cancellationPoint = runtime.GetCancellationPoint(taskId);
-        AccessLog = runtime.CreateAccessLog(taskId, scheduler, Diverge);
+        AccessLog = runtime.CreateAccessLog(this, scheduler, Diverge);
     }
 
     /// <summary>Gets the runtime which runs this attempt.</summary>
@@ -154,12 +154,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     }
 
     /// <summary>
-    /// Marks the runtime's synchronous work on behalf of the attempt until the returned value is disposed, so the accesses
-    /// to journaled state which it makes, including those of an effect, aren't recorded as the body's.
-    /// </summary>
-    private DurableTaskAccessLog.OperationScope EnterOperation() => AccessLog is { } log ? log.EnterOperation() : default;
-
-    /// <summary>
     /// Stages the records of the reads which the body made since its last write, before an operation which can depend on
     /// them becomes durable.
     /// </summary>
@@ -170,6 +164,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             accessLog.Flush();
         }
     }
+
+    /// <summary>
+    /// Runs an asynchronous <paramref name="body"/> whose outcome one record of this attempt covers, such as a
+    /// transaction's, as a covered region for its whole flow: the body's accesses to journaled state aren't recorded as the
+    /// attempt's, its effects run directly, and its durable operations throw.
+    /// </summary>
+    internal Task<TResult> RunCoveredAsync<TResult>(Func<Task<TResult>> body) => RunInCoveredFlowAsync(body);
 
     /// <inheritdoc/>
     /// <remarks>The incarnation of the invoked task whose execution tree contains this execution, read once.</remarks>
@@ -745,7 +746,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
         ThrowIfAttemptCanceled();
         var shielded = SchedulesShieldedChildren;
-        using var _ = EnterOperation();
+
+        // Code which the start runs synchronously, such as a cancellation registration, belongs to the post's record.
+        using var region = EnterCoveredRegion();
         try
         {
             if (options.HasFlag(DurableTaskStartOptions.Detached))
@@ -890,9 +893,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         ThrowIfNotChildTaskId(effectId);
         ThrowIfAttemptCanceled();
         ObserveOperation(effectId, recordsOperation: true);
-
-        // The effect's record covers the accesses to journaled state which the effect makes.
-        using var _ = EnterOperation();
         try
         {
             return _runtime.RunEffect(effectId, state, effect);
@@ -933,7 +933,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         {
             try
             {
-                using var _ = EnterOperation();
                 version = _runtime.GetOrRecordVersion(Id, name, HasUnreachedOperations ? 0 : maxSupported);
             }
             catch (DurableTaskDivergenceException divergence)
@@ -1021,10 +1020,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         string name,
         DurableTaskResponse value,
         bool throwOnRejection,
-        CancellationToken cancellationToken) =>
-        RunOnScheduler(
+        CancellationToken cancellationToken)
+    {
+        ThrowIfInCoveredRegion();
+        return RunOnScheduler(
             _scheduler,
             () => SendSignalCoreAsync(target, taskId, name, value, throwOnRejection, cancellationToken));
+    }
 
     private async ValueTask<DurableSignalResult> SendSignalCoreAsync(
         GrainId target,

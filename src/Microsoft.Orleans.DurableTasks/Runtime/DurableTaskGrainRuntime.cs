@@ -2400,12 +2400,12 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     DurableTaskAccessLog IDurableTaskGrainRuntime.CreateAccessLog(
-        TaskId executionId,
+        DurableTaskContext attempt,
         TaskScheduler scheduler,
         Func<DurableTaskDivergenceException, Exception> diverge)
     {
         Debug.Assert(_accessLogStorage is not null, "Attempts start once the runtime is bound to its activation.");
-        return new(executionId, _accessLogStorage, _shared.Serializer, scheduler, diverge);
+        return new(attempt, _accessLogStorage, _shared.Serializer, scheduler, diverge);
     }
 
     /// <summary>

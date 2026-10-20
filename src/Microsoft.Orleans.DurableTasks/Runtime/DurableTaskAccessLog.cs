@@ -30,8 +30,10 @@ namespace Orleans.DurableTasks.Runtime;
 /// decodes, diverges: the runtime stalls the attempt.
 /// </para>
 /// <para>
-/// Accesses which run while the log runs an access or the runtime runs one of the attempt's operations belong to that
-/// access or operation, so the provider supplies no context for them while <see cref="Depth"/> is above zero. The runtime
+/// Each access runs in a covered region of the attempt (<see cref="DurableTaskContext.IsInCoveredRegion"/>), as effects
+/// and the runtime's operations on behalf of the attempt do: the record covers the code which the access runs, such as a
+/// comparer or an enumerated source, so the provider supplies no context for that code's accesses, and durable operations
+/// within it throw. The runtime
 /// closes the log when the attempt ends in a way which it records, so no later attempt replays the body: the body
 /// completed, or the task was aborted or deleted. The attempt's later accesses then return the outcomes of the records
 /// which it hasn't consumed yet, and run against the state directly, unrecorded, after that. Recorded task cancellation
@@ -42,7 +44,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// </para>
 /// </remarks>
 internal sealed class DurableTaskAccessLog(
-    TaskId taskId,
+    DurableTaskContext attempt,
     IDurableTaskAccessLogStorage storage,
     Serializer serializer,
     TaskScheduler scheduler,
@@ -58,14 +60,15 @@ internal sealed class DurableTaskAccessLog(
     private const byte ReservedFlags = unchecked((byte)~(KindMask | HasValue | IsException));
     private const int HeaderLength = 6;
 
-    private readonly TaskId _taskId = taskId;
+    private readonly DurableTaskContext _attempt = attempt;
+    private readonly TaskId _taskId = attempt.Id;
     private readonly IDurableTaskAccessLogStorage _storage = storage;
     private readonly Serializer _serializer = serializer;
     private readonly TaskScheduler _scheduler = scheduler;
     private readonly Func<DurableTaskDivergenceException, Exception> _diverge = diverge;
 
     // The records which earlier attempts staged, and the position of the next one which this attempt consumes.
-    private byte[] _recorded = storage.GetAccessLog(taskId);
+    private byte[] _recorded = storage.GetAccessLog(attempt.Id);
     private int _position;
     private int _consumed;
 
@@ -86,24 +89,8 @@ internal sealed class DurableTaskAccessLog(
     /// </summary>
     public bool IsActive => _state is not AccessLogState.Closed || IsReplaying;
 
-    /// <summary>
-    /// Gets the number of accesses and runtime operations of the attempt which are running. Accesses made meanwhile belong
-    /// to them.
-    /// </summary>
-    public int Depth { get; private set; }
-
     /// <summary>Gets whether the attempt hasn't yet consumed every access which earlier attempts recorded.</summary>
     public bool IsReplaying => _position < _recorded.Length;
-
-    /// <summary>
-    /// Marks the runtime's synchronous work on behalf of the attempt, such as starting a child, until the returned value is
-    /// disposed: the accesses to journaled state which it makes belong to that operation.
-    /// </summary>
-    public OperationScope EnterOperation()
-    {
-        Depth++;
-        return new(this);
-    }
 
     /// <summary>Stages the records of the reads which the attempt made since its last write or recorded operation.</summary>
     /// <remarks>The attempt calls this as it reaches a recorded operation, which can depend on those reads.</remarks>
@@ -162,30 +149,23 @@ internal sealed class DurableTaskAccessLog(
         Action<TState, TResult>? apply)
     {
         Debug.Assert(TaskScheduler.Current == _scheduler, "A durable task body accesses journaled state on its activation's scheduler.");
-        Depth++;
-        try
+        using var region = _attempt.EnterCoveredRegion();
+        if (_state is AccessLogState.Discarding)
         {
-            if (_state is AccessLogState.Discarding)
-            {
-                return access.Kind is JournaledStateAccessKind.Write ? throw _discarded!() : operation(state);
-            }
-
-            if (IsReplaying)
-            {
-                return Replay<TResult>(access);
-            }
-
-            if (_state is AccessLogState.Closed)
-            {
-                return RunLive(state, operation, apply);
-            }
-
-            return Record(access, state, operation, apply);
+            return access.Kind is JournaledStateAccessKind.Write ? throw _discarded!() : operation(state);
         }
-        finally
+
+        if (IsReplaying)
         {
-            Depth--;
+            return Replay<TResult>(access);
         }
+
+        if (_state is AccessLogState.Closed)
+        {
+            return RunLive(state, operation, apply);
+        }
+
+        return Record(access, state, operation, apply);
     }
 
     private static TResult RunLive<TState, TResult>(TState state, Func<TState, TResult> operation, Action<TState, TResult>? apply)
@@ -354,19 +334,6 @@ internal sealed class DurableTaskAccessLog(
         if (access.Kind is JournaledStateAccessKind.Write)
         {
             Flush();
-        }
-    }
-
-    /// <summary>Ends a runtime operation which <see cref="EnterOperation"/> marked.</summary>
-    public readonly struct OperationScope(DurableTaskAccessLog? log) : IDisposable
-    {
-        /// <inheritdoc/>
-        public void Dispose()
-        {
-            if (log is not null)
-            {
-                log.Depth--;
-            }
         }
     }
 
