@@ -20,7 +20,7 @@ public sealed class DedupeExpiryClusterCollection : ICollectionFixture<DedupeExp
 public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture)
 {
     [Fact]
-    public async Task IdleReplay_AtDeduplicationBoundary_IsAcceptedWithoutCompactionTrigger()
+    public async Task LegacyNullCutoff_AtDeduplicationBoundary_RemainsDuplicateWithoutCompactionTrigger()
     {
         var receiver = fixture.Client.GetGrain<IMessagingTestGrain>(Guid.NewGuid());
         var original = new TestMessage(TestApplicationProtocol.NewMessageId(), 15, "expires");
@@ -35,14 +35,14 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
 
         fixture.Clock.Advance(TimeSpan.FromTicks(1));
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first)).Status);
-        var state = await fixture.WaitForEffectCountAsync(receiver, 2);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, first)).Status);
+        var state = await receiver.GetSnapshotAsync();
 
-        Assert.Equal(2, state.Effects.Single(effect => effect.LogicalId == original.LogicalId).Count);
+        Assert.Equal(1, state.Effects.Single(effect => effect.LogicalId == original.LogicalId).Count);
     }
 
     [Fact]
-    public async Task ExpiryReplacementFailure_ReplaysDedupeRecordBeforeExpiryMaintenance()
+    public async Task LegacyNullCutoff_SnapshotFailureAndRecoveryNeverForgetTheCompletedMessage()
     {
         var receiver = fixture.Client.GetGrain<IMessagingTestGrain>(Guid.NewGuid());
         var envelope = CreateEnvelope(
@@ -54,9 +54,11 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
         await WaitForIdleInboxAsync(receiver);
         fixture.Clock.Advance(TimeSpan.FromMinutes(10));
         var oldContext = fixture.GetGrainContext(receiver);
-        fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+        var journal = JournalId.FromGrainId(receiver.GetGrainId());
+        fixture.Storage.RequestSnapshot(journal);
+        fixture.Storage.FailWrite(journal);
 
-        await Assert.ThrowsAnyAsync<Exception>(() => DeliverAsync(receiver, envelope));
+        await Assert.ThrowsAsync<IOException>(() => receiver.RetryWriteStateAsync());
 
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var failed = await receiver.GetSnapshotAsync();
@@ -64,7 +66,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
         Assert.Equal(1, Assert.Single(failed.Effects).Count);
         var replayed = Assert.IsType<MessagingTestGrain>(fixture.GetGrainContext(receiver).GrainInstance).ReplayedSnapshot;
         Assert.Equal(1, Assert.IsType<EndpointSnapshot>(replayed).ProcessedMessageCount);
-        // Expired dedupe records remain until a snapshot compacts them, but they no longer deduplicate.
+        // A legacy record has no finite cutoff which a floor could fence.
         Assert.Equal(1, failed.ProcessedMessageCount);
 
         await receiver.RequestDeactivationAsync();
@@ -74,9 +76,9 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
         Assert.Equal(1, recovered.ProcessedMessageCount);
         Assert.Equal(1, Assert.Single(recovered.Effects).Count);
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
-        var retried = await fixture.WaitForEffectCountAsync(receiver, 2);
-        Assert.Equal(2, Assert.Single(retried.Effects).Count);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+        var retried = await receiver.GetSnapshotAsync();
+        Assert.Equal(1, Assert.Single(retried.Effects).Count);
     }
 
     private Task<EndpointSnapshot> WaitForIdleInboxAsync(IMessagingTestGrain receiver) =>

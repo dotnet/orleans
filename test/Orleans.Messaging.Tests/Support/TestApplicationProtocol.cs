@@ -98,7 +98,8 @@ internal static class TestApplicationProtocol
                 Subject = removeSubject ? null : subject ?? message.Envelope.Subject,
                 Headers = headers,
                 DeliverAt = message.Envelope.DeliverAt
-            }
+            },
+            RedeliveryDeadline = message.RedeliveryDeadline
         };
     }
 }
