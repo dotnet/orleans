@@ -8,7 +8,7 @@ The S3 integration tests run SeaweedFS in a container and exercise conditional-r
 
 Buckets should be created ahead of time for AWS S3 Express One Zone. `CreateBucketIfNotExists` is intended for local emulators.
 
-Metadata updates rewrite the current WAL using a conditional single-object upload. Publish a checkpoint to compact the WAL before updating metadata when the replacement object would exceed S3's 5 GB (5,000,000,000 byte) single-upload limit. Checkpoint snapshots use the same upload limit.
+Each append is one conditional single-object upload of at most 5 GB (5,000,000,000 bytes), so S3 stores the whole segment or none of it, and a larger segment fails before any request is sent. A replacement uploads a checkpoint object within the same limit and publishes it through one conditional WAL upload. With conditional-rewrite appends, the whole WAL, including the append, stays within that limit. Metadata updates rewrite the current WAL using a conditional single-object upload, so a metadata update conflicts with a concurrent content write. Publish a checkpoint to compact the WAL before updating metadata when the replacement object would exceed S3's 5 GB (5,000,000,000 byte) single-upload limit. Checkpoint snapshots use the same upload limit.
 
 `AddS3JournalStorage` also calls `AddJournaling` to register core services and activation lifecycle
 integration. Application code injects `IDurableStateManager` and declares durable states before
