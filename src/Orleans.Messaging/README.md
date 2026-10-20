@@ -112,7 +112,10 @@ Each receiver returns a `DeliveryResult`:
 - `Backpressured`: the inbox holds `MaxCapacity` pending messages.
 - `HandlerNotFound`: the receiver has no registered handlers.
 - `DeadLettered`: the receiver rejected the message permanently and moved it to its
-  dead letters, with a reason and an optional `Code`.
+  dead letters, with a reason and an optional `Code`. A receiver also answers
+  `DeadLettered` with `DeliveryResult.DeduplicationWindowExceededCode`, staging
+  nothing, when a message's `RedeliveryDeadline` is later than its
+  `DeduplicationWindow` covers.
 
 `DurableMessagingOptions` configures capacity, batch sizes, retries, deduplication,
 and dead-letter retention.
