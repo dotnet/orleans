@@ -20,6 +20,13 @@ namespace Orleans.Serialization.Buffers;
 /// <summary>
 /// A <see cref="IBufferWriter{T}"/> implementation implemented using pooled arrays which is specialized for creating <see cref="ReadOnlySequence{T}"/> instances.
 /// </summary>
+/// <remarks>
+/// As with <see cref="ArrayPool{T}.Shared"/>, backing buffers can contain data from earlier uses and
+/// are returned without clearing. Callers must initialize every byte before advancing the writer
+/// and read only the written region of a buffer.
+/// Fixed-size pinned pages are reused and evicted every 10 seconds according to recent pool activity.
+/// Larger arrays return to <see cref="ArrayPool{T}.Shared"/> when their last owner releases them.
+/// </remarks>
 [StructLayout(LayoutKind.Auto)]
 [Immutable]
 public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
@@ -585,41 +592,101 @@ internal sealed class ArcBufferPagePool
 {
     public static ArcBufferPagePool Shared { get; } = new();
     public const int MinimumPageSize = 16 * 1024;
+    private static readonly Timer _evictionTimer = CreateEvictionTimer();
+    private readonly object _evictionLock = new();
     private readonly ConcurrentQueue<ArcBufferPage> _pages = new();
-    private readonly ConcurrentQueue<ArcBufferPage> _largePages = new();
+    private long _rentCount;
+    private long _returnCount;
 
-    private ArcBufferPagePool() { }
+    internal int RetainedPages => _pages.Count;
 
     public ArcBufferPage Rent(int size = -1)
     {
-        ArcBufferPage? block;
-        if (size <= MinimumPageSize)
+        if (size > MinimumPageSize)
         {
-            if (!_pages.TryDequeue(out block))
-            {
-                block = new ArcBufferPage(size);
-            }
+            return new ArcBufferPage(size);
         }
-        else if (_largePages.TryDequeue(out block))
+
+        if (_pages.TryDequeue(out var block))
         {
-            block.ResizeLargeSegment(size);
+            Interlocked.Increment(ref _rentCount);
             return block;
         }
 
-        return block ?? new ArcBufferPage(size);
+        // A miss indicates growing demand. Weight it twice to avoid evicting pages during allocation bursts.
+        Interlocked.Add(ref _rentCount, 2);
+        return new ArcBufferPage(size);
     }
 
     internal void Return(ArcBufferPage block)
     {
         Debug.Assert(block.IsValid);
+        Debug.Assert(block.ReferenceCount == 0);
         if (block.IsMinimumSize)
         {
+            Interlocked.Increment(ref _returnCount);
             _pages.Enqueue(block);
         }
         else
         {
-            _largePages.Enqueue(block);
+            block.ReleaseArray();
         }
+    }
+
+    internal void Evict()
+    {
+        lock (_evictionLock)
+        {
+            var rents = Interlocked.Exchange(ref _rentCount, 0);
+            var returns = Interlocked.Exchange(ref _returnCount, 0);
+            var count = _pages.Count;
+            // Match Kestrel's gradual eviction: protect growing demand, trim steadily used excess slowly,
+            // and reclaim idle capacity faster. Counts are approximate when rent/return races with this tick.
+            var releaseCount = 0;
+            if (rents == 0 && returns == 0)
+            {
+                releaseCount = Math.Max(10, count / 20);
+            }
+            else if (returns > rents)
+            {
+                releaseCount = (int)Math.Min(count / 100, (returns - rents) / 5);
+            }
+            else if (returns == rents)
+            {
+                releaseCount = Math.Max(1, count / 100);
+            }
+
+            while (releaseCount-- > 0 && TryReleasePage())
+            {
+            }
+        }
+    }
+
+    private bool TryReleasePage()
+    {
+        if (!_pages.TryDequeue(out var block))
+        {
+            return false;
+        }
+
+        block.ReleaseArray();
+        return true;
+    }
+
+    private static Timer CreateEvictionTimer()
+    {
+        // The process-wide timer must not retain the execution context of the first buffer user.
+        if (ExecutionContext.IsFlowSuppressed())
+        {
+            return CreateTimer();
+        }
+
+        using (ExecutionContext.SuppressFlow())
+        {
+            return CreateTimer();
+        }
+
+        static Timer CreateTimer() => new(static state => ((ArcBufferPagePool)state!).Evict(), Shared, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
     }
 }
 
@@ -694,6 +761,16 @@ public sealed class ArcBufferPage
 
             Array = ArrayPool<byte>.Shared.Rent(length);
         }
+    }
+
+    internal void ReleaseArray()
+    {
+        if (!IsMinimumSize)
+        {
+            ArrayPool<byte>.Shared.Return(Array);
+        }
+
+        Array = [];
     }
 
     /// <summary>
