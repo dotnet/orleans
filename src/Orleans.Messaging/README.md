@@ -136,8 +136,8 @@ construction or activation setup, before journal recovery.
 
   Sink-owned messages never occupy capacity and have no inbox retry lifecycle; the
   sink honors their `DeliverAt`. Declined messages follow the handler path once
-  `DeliverAt` passes. A message is offered again after its processed record leaves
-  `DeduplicationWindow`, so sinks must be idempotent.
+  `DeliverAt` passes. Retained completion records deduplicate before a sink runs;
+  the durable admission floor fences a compacted logical send's original cutoff.
 - `IInbox.Register(IInboxWorkSource)` adds a work source: a component, such as a
   sink, that holds durable work in the grain's journal. `GetWakeupDelay` returns how
   soon a deactivated grain must wake to resume that work, or `null` when none is
@@ -218,7 +218,8 @@ with the JSON and Orleans binary journal formats. It persists alongside the grai
 other journaled state. After the grain's state is deleted, it starts empty and
 continues working.
 
-Completed message IDs are retained for `DeduplicationWindow`. Dead letters are
+Completed message IDs remain until their immutable cutoff is durably fenced.
+Null-cutoff deliveries retain their completion records permanently. Dead letters are
 retained up to `DeadLetterRetentionPeriod` and `MaxRetainedDeadLetters`.
 
 ## Diagnostics
