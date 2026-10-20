@@ -156,17 +156,20 @@ public static class DurableTaskEvents
     /// <summary>
     /// Event payload for an attempt which stalled because the running code can't replay its execution: the execution
     /// recorded a version which the code doesn't support, or the code diverged from the recorded execution. The runtime
-    /// discarded the attempt's result and keeps the task pending, and a later activation replays it.
+    /// discarded the attempt's result and keeps the task pending, and a later activation replays it. An attempt which met
+    /// journaled state that an open transaction holds stalls too, and its task runs again in this activation once the
+    /// transaction ends.
     /// </summary>
     /// <param name="grainContext">The activation whose runtime raised the event.</param>
     /// <param name="taskId">The stalled execution.</param>
     /// <param name="reason">
-    /// Why the attempt stalled: <see cref="DurableTaskAttemptCancellationReason.UnsupportedVersion"/> or
-    /// <see cref="DurableTaskAttemptCancellationReason.Diverged"/>.
+    /// Why the attempt stalled: <see cref="DurableTaskAttemptCancellationReason.UnsupportedVersion"/>,
+    /// <see cref="DurableTaskAttemptCancellationReason.Diverged"/> or
+    /// <see cref="DurableTaskAttemptCancellationReason.TransactionConflict"/>.
     /// </param>
     /// <param name="exception">
     /// The exception which describes the stall: a <see cref="DurableTaskVersionException"/> for an unsupported version, or
-    /// an <see cref="InvalidOperationException"/> which describes the divergence.
+    /// an <see cref="InvalidOperationException"/> which describes the divergence or the conflict.
     /// </param>
     public sealed class ExecutionStalled(IGrainContext grainContext, TaskId taskId, DurableTaskAttemptCancellationReason reason, Exception exception)
         : DurableTaskEvent(grainContext, taskId)

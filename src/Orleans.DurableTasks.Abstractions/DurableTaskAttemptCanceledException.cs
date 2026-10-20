@@ -27,6 +27,13 @@ public enum DurableTaskAttemptCancellationReason
     /// <see cref="DurableTaskAttemptCanceledException"/>'s inner exception describes the divergence.
     /// </summary>
     Diverged,
+
+    /// <summary>
+    /// The attempt read or changed journaled state which an open transaction of the grain holds, whose changes aren't
+    /// committed yet. A new attempt of the task runs once the transaction ends, and replays what this attempt recorded
+    /// before the access.
+    /// </summary>
+    TransactionConflict,
 }
 
 /// <summary>
@@ -114,6 +121,7 @@ public sealed class DurableTaskAttemptCanceledException : OperationCanceledExcep
         DurableTaskAttemptCancellationReason.TaskDeleted => "The durable task attempt was canceled because the task was deleted with its execution tree.",
         DurableTaskAttemptCancellationReason.UnsupportedVersion => "The durable task attempt was canceled because its execution recorded a version which the running code doesn't support. The task stays pending until code which supports the version replays it.",
         DurableTaskAttemptCancellationReason.Diverged => "The durable task attempt was canceled because it diverged from its recorded execution. The task stays pending until code which replays the recorded execution runs it.",
+        DurableTaskAttemptCancellationReason.TransactionConflict => "The durable task attempt was canceled because it accessed journaled state which an open transaction holds. The task continues in a new attempt once the transaction ends.",
         _ => "The durable task attempt was canceled.",
     };
 }
