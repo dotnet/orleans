@@ -149,25 +149,19 @@ public sealed class MessagingCommandSerializationTests
         var deadLetter = new OutboxDeadLetterRecord { Message = OutboxMessage("dead"), DeadLetteredAt = Now, Reason = "rejected", AttemptCount = 3 };
         return
         [
-            new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("enqueue"), State = new() },
-            new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("scheduled", Now), State = new() },
-            new() { Kind = OutboxCommandKind.Enqueue, Reference = Reference("reference"), State = new() },
-            new() { Kind = OutboxCommandKind.Delivery, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", ExpirationTime = Now } },
-            new() { Kind = OutboxCommandKind.Delivery, MessageId = MessageId.Create("orders", "dead"), DeadLetter = deadLetter },
-            new() { Kind = OutboxCommandKind.RemoveDeadLetters, RemovedDeadLetters = [MessageId.Create("orders", "dead")] },
-            new()
-            {
-                Kind = OutboxCommandKind.Snapshot,
-                Snapshot = new()
-                {
-                    Messages =
-                    [
-                        new() { Message = OutboxMessage("pending", Now), State = new() { AttemptCount = 1, ExpirationTime = Now } },
-                        new() { Reference = Reference("pending-reference"), State = new() { AttemptCount = 2 } }
-                    ],
-                    DeadLetters = [deadLetter]
-                }
-            }
+            new OutboxCommand.Enqueue(OutboxMessage("enqueue"), new() { SentAt = Now }),
+            new OutboxCommand.Enqueue(OutboxMessage("scheduled", Now), new() { SentAt = Now }),
+            new OutboxCommand.EnqueueReference(Reference("reference"), new() { SentAt = Now }),
+            new OutboxCommand.Retry(MessageId.Create("orders", "retry"), new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", SentAt = Now }),
+            new OutboxCommand.Retire(MessageId.Create("orders", "done")),
+            new OutboxCommand.Retire(MessageId.Create("orders", "dead"), deadLetter),
+            new OutboxCommand.RemoveDeadLetters([MessageId.Create("orders", "dead")]),
+            new OutboxCommand.Snapshot(
+                [
+                    new() { Message = OutboxMessage("pending", Now), State = new() { AttemptCount = 1, SentAt = Now } },
+                    new() { Reference = Reference("pending-reference"), State = new() { AttemptCount = 2, SentAt = Now } }
+                ],
+                [deadLetter])
         ];
     }
 }

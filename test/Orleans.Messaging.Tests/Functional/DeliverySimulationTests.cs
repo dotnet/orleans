@@ -23,7 +23,7 @@ public sealed class DeliverySimulationTests : MessagingBehaviorTestBase
 
     private static readonly Gen<Step> GenStep = Gen.Frequency(
         (4, Gen.Const(new Step(StepKind.Send))),
-        (3, Gen.OneOfConst(DeliveryFaultKind.Throw, DeliveryFaultKind.TimeOut, DeliveryFaultKind.LoseResponse, DeliveryFaultKind.TimeOutInFlight, DeliveryFaultKind.ExtendDeadline)
+        (3, Gen.OneOfConst(DeliveryFaultKind.Throw, DeliveryFaultKind.TimeOut, DeliveryFaultKind.LoseResponse, DeliveryFaultKind.TimeOutInFlight)
             .Select(static fault => new Step(StepKind.Fault, fault))),
         (1, Gen.Const(new Step(StepKind.CrashSender))),
         (1, Gen.Const(new Step(StepKind.CrashReceiver))),
@@ -100,8 +100,6 @@ public sealed class DeliverySimulationTests : MessagingBehaviorTestBase
         DeliveryFaultKind.Throw => DeliveryFault.Throw(),
         DeliveryFaultKind.TimeOut => DeliveryFault.TimeOut(),
         DeliveryFaultKind.LoseResponse => DeliveryFault.LoseResponse(),
-        // A long finite cutoff is valid, but must remain immutable once the receiver tracks it.
-        DeliveryFaultKind.ExtendDeadline => DeliveryFault.ExtendRedeliveryDeadline(TimeSpan.FromDays(2)),
         _ => DeliveryFault.TimeOutInFlight()
     };
 

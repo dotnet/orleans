@@ -44,7 +44,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         await AssertWakeupAtAsync(sender, startedAt + options.RetryInitialInterval);
         var state = await GetRetryStateAsync();
         Assert.Equal(1, state.AttemptCount);
-        Assert.Equal(expiresAt, state.ExpirationTime);
+        Assert.Equal(startedAt, state.SentAt);
         Assert.Equal(startedAt + options.RetryInitialInterval, state.NextAttemptAt);
 
         Fixture.Clock.Advance(TimeSpan.FromDays(1));
@@ -56,7 +56,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         _ = await Fixture.RunPumpAsync(sender);
         await secondRetry;
         state = await GetRetryStateAsync();
-        Assert.Equal(expiresAt, state.ExpirationTime);
+        Assert.Equal(startedAt, state.SentAt);
         Assert.Equal(JobClock.GetUtcNow() + 2 * options.RetryInitialInterval, state.NextAttemptAt);
         await AssertWakeupAtAsync(sender, Assert.IsType<DateTimeOffset>(state.NextAttemptAt));
 
@@ -68,7 +68,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         await ReactivateAsync(sender);
         var recovered = await GetRetryStateAsync();
         Assert.Equal(state.AttemptCount, recovered.AttemptCount);
-        Assert.Equal(state.ExpirationTime, recovered.ExpirationTime);
+        Assert.Equal(state.SentAt, recovered.SentAt);
         Assert.Equal(state.NextAttemptAt, recovered.NextAttemptAt);
         await AssertWakeupAtAsync(sender, Assert.IsType<DateTimeOffset>(recovered.NextAttemptAt));
 
