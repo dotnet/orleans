@@ -38,11 +38,12 @@ public sealed class PublicInboxHandlerTransactionTests : MessagingBehaviorTestBa
             Payload = bytes,
             Headers = new Dictionary<string, byte[]>(StringComparer.Ordinal) { ["attachment"] = [0xff, 0x80, 0x01] }
         };
+        var sentAt = Fixture.JobNow;
         // Deactivation cancels any handler the original activation starts, leaving the message to recovery.
         using (Fixture.HandlerProbe.Arm(receiver.GetGrainId(), RawPayloadTestGrain.HandlerBarrier))
         {
             Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(
-                new InboxMessage { Envelope = envelope })).Status);
+                new InboxMessage { Envelope = envelope, SentAt = sentAt })).Status);
             await original.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         }
         var accepted = Assert.IsType<RawPayloadSnapshot>(Assert.IsType<RawPayloadTestGrain>(original.GrainInstance).AcceptedSnapshot);
@@ -115,7 +116,7 @@ public sealed class PublicInboxHandlerTransactionTests : MessagingBehaviorTestBa
         Assert.Equal(1, recovered.ProcessedCount);
         Assert.Equal(0, recovered.OutboxCount);
         Assert.Equal(DeliveryStatus.Duplicate, (await receiver.AsReference<IMessagingExtension>().DeliverAsync(
-            new InboxMessage { Envelope = envelope }, TestContext.Current.CancellationToken)).Status);
+            new InboxMessage { Envelope = envelope, SentAt = sentAt }, TestContext.Current.CancellationToken)).Status);
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
         var sinkState = await sink.GetSnapshotAsync();
         Assert.Equal(sends, sinkState.Effects.Length);

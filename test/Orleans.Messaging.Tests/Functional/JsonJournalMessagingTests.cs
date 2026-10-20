@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
+using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Messaging.Tests.Support;
 using Orleans.Runtime;
@@ -18,6 +19,8 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
     private InProcessTestCluster Cluster => fixture.Cluster;
     private JsonMessagingProbe Probe => fixture.Probe;
+    private DateTimeOffset JobNow => Cluster.Silos[0].ServiceProvider
+        .GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs).GetUtcNow();
 
     [Fact]
     public async Task JsonJournal_RecoversOutboxAndInboxStateAcrossActivations()
@@ -37,12 +40,11 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
             await Task.Delay(10, Token);
         }
 
-        var cutoff = await ReadCutoffAsync(receiverContext, messageId);
-        Assert.NotNull(cutoff);
+        var sentAt = await ReadSentAtAsync(receiverContext, messageId);
         await receiver.DeactivateAsync();
         await receiverContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Token);
         var type = new MessageType<int>(JsonMessagingGrain.Subject, Cluster.Client.ServiceProvider.GetRequiredService<Serializer<int>>());
-        var redelivery = type.Create(messageId, receiver.GetGrainId(), 42).ToInboxMessage() with { RedeliveryDeadline = cutoff };
+        var redelivery = type.Create(messageId, receiver.GetGrainId(), 42).ToInboxMessage(sentAt);
 
         Assert.Equal(DeliveryStatus.Duplicate, (await receiver.AsReference<IMessagingExtension>().DeliverAsync(redelivery, Token)).Status);
         Assert.Equal(new[] { 42 }, Probe.Get(receiver.GetGrainId()));
@@ -54,7 +56,8 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
         var receiver = Cluster.Client.GetGrain<ICustomHandlerGrain>(Guid.NewGuid());
         var message = new InboxMessage
         {
-            Envelope = new Envelope { MessageId = MessageId.Create("custom", Guid.NewGuid().ToString("N")), Payload = [7], Subject = "custom" }
+            Envelope = new Envelope { MessageId = MessageId.Create("custom", Guid.NewGuid().ToString("N")), Payload = [7], Subject = "custom" },
+            SentAt = JobNow
         };
 
         var result = await receiver.AsReference<IMessagingExtension>().DeliverAsync(message, Token);
@@ -70,7 +73,7 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
         var messageId = MessageId.Create("json", "scheduled", Guid.NewGuid().ToString("N"));
         var type = new MessageType<int>(JsonMessagingGrain.Subject, Cluster.Client.ServiceProvider.GetRequiredService<Serializer<int>>());
         var deliverAt = new DateTimeOffset(DateTime.UtcNow.AddDays(1).Ticks, TimeSpan.Zero).ToOffset(TimeSpan.FromHours(5));
-        var scheduled = type.Create(messageId, receiver.GetGrainId(), 7, deliverAt).ToInboxMessage();
+        var scheduled = type.Create(messageId, receiver.GetGrainId(), 7, deliverAt).ToInboxMessage(JobNow);
         var extension = receiver.AsReference<IMessagingExtension>();
 
         Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(scheduled, Token)).Status);
@@ -80,7 +83,7 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
 
         // Redelivery replays the JSON journal; pending-command equivalence requires the recovered DeliverAt.
         Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(scheduled, Token)).Status);
-        var conflicting = type.Create(messageId, receiver.GetGrainId(), 7, deliverAt.AddSeconds(1)).ToInboxMessage();
+        var conflicting = type.Create(messageId, receiver.GetGrainId(), 7, deliverAt.AddSeconds(1)).ToInboxMessage(scheduled.SentAt);
         await Assert.ThrowsAsync<InvalidOperationException>(() => extension.DeliverAsync(conflicting, Token).AsTask());
         Assert.True(Cluster.TryGetGrainContext(receiver.GetGrainId(), out var recoveredContext));
         Assert.NotSame(receiverContext, recoveredContext);
@@ -105,8 +108,7 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
         Assert.Equal(0, await grain.GetOutboxCountAsync());
         Assert.Equal(new[] { 8 }, await Probe.WaitAsync(grain.GetGrainId(), 1, Token));
         Assert.True(Cluster.TryGetGrainContext(grain.GetGrainId(), out var context));
-        var cutoff = await ReadCutoffAsync(context, immediateId);
-        Assert.NotNull(cutoff);
+        var sentAt = await ReadSentAtAsync(context, immediateId);
         await grain.DeactivateAsync();
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Token);
 
@@ -119,22 +121,22 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
         recoveredContext.Scheduler.QueueAction(() => recovered.SetResult((inbox.Count, inbox.MessageState[scheduledId].Message.Envelope.DeliverAt)));
         Assert.Equal((1, deliverAt), await recovered.Task.WaitAsync(TimeSpan.FromSeconds(30), Token));
         var type = new MessageType<int>(JsonMessagingGrain.Subject, Cluster.Client.ServiceProvider.GetRequiredService<Serializer<int>>());
-        var redelivery = type.Create(immediateId, grain.GetGrainId(), 8).ToInboxMessage() with { RedeliveryDeadline = cutoff };
+        var redelivery = type.Create(immediateId, grain.GetGrainId(), 8).ToInboxMessage(sentAt);
         Assert.Equal(DeliveryStatus.Duplicate, (await grain.AsReference<IMessagingExtension>().DeliverAsync(redelivery, Token)).Status);
         Assert.Equal(new[] { 8 }, Probe.Get(grain.GetGrainId()));
     }
 
-    private static Task<DateTimeOffset?> ReadCutoffAsync(IGrainContext context, MessageId messageId)
+    private static Task<DateTimeOffset> ReadSentAtAsync(IGrainContext context, MessageId messageId)
     {
-        var result = new TaskCompletionSource<DateTimeOffset?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var result = new TaskCompletionSource<DateTimeOffset>(TaskCreationOptions.RunContinuationsAsynchronously);
         context.Scheduler.QueueAction(() =>
         {
             try
             {
                 var inbox = context.ActivationServices.GetRequiredService<Inbox>();
                 result.SetResult(inbox.MessageState.TryGetValue(messageId, out var pending)
-                    ? pending.Message.RedeliveryDeadline
-                    : InboxTestAccess.GetProcessedCutoff(inbox, messageId));
+                    ? pending.Message.SentAt
+                    : InboxTestAccess.GetProcessedSentAt(inbox, messageId));
             }
             catch (Exception exception) { result.SetException(exception); }
         });
