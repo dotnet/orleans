@@ -1,6 +1,17 @@
 namespace Documentation.Diagnostics.DurableTasks;
 
-public sealed class DispatchGrain(IEmailSender email, ICustomerSurveys surveys) : DurableGrain
+public interface IDispatchGrain : IGrainWithStringKey
+{
+    DurableTask DispatchAsync(string customer);
+
+    DurableTask DispatchAndNotifyAsync(string customer);
+
+    DurableTask DispatchAndInvoiceAsync(string customer);
+
+    DurableTask DispatchAndSurveyAsync(string customer);
+}
+
+public sealed class DispatchGrain(IEmailSender email) : DurableGrain, IDispatchGrain
 {
 #pragma warning disable ORLEANS0219
     // <orleans0219_violation>
@@ -40,7 +51,7 @@ public sealed class DispatchGrain(IEmailSender email, ICustomerSurveys surveys) 
 
         // A durable grain call, started as an independent root task, which continues after this execution completes and
         // is deleted.
-        await surveys.SendSurveyAsync(customer).WithId("survey").Detached().ScheduleAsync();
+        await GrainFactory.GetGrain<ICustomerSurveys>(customer).SendSurveyAsync(customer).WithId("survey").Detached().ScheduleAsync();
     }
     // </orleans0219_fix_detached>
 
@@ -50,4 +61,5 @@ public sealed class DispatchGrain(IEmailSender email, ICustomerSurveys surveys) 
         await email.SendAsync(customer, "Your order is on its way", DurableTask.Current.CancellationToken);
 
     private async DurableTask Invoice(string customer) =>
-        await email.SendAsync(customer, "Your invoice", DurableTask.Current.CancellationToken);}
+        await email.SendAsync(customer, "Your invoice", DurableTask.Current.CancellationToken);
+}

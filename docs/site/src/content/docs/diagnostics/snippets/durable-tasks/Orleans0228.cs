@@ -1,6 +1,15 @@
 namespace Documentation.Diagnostics.DurableTasks;
 
-public sealed class CompletionSurveyGrain(ICustomerSurveys surveys) : DurableGrain
+public interface ICompletionSurveyGrain : IGrainWithStringKey
+{
+    DurableTask CompleteAsync(string customer);
+
+    DurableTask CompleteAndSurveyAsync(string customer);
+
+    DurableTask CompleteThenSurveyAsync(string customer);
+}
+
+public sealed class CompletionSurveyGrain : DurableGrain, ICompletionSurveyGrain
 {
 #pragma warning disable ORLEANS0228
     // <orleans0228_violation>
@@ -20,7 +29,7 @@ public sealed class CompletionSurveyGrain(ICustomerSurveys surveys) : DurableGra
         await Pack().WithId("pack");
 
         // The surveys grain stores and runs the call as a root task, which continues after this execution completes.
-        _ = surveys.SendSurveyAsync(customer).WithId("survey").Detached().Post();
+        _ = GrainFactory.GetGrain<ICustomerSurveys>(customer).SendSurveyAsync(customer).WithId("survey").Detached().Post();
     }
     // </orleans0228_fix_grain>
 
