@@ -27,9 +27,13 @@ public sealed class OrderProcessingFixture : IAsyncLifetime
     private WebApplication? _app;
     private TestServer? _server;
 
-    public OrderProcessingFixture()
+    public OrderProcessingFixture() : this(configureSilo: null)
     {
-        var builder = new InProcessTestClusterBuilder();
+    }
+
+    internal OrderProcessingFixture(Action<ISiloBuilder>? configureSilo, short initialSilosCount = 2)
+    {
+        var builder = new InProcessTestClusterBuilder(initialSilosCount);
         builder.ConfigureClient(client => client.AddDurableTasks());
         builder.ConfigureSilo((_, silo) =>
         {
@@ -44,6 +48,7 @@ public sealed class OrderProcessingFixture : IAsyncLifetime
                 options.PaymentTimeout = TimeSpan.FromMinutes(5);
                 options.PaymentPollInterval = TimeSpan.FromMilliseconds(100);
             });
+            configureSilo?.Invoke(silo);
         });
         _cluster = builder.Build();
     }
@@ -51,6 +56,8 @@ public sealed class OrderProcessingFixture : IAsyncLifetime
     public HttpClient Http { get; private set; } = null!;
 
     public IClusterClient Client => _cluster.Client;
+
+    internal InProcessTestCluster Cluster => _cluster;
 
     public PaymentGateway Gateway => _app!.Services.GetRequiredService<PaymentGateway>();
 
