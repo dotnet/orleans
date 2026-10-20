@@ -267,6 +267,11 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
         foreach (var (key, entry) in _messages)
         {
+            if (entry.State.ExpirationTime is null)
+            {
+                throw new InvalidOperationException("A recovered outbox entry requires its immutable retry expiration and admission cutoff.");
+            }
+
             if (entry.Message is { } message)
             {
                 if (entry.Reference is not null)
