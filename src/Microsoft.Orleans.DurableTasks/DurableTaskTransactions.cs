@@ -28,7 +28,15 @@ internal static class DurableTaskTransactions
     /// </para>
     /// <para>
     /// The body runs exclusively on the activation, as <c>JournaledStateManager.RunTransactionAsync</c> describes. Its
-    /// accesses to journaled state aren't recorded.
+    /// accesses to journaled state aren't recorded, an effect inside it runs directly, and a durable operation inside it
+    /// throws, since a replay returns the transaction's record without running the body.
+    /// </para>
+    /// <para>
+    /// A request to cancel the task doesn't change how the transaction commits: its record commits with its changes. A
+    /// transaction in an attempt which the runtime discarded, for example because its activation stopped, aborts and
+    /// records nothing, since the next attempt runs the body again. Once the task can't replay, because the runtime aborted
+    /// or deleted it or its body completed, a transaction, such as one in the abort's cleanup, commits its changes durably
+    /// without a record, as the attempt's other writes then apply.
     /// </para>
     /// </remarks>
     public static Task<T> RunAsync<T>(string name, Func<CancellationToken, Task<T>> body, CancellationToken cancellationToken = default)
