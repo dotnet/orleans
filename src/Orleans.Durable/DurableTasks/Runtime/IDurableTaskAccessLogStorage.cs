@@ -24,4 +24,21 @@ internal interface IDurableTaskAccessLogStorage
     /// <summary>Appends <paramref name="records"/> to the access log of execution <paramref name="taskId"/>.</summary>
     /// <remarks>The records are staged, and commit with the next write together with the changes staged before them.</remarks>
     void AppendAccessLog(TaskId taskId, ReadOnlySpan<byte> records);
+
+    /// <summary>
+    /// Stages the records which <paramref name="source"/> holds before the next write captures the activation's changes.
+    /// </summary>
+    /// <remarks>
+    /// A source adds itself when it begins to hold records which it hasn't staged, such as reads which no later write of
+    /// its attempt depends on yet. Every durable consequence of such a read commits with a write, so staging them as the
+    /// write captures commits each read with everything which can depend on it.
+    /// </remarks>
+    void AddPendingRecords(IDurableTaskPendingAccessRecords source);
+}
+
+/// <summary>Records of accesses to journaled state which an attempt holds before staging them.</summary>
+internal interface IDurableTaskPendingAccessRecords
+{
+    /// <summary>Stages the records which the attempt holds.</summary>
+    void Flush();
 }

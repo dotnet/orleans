@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Durable.Tasks.Runtime;
 using Orleans.Durable.Journaling;
 
 namespace Orleans.Durable.Tasks.Storage;
@@ -31,6 +32,9 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IDurableDictionaryC
     private readonly HashSet<TaskId> _removed = [];
     private bool _cleared;
 
+    // The attempts which hold records that they haven't staged, which every write stages before it captures.
+    private readonly List<IDurableTaskPendingAccessRecords> _pendingSources = [];
+
     /// <summary>Creates the access logs of <paramref name="manager"/>'s activation, which journal through it.</summary>
     public DurableTaskAccessLogs(IJournaledStateManager manager, IDurableDictionaryCommandCodec<TaskId, byte[]> codec)
     {
@@ -62,6 +66,24 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IDurableDictionaryC
 
         log.Append(records);
         _appended.Add(taskId);
+    }
+
+    /// <summary>Stages <paramref name="source"/>'s records before the next write captures.</summary>
+    /// <remarks>
+    /// A pending read's record stages no change of the attempt's journaled state: it records what the attempt observed, and
+    /// commits with whichever write captures next.
+    /// </remarks>
+    public void AddPendingRecords(IDurableTaskPendingAccessRecords source) => _pendingSources.Add(source);
+
+    // The activation runs one work item at a time, so no access is in progress while a write captures.
+    private void StagePendingRecords()
+    {
+        foreach (var source in _pendingSources)
+        {
+            source.Flush();
+        }
+
+        _pendingSources.Clear();
     }
 
     public void Remove(TaskId taskId)
@@ -99,6 +121,7 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IDurableDictionaryC
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
+        StagePendingRecords();
         if (_cleared)
         {
             _codec.WriteClear(writer);
@@ -123,6 +146,7 @@ internal sealed class DurableTaskAccessLogs : IStateMachine, IDurableDictionaryC
 
     void IStateMachine.WriteSnapshot(JournalStreamWriter writer)
     {
+        StagePendingRecords();
         _codec.WriteSnapshot(
             [.. _logs.Select(static pair => KeyValuePair.Create(pair.Key, pair.Value.Records.AsSpan(0, pair.Value.Length).ToArray()))],
             writer);

@@ -154,18 +154,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     }
 
     /// <summary>
-    /// Stages the records of the reads which the body made since its last write, before an operation which can depend on
-    /// them becomes durable.
-    /// </summary>
-    internal void FlushAccessLog()
-    {
-        if (AccessLog is { IsOpen: true } accessLog && TaskScheduler.Current == _scheduler)
-        {
-            accessLog.Flush();
-        }
-    }
-
-    /// <summary>
     /// Runs an asynchronous <paramref name="body"/> whose outcome one record of this attempt covers, such as a
     /// transaction's, as a covered region for its whole flow: the body's accesses to journaled state aren't recorded as the
     /// attempt's, its effects run directly, and its durable operations throw.
@@ -468,7 +456,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         AssertOnScheduler();
         ReachCancellationPoint();
-        FlushAccessLog();
         if (_unreached is not { } unreached)
         {
             return;
@@ -815,13 +802,10 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     protected internal override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
         TaskId taskId,
         DateTimeOffset dueTime,
-        CancellationToken cancellationToken)
-    {
-        FlushAccessLog();
-        return RunOnScheduler(
+        CancellationToken cancellationToken) =>
+        RunOnScheduler(
             _scheduler,
             () => ScheduleDelayCoreAsync(taskId, dueTime, cancellationToken));
-    }
 
     private async ValueTask<DurableTaskResponse> ScheduleDelayCoreAsync(
         TaskId taskId,
@@ -983,13 +967,10 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// The wait observes the signals of the invoked task whose execution tree contains this execution, and advances this
     /// execution's logical time to when the signal was recorded.
     /// </remarks>
-    protected internal override ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, CancellationToken cancellationToken)
-    {
-        FlushAccessLog();
-        return RunOnScheduler(
+    protected internal override ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, CancellationToken cancellationToken) =>
+        RunOnScheduler(
             _scheduler,
             () => WaitForSignalCoreAsync(name, cancellationToken));
-    }
 
     private async ValueTask<DurableTaskResponse> WaitForSignalCoreAsync(string name, CancellationToken cancellationToken)
     {
@@ -1143,13 +1124,10 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             where TFeature : class =>
             addressedHost.IsDefault ? null : new DurableTaskAddress(addressedHost, TargetTaskId) as TFeature;
 
-        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
-        {
-            owner.FlushAccessLog();
-            return RunOnScheduler(
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) =>
+            RunOnScheduler(
                 owner._scheduler,
                 () => CancelCoreAsync(reason, cancellationToken));
-        }
 
         private async ValueTask CancelCoreAsync(string? reason, CancellationToken cancellationToken)
         {
@@ -1158,13 +1136,10 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             await owner.CompleteOperationAsync(inner.CancelAsync(reason, operationCts.Token));
         }
 
-        public ValueTask AbortAsync(string reason, CancellationToken cancellationToken)
-        {
-            owner.FlushAccessLog();
-            return RunOnScheduler(
+        public ValueTask AbortAsync(string reason, CancellationToken cancellationToken) =>
+            RunOnScheduler(
                 owner._scheduler,
                 () => AbortCoreAsync(reason, cancellationToken));
-        }
 
         private async ValueTask AbortCoreAsync(string reason, CancellationToken cancellationToken)
         {
