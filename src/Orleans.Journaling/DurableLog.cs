@@ -10,7 +10,7 @@ namespace Orleans.Journaling;
 // Every change commits a journal entry when it is made: an append, trim, clear, seal, epoch, or draft commit. An open
 // draft stages nothing until it commits, so the log reports each change it stages.
 [DebuggerDisplay("Count = {Count}, NextSequence = {NextSequence}")]
-internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsStagedChanges, IDurableLogCommandHandler<T>, IReplicableState, IJournaledStateReplica
+internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsStagedChanges, IDurableLogCommandHandler<T>, IReplicableState, IJournaledStateReplica, IJournaledStateResync, IJournaledStateRollback
 {
     private readonly IDurableLogCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
@@ -295,6 +295,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
         DurableStateObservation.ValidateMode(mode);
         return DurableStateObservation.WatchAsync(
             DurableStateObservation.GetRequiredManager(_manager),
+            this,
             (Log: this, FromSequence: fromSequence, Epoch: epoch, Mode: mode, ResumeDraftId: resumeDraftId),
             static (hub, arg) => arg.Log.CreateReader(hub, arg.FromSequence, arg.Epoch, arg.Mode, arg.ResumeDraftId),
             cancellationToken);
@@ -329,10 +330,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
-        // The reset also restarts the committed boundary, which belongs to the change which ApplyReset records.
-        ApplyReset(epoch: 0, firstSequence: 0, resetSequence: 0, capacityHint: 0);
-        _captured = _committed = default;
-        _writer = writer;
+        ClearJournaledContent(writer);
         if (_drafts is { } drafts)
         {
             while (drafts.Open.Count > 0)
@@ -342,6 +340,18 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
         }
 
         SignalAllReaders();
+    }
+
+    // An aborted transaction's rebuild keeps open drafts, which other code owns. A reader whose cursor passed the rebuilt
+    // end resynchronizes on its own, as after any shortening of the log.
+    void IJournaledStateRollback.ResetForRollback(JournalStreamWriter writer) => ClearJournaledContent(writer);
+
+    private void ClearJournaledContent(JournalStreamWriter writer)
+    {
+        // The reset also restarts the committed boundary, which belongs to the change which ApplyReset records.
+        ApplyReset(epoch: 0, firstSequence: 0, resetSequence: 0, capacityHint: 0);
+        _captured = _committed = default;
+        _writer = writer;
     }
 
     void IStateMachine.OnRecoveryCompleted()
@@ -595,6 +605,9 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
             topic.SignalAll();
         }
     }
+
+    // Readers read the log itself, so waking them shows them what a transaction changed.
+    void IJournaledStateResync.PublishResync(StateTopic topic) => topic.SignalAll();
 
     private void CloseDraft(Draft draft, DraftOutcome outcome)
     {

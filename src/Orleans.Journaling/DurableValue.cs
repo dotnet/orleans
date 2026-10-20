@@ -21,7 +21,7 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReportsStagedChanges, IDurableValueCommandHandler<T>, IReplicableState, IJournaledStateReplica
+internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReportsStagedChanges, IDurableValueCommandHandler<T>, IReplicableState, IJournaledStateReplica, IJournaledStateResync, ICoalescingJournaledState
 {
     private readonly IDurableValueCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
@@ -32,6 +32,11 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
 
     // Whether the write in flight captured the value. A completed write acknowledges only the value it captured.
     private bool _isValueCaptured;
+
+    // Whether the journal buffer holds the value in an entry which no write captured with this state: a transaction staged
+    // it, or an aborted transaction's rebuild replayed it from the unwritten buffer. The next write which captures this
+    // state captures that entry, and acknowledges the value.
+    private bool _isValueStaged;
 
     public DurableValue(
         [ServiceKey] string key,
@@ -105,6 +110,8 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
 
     void IStateMachine.OnRecoveryCompleted()
     {
+        // Storage holds every entry replayed so far.
+        _isValueStaged = false;
         OnValuePersisted();
         PublishCurrentValue();
     }
@@ -124,6 +131,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
         ApplySet(default);
         _isDirty = false;
         _isValueCaptured = false;
+        _isValueStaged = false;
         PublishCurrentValue();
     }
 
@@ -135,14 +143,23 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
         }
     }
 
+    void IJournaledStateResync.PublishResync(StateTopic topic) => topic.PublishStaged(_value);
+
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
+        Debug.Assert(_manager is not { } manager || !manager.IsHeldByTransaction(this), "A write captures no state which an open transaction holds.");
         if (_isDirty)
         {
             WriteState(writer);
             _isDirty = false;
             _isValueCaptured = true;
         }
+        else if (_isValueStaged)
+        {
+            _isValueCaptured = true;
+        }
+
+        _isValueStaged = false;
     }
 
     void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter)
@@ -150,6 +167,20 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
         WriteState(snapshotWriter);
         _isDirty = false;
         _isValueCaptured = true;
+        _isValueStaged = false;
+    }
+
+    // A transaction journals the value's pending change through its stream: into the journal when it first writes the
+    // value, and into its segment when it commits. The write which captures this state after the transaction ends
+    // acknowledges it.
+    void ICoalescingJournaledState.StagePendingChanges(JournalStreamWriter writer)
+    {
+        if (_isDirty)
+        {
+            WriteState(writer);
+            _isDirty = false;
+            _isValueStaged = true;
+        }
     }
 
 
@@ -158,7 +189,13 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
         _codec.WriteSet(_value!, writer);
     }
 
-    void IDurableValueCommandHandler<T>.ApplySet(T value) => ApplySet(value);
+    // A replayed entry which no recovery confirms as stored, such as one which an aborted transaction's rebuild replays from
+    // the unwritten journal buffer, awaits the write which captures it.
+    void IDurableValueCommandHandler<T>.ApplySet(T value)
+    {
+        ApplySet(value);
+        _isValueStaged = true;
+    }
 
     // Makes every change of the value, for live operations and replayed entries alike, so it records each change.
     private void ApplySet(T? value)

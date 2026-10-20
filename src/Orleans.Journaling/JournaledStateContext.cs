@@ -31,9 +31,18 @@ internal abstract class JournaledStateContext
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryGetCurrent([NotNullWhen(true)] JournaledStateAccessTarget? target, [NotNullWhen(true)] out JournaledStateContext? context)
     {
-        context = target?.Manager is { HostAccessDepth: 0 } manager ? manager.ContextProvider?.Current : null;
+        context = target?.Manager is { HostAccessDepth: 0 } manager ? manager.CurrentContext : null;
         return context is not null;
     }
+
+    /// <summary>Runs <see cref="Access"/> on this context, for a context which wraps another.</summary>
+    internal TResult AccessThrough<TArgument, TState, TResult>(
+        in JournaledStateAccess access,
+        TArgument argument,
+        TState state,
+        Func<TState, TResult> operation,
+        Action<TState, TResult>? apply)
+        => Access(access, argument, state, operation, apply);
 
     /// <summary>
     /// Reads <paramref name="target"/> through this context, with a read whose result depends on the state's content
