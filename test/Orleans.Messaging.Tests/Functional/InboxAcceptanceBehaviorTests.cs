@@ -142,7 +142,7 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task RedeliveryDeadlineBeyondDeduplicationWindow_IsRejectedWithoutStagingAnything()
+    public async Task RedeliveryDeadlineBeyondDeduplicationWindow_IsAcceptedAndRemainsImmutable()
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
@@ -155,19 +155,61 @@ public sealed class InboxAcceptanceBehaviorTests : MessagingBehaviorTestBase
         var first = await DeliverAsync(receiver, late);
         var redelivery = await DeliverAsync(receiver, late);
 
-        Assert.Equal(DeliveryStatus.DeadLettered, first.Status);
-        Assert.Equal(DeliveryResult.DeduplicationWindowExceededCode, first.Code);
-        Assert.Equal((first.Status, first.Code), (redelivery.Status, redelivery.Code));
-        var rejected = await receiver.GetSnapshotAsync();
-        Assert.Equal((0, 0), (rejected.InboxCount, rejected.ProcessedMessageCount));
-        Assert.Empty(rejected.InboxDeadLetters);
+        Assert.Equal(DeliveryStatus.Accepted, first.Status);
+        Assert.Null(first.Code);
+        Assert.Equal(DeliveryStatus.Duplicate, redelivery.Status);
+        await Fixture.WaitForInboxCountAsync(receiver, 0);
+        var accepted = await receiver.GetSnapshotAsync();
+        Assert.Equal((0, 1), (accepted.InboxCount, accepted.ProcessedMessageCount));
+        Assert.Empty(accepted.InboxDeadLetters);
 
-        // Nothing recorded the ID, so a deadline the window covers is a first acceptance, and later deliveries are
-        // duplicates whatever their deadline.
+        // The cutoff belongs to the logical send. A different cutoff cannot reuse its tracked identity.
         var covered = envelope with { RedeliveryDeadline = jobClock.GetUtcNow() + window - TimeSpan.FromMinutes(1) };
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, covered)).Status);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverAsync(receiver, covered));
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, late)).Status);
         Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task TrackedMessage_RequiresTheOriginalCutoff(bool completed, bool legacyNull)
+    {
+        var receiver = NewGrain();
+        const string route = "messages/cutoff-identity";
+        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
+        var cutoff = Fixture.Clock.GetUtcNow() + TimeSpan.FromHours(1);
+        var message = CreateEnvelope(receiver, NewMessage(32, "immutable-cutoff"), route) with
+        {
+            RedeliveryDeadline = legacyNull ? null : cutoff
+        };
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, message)).Status);
+        await handler.WaitUntilEnteredAsync();
+        if (completed)
+        {
+            handler.Release();
+            await Fixture.WaitForInboxCountAsync(receiver, 0);
+        }
+
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            DeliverAsync(receiver, message with { RedeliveryDeadline = cutoff + TimeSpan.FromTicks(1) }));
+        if (!legacyNull)
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                DeliverAsync(receiver, message with { RedeliveryDeadline = cutoff - TimeSpan.FromTicks(1) }));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                DeliverAsync(receiver, message with { RedeliveryDeadline = null }));
+        }
+
+        handler.Release();
+        await Fixture.WaitForInboxCountAsync(receiver, 0);
+        var state = await receiver.GetSnapshotAsync();
+        Assert.Equal("immutable-cutoff", Assert.Single(state.Effects).Value);
+        Assert.Equal(1, Assert.Single(state.Effects).Count);
+        Assert.Equal(1, state.ProcessedMessageCount);
     }
 
     [Fact]
