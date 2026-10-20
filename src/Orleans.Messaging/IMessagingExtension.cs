@@ -37,6 +37,10 @@ public interface IMessagingExtension : IGrainExtension
     /// <paramref name="message"/> has an unset message ID, exceeds identity admission limits, or has invalid payload or headers.
     /// Optional standard metadata is validated where its contract is consumed.
     /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The message's <see cref="InboxMessage.SentAt"/> is later than the receiver's clock plus <c>DeduplicationWindow</c>.
+    /// The inbox stages nothing for it.
+    /// </exception>
     [Alias("DeliverAsync")]
     [AlwaysInterleave]
     ValueTask<DeliveryResult> DeliverAsync(InboxMessage message, CancellationToken cancellationToken = default);
