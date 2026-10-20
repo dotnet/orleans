@@ -44,7 +44,7 @@ commands. A pending duplicate refers to the already-accepted work and carries th
 same subject, body bytes, and `DeliverAt` time; a pending repeat with a different
 subject, body, or `DeliverAt` fails.
 A completed duplicate returns `Duplicate` while its completion record is retained.
-Completed records retain the ID, timestamp, and immutable
+Completed records retain the ID and immutable
 <xref:Orleans.Messaging.InboxMessage.RedeliveryDeadline> admission cutoff. A repeat
 with a different cutoff fails for both pending and completed identities.
 Applications uphold the immutable command contract; the completion fact
