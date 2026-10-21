@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFrameworks>net10.0</TargetFrameworks>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <!-- Solution-wide test runs for other frameworks skip this net10.0-only project. -->
+  <PropertyGroup Condition="'$(TargetFramework)' != '' and '$(TargetFramework)' != 'net10.0'">
+    <IsTestProject>false</IsTestProject>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Garnet\Orleans.Journaling.Garnet\Orleans.Journaling.Garnet.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Orleans.Journaling.Tests\Orleans.Journaling.Tests.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\Orleans.Journaling.Garnet.CrashHost\Orleans.Journaling.Garnet.CrashHost.csproj" />
+  </ItemGroup>
+
+</Project>
