@@ -202,6 +202,7 @@ namespace Orleans.DurableTasks.Http
     public sealed partial record DurableOperationError(string Code, string Message)
     {
         public const string NotStartedCode = "NotStarted";
+        public const string OutcomeUnknownCode = "OutcomeUnknown";
     }
 
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<DurableOperationStatus>))]
