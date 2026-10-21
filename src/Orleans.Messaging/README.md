@@ -145,9 +145,10 @@ time would extend its record, so the sender retries it within its retry budget. 
 tracked message with an equal or earlier `SentAt` still receives its recorded
 outcome, including after the receiver's clock steps backward, and an untracked
 message at or below the floor still receives `Expired`. A grain's messages to itself
-use its clock, or the first time above the floor after a backward clock jump. Every
-record therefore becomes eligible for removal within twice the window, or just after
-the floor when a self-send follows a backward jump.
+use its clock, or the first time above the floor after a backward clock jump. Pending
+messages stay until they are processed, and every processed record becomes eligible
+for removal within twice the window, or just after the floor when a self-send follows a
+backward jump.
 
 A forward clock jump can expire undelivered work early; a backward jump can delay
 cleanup and prolong retries. The journaled floor keeps removed messages expired in
