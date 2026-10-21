@@ -19,10 +19,11 @@ public readonly struct InboxMessage
     /// Direct callers of <see cref="IMessagingExtension.DeliverAsync"/> likewise reuse it when retrying a command.
     /// </para>
     /// <para>
-    /// The receiving inbox retains each pending and processed record for <c>DeduplicationWindow</c> after the latest
-    /// send time it has observed for that message ID. A delivery of a tracked message receives its recorded outcome;
-    /// when its send time is later than the recorded one, the inbox durably extends the record to that time before
-    /// answering, and an earlier or equal send time leaves the record unchanged. Before removing records, the inbox
+    /// The receiving inbox keeps each pending message until it is processed, including a message whose
+    /// <see cref="Envelope.DeliverAt"/> is later. It retains each processed record for <c>DeduplicationWindow</c> after
+    /// the latest send time it has observed for that message ID. A delivery of a tracked message receives its recorded
+    /// outcome; when its send time is later than the recorded one, the inbox durably extends the record to that time
+    /// before answering, and an earlier or equal send time leaves the record unchanged. Before removing records, the inbox
     /// journals an admission floor, which only advances. It answers a message it doesn't track with
     /// <see cref="DeliveryStatus.Expired"/>, staging nothing for it, when the message's send time is at or below that
     /// floor.
@@ -40,8 +41,8 @@ public readonly struct InboxMessage
     /// budget. A tracked message whose send time is equal to or earlier than its record's still receives its recorded
     /// outcome, and an untracked message at or below the floor still receives <see cref="DeliveryStatus.Expired"/>.
     /// A message a grain sends to itself uses its clock, or the first time above the admission floor after a backward
-    /// clock jump. Every record therefore becomes eligible for removal within twice the window of the receiver's clock,
-    /// or just after the floor when a self-send follows a backward jump.
+    /// clock jump. Every processed record therefore becomes eligible for removal within twice the window of the
+    /// receiver's clock, or just after the floor when a self-send follows a backward jump.
     /// </para>
     /// </remarks>
     [Id(1)]
