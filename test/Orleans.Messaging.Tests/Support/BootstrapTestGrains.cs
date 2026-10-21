@@ -290,6 +290,13 @@ public sealed class BootstrapClusterFixture : MessagingClusterFixture
 
     public BootstrapProbe Probe { get; } = new();
     public BootstrapDeliveryProbe Delivery { get; } = new();
+
+    public override async ValueTask DisposeAsync()
+    {
+        Delivery.Dispose();
+        await base.DisposeAsync();
+    }
+
     protected override void ConfigureServices(IServiceCollection services)
     {
         services.AddScoped(provider => provider.GetRequiredKeyedService<IDurableDictionaryCommandCodec<MessageId, int>>("orleans-binary"));

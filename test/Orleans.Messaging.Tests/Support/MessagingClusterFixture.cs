@@ -337,7 +337,7 @@ public class MessagingClusterFixture : IAsyncLifetime
         return new(_cluster.DeployAsync());
     }
 
-    public async ValueTask DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
         if (_cluster is not null) await _cluster.DisposeAsync();
         Metrics.Dispose();
