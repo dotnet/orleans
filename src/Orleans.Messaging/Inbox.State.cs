@@ -208,7 +208,10 @@ internal sealed partial class Inbox
                 break;
             case InboxCommandKind.ExtendSentAt:
                 // Pending entries are present in every snapshot; processed extensions use completion upserts.
-                var pending = _messages[command.MessageId];
+                if (!_messages.TryGetValue(command.MessageId, out var pending))
+                {
+                    throw new InvalidOperationException("An ExtendSentAt command requires its pending entry.");
+                }
                 if (command.SentAt > pending.Message.SentAt)
                 {
                     pending.Message = pending.Message with { SentAt = command.SentAt };
