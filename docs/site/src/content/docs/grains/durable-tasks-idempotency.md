@@ -72,9 +72,11 @@ operations which it already applied.
 
 ## Derive idempotency keys from the task
 
-The grain's identity and `DurableTask.Current.Id` name the execution in every replay,
-every retry, and every activation, so a key derived from them is the same for every
-attempt of one operation and different for every other operation:
+The grain's identity, `DurableTask.Current.Id`, and `DurableTask.Current.Incarnation` name
+the run in every replay, every retry, and every activation, so a key derived from them is
+the same for every attempt of one operation and different for every other operation. The
+incarnation distinguishes a later run of the same task ID, such as one which starts after
+the earlier run completed and was deleted, whose operations are new:
 
 :::code source="../snippets/compiled/Grains/DurableTaskIntegrationSnippets.cs" id="durable_tasks_idempotency_key" language="csharp":::
 

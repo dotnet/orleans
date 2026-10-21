@@ -33,7 +33,7 @@ For the rules and the replay model, see [Replay-safety rules](../grains/durable-
 
 ## How to fix violations
 
-**Derive identifiers from the task's identity, and read logical time.** The grain and `DurableTask.Current.Id` name the execution in every replay, so a key built from them is the same in every run, including a run which repeats a charge whose result didn't commit. `DurableTask.Current.UtcNow` is the execution's logical time, which the runtime records, so a replay computes the same deadline. See [Derive idempotency keys from the task](../grains/durable-tasks-idempotency.md#derive-idempotency-keys-from-the-task):
+**Derive identifiers from the task's identity, and read logical time.** The grain, `DurableTask.Current.Id`, and `DurableTask.Current.Incarnation` name the run in every replay, so a key built from them is the same in every replay and attempt, including one which repeats a charge whose result didn't commit. The incarnation distinguishes a later run of the same task identifier, such as one which starts after the earlier run completed and its history was deleted, so that run charges under another key. `DurableTask.Current.UtcNow` is the execution's logical time, which the runtime records, so a replay computes the same deadline. See [Derive idempotency keys from the task](../grains/durable-tasks-idempotency.md#derive-idempotency-keys-from-the-task):
 
 :::code source="snippets/durable-tasks/Orleans0201.cs" id="orleans0201_fix" language="csharp":::
 
