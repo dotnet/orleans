@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Hosting;
+using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using Orleans.Messaging.Configuration;
@@ -550,12 +551,12 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Contains("no outbox message source is registered", error.Message, StringComparison.Ordinal);
     }
 
-    private static void ApplyReference(Outbox outbox, MessageId messageId) =>
+    private void ApplyReference(Outbox outbox, MessageId messageId) =>
         ((IDurableValueCommandHandler<OutboxCommand>)outbox).ApplySet(new OutboxCommand
         {
             Kind = OutboxCommandKind.Enqueue,
             Reference = new() { MessageId = messageId },
-            State = new() { ExpirationTime = DateTimeOffset.MaxValue }
+            State = new() { SentAt = fixture.JobNow }
         });
 
     private static void AssertSourceFailureDeadLetter(DeadLetter<OutboxMessage> letter, MessageId messageId, SourceFault fault)
@@ -580,7 +581,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     };
 
     [Fact]
-    public async Task SinkAcceptance_WithNullCutoff_DeduplicatesPermanentlyWithoutReofferingTheSink()
+    public async Task SinkAcceptance_TrackedSentAtDeduplicatesWithoutReofferingTheSink()
     {
         var receiver = NewGrain();
         var message = NewInboxMessage("deduplicated", NewPayload());
@@ -645,7 +646,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(0, Probe.For(receiver).SinkAcceptances);
         Assert.Equal(0, Probe.For(receiver).Handled);
 
-        // A null cutoff has no safe compaction boundary, including for a durable rejection.
+        // A tracked rejection remains the answer until an acknowledged floor compacts its send time.
         fixture.Clock.Advance(MessageSourceAndSinkFixture.DeduplicationWindow);
         AssertRejected(await extension.DeliverAsync(message, Token));
         Assert.Equal(1, Probe.For(receiver).SinkOffers);
@@ -804,9 +805,10 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
 
     private static byte[] NewPayload() => RandomNumberGenerator.GetBytes(48);
 
-    private static InboxMessage NewInboxMessage(string name, byte[] payload, DateTimeOffset? deliverAt = null) => new()
+    private InboxMessage NewInboxMessage(string name, byte[] payload, DateTimeOffset? deliverAt = null) => new()
     {
-        Envelope = new Envelope { MessageId = NewMessageId(name), Payload = payload, Subject = SourceSinkGrain.Subject, DeliverAt = deliverAt }
+        Envelope = new Envelope { MessageId = NewMessageId(name), Payload = payload, Subject = SourceSinkGrain.Subject, DeliverAt = deliverAt },
+        SentAt = fixture.JobNow
     };
 
     private static JournalId Journal(IAddressable grain) => JournalId.FromGrainId(grain.GetGrainId());
@@ -941,6 +943,8 @@ public abstract class MessageSourceAndSinkFixture(string journalFormatKey) : IAs
     public RecordingJournalStorageProvider Storage { get; } = new();
     public SourceSinkProbe Probe { get; } = new();
     public InProcessTestCluster Cluster { get; private set; } = null!;
+    public DateTimeOffset JobNow => Cluster.Silos[0].ServiceProvider
+        .GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs).GetUtcNow();
 
     public async ValueTask InitializeAsync()
     {
@@ -951,6 +955,8 @@ public abstract class MessageSourceAndSinkFixture(string journalFormatKey) : IAs
             silo.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
             silo.Services.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(SourceSinkJsonContext.Default));
             silo.Services.AddSingleton<TimeProvider>(Clock);
+            silo.Services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs,
+                new MessagingClusterFixture.FollowingJobClock(Clock, Clock.GetUtcNow()));
             silo.Services.UseTimeProviderForBackgroundAreas(TimeProvider.System);
             silo.UseInMemoryDurableJobs();
             silo.AddMessaging(options =>
@@ -981,6 +987,7 @@ public abstract class MessageSourceAndSinkFixture(string journalFormatKey) : IAs
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(byte[]))]
 [JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(MessageEffect))]
 internal sealed partial class SourceSinkJsonContext : JsonSerializerContext;
 
 public enum SinkMode
@@ -1021,6 +1028,7 @@ public sealed class SourceSinkProbe
         private int _retirementCallbacks;
 
         public volatile SinkMode Mode;
+        public volatile string? SubjectOverride;
 
         /// <summary>Makes the source share its payload array as a header value, and clear that array when the message retires.</summary>
         public volatile bool ReleaseBuffersOnRetired;
@@ -1200,7 +1208,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
             {
                 MessageId = messageId,
                 Payload = payload,
-                Subject = Subject,
+                Subject = _probe.SubjectOverride ?? Subject,
                 Headers = _probe.ReleaseBuffersOnRetired ? new() { [PayloadHeader] = payload } : null
             },
             ReceiverId = GrainId.Parse(_receivers[key])

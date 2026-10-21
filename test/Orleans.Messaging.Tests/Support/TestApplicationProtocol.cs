@@ -23,26 +23,27 @@ internal static class TestApplicationProtocol
         new()
         {
             ReceiverId = receiver,
-            Envelope = CreateInbox(sessions, sender, route, body, messageId).Envelope
+            Envelope = CreateEnvelope(sessions, sender, route, body, messageId)
         };
 
     public static InboxMessage CreateInbox(SerializerSessionPool sessions, GrainId sender,
-        string route, object? body, MessageId messageId = default)
+        string route, object? body, DateTimeOffset sentAt, MessageId messageId = default) =>
+        new() { Envelope = CreateEnvelope(sessions, sender, route, body, messageId), SentAt = sentAt };
+
+    private static Envelope CreateEnvelope(SerializerSessionPool sessions, GrainId sender,
+        string route, object? body, MessageId messageId)
     {
         var key = messageId.IsDefault
             ? body is TestMessage message ? message.LogicalId : NewMessageId()
             : messageId;
         return new()
         {
-            Envelope = new()
+            MessageId = key,
+            Payload = Encode(sessions, new TestApplicationMessage(route, body)),
+            Subject = route,
+            Headers = new(StringComparer.Ordinal)
             {
-                MessageId = key,
-                Payload = Encode(sessions, new TestApplicationMessage(route, body)),
-                Subject = route,
-                Headers = new(StringComparer.Ordinal)
-                {
-                    ["sender"] = new Serializer<GrainId>(sessions).SerializeToArray(sender)
-                }
+                ["sender"] = new Serializer<GrainId>(sessions).SerializeToArray(sender)
             }
         };
     }
@@ -99,7 +100,7 @@ internal static class TestApplicationProtocol
                 Headers = headers,
                 DeliverAt = message.Envelope.DeliverAt
             },
-            RedeliveryDeadline = message.RedeliveryDeadline
+            SentAt = message.SentAt
         };
     }
 }

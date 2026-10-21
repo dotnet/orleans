@@ -25,13 +25,13 @@ internal static class InboxTestAccess
 
     public static HashSet<MessageId> GetProcessedKeys(Inbox inbox) => [.. GetProcessed(inbox).Keys];
 
-    public static void AddProcessed(Inbox inbox, MessageId messageId) =>
-        GetProcessed(inbox).Add(messageId, new() { MessageId = messageId });
+    public static void AddProcessed(Inbox inbox, MessageId messageId, DateTimeOffset sentAt) =>
+        GetProcessed(inbox).Add(messageId, new() { MessageId = messageId, SentAt = sentAt });
 
     public static IReadOnlyDictionary<MessageId, InboxEntry> GetPendingMessages(Inbox inbox) => inbox.MessageState;
 
-    public static DateTimeOffset? GetProcessedCutoff(Inbox inbox, MessageId messageId) =>
-        GetProcessed(inbox)[messageId].RedeliveryDeadline;
+    public static DateTimeOffset GetProcessedSentAt(Inbox inbox, MessageId messageId) =>
+        GetProcessed(inbox)[messageId].SentAt;
 
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_admissionFloor")]
     public static extern ref DateTimeOffset AdmissionFloor(Inbox inbox);

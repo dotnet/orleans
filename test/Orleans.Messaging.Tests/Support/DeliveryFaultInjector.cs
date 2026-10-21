@@ -24,7 +24,8 @@ public sealed class DeliveryFaultInjector
     private readonly CountSignal _receiverCalls = new();
     private readonly CountSignal _answerCount = new();
     private readonly List<DeliveryStatus> _answers = [];
-    private readonly List<DateTimeOffset?> _deadlines = [];
+    private readonly List<Exception> _receiverFailures = [];
+    private readonly List<DateTimeOffset> _sentTimes = [];
     private Func<DeliveryFault>? _repeat;
 
     /// <summary>Gets the number of delivery tries which reached the injector.</summary>
@@ -42,12 +43,21 @@ public sealed class DeliveryFaultInjector
         }
     }
 
-    /// <summary>Gets the redelivery deadline which the sender stamped on each try, in the order the tries started.</summary>
-    public IReadOnlyList<DateTimeOffset?> Deadlines
+    /// <summary>Gets the logical send time which the sender stamped on each try, in the order the tries started.</summary>
+    public IReadOnlyList<DateTimeOffset> SentTimes
     {
         get
         {
-            lock (_deadlines) return [.. _deadlines];
+            lock (_sentTimes) return [.. _sentTimes];
+        }
+    }
+
+    /// <summary>Gets failures thrown by actual receiver calls, not failures fabricated by the scripted transport.</summary>
+    public IReadOnlyList<Exception> ReceiverFailures
+    {
+        get
+        {
+            lock (_receiverFailures) return [.. _receiverFailures];
         }
     }
 
@@ -89,7 +99,7 @@ public sealed class DeliveryFaultInjector
     // Awaits continue on the sending activation's scheduler, so every receiver call is made from the sending grain.
     private ValueTask<DeliveryResult> DeliverAsync(IOutboxTransport inner, GrainId receiver, InboxMessage message, CancellationToken cancellationToken)
     {
-        lock (_deadlines) _deadlines.Add(message.RedeliveryDeadline);
+        lock (_sentTimes) _sentTimes.Add(message.SentAt);
         _executions.Increment();
         var fault = _script.TryDequeue(out var scripted) ? scripted : _repeat?.Invoke();
         return fault is null
@@ -123,9 +133,6 @@ public sealed class DeliveryFaultInjector
                 }
 
                 throw new TimeoutException("Injected loss of the receiver's response.");
-            case DeliveryFaultKind.ExtendDeadline:
-                var extended = message with { RedeliveryDeadline = message.RedeliveryDeadline!.Value + fault.Extension };
-                return await CallReceiverAsync(inner, receiver, extended, cancellationToken, fault);
             case DeliveryFaultKind.HoldBeforeCall:
                 await fault.WaitForReleaseAsync(cancellationToken);
                 return await CallReceiverAsync(inner, receiver, message, cancellationToken, fault);
@@ -150,6 +157,7 @@ public sealed class DeliveryFaultInjector
         }
         catch (Exception exception)
         {
+            lock (_receiverFailures) _receiverFailures.Add(exception);
             fault?.OnAnswered(exception);
             throw;
         }
@@ -227,9 +235,6 @@ public enum DeliveryFaultKind
     /// <summary>The try calls the receiver, then hides its answer behind a timeout.</summary>
     LoseResponse,
 
-    /// <summary>The try calls the receiver with a later redelivery deadline, as a sender with a longer retry horizon would.</summary>
-    ExtendDeadline,
-
     /// <summary>The try waits for a release before it calls the receiver.</summary>
     HoldBeforeCall,
 
@@ -247,12 +252,11 @@ public sealed class DeliveryFault
     private readonly TaskCompletionSource<DeliveryResult> _answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _used;
 
-    private DeliveryFault(DeliveryFaultKind kind, Exception? exception = null, DeliveryResult? result = null, TimeSpan extension = default)
+    private DeliveryFault(DeliveryFaultKind kind, Exception? exception = null, DeliveryResult? result = null)
     {
         Kind = kind;
         Exception = exception;
         Result = result;
-        Extension = extension;
     }
 
     /// <summary>Gets the kind of this fault.</summary>
@@ -260,7 +264,6 @@ public sealed class DeliveryFault
 
     internal Exception? Exception { get; }
     internal DeliveryResult? Result { get; }
-    internal TimeSpan Extension { get; }
 
     /// <summary>
     /// Gets the receiver's answer to the call which this fault made, or its failure. It completes only for faults which
@@ -289,13 +292,6 @@ public sealed class DeliveryFault
     /// the response is lost after the receiver committed.
     /// </summary>
     public static DeliveryFault LoseResponse() => new(DeliveryFaultKind.LoseResponse);
-
-    /// <summary>
-    /// Calls the receiver with the sender's redelivery deadline moved <paramref name="extension"/> later, as a sender whose
-    /// retry timeout is that much longer would.
-    /// </summary>
-    public static DeliveryFault ExtendRedeliveryDeadline(TimeSpan extension) =>
-        new(DeliveryFaultKind.ExtendDeadline, extension: extension);
 
     /// <summary>
     /// Holds the try before it calls the receiver until <see cref="Release"/> or <see cref="Fail"/>, or until the delivery

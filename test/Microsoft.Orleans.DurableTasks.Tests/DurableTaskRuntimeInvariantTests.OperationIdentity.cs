@@ -219,7 +219,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         pendingRequest.Context!.CallerId = default;
         var payload = CreateSerializer().SerializeToArray(
             new DurableTaskInvocationMessage { TaskId = rootId, Request = pendingRequest, Sender = runtime.GrainId, Detached = true });
-        storage.Invocations[messageId] = new PendingInvocation(target, payload, RecordId: null, runtime.UtcNow);
+        storage.Invocations[messageId] = new PendingInvocation(target, payload, RecordId: null);
 
         runtime.PostRoot(rootId, CreateSerializableRequest(target));
 

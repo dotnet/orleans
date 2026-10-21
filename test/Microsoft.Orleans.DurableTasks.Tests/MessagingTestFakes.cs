@@ -42,6 +42,13 @@ internal sealed class RecordingOutbox : IOutbox
 
 internal static class MessagingTestHelpers
 {
+    /// <summary>Delivers <paramref name="message"/> as its sender's outbox would, sent now on the system clock.</summary>
+    /// <remarks>
+    /// Only an invocation's send time affects the receiver, which admits it within <c>DeduplicationWindow</c>; tests which
+    /// control the receiver's clock pass the send time explicitly.
+    /// </remarks>
+    public static InboxMessage ToInboxMessage(this OutboxMessage message) => message.ToInboxMessage(DateTimeOffset.UtcNow);
+
     private static readonly ServiceProvider Services = new ServiceCollection()
         .AddSerializer(builder => builder
             .AddAssembly(typeof(DurableTaskMessageTransport).Assembly)
@@ -73,11 +80,7 @@ internal static class MessagingTestHelpers
             DurableTaskMessageTransport.CreateMessageId(sender, receiver, taskId, DurableTaskMessageTypes.InvocationSubject),
             receiver,
             body);
-        return new OutboxMessage
-        {
-            Envelope = message.Envelope with { Headers = DurableTaskMessageTypes.CreateSentAtHeaders(sentAt) },
-            ReceiverId = receiver,
-        }.ToInboxMessage();
+        return message.ToInboxMessage(sentAt);
     }
 
     public static InboxMessage CreateResumeMessage(GrainId grainId, TaskId taskId, Guid incarnation, long generation, DateTimeOffset dueTime) =>

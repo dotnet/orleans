@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks;
 using Orleans.Messaging;
@@ -147,9 +146,7 @@ internal sealed class DurableTaskSignalMessage
 /// The durable grain RPC message subjects and their payload contracts.
 /// </summary>
 /// <remarks>
-/// Messaging envelopes carry no sender identity, so each body carries the sending grain. An invocation's envelope also
-/// carries the <see cref="SentAtHeader"/> header: when the sender first staged it, on the sender's Durable Jobs clock. The
-/// header is outside the payload, so a replayed send's payload stays identical and coalesces with the pending one.
+/// Messaging envelopes carry no sender identity, so each body carries the sending grain.
 /// </remarks>
 internal sealed class DurableTaskMessageTypes(Serializer serializer)
 {
@@ -159,7 +156,6 @@ internal sealed class DurableTaskMessageTypes(Serializer serializer)
     public const string CancellationSubject = SubjectPrefix + "cancel";
     public const string ResumeSubject = SubjectPrefix + "resume";
     public const string SignalSubject = SubjectPrefix + "signal";
-    public const string SentAtHeader = SubjectPrefix + "sent-at";
 
     public MessageType<DurableTaskInvocationMessage> Invocation { get; } = new(InvocationSubject, serializer);
 
@@ -170,28 +166,4 @@ internal sealed class DurableTaskMessageTypes(Serializer serializer)
     public MessageType<DurableTaskResumeMessage> Resume { get; } = new(ResumeSubject, serializer);
 
     public MessageType<DurableTaskSignalMessage> Signal { get; } = new(SignalSubject, serializer);
-
-    /// <summary>Creates the headers which carry an invocation's send time.</summary>
-    public static Dictionary<string, byte[]> CreateSentAtHeaders(DateTimeOffset sentAt)
-    {
-        var value = new byte[sizeof(long)];
-        BinaryPrimitives.WriteInt64LittleEndian(value, sentAt.UtcTicks);
-        return new(StringComparer.Ordinal) { [SentAtHeader] = value };
-    }
-
-    /// <summary>Reads an invocation's send time from its envelope.</summary>
-    public static DateTimeOffset GetSentAt(Envelope envelope)
-    {
-        if (envelope.Headers is { } headers
-            && headers.TryGetValue(SentAtHeader, out var value)
-            && value.Length == sizeof(long)
-            && BinaryPrimitives.ReadInt64LittleEndian(value) is var ticks
-            && ticks >= DateTimeOffset.MinValue.UtcTicks
-            && ticks <= DateTimeOffset.MaxValue.UtcTicks)
-        {
-            return new(ticks, TimeSpan.Zero);
-        }
-
-        throw new InvalidOperationException("The durable task invocation has no valid send time.");
-    }
 }

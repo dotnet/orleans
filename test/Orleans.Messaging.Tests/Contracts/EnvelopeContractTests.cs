@@ -14,13 +14,14 @@ public sealed class EnvelopeContractTests
 {
     private static MessageId Id => MessageId.Create("orders", "123");
     private static GrainId Receiver => GrainId.Create("receiver", "123");
+    private static DateTimeOffset SentAt => new(2040, 1, 2, 3, 4, 5, TimeSpan.FromHours(2));
 
     [Fact]
     public void RequiredPayloadAndOptionalMetadata()
     {
         var envelope = Create([]);
         Validate(envelope);
-        Validate(new InboxMessage { Envelope = envelope });
+        Validate(new InboxMessage { Envelope = envelope, SentAt = SentAt });
         Assert.Equal(Id, envelope.MessageId);
         Assert.Empty(envelope.Payload);
         Assert.Null(envelope.Subject);
@@ -77,12 +78,14 @@ public sealed class EnvelopeContractTests
         var envelope = Create([0, 255, 128]) with { Headers = new(StringComparer.Ordinal) { ["trace"] = "original"u8.ToArray() } };
         var assigned = envelope;
         var outgoing = new OutboxMessage { Envelope = envelope, ReceiverId = Receiver };
-        var incoming = outgoing.ToInboxMessage();
+        var incoming = outgoing.ToInboxMessage(SentAt);
         Assert.Same(envelope.Payload, assigned.Payload);
         Assert.Same(envelope.Headers, assigned.Headers);
         Assert.Same(envelope.Payload, incoming.Envelope.Payload);
         Assert.Same(envelope.Headers, incoming.Envelope.Headers);
         Assert.Equal(Id, incoming.Envelope.MessageId);
+        Assert.Equal(SentAt, incoming.SentAt);
+        Assert.Equal(SentAt.Offset, incoming.SentAt.Offset);
         Assert.Null(typeof(InboxMessage).GetProperty("ReceiverId"));
         Assert.Null(typeof(Envelope).GetProperty("ReceiverId"));
     }
@@ -173,7 +176,7 @@ public sealed class EnvelopeContractTests
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var envelope = Create([0, 255]) with { Subject = "subject.v1", Headers = new() { ["custom"] = "value"u8.ToArray() } };
-        object value = kind.StartsWith("Inbox", StringComparison.Ordinal) ? new InboxMessage { Envelope = envelope }
+        object value = kind.StartsWith("Inbox", StringComparison.Ordinal) ? new InboxMessage { Envelope = envelope, SentAt = SentAt }
             : new OutboxMessage { Envelope = envelope, ReceiverId = Receiver };
         if (kind.EndsWith("DeadLetter", StringComparison.Ordinal))
         {
@@ -199,6 +202,7 @@ public sealed class EnvelopeContractTests
             Assert.Equal("value"u8.ToArray(), actual.Headers["custom"]);
             Assert.NotSame(envelope.Headers!["custom"], actual.Headers["custom"]);
             if (message is OutboxMessage outgoing) Assert.Equal(Receiver, outgoing.ReceiverId);
+            if (message is InboxMessage received) Assert.Equal(SentAt, received.SentAt);
             if (kind.EndsWith("DeadLetter", StringComparison.Ordinal)) Assert.Equal(3, result.GetType().GetProperty("AttemptCount")!.GetValue(result));
         }
     }
@@ -209,7 +213,7 @@ public sealed class EnvelopeContractTests
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var letter = new DeadLetter<InboxMessage>
         {
-            Message = new InboxMessage { Envelope = Create([1, 2]) with { Subject = "subject.v1" } },
+            Message = new InboxMessage { Envelope = Create([1, 2]) with { Subject = "subject.v1" }, SentAt = SentAt },
             DeadLetteredAt = DateTimeOffset.UnixEpoch,
             Reason = "failure",
             AttemptCount = 3,
@@ -232,7 +236,9 @@ public sealed class EnvelopeContractTests
     public void SimpleEnvelopeSurfaceUsesGeneratedOrdinaryFields()
     {
         AssertIds(typeof(Envelope), ("MessageId", 0u), ("Payload", 1u), ("Subject", 2u), ("Headers", 3u), ("DeliverAt", 4u));
-        AssertIds(typeof(InboxMessage), ("Envelope", 0u), ("RedeliveryDeadline", 1u));
+        AssertIds(typeof(InboxMessage), ("Envelope", 0u), ("SentAt", 1u));
+        Assert.Equal(typeof(DateTimeOffset), typeof(InboxMessage).GetProperty("SentAt")!.PropertyType);
+        Assert.NotNull(typeof(InboxMessage).GetProperty("SentAt")!.GetCustomAttribute<System.Runtime.CompilerServices.RequiredMemberAttribute>());
         AssertIds(typeof(OutboxMessage), ("Envelope", 0u), ("ReceiverId", 1u));
         Assert.Equal(typeof(Dictionary<string, byte[]>), typeof(Envelope).GetProperty("Headers")!.PropertyType);
         Assert.Equal(typeof(byte[]), typeof(Envelope).GetProperty("Payload")!.PropertyType);
@@ -252,7 +258,7 @@ public sealed class EnvelopeContractTests
         var outgoing = new OutboxMessage { Envelope = Create([7]), ReceiverId = Receiver };
         var other = outgoing with { ReceiverId = GrainId.Create("receiver", "other") };
         var serializer = services.GetRequiredService<Serializer<InboxMessage>>();
-        Assert.Equal(serializer.SerializeToArray(outgoing.ToInboxMessage()), serializer.SerializeToArray(other.ToInboxMessage()));
+        Assert.Equal(serializer.SerializeToArray(outgoing.ToInboxMessage(SentAt)), serializer.SerializeToArray(other.ToInboxMessage(SentAt)));
     }
 
     [Theory]
@@ -294,7 +300,7 @@ public sealed class EnvelopeContractTests
             }
         };
         Assert.Equal(outbox, Invoke<bool>("EnvelopeEquivalence", "AreEquivalent", original, repeated));
-        Assert.Equal(inbox, Invoke<bool>("EnvelopeEquivalence", "AreSameCommand", original.ToInboxMessage(), repeated.ToInboxMessage()));
+        Assert.Equal(inbox, Invoke<bool>("EnvelopeEquivalence", "AreSameCommand", original.ToInboxMessage(SentAt), repeated.ToInboxMessage(SentAt)));
         Assert.Equal(inbox, Invoke<bool>("EnvelopeEquivalence", "AreSameCommand", original.Envelope, repeated.Envelope));
         Assert.Equal("first"u8.ToArray(), original.Envelope.Headers!["custom"]);
         Assert.Equal(new byte[] { 0, 255, 128 }, original.Envelope.Payload);
@@ -363,7 +369,7 @@ public sealed class EnvelopeContractTests
             }
         };
         Assert.ThrowsAny<ArgumentException>(() => Validate(envelope));
-        Assert.ThrowsAny<ArgumentException>(() => Validate(new InboxMessage { Envelope = envelope }));
+        Assert.ThrowsAny<ArgumentException>(() => Validate(new InboxMessage { Envelope = envelope, SentAt = SentAt }));
         Assert.ThrowsAny<ArgumentException>(() => Validate(new OutboxMessage { Envelope = envelope, ReceiverId = Receiver }));
         Assert.Equal(new byte[] { 1 }, envelope.Payload);
     }

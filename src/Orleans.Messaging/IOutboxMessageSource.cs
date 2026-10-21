@@ -137,8 +137,8 @@ public enum OutboxMessageRetirementStatus
 
     /// <summary>
     /// The outbox dead-lettered the message: its delivery attempts didn't succeed before its retry limits elapsed, or its
-    /// source failed to provide it, or the receiver fenced its admission cutoff. The receiver's earlier delivery
-    /// outcome is unknown: an earlier attempt can have been durably accepted.
+    /// source failed to provide it, or the receiver answered <see cref="DeliveryStatus.Expired"/>. The receiver's
+    /// earlier delivery outcome is unknown: an earlier attempt can have been durably accepted.
     /// </summary>
     DeadLettered = 2,
 

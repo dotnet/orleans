@@ -35,8 +35,8 @@ responsible for correctness when calls interleave.
   with `DeliverAt` counts toward `MaxCapacity` from its acceptance until it completes.
 
 `OutboxMessage` pairs an envelope with its receiver. `InboxMessage` carries the same
-envelope and the send's immutable `RedeliveryDeadline` admission cutoff at the
-receiver. Keep published payload and header arrays unchanged.
+envelope and the logical send's `SentAt` time at the receiver. Keep published payload
+and header arrays unchanged.
 
 `MessageId` wraps a `HierarchicalKey`. Create one with `new MessageId(key)` or
 `MessageId.Create(segments)`, and read the key through `Key`. `HierarchicalKey` wraps
@@ -91,7 +91,7 @@ after the first change.
   received message ID's `result` child, sent to a destination the application
   carries in its request.
 
-`MessageType<T>.Create` and `OutboxMessage.ToInboxMessage()` build messages for direct
+`MessageType<T>.Create` and `OutboxMessage.ToInboxMessage(sentAt)` build messages for direct
 inbox delivery. Sending equivalent content (destination, subject, payload, and
 `DeliverAt`) with a pending ID coalesces with the original message; different content
 throws `InvalidOperationException`.
@@ -168,8 +168,8 @@ construction or activation setup, before journal recovery.
   until `OutboxRetryTimeout`, and a self-sent message fails its `Send`.
   Sink-owned messages never occupy capacity and have no inbox retry lifecycle; the
   sink honors their `DeliverAt`. Declined messages follow the handler path once
-  `DeliverAt` passes. The admission fence prevents a compacted logical send from
-  reaching the sink again.
+  `DeliverAt` passes. After its processed record is removed, a message at or below
+  the durable admission floor receives `Expired` before reaching the sink.
 - `IInbox.Register(IInboxWorkSource)` adds a work source: a component, such as a
   sink, that holds durable work in the grain's journal. `GetWakeupDelay` returns how
   soon a deactivated grain must wake to resume that work, or `null` when none is
@@ -196,8 +196,8 @@ stays in the receiver's journal until it is due. Each receiver returns a
 - `HandlerNotFound`: the receiver has no registered handlers.
 - `DeadLettered`: the receiver durably rejected the message and moved it to its
   dead letters, with a reason and an optional `Code`.
-- `Expired`: the receiver's durable admission floor fences the send's cutoff and
-  it retains no outcome for the message. This attempt stages no message effects;
+- `Expired`: the message was sent before the receiver's deduplication window and
+  the receiver retains no outcome for it. This attempt stages no message effects;
   an earlier attempt can have been accepted, so the delivery outcome is unknown.
 
 `Accepted`, `Duplicate`, and `DeadLettered` remove the outbox entry. `Expired`
@@ -225,9 +225,9 @@ The inbox and the outbox are event-sourced journal states named
 Orleans binary journal formats. They persist alongside the grain's other journaled
 state. After the grain's state is deleted, both start empty and continue working.
 
-Completed message IDs remain until their immutable cutoff is durably fenced.
-Direct deliveries with a null cutoff retain their completion records permanently.
-Dead letters are
+Completed message IDs become eligible for removal after `DeduplicationWindow`
+from their latest observed `SentAt`. Acknowledged snapshots and recovery reclaim
+eligible records once the admission floor covers their send time. Dead letters are
 retained up to `DeadLetterRetentionPeriod` and `MaxRetainedDeadLetters` for each queue.
 Dead-letter timestamps and retention follow the grain's `TimeProvider`.
 
@@ -258,23 +258,38 @@ from an `InboxMessageReceiving` observer, which fails the attempt like a sink ex
 `DurableMessagingOptions` configures capacity, batch sizes, retries, deduplication,
 and dead-letter retention.
 
-## Clock-independent deduplication
+## Deduplication window
 
-The outbox journals one admission cutoff and an absolute retry expiration when it
-stages a send. Every delivery and recovery preserves them. `OutboxRetryTimeout`
-defaults to six hours and bounds delivery attempts, including backpressure.
+The outbox journals each send's `SentAt` time; every delivery attempt and recovery
+reuses it. `OutboxRetryTimeout`, six hours by default, bounds delivery attempts
+after that time, including while the receiver is backpressured.
 
-The inbox journals an admission floor which only advances. Its clock minus
-`DeduplicationWindow` proposes floor advancements; the default interval is seven
-days. Pending and processed records determine known outcomes first. An untracked
-send with a cutoff at or below the floor receives `Expired` before any sink or
-handler effects. Processed records can be compacted once the durable floor fences
-their cutoffs. Recovery and migration preserve that fence.
+The inbox retains each processed record for `DeduplicationWindow`, seven days by
+default, after the latest observed `SentAt`, and then makes it eligible for removal. Before removing records,
+the inbox journals an admission floor: its clock minus `DeduplicationWindow`, which
+only advances. Pending and processed records determine known outcomes first. A
+message the inbox no longer tracks whose `SentAt` is at or below the floor receives
+`Expired` before any sink or handler runs. Recovery preserves the floor.
+The inbox never stores a new `SentAt` later than its clock plus `DeduplicationWindow`.
+It rejects such a delivery with `ArgumentOutOfRangeException`, staging nothing, when
+the message is untracked and above the admission floor, or the time would extend its
+record, so the sender retries it within its retry budget. A tracked message with an
+equal or earlier `SentAt` still receives its recorded outcome, including after the
+receiver's clock steps backward, and an untracked message at or below the floor
+still receives `Expired`. Completed
+records become eligible for removal within twice the window of the receiver's
+clock after their latest observation.
 
-A forward clock jump can fence undelivered work early; a backward jump can delay
-cleanup and prolong retries. Durable fencing preserves deduplication in both cases.
-Direct callers preserve the original cutoff across retries. A null cutoff retains
-the processed record permanently.
+A resend with a later `SentAt` extends a tracked pending or completed record.
+The receiver persists that extension before returning `Duplicate` or the original
+durable rejection. A pending message still requires matching subject, payload,
+and `DeliverAt`.
+
+A forward clock jump can expire undelivered work early; a backward jump can delay
+cleanup and prolong retries. The journaled floor keeps removed messages expired in
+both cases. Direct callers reuse a command's `SentAt` across retries.
+`OutboxRetryTimeout` must be shorter than `DeduplicationWindow`, so the retry
+budget ends within the receiver's retention window.
 
 ## Recoverable terminal outcomes
 
@@ -290,8 +305,8 @@ the messaging pump's durable wake-up and handler path after recovery.
 duplicate. `Rejected` carries the receiver's durable rejection. `DeadLettered`
 means the outbox stopped delivering and the receiver's earlier outcome is unknown,
 including when it received `Expired`. Reconcile uncertain outcomes using the
-application's idempotency protocol before initiating a new send. Preserve the
-original cutoff for retries of the same logical send.
+application's idempotency protocol before initiating a new send. Reuse the
+original `SentAt` for retries of the same logical send.
 
 Dead-letter retention limits control diagnostic history. The application-owned
 outcome and follow-up work have the lifetime the application gives them.

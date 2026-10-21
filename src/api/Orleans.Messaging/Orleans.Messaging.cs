@@ -253,7 +253,7 @@ namespace Orleans.Messaging
         public required Envelope Envelope { get { throw null; } init { } }
 
         [Id(1)]
-        public System.DateTimeOffset? RedeliveryDeadline { get { throw null; } init { } }
+        public required System.DateTimeOffset SentAt { get { throw null; } init { } }
     }
 
     public partial interface IOutbox
@@ -357,7 +357,7 @@ namespace Orleans.Messaging
         [Id(1)]
         public required Runtime.GrainId ReceiverId { get { throw null; } init { } }
 
-        public readonly InboxMessage ToInboxMessage() { throw null; }
+        public readonly InboxMessage ToInboxMessage(System.DateTimeOffset sentAt) { throw null; }
     }
 
     public readonly partial struct OutboxMessageRetirement

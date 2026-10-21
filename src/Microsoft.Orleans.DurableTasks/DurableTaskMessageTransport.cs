@@ -71,7 +71,7 @@ internal sealed class DurableTaskMessageTransport(
             CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.InvocationSubject, subscriberId?.ToString()),
             deliverAt: null);
 
-    public OutboxMessage CreateInvocation(MessageId messageId, GrainId target, byte[] payload, DateTimeOffset sentAt) =>
+    public OutboxMessage CreateInvocation(MessageId messageId, GrainId target, byte[] payload) =>
         new()
         {
             Envelope = new()
@@ -79,7 +79,6 @@ internal sealed class DurableTaskMessageTransport(
                 MessageId = messageId,
                 Subject = DurableTaskMessageTypes.InvocationSubject,
                 Payload = payload,
-                Headers = DurableTaskMessageTypes.CreateSentAtHeaders(sentAt),
             },
             ReceiverId = target,
         };

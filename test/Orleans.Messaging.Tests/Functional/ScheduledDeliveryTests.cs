@@ -44,7 +44,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         await AssertWakeupAtAsync(sender, startedAt + options.RetryInitialInterval);
         var state = await GetRetryStateAsync();
         Assert.Equal(1, state.AttemptCount);
-        Assert.Equal(expiresAt, state.ExpirationTime);
+        Assert.Equal(startedAt, state.SentAt);
         Assert.Equal(startedAt + options.RetryInitialInterval, state.NextAttemptAt);
 
         Fixture.Clock.Advance(TimeSpan.FromDays(1));
@@ -56,7 +56,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         _ = await Fixture.RunPumpAsync(sender);
         await secondRetry;
         state = await GetRetryStateAsync();
-        Assert.Equal(expiresAt, state.ExpirationTime);
+        Assert.Equal(startedAt, state.SentAt);
         Assert.Equal(JobClock.GetUtcNow() + 2 * options.RetryInitialInterval, state.NextAttemptAt);
         await AssertWakeupAtAsync(sender, Assert.IsType<DateTimeOffset>(state.NextAttemptAt));
 
@@ -68,7 +68,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         await ReactivateAsync(sender);
         var recovered = await GetRetryStateAsync();
         Assert.Equal(state.AttemptCount, recovered.AttemptCount);
-        Assert.Equal(state.ExpirationTime, recovered.ExpirationTime);
+        Assert.Equal(state.SentAt, recovered.SentAt);
         Assert.Equal(state.NextAttemptAt, recovered.NextAttemptAt);
         await AssertWakeupAtAsync(sender, Assert.IsType<DateTimeOffset>(recovered.NextAttemptAt));
 
@@ -467,6 +467,10 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         _ = await Fixture.RunPumpAsync(receiver);
         Assert.Equal(0, (await Fixture.WaitForEffectCountAsync(receiver, 2)).InboxCount);
 
+        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, laterScheduled)).Status);
+        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, unscheduled)).Status);
+        laterScheduled = laterScheduled with { SentAt = JobClock.GetUtcNow() };
+        unscheduled = unscheduled with { SentAt = JobClock.GetUtcNow() };
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, laterScheduled)).Status);
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, unscheduled)).Status);
         var all = await Fixture.WaitForEffectCountAsync(receiver, 4);
@@ -558,7 +562,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
     }
 
     private static InboxMessage Schedule(InboxMessage message, DateTimeOffset? deliverAt) =>
-        new() { Envelope = message.Envelope with { DeliverAt = deliverAt } };
+        message with { Envelope = message.Envelope with { DeliverAt = deliverAt } };
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {

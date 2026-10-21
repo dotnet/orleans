@@ -667,7 +667,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         if (_invocations.TryGetValue(messageId, out var invocation))
         {
-            message = MessageTransport.CreateInvocation(messageId, invocation.Target, invocation.Payload, invocation.SentAt);
+            message = MessageTransport.CreateInvocation(messageId, invocation.Target, invocation.Payload);
             return true;
         }
 

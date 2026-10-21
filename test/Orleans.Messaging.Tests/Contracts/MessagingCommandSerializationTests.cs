@@ -97,7 +97,7 @@ public sealed class MessagingCommandSerializationTests
         }
     }
 
-    private static InboxMessage InboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt) };
+    private static InboxMessage InboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt), SentAt = Now };
 
     private static OutboxMessage OutboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt), ReceiverId = Receiver };
 
@@ -121,8 +121,11 @@ public sealed class MessagingCommandSerializationTests
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("accept"), State = new() },
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("scheduled", Now), State = new() },
             new() { Kind = InboxCommandKind.Retry, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom" } },
-            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), DeadLetter = deadLetter },
-            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "dead"), DeadLetter = deadLetter, Rejection = rejection },
+            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), SentAt = Now, DeadLetter = deadLetter },
+            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "dead"), SentAt = Now, DeadLetter = deadLetter, Rejection = rejection },
+            new() { Kind = InboxCommandKind.ExtendSentAt, MessageId = MessageId.Create("orders", "accept"), SentAt = Now.AddHours(1) },
+            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), SentAt = Now.AddHours(1) },
+            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "dead"), SentAt = Now.AddHours(1), Rejection = rejection },
             new() { Kind = InboxCommandKind.RemoveDeadLetters, RemovedKeys = [MessageId.Create("orders", "dead")] },
             new()
             {
@@ -132,8 +135,8 @@ public sealed class MessagingCommandSerializationTests
                     Messages = [new() { Message = InboxMessage("pending"), State = new() { AttemptCount = 1 } }, new() { Message = InboxMessage("scheduled", Now), State = new() }],
                     Processed =
                     [
-                        new() { MessageId = MessageId.Create("orders", "done") },
-                        new() { MessageId = MessageId.Create("orders", "dead"), Rejection = rejection }
+                        new() { MessageId = MessageId.Create("orders", "done"), SentAt = Now },
+                        new() { MessageId = MessageId.Create("orders", "dead"), SentAt = Now, Rejection = rejection }
                     ],
                     DeadLetters = [deadLetter]
                 }
@@ -149,7 +152,7 @@ public sealed class MessagingCommandSerializationTests
             new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("enqueue"), State = new() },
             new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("scheduled", Now), State = new() },
             new() { Kind = OutboxCommandKind.Enqueue, Reference = Reference("reference"), State = new() },
-            new() { Kind = OutboxCommandKind.Delivery, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", ExpirationTime = Now } },
+            new() { Kind = OutboxCommandKind.Delivery, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", SentAt = Now } },
             new() { Kind = OutboxCommandKind.Delivery, MessageId = MessageId.Create("orders", "dead"), DeadLetter = deadLetter },
             new() { Kind = OutboxCommandKind.RemoveDeadLetters, RemovedDeadLetters = [MessageId.Create("orders", "dead")] },
             new()
@@ -159,7 +162,7 @@ public sealed class MessagingCommandSerializationTests
                 {
                     Messages =
                     [
-                        new() { Message = OutboxMessage("pending", Now), State = new() { AttemptCount = 1, ExpirationTime = Now } },
+                        new() { Message = OutboxMessage("pending", Now), State = new() { AttemptCount = 1, SentAt = Now } },
                         new() { Reference = Reference("pending-reference"), State = new() { AttemptCount = 2 } }
                     ],
                     DeadLetters = [deadLetter]

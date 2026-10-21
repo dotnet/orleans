@@ -59,7 +59,7 @@ internal sealed class DurableTaskMessageHandler(
                 // An attached invocation addresses the sender's child, which this grain stores under the sender's scope; a
                 // detached invocation addresses a root task.
                 var invokedId = CallerScope.Resolve(sender, invocation.TaskId);
-                if (runtime.GetInvocationAdmissionRejection(invokedId, DurableTaskMessageTypes.GetSentAt(message.Envelope)) is { } expired)
+                if (runtime.GetInvocationAdmissionRejection(invokedId, message.SentAt) is { } expired)
                 {
                     // A late invocation stages nothing.
                     result = DeliveryResult.DeadLettered(expired, DurableTaskRejectionCodes.Expired);

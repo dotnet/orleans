@@ -39,7 +39,8 @@ public enum DeliveryStatus
     DeadLettered = 5,
 
     /// <summary>
-    /// The receiver's durable admission floor fences the message's cutoff, and it retains no outcome for the message.
+    /// The message was sent at or before the receiver's durable admission floor, and the receiver retains no outcome
+    /// for it.
     /// </summary>
     /// <remarks>
     /// This attempt stages no message effects. An earlier attempt can have been accepted, so the sender treats the

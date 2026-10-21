@@ -418,7 +418,7 @@ synchronously on the activation which makes them, when the runtime stages them: 
   direct cancellation, from a client, a grain method, or `IDurableTaskManager.CancelAsync`, of a task which the grain
   doesn't retain throws `DurableTaskNotFoundException` and stores nothing. The
   grain admits an invocation until Messaging's `DeduplicationWindow` has elapsed since its
-  sender first staged it, and dead-letters a later one with the `durable-rpc/expired` code,
+  sender first staged it, the delivery's `InboxMessage.SentAt`, and dead-letters a later one with the `durable-rpc/expired` code,
   so a record whose invocation doesn't arrive within that window is deleted.
 - A completion whose stored result no longer decodes, for example after a later
   deployment removes the result type, can't be materialized. The outbox

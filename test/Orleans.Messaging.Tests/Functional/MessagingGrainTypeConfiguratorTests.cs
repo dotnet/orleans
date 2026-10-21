@@ -102,8 +102,8 @@ public class MessagingGrainTypeConfiguratorTests : MessagingBehaviorTestBase
 
         var delivered = Delivery.WaitForOutputAsync(grain.GetGrainId());
         var drained = Delivery.WaitForDrainAsync(grain.GetGrainId());
-        var cutoff = await Fixture.OnGrainAsync(grain, () =>
-            new OutboxStateTestAccess(recovered.Outbox!).Attempt(output.Envelope.MessageId).ExpirationTime);
+        var sentAt = await Fixture.OnGrainAsync(grain, () =>
+            new OutboxStateTestAccess(recovered.Outbox!).Attempt(output.Envelope.MessageId).SentAt);
         Delivery.Release();
         var receipt = await delivered;
         await drained;
@@ -113,7 +113,7 @@ public class MessagingGrainTypeConfiguratorTests : MessagingBehaviorTestBase
         var sink = Fixture.Client.GetGrain<IBootstrapOutputGrain>("capture");
         Assert.Equal(1, await sink.GetMessageCountAsync());
         Assert.Equal(DeliveryStatus.Duplicate, (await sink.AsReference<IMessagingExtension>()
-            .DeliverAsync(output.ToInboxMessage() with { RedeliveryDeadline = cutoff }, Cancellation)).Status);
+            .DeliverAsync(output.ToInboxMessage(sentAt!.Value), Cancellation)).Status);
         Assert.Equal(1, await sink.GetMessageCountAsync());
     }
 
@@ -464,7 +464,7 @@ public class MessagingGrainTypeConfiguratorTests : MessagingBehaviorTestBase
     private InboxMessage CreateEnvelope(IAddressable grain) =>
         OutboxTestMessages.CreateApplication(Fixture.Client.ServiceProvider,
             MessageId.Create("test", grain.GetGrainId().ToString(), "command", (++_commandSequence).ToString(CultureInfo.InvariantCulture)),
-            GrainId.Create("bootstrap-sender", "external"), grain.GetGrainId(), BootstrapState.Route, 1).ToInboxMessage();
+            GrainId.Create("bootstrap-sender", "external"), grain.GetGrainId(), BootstrapState.Route, 1).ToInboxMessage(Fixture.JobNow);
 
     private static int GetProcessedCount(BootstrapObservation observation) =>
         InboxTestAccess.GetProcessedCount(Assert.IsType<Inbox>(observation.Inbox));
