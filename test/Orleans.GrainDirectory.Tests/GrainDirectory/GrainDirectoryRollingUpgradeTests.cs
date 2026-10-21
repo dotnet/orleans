@@ -61,6 +61,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         {
             if (!ShouldUseDistributedDirectory(siloOptions.SiloName, initialSiloCount))
             {
+                siloBuilder.UseLocalGrainDirectory();
                 return;
             }
 
@@ -862,6 +863,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         {
             if (!upgradedSiloNames.ContainsKey(siloOptions.SiloName))
             {
+                siloBuilder.UseLocalGrainDirectory();
                 return;
             }
 

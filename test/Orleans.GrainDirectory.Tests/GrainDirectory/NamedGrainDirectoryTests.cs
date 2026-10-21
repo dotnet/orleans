@@ -24,9 +24,12 @@ public sealed class NamedGrainDirectoryTests
         builder.Options.UseTestClusterGrainDirectory = false;
         builder.ConfigureSilo((_, siloBuilder) =>
         {
-#pragma warning disable ORLEANSEXP003
+            if (directoryName is not null)
+            {
+                siloBuilder.UseLocalGrainDirectory();
+            }
+
             siloBuilder.AddDistributedGrainDirectory(directoryName);
-#pragma warning restore ORLEANSEXP003
         });
 
         await using var cluster = builder.Build();
