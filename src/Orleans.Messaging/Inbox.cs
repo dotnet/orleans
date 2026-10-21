@@ -82,7 +82,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         var receiverTime = Shared.JobTimeProvider.GetUtcNow();
         if (message.SentAt > MessagingTime.AddClamped(receiverTime, Options.DeduplicationWindow))
         {
-            LogSentAtTooFarAhead(Logger, key, message.SentAt, receiverTime);
+            LogSentAtTooFarAhead(Logger, key, GrainContext.GrainId, message.SentAt, receiverTime);
             throw new ArgumentOutOfRangeException(nameof(message), message.SentAt,
                 "SentAt must not be later than the receiver's clock plus DeduplicationWindow.");
         }
@@ -333,16 +333,19 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     private void ExtendSentAt(InboxMessage message, DateTimeOffset recordedSentAt)
     {
         if (message.SentAt <= recordedSentAt) return;
+        var key = message.Envelope.MessageId;
         try
         {
-            if (_processed.TryGetValue(message.Envelope.MessageId, out var processed))
+            if (_processed.TryGetValue(key, out var processed))
             {
                 // An in-flight snapshot can omit the old record, so replay needs the complete decision, not a delta.
                 StageCompletion(message, deadLetter: null, rejection: processed.Rejection);
             }
             else
             {
-                Emit(new() { Kind = InboxCommandKind.ExtendSentAt, MessageId = message.Envelope.MessageId, SentAt = message.SentAt });
+                Debug.Assert(_messages.ContainsKey(key));
+                Debug.Assert(!_processed.ContainsKey(key));
+                Emit(new() { Kind = InboxCommandKind.ExtendSentAt, MessageId = key, SentAt = message.SentAt });
             }
         }
         catch (Exception exception)
@@ -737,8 +740,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     [LoggerMessage(Level = LogLevel.Warning, Message = "Inbox for {ReceiverId} expired message {MessageId}: its send time {SentAt} is at or below the durable admission floor {AdmissionFloor}. Its earlier delivery outcome is unknown.")]
     private static partial void LogMessageExpired(ILogger logger, MessageId messageId, GrainId receiverId, DateTimeOffset sentAt, DateTimeOffset admissionFloor);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Rejected inbox message {MessageId}: its send time {SentAt} is later than receiver time {ReceiverTime} plus DeduplicationWindow.")]
-    private static partial void LogSentAtTooFarAhead(ILogger logger, MessageId messageId, DateTimeOffset sentAt, DateTimeOffset receiverTime);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Inbox for {ReceiverId} rejected message {MessageId}: its send time {SentAt} is later than receiver time {ReceiverTime} plus DeduplicationWindow.")]
+    private static partial void LogSentAtTooFarAhead(ILogger logger, MessageId messageId, GrainId receiverId, DateTimeOffset sentAt, DateTimeOffset receiverTime);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "No inbox handler registered for message {MessageId} to {ReceiverId}")]
     private static partial void LogHandlerNotFound(ILogger logger, MessageId messageId, GrainId receiverId);
