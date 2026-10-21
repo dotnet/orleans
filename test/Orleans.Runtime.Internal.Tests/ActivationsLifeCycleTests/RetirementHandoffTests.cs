@@ -2109,6 +2109,33 @@ public sealed class RetirementHandoffTests
         Assert.Equal(0, Volatile.Read(ref migrationsReceived));
     }
 
+    [Fact]
+    public async Task RetiringActivationWithAnOpenExclusiveSection_FaultsWaitingSectionsAndMigratesHeldRequests()
+    {
+        await using var cluster = await DeployAsync();
+        var retiring = cluster.Silos[1];
+        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        var state = ExclusiveSectionRetirementState.Create(key);
+        var grain = grainFactory.GetGrain<IExclusiveSectionRetirementGrain>(key);
+        await PlaceOnAsync(retiring, grain.GetLocation);
+
+        // An open section without a call chain holds back the ordinary request, and a second section waits behind the first.
+        await grain.OpenSection().WaitAsync(Timeout, Cancellation);
+        await grain.RequestSection().WaitAsync(Timeout, Cancellation);
+        var held = grain.GetLocation().AsTask();
+        await WaitUntilAsync(() => GetWaitingCount(retiring, grain.GetGrainId()) == 1);
+
+        // Deactivation doesn't wait for the section's code, faults the waiting section, and the held request migrates with the
+        // activation, whose new activation has no section open.
+        var stopping = cluster.StopSiloAsync(retiring, Cancellation);
+        Assert.IsType<InvalidOperationException>(await state.SectionWaitFault.Task.WaitAsync(Timeout, Cancellation));
+        var destination = await held.WaitAsync(Timeout, Cancellation);
+        Assert.NotEqual(retiring.SiloAddress, destination);
+        await stopping.WaitAsync(Timeout, Cancellation);
+        Assert.Equal(destination, await grain.GetLocation().AsTask().WaitAsync(Timeout, Cancellation));
+    }
+
     private static Message CreateRequest(InProcessTestCluster cluster, GrainId grainId, long id, object body) => new()
     {
         Direction = Message.Directions.Request,
@@ -3069,4 +3096,59 @@ public sealed class RetirementHandoffState
     public static RetirementHandoffState Create(Guid key) => States[key] = new();
 
     public static RetirementHandoffState Get(Guid key) => States[key];
+}
+
+public interface IExclusiveSectionRetirementGrain : IGrainWithGuidKey
+{
+    ValueTask<SiloAddress> GetLocation();
+
+    [AlwaysInterleave]
+    Task OpenSection();
+
+    [AlwaysInterleave]
+    Task RequestSection();
+}
+
+public sealed class ExclusiveSectionRetirementGrain : Grain, IExclusiveSectionRetirementGrain
+{
+    private IDisposable? _section;
+
+    private IGrainRequestAdmission Admission => GrainContext.GetComponent<IGrainRequestAdmission>()!;
+
+    public ValueTask<SiloAddress> GetLocation() => new(GrainContext.Address.SiloAddress!);
+
+    // The section stays open after the request completes, as code which isn't a request holds it.
+    public async Task OpenSection() => _section = await Admission.EnterExclusiveSectionAsync(CancellationToken.None);
+
+    // The section waits behind the open one; the wait's outcome is recorded once it completes.
+    public Task RequestSection()
+    {
+        var state = ExclusiveSectionRetirementState.Get(this.GetPrimaryKey());
+        _ = ObserveAsync(Admission.EnterExclusiveSectionAsync(CancellationToken.None), state);
+        return Task.CompletedTask;
+
+        static async Task ObserveAsync(ValueTask<IDisposable> entering, ExclusiveSectionRetirementState state)
+        {
+            try
+            {
+                (await entering).Dispose();
+                state.SectionWaitFault.TrySetResult(null);
+            }
+            catch (Exception exception)
+            {
+                state.SectionWaitFault.TrySetResult(exception);
+            }
+        }
+    }
+}
+
+public sealed class ExclusiveSectionRetirementState
+{
+    private static readonly ConcurrentDictionary<Guid, ExclusiveSectionRetirementState> States = new();
+
+    public TaskCompletionSource<Exception?> SectionWaitFault { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public static ExclusiveSectionRetirementState Create(Guid key) => States[key] = new();
+
+    public static ExclusiveSectionRetirementState Get(Guid key) => States[key];
 }
