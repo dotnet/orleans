@@ -131,6 +131,49 @@ public class DurableTaskDivergenceTests
         Assert.IsType<DurableTaskAttemptCanceledException>(response.Exception);
     }
 
+    [Fact]
+    public async Task ChildStartEndsWhenTheAttemptIsCanceled()
+    {
+        // The abstraction links the attempt's cancellation into every child start, so an awaited child whose start the
+        // host holds pending ends with the attempt, as its wait does.
+        var context = new ScriptedContext { HeldStarts = true };
+
+        var running = DurableTaskRuntimeHelper.RunAsync(
+            DurableTask.Run(async _ => await DurableTask.Run(static _ => 1).WithId("child")),
+            context).AsTask();
+        Assert.False(running.IsCompleted);
+        context.CancelAttempt(DurableTaskAttemptCancellationReason.ActivationStopping);
+        var response = await running.WaitAsync(TimeSpan.FromSeconds(30), Xunit.TestContext.Current.CancellationToken);
+
+        var canceled = Assert.IsType<DurableTaskAttemptCanceledException>(response.Exception);
+        Assert.Equal(DurableTaskAttemptCancellationReason.ActivationStopping, canceled.Reason);
+    }
+
+    [Fact]
+    public async Task ChildStartReportsTheCallersCancellation()
+    {
+        // The caller's token abandons a pending start, and the start reports that token while the attempt continues.
+        var context = new ScriptedContext { HeldStarts = true };
+        using var caller = new CancellationTokenSource();
+        OperationCanceledException? observed = null;
+
+        var running = DurableTaskRuntimeHelper.RunAsync(
+            DurableTask.Run(async _ =>
+            {
+                observed = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => DurableTask.Run(static _ => 1).WithId("child").ScheduleAsync(caller.Token));
+            }),
+            context).AsTask();
+        Assert.False(running.IsCompleted);
+        await caller.CancelAsync();
+        var response = await running.WaitAsync(TimeSpan.FromSeconds(30), Xunit.TestContext.Current.CancellationToken);
+
+        Assert.Null(response.Exception);
+        Assert.IsNotType<DurableTaskAttemptCanceledException>(observed);
+        Assert.Equal(caller.Token, observed!.CancellationToken);
+        Assert.False(context.AttemptCancellationToken.IsCancellationRequested);
+    }
+
     private static void AssertDiverged<TCause>(ScriptedContext context, DurableTaskResponse response)
         where TCause : Exception
     {
@@ -154,6 +197,8 @@ public class DurableTaskDivergenceTests
 
         public bool PendingStarts { get; init; }
 
+        public bool HeldStarts { get; init; }
+
         public int VersionChecks { get; private set; }
 
         public Dictionary<TaskId, ScriptedHandle> Handles { get; } = [];
@@ -173,6 +218,11 @@ public class DurableTaskDivergenceTests
             if (taskId.ToString().Split('/')[^1] == FailingStart)
             {
                 return ValueTask.FromException<IScheduledTaskHandle>(new InvalidOperationException($"start {FailingStart}"));
+            }
+
+            if (HeldStarts)
+            {
+                return HoldAsync(cancellationToken);
             }
 
             var handle = new ScriptedHandle(this, taskId);
@@ -198,6 +248,13 @@ public class DurableTaskDivergenceTests
         }
 
         public void OnCanceled(TaskId taskId) => Canceled.Add(taskId);
+
+        /// <summary>Holds a start until the token which the abstraction gave the host is canceled.</summary>
+        private static async ValueTask<IScheduledTaskHandle> HoldAsync(CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new System.Diagnostics.UnreachableException();
+        }
     }
 
     private sealed class ScriptedHandle(ScriptedContext context, TaskId taskId) : IScheduledTaskHandle
