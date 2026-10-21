@@ -19,10 +19,10 @@ public sealed class GrainDirectoryOptionsTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(1);
+        builder.Options.UseDistributedGrainDirectory = true;
         builder.ConfigureSilo((_, siloBuilder) =>
         {
             siloBuilder.Configure<GrainDirectoryOptions>(options => options.PartitionsPerSilo = 3);
-            siloBuilder.AddDistributedGrainDirectory();
         });
 
         var cluster = builder.Build();
@@ -46,6 +46,7 @@ public sealed class GrainDirectoryOptionsTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(1);
+        builder.Options.UseDistributedGrainDirectory = true;
         builder.ConfigureSilo((_, siloBuilder) =>
         {
             if (useLegacyMapping)
@@ -60,9 +61,6 @@ public sealed class GrainDirectoryOptionsTests
                     options.GetPartitionBoundaries = static (_, _) => [300, 100, 200];
                 });
             }
-#pragma warning disable ORLEANSEXP003
-            siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003
         });
 
         var cluster = builder.Build();
