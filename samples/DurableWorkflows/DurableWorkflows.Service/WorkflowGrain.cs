@@ -87,9 +87,17 @@ public sealed class WorkflowGrain(ILocalSiloDetails localSiloDetails) : DurableG
 
     // Reserves stock and charges payment concurrently, then ships. When a step fails, the saga undoes exactly the steps
     // which succeeded. Each participant applies an operation ID once, so a replay or a repeated saga changes nothing.
+    // The workflow grain is the order's grain: the request names the order which the grain's key identifies, so the saga
+    // and its participants' effects are retained under the same order.
     public async DurableTask<OrderWorkflowResult> RunOrderSagaAsync(OrderRequest request)
     {
-        var orderId = request.OrderId;
+        ArgumentNullException.ThrowIfNull(request);
+        var orderId = WorkflowId;
+        if (!string.Equals(request.OrderId, orderId, StringComparison.Ordinal))
+        {
+            throw new ArgumentException($"The order '{request.OrderId}' isn't the order '{orderId}' which this workflow grain runs.", nameof(request));
+        }
+
         var inventory = GrainFactory.GetGrain<IInventoryGrain>(orderId);
         var payment = GrainFactory.GetGrain<IPaymentGrain>(orderId);
 
