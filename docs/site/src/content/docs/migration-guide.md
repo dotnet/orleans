@@ -1,7 +1,7 @@
 ---
 title: Orleans migration guides
-description: Plan and execute an upgrade to Orleans 10 from Orleans 9, 8, 7, or an older release.
-ms.date: 08/07/2026
+description: Plan upgrades to Orleans 11 preview or Orleans 10, preserving application, provider, deployment, and rollback compatibility.
+ms.date: 10/21/2026
 ms.topic: how-to
 ms.custom: migration-guide
 ---
@@ -12,13 +12,14 @@ Use the guide that matches the Orleans major version currently deployed in produ
 
 | Starting version | Recommended path | Guide |
 |------------------|------------------|-------|
+| Orleans 10.x | Establish an Orleans 10.4.0 baseline, then qualify Orleans 11.0.0-preview.1 | [Upgrade Orleans 10.x to 11](migration/10-to-11.md) |
 | Orleans 9.x | Update to the latest 9.x patch, then upgrade to Orleans 10.x | [Upgrade Orleans 9.x to 10.x](migration/9-to-10.md) |
 | Orleans 8.x | Update to Orleans 8.2, validate Orleans 9.2, then upgrade to Orleans 10.x | [Upgrade Orleans 8.x to 10.x](migration/8-to-10.md) |
 | Orleans 7.x | Update to the latest 7.2 patch, then validate each supported major-version checkpoint | [Upgrade Orleans 7.x to 10.x](migration/7-to-10.md) |
 | Orleans 3.x or earlier | Migrate to Orleans 7 in a separate cluster before continuing sequentially | [Archived Orleans 3.x to 7.x notes](migration/3-to-7-archive.md) |
 
 > [!IMPORTANT]
-> Orleans documents mixed-version deployment safety only within one major-version family. Don't put Orleans 9 and Orleans 10 silos in the same production cluster without completing your own compatibility qualification. The guides use a parallel-cluster deployment as the safe default for crossing major versions.
+> Orleans documents mixed-version deployment safety within one major-version family. The guides use a parallel-cluster deployment as the safe default for crossing major versions. Qualify the exact runtime, provider, directory, and application versions before a mixed-major rollout.
 
 ## What every upgrade must preserve
 
@@ -47,7 +48,7 @@ See the [metrics catalog](host/monitoring/metrics-catalog.md#grain-type-identity
 
 ## Package version policy
 
-Keep all `Microsoft.Orleans.*` packages on the same 10.x patch. For solutions that use NuGet Central Package Management, declare the versions in `Directory.Packages.props` and omit versions from project-level `PackageReference` items. Don't copy old provider dependency versions from migration examples; select a current version that is supported by your target runtime and provider.
+Keep all `Microsoft.Orleans.*` packages on the same release, including matching prerelease and experimental suffixes. Orleans 10 upgrades use one current 10.x patch; Orleans 11 preview upgrades use the [package set in the 10-to-11 guide](migration/10-to-11.md#align-packages-and-rebuild). For solutions that use NuGet Central Package Management, declare the versions in `Directory.Packages.props` and omit versions from project-level `PackageReference` items. Select provider dependencies supported by the target runtime and provider.
 
 For related guidance, see:
 
