@@ -39,7 +39,8 @@ public interface IMessagingExtension : IGrainExtension
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// The message's <see cref="InboxMessage.SentAt"/> is later than the receiver's clock plus <c>DeduplicationWindow</c>,
-    /// and the message is untracked or that send time would extend its record. The inbox stages nothing for it.
+    /// and the message is untracked and above the admission floor, or that send time would extend its record. The inbox
+    /// stages nothing for it.
     /// </exception>
     [Alias("DeliverAsync")]
     [AlwaysInterleave]

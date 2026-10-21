@@ -35,10 +35,11 @@ public readonly struct InboxMessage
     /// </para>
     /// <para>
     /// The inbox never stores a send time later than its own clock plus <c>DeduplicationWindow</c>. It rejects such a
-    /// delivery with an <see cref="ArgumentOutOfRangeException"/>, staging nothing, when the message is untracked or the
-    /// send time would extend its record, so the sender retries it within its retry budget. A tracked message whose send
-    /// time is equal to or earlier than its record's still receives its recorded outcome. Every record therefore becomes
-    /// eligible for removal within twice the window of the receiver's clock.
+    /// delivery with an <see cref="ArgumentOutOfRangeException"/>, staging nothing, when the message is untracked and
+    /// above the admission floor or the send time would extend its record, so the sender retries it within its retry
+    /// budget. A tracked message whose send time is equal to or earlier than its record's still receives its recorded
+    /// outcome, and an untracked message at or below the floor still receives <see cref="DeliveryStatus.Expired"/>.
+    /// Every record therefore becomes eligible for removal within twice the window of the receiver's clock.
     /// </para>
     /// </remarks>
     [Id(1)]
