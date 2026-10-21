@@ -82,7 +82,9 @@ public interface IOutbox
     /// <remarks>
     /// Stage the source's release of the payload in the same journal write. The outbox makes no further delivery attempt
     /// and doesn't call <see cref="IOutboxMessageSource.OnRetired"/>. An attempt already in flight can still deliver the
-    /// message.
+    /// message and still reads the payload array, header dictionary, and header value arrays which
+    /// <see cref="IOutboxMessageSource.TryGetMessage"/> returned, so release them by dropping references rather than
+    /// reusing them.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// The ID is pending as an ordinary message, or the outbox is unavailable.
