@@ -430,8 +430,7 @@ The following outcomes cover the remaining cases:
 
 | Handler outcome | Result |
 | --- | --- |
-| Exception, or return without a terminal operation | The outcome is unknown: the message retries with backoff until `InboxRetryTimeout`, then moves to the dead letters. |
-| Exception or return without a terminal operation after staging journaled changes | The grain deactivates, recovery from the journal discards the staged changes, and the message runs again. That attempt doesn't count toward the retry policy. |
+| Exception, or return without a terminal operation | The outcome is unknown. The grain deactivates, recovery from the journal discards the attempt's staged changes and charges the attempt, and the message retries with backoff until `InboxRetryTimeout`, then moves to the dead letters. |
 | Exception after a terminal operation | The exception is logged and the staged outcome persists. |
 | Conflicting terminal operations | Contract error: messaging stops and the grain deactivates. |
 
@@ -440,17 +439,17 @@ outcome fails the activation rather than committing a retry alongside them.
 
 ## Backpressure, retries, and dead letters
 
-The inbox bounds a newly admitted or extended `SentAt` by its Durable Jobs time
-plus `DeduplicationWindow`; equality is admitted. A tracked message with an equal
-or earlier time receives its recorded answer even after a receiver clock rollback.
-An untracked message at or below the admission floor receives `Expired`, including
-when the floor is above that bound. A time that would otherwise be admitted or
-extend retention beyond the bound throws <xref:System.ArgumentOutOfRangeException>,
+For deliveries, a tracked message receives its recorded answer whatever its `SentAt`,
+including after a receiver clock rollback. An untracked message at or below the
+admission floor receives `Expired`. Above the floor, the inbox bounds an untracked
+message's `SentAt` by its Durable Jobs time plus `DeduplicationWindow`; equality is
+admitted, and a later time throws <xref:System.ArgumentOutOfRangeException>,
 with no staged change or sink offer. The outbox treats the
 exception as a failed attempt, preserving the original `SentAt` and retrying until
 `SentAt + OutboxRetryTimeout`; retry exhaustion retires the send as `DeadLettered`
 with an unknown earlier outcome. Messages staged directly in the sending grain's
-own inbox use a local staging time and follow the local-send path.
+own inbox use the local staging time, or the first time above the admission floor
+after a backward clock jump, and follow the local-send path.
 
 When the inbox holds
 <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.MaxCapacity> pending
