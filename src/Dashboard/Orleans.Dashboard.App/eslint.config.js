@@ -42,7 +42,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["vite.config.ts"],
+    files: ["vite.config.ts", "playwright.config.ts", "tests/**/*.ts"],
     extends: recommendedTypeScript,
     languageOptions: {
       ecmaVersion: 2020,

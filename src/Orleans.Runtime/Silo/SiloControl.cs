@@ -41,6 +41,7 @@ namespace Orleans.Runtime
         private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
 
         private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
+        private readonly IConnectedClientCollection _connectedClients;
         private readonly GrainCountStatistics _grainCountStatistics;
         private readonly GrainPropertiesResolver grainPropertiesResolver;
         private readonly GrainMigratabilityChecker _migratabilityChecker;
@@ -59,6 +60,7 @@ namespace Orleans.Runtime
             IActivationWorkingSet activationWorkingSet,
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
+            IConnectedClientCollection connectedClients,
             GrainCountStatistics grainCountStatistics,
             GrainPropertiesResolver grainPropertiesResolver,
             GrainMigratabilityChecker migratabilityChecker,
@@ -78,6 +80,7 @@ namespace Orleans.Runtime
             this.activationWorkingSet = activationWorkingSet;
             this.environmentStatisticsProvider = environmentStatisticsProvider;
             this.loadSheddingOptions = loadSheddingOptions;
+            _connectedClients = connectedClients;
             _grainCountStatistics = grainCountStatistics;
             this.grainPropertiesResolver = grainPropertiesResolver;
             _migratabilityChecker = migratabilityChecker;
@@ -122,6 +125,7 @@ namespace Orleans.Runtime
                 activationWorkingSet.Count,
                 this.environmentStatisticsProvider,
                 this.loadSheddingOptions,
+                _connectedClients.Count,
                 DateTime.UtcNow);
             return Task.FromResult(stats);
         }
