@@ -68,8 +68,9 @@ namespace Orleans.DurableTasks.Runtime;
 /// <see cref="CallerScope"/> describes. A cancellation or a signal which arrives before its
 /// invocation is recorded, and the invocation finds it in its tree. The grain admits an invocation until
 /// <see cref="Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow"/> has elapsed since its sender
-/// first staged it, and dead-letters a later one, so a record whose invocation doesn't arrive within that window is
-/// deleted.
+/// first staged it, and dead-letters a later one. A record whose invocation doesn't arrive is deleted after
+/// <see cref="DurableTaskGrainRuntimeShared.EarlyRecordRetention"/>, which covers the skew between the sender's clock and
+/// the grain's.
 /// A subscription to a task which the grain doesn't retain as an invoked task completes as not found at once.
 /// </para>
 /// <para>
@@ -2602,13 +2603,13 @@ internal sealed partial class DurableTaskGrainRuntime(
             var expiry = state.CompletedAt.HasValue ? GetRetentionExpiry(state) : DateTimeOffset.MinValue;
             if (isCancellationRecord)
             {
-                // The invocation which the cancellation precedes is admitted within the admission window, or never.
-                var recordExpiry = AddSaturating(state.CreatedAt, _shared.InvocationAdmissionWindow);
+                // The invocation which the cancellation precedes is admitted within the record's retention, or never.
+                var recordExpiry = AddSaturating(state.CreatedAt, _shared.EarlyRecordRetention);
                 expiry = recordExpiry > expiry ? recordExpiry : expiry;
             }
             else if (IsSignalRecord(state))
             {
-                // A signal record without its task preceded the invocation, which is admitted within the admission window,
+                // A signal record without its task preceded the invocation, which is admitted within the record's retention,
                 // or never.
                 expiry = GetEarlySignalExpiry(state);
             }
@@ -2969,7 +2970,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             taskState = GetOrCreateTask(taskId, DurableTaskRecordKind.EarlyCancellation, request: null);
             StageCaller(taskId, taskState, callerId);
             _storage.RequestCancellation(taskId, taskState, reason);
-            TrackExpiry(AddSaturating(taskState.CreatedAt, _shared.InvocationAdmissionWindow));
+            TrackExpiry(AddSaturating(taskState.CreatedAt, _shared.EarlyRecordRetention));
             return (true, [], []);
         }
 

@@ -3037,7 +3037,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
-    public Task EarlyCancellationRecordIsDeletedOnceTheInvocationAdmissionWindowEnds() => ActivationScheduler.RunAsync(async () =>
+    public Task EarlyCancellationRecordIsDeletedOnceTwiceTheInvocationAdmissionWindowEnds() => ActivationScheduler.RunAsync(async () =>
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var retryAge = TimeSpan.FromHours(2);
@@ -3056,7 +3056,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.NotNull(record.CancellationRequestedAt);
         Assert.Null(record.Result);
 
-        clock.Advance(retryAge - TimeSpan.FromTicks(1));
+        // The record outlives the admission window by one more window, which covers the sender's clock running ahead.
+        clock.Advance(retryAge * 2 - TimeSpan.FromTicks(1));
         Assert.False(InvokeDeleteExpiredTasks(runtime));
         Assert.True(storage.Contains(taskId));
 
@@ -3777,6 +3778,44 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Contains($"Durable task '{storedId}' is already associated with a different request.", result.Message);
         Assert.Equal(fingerprint, storage.Get(storedId).RequestFingerprint);
         Assert.Equal(destinations, storage.Get(storedId).CompletionDestinations);
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    });
+
+    [Fact]
+    public Task InvocationFromASenderWhoseClockRunsAheadFindsTheCancellationWhichPrecededIt() => ActivationScheduler.RunAsync(async () =>
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var window = TimeSpan.FromHours(2);
+        var skew = TimeSpan.FromMinutes(30);
+        var (runtime, storage, manager, _) = CreateRuntime(timeProvider: clock, deduplicationWindow: window);
+        var handler = CreateHandler(runtime);
+        var sender = GrainId.Create("caller", "one");
+        var taskId = TaskId.Parse("starter/call");
+        var storedId = CallerScope.Resolve(sender, taskId);
+
+        // The sender's clock runs ahead of the grain's, so it stamps the invocation later than the grain's time when the
+        // cancellation which follows it arrives first.
+        var sentAt = clock.GetUtcNow() + skew;
+        Accept(handler, CancellationMessage(sender, runtime.GrainId, taskId));
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        // Past one window on the grain's clock, the invocation is still within its admission window, and so is the
+        // cancellation's record.
+        clock.Advance(window + skew / 2);
+        Assert.False(InvokeDeleteExpiredTasks(runtime));
+        Assert.True(handler.TryAccept(
+            MessagingTestHelpers.CreateInvocationMessage(
+                sender,
+                runtime.GrainId,
+                taskId,
+                new DurableTaskInvocationMessage { TaskId = taskId, Request = CreateSerializableRequest(runtime.GrainId), Sender = sender },
+                sentAt),
+            out var result));
+        Assert.Equal(DeliveryStatus.Accepted, result.Status);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => storage.Get(storedId).Result is { IsCompleted: true });
+
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(storedId).Result!.Status);
         await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     });
 

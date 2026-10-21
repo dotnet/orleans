@@ -256,9 +256,10 @@ await tasks.SignalAsync(workflowId, Shipped, shipment);
   them independently, so a signal message can arrive first. The inbox records a signal message
   for a task which the grain doesn't hold yet, and the invocation finds the value when it
   arrives. The grain admits an invocation until Messaging's `DeduplicationWindow` has elapsed
-  since its sender first staged it, and keeps the value for that window, so an admitted
-  invocation finds it. When no invocation arrives within the window, the grain deletes the value
-  and logs a warning.
+  since its sender first staged it, and keeps the value for twice that window after it arrives,
+  which covers the skew between the sender's clock and the grain's, so an admitted invocation
+  finds it. When no invocation arrives within that time, the grain deletes the value and logs a
+  warning.
 - In a durable task, the send and a marker in the execution's tree commit in one journal write,
   like a posted start, so a replay which reaches the marker doesn't send it again, whatever value
   it passes. The marker is
@@ -421,8 +422,9 @@ synchronously on the activation which makes them, when the runtime stages them: 
   direct cancellation, from a client, a grain method, or `IDurableTaskManager.CancelAsync`, of a task which the grain
   doesn't retain throws `DurableTaskNotFoundException` and stores nothing. The
   grain admits an invocation until Messaging's `DeduplicationWindow` has elapsed since its
-  sender first staged it, the delivery's `InboxMessage.SentAt`, and dead-letters a later one with the `durable-rpc/expired` code,
-  so a record whose invocation doesn't arrive within that window is deleted.
+  sender first staged it, the delivery's `InboxMessage.SentAt`, and dead-letters a later one with the `durable-rpc/expired` code.
+  An early record is kept for twice that window after it arrives, because admission reads the sender's clock and the
+  record's lifetime the grain's; Messaging bounds how far a send time can be ahead of the grain's clock by one window.
 - A completion whose stored result no longer decodes, for example after a later
   deployment removes the result type, can't be materialized. The outbox
   dead-letters that completion, recording the decoding error as the reason, and the

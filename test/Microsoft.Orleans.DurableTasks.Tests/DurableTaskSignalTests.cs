@@ -343,7 +343,7 @@ public sealed partial class DurableTaskSignalTests
     });
 
     [Fact]
-    public Task SignalWhoseInvocationNeverArrivesIsDeletedAfterTheInvocationAdmissionWindow() => ActivationScheduler.RunAsync(async () =>
+    public Task SignalWhoseInvocationNeverArrivesIsDeletedAfterTwiceTheInvocationAdmissionWindow() => ActivationScheduler.RunAsync(async () =>
     {
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
         var harness = new Harness(time);
@@ -352,7 +352,7 @@ public sealed partial class DurableTaskSignalTests
         Assert.True(handler.TryAccept(CreateSignalMessage(harness, GrainId.Create("caller", "one"), WorkflowId, "ada"), out _));
         await harness.Manager.WriteStateAsync(TestCancellation);
 
-        time.Advance(retryAge - TimeSpan.FromTicks(1));
+        time.Advance(retryAge * 2 - TimeSpan.FromTicks(1));
         await harness.Runtime.ResumePendingTasksAsync(TestCancellation);
         Assert.Equal([RecordId], harness.Storage.Ids);
 
