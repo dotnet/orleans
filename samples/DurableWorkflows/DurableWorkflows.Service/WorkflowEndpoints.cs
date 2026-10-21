@@ -47,12 +47,18 @@ public static class WorkflowEndpoints
     private static async Task<IResult> RunFanOutAsync(
         IClusterClient client,
         string workflowId,
-        [FromBody] string[] items,
+        [FromBody] string[]? items,
         CancellationToken cancellationToken)
     {
         if (!IsValidId(workflowId))
         {
             return InvalidId();
+        }
+
+        // A JSON null body binds as null; an empty list has no branch to run.
+        if (items is not { Length: > 0 })
+        {
+            return InvalidItems();
         }
 
         var workflow = client.GetGrain<IWorkflowGrain>(workflowId);
@@ -85,7 +91,7 @@ public static class WorkflowEndpoints
     private static async Task<IResult> SubmitApprovalAsync(
         IClusterClient client,
         string workflowId,
-        ApprovalSubmission submission,
+        ApprovalSubmission? submission,
         CancellationToken cancellationToken)
     {
         if (!IsValidId(workflowId))
@@ -93,7 +99,8 @@ public static class WorkflowEndpoints
             return InvalidId();
         }
 
-        if (string.IsNullOrWhiteSpace(submission.Subject))
+        // A JSON null body binds as null.
+        if (submission is null || string.IsNullOrWhiteSpace(submission.Subject))
         {
             return InvalidSubject();
         }
@@ -235,6 +242,9 @@ public static class WorkflowEndpoints
 
     private static IResult InvalidId() =>
         Results.BadRequest(new WorkflowApiError("Workflow IDs must be non-empty task-ID segments without '/' and cannot begin with '$'."));
+
+    private static IResult InvalidItems() =>
+        Results.BadRequest(new WorkflowApiError("A fan-out request must list at least one item."));
 
     private static IResult InvalidSubject() =>
         Results.BadRequest(new WorkflowApiError("Approval subjects must contain a non-whitespace value."));

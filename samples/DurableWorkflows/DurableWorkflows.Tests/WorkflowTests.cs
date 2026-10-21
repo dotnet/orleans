@@ -484,6 +484,25 @@ public sealed class WorkflowEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task NullOrEmptyBodiesAreBadRequests()
+    {
+        var id = UniqueId();
+        using var nullSubmission = await _http.PutAsync($"/workflows/approval/{id}", JsonNull());
+        using var nullItems = await _http.PostAsync($"/workflows/fan-out/{id}", JsonNull());
+        using var noItems = await _http.PostAsJsonAsync($"/workflows/fan-out/{id}", Array.Empty<string>());
+        using var approvalStatus = await _http.GetAsync($"/workflows/approval/{id}/status");
+
+        Assert.Equal(HttpStatusCode.BadRequest, nullSubmission.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, nullItems.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, noItems.StatusCode);
+
+        // A rejected submission starts nothing.
+        Assert.Equal(HttpStatusCode.NotFound, approvalStatus.StatusCode);
+
+        static StringContent JsonNull() => new("null", System.Text.Encoding.UTF8, "application/json");
+    }
+
+    [Fact]
     public async Task FanOutRequestUnderAnExistingIdReturnsTheOriginalResult()
     {
         var id = UniqueId();
