@@ -82,9 +82,18 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         var receiverTime = Shared.JobTimeProvider.GetUtcNow();
         if (message.SentAt > MessagingTime.AddClamped(receiverTime, Options.DeduplicationWindow))
         {
-            LogSentAtTooFarAhead(Logger, key, GrainContext.GrainId, message.SentAt, receiverTime);
-            throw new ArgumentOutOfRangeException(nameof(message), message.SentAt,
-                "SentAt must not be later than the receiver's clock plus DeduplicationWindow.");
+            // Recorded outcomes and expiration decisions survive clock rollback. Bound only a time we would store.
+            var wouldStoreTime = _processed.TryGetValue(key, out var processed)
+                ? message.SentAt > processed.SentAt
+                : _messages.TryGetValue(key, out var pending)
+                    ? message.SentAt > pending.Message.SentAt
+                    : message.SentAt > GetAdmissionFloor(receiverTime);
+            if (wouldStoreTime)
+            {
+                LogSentAtTooFarAhead(Logger, key, GrainContext.GrainId, message.SentAt, receiverTime);
+                throw new ArgumentOutOfRangeException(nameof(message), message.SentAt,
+                    "SentAt must not be later than the receiver's clock plus DeduplicationWindow.");
+            }
         }
 
         // Delivery is a grain call, so the activation is servicing requests.
