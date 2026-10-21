@@ -45,7 +45,7 @@ For the replay model, see [Writing replay-safe workflows](../grains/durable-task
 
 :::code source="snippets/durable-tasks/Orleans0202.cs" id="orleans0202_fix_tail" language="csharp":::
 
-A step which ends before its result commits runs again, and so does the tail of a run which ends before the task's result commits. An external operation in a step or the tail therefore runs at least once, so give it an idempotency key derived from the task, such as `$"{grainId}/{DurableTask.Current.Id}"`, when it changes another system.
+A step which ends before its result commits runs again, and so does the tail of a run which ends before the task's result commits. An external operation in a step or the tail therefore runs at least once, so give it an idempotency key derived from the task, such as `$"{grainId}/{DurableTask.Current.Id}/{DurableTask.Current.Incarnation:N}"`, when it changes another system. The incarnation distinguishes a later run of the same task identifier, whose operations are new.
 
 ## When to suppress
 
