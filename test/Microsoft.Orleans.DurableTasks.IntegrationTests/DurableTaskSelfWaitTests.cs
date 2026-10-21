@@ -5,8 +5,8 @@ using Xunit;
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
 
 /// <summary>
-/// Verifies that waits for a task of the waiter's own grain complete when the grain admits the task's segments alongside
-/// the waiting request: an interleaving waiter, a reentrant grain, and durable code.
+/// Verifies that a request which waits for a task of its own grain, which the grain's admission rules hold the task's
+/// segments behind, fails at once, and that waits which the grain admits the segments alongside complete.
 /// </summary>
 public abstract class DurableTaskSelfWaitTests(string journalFormatKey) : IAsyncLifetime
 {
@@ -15,6 +15,34 @@ public abstract class DurableTaskSelfWaitTests(string journalFormatKey) : IAsync
 
     public ValueTask InitializeAsync() => _fixture.InitializeAsync();
     public ValueTask DisposeAsync() => _fixture.DisposeAsync();
+
+    [Fact]
+    public async Task WaitForAnOwnTaskThroughAGrainReferenceFailsAtOnce()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grain = _fixture.Client.GetGrain<ISelfWaitingGrain>(Guid.NewGuid());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => grain.ScheduleAndAwaitOwnTaskAsync(2).WaitAsync(Timeout, cancellationToken));
+
+        Assert.Contains("[AlwaysInterleave]", exception.Message, StringComparison.Ordinal);
+
+        // The task itself runs once the failed request has released the grain.
+        Assert.Equal(6, (await grain.GetDurableTask<int>("own").GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken)).GetResult<int>());
+    }
+
+    [Fact]
+    public async Task WaitForAnOwnTaskThroughTheTaskManagerFailsAtOnce()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grain = _fixture.Client.GetGrain<ISelfWaitingGrain>(Guid.NewGuid());
+        var waiting = await grain.WaitForCancellationAsync().WithId("wait").ScheduleAsync(cancellationToken);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => grain.CancelAndAwaitThroughManagerAsync("wait").WaitAsync(Timeout, cancellationToken));
+
+        Assert.Equal(DurableTaskStatus.Canceled, (await waiting.GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken)).Status);
+    }
 
     [Fact]
     public async Task InterleavingWaitsForOwnTasksComplete()
@@ -94,6 +122,10 @@ public interface ISelfWaitingGrain : IGrainWithGuidKey
 
     DurableTask<int> WaitForCancellationAsync();
 
+    Task<int> ScheduleAndAwaitOwnTaskAsync(int value);
+
+    Task<DurableTaskStatus> CancelAndAwaitThroughManagerAsync(string rootId);
+
     [AlwaysInterleave]
     Task<int> InterleavingScheduleAndAwaitOwnTaskAsync(int value);
 
@@ -134,8 +166,12 @@ public sealed class SelfWaitingGrain(IDurableTaskManager tasks) : DurableGrain, 
 
     public DurableTask<int> WaitForCancellationAsync() => SelfWaiting.WaitForCancellationAsync();
 
+    public Task<int> ScheduleAndAwaitOwnTaskAsync(int value) => SelfWaiting.ScheduleAndAwaitAsync(this.AsReference<ISelfWaitingGrain>().TripleAsync(value));
+
+    public Task<DurableTaskStatus> CancelAndAwaitThroughManagerAsync(string rootId) => SelfWaiting.CancelAndAwaitAsync(tasks, rootId);
+
     public Task<int> InterleavingScheduleAndAwaitOwnTaskAsync(int value) =>
-        SelfWaiting.ScheduleAndAwaitAsync(this.AsReference<ISelfWaitingGrain>().TripleAsync(value));
+        SelfWaiting.ScheduleAndAwaitAsync(this.AsReference<ISelfWaitingGrain>().TripleAsync(value), name: null);
 
     public Task<DurableTaskStatus> InterleavingCancelAndAwaitThroughManagerAsync(string rootId) => SelfWaiting.CancelAndAwaitAsync(tasks, rootId);
 
@@ -171,9 +207,9 @@ internal static class SelfWaiting
         return 0;
     }
 
-    public static async Task<int> ScheduleAndAwaitAsync(DurableTask<int> task)
+    public static async Task<int> ScheduleAndAwaitAsync(DurableTask<int> task, string? name = "own")
     {
-        var scheduled = await task.ScheduleAsync();
+        var scheduled = await (name is null ? task.ScheduleAsync() : task.WithId(name).ScheduleAsync());
         return await scheduled;
     }
 
