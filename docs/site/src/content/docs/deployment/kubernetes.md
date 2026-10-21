@@ -148,6 +148,8 @@ The [`Microsoft.Orleans.Hosting.Kubernetes`](https://www.nuget.org/packages/Micr
 
 For the supported simple topology, <xref:Orleans.Hosting.KubernetesHostingExtensions.UseKubernetesHosting*> configures the silo name, pod IP, listening endpoints, service ID, and cluster ID from pod metadata. It also calls the Kubernetes API to reconcile Orleans membership with matching pods. It supplements a production clustering provider; it doesn't replace one.
 
+Align direct `KubernetesClient` references with the hosting package's supported range, `[21.0.8,22.0.0)`. The package uses the generated pod-operation methods from KubernetesClient 21.x. The upper bound lets package restore identify an incompatible client major before silo startup.
+
 To use it:
 
 1. Reference `Microsoft.Orleans.Hosting.Kubernetes` and call `UseKubernetesHosting()`.
