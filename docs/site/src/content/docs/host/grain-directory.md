@@ -96,6 +96,7 @@ The distributed directory is stable and enabled by default. Clusters upgrading f
 
 1. Inventory the default and named directories selected by every grain type. Keep named-provider selections and cluster identity unchanged during this procedure.
 1. Qualify the exact application versions, serialized contracts, persistence providers, and deployment configuration under representative traffic. Verify duplicate-activation detection, registration preservation, graceful silo departure, and application recovery.
+1. Persist state needed after reactivation and budget capacity for activation recovery. Legacy directory-owner departures can deactivate affected grains on surviving silos; later calls recreate them through the current directory owner.
 1. Roll out the new runtime with <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalGrainDirectory*> configured on **every replacement silo**. This explicitly retains the local directory while the runtime versions coexist. Keep that configuration on scale-out instances too.
 1. Wait until every silo runs the new runtime, membership is stable, and grain-call and activation behavior match the baseline. Applications can remain in this all-local configuration until ready for the directory migration.
 
@@ -113,7 +114,7 @@ The runtime compatibility endpoints let local- and distributed-directory silos r
 
 ### Watch the migration
 
-Compare grain-call error rate and latency, activation failures, duplicate-activation reports, membership churn, and directory registration errors with the pre-upgrade baseline. Observe directory snapshot transfers, range recovery, and range-lock duration alongside silo departures. A healthy checkpoint has a stable membership view, completed transfers, successful calls to existing and new grains, and one registered activation per single-activation grain.
+Compare grain-call error rate and latency, activation churn and failures, duplicate-activation reports, membership churn, and directory registration errors with the pre-upgrade baseline. Observe directory snapshot transfers, range recovery, and range-lock duration alongside silo departures. A healthy checkpoint has a stable membership view, completed transfers, successful calls to existing and new grains, and one registered activation per single-activation grain.
 
 Pause replacements when a safety or availability threshold is exceeded. Preserve directory and membership logs, retain sufficient distributed-directory capacity, and investigate the failed transition before continuing. Recover application state using the qualified recovery procedure while retaining the distributed directory.
 
