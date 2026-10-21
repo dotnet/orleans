@@ -42,7 +42,8 @@ public sealed record TestMessage(
     [property: Id(5)] bool CommitDuringHandling = false,
     [property: Id(6)] bool DeleteDuringHandling = false,
     [property: Id(9)] bool ThrowOnceDuringPreparation = false,
-    [property: Id(10)] int ThrowForAttempts = 0);
+    [property: Id(10)] int ThrowForAttempts = 0,
+    [property: Id(11)] bool ThrowAfterStaging = false);
 
 [GenerateSerializer, Immutable]
 public sealed record MessageEffect(
@@ -412,6 +413,11 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
             }
             _effects.TryGetValue(message.LogicalId, out var prior);
             _effects[message.LogicalId] = new MessageEffect(message.LogicalId, (prior?.Count ?? 0) + 1, message.Sequence, message.Value);
+            if (message.ThrowAfterStaging)
+            {
+                throw new InvalidOperationException($"Injected handler failure after staging for {message.LogicalId}.");
+            }
+
             ApplyAttempted.TrySetResult();
             if (outgoing is { } output)
             {

@@ -166,6 +166,45 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
     }
 
     [Fact]
+    public async Task UncleanStop_ChargesEachDueMessageOneAttemptWithoutDeadLetteringIt()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+        var running = CreateEnvelope(receiver, NewMessage(180, "interrupted"), "messages/interrupted");
+        var queued = CreateEnvelope(receiver, NewMessage(181, "queued"));
+        using (var barrier = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/interrupted"))
+        {
+            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, running)).Status);
+            await WaitForBarrierAsync(receiver, barrier);
+            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, queued)).Status);
+            await receiver.ConfigureHandlerAsync(false);
+
+            // The clean-stop write fails, so the journal ends as if the process had died mid-attempt.
+            Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+            await _cluster.CrashAsync(receiver);
+        }
+
+        // Recovery charges the interrupted attempt and the queued message which hadn't run, one attempt each. Neither
+        // had failed before, so even this fixture's zero InboxRetryTimeout dead-letters neither.
+        var recovered = await receiver.GetSnapshotAsync();
+        var inbox = Fixture.GetInbox(receiver);
+        var states = await Fixture.OnGrainAsync(receiver, () => new[]
+        {
+            InboxTestAccess.GetMessageState(inbox, running.Envelope.MessageId),
+            InboxTestAccess.GetMessageState(inbox, queued.Envelope.MessageId)
+        });
+        Assert.All(states, static state => Assert.Equal(1, state.AttemptCount));
+        Assert.Equal(2, recovered.InboxCount);
+        Assert.Empty(recovered.InboxDeadLetters);
+
+        await receiver.ConfigureHandlerAsync(true);
+        await _cluster.AdvanceAndRunPumpAsync(receiver, TimeSpan.Zero);
+        var completed = await Fixture.WaitForEffectCountAsync(receiver, 2);
+        Assert.All(completed.Effects, static effect => Assert.Equal(1, effect.Count));
+        Assert.Empty(completed.InboxDeadLetters);
+    }
+
+    [Fact]
     public async Task FailedAttemptRetry_StaysCoveredByTheSendsWakeupThroughACrash()
     {
         var sender = NewGrain();

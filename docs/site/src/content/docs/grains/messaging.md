@@ -423,7 +423,7 @@ The following outcomes cover the remaining cases:
 | Handler outcome | Result |
 | --- | --- |
 | Exception, or return without a terminal operation | The outcome is unknown: the message retries with backoff until `InboxRetryTimeout`, then moves to the dead letters. |
-| Exception or return without a terminal operation after staging journaled changes | The grain deactivates, recovery from the journal discards the staged changes, and the message runs again. That attempt doesn't count toward the retry policy. |
+| Exception or return without a terminal operation after staging journaled changes | The grain deactivates, recovery from the journal discards the staged changes and counts the attempt, and the message retries with backoff until `InboxRetryTimeout`. A grain with state which can't report its changes, such as journaled `IPersistentState`, recovers this way after every failed attempt. |
 | Exception after a terminal operation | The exception is logged and the staged outcome persists. |
 | Conflicting terminal operations | Contract error: messaging stops and the grain deactivates. |
 

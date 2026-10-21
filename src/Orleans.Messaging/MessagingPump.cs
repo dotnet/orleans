@@ -330,6 +330,9 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         }
 
         await Outbox.StopAsync().ConfigureAwait(true);
+
+        // The loop and the outbox's deliveries have ended, so no attempt is in progress unless messaging failed.
+        await Inbox.RecordCleanStopAsync().ConfigureAwait(true);
     }
 
     /// <summary>Stops processing for this activation.</summary>
