@@ -12,7 +12,7 @@ Use the guide that matches the Orleans major version currently deployed in produ
 
 | Starting version | Recommended path | Guide |
 |------------------|------------------|-------|
-| Orleans 10.x | Establish an Orleans 10.4.0 baseline, then qualify Orleans 11.0.0-preview.1 | [Upgrade Orleans 10.x to 11](migration/10-to-11.md) |
+| Orleans 10.x | Qualify Orleans 11.0.0-preview.1, preserving existing directory partition identities | [Upgrade Orleans 10.x to 11](migration/10-to-11.md) |
 | Orleans 9.x | Update to the latest 9.x patch, then upgrade to Orleans 10.x | [Upgrade Orleans 9.x to 10.x](migration/9-to-10.md) |
 | Orleans 8.x | Update to Orleans 8.2, validate Orleans 9.2, then upgrade to Orleans 10.x | [Upgrade Orleans 8.x to 10.x](migration/8-to-10.md) |
 | Orleans 7.x | Update to the latest 7.2 patch, then validate each supported major-version checkpoint | [Upgrade Orleans 7.x to 10.x](migration/7-to-10.md) |
