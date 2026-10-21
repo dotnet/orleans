@@ -67,11 +67,12 @@ public abstract class DurableTaskCompletionDeadLetterTests : IAsyncLifetime
             cancellationToken);
         Assert.Empty(await callee.GetOutboxDeadLettersAsync());
 
-        // A new callee activation recovers the completion and must decode its stored result to deliver it.
+        // A new callee activation recovers the completion and must decode its stored result to deliver it. Its retry is due
+        // once the clock advances, so the dead letter is observed through its retirement event rather than by reading the
+        // list, which the recovered activation's retry can already have filled.
         await callee.RequestDeactivationAsync();
         await probe.CalleeDeactivated.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         _fixture.JobClock.Advance(RetryDelay * 2);
-        Assert.Empty(await callee.GetOutboxDeadLettersAsync());
         await deliveries.WaitForEventAsync(
             nameof(MessagingEvents.OutboxMessageRetired),
             evt => evt.Payload is MessagingEvents.OutboxMessageRetired retired
