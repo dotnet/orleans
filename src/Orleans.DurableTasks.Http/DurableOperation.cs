@@ -116,46 +116,80 @@ public sealed record DurableOperationError(
     [property: JsonPropertyName("message")] string Message)
 {
     /// <summary>
-    /// The code of a failed operation whose work never ran, because the grain which runs it didn't accept it, such as
-    /// when the work arrived after the grain's admission window. A client starts the work again with a new
-    /// <c>Idempotency-Key</c>.
+    /// The code of a failed operation whose work never ran, because the grain which runs it refused it without storing
+    /// it, such as when the work's identifier already names another method's task there. A client starts the work again
+    /// with a new <c>Idempotency-Key</c>.
     /// </summary>
     public const string NotStartedCode = "NotStarted";
+
+    /// <summary>
+    /// The code of a failed operation whose work's grain didn't confirm the work, so whether it ran is unknown: the
+    /// delivery of its start retired without an acknowledgement, or arrived after the grain's admission window, by which
+    /// time the grain may have run it and deleted it. A client checks the work's effects, such as the resource it
+    /// creates, before it starts the work again, so the work's side effects aren't duplicated.
+    /// </summary>
+    public const string OutcomeUnknownCode = "OutcomeUnknown";
 }
 
-/// <summary>
-/// Represents an operation whose work never ran, because the grain which runs it didn't accept it.
-/// </summary>
+/// <summary>Represents an operation whose host failed to start its work on the work's grain.</summary>
 /// <remarks>
-/// The operation's host fails with this exception when scheduling its work fails, so clients distinguish work which never
-/// ran from work which ran and failed.
+/// The operation's host fails with this exception when scheduling its work fails, so clients distinguish work which
+/// never ran, <see cref="DurableOperationError.NotStartedCode"/>, and work whose outcome is unknown,
+/// <see cref="DurableOperationError.OutcomeUnknownCode"/>, from work which ran and failed.
 /// </remarks>
 [GenerateSerializer]
-[Alias("Orleans.DurableTasks.Http.DurableOperationNotStartedException")]
-internal sealed class DurableOperationNotStartedException : Exception
+[Alias("Orleans.DurableTasks.Http.DurableOperationStartException")]
+internal sealed class DurableOperationStartException : Exception
 {
-    private DurableOperationNotStartedException()
+    private DurableOperationStartException()
     {
+        ErrorCode = DurableOperationError.OutcomeUnknownCode;
     }
 
-    public DurableOperationNotStartedException(string? code, Exception innerException)
-        : base(code is null ? "The operation's work wasn't started." : $"The operation's work wasn't started ({code}).", innerException)
+    private DurableOperationStartException(string errorCode, string message, Exception innerException)
+        : base(message, innerException)
     {
-        Code = code;
+        ErrorCode = errorCode;
     }
 
-    /// <summary>Gets the rejection code which the work's grain reported, or <see langword="null"/> for none.</summary>
+    /// <summary>
+    /// Gets the operation's error code: <see cref="DurableOperationError.NotStartedCode"/> or
+    /// <see cref="DurableOperationError.OutcomeUnknownCode"/>.
+    /// </summary>
     [Id(0)]
-    public string? Code { get; private set; }
-}
+    public string ErrorCode { get; private set; }
 
+    /// <summary>
+    /// Returns the exception which reports <paramref name="failure"/>, a failure to schedule the operation's work, or
+    /// <see langword="null"/> for another failure.
+    /// </summary>
+    /// <remarks>
+    /// Only a refusal which the work's grain makes without storing the work, a conflict or a rejection with its own code,
+    /// proves that the work never ran. A delivery which retired unacknowledged, or an invocation which arrived after the
+    /// grain's admission window, leaves the outcome unknown: the grain may have run the work, and even deleted it.
+    /// </remarks>
+    public static DurableOperationStartException? FromScheduleFailure(Exception failure) => failure switch
+    {
+        DurableTaskConflictException => NotStarted(failure),
+        DurableTaskRejectedException { Code: DurableTaskRejectionCodes.Expired } => OutcomeUnknown(failure),
+        DurableTaskRejectedException => NotStarted(failure),
+        DurableTaskDeliveryException => OutcomeUnknown(failure),
+        _ => null,
+    };
+
+    private static DurableOperationStartException NotStarted(Exception failure) =>
+        new(DurableOperationError.NotStartedCode, "The operation's work wasn't started.", failure);
+
+    private static DurableOperationStartException OutcomeUnknown(Exception failure) =>
+        new(DurableOperationError.OutcomeUnknownCode, "The operation's work wasn't confirmed, so whether it ran is unknown.", failure);
+}
 /// <summary>Describes durable task responses as operations, for every protocol which serves them.</summary>
 internal static class DurableOperationResponses
 {
     /// <summary>Returns the error which describes a failed or canceled response to clients.</summary>
     public static DurableOperationError GetError(DurableTaskResponse response, DurableHttpOptions options) => response.Exception switch
     {
-        DurableOperationNotStartedException notStarted => new(DurableOperationError.NotStartedCode, notStarted.Message),
+        DurableOperationStartException start => new(start.ErrorCode, start.Message),
         { } exception => options.CreateError(exception),
         null => throw new InvalidOperationException($"A {response.Status} response carries its exception."),
     };

@@ -45,7 +45,7 @@ internal interface IDurableOperationGrain : IGrainWithStringKey
     /// </summary>
     /// <remarks>
     /// The journal records the work once its grain holds the task, so a request which then signals or cancels the work
-    /// reaches it. An operation whose work's grain rejected the work records it as <see cref="DurableOperationWorkKind.NotStarted"/>.
+    /// reaches it. An operation whose host failed to start its work records it as <see cref="DurableOperationWorkKind.NotStarted"/>.
     /// </remarks>
     [Alias("WaitForWork"), Orleans.Concurrency.AlwaysInterleave]
     Task<DurableOperationWork?> WaitForWorkAsync(TimeSpan timeout);
@@ -59,7 +59,10 @@ internal enum DurableOperationWorkKind
     /// <summary>A durable grain call, which the operation runs.</summary>
     Run,
 
-    /// <summary>A durable grain call which the operation's grain didn't accept, so it never ran.</summary>
+    /// <summary>
+    /// A durable grain call which the operation's host failed to start on its grain: the call never ran, or whether it
+    /// ran is unknown, as the operation's error reports.
+    /// </summary>
     NotStarted,
 
     /// <summary>An existing task, which the operation subscribes to and which other parties own.</summary>
@@ -169,19 +172,12 @@ internal sealed class DurableOperationGrain(
         {
             root = await call.Detached(this.GetPrimaryKeyString()).ScheduleAsync();
         }
-        catch (Exception exception) when (exception is DurableTaskRejectedException or DurableTaskConflictException or DurableTaskDeliveryException)
+        catch (Exception exception) when (DurableOperationStartException.FromScheduleFailure(exception) is { } failure)
         {
-            // The journal records that the work never started with the operation's failure, so requests which wait for
+            // The journal records that the work wasn't started with the operation's failure, so requests which wait for
             // the work end.
             work.Value = (described with { Kind = DurableOperationWorkKind.NotStarted }).Format();
-            throw new DurableOperationNotStartedException(
-                exception switch
-                {
-                    DurableTaskRejectedException rejected => rejected.Code,
-                    DurableTaskConflictException => DurableTaskRejectionCodes.Conflict,
-                    _ => null,
-                },
-                exception);
+            throw failure;
         }
 
         var recorded = root.TryGetAddress(out var address);
