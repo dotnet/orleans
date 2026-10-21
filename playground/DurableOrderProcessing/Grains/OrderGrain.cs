@@ -135,7 +135,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         try
         {
             // The start is shielded, so a cancellation lets it finish and the workflow learns the authorization to void.
-            authorization = await _payments.StartOperationAsync(() => CreateAuthorizationRequest(order)).WithId("authorize-payment").Shielded();
+            authorization = await _payments.StartOperationAsync(() => CreateAuthorizationRequest(order, DurableTask.Current.Incarnation)).WithId("authorize-payment").Shielded();
             payment = await _payments.WaitForOperationAsync<PaymentResult>(authorization, new() { PollInterval = _options.PaymentPollInterval })
                 .WaitAsync(_options.PaymentTimeout)
                 .WithId("await-payment");
@@ -191,7 +191,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
     {
         try
         {
-            authorization ??= await _payments.StartOperationAsync(() => CreateAuthorizationRequest(order)).WithId("recover-authorization").Shielded();
+            authorization ??= await _payments.StartOperationAsync(() => CreateAuthorizationRequest(order, DurableTask.Current.Incarnation)).WithId("recover-authorization").Shielded();
             if (authorization.Location is { } location)
             {
                 await _payments.CancelOperationAsync(location, reason).WithId("void-payment").Shielded();
@@ -202,16 +202,17 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         }
     }
 
-    // Creates the order's authorization request. Its Idempotency-Key names the order, so every request for the order's
-    // authorization, including the one which voids an authorization whose location the order didn't learn, reaches the
-    // same authorization.
-    private HttpRequestMessage CreateAuthorizationRequest(OrderDetails order)
+    // Creates the order's authorization request. Its Idempotency-Key names the order and the workflow's run, so every
+    // request for the run's authorization, including the one which voids an authorization whose location the order
+    // didn't learn, reaches the same authorization, and a later run of the order's workflow ID, after its retention
+    // ended, authorizes anew. Each step of the workflow reports the workflow's incarnation.
+    private HttpRequestMessage CreateAuthorizationRequest(OrderDetails order, Guid incarnation)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "authorizations")
         {
             Content = JsonContent.Create(new PaymentAuthorizationRequest(OrderId, order.Order.Total, order.Order.CardLast4)),
         };
-        request.Headers.Add(PaymentGateway.IdempotencyKeyHeader, $"authorize-{OrderId}");
+        request.Headers.Add(PaymentGateway.IdempotencyKeyHeader, $"authorize-{OrderId}-{incarnation:N}");
         return request;
     }
 
