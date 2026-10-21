@@ -166,6 +166,65 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
     }
 
     [Fact]
+    public async Task FailedAttemptRetry_StaysCoveredByTheSendsWakeupThroughACrash()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        Deliveries.Enqueue(DeliveryFault.Throw());
+        var message = NewMessage(9, "retry-wakeup");
+
+        var id = await sender.SendAsync(receiver.GetGrainId(), Route, message);
+        var attempt = await WaitForFailedAttemptAsync(sender, id, 1);
+
+        // The retry write schedules no job of its own: the wake-up which the send ensured before it became durable keeps
+        // running while the outbox holds the entry, and its run reschedules to the retry time.
+        Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, sender.GetGrainId()));
+        var wakeup = await Fixture.RunPumpAsync(sender);
+        Assert.Equal(DurableJobRunStatus.RescheduleRequested, wakeup.Status);
+        Assert.Equal(attempt.NextAttemptAt, wakeup.RescheduleTime);
+
+        // A crash loses the activation; recovery re-arms the wake-up from the journaled retry time.
+        await _cluster.CrashAsync(sender);
+        _ = await sender.GetSnapshotAsync();
+        await _cluster.AdvanceAndRunPumpAsync(sender, RetryInterval);
+
+        await WaitForDrainedOutboxAsync(sender);
+        await AssertProcessedOnceAsync(receiver, message);
+        DeliveryResultAssert.Equal([DeliveryResult.Accepted.Instance], Deliveries.Answers);
+    }
+
+    [Fact]
+    public async Task FailedAttemptRetry_DuplicateWakeupWaitsForTheRetryWrite()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        _ = await sender.GetSnapshotAsync();
+
+        // The send is the sender's first write, and the failed attempt's retry is its second.
+        using var retryWrite = Fixture.Storage.BlockWrite(JournalId.FromGrainId(sender.GetGrainId()), matchingWrite: 2);
+        Deliveries.Enqueue(DeliveryFault.Throw());
+        var message = NewMessage(24, "retry-write");
+        await sender.SendAsync(receiver.GetGrainId(), Route, message);
+        await retryWrite.WaitUntilEnteredAsync();
+
+        // Every wake-up signals the pump's one processing loop, which is awaiting the retry write, so a duplicate wake-up
+        // after the retry time starts no attempt from the staged retry state.
+        _cluster.JobClock.Advance(RetryInterval);
+        var duplicate = Fixture.RunDuplicatePumpAsync(sender);
+        _ = await Fixture.OnGrainAsync(sender, static () => true);
+        Assert.False(duplicate.IsCompleted);
+        Assert.Equal(1, Deliveries.Executions);
+
+        // Once the retry is durable, the duplicate wake-up's pass delivers the message.
+        retryWrite.Release();
+        await duplicate;
+        await WaitForDrainedOutboxAsync(sender);
+        await AssertProcessedOnceAsync(receiver, message);
+        Assert.Equal(2, Deliveries.Executions);
+        DeliveryResultAssert.Equal([DeliveryResult.Accepted.Instance], Deliveries.Answers);
+    }
+
+    [Fact]
     public async Task LostResponse_AfterTheReceiverCommitted_IsADuplicateAtTheReceiverAndDeliveredAtTheSender()
     {
         var sender = NewGrain();
