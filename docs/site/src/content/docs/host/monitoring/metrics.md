@@ -66,8 +66,6 @@ Configure boundaries according to the application's latency objectives and expec
 
 Message-size instruments `orleans-messaging-sent-messages-size` and `orleans-messaging-received-messages-size` are histograms in `bytes`. Use their distributions for payload growth and their sums for bandwidth diagnosis. They include `ConnectionDirection`, `MessageDirection`, and sometimes a remote `silo` attribute.
 
-Use these histograms through OpenTelemetry in place of <xref:Orleans.Runtime.SiloRuntimeStatistics.SentMessages>, <xref:Orleans.Runtime.SiloRuntimeStatistics.ReceivedMessages>, and <xref:Orleans.Runtime.SiloRuntimeMetricsListener>. For a cumulative byte total, use cumulative histogram sums or accumulate delta sums from the start of collection. Aggregate across the instrument attributes while retaining the emitting silo's identity; the `silo` instrument attribute identifies the remote silo. If several silos or clients share a process, scope collection to each runtime's meter instance. Totals cover traffic recorded since collection began, so start collection during host startup to include startup traffic.
-
 ### Scheduling and activations
 
 | Instrument | Type and unit | Meaning and interpretation |
