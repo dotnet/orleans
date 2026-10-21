@@ -38,7 +38,7 @@ command even when producers and consumers are deployed at different times.
 
 ## Transport deduplication
 
-The inbox bounds a newly admitted or extended `SentAt` by the receiver's Durable
+For deliveries, the inbox bounds a newly admitted or extended `SentAt` by the receiver's Durable
 Jobs time plus
 <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>;
 equality is admitted. A tracked identity with an equal or earlier send time gets
@@ -49,6 +49,10 @@ For an untracked identity, expiration at the admission floor takes precedence;
 otherwise, a time beyond the bound throws the same exception. The sender retries
 within its original budget, so diagnose clock skew or an incorrectly stamped
 direct caller.
+
+A grain's messages to itself use its local staging time, or the first time above
+the admission floor after a backward clock jump. The latter remains just beyond
+the floor for compaction, even when it exceeds the delivery-time bound.
 
 Each receiver checks the exact `MessageId`, which identifies one command at that
 receiver regardless of sender or subject. A parent and its child are independent
