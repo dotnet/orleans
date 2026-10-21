@@ -10,6 +10,9 @@ namespace Orleans.Journaling;
 /// </summary>
 /// <typeparam name="TKey">The type of keys in the dictionary.</typeparam>
 /// <typeparam name="TValue">The type of values in the dictionary.</typeparam>
+/// <remarks>
+/// The dictionary takes ownership of the keys and values passed to it, and the journal records each mutation when it is made. To change a value, assign a new instance.
+/// </remarks>
 public interface IDurableDictionary<TKey, TValue> : IDictionary<TKey, TValue> where TKey : notnull
 {
 }

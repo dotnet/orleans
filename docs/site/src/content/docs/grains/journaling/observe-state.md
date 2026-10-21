@@ -45,6 +45,8 @@ Each change is tagged with an activation-local write version: the version of the
 
 ## Watch values and collections
 
+Durable state takes ownership of the values, items, and entries passed to it, and the journal records each change when it is made. To change one, assign or append a new instance. Watch streams deliver those same instances, so an observed change matches what its write stored.
+
 <xref:Orleans.Journaling.DurableStateWatchExtensions> provides `WatchAsync` for each built-in state type:
 
 | State | Event type | Change kinds |
