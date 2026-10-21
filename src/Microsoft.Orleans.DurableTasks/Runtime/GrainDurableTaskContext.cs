@@ -56,7 +56,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// </remarks>
 internal sealed class GrainDurableTaskContext : DurableTaskContext
 {
-    internal static readonly LocalRequestOptions SegmentOptions = new();
+    private static readonly LocalRequestOptions SegmentOptions = new();
 
     private readonly IDurableTaskGrainRuntime _runtime;
     private readonly IGrainContext _grainContext;
