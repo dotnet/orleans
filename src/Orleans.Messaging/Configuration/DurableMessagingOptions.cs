@@ -69,8 +69,9 @@ public class DurableMessagingOptions
     /// and survives recovery and migration. A processed record becomes eligible for removal once its
     /// <see cref="InboxMessage.SentAt"/> is at or below the durable floor. A message the inbox doesn't track whose send
     /// time is at or below the floor receives <see cref="DeliveryStatus.Expired"/>, including after a backward clock
-    /// jump. A delivery whose send time is later than the inbox's clock plus this window is rejected without staging
-    /// anything, so every record becomes eligible for removal within twice this window of the receiver's clock.
+    /// jump. The inbox never stores a send time later than its clock plus this window: it rejects such a delivery without
+    /// staging anything when the message is untracked or the time would extend its record. Every record therefore becomes
+    /// eligible for removal within twice this window of the receiver's clock.
     /// </para>
     /// <para>
     /// Clock jumps and skew change when messages expire and how long records are retained; deduplication follows the
