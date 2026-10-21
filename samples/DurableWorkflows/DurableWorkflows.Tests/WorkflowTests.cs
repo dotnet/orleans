@@ -234,6 +234,24 @@ public sealed class WorkflowTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SagaRejectsAnOrderWhichIsntItsGrains()
+    {
+        var orderId = UniqueId();
+        var otherOrderId = UniqueId();
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            RunAsync(Client.GetGrain<IWorkflowGrain>(orderId).RunOrderSagaAsync(new(otherOrderId, FailShipping: false)), $"order-{orderId}"));
+
+        // The saga fails before it starts a step, so neither order's participants record an effect.
+        Assert.Contains(otherOrderId, exception.Message, StringComparison.Ordinal);
+        foreach (var id in new[] { orderId, otherOrderId })
+        {
+            Assert.Empty((await Client.GetGrain<IInventoryGrain>(id).GetSnapshotAsync()).Effects);
+            Assert.Empty((await Client.GetGrain<IPaymentGrain>(id).GetSnapshotAsync()).Effects);
+        }
+    }
+
+    [Fact]
     public async Task SuccessfulSagaDoesNotCompensate()
     {
         var orderId = UniqueId();
