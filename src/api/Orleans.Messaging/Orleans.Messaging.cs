@@ -221,7 +221,7 @@ namespace Orleans.Messaging
         bool RemoveOutboxDeadLetter(MessageId messageId);
     }
 
-    [Alias("IMessagingExtension")]
+    [Alias("Orleans.Messaging.IMessagingExtension")]
     public partial interface IMessagingExtension : Runtime.IGrainExtension, Runtime.IAddressable
     {
         [Alias("DeliverAsync")]

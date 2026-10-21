@@ -102,10 +102,17 @@ internal sealed partial class DurableTaskGrainRuntime(
     IDurableTaskGrainExtension,
     IDurableTaskManager,
     IStateMachine,
+    IReportsStagedChanges,
     IOutboxMessageSource,
     IInboxWorkSource
 {
     /// <summary>The journal state machine name of the runtime's commit hook.</summary>
+    /// <remarks>
+    /// The hook journals no entries of its own: the runtime stages every change in the built-in durable states which hold
+    /// its task state, which report each change, and the effects it runs after a write follow those changes. It therefore
+    /// reports its changes (<see cref="IReportsStagedChanges"/>), so Messaging can tell whether a failed handler attempt
+    /// staged anything.
+    /// </remarks>
     internal const string StateMachineName = "orleans.durable-tasks.runtime";
 
     // The runtime's state is confined to the activation's scheduler, as grain state is.

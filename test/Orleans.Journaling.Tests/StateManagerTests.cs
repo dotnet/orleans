@@ -84,6 +84,26 @@ public partial class StateManagerTests : JournalingTestBase
         await manager.WriteStateAsync(CancellationToken.None);
         Assert.Equal(afterValue, manager.StagedChangeCount);
     }
+
+    [Fact]
+    public async Task StagedChangeCount_IsUnknownWhileAStateJournalsChangesItCannotObserve()
+    {
+        var sut = CreateTestSystem();
+        var manager = Assert.IsType<JournaledStateManager>(sut.Manager);
+        IPersistentState<List<int>> persistent = new JournaledPersistentState<List<int>>(
+            "persistent",
+            manager,
+            new OrleansBinaryPersistentStateCommandCodec<List<int>>(CodecProvider.GetCodec<List<int>>(), SessionPool),
+            CodecProvider.GetActivator<List<int>>());
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        // A persistent state's object is mutated in place and serialized whole at capture, so no reading can show that
+        // this change was staged; the count reports that it can't tell.
+        persistent.State.Add(1);
+
+        Assert.True(manager.StagedChangeCount < 0);
+    }
+
     [Fact]
     public async Task StateManager_Initialize_UsesStreamingStorageRead()
     {

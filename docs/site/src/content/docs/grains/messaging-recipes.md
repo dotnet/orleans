@@ -30,11 +30,10 @@ Grains inject the application's `Messages` class, whose
 The [Messaging sample](https://github.com/dotnet/orleans/tree/main/samples/Messaging)
 runs an order grain and a stock grain in one localhost silo. Three independent
 hierarchical command IDs exercise acceptance, insufficient stock, and invalid
-quantity. For each command, the host arms an explicit journal-acknowledgement
-observer before submission, awaits the typed reply's acknowledgement, and resubmits
-the same immutable command. It verifies `Duplicate` admission for successful and
-rejected commands, unchanged stock for rejections, and one stock decrement per
-command ID using acknowledged replies and state snapshots.
+quantity. The order grain sends each command through its outbox and waits for the
+stock grain's typed reply, which reaches the order grain's inbox. The host verifies
+that each command receives its own outcome, that rejections leave stock unchanged,
+and that the stock grain processes each command once.
 
 From the repository root:
 

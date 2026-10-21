@@ -278,8 +278,9 @@ tracked message with an equal or earlier `SentAt` still receives its recorded
 outcome, including after the receiver's clock steps backward, and an untracked
 message at or below the floor still receives `Expired`. A grain's messages to itself
 use its clock, or the first time above the floor after a backward clock jump.
-Completed records become eligible for removal within twice the window of the
-receiver's clock, or just after the floor when a self-send follows a backward jump.
+Pending messages stay until they are processed, and completed records become eligible
+for removal within twice the window of the receiver's clock, or just after the floor
+when a self-send follows a backward jump.
 
 A resend with a later `SentAt` extends a tracked pending or completed record.
 The receiver persists that extension before returning `Duplicate` or the original

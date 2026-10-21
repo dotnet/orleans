@@ -245,6 +245,7 @@ public sealed class EnvelopeContractTests
         Assert.Null(typeof(Envelope).GetCustomAttribute<ImmutableAttribute>());
         Assert.Single(typeof(Envelope).GetCustomAttributes<GenerateSerializerAttribute>());
         Assert.Equal("Orleans.Messaging.Envelope", typeof(Envelope).GetCustomAttribute<AliasAttribute>()!.Alias);
+        Assert.Equal("Orleans.Messaging.IMessagingExtension", typeof(IMessagingExtension).GetCustomAttribute<AliasAttribute>()!.Alias);
         Assert.Equal(typeof(DateTimeOffset?), typeof(Envelope).GetProperty("DeliverAt")!.PropertyType);
         Assert.Equal(new[] { "DeliverAt", "Headers", "MessageId", "Payload", "Subject" }, typeof(Envelope).GetProperties().Select(p => p.Name).Order(StringComparer.Ordinal));
         Assert.Null(typeof(Envelope).Assembly.GetType("Orleans.Messaging.PackedEnvelopeHeaders"));

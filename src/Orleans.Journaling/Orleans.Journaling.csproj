@@ -27,7 +27,9 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Benchmarks" />
     <InternalsVisibleTo Include="Orleans.Journaling.Tests" />
+    <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks" />
     <InternalsVisibleTo Include="Orleans.Messaging" />
+    <InternalsVisibleTo Include="Orleans.Messaging.Tests" />
     <InternalsVisibleTo Include="Orleans.Journaling.Json.Tests" />
     <InternalsVisibleTo Include="Orleans.Journaling.AzureStorage" />
     <InternalsVisibleTo Include="Orleans.Journaling.S3" />

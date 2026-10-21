@@ -172,6 +172,31 @@ public abstract class DurableTaskFaultClassificationTests(string journalFormatKe
     }
 
     /// <summary>
+    /// A handler attempt which fails before it stages anything on a durable task grain is retried by the same activation:
+    /// the durable task states report every change they stage, so Messaging can tell that the attempt staged none.
+    /// </summary>
+    [Fact]
+    public async Task FailedHandlerAttemptOnADurableTaskGrainIsRetriedByTheSameActivation()
+    {
+        var workflow = _harness.Client.GetGrain<IFaultWorkflowGrain>(Guid.NewGuid());
+        var partnerKey = Guid.NewGuid();
+        await workflow.GetStateAsync();
+        Assert.True(_harness.Fixture.Cluster.TryGetGrainContext(workflow.GetGrainId(), out var activation));
+        _harness.Injector.Reset();
+        var fault = _harness.Injector.Arm(FaultPoint.InboxHandlerThrows, workflow.GetGrainId(), 0, Resume);
+
+        await RunForResultAsync(
+            workflow,
+            FaultScenario.RootId,
+            token => workflow.PipelineAsync(partnerKey, FaultScenario.RootId).WithId(FaultScenario.RootId).ScheduleAsync(token));
+
+        Assert.True(fault.HasFired, $"{fault} didn't fire.");
+        Assert.True(_harness.Fixture.Cluster.TryGetGrainContext(workflow.GetGrainId(), out var current));
+        Assert.Same(activation, current);
+        Assert.False(activation.Deactivated.IsCompleted);
+    }
+
+    /// <summary>
     /// A delivery which the receiver admitted before a failed write fenced its journal reaches the inbox while the fenced
     /// activation deactivates: the inbox's sink fails to stage it, the sender retries, and the next activation accepts the
     /// message exactly once.

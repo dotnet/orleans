@@ -166,6 +166,34 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
     }
 
     [Fact]
+    public async Task FailedAttemptRetry_StaysCoveredByTheSendsWakeupThroughACrash()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        Deliveries.Enqueue(DeliveryFault.Throw());
+        var message = NewMessage(9, "retry-wakeup");
+
+        var id = await sender.SendAsync(receiver.GetGrainId(), Route, message);
+        var attempt = await WaitForFailedAttemptAsync(sender, id, 1);
+
+        // The retry write schedules no job of its own: the wake-up which the send ensured before it became durable keeps
+        // running while the outbox holds the entry, and its run reschedules to the retry time.
+        Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, sender.GetGrainId()));
+        var wakeup = await Fixture.RunPumpAsync(sender);
+        Assert.Equal(DurableJobRunStatus.RescheduleRequested, wakeup.Status);
+        Assert.Equal(attempt.NextAttemptAt, wakeup.RescheduleTime);
+
+        // A crash loses the activation; recovery re-arms the wake-up from the journaled retry time.
+        await _cluster.CrashAsync(sender);
+        _ = await sender.GetSnapshotAsync();
+        await _cluster.AdvanceAndRunPumpAsync(sender, RetryInterval);
+
+        await WaitForDrainedOutboxAsync(sender);
+        await AssertProcessedOnceAsync(receiver, message);
+        Assert.Equal([DeliveryStatus.Accepted], Deliveries.Answers);
+    }
+
+    [Fact]
     public async Task LostResponse_AfterTheReceiverCommitted_IsADuplicateAtTheReceiverAndDeliveredAtTheSender()
     {
         var sender = NewGrain();

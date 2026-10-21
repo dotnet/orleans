@@ -58,7 +58,8 @@ try
 
     var snapshot = await stock.GetSnapshotAsync().WaitAsync(timeout.Token);
     Require(snapshot.Inventory is { Remaining: 8, Reservations: 1, ProcessedRequests: 3 },
-        "The stock grain processes each command once.");    Console.WriteLine("VERIFIED: remaining stock=8, reservations=1, processed requests=3.");
+        "The stock grain processes each command once.");
+    Console.WriteLine("VERIFIED: remaining stock=8, reservations=1, processed requests=3.");
     Console.WriteLine("Volatile storage keeps journals and jobs in memory for the host's lifetime.");
 }
 finally

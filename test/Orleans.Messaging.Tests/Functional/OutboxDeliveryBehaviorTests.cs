@@ -19,6 +19,22 @@ public sealed class OutboxDeliveryBehaviorTests : MessagingBehaviorTestBase
     }
 
     [Fact]
+    public async Task OutboxSends_ReportTheirStagedChanges()
+    {
+        // The outbox journals every send when it is staged, so a failed handler attempt can tell whether it sent
+        // anything, and an unrelated failure doesn't cost the activation.
+        var sender = NewGrain();
+        _ = await sender.GetSnapshotAsync();
+        var pump = Fixture.GetGrainContext(sender).ActivationServices.GetRequiredService<MessagingPump>();
+        var before = await Fixture.OnGrainAsync(sender, () => pump.StagedChangeCount);
+
+        _ = await sender.StageWithoutCommitAsync(NewGrain().GetGrainId(), "messages/staged-change", NewMessage(150, "staged-change"));
+
+        Assert.True(before >= 0);
+        Assert.True(await Fixture.OnGrainAsync(sender, () => pump.StagedChangeCount) > before);
+    }
+
+    [Fact]
     public async Task StagedOutboxWithoutCommit_IsRemovedOnReactivationAndNeverDispatched()
     {
         var sender = NewGrain();

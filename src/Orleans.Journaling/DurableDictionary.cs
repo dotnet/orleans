@@ -19,7 +19,7 @@ public interface IDurableDictionary<TKey, TValue> : IDictionary<TKey, TValue> wh
 
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue>, IStateMachine, IDurableDictionaryCommandHandler<TKey, TValue>,
+internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue>, IStateMachine, IReportsStagedChanges, IDurableDictionaryCommandHandler<TKey, TValue>,
     IResyncSource<DictionaryChange<TKey, TValue>> where TKey : notnull
 {
     private readonly IDurableDictionaryCommandCodec<TKey, TValue> _codec;

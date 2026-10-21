@@ -23,7 +23,8 @@ namespace Orleans.Messaging;
 /// A source withdraws a pending message through <see cref="IOutbox.Withdraw"/>, for example after the application times
 /// it out or an administrator removes it, and releases its payload in the same journal write. The outbox removes the
 /// entry without calling <see cref="OnRetired"/> and makes no further delivery attempt. An attempt already in flight can
-/// still deliver the message.
+/// still deliver the message and reads the buffers which <see cref="TryGetMessage"/> returned, so keep them unchanged:
+/// release them by dropping references rather than reusing them.
 /// </para>
 /// <para>
 /// A source which can't provide a pending message after its send, for example because its stored payload no longer
