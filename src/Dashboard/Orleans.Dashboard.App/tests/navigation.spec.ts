@@ -130,8 +130,9 @@ for (const { path, endpoint } of [
     await firstRequest;
     await page.clock.runFor(5_000);
     expect(requests).toBe(1);
+    const response = page.waitForResponse(endpoint);
     release();
-    await expect.poll(() => requests).toBe(1);
+    await (await response).finished();
     await page.clock.runFor(1_000);
     await expect.poll(() => requests).toBe(2);
   });
