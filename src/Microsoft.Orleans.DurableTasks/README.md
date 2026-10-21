@@ -343,7 +343,10 @@ synchronously on the activation which makes them, when the runtime stages them: 
   method `[AlwaysInterleave]` or the grain class `[Reentrant]`, or await the task
   from durable code, whose durable wait ends its segment. A non-reentrant
   request which waits instead holds the segments behind itself until the call
-  times out.
+  times out. Code which holds the grain's exclusive section, such as a
+  transaction, holds the segments back until it closes the section, even from
+  an `[AlwaysInterleave]` method, so it waits for its grain's tasks only
+  outside the section.
 - The runtime is an inbox work source: while the grain holds a runnable
   execution, one whose segment runs or is about to run, Messaging keeps the
   grain's Durable Jobs wake-up, which a journal write ensures before it becomes
