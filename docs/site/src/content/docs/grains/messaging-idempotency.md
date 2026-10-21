@@ -38,14 +38,17 @@ command even when producers and consumers are deployed at different times.
 
 ## Transport deduplication
 
-An incoming delivery's `SentAt` must be at or before the receiver's Durable Jobs
-time plus
-<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>.
-The boundary itself is admitted. A later time throws
-<xref:System.ArgumentOutOfRangeException> before deduplication, with no staged
-change or sink offer. This also protects already-tracked records from a
-far-future retention extension. The sender retries within its original budget,
-so diagnose and correct clock skew or an incorrectly stamped direct caller.
+The inbox bounds a newly admitted or extended `SentAt` by the receiver's Durable
+Jobs time plus
+<xref:Orleans.Messaging.Configuration.DurableMessagingOptions.DeduplicationWindow>;
+equality is admitted. A tracked identity with an equal or earlier send time gets
+its recorded answer, including after a receiver clock rollback puts that time
+beyond the bound. A later send time beyond the bound throws
+<xref:System.ArgumentOutOfRangeException> with no staged change or sink offer.
+For an untracked identity, expiration at the admission floor takes precedence;
+otherwise, a time beyond the bound throws the same exception. The sender retries
+within its original budget, so diagnose clock skew or an incorrectly stamped
+direct caller.
 
 Each receiver checks the exact `MessageId`, which identifies one command at that
 receiver regardless of sender or subject. A parent and its child are independent

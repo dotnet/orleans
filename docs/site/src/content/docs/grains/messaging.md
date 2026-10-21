@@ -339,8 +339,8 @@ write, and a later pass processes it.
 
 Deliveries to the grain, through
 <xref:Orleans.Messaging.IMessagingExtension.DeliverAsync*>, interleave with the
-grain's other requests. A delivery validates the envelope and the future-send-time
-bound before deduplication, then stages the message's
+grain's other requests. A delivery validates the envelope, recognizes recorded
+outcomes, and validates any newly stored send time before staging the message's
 acceptance synchronously, then waits for that journal write; concurrent deliveries
 share journal writes. Inbox message sinks run synchronously within the delivery, so a
 sink can run while a request is suspended at an `await`, as handlers can.
@@ -429,10 +429,13 @@ The inbox detects staged changes through the journal's staged change count.
 
 ## Backpressure, retries, and dead letters
 
-The inbox rejects an incoming `SentAt` later than its Durable Jobs time plus
-`DeduplicationWindow` with <xref:System.ArgumentOutOfRangeException>. Equality is
-admitted. The check precedes deduplication, so a far-future timestamp stages
-nothing and extends no pending or completed record. The outbox treats the
+The inbox bounds a newly admitted or extended `SentAt` by its Durable Jobs time
+plus `DeduplicationWindow`; equality is admitted. A tracked message with an equal
+or earlier time receives its recorded answer even after a receiver clock rollback.
+An untracked message at or below the admission floor receives `Expired`, including
+when the floor is above that bound. A time that would otherwise be admitted or
+extend retention beyond the bound throws <xref:System.ArgumentOutOfRangeException>,
+with no staged change or sink offer. The outbox treats the
 exception as a failed attempt, preserving the original `SentAt` and retrying until
 `SentAt + OutboxRetryTimeout`; retry exhaustion retires the send as `DeadLettered`
 with an unknown earlier outcome. Messages staged directly in the sending grain's
