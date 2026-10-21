@@ -84,6 +84,8 @@ API: <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?d
 
 During migration, compatibility system targets bridge the two directory protocols. A distributed-default silo serves legacy remote-directory requests through its distributed directory, so old callers and new callers reach the same authority. Local-directory silos expose compatibility endpoints for distributed partition requests and activation recovery. Directory registration and handoff retain each live activation's authoritative address as ownership moves.
 
+Directory membership views carry confirmed owner-recovery capabilities. Before a distributed registration commits in a mixed-directory view, legacy owner-change handling applies that view. Transitions involving legacy ownership invalidate affected activations so later calls recreate them through the current owner. Fully recovery-capable ranges use snapshot transfer and range recovery to preserve surviving activations.
+
 The local-to-distributed transition is one-way. First upgrade all silo runtimes while explicitly retaining the local directory, then migrate the directory in a separate rolling deployment. Keep one partition per silo and the default boundary function during that migration. Existing experimental distributed-directory clusters retain their original partition identities, including the sorted 30-partition mapping used by earlier experimental releases. The [upgrade procedure](../host/grain-directory.md#local-to-distributed-directory-upgrade) defines deployment prerequisites and checkpoints.
 
 ## Tradeoffs
