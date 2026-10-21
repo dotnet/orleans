@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Storage;
+using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using Orleans.Persistence.TestKit;
 using UnitTests.StorageTests.Relational;
@@ -97,6 +98,31 @@ namespace Tester.AdoNet.Persistence
             this.fixture.DatabaseStorage,
             deleteStateOnClear: false,
             TestContext.Current.CancellationToken);
+
+        [Fact]
+        public async Task ReapplyingScriptRepairsVersionCommittedPastMaximum()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var storage = this.fixture.Storage;
+            var key = $"version-repair-{Guid.NewGuid():N}";
+            var grainId = GrainId.Create("version-repair", key);
+            const string grainType = "sqlite-version-repair-grain";
+            var grainState = new GrainState<TestState1> { State = new TestState1 { A = "committed-past-maximum" } };
+            await storage.WriteStateAsync(grainType, grainId, grainState, cancellationToken);
+            var updated = await this.fixture.DatabaseStorage.ExecuteAsync(
+                "UPDATE OrleansStorage SET Version = 2147483648 WHERE GrainIdExtensionString = @GrainKey",
+                command => command.AddParameter("GrainKey", key),
+                cancellationToken: cancellationToken);
+            Assert.Equal(1, updated);
+
+            await this.fixture.InitializeSchemaAsync(cancellationToken);
+            var read = new GrainState<TestState1>();
+            await storage.ReadStateAsync(grainType, grainId, read, cancellationToken);
+            read.State = new TestState1 { A = "written-after-repair" };
+            await storage.WriteStateAsync(grainType, grainId, read, cancellationToken);
+
+            Assert.Equal("2", read.ETag);
+        }
 
         [Fact]
         public async Task HashCollisionWriteReadWriteRead()

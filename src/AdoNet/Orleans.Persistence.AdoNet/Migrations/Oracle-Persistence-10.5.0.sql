@@ -159,3 +159,10 @@ CREATE OR REPLACE FUNCTION DeleteStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAI
     RETURN(newGrainStateVersion);
   END;
 /
+
+-- Releases before 10.5.0 could commit a version past 2147483647 before failing to read it back.
+-- Move such versions onto the same cycle used by the wrapping writes.
+UPDATE ORLEANSSTORAGE
+SET VERSION = MOD(VERSION - 1, 2147483647) + 1
+WHERE VERSION > 2147483647;
+COMMIT;

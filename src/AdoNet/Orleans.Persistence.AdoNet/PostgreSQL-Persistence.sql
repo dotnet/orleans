@@ -11,6 +11,7 @@ CREATE TABLE OrleansStorage
     modifiedon timestamptz NOT NULL,
     -- The next version wraps from 2147483647 back to 1 so a frequently written grain never overflows.
     -- Orleans compares versions only for equality, so the version must change on every write but does not need to increase forever.
+    -- A stale version can only match again after 2147483647 further writes to the same grain.
     version integer
 );
 

@@ -46,7 +46,8 @@
 --
 -- 8. The next Version wraps from 2147483647 back to 1 so a frequently written grain never overflows
 -- the 32-bit Version. Orleans compares versions only for equality, so the version must change on
--- every write but does not need to increase forever.
+-- every write but does not need to increase forever. A stale version can only match again after
+-- 2147483647 further writes to the same grain.
 CREATE TABLE IF NOT EXISTS OrleansStorage
 (
     -- These are for the book keeping. Orleans calculates
@@ -189,3 +190,9 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
         AND @GrainStateVersion IS NOT NULL;
 ')
 ON CONFLICT(QueryKey) DO UPDATE SET QueryText = excluded.QueryText;
+
+-- Releases before 10.5.0 could commit a version past 2147483647 before failing to read it back.
+-- Reapplying this script moves such versions onto the same cycle used by the wrapping writes.
+UPDATE OrleansStorage
+SET Version = (Version - 1) % 2147483647 + 1
+WHERE Version > 2147483647;
