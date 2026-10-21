@@ -15,9 +15,9 @@ namespace Orleans.Runtime.Providers
     {
         private readonly IConsistentRingProvider consistentRingProvider;
         private readonly InsideRuntimeClient runtimeClient;
-        private readonly IStreamPubSub grainBasedPubSub;
-        private readonly IStreamPubSub implictPubSub;
-        private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
+        private readonly IStreamPubSubRuntime grainBasedPubSub;
+        private readonly IStreamPubSubRuntime implictPubSub;
+        private readonly IStreamPubSubRuntime combinedGrainBasedAndImplicitPubSub;
         private readonly ILoggerFactory loggerFactory;
         private readonly ILocalSiloDetails siloDetails;
         private readonly IGrainContextAccessor grainContextAccessor;
@@ -49,7 +49,7 @@ namespace Orleans.Runtime.Providers
             this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
         }
 
-        public IStreamPubSub? PubSub(StreamPubSubType pubSubType)
+        public IStreamPubSubRuntime? PubSub(StreamPubSubType pubSubType)
         {
             switch (pubSubType)
             {

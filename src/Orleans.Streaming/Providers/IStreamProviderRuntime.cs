@@ -28,7 +28,7 @@ namespace Orleans.Streams
         /// A Pub Sub runtime interface.
         /// </summary>
         /// <returns></returns>
-        IStreamPubSub? PubSub(StreamPubSubType pubSubType);
+        IStreamPubSubRuntime? PubSub(StreamPubSubType pubSubType);
     }
 
     /// <summary>
@@ -41,6 +41,18 @@ namespace Orleans.Streams
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
+            CancellationToken cancellationToken);
+    }
+
+    internal interface IStreamPubSubRuntime : IStreamPubSub
+    {
+        /// <summary>
+        /// Durably removes a subscription already detached by the requesting producer, and notifies the other producers.
+        /// </summary>
+        Task UnregisterConsumerFromProducer(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            GrainId producer,
             CancellationToken cancellationToken);
     }
 

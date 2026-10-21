@@ -1,8 +1,11 @@
 using Amazon.Kinesis;
 using Amazon.Kinesis.Model;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using Orleans.Configuration;
+using Orleans.Serialization;
 using Orleans.Streaming.Kinesis;
 using Orleans.Streams;
 using TestExtensions;
@@ -94,6 +97,205 @@ public sealed class KinesisRuntimeTests
     }
 
     [Fact]
+    public void QueueAdapterFactoryIsRewindable()
+    {
+        var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<KinesisBatchContainer.Body>>();
+        using var factory = new KinesisAdapterFactory(
+            "Kinesis",
+            new KinesisStreamOptions(),
+            new SimpleQueueCacheOptions(),
+            serializer,
+            checkpointerFactory: null,
+            NullLoggerFactory.Instance);
+
+        Assert.True(factory.IsRewindable);
+        Assert.Equal(StreamProviderDirection.ReadWrite, factory.Direction);
+    }
+
+    [Fact]
+    public void ReceiverAndCacheCreationRequireAdapterInitialization()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var factory = new KinesisAdapterFactory(
+            "Kinesis",
+            new KinesisStreamOptions(),
+            new SimpleQueueCacheOptions(),
+            services.GetRequiredService<Serializer<KinesisBatchContainer.Body>>(),
+            Substitute.For<IStreamQueueCheckpointerFactory>(),
+            NullLoggerFactory.Instance);
+        var queueId = QueueId.GetQueueId("queue", 0, 0);
+
+        var receiverException = Assert.Throws<InvalidOperationException>(() => factory.CreateReceiver(queueId));
+        var cacheException = Assert.Throws<InvalidOperationException>(() => factory.CreateQueueCache(queueId));
+
+        Assert.Contains(nameof(KinesisAdapterFactory.CreateAdapter), receiverException.Message, StringComparison.Ordinal);
+        Assert.Equal(receiverException.Message, cacheException.Message);
+    }
+
+    [Fact]
+    public async Task ConcurrentCreateAdapterCallsInitializeOnce()
+    {
+        const int callerCount = 8;
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var factory = new BlockingKinesisAdapterFactory(
+            services.GetRequiredService<Serializer<KinesisBatchContainer.Body>>());
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var invoked = new CountdownEvent(callerCount);
+        var tasks = Enumerable.Range(0, callerCount).Select(async _ =>
+        {
+            await start.Task;
+            var operation = factory.CreateAdapter(TestContext.Current.CancellationToken);
+            invoked.Signal();
+            return await operation;
+        }).ToArray();
+
+        start.SetResult();
+        await Task.Run(
+            () => invoked.Wait(TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+
+        var partitionDiscoveryCount = factory.PartitionDiscoveryCount;
+        factory.CompletePartitionDiscovery();
+
+        var adapters = await Task.WhenAll(tasks);
+        Assert.Equal(1, partitionDiscoveryCount);
+        Assert.Equal(1, factory.PartitionDiscoveryCount);
+        Assert.All(adapters, adapter => Assert.Same(factory, adapter));
+    }
+
+    [Fact]
+    public async Task ReceiverAndCacheCreationRemainUnavailableDuringAdapterInitialization()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var factory = new BlockingKinesisAdapterFactory(
+            services.GetRequiredService<Serializer<KinesisBatchContainer.Body>>(),
+            Substitute.For<IStreamQueueCheckpointerFactory>());
+        var initialization = factory.CreateAdapter(TestContext.Current.CancellationToken);
+        await factory.PartitionDiscoveryStarted.WaitAsync(TestContext.Current.CancellationToken);
+        var queueId = QueueId.GetQueueId("queue", 0, 0);
+
+        Assert.Throws<InvalidOperationException>(() => factory.CreateReceiver(queueId));
+        Assert.Throws<InvalidOperationException>(() => factory.CreateQueueCache(queueId));
+
+        factory.CompletePartitionDiscovery();
+        Assert.Same(factory, await initialization);
+        Assert.NotNull(factory.GetStreamQueueMapper());
+    }
+
+    [Fact]
+    public async Task PooledReceiver_ReadsAndDisposesLifecycleCancellationOnShutdown()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        client.GetShardIteratorAsync(
+                Arg.Any<GetShardIteratorRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new GetShardIteratorResponse { ShardIterator = "iterator" });
+        client.GetRecordsAsync(Arg.Any<GetRecordsRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new GetRecordsResponse
+            {
+                NextShardIterator = "iterator",
+                Records = [],
+            });
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
+        var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>()).Returns(checkpointer);
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<KinesisBatchContainer.Body>>();
+        var timeProvider = new FakeTimeProvider();
+        var topologyMonitor = new KinesisShardTopologyMonitor(
+            client,
+            "stream",
+            ["shard-1"],
+            TimeSpan.FromMinutes(1),
+            timeProvider,
+            NullLogger<KinesisShardTopologyMonitor>.Instance);
+        var receiver = new KinesisPooledAdapterReceiver(
+            client,
+            "stream",
+            "shard-1",
+            checkpointerFactory,
+            new SimpleQueueCacheOptions(),
+            serializer,
+            NullLoggerFactory.Instance,
+            topologyMonitor,
+            TimeSpan.Zero,
+            timeProvider);
+        var lifecycleCancellationToken = receiver.LifecycleCancellationToken;
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+
+        Assert.Empty(await receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+
+        await client.Received(1).GetRecordsAsync(
+            Arg.Any<GetRecordsRequest>(),
+            Arg.Any<CancellationToken>());
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+        Assert.True(lifecycleCancellationToken.IsCancellationRequested);
+        Assert.Throws<ObjectDisposedException>(() => _ = receiver.LifecycleCancellationToken);
+    }
+
+    private sealed class BlockingKinesisAdapterFactory(
+        Serializer<KinesisBatchContainer.Body> serializer,
+        IStreamQueueCheckpointerFactory? checkpointerFactory = null)
+        : KinesisAdapterFactory(
+            "Kinesis",
+            new KinesisStreamOptions
+            {
+                StreamName = "stream",
+                Service = "http://localhost:4566",
+                AccessKey = "access-key",
+                SecretKey = "secret-key",
+            },
+            new SimpleQueueCacheOptions(),
+            serializer,
+            checkpointerFactory,
+            NullLoggerFactory.Instance)
+    {
+        private readonly TaskCompletionSource _partitionDiscovery =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _partitionDiscoveryStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _partitionDiscoveryCount;
+
+        public int PartitionDiscoveryCount => Volatile.Read(ref _partitionDiscoveryCount);
+
+        public Task PartitionDiscoveryStarted => _partitionDiscoveryStarted.Task;
+
+        public void CompletePartitionDiscovery() => _partitionDiscovery.SetResult();
+
+        internal override async Task<string[]> GetPartitionIdsAsync(CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _partitionDiscoveryCount);
+            _partitionDiscoveryStarted.TrySetResult();
+            await _partitionDiscovery.Task.WaitAsync(cancellationToken);
+            return ["shard-1"];
+        }
+    }
+
+    [Fact]
+    public async Task InitialShardIteratorUsesTrimHorizonWhenNoCheckpointExists()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
+        var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>()).Returns(checkpointer);
+        client.GetShardIteratorAsync(Arg.Any<GetShardIteratorRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new GetShardIteratorResponse { ShardIterator = "iterator-1" }));
+        var receiver = CreateReceiver(client, checkpointerFactory, new FakeTimeProvider());
+
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+
+        await client.Received(1).GetShardIteratorAsync(
+            Arg.Is<GetShardIteratorRequest>(request =>
+                request.ShardIteratorType == ShardIteratorType.TRIM_HORIZON
+                && request.StartingSequenceNumber == null),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task TopologyMonitorLatchesWhenShardSetChanges()
     {
         var client = Substitute.For<IAmazonKinesis>();
@@ -147,6 +349,99 @@ public sealed class KinesisRuntimeTests
                 request.ShardIteratorType == ShardIteratorType.AFTER_SEQUENCE_NUMBER
                 && request.StartingSequenceNumber == "123"),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ReceiverAssignsMonotonicallyIncreasingLocalOrdinalsAcrossReads()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
+        var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>()).Returns(checkpointer);
+        client.GetShardIteratorAsync(Arg.Any<GetShardIteratorRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new GetShardIteratorResponse { ShardIterator = "iterator-1" }));
+        client.GetRecordsAsync(Arg.Any<GetRecordsRequest>(), Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromResult(new GetRecordsResponse
+                {
+                    NextShardIterator = "iterator-2",
+                    Records = [
+                        new Amazon.Kinesis.Model.Record { SequenceNumber = "10", Data = new MemoryStream() },
+                        new Amazon.Kinesis.Model.Record { SequenceNumber = "20", Data = new MemoryStream() },
+                    ],
+                }),
+                Task.FromResult(new GetRecordsResponse
+                {
+                    NextShardIterator = "iterator-3",
+                    Records = [new Amazon.Kinesis.Model.Record { SequenceNumber = "30", Data = new MemoryStream() }],
+                }));
+        var timeProvider = new FakeTimeProvider { AutoAdvanceAmount = TimeSpan.FromMilliseconds(200) };
+        var receiver = CreateReceiver(client, checkpointerFactory, timeProvider);
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+
+        var firstBatch = (await receiver.GetQueueMessagesAsync(
+            10,
+            TestContext.Current.CancellationToken)).Cast<KinesisBatchContainer>().ToArray();
+        var secondBatch = (await receiver.GetQueueMessagesAsync(
+            10,
+            TestContext.Current.CancellationToken)).Cast<KinesisBatchContainer>().ToArray();
+
+        Assert.Equal([0L, 1L], firstBatch.Select(container => container.Token.SequenceNumber));
+        Assert.Equal([2L], secondBatch.Select(container => container.Token.SequenceNumber));
+    }
+
+    [Fact]
+    public async Task MessagesDeliveredCommitsNumericallyHighestShardSequence()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
+        var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>()).Returns(checkpointer);
+        client.GetShardIteratorAsync(Arg.Any<GetShardIteratorRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new GetShardIteratorResponse { ShardIterator = "iterator-1" }));
+        var receiver = CreateReceiver(client, checkpointerFactory, new FakeTimeProvider());
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+
+        var hugeButReadFirst = KinesisBatchContainer.FromKinesisRecord(
+            null!,
+            new Amazon.Kinesis.Model.Record { SequenceNumber = "170141183460469231731687303715884105727", Data = new MemoryStream() },
+            sequenceId: 0);
+        var smallButReadSecond = KinesisBatchContainer.FromKinesisRecord(
+            null!,
+            new Amazon.Kinesis.Model.Record { SequenceNumber = "42", Data = new MemoryStream() },
+            sequenceId: 1);
+
+        await receiver.MessagesDeliveredAsync(
+            [hugeButReadFirst, smallButReadSecond],
+            TestContext.Current.CancellationToken);
+
+        checkpointer.Received(1).Update(
+            "170141183460469231731687303715884105727",
+            Arg.Any<DateTime>(),
+            Arg.Any<CancellationToken>());
+        checkpointer.DidNotReceive().Update("42", Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task MessagesDeliveredWithEmptyListDoesNotUpdateCheckpointOrThrow()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
+        var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>()).Returns(checkpointer);
+        client.GetShardIteratorAsync(Arg.Any<GetShardIteratorRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new GetShardIteratorResponse { ShardIterator = "iterator-1" }));
+        var receiver = CreateReceiver(client, checkpointerFactory, new FakeTimeProvider());
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+
+        await receiver.MessagesDeliveredAsync(
+            Array.Empty<IBatchContainer>(),
+            TestContext.Current.CancellationToken);
+
+        checkpointer.DidNotReceive().Update(Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -281,6 +576,80 @@ public sealed class KinesisRuntimeTests
         await client.Received(1).GetRecordsAsync(
             Arg.Any<GetRecordsRequest>(),
             TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task ConcurrentInitializationRetriesWhenOwningCallerCancels()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
+        var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
+        var firstAttemptStarted = new TaskCompletionSource<CancellationToken>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var createCount = 0;
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                var token = call.Arg<CancellationToken>();
+                if (Interlocked.Increment(ref createCount) == 1)
+                {
+                    firstAttemptStarted.SetResult(token);
+                    await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                }
+
+                return checkpointer;
+            });
+        client.GetShardIteratorAsync(Arg.Any<GetShardIteratorRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new GetShardIteratorResponse { ShardIterator = "iterator-1" }));
+        client.GetRecordsAsync(Arg.Any<GetRecordsRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new GetRecordsResponse
+            {
+                NextShardIterator = "iterator-1",
+                Records = [],
+            }));
+        var receiver = CreateReceiver(client, checkpointerFactory, new FakeTimeProvider());
+        using var ownerCancellation = new CancellationTokenSource();
+
+        var owner = receiver.GetQueueMessagesAsync(10, ownerCancellation.Token);
+        var unaffected = receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+        var firstAttemptToken = await firstAttemptStarted.Task;
+        ownerCancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => owner);
+        Assert.Empty(await unaffected);
+
+        Assert.True(firstAttemptToken.IsCancellationRequested);
+        Assert.Equal(2, createCount);
+        await client.Received(1).GetShardIteratorAsync(
+            Arg.Any<GetShardIteratorRequest>(),
+            Arg.Any<CancellationToken>());
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task ConcurrentInitializationPropagatesProviderCancellationWhenOwnerIsActive()
+    {
+        var client = Substitute.For<IAmazonKinesis>();
+        var checkpointerFactory = Substitute.For<IStreamQueueCheckpointerFactory>();
+        var createCount = 0;
+        checkpointerFactory.Create("shard-1", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                Interlocked.Increment(ref createCount);
+                return Task.FromException<IStreamQueueCheckpointer<string>>(
+                    new OperationCanceledException("provider canceled independently"));
+            });
+        var receiver = CreateReceiver(client, checkpointerFactory, new FakeTimeProvider());
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+
+        Assert.Equal(1, createCount);
+        await client.DidNotReceive().GetShardIteratorAsync(
+            Arg.Any<GetShardIteratorRequest>(),
+            Arg.Any<CancellationToken>());
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
     }
 
     [Fact]
