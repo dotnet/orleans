@@ -1178,6 +1178,42 @@ public class DurableLogTests : JournalingTestBase
     });
 
     [Fact]
+    public Task StagedReset_WithLaterTrim_ConfirmsTheTrimOnceDurable() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        log.Append("a");
+        log.Append("b");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+
+        // A held write captures a clear and the replacement entries 3 and 4. A trim staged during the write discards entry 3.
+        log.Clear();
+        log.Append("c");
+        log.Append("d");
+        sut.Storage.HoldNextWrite();
+        var write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
+        await sut.Storage.WriteStarted.Task;
+        log.TrimBefore(4);
+
+        await using var read = log.ReadAsync(0, log.Epoch, DurableWatchMode.Staged, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(Reset(4, DurableChangeStatus.Staged), await read.NextAsync());
+        Assert.Equal(CaughtUp(4), await read.NextAsync());
+        Assert.Equal(Entry(4, "d", DurableChangeStatus.Staged), await read.NextAsync());
+
+        sut.Storage.Release();
+        await write;
+        Assert.Equal(Watermark(5), await read.NextAsync());
+        var next = read.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+
+        // The trim's write confirms the retention boundary which the staged reset reported.
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(Trimmed(4), read.Current with { Epoch = 0 });
+    });
+
+    [Fact]
     public Task EmptyDraftCommit_IsReportedAsCommittedAfterItsRecordIsDurable() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();
