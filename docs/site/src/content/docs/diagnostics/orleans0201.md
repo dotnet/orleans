@@ -33,15 +33,13 @@ For the rules and the replay model, see [Replay-safety rules](../grains/durable-
 
 ## How to fix violations
 
-**Record the value with `DurableTask.RunInline`, and read logical time.** The effect runs once, and every replay returns the recorded value. `DurableTask.Current.UtcNow` is the execution's logical time, which the runtime records, so a replay computes the same deadline:
+**Derive identifiers from the task's identity, and read logical time.** The grain and `DurableTask.Current.Id` name the execution in every replay, so a key built from them is the same in every run, including a run which repeats a charge whose result didn't commit. `DurableTask.Current.UtcNow` is the execution's logical time, which the runtime records, so a replay computes the same deadline. See [Derive idempotency keys from the task](../grains/durable-tasks-idempotency.md#derive-idempotency-keys-from-the-task):
 
 :::code source="snippets/durable-tasks/Orleans0201.cs" id="orleans0201_fix" language="csharp":::
 
-**Derive identifiers from the task's identity.** The grain and `DurableTask.Current.Id` name the execution in every replay, so a key built from them is stable without a record; see [Derive idempotency keys from the task](../grains/durable-tasks-idempotency.md#derive-idempotency-keys-from-the-task):
+**Record other values with `DurableTask.RunInline`.** The effect runs once, such as `DurableTask.RunInline("reference", () => Guid.NewGuid().ToString("N"))`, and every replay returns the recorded value. The record commits with the task's next journal write, together with the grain state which the body changes, so state and branches observe the same value in every run. A value which leaves the grain before that write, such as a key which a step passes to an external service, comes from the task's identity.
 
-:::code source="snippets/durable-tasks/Orleans0201.cs" id="orleans0201_fix_task_id" language="csharp":::
-
-**Produce the value inside a step.** A `DurableTask.Run` delegate or a local step records its result, so values which it computes, including values which it passes to an external service, are recorded with it.
+**Produce the value inside a step.** A `DurableTask.Run` delegate or a local step records its result, so values which it returns are recorded with it.
 
 ## When to suppress
 

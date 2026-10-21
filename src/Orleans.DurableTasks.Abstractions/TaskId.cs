@@ -1,12 +1,14 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 
 namespace Orleans.DurableTasks;
 
 /// <summary>Identifies a durable task within a hierarchy.</summary>
 /// <remarks>
-/// System.Text.Json serializes the identifier as its escaped hierarchical path, through
+/// Each segment is non-empty, well-formed UTF-16 text, so every encoding of the identifier, such as UTF-8 and JSON,
+/// round-trips it unchanged. System.Text.Json serializes the identifier as its escaped hierarchical path, through
 /// <see cref="TaskIdJsonConverter"/>.
 /// </remarks>
 [JsonConverter(typeof(TaskIdJsonConverter))]
@@ -24,9 +26,15 @@ public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanPars
     public bool IsDefault => _key is null;
 
     /// <summary>Creates a root identifier from one logical segment.</summary>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="rootSegment"/> is <see langword="null"/>, empty, or contains an unpaired UTF-16 surrogate.
+    /// </exception>
     public static TaskId CreateRoot(string rootSegment) => new(HierarchicalKey.FromSegment(rootSegment));
 
     /// <summary>Creates a child identifier by appending one logical segment.</summary>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="segment"/> is <see langword="null"/>, empty, or contains an unpaired UTF-16 surrogate.
+    /// </exception>
     public TaskId Child(string segment)
     {
         if (_key is null)
@@ -187,14 +195,45 @@ internal sealed class HierarchicalKey : IEquatable<HierarchicalKey>
 
     public static HierarchicalKey FromSegment(string segment)
     {
-        ArgumentException.ThrowIfNullOrEmpty(segment);
+        ValidateSegment(segment);
         return new([segment]);
     }
 
     public HierarchicalKey AppendSegment(string segment)
     {
-        ArgumentException.ThrowIfNullOrEmpty(segment);
+        ValidateSegment(segment);
         return new([.. _segments, segment]);
+    }
+
+    /// <summary>
+    /// Validates a segment: it is non-empty, well-formed UTF-16 text, so every UTF-8 or JSON encoding of the identifier
+    /// round-trips it unchanged, instead of replacing an unpaired surrogate with U+FFFD and merging distinct identifiers.
+    /// </summary>
+    private static void ValidateSegment(string segment, [CallerArgumentExpression(nameof(segment))] string? paramName = null)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(segment, paramName);
+        if (!IsWellFormedUtf16(segment))
+        {
+            throw new ArgumentException("A task identifier segment must be well-formed UTF-16 text, without unpaired surrogates.", paramName);
+        }
+    }
+
+    /// <summary>Returns whether every surrogate in <paramref name="value"/> is part of a high-low pair.</summary>
+    private static bool IsWellFormedUtf16(ReadOnlySpan<char> value)
+    {
+        for (var index = 0; index < value.Length; index++)
+        {
+            if (char.IsHighSurrogate(value[index]) && index + 1 < value.Length && char.IsLowSurrogate(value[index + 1]))
+            {
+                index++;
+            }
+            else if (char.IsSurrogate(value[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public bool IsAncestorOf(HierarchicalKey? other)
@@ -226,7 +265,9 @@ internal sealed class HierarchicalKey : IEquatable<HierarchicalKey>
     public static bool TryParse(ReadOnlySpan<char> value, [NotNullWhen(true)] out HierarchicalKey? result)
     {
         result = null;
-        if (value.IsEmpty)
+
+        // Escapes are ASCII, so the path is well-formed UTF-16 exactly when each of its segments is.
+        if (value.IsEmpty || !IsWellFormedUtf16(value))
         {
             return false;
         }
