@@ -49,6 +49,7 @@ internal sealed partial class DurableTaskGrainRuntime
             cancellationToken.ThrowIfCancellationRequested();
             if (options.PollTimeout > TimeSpan.Zero)
             {
+                ThrowIfWaitHoldsSegments();
                 try
                 {
                     await ((Task)ResponseTask)
@@ -72,7 +73,17 @@ internal sealed partial class DurableTaskGrainRuntime
         public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfWaitHoldsSegments();
             return await ResponseTask.WaitAsync(cancellationToken);
+        }
+
+        // Checked only before a wait which can block, so a completed wait pays nothing; a remote task's segments run on its own grain.
+        private void ThrowIfWaitHoldsSegments()
+        {
+            if (!ResponseTask.IsCompleted && RemoteTarget.IsDefault)
+            {
+                runtime.ThrowIfWaitHoldsSegments(TaskId);
+            }
         }
 
         public bool TrySetResponse(DurableTaskResponse response) => _responseTcs.TrySetResult(response);
