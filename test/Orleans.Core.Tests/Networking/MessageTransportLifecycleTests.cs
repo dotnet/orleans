@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Linq;
 using System.Reflection;
 using System.Net;
@@ -25,6 +26,7 @@ using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Session;
 using TestExtensions;
 using Xunit;
@@ -187,6 +189,24 @@ public class MessageTransportLifecycleTests
         readRequest.Reset();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MessageSerializer_RejectsNullCacheInvalidationEntries(bool beyondRetainedLimit)
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        var entries = Enumerable.Range(0, Message.MaxCacheInvalidationHeaderEntries + 2)
+            .Select(i => new GrainAddressCacheUpdate(new GrainAddress { GrainId = GrainId.Create("test", i.ToString()) }, validAddress: null))
+            .ToList();
+        entries[beyondRetainedLimit ? entries.Count - 1 : 0] = null!;
+        using var message = new Message { CacheInvalidationHeader = entries, BodyObject = "body" };
+        using var frame = new ArcBufferWriter();
+        MessageFrames.Write(services.GetRequiredService<MessageSerializer>(), frame, message);
+
+        Assert.Throws<InvalidMessageFrameException>(() => MessageFrames.Read(shared, frame));
+    }
+
     [Fact]
     public void MessageFactory_ResponseTimeToLive_IsSerialized()
     {
@@ -259,7 +279,7 @@ public class MessageTransportLifecycleTests
     [Theory]
     [InlineData((int)Message.Directions.Request, (int)Message.ResponseTypes.None)]
     [InlineData((int)Message.Directions.Response, (int)Message.ResponseTypes.Success)]
-    public void Message_FormattingFailure_PreservesLazyBodyAndResponseType(int directionValue, int responseTypeValue)
+    public void Message_Formatting_PreservesLazyBodyAndResponseType(int directionValue, int responseTypeValue)
     {
         var direction = (Message.Directions)directionValue;
         var responseType = (Message.ResponseTypes)responseTypeValue;
@@ -274,8 +294,8 @@ public class MessageTransportLifecycleTests
         using var message = new Message { Direction = direction, Result = responseType };
         message.SetMessageReadRequest(readRequest);
 
-        Assert.Contains("Unable to deserialize message body:", message.ToString());
-        Assert.Contains("Unable to deserialize message body:", message.ToString());
+        Assert.Contains("<serialized>", message.ToString());
+        Assert.Contains("<serialized>", message.ToString());
         Assert.Same(readRequest, message._bodyObject);
         Assert.Equal(responseType, message.Result);
         Assert.Equal([0xff], readRequest.Body.ToArray());
@@ -534,6 +554,439 @@ public class MessageTransportLifecycleTests
             new SiloMessagingOptions { MaxMessageHeaderSize = int.MaxValue, MaxMessageBodySize = int.MaxValue });
 
         Assert.Throws<InvalidMessageFrameException>(() => serializer.ValidateFrameLengths(int.MaxValue, int.MaxValue));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MessageWriteRequest_RetriedMessages_PreservePayloadsAfterTransportConsumption(bool refuseEnqueue)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var serviceProvider = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(serviceProvider);
+        await using var transport = new CapturingTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(serviceProvider, shared), shared.MessageCenter);
+        var payload = Enumerable.Repeat((byte)0x5A, 20_000).ToArray();
+        using var requestMessage = new Message { Direction = Message.Directions.Request, BodyObject = CreateBuffer() };
+        using var response = new Message { Direction = Message.Directions.Response, BodyObject = Orleans.Serialization.Invocation.Response.FromResult(42) };
+        using var bodyless = new Message { Direction = Message.Directions.Response };
+        Message[] messages = [requestMessage, response, bodyless];
+        foreach (var message in messages)
+        {
+            message.RequestContextData = new() { ["payload"] = CreateBuffer() };
+            message.TimeToLive = TimeSpan.FromHours(1);
+        }
+
+        var target = SiloAddress.New(IPAddress.Loopback, 12345, 1);
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            await using var failingTransport = new CancelableTransport();
+            var write = WriteMessages();
+            foreach (var message in messages)
+            {
+                message.TargetSilo = target;
+                message.ForwardCount++;
+                message.TimeToLive = TimeSpan.FromMinutes(1);
+            }
+
+            if (refuseEnqueue)
+            {
+                await failingTransport.CloseAsync(null, cancellationToken);
+                Assert.False(failingTransport.EnqueueWrite(write));
+                write.RerouteMessages(error: null);
+            }
+            else
+            {
+                Assert.True(failingTransport.EnqueueWrite(write));
+                // Real transports consume and release the buffers before reporting a failed write.
+                write.Buffers.ConsumeSlice(write.Buffers.Length).Dispose();
+                Assert.Equal(0, write.Buffers.Length);
+                await failingTransport.CloseAsync(new ConnectionClosedException(), cancellationToken);
+            }
+
+            var retries = new List<Message>();
+            foreach (var _ in messages)
+            {
+                retries.Add((await connection.Retries.Reader.ReadAsync(cancellationToken)).Message);
+            }
+
+            Assert.All(messages, message => Assert.Single(retries, retry => ReferenceEquals(message, retry)));
+            Assert.All(messages, message => Assert.InRange(message.TimeToLive!.Value, TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(1)));
+            Assert.False(connection.Retries.Reader.TryRead(out _));
+            Assert.IsType<MessageReadRequest>(requestMessage._bodyObject);
+            Assert.IsType<MessageReadRequest>(response._bodyObject);
+            Assert.Null(bodyless._bodyObject);
+        }
+
+        // Retransmit without decoding any body locally, then read the frames as their destination does.
+        Assert.True(transport.EnqueueWrite(WriteMessages()));
+        Assert.Equal(messages.Length, connection.SentMessageCount);
+        Assert.All(messages, message => Assert.Null(message._bodyObject));
+        var offset = 0;
+        for (var i = 0; i < messages.Length; i++)
+        {
+            var bytes = transport.Written!.AsSpan(offset);
+            var length = Message.LENGTH_HEADER_SIZE + BinaryPrimitives.ReadInt32LittleEndian(bytes) + BinaryPrimitives.ReadInt32LittleEndian(bytes[sizeof(int)..]);
+            using var frame = new ArcBufferWriter();
+            frame.Write(bytes[..length]);
+            using var received = MessageFrames.Read(shared, frame);
+            using var contextPayload = Assert.IsType<PooledBuffer>(Assert.IsType<Dictionary<string, object>>(received.RequestContextData)["payload"]);
+            Assert.Equal(payload, contextPayload.ToArray());
+            Assert.Equal(target, received.TargetSilo);
+            Assert.Equal(2, received.ForwardCount);
+            Assert.InRange(received.TimeToLive!.Value, TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(1));
+            if (i == 0)
+            {
+                using var receivedPayload = Assert.IsType<PooledBuffer>(received.BodyObject);
+                Assert.Equal(payload, receivedPayload.ToArray());
+            }
+            else if (i == 1)
+            {
+                Assert.Equal(42, Assert.IsAssignableFrom<Orleans.Serialization.Invocation.Response>(received.BodyObject).Result);
+            }
+            else
+            {
+                Assert.Null(received.BodyObject);
+            }
+
+            offset += length;
+        }
+
+        Assert.Equal(transport.Written!.Length, offset);
+
+        await connection.CloseAsync(null).WaitAsync(cancellationToken);
+
+        PooledBuffer CreateBuffer()
+        {
+            var buffer = new PooledBuffer();
+            buffer.Write(payload);
+            return buffer;
+        }
+
+        MessageWriteRequest WriteMessages()
+        {
+            var write = shared.GetSendMessageHandler(connection);
+            foreach (var message in messages)
+            {
+                write.WriteMessage(message);
+            }
+
+            write.CompleteWriting();
+            return write;
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MessageWriteRequest_TimeoutDuringRetrySerialization_PreservesTheSerializedBody(bool loggingEnabled)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var services = CreateServiceProvider();
+        using var loggerFactory = new FormattingLoggerFactory(loggingEnabled);
+        using var shared = CreateMessageHandlerShared(services, loggerFactory);
+        await using var transport = new CapturingTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        var payload = Enumerable.Repeat((byte)0x5A, 20_000).ToArray();
+        var body = new PooledBuffer();
+        body.Write(payload);
+        using var message = new Message { Direction = Message.Directions.Request, BodyObject = body };
+        var completion = new DiagnosticResponseCompletion();
+        var callback = new CallbackData(
+            new SharedCallbackData(_ => { }, loggerFactory.CreateLogger<CallbackData>(), TimeProvider.System, TimeSpan.FromSeconds(1),
+                cancelOnTimeout: false, waitForCancellationAcknowledgement: false, cancellationManager: null,
+                new ApplicationRequestInstruments(services.GetRequiredService<OrleansInstruments>())),
+            completion, message);
+        var first = shared.GetSendMessageHandler(connection);
+        first.WriteMessage(message);
+        first.CompleteWriting();
+        first.Buffers.ConsumeSlice(first.Buffers.Length).Dispose();
+        first.RerouteMessages(error: null);
+        Assert.Same(message, (await connection.Retries.Reader.ReadAsync(cancellationToken)).Message);
+        var savedBody = Assert.IsType<MessageReadRequest>(message._bodyObject);
+        var expectedBytes = savedBody.Body.ToArray();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        var gate = new RetrySerializationGate
+        {
+            OnWrite = () =>
+            {
+                entered.TrySetResult();
+                release.Wait(cancellationToken);
+            }
+        };
+        message.RequestContextData = new() { ["gate"] = gate };
+        var retry = shared.GetSendMessageHandler(connection);
+        var writing = Task.Run(() =>
+        {
+            retry.WriteMessage(message);
+            retry.CompleteWriting();
+        }, cancellationToken);
+        try
+        {
+            // The serializer captured the body handler before serializing this header.
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            callback.OnTimeout();
+            Assert.IsType<TimeoutException>(completion.Response.Exception);
+            if (loggingEnabled)
+            {
+                Assert.Contains(loggerFactory.Messages, text => text.Contains("Response did not arrive on time", StringComparison.Ordinal));
+            }
+
+            Assert.Same(savedBody, message._bodyObject);
+            Assert.Equal(expectedBytes, savedBody.Body.ToArray());
+        }
+        finally
+        {
+            release.Set();
+            await writing.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+        }
+
+        Assert.True(transport.EnqueueWrite(retry));
+        using var frame = new ArcBufferWriter();
+        frame.Write(transport.Written!);
+        using var received = MessageFrames.Read(shared, frame);
+        using var receivedBody = Assert.IsType<PooledBuffer>(received.BodyObject);
+        Assert.Equal(payload, receivedBody.ToArray());
+        Assert.Null(message._bodyObject);
+        await connection.CloseAsync(null).WaitAsync(cancellationToken);
+    }
+
+    private sealed class FormattingLoggerFactory(bool enabled) : ILoggerFactory, ILogger
+    {
+        public System.Collections.Concurrent.ConcurrentQueue<string> Messages { get; } = new();
+        public ILogger CreateLogger(string categoryName) => this;
+        public void AddProvider(ILoggerProvider provider) => throw new NotSupportedException();
+        public void Dispose() { }
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => enabled;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            => Messages.Enqueue(formatter(state, exception));
+    }
+
+    private sealed class DiagnosticResponseCompletion : Orleans.Serialization.Invocation.IResponseCompletionSource
+    {
+        public Orleans.Serialization.Invocation.Response Response { get; private set; } = null!;
+        public void Complete(Orleans.Serialization.Invocation.Response response) => Response = response;
+        public void Complete() => Response = Orleans.Serialization.Invocation.Response.Completed;
+    }
+
+    [Fact]
+    public void MigrationMessages_PreserveEachRequestsSerializedLifetime()
+    {
+        using var sourceServices = CreateServiceProvider();
+        using var destinationServices = CreateServiceProvider();
+        using var sourceShared = CreateMessageHandlerShared(sourceServices);
+        using var destinationShared = CreateMessageHandlerShared(destinationServices);
+        using var first = new Message { Direction = Message.Directions.Request, Id = new(1), BodyObject = "first" };
+        using var second = new Message { Direction = Message.Directions.Request, Id = new(2), BodyObject = "second" };
+        using var infinite = new Message { Direction = Message.Directions.Request, Id = new(3), BodyObject = "infinite" };
+        first.TimeToLive = TimeSpan.FromMinutes(-1);
+        second.TimeToLive = TimeSpan.FromMinutes(10);
+        var serialized = false;
+        first.RequestContextData = new()
+        {
+            ["gate"] = new RetrySerializationGate
+            {
+                OnWrite = () =>
+                {
+                    Assert.False(serialized);
+                    serialized = true;
+                    second.TimeToLive = TimeSpan.FromMinutes(4);
+                }
+            }
+        };
+        var package = CreateMigrationPackage(sourceServices, [first, second, infinite]);
+        using var outer = new Message
+        {
+            Direction = Message.Directions.Request,
+            BodyObject = package,
+        };
+        using var frame = new ArcBufferWriter();
+        MessageFrames.Write(sourceServices.GetRequiredService<MessageSerializer>(), frame, outer);
+        second.TimeToLive = TimeSpan.FromMinutes(-1);
+        using var received = MessageFrames.Read(destinationShared, frame);
+        var snapshot = Assert.IsType<GrainMigrationPackage>(received.BodyObject);
+        Assert.True(serialized);
+        Assert.True(second.IsExpired);
+        Assert.Null(received.RequestContextData);
+        try
+        {
+            Assert.Collection(snapshot.Requests!,
+                request =>
+                {
+                    Assert.Equal(new CorrelationId(1), request.Id);
+                    Assert.True(request.IsExpired);
+                },
+                request =>
+                {
+                    Assert.Equal(new CorrelationId(2), request.Id);
+                    Assert.False(request.IsExpired);
+                    Assert.InRange(request.TimeToLive!.Value, TimeSpan.Zero, TimeSpan.FromMinutes(4));
+                },
+                request =>
+                {
+                    Assert.Equal(new CorrelationId(3), request.Id);
+                    Assert.Null(request.TimeToLive);
+                });
+        }
+        finally
+        {
+            package.MigrationContext.Dispose();
+            snapshot.MigrationContext.Dispose();
+            foreach (var request in snapshot.Requests!) request.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task MigrationMessages_TransportRetriesPreservePayloadAndSerializedLifetimes()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var sourceServices = CreateServiceProvider();
+        using var destinationServices = CreateServiceProvider();
+        using var sourceShared = CreateMessageHandlerShared(sourceServices);
+        using var destinationShared = CreateMessageHandlerShared(destinationServices);
+        await using var transport = new CapturingTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(sourceServices, sourceShared), sourceShared.MessageCenter);
+        using var shortRequest = new Message { Direction = Message.Directions.Request, BodyObject = "short" };
+        using var longRequest = new Message { Direction = Message.Directions.Request, BodyObject = "long" };
+        shortRequest.TimeToLive = TimeSpan.FromMinutes(-1);
+        longRequest.TimeToLive = TimeSpan.FromMinutes(5);
+        var package = CreateMigrationPackage(sourceServices, [shortRequest, longRequest]);
+        var invocation = MessageFramesTests.CreateMigrationInvocation([package]);
+        using var message = new Message
+        {
+            Direction = Message.Directions.Request,
+            BodyObject = invocation,
+        };
+        byte[]? retained = null;
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var write = sourceShared.GetSendMessageHandler(connection);
+            write.WriteMessage(message);
+            write.CompleteWriting();
+            write.Buffers.ConsumeSlice(write.Buffers.Length).Dispose();
+            longRequest.TimeToLive = TimeSpan.FromMinutes(-1);
+            write.RerouteMessages(new ConnectionClosedException());
+            Assert.Same(message, (await connection.Retries.Reader.ReadAsync(cancellation)).Message);
+            var bytes = Assert.IsType<MessageReadRequest>(message._bodyObject).Body.ToArray();
+            if (retained is null)
+            {
+                retained = bytes;
+            }
+            else
+            {
+                Assert.Equal(retained, bytes);
+            }
+
+            Assert.Null(message.RequestContextData);
+        }
+
+        var retry = sourceShared.GetSendMessageHandler(connection);
+        retry.WriteMessage(message);
+        retry.CompleteWriting();
+        Assert.True(transport.EnqueueWrite(retry));
+        using var frame = new ArcBufferWriter();
+        frame.Write(transport.Written!);
+        using var received = MessageFrames.Read(destinationShared, frame);
+        Assert.Null(received.TimeToLive);
+        Assert.Equal(retained, Assert.IsType<MessageReadRequest>(received._bodyObject).Body.ToArray());
+        Assert.Null(received.RequestContextData);
+        var receivedInvocation = Assert.IsAssignableFrom<IInvokable>(received.BodyObject);
+        var snapshot = Assert.Single(Assert.IsType<List<GrainMigrationPackage>>(receivedInvocation.GetArgument(0)));
+        try
+        {
+            Assert.Collection(snapshot.Requests!,
+                request =>
+                {
+                    Assert.True(request.IsExpired);
+                },
+                request =>
+                {
+                    Assert.False(request.IsExpired);
+                    Assert.InRange(request.TimeToLive!.Value, TimeSpan.Zero, TimeSpan.FromMinutes(5));
+                });
+            Assert.True(longRequest.IsExpired);
+            Assert.Null(message._bodyObject);
+        }
+        finally
+        {
+            package.MigrationContext.Dispose();
+            snapshot.MigrationContext.Dispose();
+            foreach (var request in snapshot.Requests!) request.Dispose();
+            await connection.CloseAsync(null);
+        }
+    }
+
+    private static GrainMigrationPackage CreateMigrationPackage(IServiceProvider services, List<Message> requests)
+    {
+        var package = new GrainMigrationPackage
+        {
+            GrainId = GrainId.Create("test", "migration"),
+            MigrationContext = new MigrationContext(services.GetRequiredService<SerializerSessionPool>()),
+            Requests = requests
+        };
+        var silo = SiloAddress.New(IPAddress.Loopback, 12345, 1);
+        var address = GrainAddress.GetAddress(silo, package.GrainId, ActivationId.NewId());
+        var migration = new ActivationMigration(null!, address, silo, package, requests, null, 0, CancellationToken.None);
+        Assert.True(migration.TrySend());
+        return migration.Package;
+    }
+
+    [GenerateSerializer, SerializationCallbacks(typeof(RetrySerializationCallbacks))]
+    public sealed class RetrySerializationGate
+    {
+        [NonSerialized]
+        public Action? OnWrite;
+    }
+
+    public sealed class RetrySerializationCallbacks
+    {
+        public void OnSerializing(RetrySerializationGate value) => value.OnWrite?.Invoke();
+    }
+
+    [Fact]
+    public async Task MessageWriteRequest_UnreadableRetryContext_FailsOnlyTheAffectedMessage()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var serviceProvider = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(serviceProvider);
+        await using var transport = new CancelableTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(serviceProvider, shared), shared.MessageCenter);
+        using var invalid = new Message
+        {
+            Direction = Message.Directions.Request,
+            Id = new CorrelationId(1),
+            RequestContextData = new() { ["invalid"] = new UnreadableContext() }
+        };
+        using var valid = new Message { Direction = Message.Directions.Request, BodyObject = 42 };
+        Message? failureResponse = null;
+        shared.MessageCenter.When(center => center.DispatchLocalMessage(Arg.Any<Message>()))
+            .Do(call => failureResponse = call.Arg<Message>());
+        var write = shared.GetSendMessageHandler(connection);
+        write.WriteMessage(invalid);
+        write.WriteMessage(valid);
+        write.CompleteWriting();
+        Assert.True(transport.EnqueueWrite(write));
+        write.Buffers.ConsumeSlice(write.Buffers.Length).Dispose();
+
+        await transport.CloseAsync(new ConnectionClosedException(), cancellationToken);
+        var retry = await connection.Retries.Reader.ReadAsync(cancellationToken);
+        Assert.Same(valid, retry.Message);
+        Assert.Equal(42, valid.BodyObject);
+        Assert.False(connection.Retries.Reader.TryRead(out _));
+        shared.MessageCenter.Received(1).DispatchLocalMessage(Arg.Any<Message>());
+        using var response = Assert.IsType<Message>(failureResponse);
+        Assert.Equal(invalid.Id, response.Id);
+        Assert.Equal(Message.ResponseTypes.Error, response.Result);
+        var error = Assert.IsAssignableFrom<Orleans.Serialization.Invocation.Response>(response.BodyObject).Exception;
+        Assert.Equal("Invalid retry context.", Assert.IsType<InvalidOperationException>(error).Message);
+
+        var reused = shared.GetSendMessageHandler();
+        Assert.Same(write, reused);
+        Assert.Equal(0, reused.MessageCount);
+        reused.Reset();
+        await connection.CloseAsync(null).WaitAsync(cancellationToken);
     }
 
     [Fact]
@@ -921,12 +1374,23 @@ public class MessageTransportLifecycleTests
     private static ServiceProvider CreateServiceProvider(SiloMessagingOptions? options = null) => new ServiceCollection()
         .AddMetrics()
         .AddSerializer()
+        .AddSingleton<UnreadableContextCallbacks>()
+        .AddSingleton<RetrySerializationCallbacks>()
         .AddSingleton<OrleansInstruments>()
         .AddSingleton<MessagingInstruments>()
         .AddSingleton<NetworkingInstruments>()
         .AddSingleton<MessagingProcessingInstruments>()
+        .AddSingleton(sp => CreateMessageHandlerShared(sp))
         .AddTransient(sp => new MessageSerializer(sp.GetRequiredService<SerializerSessionPool>(), options ?? new SiloMessagingOptions()))
         .BuildServiceProvider();
+
+    [GenerateSerializer, SerializationCallbacks(typeof(UnreadableContextCallbacks))]
+    public sealed class UnreadableContext;
+
+    public sealed class UnreadableContextCallbacks
+    {
+        public void OnDeserialized(UnreadableContext value) => throw new InvalidOperationException("Invalid retry context.");
+    }
 
     private static MessageHandlerShared CreateMessageHandlerShared(IServiceProvider serviceProvider, ILoggerFactory? loggerFactory = null)
     {

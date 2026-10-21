@@ -14,6 +14,9 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal sealed class CachingSiloAddressCodec
     {
+        // Length prefix, hash, IPv6 address with its length prefix, port, and generation.
+        internal const int MaxEncodedSize = 1 + 4 + 1 + 16 + 5 + 4;
+
         internal static ConcurrentLruCache<SiloAddress, (SiloAddress Value, byte[] Encoded)> SharedCache { get; } = new(capacity: 1024);
 
         // Purge entries which have not been accessed in over 2 minutes.
