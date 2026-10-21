@@ -872,8 +872,11 @@ public class DurableLogTests : JournalingTestBase
         Assert.Equal(DraftItem(draft.Id, 0, "Thinking"), await read.NextAsync());
         Assert.Equal(1, draft.Commit());
         Assert.False(draft.IsOpen);
-        Assert.Equal(Committed(draft.Id, 1, 0), await read.NextAsync());
         Assert.Equal((1L, 1L), (log.NextSequence, log.CommittedSequence));
+
+        // The commit record is durable after the next write.
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.Equal(Committed(draft.Id, 1, 0), await read.NextAsync());
     });
 
     [Fact]
@@ -1151,6 +1154,148 @@ public class DurableLogTests : JournalingTestBase
         Assert.Equal(log.Epoch, read.Current.Epoch);
         Assert.Equal(Entry(0, "answer", DurableChangeStatus.Staged), await read.NextAsync());
         Assert.Equal(log.Epoch, read.Current.Epoch);
+    });
+
+    [Fact]
+    public Task StagedRead_DeliversEligibleWatermarkBeforeLaterEntries() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        await using var read = log.ReadAsync(mode: DurableWatchMode.Staged, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await read.NextAsync());
+
+        // The producer commits the delivered entry and appends another before every read. The watermark still advances.
+        log.Append("e0");
+        Assert.Equal(Entry(0, "e0", DurableChangeStatus.Staged), await read.NextAsync());
+        for (var i = 1; i <= 5; i++)
+        {
+            await sut.Manager.WriteStateAsync(CancellationToken);
+            log.Append($"e{i}");
+            Assert.Equal(Watermark(i), await read.NextAsync());
+            Assert.Equal(Entry(i, $"e{i}", DurableChangeStatus.Staged), await read.NextAsync());
+        }
+    });
+
+    [Fact]
+    public Task StagedReset_WithLaterTrim_ConfirmsTheTrimOnceDurable() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        log.Append("a");
+        log.Append("b");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+
+        // A held write captures a clear and the replacement entries 3 and 4. A trim staged during the write discards entry 3.
+        log.Clear();
+        log.Append("c");
+        log.Append("d");
+        sut.Storage.HoldNextWrite();
+        var write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
+        await sut.Storage.WriteStarted.Task;
+        log.TrimBefore(4);
+
+        await using var read = log.ReadAsync(0, log.Epoch, DurableWatchMode.Staged, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(Reset(4, DurableChangeStatus.Staged), await read.NextAsync());
+        Assert.Equal(CaughtUp(4), await read.NextAsync());
+        Assert.Equal(Entry(4, "d", DurableChangeStatus.Staged), await read.NextAsync());
+
+        sut.Storage.Release();
+        await write;
+        Assert.Equal(Watermark(5), await read.NextAsync());
+        var next = read.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+
+        // The trim's write confirms the retention boundary which the staged reset reported.
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(Trimmed(4), read.Current with { Epoch = 0 });
+    });
+
+    [Fact]
+    public Task EmptyDraftCommit_IsReportedAsCommittedAfterItsRecordIsDurable() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        log.Append("question");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        await using var committed = log.ReadAsync(1, mode: DurableWatchMode.Committed | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var staged = log.ReadAsync(1, mode: DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(1), await committed.NextAsync());
+        Assert.Equal(CaughtUp(1), await staged.NextAsync());
+        var draft = log.BeginDraft();
+        draft.Write("partial");
+        Assert.Equal(DraftItem(draft.Id, 0, "partial"), await committed.NextAsync());
+        Assert.Equal(DraftItem(draft.Id, 0, "partial"), await staged.NextAsync());
+
+        // The commit adds no entries at the durable tail, so only its record shows whether it is durable.
+        draft.Commit();
+        Assert.Equal(Committed(draft.Id, 1, 0, DurableChangeStatus.Staged), await staged.NextAsync());
+        var next = committed.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+        await using var resumed = log.ReadAsync(1, mode: DurableWatchMode.Committed | DurableWatchMode.Drafts, resumeDraftId: draft.Id, cancellationToken: CancellationToken)
+            .GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(1), await resumed.NextAsync());
+        var resumedNext = resumed.MoveNextAsync();
+        Assert.False(resumedNext.IsCompleted);
+
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(Committed(draft.Id, 1, 0), committed.Current with { Epoch = 0 });
+        Assert.True(await resumedNext);
+        Assert.Equal(Committed(draft.Id, 1, 0), resumed.Current with { Epoch = 0 });
+    });
+
+    [Fact]
+    public Task EmptyDraftCommit_StagedDuringAnotherWrite_AwaitsTheWriteWhichCapturesIt() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        await using var read = log.ReadAsync(mode: DurableWatchMode.Committed | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await read.NextAsync());
+        log.Append("a");
+        var draft = log.BeginDraft();
+        draft.Write("partial");
+        Assert.Equal(DraftItem(draft.Id, 0, "partial"), await read.NextAsync());
+        sut.Storage.HoldNextWrite();
+        var write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
+        await sut.Storage.WriteStarted.Task;
+
+        // The held write captured entry 0. The commit's empty range ends where that write's entries end.
+        draft.Commit();
+        sut.Storage.Release();
+        await write;
+        Assert.Equal(Entry(0, "a"), await read.NextAsync());
+        var next = read.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(Committed(draft.Id, 1, 0), read.Current with { Epoch = 0 });
+    });
+
+    [Fact]
+    public Task EmptyDraftCommit_WhoseWriteFails_IsNotReportedAsCommitted() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        log.Append("question");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        await using var read = log.ReadAsync(1, mode: DurableWatchMode.Committed | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(1), await read.NextAsync());
+        var draft = log.BeginDraft();
+        draft.Write("partial");
+        Assert.Equal(DraftItem(draft.Id, 0, "partial"), await read.NextAsync());
+        draft.Commit();
+
+        sut.Storage.Failure = new IOException("The write failed.");
+        await Assert.ThrowsAsync<IOException>(async () => await sut.Manager.WriteStateAsync(CancellationToken));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(async () => await read.MoveNextAsync());
+        Assert.IsType<IOException>(error.InnerException);
     });
 
     [Fact]

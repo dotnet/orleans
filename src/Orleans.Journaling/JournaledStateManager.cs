@@ -341,16 +341,18 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                     var bufferToConsumeIsCommittedBuffer = false;
                                     var writeVersion = 0L;
 
-                                    // Each write captures every state. An append waits for an entry which another thread has open,
-                                    // since the entry occupies the journal buffer which states write their pending entries into.
+                                    // Each write captures every state, including a change which another thread is writing into an entry
+                                    // which it opened before the write. The write waits for that entry to close, whether it appends or
+                                    // replaces the journal, so that it captures the change.
                                     while (true)
                                     {
-                                        Task? activeEntryClosed = null;
+                                        Task? activeEntryClosed;
                                         lock (_lock)
                                         {
                                             // Capture journals changes which states already staged, so it doesn't count as staging.
                                             var stagedChangeCount = _journalWriter.StagedChangeCount;
-                                            if (isSnapshot)
+                                            activeEntryClosed = _journalWriter.GetActiveEntryClosedTask();
+                                            if (activeEntryClosed is null && isSnapshot)
                                             {
                                                 using var snapshotWriter = _shared.JournalFormat.CreateWriter();
                                                 if (_retirementTracker.Count > 0)
@@ -392,31 +394,27 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
                                                 committedBuffer = snapshotWriter.GetCommittedBuffer();
                                             }
-                                            else
+                                            else if (activeEntryClosed is null)
                                             {
-                                                activeEntryClosed = _journalWriter.GetActiveEntryClosedTask();
-                                                if (activeEntryClosed is null)
+                                                // The map of state ids is itself stored as a durable state with the id 0.
+                                                // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
+                                                AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot: false, StateDirectory.Id, _journalStreamDirectory);
+                                                statesScanned++;
+
+                                                foreach (var (id, state) in _statesMap)
                                                 {
-                                                    // The map of state ids is itself stored as a durable state with the id 0.
-                                                    // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
-                                                    AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot: false, StateDirectory.Id, _journalStreamDirectory);
-                                                    statesScanned++;
-
-                                                    foreach (var (id, state) in _statesMap)
+                                                    if (id is 0 || state is null)
                                                     {
-                                                        if (id is 0 || state is null)
-                                                        {
-                                                            continue;
-                                                        }
-
-                                                        AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot: false, id, state);
-                                                        statesScanned++;
+                                                        continue;
                                                     }
 
-                                                    committedBuffer = _journalWriter.GetCommittedBuffer();
-                                                    bufferToConsume = committedBuffer;
-                                                    bufferToConsumeIsCommittedBuffer = true;
+                                                    AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot: false, id, state);
+                                                    statesScanned++;
                                                 }
+
+                                                committedBuffer = _journalWriter.GetCommittedBuffer();
+                                                bufferToConsume = committedBuffer;
+                                                bufferToConsumeIsCommittedBuffer = true;
                                             }
 
                                             if (activeEntryClosed is null)

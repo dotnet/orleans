@@ -840,9 +840,9 @@ public partial class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_SnapshotWrite_DoesNotDiscardActiveEntry()
+    public async Task StateManager_SnapshotWrite_WaitsForActiveEntryAndCapturesIt()
     {
-        var storage = new CapturingStorage { IsCompactionRequested = true, DelayReplace = true };
+        var storage = new CapturingStorage { IsCompactionRequested = true };
         var format = new TrackingJournalFormat(SessionPool);
         var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var state = new ManualDirectWriteState();
@@ -850,36 +850,33 @@ public partial class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
-        var writeTask = StartSnapshotAndCommitActiveEntry();
-
+        var writeTask = SnapshotWhileEntryIsOpen();
         await writeTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        var replacement = Assert.Single(storage.Replaces);
-        Assert.DoesNotContain(ReadBinaryEntries(replacement), entry => entry.StreamId.Value >= 8);
-        Assert.Empty(storage.Appends);
 
+        // The snapshot captured the state change which the entry completed, so it replaced the entry rather than following it.
+        var replacement = Assert.Single(storage.Replaces);
+        Assert.Contains(ReadBinaryEntries(replacement), entry => entry.StreamId.Value >= 8);
+        Assert.Empty(storage.Appends);
         storage.IsCompactionRequested = false;
         await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Empty(storage.Appends);
 
-        Assert.Single(storage.Appends);
-        var append = storage.Appends[0];
-        Assert.Contains(ReadBinaryEntries(append), entry => entry.StreamId.Value >= 8);
-
-        Task StartSnapshotAndCommitActiveEntry()
+        Task SnapshotWhileEntryIsOpen()
         {
-            Task writeTask = Task.CompletedTask;
-            using var entry = state.BeginEntry();
+            var entry = state.BeginEntry();
             try
             {
                 entry.Writer.Write(new byte[] { 1, 2, 3 });
-                writeTask = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
-                Assert.True(SpinWait.SpinUntil(() => storage.ReplaceStarted.Task.IsCompleted, TimeSpan.FromSeconds(10)), writeTask.Exception?.ToString());
-                Assert.False(writeTask.IsCompleted);
+                var task = Task.Run(() => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask(), TestContext.Current.CancellationToken);
 
+                // The snapshot captures every state, so it waits for the entry which another thread is writing.
+                Assert.False(SpinWait.SpinUntil(() => task.IsCompleted || storage.Replaces.Count > 0, TimeSpan.FromMilliseconds(100)));
+
+                state.SnapshotPayload = [1, 2, 3];
                 state.MarkEntryClosing();
                 entry.Commit();
-                storage.AllowReplace.SetResult();
-                return writeTask;
+                return task;
             }
             finally
             {
@@ -2547,8 +2544,17 @@ public partial class StateManagerTests : JournalingTestBase
             AppendEntriesObservedOpenEntry |= _entryOpen;
         }
 
-        public void WriteSnapshot(JournalStreamWriter writer) { }
+        public byte[]? SnapshotPayload { get; set; }
 
+        public void WriteSnapshot(JournalStreamWriter writer)
+        {
+            if (SnapshotPayload is { } payload)
+            {
+                using var entry = writer.BeginEntry();
+                entry.Writer.Write(payload);
+                entry.Commit();
+            }
+        }
     }
 
     private sealed class AlwaysWritingState : IStateMachine

@@ -536,6 +536,30 @@ public class DurableStateObservationTests : JournalingTestBase
     });
 
     [Fact]
+    public Task StagedWatch_DeliversEligibleWatermarkBeforeLaterChanges() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var dictionary = CreateDictionary(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        await using var watch = dictionary.WatchAsync(DurableWatchMode.Staged, CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(DictionaryChangeKind.Resync, (await watch.NextAsync()).Kind);
+
+        // The producer commits the delivered change and stages another before every read. The watermark still advances.
+        dictionary["k0"] = 0;
+        Assert.Equal((DictionaryChangeKind.Set, DurableChangeStatus.Staged, 2L), Describe(await watch.NextAsync()));
+        for (var i = 1; i <= 5; i++)
+        {
+            await sut.Manager.WriteStateAsync(CancellationToken);
+            dictionary[$"k{i}"] = i;
+            Assert.Equal((DictionaryChangeKind.Watermark, DurableChangeStatus.Committed, i + 1L), Describe(await watch.NextAsync()));
+            Assert.Equal((DictionaryChangeKind.Set, DurableChangeStatus.Staged, i + 2L), Describe(await watch.NextAsync()));
+        }
+
+        static (DictionaryChangeKind, DurableChangeStatus, long) Describe(DictionaryChange<string, int> change) => (change.Kind, change.Status, change.Version);
+    });
+
+    [Fact]
     public Task ChangeWatch_Overflow_DeliversResyncSnapshot() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();

@@ -425,6 +425,14 @@ internal sealed class ChangeWatcher<TChange> : StateWatcher<TChange>, IChangeSin
             MaterializeResync();
         }
 
+        // An eligible watermark precedes further changes, so a producer which keeps staging cannot defer it indefinitely.
+        if (_unconfirmedVersion != 0 && _unconfirmedVersion <= CommittedVersion)
+        {
+            change = TChange.CreateWatermark(CommittedVersion);
+            _unconfirmedVersion = _lastStagedVersion > CommittedVersion ? CommittedVersion + 1 : 0;
+            return true;
+        }
+
         if (_buffer.TryPeek(out var head))
         {
             if (head.Version <= CommittedVersion)
@@ -446,13 +454,6 @@ internal sealed class ChangeWatcher<TChange> : StateWatcher<TChange>, IChangeSin
                 change = head.Change.WithStatus(DurableChangeStatus.Staged, head.Version);
                 return true;
             }
-        }
-
-        if (_unconfirmedVersion != 0 && _unconfirmedVersion <= CommittedVersion)
-        {
-            change = TChange.CreateWatermark(CommittedVersion);
-            _unconfirmedVersion = _lastStagedVersion > CommittedVersion ? CommittedVersion + 1 : 0;
-            return true;
         }
 
         change = default;

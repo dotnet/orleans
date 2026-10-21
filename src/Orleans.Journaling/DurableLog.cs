@@ -26,7 +26,11 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     private Boundary _committed;
 
     // The drafts whose committed entries begin at or after the first retained sequence, in sequence order. Allocated by the first commit.
-    private List<LogDraftCommit>? _draftCommits;
+    private List<DraftCommitRecord>? _draftCommits;
+
+    // Numbers this instance's draft commit records. A boundary's count shows which commit records a write captured, which an
+    // empty commit's entry range cannot show.
+    private long _draftCommitCount;
 
     // Allocated by the first draft.
     private DraftTable? _drafts;
@@ -67,7 +71,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         ? _items[index]
         : throw new ArgumentOutOfRangeException(nameof(sequence), sequence, "The log does not retain an entry with this sequence number.");
 
-    private Boundary Current => new(NextSequence, _firstSequence, _resetSequence, _isSealed);
+    private Boundary Current => new(NextSequence, _firstSequence, _resetSequence, _isSealed, _draftCommitCount);
 
     public bool TryGet(long sequence, [MaybeNullWhen(false)] out T item)
     {
@@ -206,7 +210,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             _resetSequence,
             _isSealed,
             _items,
-            (IReadOnlyCollection<LogDraftCommit>?)_draftCommits ?? [],
+            _draftCommits is { Count: > 0 } commits ? commits.ConvertAll(static record => record.Commit) : [],
             writer);
         _captured = Current;
     }
@@ -235,7 +239,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
     void IDurableLogCommandHandler<T>.ApplyDraftCommit(LogDraftCommit commit)
     {
-        var previousEnd = _draftCommits is { Count: > 0 } commits ? commits[^1].Sequence + commits[^1].Count : _firstSequence;
+        var previousEnd = _draftCommits is { Count: > 0 } commits ? commits[^1].Commit.Sequence + commits[^1].Commit.Count : _firstSequence;
         if (commit.Count < 0 || commit.Sequence < previousEnd || commit.Sequence + commit.Count > NextSequence)
         {
             throw new InvalidOperationException(
@@ -243,7 +247,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
                 + $"the uncommitted entries from sequence {previousEnd} to {NextSequence}.");
         }
 
-        (_draftCommits ??= []).Add(commit);
+        (_draftCommits ??= []).Add(new(commit, ++_draftCommitCount));
     }
 
     void IDurableLogCommandHandler<T>.ApplyTrimBefore(long sequence)
@@ -313,20 +317,21 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     }
 
     // Journals a draft's entries and outcome as one journal entry.
-    private long CommitDraft(LogDraftId draftId, ReadOnlySpan<T> items)
+    private DraftOutcome CommitDraft(LogDraftId draftId, ReadOnlySpan<T> items)
     {
         Debug.Assert(!_isSealed, "Sealing closes open drafts.");
         var sequence = NextSequence;
         EnsureEpoch();
         _codec.WriteDraftCommit(draftId, sequence, items, GetWriter());
         _items.AddRange(items);
-        (_draftCommits ??= []).Add(new(draftId, sequence, items.Length));
+        var record = new DraftCommitRecord(new(draftId, sequence, items.Length), ++_draftCommitCount);
+        (_draftCommits ??= []).Add(record);
         if (!items.IsEmpty)
         {
             SignalReaders(DurableWatchMode.Staged);
         }
 
-        return sequence;
+        return DraftOutcome.Committed(_epoch, record);
     }
 
     // The clear consumes one sequence number, so a reader's position shows whether it observed the replaced entries.
@@ -358,7 +363,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         _firstSequence = sequence;
         if (_draftCommits is { } commits)
         {
-            var retained = commits.FindIndex(commit => commit.Sequence >= sequence);
+            var retained = commits.FindIndex(record => record.Commit.Sequence >= sequence);
             commits.RemoveRange(0, retained < 0 ? commits.Count : retained);
         }
     }
@@ -435,9 +440,9 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         {
             for (var i = commits.Count - 1; i >= 0; i--)
             {
-                if (commits[i].DraftId == id)
+                if (commits[i].Commit.DraftId == id)
                 {
-                    return new(id, DraftOutcome.Committed(_epoch, commits[i].Sequence, commits[i].Count));
+                    return new(id, DraftOutcome.Committed(_epoch, commits[i]));
                 }
             }
         }
@@ -473,7 +478,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     //    whose history was deleted is reported as abandoned, since its entries no longer exist.
     // 2. A history change: another epoch, a position past the end, or a clear. Each repositions the reader with Reset.
     // 3. A trim, then the committed confirmation of a staged trim.
-    // 4. CaughtUp, then the next entry, then a watermark which confirms staged entries.
+    // 4. CaughtUp, then a watermark which confirms delivered staged entries, then the next entry.
     // 5. Sealed, once every entry has been delivered and confirmed.
     // 6. Draft items.
     private bool TryGetNextEvent(Reader reader, out LogEvent<T> logEvent)
@@ -521,9 +526,15 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         var resetSequence = reader.IncludesStaged ? _resetSequence : _committed.ResetSequence;
         if (reader.Cursor < resetSequence)
         {
-            logEvent = resetSequence <= _committed.ResetSequence
-                ? ResetReader(reader, _committed.FirstSequence, DurableChangeStatus.Committed, unconfirmedSequence: -1)
-                : ResetReader(reader, _firstSequence, DurableChangeStatus.Staged, unconfirmedSequence: resetSequence - 1);
+            if (resetSequence <= _committed.ResetSequence)
+            {
+                logEvent = ResetReader(reader, _committed.FirstSequence, DurableChangeStatus.Committed, unconfirmedSequence: -1);
+                return true;
+            }
+
+            // A staged reset reports the staged first sequence. When a trim moved it beyond the clear, the trim's write confirms it.
+            logEvent = ResetReader(reader, _firstSequence, DurableChangeStatus.Staged, unconfirmedSequence: resetSequence - 1);
+            reader.UnconfirmedTrimSequence = _firstSequence > resetSequence ? _firstSequence : -1;
             return true;
         }
 
@@ -564,6 +575,15 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             return true;
         }
 
+        // An eligible watermark precedes further entries, so a producer which keeps appending cannot defer it indefinitely.
+        if (reader.UnconfirmedSequence >= 0 && reader.UnconfirmedSequence < _committed.NextSequence)
+        {
+            var watermark = Math.Min(_committed.NextSequence, reader.Cursor);
+            reader.UnconfirmedSequence = watermark < reader.Cursor ? watermark : -1;
+            logEvent = new() { Kind = LogEventKind.Watermark, Sequence = watermark, Status = DurableChangeStatus.Committed };
+            return true;
+        }
+
         // A committed reader positioned before an uncommitted trim awaits the trim's write.
         var limit = reader.IncludesStaged ? NextSequence : _committed.NextSequence;
         if (reader.Cursor >= _firstSequence && reader.Cursor < limit)
@@ -576,14 +596,6 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             }
 
             logEvent = new() { Kind = LogEventKind.Entry, Sequence = sequence, Item = _items[(int)(sequence - _firstSequence)], Status = status };
-            return true;
-        }
-
-        if (reader.UnconfirmedSequence >= 0 && reader.UnconfirmedSequence < _committed.NextSequence)
-        {
-            var watermark = Math.Min(_committed.NextSequence, reader.Cursor);
-            reader.UnconfirmedSequence = watermark < reader.Cursor ? watermark : -1;
-            logEvent = new() { Kind = LogEventKind.Watermark, Sequence = watermark, Status = DurableChangeStatus.Committed };
             return true;
         }
 
@@ -631,9 +643,9 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
             if (outcome.IsCommitted)
             {
-                // Readers without staged entries learn of a commit once its entries are durable.
-                var end = outcome.Sequence + outcome.Count;
-                if (end > _committed.NextSequence && !reader.IncludesStaged)
+                // Readers without staged entries learn of a commit once its record, which contains its entries, is durable.
+                var isDurable = outcome.CommitIndex <= _committed.DraftCommitCount;
+                if (!isDurable && !reader.IncludesStaged)
                 {
                     continue;
                 }
@@ -646,7 +658,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
                     Sequence = outcome.Sequence,
                     Count = outcome.Count,
                     DraftId = followedDraft.Id,
-                    Status = end <= _committed.NextSequence ? DurableChangeStatus.Committed : DurableChangeStatus.Staged,
+                    Status = isDurable ? DurableChangeStatus.Committed : DurableChangeStatus.Staged,
                 };
                 return true;
             }
@@ -713,20 +725,33 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     }
 
     /// <summary>
-    /// The log's boundaries at one point: where its entries end and begin, where its most recent clear began, and whether it is sealed.
+    /// The log's boundaries at one point: where its entries end and begin, where its most recent clear began, whether it is
+    /// sealed, and how many draft commit records it holds.
     /// </summary>
-    private readonly record struct Boundary(long NextSequence, long FirstSequence, long ResetSequence, bool IsSealed);
+    private readonly record struct Boundary(long NextSequence, long FirstSequence, long ResetSequence, bool IsSealed, long DraftCommitCount);
+
+    /// <summary>
+    /// A draft commit retained by the log, and its number among this instance's commit records.
+    /// </summary>
+    private readonly record struct DraftCommitRecord(LogDraftCommit Commit, long Index);
 
     /// <summary>
     /// How a draft closed: the range of entries which replaced it, or why it was abandoned.
     /// </summary>
-    private readonly record struct DraftOutcome(long Epoch, long Sequence, int Count, LogDraftAbandonReason AbandonReason, string? Message)
+    private readonly record struct DraftOutcome(
+        long Epoch,
+        long Sequence,
+        int Count,
+        long CommitIndex,
+        LogDraftAbandonReason AbandonReason,
+        string? Message)
     {
         public bool IsCommitted => AbandonReason is LogDraftAbandonReason.None;
 
-        public static DraftOutcome Committed(long epoch, long sequence, int count) => new(epoch, sequence, count, LogDraftAbandonReason.None, Message: null);
+        public static DraftOutcome Committed(long epoch, DraftCommitRecord record) =>
+            new(epoch, record.Commit.Sequence, record.Commit.Count, record.Index, LogDraftAbandonReason.None, Message: null);
 
-        public static DraftOutcome Abandoned(LogDraftAbandonReason reason, string? message) => new(0, 0, 0, reason, message);
+        public static DraftOutcome Abandoned(LogDraftAbandonReason reason, string? message) => new(0, 0, 0, 0, reason, message);
     }
 
     /// <summary>
@@ -795,9 +820,9 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         public long Commit(params ReadOnlySpan<T> entries)
         {
             ThrowIfClosed();
-            var sequence = log.CommitDraft(Id, entries);
-            log.CloseDraft(this, DraftOutcome.Committed(log._epoch, sequence, entries.Length));
-            return sequence;
+            var outcome = log.CommitDraft(Id, entries);
+            log.CloseDraft(this, outcome);
+            return outcome.Sequence;
         }
 
         public void Abandon(string? message = null)
