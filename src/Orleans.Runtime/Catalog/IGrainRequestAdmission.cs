@@ -15,25 +15,27 @@ internal interface IGrainRequestAdmission
 {
     /// <summary>
     /// Makes activations of this grain's type record, for the code which each request they invoke from now on runs, the
-    /// request it belongs to.
+    /// request it belongs to, and, for the code which requests an exclusive section, that section.
     /// </summary>
     /// <remarks>
-    /// Recording costs one <see cref="AsyncLocal{T}"/> write per request on activations of this type. Call it before the
-    /// activation invokes requests whose code may call <see cref="IsBlockedByCurrentRequest"/>, such as while the
-    /// activation activates.
+    /// Recording costs one <see cref="AsyncLocal{T}"/> write per request, and one per exclusive section, on activations of
+    /// this type. Call it before the activation invokes requests whose code may call <see cref="IsBlockedByCurrentRequest"/>,
+    /// such as while the activation activates.
     /// </remarks>
     void TrackCurrentRequest();
 
     /// <summary>
     /// Returns whether the activation holds <paramref name="request"/>, received with <paramref name="options"/>, until the
-    /// running request which the calling code belongs to completes.
+    /// calling code's own request completes or its own exclusive section closes.
     /// </summary>
     /// <param name="request">The local request, which this call evaluates without receiving it.</param>
     /// <param name="options">The options with which the activation would receive <paramref name="request"/>.</param>
     /// <returns>
-    /// <see langword="true"/> when the calling code belongs to a running request of this activation and that request
-    /// excludes <paramref name="request"/>; otherwise <see langword="false"/>, including for code which belongs to no running
-    /// request, such as code which continues after its request completed.
+    /// <see langword="true"/> when the calling code holds this activation's open exclusive section and the section excludes
+    /// <paramref name="request"/>, or when the calling code belongs to a running request of this activation and that request
+    /// excludes <paramref name="request"/>. Otherwise <see langword="false"/>, including when another flow's section or another
+    /// request holds <paramref name="request"/> back, since those end without the calling code, and for code which belongs
+    /// to no running request and holds no section.
     /// </returns>
     bool IsBlockedByCurrentRequest(ILocalRequest request, LocalRequestOptions options);
 

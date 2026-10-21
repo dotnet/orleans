@@ -347,9 +347,11 @@ synchronously on the activation which makes them, when the runtime stages them: 
   waits for its grain's tasks only outside the section. A request whose own
   admission rules would hold the segments behind it throws
   `InvalidOperationException` at once, naming the remedies, instead of waiting
-  until the call times out. The check runs only before a wait which can block,
-  and a grain which hosts durable tasks records the request which each
-  request's code belongs to, which costs one `AsyncLocal` write per request.
+  until the call times out, and so does a wait from code which holds the
+  section. The check runs only before a wait which can block, and a grain
+  which hosts durable tasks records the request which each request's code
+  belongs to, and the exclusive section which code requests, which costs one
+  `AsyncLocal` write each.
 - The runtime is an inbox work source: while the grain holds a runnable
   execution, one whose segment runs or is about to run, Messaging keeps the
   grain's Durable Jobs wake-up, which a journal write ensures before it becomes

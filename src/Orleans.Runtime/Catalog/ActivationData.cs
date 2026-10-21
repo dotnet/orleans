@@ -44,6 +44,10 @@ internal sealed partial class ActivationData :
 
     // The request which the current code belongs to, recorded for activations whose type tracks it.
     private static readonly AsyncLocal<Message?> CurrentRequest = new();
+
+    // The exclusive section which the current code holds or waits for, recorded for activations whose type tracks the
+    // current request; ExclusiveSectionHolder identifies the open section's.
+    private static readonly AsyncLocal<object?> CurrentSection = new();
 #if NET10_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
@@ -1350,15 +1354,7 @@ internal sealed partial class ActivationData :
         {
             if (_exclusiveSectionOpen)
             {
-                // Only requests which always interleave and requests on the section holder's call chain start while an
-                // exclusive section is open.
-                if (incoming.IsAlwaysInterleave)
-                {
-                    return true;
-                }
-
-                var reentrancyId = incoming.GetReentrancyId();
-                return reentrancyId != Guid.Empty && reentrancyId == _extras?.ExclusiveSectionReentrancyId;
+                return IsAdmittedByOpenSection(incoming);
             }
 
             if (!IsCurrentlyExecuting)
@@ -1641,17 +1637,36 @@ internal sealed partial class ActivationData :
         }
     }
 
+    /// <summary>
+    /// Returns whether the open exclusive section admits <paramref name="incoming"/>: only requests which always interleave
+    /// and requests on the section holder's call chain start while an exclusive section is open. The caller holds
+    /// <see cref="_lock"/>, and a section is open.
+    /// </summary>
+    private bool IsAdmittedByOpenSection(Message incoming)
+    {
+        Debug.Assert(_exclusiveSectionOpen);
+        if (incoming.IsAlwaysInterleave)
+        {
+            return true;
+        }
+
+        var reentrancyId = incoming.GetReentrancyId();
+        return reentrancyId != Guid.Empty && reentrancyId == _extras?.ExclusiveSectionReentrancyId;
+    }
+
     void IGrainRequestAdmission.TrackCurrentRequest() => _shared.TracksCurrentRequest = true;
 
     bool IGrainRequestAdmission.IsBlockedByCurrentRequest(ILocalRequest request, LocalRequestOptions options)
     {
         Debug.Assert(_shared.TracksCurrentRequest, "The activation's type tracks the request which the current code belongs to.");
-        if (CurrentRequest.Value is not { } current)
+        var current = CurrentRequest.Value;
+        var section = CurrentSection.Value;
+        if (current is null && section is null)
         {
             return false;
         }
 
-        // The probe goes through the same factory and per-request check as the request which the activation would receive,
+        // The probe goes through the same factory and admission rules as the request which the activation would receive,
         // and the incoming-only rules of MayInvokeRequest, which a local request doesn't meet, don't apply to it.
         var incoming = _shared.InternalRuntime.RuntimeClient.CreateLocalRequest(this, request, options);
         Debug.Assert(incoming.GetReentrancyId() == Guid.Empty, "A local request starts a new call chain.");
@@ -1662,7 +1677,17 @@ internal sealed partial class ActivationData :
 
         lock (_lock)
         {
-            if (!_runningRequests.ContainsKey(current))
+            // An exclusive section which the calling code holds stays open until that code closes it. A section which
+            // another flow holds closes when that flow does, so the wait for it can end.
+            if (section is not null
+                && _exclusiveSectionOpen
+                && ReferenceEquals(section, _extras?.ExclusiveSectionHolder)
+                && !IsAdmittedByOpenSection(incoming))
+            {
+                return true;
+            }
+
+            if (current is null || !_runningRequests.ContainsKey(current))
             {
                 return false;
             }
@@ -1768,11 +1793,13 @@ internal sealed partial class ActivationData :
         _workSignal.Signal();
     }
 
-    // The holder's call chain is read here, synchronously in the caller's flow.
+    // The holder's call chain is read here, synchronously in the caller's flow, which also records the section it holds or waits
+    // for, so IsBlockedByCurrentRequest can tell the calling code's own section from another flow's.
     ValueTask<IDisposable> IGrainRequestAdmission.EnterExclusiveSectionAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var reentrancyId = RequestContext.ReentrancyId;
+        var tracksHolder = _shared.TracksCurrentRequest;
         ExclusiveSectionWaiter waiter;
         lock (_lock)
         {
@@ -1786,7 +1813,14 @@ internal sealed partial class ActivationData :
                     (_extras ??= new()).ExclusiveSectionReentrancyId = reentrancyId;
                 }
 
-                return new(new ExclusiveSection(this));
+                var section = new ExclusiveSection(this);
+                if (tracksHolder)
+                {
+                    (_extras ??= new()).ExclusiveSectionHolder = section;
+                    CurrentSection.Value = section;
+                }
+
+                return new(section);
             }
 
             var waiters = (_extras ??= new()).ExclusiveSectionWaiters ??= new();
@@ -1797,6 +1831,11 @@ internal sealed partial class ActivationData :
 
             waiter = new(reentrancyId);
             waiters.Enqueue(waiter);
+        }
+
+        if (tracksHolder)
+        {
+            CurrentSection.Value = waiter;
         }
 
         return WaitAsync(this, waiter, cancellationToken);
@@ -1824,6 +1863,9 @@ internal sealed partial class ActivationData :
             if (_extras is { } extras)
             {
                 extras.ExclusiveSectionReentrancyId = next?.ReentrancyId ?? Guid.Empty;
+
+                // A waiting section is its own holder record, which its requester's flow holds in CurrentSection.
+                extras.ExclusiveSectionHolder = _shared.TracksCurrentRequest ? next : null;
             }
 
             _exclusiveSectionOpen = next is not null;
@@ -2912,6 +2954,13 @@ internal sealed partial class ActivationData :
             get => TryGetValue(nameof(ExclusiveSectionReentrancyId), out var id) ? (Guid)id : Guid.Empty;
             set => SetOrRemoveValue(nameof(ExclusiveSectionReentrancyId), value == Guid.Empty ? null : value);
         }
+
+        /// <summary>
+        /// The open exclusive section's holder, which code that requested the section records in
+        /// <see cref="CurrentSection"/>. It's recorded only for activations whose type tracks the request which the current
+        /// code belongs to.
+        /// </summary>
+        public object? ExclusiveSectionHolder { get => GetValueOrDefault<object>(nameof(ExclusiveSectionHolder)); set => SetOrRemoveValue(nameof(ExclusiveSectionHolder), value); }
 
         private DeactivationInfo? GetDeactivationInfoOrDefault() => GetValueOrDefault<DeactivationInfo>(nameof(DeactivationInfo));
         private DeactivationInfo EnsureDeactivationInfo()
