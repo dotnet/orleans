@@ -339,13 +339,11 @@ synchronously on the activation which makes them, when the runtime stages them: 
   and calls to other grains, stay within the segment.
 - A request which waits for a task of its own grain, such as a grain method
   which awaits `this.AsReference<T>().M()` or `IDurableTaskManager.GetTask(id)`'s
-  response, throws `InvalidOperationException` when the grain holds the task's
-  segments behind that request, since the wait would end only once the request
-  does. The grain decides by its own admission rules, so a reentrant grain, a
-  waiting method marked `[AlwaysInterleave]` or `[Reentrant]`, and durable code,
-  whose durable wait ends its segment, wait for the task. A grain which hosts
-  durable tasks records the request which each request's code belongs to, which
-  costs one `AsyncLocal` write per request.
+  response, must let the task's segments run alongside it: mark its interface
+  method `[AlwaysInterleave]` or the grain class `[Reentrant]`, or await the task
+  from durable code, whose durable wait ends its segment. A non-reentrant
+  request which waits instead holds the segments behind itself until the call
+  times out.
 - The runtime is an inbox work source: while the grain holds a runnable
   execution, one whose segment runs or is about to run, Messaging keeps the
   grain's Durable Jobs wake-up, which a journal write ensures before it becomes
