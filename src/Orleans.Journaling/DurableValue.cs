@@ -7,6 +7,9 @@ namespace Orleans.Journaling;
 /// Represents a value whose changes are recorded in a journal.
 /// </summary>
 /// <typeparam name="T">The type of the value.</typeparam>
+/// <remarks>
+/// The value takes ownership of each value assigned to it, and the journal records the value when it is assigned. To change the value, assign a new instance.
+/// </remarks>
 public interface IDurableValue<T>
 {
     /// <summary>
