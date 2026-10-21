@@ -110,6 +110,44 @@ public sealed class InboxAdmissionRecoveryTests
         Assert.Equal(0, fixture.SourceSinkProbe.For(receiver).SinkOffers);
     }
 
+    [Theory]
+    [InlineData("orleans-binary")]
+    [InlineData("json")]
+    public async Task ReplayPendingExtension_RequiresItsPendingEntry(string format)
+    {
+        await using var fixture = new FaultInjectionClusterFixture(format);
+        await fixture.InitializeAsync();
+        var receiver = fixture.Client.GetGrain<ISourceSinkGrain>(Guid.NewGuid());
+        Assert.Equal(0, await receiver.GetOutboxCountAsync());
+        var command = new InboxCommand
+        {
+            Kind = InboxCommandKind.ExtendSentAt,
+            MessageId = TestApplicationProtocol.NewMessageId(),
+            SentAt = fixture.JobClock.GetUtcNow()
+        };
+        InboxCommand recovered;
+        if (format == "json")
+        {
+            recovered = JsonSerializer.Deserialize(JsonSerializer.Serialize(command, InboxJsonContext.Default.InboxCommand),
+                InboxJsonContext.Default.InboxCommand)!;
+        }
+        else
+        {
+            var serializer = fixture.Client.ServiceProvider.GetRequiredService<Serializer<InboxCommand>>();
+            recovered = serializer.Deserialize(serializer.SerializeToArray(command))!;
+        }
+        var inbox = fixture.GetGrainContext(receiver).ActivationServices.GetRequiredService<Inbox>();
+        await fixture.OnGrainAsync(receiver, () =>
+        {
+            var error = Assert.Throws<InvalidOperationException>(() =>
+                ((IDurableValueCommandHandler<InboxCommand>)inbox).ApplySet(recovered));
+            Assert.Equal("An ExtendSentAt command requires its pending entry.", error.Message);
+            Assert.Empty(InboxTestAccess.GetPendingMessages(inbox));
+            Assert.Empty(InboxTestAccess.GetProcessedKeys(inbox));
+        });
+        Assert.Equal(0, fixture.SourceSinkProbe.For(receiver).SinkOffers);
+    }
+
     [Fact]
     public void PersistedAdmissionFields_UseAdditiveStableFieldIds()
     {

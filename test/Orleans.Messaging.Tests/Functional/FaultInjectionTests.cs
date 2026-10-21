@@ -895,6 +895,38 @@ public sealed class FaultInjectionTests : MessagingBehaviorTestBase
             Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, expiredMessage)).Status);
         }
 
+        var context = Fixture.GetGrainContext(receiver);
+        var receiverClock = context.ActivationServices.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs);
+        var receiverTime = await Fixture.OnGrainAsync(receiver, receiverClock.GetUtcNow);
+        Assert.Equal(originalTime, receiverTime);
+        var window = context.ActivationServices.GetRequiredService<IOptions<Configuration.DurableMessagingOptions>>().Value.DeduplicationWindow;
+        var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
+        var journal = JournalId.FromGrainId(receiver.GetGrainId());
+        var before = await Fixture.OnGrainAsync(receiver, () => (
+            Writes: Fixture.Storage.GetSuccessfulWriteCount(journal),
+            StagedBytes: manager.PendingWriteByteCount,
+            Keys: InboxTestAccess.GetProcessedKeys(inbox),
+            Floor: InboxTestAccess.AdmissionFloor(inbox),
+            DurableFloor: InboxTestAccess.DurableAdmissionFloor(inbox)));
+        foreach (var sentAt in new[] { floor.AddTicks(1), floor + window / 2 })
+        {
+            Assert.True(sentAt > receiverTime + window);
+            var tooFuture = CreateEnvelope(receiver, NewMessage(82, "too-future-after-rollback")) with { SentAt = sentAt };
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => DeliverAsync(receiver, tooFuture));
+            var after = await Fixture.OnGrainAsync(receiver, () => (
+                Writes: Fixture.Storage.GetSuccessfulWriteCount(journal),
+                StagedBytes: manager.PendingWriteByteCount,
+                Keys: InboxTestAccess.GetProcessedKeys(inbox),
+                Floor: InboxTestAccess.AdmissionFloor(inbox),
+                DurableFloor: InboxTestAccess.DurableAdmissionFloor(inbox)));
+            Assert.Equal(before.Writes, after.Writes);
+            Assert.Equal(before.StagedBytes, after.StagedBytes);
+            Assert.True(before.Keys.SetEquals(after.Keys));
+            Assert.Equal(before.Floor, after.Floor);
+            Assert.Equal(before.DurableFloor, after.DurableFloor);
+            Assert.Equal(receiverTime, await Fixture.OnGrainAsync(receiver, receiverClock.GetUtcNow));
+        }
+
         // Keep the floor+1 boundary at the permitted future upper bound after the earlier clock rollback.
         _cluster.JobClock.Advance(TimeSpan.FromTicks(1));
         var available = CreateEnvelope(receiver, NewMessage(82, "above-floor")) with { SentAt = floor.AddTicks(1) };
