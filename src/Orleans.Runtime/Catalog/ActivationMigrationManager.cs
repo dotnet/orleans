@@ -111,7 +111,7 @@ internal interface IActivationMigrationManager
     /// <param name="requests">The requests which were queued for the activation, if any. The migration takes ownership of them.</param>
     /// <param name="cancellationToken">
     /// A token which ends the migration if it has not been sent yet, or if the target has taken its requests and their callers are being retargeted.
-    /// A migration which has been sent and awaits the target's response completes when the target responds.
+    /// Once acceptance starts, the migration awaits its result up to the system response timeout, including outgoing call filters.
     /// </param>
     /// <returns>The migration.</returns>
     ActivationMigration StartMigration(SiloAddress target, GrainAddress source, MigrationContext migrationContext, List<Message>? requests, CancellationToken cancellationToken);
@@ -329,6 +329,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private readonly GrainInterfaceType _migrationInterfaceType;
     private MessageCenter? _messageCenter;
     private readonly int _maxMessageBodySize;
+    private readonly TimeSpan _systemResponseTimeout;
     private readonly ActivationDirectory _activations;
 #if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
@@ -354,6 +355,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         _clusterManifestProvider = clusterManifestProvider;
         _migrationInterfaceType = interfaceTypeResolver.GetGrainInterfaceType(typeof(IActivationMigrationManagerSystemTarget));
         _maxMessageBodySize = messagingOptions.Value.MaxMessageBodySize;
+        _systemResponseTimeout = messagingOptions.Value.SystemResponseTimeout;
         _activations = shared.ActivationDirectory;
         _grainFactory = grainFactory;
         _logger = loggerFactory.CreateLogger<ActivationMigrationManager>();
@@ -734,7 +736,10 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                         continue;
                     }
 
-                    await remote.AcceptMigratingGrains(batch, _shuttingDownCts.Token);
+                    var acceptance = remote.AcceptMigratingGrains(batch, _shuttingDownCts.Token).AsTask();
+                    // Filters can delay callback registration, or resume after this wait has timed out.
+                    acceptance.Ignore();
+                    await acceptance.WaitAsync(_systemResponseTimeout, _runtimeClient.TimeProvider);
                     CompleteAfterRetargeting(items);
 
                     LogDebugMigratedActivations(items.Count, targetSilo);

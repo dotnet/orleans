@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Metadata;
@@ -556,6 +557,104 @@ public sealed class RetirementHandoffTests
         await activation.Deactivated.WaitAsync(Timeout, Cancellation);
         await Assert.ThrowsAsync<OrleansMessageRejectionException>(() => queued.WaitAsync(Timeout, Cancellation));
         Assert.Equal(0, state.HoldCount);
+    }
+
+    [Fact]
+    public async Task MigrationAcceptance_HeldOutgoingFilterTimesOutAndAllowsDeactivation()
+    {
+        var responseTimeout = TimeSpan.FromSeconds(10);
+        var filterEntered = new TaskCompletionSource<GrainMigrationPackage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFilter = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var filterFinished = new TaskCompletionSource<Exception?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var accepted = 0;
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
+        {
+            silo.Services.AddKeyedSingleton<TimeProvider>(TimeProviderNames.Messaging, new FakeTimeProvider());
+            silo.Configure<SiloMessagingOptions>(options => options.SystemResponseTimeout = responseTimeout);
+            silo.AddOutgoingGrainCallFilter(async context =>
+            {
+                if (context.Request.GetMethodName() != nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
+                {
+                    await context.Invoke();
+                    return;
+                }
+
+                filterEntered.TrySetResult(Assert.Single((List<GrainMigrationPackage>)context.Request.GetArgument(0)!));
+                await releaseFilter.Task;
+                try
+                {
+                    await context.Invoke();
+                    filterFinished.TrySetResult(null);
+                }
+                catch (Exception exception)
+                {
+                    filterFinished.TrySetResult(exception);
+                    throw;
+                }
+            });
+            silo.AddIncomingGrainCallFilter(async context =>
+            {
+                if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
+                {
+                    Interlocked.Increment(ref accepted);
+                }
+
+                await context.Invoke();
+            });
+        }));
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var manager = source.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
+        var time = Assert.IsType<FakeTimeProvider>(source.ServiceProvider.GetRequiredKeyedService<TimeProvider>(TimeProviderNames.Messaging));
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grain = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>()
+            .GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+        await PlaceOnAsync(source, () => grain.GetLocation());
+        var activation = Assert.IsType<ActivationData>(FindActivation(source, grain.GetGrainId()));
+        var running = grain.Block().AsTask();
+        await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
+        var queued = grain.Record("queued").AsTask();
+        await WaitUntilAsync(() => activation.WaitingCount == 1);
+        try
+        {
+            await grain.MigrateOnIdleTo(target.SiloAddress);
+            state.ReleaseBlock.TrySetResult();
+            await running.WaitAsync(Timeout, Cancellation);
+            var package = await filterEntered.Task.WaitAsync(Timeout, Cancellation);
+            var request = Assert.Single(package.Requests!);
+
+            // Finish the pump's turn so its acceptance wait is armed before advancing its clock.
+            await manager.RunOrQueueTask(() => Task.CompletedTask);
+            time.Advance(responseTimeout - TimeSpan.FromTicks(1));
+            await manager.RunOrQueueTask(() => Task.CompletedTask);
+            Assert.False(package.Source!.Completion.IsCompleted);
+            Assert.False(activation.Deactivated.IsCompleted);
+            Assert.IsType<Orleans.Runtime.Messaging.MessageReadRequest>(request._bodyObject);
+
+            time.Advance(TimeSpan.FromTicks(1));
+            await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+            await Assert.ThrowsAsync<TimeoutException>(() => package.Source.Completion);
+            await Assert.ThrowsAsync<OrleansMessageRejectionException>(() => queued.WaitAsync(Timeout, Cancellation));
+            Assert.Null(FindActivation(source, grain.GetGrainId()));
+            Assert.Null(request._bodyObject);
+            Assert.Empty(package.MigrationContext.Keys);
+            Assert.Empty(state.Calls);
+        }
+        finally
+        {
+            state.ReleaseBlock.TrySetResult();
+            releaseFilter.TrySetResult();
+            if (filterEntered.Task.IsCompletedSuccessfully)
+            {
+                await filterFinished.Task.WaitAsync(Timeout, Cancellation);
+            }
+        }
+
+        Assert.IsAssignableFrom<OperationCanceledException>(await filterFinished.Task);
+        Assert.Equal(0, Volatile.Read(ref accepted));
+        Assert.Empty(state.Calls);
+        Assert.Null(FindActivation(target, grain.GetGrainId()));
     }
 
     [Fact]
