@@ -27,6 +27,12 @@ internal sealed partial class Inbox
     private long _lastCompletionSequence;
     private bool _capturedSnapshot;
 
+    // Whether the last inbox command in the journal records that an activation stopped without an interrupted attempt.
+    private bool _stoppedCleanly;
+
+    // Whether this activation finished its recovery bookkeeping, so its stop can be recorded as clean.
+    private bool _recovered;
+
     // The earliest due time, on the Durable Jobs clock, of accepted or retrying messages staged since the last capture.
     private DateTimeOffset? _stagedWakeup;
 
@@ -118,6 +124,7 @@ internal sealed partial class Inbox
         _admissionFloor = _capturedAdmissionFloor = _durableAdmissionFloor = DateTimeOffset.MinValue;
         _stagedWakeup = null;
         _capturedSnapshot = false;
+        _stoppedCleanly = false;
         _lastSequence = _capturedSequence = _durableSequence = _lastCompletionSequence = 0;
     }
 
@@ -168,7 +175,8 @@ internal sealed partial class Inbox
                 Messages = _messages.Values.ToArray(),
                 Processed = _processed.Values.Where(entry => !IsAtOrBelowFloor(entry, floor)).ToArray(),
                 DeadLetters = _deadLetters.Values.ToArray(),
-                AdmissionFloor = floor
+                AdmissionFloor = floor,
+                StoppedCleanly = _stoppedCleanly
             }
         }, writer);
         _admissionFloor = floor;
@@ -179,6 +187,7 @@ internal sealed partial class Inbox
 
     private void Apply(InboxCommand command)
     {
+        if (command.Kind != InboxCommandKind.Snapshot) _stoppedCleanly = command.Kind == InboxCommandKind.CleanStop;
         switch (command.Kind)
         {
             case InboxCommandKind.Accept:
@@ -221,9 +230,13 @@ internal sealed partial class Inbox
             case InboxCommandKind.RemoveDeadLetters:
                 foreach (var key in command.RemovedKeys!) _deadLetters.Remove(key);
                 break;
+            case InboxCommandKind.CleanStop:
+            case InboxCommandKind.Resume:
+                break;
             case InboxCommandKind.Snapshot:
                 var snapshot = command.Snapshot ?? throw new InvalidOperationException("A snapshot command requires its state.");
                 AdvanceAdmissionFloor(snapshot.AdmissionFloor);
+                _stoppedCleanly = snapshot.StoppedCleanly;
                 var previousCount = _messages.Count;
                 _messages.Clear();
                 _processed.Clear();
@@ -265,7 +278,13 @@ internal enum InboxCommandKind
     RemoveDeadLetters = 4,
     Snapshot = 6,
     AdvanceAdmissionFloor = 7,
-    ExtendSentAt = 8
+    ExtendSentAt = 8,
+
+    // An activation stopped with no handler attempt interrupted, so recovery charges no attempt.
+    CleanStop = 9,
+
+    // A recovered activation consumed a clean stop, so a later unclean stop is charged.
+    Resume = 10
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxCommand")]
@@ -290,6 +309,7 @@ internal sealed class InboxSnapshot
     [Id(1)] public InboxProcessedEntry[] Processed { get; init; } = [];
     [Id(2)] public InboxDeadLetter[] DeadLetters { get; init; } = [];
     [Id(3)] public DateTimeOffset AdmissionFloor { get; init; } = DateTimeOffset.MinValue;
+    [Id(4)] public bool StoppedCleanly { get; init; }
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxProcessedEntry")]

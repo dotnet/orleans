@@ -72,8 +72,15 @@ A handler finishes each message with `IInboxHandlerContext.Complete()` or
   so the message retries with exponential backoff until `InboxRetryTimeout` (6 hours)
   after its first failure, then moves to the dead letters.
 - If the attempt staged journaled changes before failing, they can't commit with the
-  retry: the grain deactivates, recovery from the journal discards them, and the
-  message runs again.
+  retry: the grain deactivates, and recovery from the journal discards them. A grain
+  whose state can't report its changes, such as journaled `IPersistentState`, recovers
+  this way after every failed attempt.
+- Recovery after an activation stops without recording an attempt's outcome, through
+  such a failure or a crash, charges one attempt to each due message, so backoff and
+  `InboxRetryTimeout` still apply. A graceful deactivation journals a clean stop when
+  messages are pending, so it charges nothing. A crash can charge a message that hadn't
+  run, so attempts overcount by at most one per crash, and a charge alone never
+  dead-letters a message whose retries hadn't started.
 - Calling both with conflicting outcomes deactivates the grain.
 
 The inbox persists each batch's outcomes and business changes in one journal write.

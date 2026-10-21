@@ -147,7 +147,8 @@ public sealed class InboxHandlerTransactionTests : MessagingBehaviorTestBase
         _ = await receiver.GetSnapshotAsync();
         var completed = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
         Assert.NotEqual(before.ActivationId, completed.ActivationId);
-        Assert.Equal(1, Assert.Single(completed.InboxDeadLetters).AttemptCount);
+        // Recovery charges the attempt whose failure record didn't commit, so the rerun is the second attempt.
+        Assert.Equal(2, Assert.Single(completed.InboxDeadLetters).AttemptCount);
         Assert.Empty(completed.Effects);
         Assert.Empty(Fixture.GetStagedOutput(receiver));
     }
