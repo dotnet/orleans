@@ -1,5 +1,6 @@
 using Orleans.Concurrency;
 using Orleans.DurableTasks;
+using Orleans.Runtime;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
@@ -42,6 +43,59 @@ public abstract class DurableTaskSelfWaitTests(string journalFormatKey) : IAsync
             () => grain.CancelAndAwaitThroughManagerAsync("wait").WaitAsync(Timeout, cancellationToken));
 
         Assert.Equal(DurableTaskStatus.Canceled, (await waiting.GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken)).Status);
+    }
+
+    [Fact]
+    public async Task InterleavingWaitForAnOwnTaskInsideItsOwnExclusiveSectionFailsAtOnce()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grain = _fixture.Client.GetGrain<ISelfWaitingGrain>(Guid.NewGuid());
+
+        // The waiter interleaves, but the section it holds admits the task's segments only once it closes.
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => grain.InterleavingScheduleAndAwaitOwnTaskInSectionAsync(2, holdSection: true).WaitAsync(Timeout, cancellationToken));
+        Assert.Contains("exclusive section", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InterleavingWaitForAnOwnTaskWithoutASectionCompletes()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grain = _fixture.Client.GetGrain<ISelfWaitingGrain>(Guid.NewGuid());
+
+        Assert.Equal(6, await grain.InterleavingScheduleAndAwaitOwnTaskInSectionAsync(2, holdSection: false).WaitAsync(Timeout, cancellationToken));
+    }
+
+    [Fact]
+    public async Task InterleavingWaitForAnOwnTaskInsideASectionWhichWaitedForAnotherFailsOnceItOpens()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grain = _fixture.Client.GetGrain<ISelfWaitingGrain>(Guid.NewGuid());
+        await grain.OpenSectionAsync().WaitAsync(Timeout, cancellationToken);
+
+        // The waiter's section waits behind the open one, and the waiter holds it once the open one closes.
+        var waiter = grain.InterleavingScheduleAndAwaitOwnTaskInSectionAsync(2, holdSection: true);
+        await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+        Assert.False(waiter.IsCompleted);
+
+        await grain.CloseSectionAsync().WaitAsync(Timeout, cancellationToken);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => waiter.WaitAsync(Timeout, cancellationToken));
+    }
+
+    [Fact]
+    public async Task InterleavingWaitForAnOwnTaskBehindAnotherFlowsSectionCompletesOnceItCloses()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grain = _fixture.Client.GetGrain<ISelfWaitingGrain>(Guid.NewGuid());
+        await grain.OpenSectionAsync().WaitAsync(Timeout, cancellationToken);
+
+        // Another flow's section holds the task's segments back, and it closes without the waiter, so the waiter waits.
+        var waiter = grain.InterleavingScheduleAndAwaitOwnTaskAsync(2);
+        await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+        Assert.False(waiter.IsCompleted);
+
+        await grain.CloseSectionAsync().WaitAsync(Timeout, cancellationToken);
+        Assert.Equal(6, await waiter.WaitAsync(Timeout, cancellationToken));
     }
 
     [Fact]
@@ -132,6 +186,15 @@ public interface ISelfWaitingGrain : IGrainWithGuidKey
     [AlwaysInterleave]
     Task<DurableTaskStatus> InterleavingCancelAndAwaitThroughManagerAsync(string rootId);
 
+    [AlwaysInterleave]
+    Task<int> InterleavingScheduleAndAwaitOwnTaskInSectionAsync(int value, bool holdSection);
+
+    [AlwaysInterleave]
+    Task OpenSectionAsync();
+
+    [AlwaysInterleave]
+    Task CloseSectionAsync();
+
     Task BlockAsync();
 }
 
@@ -150,6 +213,8 @@ public interface IReentrantSelfWaitingGrain : IGrainWithGuidKey
 public sealed class SelfWaitingGrain(IDurableTaskManager tasks) : DurableGrain, ISelfWaitingGrain
 {
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, (TaskCompletionSource Blocked, TaskCompletionSource Release)> Gates = new();
+
+    private IDisposable? _section;
 
     public static Task WaitUntilBlockedAsync(Guid key) => GetGate(key).Blocked.Task;
 
@@ -174,6 +239,24 @@ public sealed class SelfWaitingGrain(IDurableTaskManager tasks) : DurableGrain, 
         SelfWaiting.ScheduleAndAwaitAsync(this.AsReference<ISelfWaitingGrain>().TripleAsync(value), name: null);
 
     public Task<DurableTaskStatus> InterleavingCancelAndAwaitThroughManagerAsync(string rootId) => SelfWaiting.CancelAndAwaitAsync(tasks, rootId);
+
+    public async Task<int> InterleavingScheduleAndAwaitOwnTaskInSectionAsync(int value, bool holdSection)
+    {
+        using var section = holdSection ? await Admission.EnterExclusiveSectionAsync(CancellationToken.None) : null;
+        return await SelfWaiting.ScheduleAndAwaitAsync(this.AsReference<ISelfWaitingGrain>().TripleAsync(value), name: null);
+    }
+
+    // The section stays open after the request completes, as code which isn't a request, such as a transaction, holds it.
+    public async Task OpenSectionAsync() => _section = await Admission.EnterExclusiveSectionAsync(CancellationToken.None);
+
+    public Task CloseSectionAsync()
+    {
+        _section!.Dispose();
+        _section = null;
+        return Task.CompletedTask;
+    }
+
+    private IGrainRequestAdmission Admission => GrainContext.GetComponent<IGrainRequestAdmission>()!;
 
     public async Task BlockAsync()
     {

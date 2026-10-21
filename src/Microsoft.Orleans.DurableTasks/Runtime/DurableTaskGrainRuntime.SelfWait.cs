@@ -6,15 +6,17 @@ namespace Orleans.DurableTasks.Runtime;
 internal sealed partial class DurableTaskGrainRuntime
 {
     /// <summary>
-    /// Throws when the calling code waits for <paramref name="taskId"/>, a task of this grain, from a request which the
-    /// activation holds the task's segments behind, so the wait could only end when the request itself does.
+    /// Throws when the calling code waits for <paramref name="taskId"/>, a task of this grain, while its own request or its
+    /// own exclusive section holds the task's segments back, so the wait could only end when that request or section does.
     /// </summary>
     /// <remarks>
     /// The activation decides by its own admission rules, so a reentrant grain, a waiting method marked
-    /// <c>[AlwaysInterleave]</c>, and a <c>[MayInterleave]</c> predicate which admits segments wait instead. Code which
-    /// belongs to no running request, or whose request doesn't exclude segments, waits too.
+    /// <c>[AlwaysInterleave]</c>, and a <c>[MayInterleave]</c> predicate which admits segments wait instead, unless the
+    /// waiting code holds an open exclusive section, such as a transaction, which admits segments only once it closes. Code
+    /// which belongs to no running request and holds no section, or whose request and section don't exclude segments,
+    /// waits too.
     /// </remarks>
-    /// <exception cref="InvalidOperationException">The calling code's request holds the task's segments.</exception>
+    /// <exception cref="InvalidOperationException">The calling code's request or section holds the task's segments.</exception>
     internal void ThrowIfWaitHoldsSegments(TaskId taskId)
     {
         if (_grainContext?.GetComponent<IGrainRequestAdmission>() is not { } admission
@@ -24,7 +26,7 @@ internal sealed partial class DurableTaskGrainRuntime
         }
 
         throw new InvalidOperationException(
-            $"A request of grain {GrainId} waits for its durable task '{taskId}', whose code runs as requests to the same grain, which the grain holds until the waiting request completes, so the wait can't end. "
-            + "Await the task from durable code, such as a method which returns DurableTask, return the task's handle instead of waiting for it, or let the waiting request interleave: mark its interface method [AlwaysInterleave] or the grain class [Reentrant].");
+            $"Code of grain {GrainId} waits for its durable task '{taskId}', whose code runs as requests to the same grain, which the grain holds until the waiting request completes or the exclusive section which the waiting code holds, such as a transaction, closes, so the wait can't end. "
+            + "Await the task from durable code, such as a method which returns DurableTask, return the task's handle instead of waiting for it, or let the waiting request interleave: mark its interface method [AlwaysInterleave] or the grain class [Reentrant], and wait outside any transaction.");
     }
 }
