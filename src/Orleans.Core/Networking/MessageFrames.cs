@@ -47,25 +47,6 @@ internal static class MessageFrames
     }
 
     /// <summary>
-    /// Reads an embedded frame, sharing reference-counted input or copying other inputs into an owned buffer.
-    /// </summary>
-    internal static Message Read<TInput>(MessageHandlerShared shared, ref Reader<TInput> reader, int length)
-    {
-        if (!reader.TryReadSlice(length, out var frame))
-        {
-            using var buffer = new ArcBufferWriter();
-            var output = buffer;
-            reader.ReadBytes(ref output, length);
-            frame = buffer.ConsumeSlice(length);
-        }
-
-        using (frame)
-        {
-            return Read(shared, frame);
-        }
-    }
-
-    /// <summary>
     /// Reads a frame, retaining independent slices for the message while the caller keeps ownership of <paramref name="buffer"/>.
     /// </summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage(

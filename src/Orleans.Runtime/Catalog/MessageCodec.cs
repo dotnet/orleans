@@ -137,7 +137,8 @@ internal sealed class MessageCodec(
 
         field.EnsureWireType(WireType.LengthPrefixed);
         var length = checked((int)reader.ReadVarUInt32());
-        var result = MessageFrames.Read(Shared, ref reader, length);
+        using var frame = reader.ReadOwnedBuffer(length);
+        var result = MessageFrames.Read(Shared, frame);
         ReferenceCodec.RecordObject(reader.Session, result);
         return result;
     }

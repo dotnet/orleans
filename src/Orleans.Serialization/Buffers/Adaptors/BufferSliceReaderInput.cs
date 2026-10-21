@@ -143,8 +143,6 @@ public struct ArcBufferReaderInput(in ArcBuffer slice)
         return new ArcBufferReaderInput(in sliced);
     }
 
-    internal readonly ArcBuffer Slice(int position, int length) => _slice.Slice(position, length);
-
     internal ReadOnlySpan<byte> GetNext()
     {
         _slice.CheckValidity();

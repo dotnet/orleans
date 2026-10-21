@@ -975,24 +975,6 @@ namespace Orleans.Serialization.Buffers
         }
 
         /// <summary>
-        /// Retains an owned slice when the input is reference-counted, advancing past it.
-        /// </summary>
-        internal bool TryReadSlice(int length, out ArcBuffer result)
-        {
-            if (IsArcBufferInput)
-            {
-                EnsureAvailable((uint)length);
-                ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
-                result = input.Slice(checked((int)(Position - _sequenceOffset)), length);
-                Skip(length);
-                return true;
-            }
-
-            result = default;
-            return false;
-        }
-
-        /// <summary>
         /// Reads an array of bytes from the input.
         /// </summary>
         /// <param name="count">The length of the array to read.</param>
