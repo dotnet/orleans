@@ -19,5 +19,9 @@ public static class DurableTaskRejectionCodes
     /// The invocation arrived after the grain's admission window: Messaging's <c>DeduplicationWindow</c> since its sender
     /// first staged it.
     /// </summary>
+    /// <remarks>
+    /// The grain admits a late redelivery of a task which it still stores, so this code means it doesn't store the task
+    /// now. An earlier delivery may have run it, and its retention may have ended since, so the outcome is unknown.
+    /// </remarks>
     public const string Expired = "durable-rpc/expired";
 }

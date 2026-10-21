@@ -206,9 +206,12 @@ var placement = await order.PlaceOrderAsync(request).WithId(PlaceOrderTaskId(ord
   | Outcome | Code | Failure |
   | --- | --- | --- |
   | The task ID already identifies another request or caller. | `durable-rpc/conflict` | `DurableTaskConflictException` |
-  | The invocation arrives after the target's admission window, Messaging's `DeduplicationWindow` since the starter first staged it. | `durable-rpc/expired` | `DurableTaskRejectedException` |
+  | The invocation arrives after the target's admission window, Messaging's `DeduplicationWindow` since the starter first staged it. The target may have run and deleted the task earlier, so the outcome is unknown. | `durable-rpc/expired` | `DurableTaskRejectedException` |
   | The target rejects the invocation with another code, or with none. | The target's code | `DurableTaskRejectedException` |
-  | The invocation isn't accepted before `OutboxRetryTimeout`, such as one which never decodes. | | `DurableTaskDeliveryException`, with the dead letter's reason |
+  | The outbox can't confirm the invocation before `OutboxRetryTimeout`, such as one which never decodes, or the target fences it after its admission cutoff. An earlier attempt may have reached the target, so the outcome is unknown. | | `DurableTaskDeliveryException`, with the dead letter's reason |
+
+  An unknown outcome means the task may have run: establish whether it did, for example by polling it
+  or checking its effects, before starting the work again under another task ID.
 
   `DurableTaskRejectedException.Code` reports the target's code, and `Target` the rejecting grain.
 - In an ordinary method of a durable grain, `ScheduleAsync` calls the target directly, like a client,
