@@ -9,6 +9,8 @@ CREATE TABLE OrleansStorage
     serviceid character varying(150)  NOT NULL,
     payloadbinary bytea,
     modifiedon timestamptz NOT NULL,
+    -- The next version wraps from 2147483647 back to 1 so a frequently written grain never overflows.
+    -- Orleans compares versions only for equality, so the version must change on every write but does not need to increase forever.
     version integer
 );
 
@@ -59,7 +61,7 @@ AS $function$
         SET
             PayloadBinary = _PayloadBinary,
             ModifiedOn = now(),
-            Version = Version + 1
+            Version = Version % 2147483647 + 1
 
         WHERE
             GrainIdHash = _GrainIdHash AND _GrainIdHash IS NOT NULL
@@ -74,7 +76,7 @@ AS $function$
         GET DIAGNOSTICS RowCountVar = ROW_COUNT;
         IF RowCountVar > 0
         THEN
-            _newGrainStateVersion := _GrainStateVersion + 1;
+            _newGrainStateVersion := _GrainStateVersion % 2147483647 + 1;
         END IF;
     END IF;
 
@@ -168,7 +170,7 @@ VALUES
     UPDATE OrleansStorage
     SET
         PayloadBinary = NULL,
-        Version = Version + 1
+        Version = Version % 2147483647 + 1
     WHERE
         GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
         AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
@@ -195,5 +197,5 @@ VALUES
         AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
         AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND Version IS NOT NULL AND Version = @GrainStateVersion AND @GrainStateVersion IS NOT NULL
-    Returning Version + 1 as NewGrainStateVersion
+    Returning Version % 2147483647 + 1 as NewGrainStateVersion
 ');

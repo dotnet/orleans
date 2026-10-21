@@ -43,6 +43,10 @@
 --
 -- 7. In the storage operations queries the columns need to be in the exact same order
 -- since the storage table operations support optionally streaming.
+--
+-- 8. The next Version wraps from 2147483647 back to 1 so a frequently written grain never overflows
+-- the 32-bit Version. Orleans compares versions only for equality, so the version must change on
+-- every write but does not need to increase forever.
 IF OBJECT_ID(N'[OrleansStorage]', 'U') IS NULL
 CREATE TABLE OrleansStorage
 (
@@ -127,9 +131,9 @@ SELECT
         SET
             PayloadBinary = @PayloadBinary,
             ModifiedOn = GETUTCDATE(),
-            Version = Version + 1,
-            @NewGrainStateVersion = Version + 1,
-            @GrainStateVersion = Version + 1
+            Version = Version % 2147483647 + 1,
+            @NewGrainStateVersion = Version % 2147483647 + 1,
+            @GrainStateVersion = Version % 2147483647 + 1
         WHERE
             GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
             AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
@@ -210,8 +214,8 @@ SELECT
     SET
         PayloadBinary = NULL,
         ModifiedOn = GETUTCDATE(),
-        Version = Version + 1,
-        @NewGrainStateVersion = Version + 1
+        Version = Version % 2147483647 + 1,
+        @NewGrainStateVersion = Version % 2147483647 + 1
     WHERE
         GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
         AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
@@ -268,7 +272,7 @@ SELECT
     'DeleteStorageKey',
     'BEGIN TRANSACTION;
     SET XACT_ABORT, NOCOUNT ON;
-    DELETE FROM OrleansStorage OUTPUT DELETED.Version + 1
+    DELETE FROM OrleansStorage OUTPUT DELETED.Version % 2147483647 + 1
     WHERE
         GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
         AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL

@@ -43,6 +43,10 @@
 --
 -- 7. In the storage operations queries the columns need to be in the exact same order
 -- since the storage table operations support optionally streaming.
+--
+-- 8. The next Version wraps from 2147483647 back to 1 so a frequently written grain never overflows
+-- the 32-bit Version. Orleans compares versions only for equality, so the version must change on
+-- every write but does not need to increase forever.
 CREATE TABLE "ORLEANSSTORAGE"
 (
 
@@ -111,7 +115,7 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
         SET
             PayloadBinary = PARAM_PAYLOADBINARY,
             ModifiedOn = sys_extract_utc(systimestamp),
-            Version = Version + 1
+            Version = MOD(Version, 2147483647) + 1
         WHERE
             GrainIdHash = PARAM_GRAINIDHASH AND PARAM_GRAINIDHASH IS NOT NULL
             AND GrainTypeHash = PARAM_GRAINTYPEHASH AND PARAM_GRAINTYPEHASH IS NOT NULL
@@ -195,7 +199,7 @@ CREATE OR REPLACE FUNCTION ClearStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAIN
     SET
         PayloadBinary = NULL,
         ModifiedOn = sys_extract_utc(systimestamp),
-        Version = Version + 1
+        Version = MOD(Version, 2147483647) + 1
     WHERE GrainIdHash = PARAM_GRAINIDHASH AND PARAM_GRAINIDHASH IS NOT NULL
       AND GrainTypeHash = PARAM_GRAINTYPEHASH AND PARAM_GRAINTYPEHASH IS NOT NULL
       AND (GrainIdN0 = PARAM_GRAINIDN0 OR PARAM_GRAINIDN0 IS NULL)
@@ -231,7 +235,7 @@ CREATE OR REPLACE FUNCTION DeleteStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAI
     rowCount := SQL%ROWCOUNT;
 
     IF rowCount > 0 THEN
-        newGrainStateVersion := PARAM_GRAINSTATEVERSION + 1;
+        newGrainStateVersion := MOD(PARAM_GRAINSTATEVERSION, 2147483647) + 1;
     END IF;
 
     COMMIT;

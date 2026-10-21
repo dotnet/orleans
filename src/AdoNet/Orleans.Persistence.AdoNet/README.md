@@ -98,6 +98,11 @@ Before using the ADO.NET provider, you need to set up the necessary database tab
 The SQLite scripts are idempotent: reapplying them refreshes the persistence
 queries while preserving grain state.
 
+To upgrade a database created by an earlier release, run the
+[migration scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Migrations)
+for your database that are newer than that release, in version order. For example, the 10.5.0 migrations
+make grain state versions wrap from 2147483647 back to 1 instead of failing writes with an overflow.
+
 ## Storage Key Format
 
 `AdoNetGrainStorageOptions.KeyFormat` controls how grain state maps to rows.

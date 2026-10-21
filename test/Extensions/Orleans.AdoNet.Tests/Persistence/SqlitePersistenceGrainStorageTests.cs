@@ -92,6 +92,13 @@ namespace Tester.AdoNet.Persistence
         }
 
         [Fact]
+        public Task VersionWrapsAfterMaximum() => GrainStorageVersionWrapTests.VersionWrapsAfterMaximum(
+            this.fixture.Storage,
+            this.fixture.DatabaseStorage,
+            deleteStateOnClear: false,
+            TestContext.Current.CancellationToken);
+
+        [Fact]
         public async Task HashCollisionWriteReadWriteRead()
         {
             var storage = await this.fixture.CreateGrainStorageAsync(
