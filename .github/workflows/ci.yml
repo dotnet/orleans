@@ -36,6 +36,20 @@ env:
   TESTCONTAINERS_RYUK_IMAGE: testcontainers/ryuk:0.14.0
   ZOOKEEPER_IMAGE: zookeeper:3.9
 jobs:
+  dashboard-ui:
+    name: Dashboard UI regressions
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/Dashboard/Orleans.Dashboard.App
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+        node-version: '24.x'
+    - run: npm ci --no-audit --no-fund
+    - run: npx playwright install --with-deps chromium
+    - run: npm run test:ui
   whitespace:
     name: Whitespace formatting
     runs-on: ubuntu-latest
