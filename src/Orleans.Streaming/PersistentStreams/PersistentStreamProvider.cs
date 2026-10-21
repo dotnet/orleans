@@ -79,6 +79,8 @@ namespace Orleans.Providers.Streams.Common
         private IQueueAdapterFactory adapterFactory = null!;
         private IQueueAdapter queueAdapter = null!;
         private IPersistentStreamPullingManager? pullingAgentManager;
+        private Task? pullingAgentStopTask;
+        private Task? adapterShutdownTask;
         private IStreamSubscriptionManager? streamSubscriptionManager;
         private readonly StreamPubSubOptions pubsubOptions;
         private readonly StreamLifecycleOptions lifeCycleOptions;
@@ -121,15 +123,24 @@ namespace Orleans.Providers.Streams.Common
         {
             if (!this.stateManager.PresetState(ProviderState.Initialized)) return;
             this.adapterFactory = this.runtime.ServiceProvider.GetRequiredKeyedService<IQueueAdapterFactory>(this.Name);
-            this.queueAdapter = await adapterFactory.CreateAdapter(token);
-
-            if (this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit
-                || this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
+            try
             {
-                var subscriptionManagerAdmin = this.runtime.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>()!;
-                this.streamSubscriptionManager = subscriptionManagerAdmin.GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+                this.queueAdapter = await adapterFactory.CreateAdapter(token);
+
+                if (this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit
+                    || this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
+                {
+                    var subscriptionManagerAdmin = this.runtime.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>()!;
+                    this.streamSubscriptionManager = subscriptionManagerAdmin.GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+                }
+                this.stateManager.CommitState();
             }
-            this.stateManager.CommitState();
+            catch (Exception exception)
+            {
+                LogErrorInitializingAdapter(exception, Name);
+                await ShutdownAdapter(token);
+                throw;
+            }
         }
 
         private async Task Start(CancellationToken token)
@@ -161,22 +172,71 @@ namespace Orleans.Providers.Streams.Common
         {
             if (!stateManager.PresetState(ProviderState.Closed)) return;
 
-            var manager = this.pullingAgentManager;
-            if (manager != null)
+            var stopTask = GetPullingAgentStopTask();
+            try
             {
-                var stopTask = manager.Stop(CancellationToken.None);
-                try
-                {
-                    await stopTask.WaitAsync(token);
-                }
-                catch (OperationCanceledException) when (token.IsCancellationRequested)
-                {
-                    // The lifecycle deadline only bounds the observer; manager cleanup continues.
-                    stopTask.Ignore();
-                }
+                await stopTask.WaitAsync(token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                // The lifecycle deadline only bounds the observer; manager cleanup continues.
+                stopTask.Ignore();
             }
 
             stateManager.CommitState();
+        }
+
+        private Task GetPullingAgentStopTask() => this.pullingAgentStopTask ??=
+            this.pullingAgentManager is { } manager ? StopPullingAgents(manager) : Task.CompletedTask;
+
+        private async Task StopPullingAgents(IPersistentStreamPullingManager manager)
+        {
+            try
+            {
+                await manager.Stop(CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                LogErrorStoppingPullingAgents(exception, Name);
+                throw;
+            }
+        }
+
+        private async Task ShutdownAdapter(CancellationToken token)
+        {
+            var shutdownTask = this.adapterShutdownTask ??= ShutdownAdapterCore();
+            try
+            {
+                await shutdownTask.WaitAsync(token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                shutdownTask.Ignore();
+            }
+        }
+
+        private async Task ShutdownAdapterCore()
+        {
+            try
+            {
+                await GetPullingAgentStopTask();
+            }
+            finally
+            {
+                // Initialization can fail before a factory is resolved.
+                if (this.adapterFactory is { } factory)
+                {
+                    try
+                    {
+                        await factory.ShutdownAsync(CancellationToken.None);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorShuttingDownAdapter(exception, Name);
+                        throw;
+                    }
+                }
+            }
         }
 
         /// <inheritdoc />
@@ -237,7 +297,7 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public void Participate(ILifecycleObservable lifecycle)
         {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.lifeCycleOptions.InitStage, Init);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.lifeCycleOptions.InitStage, Init, ShutdownAdapter);
             lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.lifeCycleOptions.StartStage, Start, Close);
         }
 
@@ -273,5 +333,14 @@ namespace Orleans.Providers.Streams.Common
             Message = "Got command {Command} with arg {Argument}, but PullingAgentManager is not initialized yet. Ignoring the command."
         )]
         private partial void LogWarningGotCommand(PersistentStreamProviderCommand command, object? argument);
+
+        [LoggerMessage(Level = LogLevel.Error, Message = "Error stopping pulling agents for stream provider {ProviderName}.")]
+        private partial void LogErrorStoppingPullingAgents(Exception exception, string providerName);
+
+        [LoggerMessage(Level = LogLevel.Error, Message = "Error shutting down the adapter for stream provider {ProviderName}.")]
+        private partial void LogErrorShuttingDownAdapter(Exception exception, string providerName);
+
+        [LoggerMessage(Level = LogLevel.Error, Message = "Error initializing the adapter for stream provider {ProviderName}.")]
+        private partial void LogErrorInitializingAdapter(Exception exception, string providerName);
     }
 }

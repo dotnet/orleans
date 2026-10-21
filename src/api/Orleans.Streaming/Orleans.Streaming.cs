@@ -1697,6 +1697,7 @@ namespace Orleans.Streams
         System.Threading.Tasks.Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId);
         IQueueAdapterCache GetQueueAdapterCache();
         IStreamQueueMapper GetStreamQueueMapper();
+        System.Threading.Tasks.Task ShutdownAsync(System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface IQueueAdapterReceiver
