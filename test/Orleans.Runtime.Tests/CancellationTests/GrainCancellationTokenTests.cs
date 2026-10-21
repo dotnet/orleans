@@ -1,5 +1,3 @@
-#pragma warning disable CS0618 // These tests exercise the legacy cancellation token API.
-
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
@@ -9,6 +7,7 @@ using Xunit;
 
 namespace UnitTests.CancellationTests
 {
+#pragma warning disable CS0618 // This suite exercises the legacy cancellation token API.
     /// <summary>
     /// Tests for GrainCancellationToken functionality including task cancellation and token callbacks.
     /// </summary>
@@ -26,6 +25,7 @@ namespace UnitTests.CancellationTests
                 base.ConfigureTestCluster(builder);
                 builder.AddSiloBuilderConfigurator<SiloConfig>();
             }
+            #pragma warning restore CS0618
 
             private class SiloConfig : ISiloConfigurator
             {

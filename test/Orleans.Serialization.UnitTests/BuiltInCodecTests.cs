@@ -1,5 +1,3 @@
-#pragma warning disable CS0618 // This verifies serialization compatibility for the legacy cancellation token.
-
 using CsCheck;
 #if NET8_0_OR_GREATER
 using Orleans;
@@ -4279,6 +4277,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
 #if NET8_0_OR_GREATER
+#pragma warning disable CS0618 // Verify serialization compatibility for the legacy cancellation token.
     public class GrainCancellationTokenCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<GrainCancellationToken, IFieldCodec<GrainCancellationToken>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         private static readonly PropertyInfo TokenIdProperty = typeof(GrainCancellationToken).GetProperty("Id", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -4335,6 +4334,7 @@ namespace Orleans.Serialization.UnitTests
         private static Guid GetTokenId(GrainCancellationToken token)
             => (Guid)TokenIdProperty.GetValue(token)!;
     }
+#pragma warning restore CS0618
 
     public class IdSpanCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IdSpan, IdSpanCodec>(output, fixture), IClassFixture<SerializationTesterFixture>
     {

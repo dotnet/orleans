@@ -1,5 +1,3 @@
-#pragma warning disable CS0618 // These tests exercise runtime compatibility with the legacy token.
-
 using System.Reflection;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;

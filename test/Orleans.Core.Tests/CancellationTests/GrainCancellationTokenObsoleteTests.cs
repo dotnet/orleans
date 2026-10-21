@@ -4,9 +4,12 @@ using Xunit;
 
 namespace UnitTests.CancellationTests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class GrainCancellationTokenObsoleteTests
 {
-    [Fact]
+    [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
     public void LegacyCancellationTypesAreObsolete()
     {
         var assembly = typeof(Grain).Assembly;

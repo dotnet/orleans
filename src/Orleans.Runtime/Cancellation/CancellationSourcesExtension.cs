@@ -1,5 +1,3 @@
-#pragma warning disable CS0618 // Preserve distributed cancellation support for the legacy token.
-
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -10,6 +8,7 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
+#pragma warning disable CS0618 // This extension provides distributed cancellation for the legacy token.
     /// <summary>
     /// Contains list of cancellation token source corresponding to the tokens
     /// passed to the related grain activation.
@@ -148,4 +147,5 @@ namespace Orleans.Runtime
         )]
         private partial void LogCancellationFailed(Guid tokenId);
     }
+#pragma warning restore CS0618
 }

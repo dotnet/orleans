@@ -1,5 +1,3 @@
-#pragma warning disable CS0618 // Preserve serialization support for the legacy cancellation token.
-
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -74,6 +72,7 @@ namespace Orleans.Runtime
         }
     }
 
+#pragma warning disable CS0618 // Preserve serialization support for the legacy cancellation token.
     [RegisterSerializer]
     internal class GrainCancellationTokenCodec : GeneralizedReferenceTypeSurrogateCodec<GrainCancellationToken, GrainCancellationTokenSurrogate>
     {
@@ -95,6 +94,8 @@ namespace Orleans.Runtime
             surrogate.TokenId = value.Id;
         }
     }
+
+#pragma warning restore CS0618
 
     [GenerateSerializer]
     internal struct GrainCancellationTokenSurrogate

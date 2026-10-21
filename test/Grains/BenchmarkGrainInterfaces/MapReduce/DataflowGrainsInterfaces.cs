@@ -1,5 +1,3 @@
-#pragma warning disable CS0618 // Preserve the legacy token benchmark contract.
-
 namespace BenchmarkGrainInterfaces.MapReduce
 {
     public interface IDataflowGrain : IGrain
@@ -17,7 +15,9 @@ namespace BenchmarkGrainInterfaces.MapReduce
 
         Task SendAsync(TInput t);
 
+#pragma warning disable CS0618 // Preserve the legacy token benchmark contract.
         Task SendAsync(TInput t, GrainCancellationToken gct);
+#pragma warning restore CS0618
     }
 
     public interface ISourceGrain<TOutput> : IDataflowGrain, IGrainWithGuidKey

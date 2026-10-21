@@ -1,5 +1,3 @@
-#pragma warning disable CS0618 // Preserve grain contracts used to test legacy token behavior.
-
 using Orleans.Concurrency;
 
 namespace UnitTests.GrainInterfaces
@@ -204,10 +202,12 @@ namespace UnitTests.GrainInterfaces
         Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay);
         Task<T> FanOutOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay, int degreeOfParallelism);
 
+#pragma warning disable CS0618 // Preserve grain contracts used to test legacy token behavior.
         Task LongWaitGrainCancellation(GrainCancellationToken tc, TimeSpan delay, Guid callId);
         Task LongWaitGrainCancellationAsObject(object tc, TimeSpan delay, Guid callId, ILongRunningTaskObserver observer);
         [AlwaysInterleave]
         Task LongWaitGrainCancellationInterleaving(GrainCancellationToken tc, TimeSpan delay, Guid callId);
+#pragma warning restore CS0618
         Task LongWait(TimeSpan delay, Guid callId, CancellationToken tc);
         Task LongWaitWithStartNotification(TimeSpan delay, Guid callId, ILongRunningTaskObserver observer, CancellationToken cancellationToken);
         [AlwaysInterleave]
@@ -216,14 +216,20 @@ namespace UnitTests.GrainInterfaces
         Task LongWaitInterleavingWithStartNotification(TimeSpan delay, Guid callId, ILongRunningTaskObserver observer, CancellationToken cancellationToken);
         Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, TimeSpan delay, Guid callId, CancellationToken tc);
         Task CallOtherLongRunningTaskWithStartNotification(ILongRunningTaskGrain<T> target, ILongRunningTaskObserver observer, TimeSpan delay, Guid callId, CancellationToken tc);
+#pragma warning disable CS0618 // Preserve grain contracts used to test legacy token behavior.
         Task CallOtherLongRunningTaskGrainCancellation(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay, Guid callId);
+#pragma warning restore CS0618
         Task CallOtherLongRunningTaskWithLocalGrainCancellationToken(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel, Guid callId);
         Task CallOtherLongRunningTaskWithLocalCancellation(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel, Guid callId);
+#pragma warning disable CS0618 // Preserve grain contracts used to test legacy token behavior.
         Task<bool> GrainCancellationTokenCallbackResolve(GrainCancellationToken tc, Guid callId);
+#pragma warning restore CS0618
         Task<bool> CancellationTokenCallbackResolve(Guid callId, CancellationToken tc);
         Task<bool> CallOtherGrainCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target, Guid callId);
         Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target, Guid callId);
+#pragma warning disable CS0618 // Preserve grain contracts used to test legacy token behavior.
         Task GrainCancellationTokenCallbackThrow(GrainCancellationToken tc, Guid callId, ILongRunningTaskObserver observer);
+#pragma warning restore CS0618
         Task CancellationTokenCallbackThrow(Guid callId, CancellationToken tc);
         Task<T> GetLastValue();
 

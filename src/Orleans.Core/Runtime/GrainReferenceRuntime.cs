@@ -2,8 +2,6 @@ using Orleans.CodeGeneration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Serialization.Invocation;
-#pragma warning disable CS0618 // Preserve runtime propagation for the legacy cancellation token.
-
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -126,7 +124,9 @@ namespace Orleans.Runtime
             for (var i = 0; i < argumentCount; i++)
             {
                 var arg = request.GetArgument(i);
+#pragma warning disable CS0618 // Preserve runtime propagation for the legacy cancellation token.
                 if (arg is not GrainCancellationToken grainToken)
+#pragma warning restore CS0618
                 {
                     continue;
                 }

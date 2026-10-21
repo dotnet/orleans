@@ -1,5 +1,3 @@
-#pragma warning disable CS0618 // Preserve the legacy token benchmark implementation.
-
 using BenchmarkGrainInterfaces.MapReduce;
 
 namespace BenchmarkGrains.MapReduce
@@ -24,7 +22,9 @@ namespace BenchmarkGrains.MapReduce
             throw new NotImplementedException();
         }
 
+#pragma warning disable CS0618 // Preserve the legacy token benchmark implementation.
         public Task SendAsync(TInput t, GrainCancellationToken gct)
+#pragma warning restore CS0618
         {
             throw new NotImplementedException();
         }
