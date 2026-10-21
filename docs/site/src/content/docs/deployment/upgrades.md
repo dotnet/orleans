@@ -57,6 +57,8 @@ Orleans 11.0.0-preview.1 enables the stable distributed grain directory by defau
 
 The local-to-distributed migration is one-way. The local-directory option lets applications defer migration; once migration starts, recovery retains the distributed directory. Choose compatible application images, storage changes, and recovery procedures before that point.
 
+A local default combined with a named distributed directory requires a coordinated full-cluster restart to migrate the default. See [Local defaults with a named distributed directory](../host/grain-directory.md#local-defaults-with-a-named-distributed-directory) for that prerequisite; keep the staged runtime upgrade separate from the directory cutover.
+
 Rolling upgrades of an existing [distributed-directory cluster](../host/grain-directory.md#strongly-consistent-in-cluster-directory) preserve both the partition count and the mapping from hash boundaries to partition numbers. Directory requests and ownership-transfer snapshots address those numbered partitions, so all silos must agree on their ranges.
 
 Orleans 10.1 used 30 partitions per silo and assigned partition numbers after sorting each silo's uniform hashes by unsigned value. Orleans 10.2 changed the default count to one and assigned multiple partitions in hash-generation order.

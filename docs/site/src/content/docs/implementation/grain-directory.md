@@ -86,6 +86,8 @@ During migration, compatibility system targets bridge the two directory protocol
 
 Directory membership views carry confirmed owner-recovery capabilities. Before a distributed registration commits in a mixed-directory view, legacy owner-change handling applies that view. Transitions involving legacy ownership invalidate affected activations so later calls recreate them through the current owner. Fully recovery-capable ranges use snapshot transfer and range recovery to preserve surviving activations.
 
+Partition capability discovery distinguishes distributed-default and named-only targets. A named-only target serves the named directory's registrations, while the local directory remains authoritative for default grains on that silo. The runtime rejects rolling default migration into that configuration, preserving one authority per grain type. [Coordinated restart guidance](../host/grain-directory.md#local-defaults-with-a-named-distributed-directory) covers its directory cutover.
+
 The local-to-distributed transition is one-way. First upgrade all silo runtimes while explicitly retaining the local directory, then migrate the directory in a separate rolling deployment. Keep one partition per silo and the default boundary function during that migration. Existing experimental distributed-directory clusters retain their original partition identities, including the sorted 30-partition mapping used by earlier experimental releases. The [upgrade procedure](../host/grain-directory.md#local-to-distributed-directory-upgrade) defines deployment prerequisites and checkpoints.
 
 ## Tradeoffs
