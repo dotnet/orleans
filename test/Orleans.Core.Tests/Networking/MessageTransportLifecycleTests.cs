@@ -772,7 +772,7 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
-    public void MigrationSnapshot_PreservesEachFramesStoredLifetime()
+    public void MigrationMessages_PreserveEachRequestsSerializedLifetime()
     {
         using var sourceServices = CreateServiceProvider();
         using var destinationServices = CreateServiceProvider();
@@ -796,8 +796,7 @@ public class MessageTransportLifecycleTests
                 }
             }
         };
-        var package = Snapshot(sourceServices, sourceShared, [first, second, infinite]);
-        second.TimeToLive = TimeSpan.FromMinutes(-1);
+        var package = CreateMigrationPackage(sourceServices, [first, second, infinite]);
         using var outer = new Message
         {
             Direction = Message.Directions.Request,
@@ -805,12 +804,12 @@ public class MessageTransportLifecycleTests
         };
         using var frame = new ArcBufferWriter();
         MessageFrames.Write(sourceServices.GetRequiredService<MessageSerializer>(), frame, outer);
+        second.TimeToLive = TimeSpan.FromMinutes(-1);
         using var received = MessageFrames.Read(destinationShared, frame);
         var snapshot = Assert.IsType<GrainMigrationPackage>(received.BodyObject);
         Assert.True(serialized);
         Assert.True(second.IsExpired);
         Assert.Null(received.RequestContextData);
-        snapshot.UnpackRequests(destinationShared);
         try
         {
             Assert.Collection(snapshot.Requests!,
@@ -840,7 +839,7 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
-    public async Task MigrationSnapshot_TransportRetriesPreserveFramesAndTheirStoredLifetimes()
+    public async Task MigrationMessages_TransportRetriesPreservePayloadAndSerializedLifetimes()
     {
         var cancellation = TestContext.Current.CancellationToken;
         using var sourceServices = CreateServiceProvider();
@@ -853,15 +852,8 @@ public class MessageTransportLifecycleTests
         using var longRequest = new Message { Direction = Message.Directions.Request, BodyObject = "long" };
         shortRequest.TimeToLive = TimeSpan.FromMinutes(-1);
         longRequest.TimeToLive = TimeSpan.FromMinutes(5);
-        var package = Snapshot(sourceServices, sourceShared, [shortRequest, longRequest]);
-        var invocationType = typeof(ActivationMigrationManager).Assembly.GetTypes()
-            .Where(type => !type.IsAbstract && typeof(IInvokable).IsAssignableFrom(type)
-                && type.Name.StartsWith("Invokable_IActivationMigrationManagerSystemTarget_", StringComparison.Ordinal))
-            .Single(type => ((IInvokable)Activator.CreateInstance(type)!).GetMethodName()
-                == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains));
-        var invocation = (IInvokable)Activator.CreateInstance(invocationType)!;
-        invocation.SetArgument(0, new List<GrainMigrationPackage> { package });
-        invocation.SetArgument(1, CancellationToken.None);
+        var package = CreateMigrationPackage(sourceServices, [shortRequest, longRequest]);
+        var invocation = MessageFramesTests.CreateMigrationInvocation([package]);
         using var message = new Message
         {
             Direction = Message.Directions.Request,
@@ -902,7 +894,6 @@ public class MessageTransportLifecycleTests
         Assert.Null(received.RequestContextData);
         var receivedInvocation = Assert.IsAssignableFrom<IInvokable>(received.BodyObject);
         var snapshot = Assert.Single(Assert.IsType<List<GrainMigrationPackage>>(receivedInvocation.GetArgument(0)));
-        snapshot.UnpackRequests(destinationShared);
         try
         {
             Assert.Collection(snapshot.Requests!,
@@ -927,12 +918,11 @@ public class MessageTransportLifecycleTests
         }
     }
 
-    private static GrainMigrationPackage Snapshot(
-        IServiceProvider services, MessageHandlerShared shared, List<Message> requests)
+    private static GrainMigrationPackage CreateMigrationPackage(IServiceProvider services, List<Message> requests)
     {
         var package = new GrainMigrationPackage
         {
-            GrainId = GrainId.Create("test", "snapshot"),
+            GrainId = GrainId.Create("test", "migration"),
             MigrationContext = new MigrationContext(services.GetRequiredService<SerializerSessionPool>()),
             Requests = requests
         };
@@ -940,7 +930,7 @@ public class MessageTransportLifecycleTests
         var address = GrainAddress.GetAddress(silo, package.GrainId, ActivationId.NewId());
         var migration = new ActivationMigration(null!, address, silo, package, requests, null, 0, CancellationToken.None);
         Assert.True(migration.TrySend());
-        return migration.CreateSnapshot(shared);
+        return migration.Package;
     }
 
     [GenerateSerializer, SerializationCallbacks(typeof(RetrySerializationCallbacks))]
@@ -1390,6 +1380,7 @@ public class MessageTransportLifecycleTests
         .AddSingleton<MessagingInstruments>()
         .AddSingleton<NetworkingInstruments>()
         .AddSingleton<MessagingProcessingInstruments>()
+        .AddSingleton(sp => CreateMessageHandlerShared(sp))
         .AddTransient(sp => new MessageSerializer(sp.GetRequiredService<SerializerSessionPool>(), options ?? new SiloMessagingOptions()))
         .BuildServiceProvider();
 

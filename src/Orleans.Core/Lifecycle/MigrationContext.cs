@@ -65,16 +65,6 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
         }
     }
 
-    internal MigrationContext CreateSnapshot()
-    {
-        lock (_lock)
-        {
-            var result = new MigrationContext(_sessionPool) { _indices = new(_indices, StringComparer.Ordinal) };
-            result._buffer.Write(_buffer.WrittenSpan);
-            return result;
-        }
-    }
-
     /// <summary>
     /// Gets an upper bound on the serialized size of this context.
     /// </summary>

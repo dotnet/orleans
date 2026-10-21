@@ -1,12 +1,11 @@
 using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using Orleans.Serialization.Buffers;
 
 namespace Orleans.Runtime.Messaging;
 
 /// <summary>
-/// Writes messages in connection framing and snapshots migration requests, leaving decoded message bodies serialized.
+/// Reads and writes messages in connection framing, leaving decoded message bodies serialized.
 /// </summary>
 /// <remarks>
 /// A message read back from a frame is equivalent to one received from a connection: its headers are decoded, and its body is decoded when it is first accessed.
@@ -14,67 +13,6 @@ namespace Orleans.Runtime.Messaging;
 /// </remarks>
 internal static class MessageFrames
 {
-    internal static byte[] WriteRequests(MessageHandlerShared shared, List<Message> messages)
-    {
-        using var buffer = new ArcBufferWriter();
-        var serializer = shared.GetMessageSerializer();
-        try
-        {
-            foreach (var message in messages)
-            {
-                Write(serializer, buffer, message);
-            }
-
-            using var bytes = buffer.PeekSlice(buffer.Length);
-            return bytes.ToArray();
-        }
-        finally
-        {
-            shared.Return(serializer);
-        }
-    }
-
-    internal static List<Message> ReadRequests(MessageHandlerShared shared, byte[] bytes)
-    {
-        // One receive buffer serves the entire snapshot; each decoded message owns its body slice.
-        using var buffer = new ArcBufferWriter();
-        buffer.Write(bytes);
-        var messages = new List<Message>();
-        try
-        {
-            Span<byte> framing = stackalloc byte[Message.LENGTH_HEADER_SIZE];
-            while (buffer.Length > 0)
-            {
-                if (buffer.Peek(framing) != framing.Length)
-                {
-                    throw new InvalidMessageFrameException("The frame is incomplete.");
-                }
-
-                var headers = BinaryPrimitives.ReadInt32LittleEndian(framing);
-                var body = BinaryPrimitives.ReadInt32LittleEndian(framing[sizeof(int)..]);
-                var length = (long)Message.LENGTH_HEADER_SIZE + headers + body;
-                if (headers <= 0 || body < 0 || length > buffer.Length)
-                {
-                    throw new InvalidMessageFrameException("The frame's length does not match its contents.");
-                }
-
-                using var frame = buffer.ConsumeSlice((int)length);
-                messages.Add(Read(shared, frame));
-            }
-
-            return messages;
-        }
-        catch
-        {
-            foreach (var message in messages)
-            {
-                message.Dispose();
-            }
-
-            throw;
-        }
-    }
-
     /// <summary>
     /// Appends a frame for <paramref name="message"/> to <paramref name="buffer"/> using <paramref name="serializer"/>.
     /// </summary>
@@ -106,6 +44,25 @@ internal static class MessageFrames
     {
         using var frame = buffer.ConsumeSlice(buffer.Length);
         return Read(shared, frame);
+    }
+
+    /// <summary>
+    /// Reads an embedded frame, sharing reference-counted input or copying other inputs into an owned buffer.
+    /// </summary>
+    internal static Message Read<TInput>(MessageHandlerShared shared, ref Reader<TInput> reader, int length)
+    {
+        if (!reader.TryReadSlice(length, out var frame))
+        {
+            using var buffer = new ArcBufferWriter();
+            var output = buffer;
+            reader.ReadBytes(ref output, length);
+            frame = buffer.ConsumeSlice(length);
+        }
+
+        using (frame)
+        {
+            return Read(shared, frame);
+        }
     }
 
     /// <summary>

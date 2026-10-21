@@ -65,9 +65,13 @@ internal readonly record struct MigratedRequestRoute(
     [property: Id(2)] SiloAddress TargetSilo,
     [property: Id(3)] int ForwardCount);
 
-[GenerateSerializer, Immutable]
+[Immutable]
 internal struct GrainMigrationPackage
 {
+    // The wire payload has one owner even when completion races with serialization.
+    [field: NonSerialized]
+    internal ActivationMigration? Source { get; init; }
+
     [Id(0)]
     public GrainId GrainId { get; set; }
 
@@ -77,24 +81,19 @@ internal struct GrainMigrationPackage
     /// <summary>
     /// The requests which were queued for the grain when it migrated, if any.
     /// </summary>
-    /// <remarks>
-    /// The source owns this list until it snapshots the frames. The destination populates it when unpacking the snapshot.
-    /// </remarks>
-    [field: NonSerialized]
+    [Id(2)]
     public List<Message>? Requests { get; set; }
 
-    [Id(2)]
-    public byte[]? RequestFrames { get; set; }
-
-    internal void UnpackRequests(MessageHandlerShared shared)
+    internal void ReleasePayload()
     {
-        if (RequestFrames is not { } frames)
+        MigrationContext?.Dispose();
+        if (Requests is { } requests)
         {
-            return;
+            foreach (var request in requests)
+            {
+                request.ReleaseBodyBuffer();
+            }
         }
-
-        Requests = MessageFrames.ReadRequests(shared, frames);
-        RequestFrames = null;
     }
 }
 
@@ -128,7 +127,7 @@ internal interface IActivationMigrationManager
 /// for that original handoff and handles its remaining queue through ordinary deactivation.
 /// </para>
 /// <para>
-/// Sending snapshots the payload into managed memory and releases the source's pooled request bodies before invoking the RPC.
+/// Serialization takes ownership of the payload and releases it when writing finishes. Completion releases an unclaimed payload.
 /// Requests are rejected if the migration fails or its outcome is unknown,
 /// so their callers can retry them. Requests which the migration did not send are forwarded, followed by the later requests.
 /// </para>
@@ -146,6 +145,7 @@ internal sealed class ActivationMigration(
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private CancellationTokenRegistration _cancellation;
     private Stage _stage;
+    private bool _payloadOwnedBySerializer;
 
     private enum Stage { Queued, Sent, Accepted }
 
@@ -155,7 +155,7 @@ internal sealed class ActivationMigration(
     /// </summary>
     public Task Completion => _completion.Task;
 
-    internal GrainMigrationPackage Package { get; } = package;
+    internal GrainMigrationPackage Package => package with { Source = this };
 
     /// <summary>
     /// The routes for retargeting the callers of the requests which the migration carries.
@@ -199,6 +199,28 @@ internal sealed class ActivationMigration(
     }
 
     /// <summary>
+    /// Transfers the payload to the serializer. Completion can then proceed independently of its buffers.
+    /// </summary>
+    internal void BeginSerialization()
+    {
+        lock (_completion)
+        {
+            Debug.Assert(_stage == Stage.Sent);
+            if (Completion.IsCompleted)
+            {
+                throw new OperationCanceledException("The migration completed before its payload was serialized.");
+            }
+
+            if (_payloadOwnedBySerializer)
+            {
+                throw new InvalidOperationException("The migration payload has already been serialized. Transport retries use the serialized message.");
+            }
+
+            _payloadOwnedBySerializer = true;
+        }
+    }
+
+    /// <summary>
     /// Records acceptance and completes migrations which have no pending retargets or have reached their deadline.
     /// </summary>
     internal void SetAccepted()
@@ -232,12 +254,15 @@ internal sealed class ActivationMigration(
                 return;
             }
 
-            Package.MigrationContext.Dispose();
-            if (_stage != Stage.Queued && Package.Requests is { } carried)
+            if (!_payloadOwnedBySerializer)
             {
-                foreach (var request in carried)
+                if (_stage == Stage.Queued)
                 {
-                    request.ReleaseBodyBuffer();
+                    Package.MigrationContext.Dispose();
+                }
+                else
+                {
+                    Package.ReleasePayload();
                 }
             }
 
@@ -250,31 +275,6 @@ internal sealed class ActivationMigration(
             else
             {
                 _completion.SetException(exception);
-            }
-        }
-    }
-
-    internal GrainMigrationPackage CreateSnapshot(MessageHandlerShared shared)
-    {
-        Debug.Assert(_stage == Stage.Sent);
-        try
-        {
-            return new()
-            {
-                GrainId = Package.GrainId,
-                MigrationContext = Package.MigrationContext.CreateSnapshot(),
-                RequestFrames = Package.Requests is { } carried ? MessageFrames.WriteRequests(shared, carried) : null,
-            };
-        }
-        finally
-        {
-            Package.MigrationContext.Dispose();
-            if (Package.Requests is { } carried)
-            {
-                foreach (var request in carried)
-                {
-                    request.ReleaseBodyBuffer();
-                }
             }
         }
     }
@@ -294,7 +294,7 @@ internal sealed class ActivationMigration(
     {
         lock (_completion)
         {
-            // A sent migration waits for its outcome before disposing of its requests.
+            // A sent migration waits for its outcome before choosing its requests' disposition.
             if (_stage != Stage.Sent)
             {
                 Complete(_stage == Stage.Queued ? new OperationCanceledException(cancellationToken) : null);
@@ -316,6 +316,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private const int MaxBatchSize = 1_000;
     private const int MessageBodyFramingAllowance = 1_024;
     private const int PackageFramingAllowance = 64;
+    private const int RequestFramingAllowance = 16;
 
     private readonly ConcurrentDictionary<SiloAddress, (Task PumpTask, Channel<ActivationMigration> WorkItemChannel)> _workers = new();
     private readonly CancellationTokenSource _shuttingDownCts = new();
@@ -387,11 +388,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         {
             for (var i = 0; i < migratingGrains.Count; i++)
             {
-                var package = migratingGrains[i];
-                package.UnpackRequests(_runtimeClient.ServiceProvider.GetRequiredService<MessageHandlerShared>());
-                migratingGrains[i] = package;
-
-                ValidateRequests(package);
+                ValidateRequests(migratingGrains[i]);
             }
 
             var activations = new List<ActivationData>();
@@ -545,7 +542,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                     foreach (var request in requests)
                     {
                         requestsSize += serializer.PrepareRequestBody(shared, buffer, request)
-                            + serializer.GetHeaderSizeBound(buffer, request) + Message.LENGTH_HEADER_SIZE;
+                            + serializer.GetHeaderSizeBound(buffer, request) + Message.LENGTH_HEADER_SIZE + RequestFramingAllowance;
                         if (size + requestsSize > MaxBatchBodySize)
                         {
                             break;
@@ -646,7 +643,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                 if (!accepted && request.Direction is Message.Directions.Request)
                 {
                     // The target may have taken the request, and sending it may consume it, so it is rejected and its caller can retry it.
-                    // The RPC reads its independent managed snapshot, so rejection is independent of a late writer.
+                    // Rejection reads only routing headers, independently of an active serializer's payload.
                     MessageCenter.SendRejectionResponse(request, Message.RejectionTypes.Transient, "The activation's migration did not deliver the request.", exception: null);
                 }
 
@@ -705,7 +702,6 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
 
             LogDebugStartingWorker(targetSilo);
 
-            var messageHandlers = _runtimeClient.ServiceProvider.GetRequiredService<MessageHandlerShared>();
             var maxBatchSize = MaxBatchBodySize;
             var items = new List<ActivationMigration>();
             var reader = workItems.Reader;
@@ -729,7 +725,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                         }
 
                         items.Add(workItem);
-                        batch.Add(workItem.CreateSnapshot(messageHandlers));
+                        batch.Add(workItem.Package);
                         batchSize += workItem.Size;
                     }
 
