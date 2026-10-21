@@ -33,7 +33,7 @@ sequenceDiagram
         Order->>Catalog: ReserveAsync
     end
     alt all lines reserved
-        Order->>Gateway: POST /gateway/authorizations, Idempotency-Key: authorize-{orderId}
+        Order->>Gateway: POST /gateway/authorizations, Idempotency-Key: authorize-{orderId}-{incarnation}
         loop until decided, or the payment timeout
             Order->>Gateway: GET /gateway/authorizations/{id}
         end
@@ -88,7 +88,7 @@ Each layer names its requests, so retries at every layer reach the work which th
 | Browser to API | A checkout's `Idempotency-Key`, which the browser generates per checkout and persists until the server acknowledges it. The key is the order's ID. | The helper, after a network failure; the buyer, by clicking again; the page, after a refresh. |
 | API to the order | The operation key `orders/@/{orderId}`: the scope, the anonymous caller's scope, and the order's ID. It is the workflow's root task ID on the order grain. | Any request with the same key, which reaches the same workflow. A request which reuses the key for other work, such as another endpoint's call, receives `422`. |
 | Workflow to grains | Child task IDs, such as `checkout`, `reserve/0`, and `release/1`, beneath the root. | Replays after a deactivation or failure, which read recorded results. |
-| Workflow to gateway | The authorization's `Idempotency-Key`, `authorize-{orderId}`, which names the order, so a workflow which didn't learn its authorization's location, such as after a lost response, reaches it again to void it. Other unsafe requests, such as the void, carry a key which `IDurableHttpClient` derives from the service, the order grain, the step's task ID, and the workflow's run. | The payment client's resilience handler, which follows the key handler, and the step itself after a failure. |
+| Workflow to gateway | The authorization's `Idempotency-Key`, `authorize-{orderId}-{incarnation}`, which names the order and the workflow's run, `DurableTask.Current.Incarnation`, so a workflow which didn't learn its authorization's location, such as after a lost response, reaches it again to void it. Other unsafe requests, such as the void, carry a key which `IDurableHttpClient` derives from the service, the order grain, the step's task ID, and the workflow's run. | The payment client's resilience handler, which follows the key handler, and the step itself after a failure. |
 | Signals | The shipment's ID, which the browser persists per ship intent. | A repeated signal with an equal value, which succeeds; another value returns `409`. |
 
 `POST /api/orders` requires its `Idempotency-Key` to be a lowercase UUID, which becomes the order's ID, so every request
