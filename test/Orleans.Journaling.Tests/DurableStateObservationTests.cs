@@ -536,6 +536,33 @@ public class DurableStateObservationTests : JournalingTestBase
     });
 
     [Fact]
+    public Task StagedWatch_DeletionDiscardsPendingConfirmation() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var dictionary = CreateDictionary(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        await using var watch = dictionary.WatchAsync(DurableWatchMode.Staged, CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(DictionaryChangeKind.Resync, (await watch.NextAsync()).Kind);
+        dictionary["discarded"] = 1;
+        var staged = await watch.NextAsync();
+        Assert.Equal((DictionaryChangeKind.Set, DurableChangeStatus.Staged), (staged.Kind, staged.Status));
+
+        // The deletion discards the staged change, and the next write commits the version which the change carried.
+        await sut.Manager.DeleteStateAsync(CancellationToken);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.Equal(staged.Version, sut.Manager.AsJournaledStateManager().CommittedWriteVersion);
+
+        // The reader receives the empty durable state, and no watermark confirms the discarded change.
+        var resync = await watch.NextAsync();
+        Assert.Equal((DictionaryChangeKind.Resync, DurableChangeStatus.Committed), (resync.Kind, resync.Status));
+        Assert.Empty(resync.Snapshot!);
+        dictionary["after"] = 2;
+        var after = await watch.NextAsync();
+        Assert.Equal((DictionaryChangeKind.Set, "after", DurableChangeStatus.Staged), (after.Kind, after.Key, after.Status));
+    });
+
+    [Fact]
     public Task StagedWatch_DeliversEligibleWatermarkBeforeLaterChanges() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();
