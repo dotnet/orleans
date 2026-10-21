@@ -371,9 +371,11 @@ internal sealed class ChangeWatcher<TChange> : StateWatcher<TChange>, IChangeSin
     {
         if (version <= CommittedVersion)
         {
-            // Durable resyncs replace every buffered change.
+            // Durable resyncs replace every buffered change, and the staged changes already delivered which they discard.
             _buffer.Clear();
             _resyncVersion = 0;
+            _unconfirmedVersion = 0;
+            _lastStagedVersion = 0;
             _buffer.Enqueue((change, version));
             Signal();
             return;
