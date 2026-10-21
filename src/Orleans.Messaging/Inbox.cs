@@ -469,35 +469,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                 return;
             }
 
-            // An exception leaves the outcome unknown, so the message retries until InboxRetryTimeout after its first
-            // failure. The last attempt runs when the timeout elapses; Fail(reason) dead-letters a message at once.
-            // Retry deadlines follow the Durable Jobs clock, which schedules the wake-up for the next attempt.
-            var attempts = checked(entry.State.AttemptCount + 1);
-            var now = Shared.JobTimeProvider.GetUtcNow();
-            var expirationTime = entry.State.ExpirationTime ?? MessagingTime.AddClamped(now, Options.InboxRetryTimeout);
-            if (expirationTime <= now)
-            {
-                StageDeadLetter(entry.Message, error.Message, attempts);
-                status = "dead_lettered";
-            }
-            else
-            {
-                var retryAt = MessagingTime.AddClamped(now, MessagingTime.GetBackoff(Options.RetryInitialInterval, attempts));
-
-                Emit(new()
-                {
-                    Kind = InboxCommandKind.Retry,
-                    MessageId = entry.Message.Envelope.MessageId,
-                    State = new()
-                    {
-                        AttemptCount = attempts,
-                        LastError = error.ToString(),
-                        NextAttemptAt = retryAt < expirationTime ? retryAt : expirationTime,
-                        ExpirationTime = expirationTime
-                    }
-                });
-                status = "retry";
-            }
+            status = StageFailedAttempt(entry, error.Message, error.ToString(), Shared.JobTimeProvider.GetUtcNow());
         }
         else
         {
@@ -506,6 +478,42 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
         Shared.Instruments.OnInboxMessageProcessed(Shared.GrainType, status);
         Shared.Instruments.OnInboxProcessingDuration(Stopwatch.GetElapsedTime(start), Shared.GrainType);
+    }
+
+    /// <summary>
+    /// Stages a failed attempt's outcome: a retry with backoff, or a dead letter once <c>InboxRetryTimeout</c> has elapsed
+    /// since the message's first failure. Returns the processing status for metrics.
+    /// </summary>
+    /// <remarks>
+    /// An unknown outcome retries until the timeout; the last attempt runs when it elapses, and <c>Fail(reason)</c>
+    /// dead-letters a message at once. Retry deadlines follow the Durable Jobs clock, which schedules the next wake-up.
+    /// An interrupted attempt starts the retry window but dead-letters only a message whose window an earlier failure
+    /// started, so one unclean stop never dead-letters a message by itself.
+    /// </remarks>
+    private string StageFailedAttempt(InboxEntry entry, string reason, string detail, DateTimeOffset now, bool interrupted = false)
+    {
+        var attempts = checked(entry.State.AttemptCount + 1);
+        var expirationTime = entry.State.ExpirationTime ?? MessagingTime.AddClamped(now, Options.InboxRetryTimeout);
+        if (expirationTime <= now && (!interrupted || entry.State.ExpirationTime is not null))
+        {
+            StageDeadLetter(entry.Message, reason, attempts);
+            return "dead_lettered";
+        }
+
+        var retryAt = MessagingTime.AddClamped(now, MessagingTime.GetBackoff(Options.RetryInitialInterval, attempts));
+        Emit(new()
+        {
+            Kind = InboxCommandKind.Retry,
+            MessageId = entry.Message.Envelope.MessageId,
+            State = new()
+            {
+                AttemptCount = attempts,
+                LastError = detail,
+                NextAttemptAt = retryAt < expirationTime ? retryAt : expirationTime,
+                ExpirationTime = expirationTime
+            }
+        });
+        return "retry";
     }
 
     private bool IsCurrent(InboxEntry entry) =>
@@ -620,9 +628,72 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             throw new InvalidOperationException("Inbox activation requires IMessagingGrain or DurableGrain.");
         }
 
-        if (CompactDeadLetters(TimeProvider.GetUtcNow()))
+        var compacted = CompactDeadLetters(TimeProvider.GetUtcNow());
+        if (ChargeInterruptedAttempts() | compacted)
         {
             await PersistAsync().ConfigureAwait(true);
+        }
+
+        _recovered = true;
+    }
+
+    /// <summary>
+    /// Charges one failed attempt to each due message unless the previous activation journaled a clean stop, and returns
+    /// whether it staged anything.
+    /// </summary>
+    /// <remarks>
+    /// An activation which fails after a handler staged changes, or whose silo crashes, stops without recording the
+    /// attempt's outcome. Charging it at recovery keeps backoff and <c>InboxRetryTimeout</c> bounding every failure path
+    /// without a journal write on the happy path. A crash also charges due messages which hadn't been dispatched, so
+    /// attempts can overcount by one per unclean stop; a charge alone never dead-letters a message whose retry window
+    /// hadn't started. The charge commits before the pump runs any handler.
+    /// </remarks>
+    private bool ChargeInterruptedAttempts()
+    {
+        if (_messages.Count == 0) return false;
+        if (_stoppedCleanly)
+        {
+            // Consume the marker, so a later unclean stop of this activation is charged.
+            Emit(new() { Kind = InboxCommandKind.Resume });
+            return true;
+        }
+
+        var now = Shared.JobTimeProvider.GetUtcNow();
+        var charged = 0;
+        foreach (var entry in _messages.Values.ToArray())
+        {
+            // A message which isn't due couldn't have been in an attempt.
+            if (GetDelay(entry, now) != TimeSpan.Zero) continue;
+            var status = StageFailedAttempt(entry, InterruptedAttemptReason, InterruptedAttemptReason, now, interrupted: true);
+            Shared.Instruments.OnInboxMessageProcessed(Shared.GrainType, status);
+            charged++;
+        }
+
+        if (charged > 0) LogInterruptedAttemptsCharged(Logger, GrainContext.GrainId, charged);
+        return charged > 0;
+    }
+
+    private const string InterruptedAttemptReason = "The activation stopped without recording the outcome of an attempt.";
+
+    /// <summary>
+    /// Journals that this activation stopped with no handler attempt interrupted, so recovery charges none.
+    /// </summary>
+    /// <remarks>
+    /// The pump calls this after its loop ends. A messaging failure, such as a handler which failed after staging
+    /// changes, records nothing, so recovery charges the attempt. A failed write leaves the stop unclean, which charges
+    /// at most one extra attempt.
+    /// </remarks>
+    internal async Task RecordCleanStopAsync()
+    {
+        if (!_recovered || _pump.IsFailed || _stoppedCleanly || _messages.Count == 0) return;
+        try
+        {
+            Emit(new() { Kind = InboxCommandKind.CleanStop });
+            await _pump.StateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            LogCleanStopFailed(Logger, exception, GrainContext.GrainId);
         }
     }
 
@@ -748,6 +819,12 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Inbox command staging failed.")]
     private static partial void LogStagingFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Inbox for {ReceiverId} charged an interrupted attempt to {Count} due messages: its previous activation stopped without recording their outcome.")]
+    private static partial void LogInterruptedAttemptsCharged(ILogger logger, GrainId receiverId, int count);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Inbox for {ReceiverId} couldn't record a clean stop, so its next activation charges one attempt to each due message.")]
+    private static partial void LogCleanStopFailed(ILogger logger, Exception exception, GrainId receiverId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Inbox for {ReceiverId} expired message {MessageId}: its send time {SentAt} is at or below the durable admission floor {AdmissionFloor}. Its earlier delivery outcome is unknown.")]
     private static partial void LogMessageExpired(ILogger logger, MessageId messageId, GrainId receiverId, DateTimeOffset sentAt, DateTimeOffset admissionFloor);
