@@ -13,6 +13,20 @@ namespace Orleans.Runtime
     public interface IManagementGrain : IGrainWithIntegerKey, IVersionManager
     {
         /// <summary>
+        /// Deactivates existing instances of the specified grain on all currently active silos.
+        /// </summary>
+        /// <remarks>
+        /// Targets existing activation contexts directly, including stateless workers, and completes successfully
+        /// when no instance exists. Subsequent requests follow the normal activation lifecycle.
+        /// During a rolling upgrade, begin using this operation after all active silos support it.
+        /// </remarks>
+        /// <param name="grainId">The exact grain identity to deactivate.</param>
+        /// <param name="cancellationToken">Cancels waiting for completion. Deactivation already requested continues.</param>
+        /// <returns>A task which completes after matching instances have finished deactivating.</returns>
+        [Alias("DeactivateGrain")]
+        Task DeactivateGrain(GrainId grainId, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Get the list of silo hosts and statuses currently known about in this cluster.
         /// </summary>
         /// <param name="onlyActive">Whether data on just current active silos should be returned,
