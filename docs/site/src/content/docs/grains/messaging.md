@@ -429,7 +429,7 @@ The inbox detects staged changes through the journal's staged change count.
 
 ## Backpressure, retries, and dead letters
 
-The inbox bounds a newly admitted or extended `SentAt` by its Durable Jobs time
+For deliveries, the inbox bounds a newly admitted or extended `SentAt` by its Durable Jobs time
 plus `DeduplicationWindow`; equality is admitted. A tracked message with an equal
 or earlier time receives its recorded answer even after a receiver clock rollback.
 An untracked message at or below the admission floor receives `Expired`, including
@@ -439,7 +439,8 @@ with no staged change or sink offer. The outbox treats the
 exception as a failed attempt, preserving the original `SentAt` and retrying until
 `SentAt + OutboxRetryTimeout`; retry exhaustion retires the send as `DeadLettered`
 with an unknown earlier outcome. Messages staged directly in the sending grain's
-own inbox use a local staging time and follow the local-send path.
+own inbox use the local staging time, or the first time above the admission floor
+after a backward clock jump, and follow the local-send path.
 
 When the inbox holds
 <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.MaxCapacity> pending
