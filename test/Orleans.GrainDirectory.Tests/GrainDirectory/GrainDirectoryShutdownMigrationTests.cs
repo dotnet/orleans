@@ -22,11 +22,11 @@ public sealed class GrainDirectoryShutdownMigrationTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(2);
+        builder.Options.UseDistributedGrainDirectory = true;
         builder.ConfigureSilo((_, siloBuilder) =>
         {
             siloBuilder.Services.AddSingleton<MembershipTableManager>();
             siloBuilder.Services.AddSingleton<IMembershipManager, DelayedMembershipManager>();
-            siloBuilder.AddDistributedGrainDirectory();
         });
 
         await using var cluster = builder.Build();
