@@ -72,6 +72,37 @@ namespace NonSilo.Tests.Directory
             Assert.Equal(expected, this.target.Directories.ToArray());
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void RuntimeDefaultUsesDistributedDirectory(bool addNamedAlias)
+        {
+            using var configuredHost = new HostBuilder().UseOrleans(siloBuilder =>
+            {
+                siloBuilder.UseLocalhostClustering();
+                if (addNamedAlias)
+                {
+                    siloBuilder.AddDistributedGrainDirectory("named");
+                }
+            }).Build();
+
+            var services = configuredHost.Services;
+            var resolver = services.GetRequiredService<GrainDirectoryResolver>();
+            var directory = Assert.IsType<DistributedGrainDirectory>(resolver.DefaultGrainDirectory);
+            Assert.Same(directory, resolver.Resolve(GrainType.Create(DefaultDirectoryGrain.DIRECTORY)));
+            Assert.Same(directory, Assert.Single(resolver.Directories));
+            if (addNamedAlias)
+            {
+                Assert.Same(directory, services.GetRequiredKeyedService<IGrainDirectory>("named"));
+            }
+
+            Assert.Same(
+                directory,
+                Assert.Single(
+                    services.GetServices<ILifecycleParticipant<ISiloLifecycle>>(),
+                    static participant => participant is DistributedGrainDirectory));
+        }
+
         [Fact]
         public void LocalDirectorySelectionRemovesDistributedDefault()
         {
