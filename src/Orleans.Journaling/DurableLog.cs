@@ -478,7 +478,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     //    whose history was deleted is reported as abandoned, since its entries no longer exist.
     // 2. A history change: another epoch, a position past the end, or a clear. Each repositions the reader with Reset.
     // 3. A trim, then the committed confirmation of a staged trim.
-    // 4. CaughtUp, then the next entry, then a watermark which confirms staged entries.
+    // 4. CaughtUp, then a watermark which confirms delivered staged entries, then the next entry.
     // 5. Sealed, once every entry has been delivered and confirmed.
     // 6. Draft items.
     private bool TryGetNextEvent(Reader reader, out LogEvent<T> logEvent)
@@ -569,6 +569,15 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             return true;
         }
 
+        // An eligible watermark precedes further entries, so a producer which keeps appending cannot defer it indefinitely.
+        if (reader.UnconfirmedSequence >= 0 && reader.UnconfirmedSequence < _committed.NextSequence)
+        {
+            var watermark = Math.Min(_committed.NextSequence, reader.Cursor);
+            reader.UnconfirmedSequence = watermark < reader.Cursor ? watermark : -1;
+            logEvent = new() { Kind = LogEventKind.Watermark, Sequence = watermark, Status = DurableChangeStatus.Committed };
+            return true;
+        }
+
         // A committed reader positioned before an uncommitted trim awaits the trim's write.
         var limit = reader.IncludesStaged ? NextSequence : _committed.NextSequence;
         if (reader.Cursor >= _firstSequence && reader.Cursor < limit)
@@ -581,14 +590,6 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             }
 
             logEvent = new() { Kind = LogEventKind.Entry, Sequence = sequence, Item = _items[(int)(sequence - _firstSequence)], Status = status };
-            return true;
-        }
-
-        if (reader.UnconfirmedSequence >= 0 && reader.UnconfirmedSequence < _committed.NextSequence)
-        {
-            var watermark = Math.Min(_committed.NextSequence, reader.Cursor);
-            reader.UnconfirmedSequence = watermark < reader.Cursor ? watermark : -1;
-            logEvent = new() { Kind = LogEventKind.Watermark, Sequence = watermark, Status = DurableChangeStatus.Committed };
             return true;
         }
 
