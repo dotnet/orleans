@@ -26,8 +26,9 @@ public sealed class PaymentGrain(IPaymentGateway payments) : DurableGrain
     // <orleans0201_fix>
     public async DurableTask<Charge?> PayOnceAsync(decimal amount)
     {
-        // The grain and the task's identifier name this execution in every replay, so together they identify the charge.
-        var idempotencyKey = $"{this.GetGrainId()}/{DurableTask.Current.Id}/charge";
+        // The grain, the task's identifier, and its incarnation name this run in every replay, so together they identify
+        // the charge, and a later run of the same identifier charges under another key.
+        var idempotencyKey = $"{this.GetGrainId()}/{DurableTask.Current.Id}/{DurableTask.Current.Incarnation:N}/charge";
 
         // Logical time: the runtime records it, so a replay computes the same deadline.
         var deadline = DurableTask.Current.UtcNow.AddDays(3);
