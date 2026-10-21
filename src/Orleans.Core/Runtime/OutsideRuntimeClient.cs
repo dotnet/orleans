@@ -33,7 +33,6 @@ namespace Orleans
 
         private readonly MessagingTrace messagingTrace;
         private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
-        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private IGrainCallCancellationManager? _cancellationManager;
         private IClusterConnectionStatusObserver[]? _statusObservers;
 
@@ -82,7 +81,6 @@ namespace Orleans
         {
             TimeProvider = timeProvider;
             _interfaceToImplementationMapping = interfaceToImplementationMapping;
-            _applicationRequestInstruments = new(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             _localClientDetails = localClientDetails;
             this.loggerFactory = loggerFactory;
@@ -103,7 +101,8 @@ namespace Orleans
                 this.clientMessagingOptions.ResponseTimeout,
                 this.clientMessagingOptions.CancelRequestOnTimeout,
                 this.clientMessagingOptions.WaitForCancellationAcknowledgement,
-                null);
+                null,
+                new ApplicationRequestInstruments(orleansInstruments));
         }
 
         internal void ConsumeServices()
@@ -311,7 +310,7 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context!, message, _applicationRequestInstruments);
+                var callbackData = new CallbackData(this.sharedCallbackData, context!, message);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
@@ -484,7 +483,7 @@ namespace Orleans
             {
                 if (deadSilo.Equals(callback.Value.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callback.Value.OnTargetSiloFail(deadSilo);
                 }
             }
         }

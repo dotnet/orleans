@@ -1577,6 +1577,8 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     {
         public string arg0;
         public global::Orleans.LeaseProviders.LeaseRequest[] arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1610,6 +1612,8 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     {
         public string arg0;
         public global::Orleans.LeaseProviders.AcquiredLease[] arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1643,6 +1647,8 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     {
         public string arg0;
         public global::Orleans.LeaseProviders.AcquiredLease[] arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }

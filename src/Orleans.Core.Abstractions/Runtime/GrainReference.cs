@@ -622,6 +622,16 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public virtual bool IsCancellable => false;
+
+        /// <summary>
+        /// Gets a value indicating whether any argument of this request may be a <see cref="GrainCancellationToken"/>.
+        /// </summary>
+        /// <remarks>
+        /// When <see langword="false"/>, the runtime does not inspect arguments for <see cref="GrainCancellationToken"/> instances,
+        /// which avoids boxing value-type arguments via <see cref="GetArgument(int)"/>.
+        /// The default is <see langword="true"/> so that requests which do not override this property are always inspected.
+        /// </remarks>
+        public virtual bool MayHaveGrainCancellationToken => true;
     }
 
     /// <summary>
