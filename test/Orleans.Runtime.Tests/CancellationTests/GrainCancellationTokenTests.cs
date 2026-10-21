@@ -25,7 +25,6 @@ namespace UnitTests.CancellationTests
                 base.ConfigureTestCluster(builder);
                 builder.AddSiloBuilderConfigurator<SiloConfig>();
             }
-            #pragma warning restore CS0618
 
             private class SiloConfig : ISiloConfigurator
             {
@@ -398,4 +397,5 @@ namespace UnitTests.CancellationTests
             }
         }
     }
+#pragma warning restore CS0618
 }
