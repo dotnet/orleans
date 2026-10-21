@@ -7,6 +7,7 @@ using Xunit;
 
 namespace UnitTests.CancellationTests
 {
+#pragma warning disable CS0618 // This suite exercises the legacy cancellation token API.
     /// <summary>
     /// Tests for GrainCancellationToken functionality including task cancellation and token callbacks.
     /// </summary>
@@ -396,4 +397,5 @@ namespace UnitTests.CancellationTests
             }
         }
     }
+#pragma warning restore CS0618
 }
