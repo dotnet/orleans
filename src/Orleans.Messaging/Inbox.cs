@@ -214,12 +214,16 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     /// </exception>
     internal void StageLocal(InboxMessage message)
     {
+        // Reuse the outbox's clock observation: a fresh read could observe another rollback.
+        var now = message.SentAt;
         // A local send commits with the inbox, so it can use the first admitted time after a clock rollback.
         if (message.SentAt <= _admissionFloor)
         {
             if (_admissionFloor == DateTimeOffset.MaxValue) throw new InvalidOperationException("The inbox admission floor leaves no representable send time for a new local message.");
             message = message with { SentAt = _admissionFloor.AddTicks(1) };
         }
+        Debug.Assert(message.SentAt <= MessagingTime.AddClamped(now, Options.DeduplicationWindow)
+            || message.SentAt <= _admissionFloor.AddTicks(1));
         if (TryStageDuplicate(message, out _))
         {
             Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "duplicate");
@@ -356,7 +360,6 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             else
             {
                 Debug.Assert(_messages.ContainsKey(key));
-                Debug.Assert(!_processed.ContainsKey(key));
                 Emit(new() { Kind = InboxCommandKind.ExtendSentAt, MessageId = key, SentAt = message.SentAt });
             }
         }
