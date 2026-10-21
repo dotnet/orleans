@@ -1,4 +1,5 @@
 using Orleans.Journaling;
+using Orleans.Messaging.Configuration;
 using Orleans.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Xunit;
@@ -101,5 +102,41 @@ public sealed class ProcessedRetentionMaintenanceTests : MessagingBehaviorTestBa
     {
         var inbox = Fixture.GetInbox(receiver);
         return Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox));
+    }
+}
+
+[Collection(MessagingClusterCollection.Name)]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Messaging")]
+public sealed class MaximumDeduplicationWindowTests() : MessagingBehaviorTestBase(new MaximumWindowClusterFixture())
+{
+    [Fact]
+    public async Task MaximumWindow_ClampsTheAdmissionFloorThroughDeliveryAndSnapshotCompaction()
+    {
+        // Validation accepts any positive window, so the largest one is a valid configuration: the floor computation
+        // subtracts it from the clock and clamps at the minimum time instead of overflowing.
+        var receiver = NewGrain();
+        var message = CreateEnvelope(receiver, NewMessage(160, "maximum-window"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, message)).Status);
+        await Fixture.WaitForEffectCountAsync(receiver, 1);
+
+        Fixture.Storage.RequestSnapshot(JournalId.FromGrainId(receiver.GetGrainId()));
+        await receiver.RetryWriteStateAsync();
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, message)).Status);
+
+        var inbox = Fixture.GetInbox(receiver);
+        var floor = await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.DurableAdmissionFloor(inbox));
+        Assert.Equal(DateTimeOffset.MinValue, floor);
+        Assert.Contains(message.Envelope.MessageId, await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox)));
+    }
+
+    private sealed class MaximumWindowClusterFixture : MessagingClusterFixture
+    {
+        protected override void ConfigureOptions(DurableMessagingOptions options)
+        {
+            base.ConfigureOptions(options);
+            options.DeduplicationWindow = TimeSpan.MaxValue;
+        }
     }
 }
