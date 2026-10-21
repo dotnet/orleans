@@ -524,7 +524,21 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
                 parent.EnterShield();
             }
 
-            var handle = await parent.ObserveAttempt(parent.StartTaskAsync(childId, Task, options | GetDetachedOption(), cancellationToken));
+            // The start ends when the attempt is canceled, as the wait which follows it does, so a canceled attempt's pending
+            // start throws DurableTaskAttemptCanceledException rather than holding the attempt open.
+            using var linked = ScheduledTask.CreateLinkedWaitCancellation(parent, cancellationToken);
+            IScheduledTaskHandle handle;
+            try
+            {
+                handle = await parent.ObserveAttempt(
+                    parent.StartTaskAsync(childId, Task, options | GetDetachedOption(), linked?.Token ?? parent.AttemptCancellationToken));
+            }
+            catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
+            {
+                // The caller's cancellation ends the start, so the start reports the caller's token.
+                throw new OperationCanceledException(exception.Message, exception, cancellationToken);
+            }
+
             return (handle.TaskId, null, handle);
         }
 
