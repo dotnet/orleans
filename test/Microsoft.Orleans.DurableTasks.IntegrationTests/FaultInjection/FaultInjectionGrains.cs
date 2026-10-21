@@ -195,6 +195,34 @@ public abstract class FaultInjectedGrain : DurableGrain, IFaultInjectedGrain
     }
 }
 
+/// <summary>A fault-injected grain which also holds a durable log, a journaled state which reports its staged changes.</summary>
+public interface IFaultLoggingGrain : IFaultInjectedGrain
+{
+    /// <summary>Waits for a durable delay, then appends <paramref name="entry"/> to the grain's log in a recorded effect.</summary>
+    DurableTask<long> DelayThenLogAsync(string entry);
+
+    Task<string[]> GetLogAsync();
+}
+
+[GrainType("durable-task-fault-logging-test")]
+public sealed class FaultLoggingGrain(
+    IInbox inbox,
+    IMessagingDiagnostics diagnostics,
+    [FromKeyedServices("effects")] IDurableDictionary<string, int> effects,
+    [FromKeyedServices("history")] IDurableLog<string> history,
+    DurableTaskFaultInjector injector,
+    IGrainContext grainContext)
+    : FaultInjectedGrain(inbox, diagnostics, effects, injector, grainContext), IFaultLoggingGrain
+{
+    public async DurableTask<long> DelayThenLogAsync(string entry)
+    {
+        await DurableTask.Delay(TimeSpan.FromMilliseconds(1)).WithId("delay");
+        return DurableTask.RunInline("log", () => history.Append(entry));
+    }
+
+    public Task<string[]> GetLogAsync() => Task.FromResult(history.ToArray());
+}
+
 [GrainType("durable-task-fault-workflow-test")]
 public sealed class FaultWorkflowGrain(
     IInbox inbox,

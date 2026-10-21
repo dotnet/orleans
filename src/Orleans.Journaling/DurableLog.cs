@@ -5,8 +5,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling;
 
+// Every change commits a journal entry when it is made: an append, trim, clear, seal, epoch, or draft commit. An open
+// draft stages nothing until it commits, so the log reports each change it stages.
 [DebuggerDisplay("Count = {Count}, NextSequence = {NextSequence}")]
-internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLogCommandHandler<T>
+internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsStagedChanges, IDurableLogCommandHandler<T>
 {
     private readonly IDurableLogCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;

@@ -197,6 +197,34 @@ public abstract class DurableTaskFaultClassificationTests(string journalFormatKe
     }
 
     /// <summary>
+    /// A durable log reports every change it stages, so a durable task grain which holds one also retries a failed handler
+    /// attempt in the same activation.
+    /// </summary>
+    [Fact]
+    public async Task FailedHandlerAttemptOnAGrainWithADurableLogIsRetriedByTheSameActivation()
+    {
+        var grain = _harness.Client.GetGrain<IFaultLoggingGrain>(Guid.NewGuid());
+        Assert.Empty(await grain.GetLogAsync());
+        Assert.True(_harness.Fixture.Cluster.TryGetGrainContext(grain.GetGrainId(), out var activation));
+        _harness.Injector.Reset();
+        var fault = _harness.Injector.Arm(FaultPoint.InboxHandlerThrows, grain.GetGrainId(), 0, Resume);
+
+        var response = await _harness.RunAsync<long>(
+            grain,
+            "logged",
+            token => grain.DelayThenLogAsync("delayed").WithId("logged").ScheduleAsync(token),
+            CancellationToken);
+
+        Assert.True(response.Status == DurableTaskStatus.CompletedSuccessfully, $"Status {response.Status}: {response.Exception}");
+        Assert.Equal(0, response.GetResult<long>());
+        Assert.True(fault.HasFired, $"{fault} didn't fire.");
+        Assert.Equal(["delayed"], await grain.GetLogAsync());
+        Assert.True(_harness.Fixture.Cluster.TryGetGrainContext(grain.GetGrainId(), out var current));
+        Assert.Same(activation, current);
+        Assert.False(activation.Deactivated.IsCompleted);
+    }
+
+    /// <summary>
     /// A delivery which the receiver admitted before a failed write fenced its journal reaches the inbox while the fenced
     /// activation deactivates: the inbox's sink fails to stage it, the sender retries, and the next activation accepts the
     /// message exactly once.
