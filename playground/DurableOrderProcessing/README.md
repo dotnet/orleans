@@ -55,8 +55,8 @@ grain method which returns `DurableTask` or `DurableTask<T>`. The workflow await
 The order's state is its history, an `IDurableLog<OrderDetails>` named `history` whose entries are full snapshots of the
 order and its stock lines. The workflow keeps the current snapshot in a local variable and computes each transition as a
 pure function of the request, recorded results, and `DurableTask.Current.UtcNow`, such as `order = order.MarkPaid()`. It
-then appends the snapshot in a recorded effect, `DurableTask.RunInline(() => _history.Append(order))`: the effect appends once
-per position within the workflow, and the entry and the effect's record commit together with the workflow's next
+then appends the snapshot in a recorded effect, `DurableTask.RunInline("paid", () => _history.Append(order))`, named for its
+transition: the effect appends once per transition, whichever path the workflow takes, and the entry and the effect's record commit together with the workflow's next
 journal write. A replay returns the recorded sequence without appending again, so the history holds each version once,
 in order.
 
@@ -70,7 +70,7 @@ Until the order is paid, cancelling its operation cancels the workflow. The next
 voids the payment authorization at the gateway once the workflow has requested one, releases each line concurrently in a shielded `WhenAll`, and then
 appends the `Cancelled` snapshot, which carries `DurableTask.Current.TaskCancellationReason`. Reservations which completed
 return normally after a cancellation, so the workflow records whether a cancellation arrived before it authorizes the
-payment, with `DurableTask.RunInline`, and a cancelled order doesn't reach the gateway. Rejected stock, declined payments,
+payment, with `DurableTask.RunInline("cancellation-check", ...)`, and a cancelled order doesn't reach the gateway. Rejected stock, declined payments,
 payment timeouts, and payments which fail run the same compensation. A paid order shields the commit of its lines and
 the wait for its `shipped` signal, `await Shipped.WaitAsync().Shielded()`, so it ships whether or not a cancellation
 arrives after payment.
@@ -198,7 +198,7 @@ curl -N http://localhost:5000/api/orders/{orderId}/events
 | Payment | `AuthorizePayment` and a `PaymentResult` reply, correlated by message ID. | The workflow starts an authorization at the gateway over HTTP with `IDurableHttpClient.StartOperationAsync`, keyed by its order, and polls it with `WaitForOperationAsync(...).WaitAsync(paymentTimeout).WithId("await-payment")`. A timeout or a cancellation voids the authorization. |
 | Shipment | `ShipAsync` moves a `Paid` order to `Shipped`. | `POST /api/orders/operations/{orderId}/signals/shipped` delivers the `shipped` signal, which the paid workflow awaits with a shielded wait. The task records the first shipment, so a repeated one succeeds and another one returns `409`. |
 | Compensation | The transition which cancels the order stages `ReleaseStock` for each confirmed line. | Inline and shielded, so the compensation runs to completion after the cancellation which ended the workflow: the authorization is voided, then `lines.Select(...ReleaseAsync...).WhenAll().WithId("release").Shielded()` releases the lines concurrently. |
-| Projection | `StatusChanged` messages carry a version; the buyer keeps the highest. | The workflow posts one `RecordOrderAsync` call per version as a detached task, `.Detached().Post()`, whose root ID derives from the order grain and the workflow's ID. The update commits with the workflow's next journal write and runs independently of the workflow. The buyer keeps the highest version. |
+| Projection | `StatusChanged` messages carry a version; the buyer keeps the highest. | The workflow posts one `RecordOrderAsync` call per version as a detached task, `.WithId($"record-{transition}").Detached().Post()`, whose root ID derives from the order grain, the workflow's ID, and the transition. The update commits with the workflow's next journal write and runs independently of the workflow. The buyer keeps the highest version. |
 | Idempotency | Message IDs derived from the order ID, such as `orders/{orderId}/stock/{productId}`; each inbox processes a message ID once. | The checkout's `Idempotency-Key` names the order and its workflow, task IDs beneath it name each step, and the gateway's `Idempotency-Key` names the order's authorization, as [Idempotency end to end](#idempotency-end-to-end) describes. |
 | Recovery | The inbox and outbox resume pending messages; each handler runs from the state it finds. | The next activation replays pending tasks from the start; completed children and recorded effects return their recorded results, so the workflow resumes where it stopped and the history holds each version once. Durable Jobs wakes the order when the delay is due or a completion arrives. |
 | Observability | Order state and the dashboard. | The order's operation, with long polling and server-sent events, its history as a server-sent event stream, and the dashboard. |
