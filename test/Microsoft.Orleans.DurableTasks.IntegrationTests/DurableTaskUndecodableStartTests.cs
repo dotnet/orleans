@@ -82,7 +82,7 @@ public abstract class DurableTaskUndecodableStartTests : IAsyncLifetime
         var response = await outcome.WaitAsync(Timeout, cancellationToken);
         var childId = TaskId.CreateRoot("workflow").Child(UndecodableStartWorkflowGrain.StartId);
         Assert.Equal(
-            $"{childId} {targetId}|The invocation of durable task '{childId}' wasn't delivered to grain '{targetId}': {retired.Retirement.Reason}",
+            $"{childId} {targetId}|The delivery of durable task '{childId}' to grain '{targetId}' wasn't confirmed, so whether the grain ran it is unknown: {retired.Retirement.Reason}",
             response.GetResult<string>());
         Assert.Empty(await target.GetInboxDeadLettersAsync());
     }

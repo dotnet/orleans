@@ -3994,7 +3994,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await WaitUntilAsync(() => storage.Get(starterId).Result is { IsCompleted: true });
 
         Assert.Equal(
-            $"{childId} {target}: The invocation of durable task '{childId}' wasn't delivered to grain '{target}': The receiver is unavailable.",
+            $"{childId} {target}: The delivery of durable task '{childId}' to grain '{target}' wasn't confirmed, so whether the grain ran it is unknown: The receiver is unavailable.",
             storage.Get(starterId).Result!.GetResult<string>());
         Assert.False(storage.Get(childId).Accepted);
     });
