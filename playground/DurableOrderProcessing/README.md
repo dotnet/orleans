@@ -47,8 +47,8 @@ named `DurableTask.WhenAll` gives its inputs IDs beneath its own, such as `reser
 is its history, an `IDurableLog<OrderDetails>` named `history` whose entries are full snapshots of the order and its
 stock lines. The workflow keeps the current snapshot in a local variable and computes each transition as a pure function
 of the request, recorded results, and `DurableTask.Current.UtcNow`, such as `order = order.MarkPaid()`. It then appends
-the snapshot in a recorded effect, `DurableTask.RunInline(() => _history.Append(order))`: the effect appends once per
-position within the workflow, and the entry and the effect's record commit together with the workflow's next journal
+the snapshot in a recorded effect, `DurableTask.RunInline("paid", () => _history.Append(order))`, named for its transition: the effect
+appends once per transition, whichever path the workflow takes, and the entry and the effect's record commit together with the workflow's next journal
 write, without a write of their own. A replay returns the recorded sequence without appending again, so the history
 holds each version once, in order. Each projection update follows its append and addresses the snapshot's buyer. A paid
 order waits for its `Shipped` signal, then appends the `Shipped` snapshot and completes. `GetAsync`, `CancelAsync`, and
