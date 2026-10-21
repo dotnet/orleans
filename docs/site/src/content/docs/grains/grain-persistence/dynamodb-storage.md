@@ -18,7 +18,7 @@ The [AWS SDK for .NET credential and profile resolution chain](https://docs.aws.
 
 <xref:Orleans.Configuration.DynamoDBStorageOptions.DeleteStateOnClear> controls whether clearing state deletes the item or resets it. <xref:Orleans.Configuration.DynamoDBStorageOptions.TimeToLive> advances the item's expiration on every write; enable it only when disappearing state is valid application behavior.
 
-<xref:Orleans.Configuration.DynamoDBStorageOptions.ServiceId> must remain stable across deployments that share the same logical application state. The provider uses optimistic concurrency and rejects stale writes.
+<xref:Orleans.Configuration.DynamoDBStorageOptions.ServiceId> prefixes the key of every grain state, so it must be set explicitly and must remain stable across deployments that share the same logical application state. The silo doesn't start when it isn't set. Set it to an empty string to keep the keys written while it defaulted to an empty string. The provider uses optimistic concurrency and rejects stale writes.
 
 ## Serialization
 

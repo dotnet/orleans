@@ -13,7 +13,12 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment.
         /// </summary>
-        public string ServiceId { get; set; } = string.Empty;
+        /// <remarks>
+        /// The value prefixes the key of every grain state, so it must be set explicitly: for example to
+        /// <see cref="ClusterOptions.ServiceId"/>, or to <see cref="string.Empty"/> to keep the keys written
+        /// while it defaulted to an empty string.
+        /// </remarks>
+        public string? ServiceId { get; set; }
 
         /// <summary>
         /// Use Provisioned Throughput for tables
@@ -93,6 +98,10 @@ namespace Orleans.Configuration
         /// <inheritdoc/>
         public void ValidateConfiguration()
         {
+            if (this.options.ServiceId is null)
+                throw new OrleansConfigurationException(
+                    $"Configuration for DynamoDBGrainStorage {this.name} is invalid. {nameof(this.options.ServiceId)} is not set. Set it to the cluster's ServiceId, or to an empty string to keep the keys written while it defaulted to an empty string.");
+
             if (string.IsNullOrWhiteSpace(this.options.TableName))
                 throw new OrleansConfigurationException(
                     $"Configuration for DynamoDBGrainStorage {this.name} is invalid. {nameof(this.options.TableName)} is not valid.");

@@ -27,6 +27,7 @@ var builder = Host.CreateApplicationBuilder(args)
                 configureOptions: options =>
                 {
                     options.Service = "us-east-1";
+                    options.ServiceId = "my-application";
                     options.TableName = "OrleansGrainState";
                     options.UseProvisionedThroughput = false;
                 });
