@@ -8,8 +8,11 @@ using Orleans.Placement;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Session;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Diagnostics;
@@ -2151,6 +2154,117 @@ public sealed class RetirementHandoffTests
         => new() { GrainId = grainId, SiloAddress = silo.SiloAddress, ActivationId = ActivationId.NewId() };
 
     private sealed class UnserializableValue;
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MalformedMigrationRpc_IsRejectedBeforeAdmissionAndReleasesReceivePages(bool nullContext)
+    {
+        await using var cluster = await DeployAsync();
+        var source = cluster.Silos[0];
+        var destination = cluster.Silos[1];
+        var sourceShared = source.ServiceProvider.GetRequiredService<MessageHandlerShared>();
+        var destinationShared = destination.ServiceProvider.GetRequiredService<MessageHandlerShared>();
+        var manager = destination.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
+        var sessions = source.ServiceProvider.GetRequiredService<SerializerSessionPool>();
+        var packages = new List<GrainMigrationPackage>();
+        for (var i = 0; i < 3; i++)
+        {
+            var grainId = GrainId.Create("test", $"malformed-migration-{i}");
+            var requests = new List<Message>();
+            for (var j = 0; j < (i == 1 ? 2 : 1); j++)
+            {
+                requests.Add(CreateRequest(cluster, grainId, i * 2 + j + 1, new byte[20_000]));
+            }
+
+            if (i == 1 && !nullContext)
+            {
+                requests.Insert(1, null!);
+            }
+
+            packages.Add(new()
+            {
+                GrainId = grainId,
+                MigrationContext = i == 1 && nullContext ? null! : new MigrationContext(sessions),
+                Requests = requests,
+            });
+        }
+
+        var invocationType = typeof(ActivationMigrationManager).Assembly.GetTypes()
+            .Where(type => !type.IsAbstract && typeof(IInvokable).IsAssignableFrom(type)
+                && type.Name.StartsWith("Invokable_IActivationMigrationManagerSystemTarget_", StringComparison.Ordinal))
+            .Single(type => ((IInvokable)Activator.CreateInstance(type)!).GetMethodName()
+                == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains));
+        var invocation = (IInvokable)Activator.CreateInstance(invocationType)!;
+        invocation.SetArgument(0, packages);
+        invocation.SetArgument(1, CancellationToken.None);
+        Message received;
+        using (var frame = new ArcBufferWriter())
+        {
+            using var message = new Message { Direction = Message.Directions.Request, BodyObject = invocation };
+            var serializer = sourceShared.GetMessageSerializer();
+            try
+            {
+                MessageFrames.Write(serializer, frame, message);
+            }
+            finally
+            {
+                sourceShared.Return(serializer);
+            }
+
+            received = MessageFrames.Read(destinationShared, frame);
+        }
+
+        using (received)
+        {
+            var body = Assert.IsType<MessageReadRequest>(received._bodyObject).Body;
+            var pages = new List<(ArcBufferPage Page, int Version)>();
+            var remaining = body.Length;
+            var offset = body.Offset;
+            for (var page = body.First; remaining > 0; page = page.Next)
+            {
+                Assert.NotNull(page);
+                pages.Add((page, page.Version));
+                remaining -= Math.Min(remaining, page.Length - offset);
+                offset = 0;
+            }
+
+            Assert.NotEmpty(pages);
+            List<GrainMigrationPackage>? decoded = null;
+            try
+            {
+                var error = await Record.ExceptionAsync(async () =>
+                {
+                    var request = Assert.IsAssignableFrom<IInvokable>(received.BodyObject);
+                    decoded = Assert.IsType<List<GrainMigrationPackage>>(request.GetArgument(0));
+                    await manager.AcceptMigratingGrains(decoded, new CancellationToken(canceled: true));
+                });
+
+                var retainedPages = pages.Count(page => page.Page.Version == page.Version);
+                Assert.True(retainedPages == 0, $"{retainedPages} receive pages remain pinned after failure: {error}");
+                var malformed = Assert.IsType<InvalidMessageFrameException>(error);
+                Assert.Contains(nullContext ? "context" : "null request", malformed.Message);
+                Assert.Null(decoded);
+            }
+            finally
+            {
+                // The pre-fix negative control can reach admission with malformed decoded values.
+                foreach (var package in decoded ?? [])
+                {
+                    package.MigrationContext?.Dispose();
+                    foreach (var request in package.Requests ?? [])
+                    {
+                        request?.Dispose();
+                    }
+                }
+
+                foreach (var package in packages)
+                {
+                    package.MigrationContext?.Dispose();
+                }
+            }
+        }
+    }
 
     [Fact]
     public async Task RejectedMigrationBatch_ReleasesOnlyUnadmittedRequests()
