@@ -81,8 +81,8 @@ public sealed class DurableHttpOptions
     ///     : DurableHttpOptions.DefaultCreateError(exception);
     /// </code>
     /// <para>
-    /// An operation whose work's grain didn't accept the work, so the work never ran, fails with the
-    /// <see cref="DurableOperationError.NotStartedCode"/> code, which this function doesn't describe.
+    /// An operation whose host failed to start its work fails with the <see cref="DurableOperationError.NotStartedCode"/>
+    /// or <see cref="DurableOperationError.OutcomeUnknownCode"/> code, which this function doesn't describe.
     /// </para>
     /// </remarks>
     public Func<Exception, DurableOperationError> CreateError { get; set; } = DefaultCreateError;

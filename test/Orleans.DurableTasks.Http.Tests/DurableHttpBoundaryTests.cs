@@ -253,6 +253,31 @@ public sealed class DurableHttpBoundaryTests
         Assert.True(subscription.IsSameWorkAs(subscription));
         Assert.False(subscription.IsSameWorkAs(subscription with { TaskId = TaskId.CreateRoot("other") }));
     }
+    [Theory]
+    [InlineData("conflict", DurableOperationError.NotStartedCode)]
+    [InlineData("rejected", DurableOperationError.NotStartedCode)]
+    [InlineData("expired", DurableOperationError.OutcomeUnknownCode)]
+    [InlineData("undelivered", DurableOperationError.OutcomeUnknownCode)]
+    public void StartFailuresReportNotStartedOnlyWhenTheWorkNeverRan(string failure, string expectedCode)
+    {
+        var taskId = TaskId.CreateRoot("k");
+        var grain = GrainId.Create("durable-http-test", "a");
+        Exception exception = failure switch
+        {
+            "conflict" => new DurableTaskConflictException(taskId, "The identifier names another method's task."),
+            "rejected" => new DurableTaskRejectedException(taskId, grain, "orders/closed", "The order is closed."),
+            "expired" => new DurableTaskRejectedException(taskId, grain, DurableTaskRejectionCodes.Expired, "The invocation arrived late."),
+            _ => new DurableTaskDeliveryException(taskId, grain, "The outbox retry timeout elapsed."),
+        };
+
+        // An unconfirmed start may have run, so it never reads as safe to start again under a new key.
+        var start = DurableOperationStartException.FromScheduleFailure(exception);
+        var error = DurableOperationResponses.GetError(DurableTaskResponse.FromException(start!), Options);
+
+        Assert.Equal(expectedCode, error.Code);
+        Assert.Same(exception, start!.InnerException);
+        Assert.Null(DurableOperationStartException.FromScheduleFailure(new InvalidOperationException()));
+    }
     [Fact]
     public void StartsAreNotMappedToSafeMethods()
     {

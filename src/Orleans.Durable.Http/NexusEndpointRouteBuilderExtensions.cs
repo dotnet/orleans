@@ -75,8 +75,9 @@ public static class NexusEndpointRouteBuilderExtensions
     /// <item><description>
     /// <c>424 Failed Dependency</c> with an <c>OperationError</c> failure, whose message
     /// <see cref="DurableHttpOptions.CreateError"/> describes, when the operation failed or was canceled. An operation whose
-    /// work never ran, because its grain didn't accept it, fails with the <see cref="DurableOperationError.NotStartedCode"/>
-    /// code.
+    /// work's grain refused the work fails with the <see cref="DurableOperationError.NotStartedCode"/> code, and one whose
+    /// work's grain didn't confirm the work, which may have run, with the
+    /// <see cref="DurableOperationError.OutcomeUnknownCode"/> code.
     /// </description></item>
     /// <item><description>
     /// A handler error: <c>400</c> <c>BAD_REQUEST</c> for an invalid request identifier, <c>409</c> <c>CONFLICT</c> for a

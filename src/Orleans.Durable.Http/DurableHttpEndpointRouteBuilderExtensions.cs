@@ -55,8 +55,10 @@ public static class DurableHttpEndpointRouteBuilderExtensions
     /// </description></item>
     /// <item><description>
     /// <c>424 Failed Dependency</c> with the status monitor of an operation which failed or was canceled. An operation whose
-    /// work's grain didn't accept the work, so it never ran, fails with the <see cref="DurableOperationError.NotStartedCode"/>
-    /// error code, and a new key starts the work again.
+    /// work's grain refused the work without storing it fails with the <see cref="DurableOperationError.NotStartedCode"/>
+    /// error code, and a new key starts the work again. An operation whose work's grain didn't confirm the work fails with
+    /// the <see cref="DurableOperationError.OutcomeUnknownCode"/> error code: the work may have run, so a client checks its
+    /// effects before it starts the work again.
     /// </description></item>
     /// <item><description>
     /// <c>400 Bad Request</c> for an invalid or missing key, and <c>422 Unprocessable Content</c> for a key which another
