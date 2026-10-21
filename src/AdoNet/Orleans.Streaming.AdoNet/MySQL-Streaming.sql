@@ -256,7 +256,7 @@ IF _EvictOn <= _Now THEN
 
     -- if we won the race then we also run eviction
     IF ROW_COUNT() > 0 THEN
-        CALL EvictStreamMessages(_ServiceId, _ProviderId, _QueueId, _MaxAttempts, _RemovalTimeout, _EvictionBatchSize);
+        CALL EvictStreamMessages(_ServiceId, _ProviderId, _QueueId, _EvictionBatchSize, _MaxAttempts, _RemovalTimeout);
         CALL EvictStreamDeadLetters(_ServiceId, _ProviderId, _QueueId, _EvictionBatchSize);
     END IF;
 
@@ -265,7 +265,15 @@ END IF;
 START TRANSACTION;
 
 /* elect the batch of messages to dequeue and lock them in order */
-CREATE TEMPORARY TABLE _Batch AS
+CREATE TEMPORARY TABLE _Batch
+(
+    ServiceId NVARCHAR(150) NOT NULL,
+    ProviderId NVARCHAR(150) NOT NULL,
+    QueueId NVARCHAR(150) NOT NULL,
+    MessageId BIGINT NOT NULL
+);
+
+INSERT INTO _Batch (ServiceId, ProviderId, QueueId, MessageId)
 SELECT
 	ServiceId,
     ProviderId,
@@ -401,7 +409,15 @@ END WHILE;
 START TRANSACTION;
 
 /* elect the batch of messages to confirm and lock them in order */
-CREATE TEMPORARY TABLE _Batch AS
+CREATE TEMPORARY TABLE _Batch
+(
+    ServiceId NVARCHAR(150) NOT NULL,
+    ProviderId NVARCHAR(150) NOT NULL,
+    QueueId NVARCHAR(150) NOT NULL,
+    MessageId BIGINT NOT NULL
+);
+
+INSERT INTO _Batch (ServiceId, ProviderId, QueueId, MessageId)
 SELECT
 	M.ServiceId,
     M.ProviderId,
@@ -588,7 +604,15 @@ DECLARE _RemoveOn DATETIME(6) DEFAULT DATE_ADD(_Now, INTERVAL _RemovalTimeout SE
 START TRANSACTION;
 
 /* elect the batch of messages to move and lock them in order */
-CREATE TEMPORARY TABLE _Batch AS
+CREATE TEMPORARY TABLE _Batch
+(
+    ServiceId NVARCHAR(150) NOT NULL,
+    ProviderId NVARCHAR(150) NOT NULL,
+    QueueId NVARCHAR(150) NOT NULL,
+    MessageId BIGINT NOT NULL
+);
+
+INSERT INTO _Batch (ServiceId, ProviderId, QueueId, MessageId)
 SELECT
     ServiceId,
     ProviderId,
@@ -694,7 +718,15 @@ BEGIN
 DECLARE _Now DATETIME(6) DEFAULT UTC_TIMESTAMP();
 
 /* elect the batch of messages to remove */
-CREATE TEMPORARY TABLE _Batch AS
+CREATE TEMPORARY TABLE _Batch
+(
+    ServiceId NVARCHAR(150) NOT NULL,
+    ProviderId NVARCHAR(150) NOT NULL,
+    QueueId NVARCHAR(150) NOT NULL,
+    MessageId BIGINT NOT NULL
+);
+
+INSERT INTO _Batch (ServiceId, ProviderId, QueueId, MessageId)
 SELECT
     ServiceId,
     ProviderId,
