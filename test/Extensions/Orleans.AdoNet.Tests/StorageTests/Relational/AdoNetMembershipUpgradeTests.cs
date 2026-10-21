@@ -50,7 +50,7 @@ public sealed class AdoNetMembershipUpgradeTests
             "FD33B6AD41DDA95942F275857F27C7FD02A0DB433747DA4C3B92D677ACB6014E");
 
     // On MySQL 8.4 the original InsertMembershipKey reported a duplicate silo insert as successful and advanced the version.
-    // The migration runs twice to show that repeating it leaves an upgraded database working.
+    // The migration runs twice, as users run it, to show that repeating it leaves an upgraded database working.
     [Fact]
     [TestProvider("MySql")]
     public async Task MySql_Migration_10_5_0_RejectsDuplicateInsert()
@@ -61,12 +61,14 @@ public sealed class AdoNetMembershipUpgradeTests
         Assert.Equal(
             "FD33B6AD41DDA95942F275857F27C7FD02A0DB433747DA4C3B92D677ACB6014E",
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fixture.Replace("\r\n", "\n")))));
-        var migrationPath = Path.Combine(AppContext.BaseDirectory, "MySQL-Clustering-10.5.0.sql");
         var database = await RelationalStorageForTesting.SetupInstance(
             AdoNetInvariants.InvariantNameMySql,
             $"MembershipMigration_{Guid.NewGuid():N}",
             cancellationToken: cancellationToken,
-            setupSqlScriptFileNames: [Path.Combine(AppContext.BaseDirectory, "MySQL-Main.sql"), fixturePath, migrationPath, migrationPath]);
+            setupSqlScriptFileNames: [Path.Combine(AppContext.BaseDirectory, "MySQL-Main.sql"), fixturePath]);
+        var migration = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "MySQL-Clustering-10.5.0.sql"), cancellationToken);
+        await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, migration, cancellationToken);
+        await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, migration, cancellationToken);
         using var services = new ServiceCollection().BuildServiceProvider();
         var table = new AdoNetClusteringTable(
             services,

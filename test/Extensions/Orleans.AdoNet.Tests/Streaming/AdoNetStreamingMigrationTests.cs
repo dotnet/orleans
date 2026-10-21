@@ -31,13 +31,16 @@ public sealed class AdoNetStreamingMigrationTests
             "B349B59063190EC34AF69702EF32FFC76BF1FF396690572469B894D3F56A49A2",
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(original.Replace("\r\n", "\n")))));
 
-        // The migration runs twice to show that repeating it leaves an upgraded database working.
-        var migrationPath = Path.Combine(AppContext.BaseDirectory, "MySQL-Streaming-10.5.0.sql");
         var database = await RelationalStorageForTesting.SetupInstance(
             AdoNetInvariants.InvariantNameMySql,
             $"StreamingMigration_{Guid.NewGuid():N}",
             cancellationToken: cancellationToken,
-            setupSqlScriptFileNames: [Path.Combine(AppContext.BaseDirectory, "MySQL-Main.sql"), fixturePath, migrationPath, migrationPath]);
+            setupSqlScriptFileNames: [Path.Combine(AppContext.BaseDirectory, "MySQL-Main.sql"), fixturePath]);
+
+        // The migration runs twice, as users run it, to show that repeating it leaves an upgraded database working.
+        var migration = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "MySQL-Streaming-10.5.0.sql"), cancellationToken);
+        await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, migration, cancellationToken);
+        await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, migration, cancellationToken);
         var queries = await RelationalOrleansQueries.CreateInstance(AdoNetInvariants.InvariantNameMySql, database.CurrentConnectionString);
 
         var confirmed = await queries.QueueStreamMessageAsync(ServiceId, ProviderId, QueueId, [1], 600);
