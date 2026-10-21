@@ -59,7 +59,7 @@ public sealed class FutureSentAtTests : MessagingBehaviorTestBase
     [InlineData("pending")]
     [InlineData("processed")]
     [InlineData("rejected")]
-    public async Task KnownIdentity_RejectsTooFutureBeforeDedupOrRetentionExtension(string history)
+    public async Task KnownIdentity_RejectsNewerTimePastBoundBeforeRetentionExtension(string history)
     {
         var rejected = history == "rejected";
         IAddressable receiver = rejected ? NewSink() : NewGrain();
@@ -112,6 +112,109 @@ public sealed class FutureSentAtTests : MessagingBehaviorTestBase
             Assert.Equal("one-known-effect", effect.Value);
             Assert.Equal(1, effect.Count);
         }
+    }
+
+    [Theory]
+    [InlineData("pending", false)]
+    [InlineData("pending", true)]
+    [InlineData("processed", false)]
+    [InlineData("processed", true)]
+    [InlineData("rejected", false)]
+    [InlineData("rejected", true)]
+    public async Task KnownIdentity_EqualOrEarlierPastBoundKeepsRecordedAnswerWithoutWrites(string history, bool earlier)
+    {
+        var rejected = history == "rejected";
+        IAddressable receiver = rejected ? NewSink() : NewGrain();
+        var clock = new ManualJobClock(_cluster.JobClock.GetUtcNow());
+        _cluster.Clocks.Set(receiver, clock);
+        const string route = "messages/known-answer-after-receiver-rollback";
+        using var handler = rejected ? null : _cluster.HandlerProbe.Arm(receiver.GetGrainId(), route);
+        var original = rejected ? Message(clock.GetUtcNow())
+            : TestApplicationProtocol.CreateInbox(Sessions, GrainId.Create("ordering-test-sender", "known"), route,
+                NewMessage(98, "known-despite-rollback"), clock.GetUtcNow());
+        if (rejected) _cluster.SourceSinkProbe.For(receiver).Mode = SinkMode.DeadLetter;
+        Assert.Equal(rejected ? DeliveryStatus.DeadLettered : DeliveryStatus.Accepted,
+            (await DeliverAsync(receiver, original)).Status);
+        if (handler is not null)
+        {
+            await handler.WaitUntilEnteredAsync();
+            if (history == "processed")
+            {
+                handler.Release();
+                await _cluster.WaitForInboxCountAsync((IMessagingTestGrain)receiver, 0);
+            }
+            await ((IMessagingTestGrain)receiver).RetryWriteStateAsync();
+        }
+        else
+        {
+            _cluster.SourceSinkProbe.For(receiver).Mode = SinkMode.Accept;
+        }
+        var window = Window(receiver);
+        var before = await CaptureAsync(receiver);
+        clock.Advance(-2 * window);
+        var receiverTime = await ActualClockAsync(receiver);
+        Assert.Equal(original.SentAt - 2 * window, receiverTime);
+        var incoming = original with { SentAt = earlier ? original.SentAt - window / 2 : original.SentAt };
+        Assert.True(incoming.SentAt > receiverTime + window);
+        Assert.True(incoming.SentAt <= original.SentAt);
+        var known = await DeliverAsync(receiver, incoming);
+        Assert.Equal(rejected ? DeliveryStatus.DeadLettered : DeliveryStatus.Duplicate, known.Status);
+        Assert.Equal(rejected ? SourceSinkGrain.RejectionCode : null, known.Code);
+        if (rejected) Assert.Equal(SourceSinkGrain.Rejection, known.Message);
+        await AssertUnchangedAsync(receiver, before);
+        var inbox = Inbox(receiver);
+        Assert.Equal(original.SentAt, await _cluster.OnGrainAsync(receiver, () => history == "pending"
+            ? InboxTestAccess.GetPendingMessages(inbox)[original.Envelope.MessageId].Message.SentAt
+            : InboxTestAccess.GetProcessedSentAt(inbox, original.Envelope.MessageId)));
+        Assert.Equal(receiverTime, await ActualClockAsync(receiver));
+        if (rejected)
+        {
+            Assert.Equal(1, _cluster.SourceSinkProbe.For(receiver).SinkOffers);
+            Assert.Equal(0, _cluster.SourceSinkProbe.For(receiver).SinkAcceptances);
+            Assert.Empty((await OnSinkAsync(receiver, static grain => grain.GetState())).Received);
+        }
+        else
+        {
+            handler!.Release();
+            await _cluster.WaitForInboxCountAsync((IMessagingTestGrain)receiver, 0);
+            var effect = Assert.Single((await ((IMessagingTestGrain)receiver).GetSnapshotAsync()).Effects);
+            Assert.Equal("known-despite-rollback", effect.Value);
+            Assert.Equal(1, effect.Count);
+        }
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    public async Task UnknownPastBound_AtOrBelowDurableFloorExpiresBeforeFutureRejection(long floorTicks)
+    {
+        var receiver = NewSink();
+        var started = _cluster.JobClock.GetUtcNow();
+        var clock = new ManualJobClock(started);
+        _cluster.Clocks.Set(receiver, clock);
+        Assert.Equal(0, await receiver.GetOutboxCountAsync());
+        var window = Window(receiver);
+        clock.Advance(3 * window);
+        var floor = clock.GetUtcNow() - window;
+        Assert.Equal(DeliveryStatus.Expired, (await DeliverAsync(receiver, Message(floor))).Status);
+        Assert.Equal(floor, await _cluster.OnGrainAsync(receiver, () => InboxTestAccess.DurableAdmissionFloor(Inbox(receiver))));
+        clock.Advance(started - clock.GetUtcNow());
+        var receiverTime = await ActualClockAsync(receiver);
+        Assert.Equal(started, receiverTime);
+        Assert.True(floor > receiverTime + window);
+        var before = await CaptureAsync(receiver);
+        var incoming = Message(floor.AddTicks(floorTicks));
+        Assert.True(incoming.SentAt > receiverTime + window);
+        Assert.True(incoming.SentAt <= floor);
+        var expired = await DeliverAsync(receiver, incoming);
+        Assert.Equal(DeliveryStatus.Expired, expired.Status);
+        Assert.Null(expired.Code);
+        await AssertUnchangedAsync(receiver, before);
+        Assert.Empty((await OnSinkAsync(receiver, static grain => grain.GetState())).Received);
+        Assert.Equal(0, _cluster.SourceSinkProbe.For(receiver).SinkOffers);
+        await AssertRejectedAsync(receiver, Message(floor.AddTicks(1)));
+        await AssertUnchangedAsync(receiver, before);
+        Assert.Equal(receiverTime, await ActualClockAsync(receiver));
     }
 
     [Theory]
@@ -252,6 +355,90 @@ public sealed class FutureSentAtTests : MessagingBehaviorTestBase
             Assert.Equal(receiverTime, await ActualClockAsync(receiver));
             Assert.Equal(receiverTime, receiverClock.GetUtcNow());
             Assert.Equal(receiverTime, _cluster.JobClock.GetUtcNow());
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RealOutbox_LostReplyThenReceiverRollbackReturnsDuplicateAndRetiresDelivered(bool realSink)
+    {
+        var sender = NewSink();
+        IAddressable receiver = realSink ? NewSink() : NewGrain();
+        var started = _cluster.JobClock.GetUtcNow();
+        var senderClock = new ManualJobClock(started);
+        var receiverClock = new ManualJobClock(started);
+        _cluster.Clocks.Set(sender, senderClock);
+        _cluster.Clocks.Set(receiver, receiverClock);
+        Assert.Equal(0, await sender.GetOutboxCountAsync());
+        if (realSink) Assert.Equal(0, await ((ISourceSinkGrain)receiver).GetOutboxCountAsync());
+        else _ = await ((IMessagingTestGrain)receiver).GetSnapshotAsync();
+        var id = TestApplicationProtocol.NewMessageId();
+        const string route = "messages/lost-reply-receiver-rollback";
+        var payload = realSink ? new byte[] { 100, 101 }
+            : TestApplicationProtocol.Encode(Sessions, new TestApplicationMessage(route, new TestMessage(id, 100, "once-after-receiver-rollback")));
+        if (!realSink) _cluster.SourceSinkProbe.For(sender).SubjectOverride = route;
+        using var events = new DeliveryEventObserver(sender.GetGrainId(), receiver.GetGrainId(), id, faults: 0);
+        var retry = events.RetryScheduled.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        var retired = events.Retired.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        var lost = DeliveryFault.LoseResponse();
+        var held = DeliveryFault.HoldAfterCall();
+        var retryAnswer = held.ReceiverAnswer;
+        _cluster.Deliveries.Enqueue(lost, held);
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), id, payload, write: true);
+        await _cluster.RunPumpAsync(sender);
+        Assert.Equal(DeliveryStatus.Accepted, (await lost.ReceiverAnswer).Status);
+        await retry;
+        await sender.WriteAsync();
+        if (!realSink)
+        {
+            await _cluster.WaitForEffectCountAsync((IMessagingTestGrain)receiver, 1);
+            await _cluster.WaitForInboxCountAsync((IMessagingTestGrain)receiver, 0);
+            await ((IMessagingTestGrain)receiver).RetryWriteStateAsync();
+        }
+        var before = await CaptureAsync(receiver);
+        var window = Window(receiver);
+        receiverClock.Advance(-2 * window - TimeSpan.FromHours(1));
+        Assert.True(started > receiverClock.GetUtcNow() + window);
+        var state = await _cluster.OnGrainAsync(sender, () => _cluster.GetOutboxState(sender).Attempt(id));
+        Assert.Equal(1, state.AttemptCount);
+        Assert.Equal(started, state.SentAt);
+        senderClock.Advance(state.NextAttemptAt!.Value - senderClock.GetUtcNow());
+        await _cluster.RunPumpAsync(sender);
+        await held.WaitUntilEnteredAsync();
+        Assert.Equal(DeliveryStatus.Duplicate, (await retryAnswer).Status);
+        Assert.Equal([DeliveryStatus.Accepted, DeliveryStatus.Duplicate], _cluster.Deliveries.Answers);
+        Assert.Equal([started, started], _cluster.Deliveries.SentTimes);
+        Assert.Empty(_cluster.Deliveries.ReceiverFailures);
+        Assert.Single(events.Retries);
+        Assert.False(retired.IsCompleted);
+        await AssertUnchangedAsync(receiver, before);
+        Assert.Equal(started, await _cluster.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedSentAt(Inbox(receiver), id)));
+        held.Release();
+        Assert.Equal(OutboxMessageRetirementStatus.Delivered, (await retired).Retirement.Status);
+        await sender.WriteAsync();
+        var final = await OnSinkAsync(sender, static grain => grain.GetState());
+        Assert.Empty(final.Outgoing);
+        Assert.Equal(nameof(OutboxMessageRetirementStatus.Delivered), Assert.Single(final.Retired).Value);
+        Assert.Equal(0, await sender.GetOutboxCountAsync());
+        Assert.Empty(await _cluster.OnGrainAsync(sender, () => _cluster.GetOutboxState(sender).DeadLetterKeys.ToArray()));
+        Assert.Equal(2, _cluster.Deliveries.Executions);
+        Assert.Equal(2, _cluster.Deliveries.ReceiverCalls);
+        Assert.Single(events.Retries);
+        Assert.Equal(started + FaultInjectionClusterFixture.RetryInterval, await ActualClockAsync(sender));
+        Assert.Equal(started - 2 * window - TimeSpan.FromHours(1), await ActualClockAsync(receiver));
+        Assert.Equal(started, _cluster.JobClock.GetUtcNow());
+        if (realSink)
+        {
+            Assert.Equal(payload, (await OnSinkAsync(receiver, static grain => grain.GetState())).Received[id.ToString()]);
+            Assert.Equal(1, _cluster.SourceSinkProbe.For(receiver).SinkOffers);
+            Assert.Equal(1, _cluster.SourceSinkProbe.For(receiver).SinkAcceptances);
+        }
+        else
+        {
+            var effect = Assert.Single((await ((IMessagingTestGrain)receiver).GetSnapshotAsync()).Effects);
+            Assert.Equal("once-after-receiver-rollback", effect.Value);
+            Assert.Equal(1, effect.Count);
         }
     }
 
