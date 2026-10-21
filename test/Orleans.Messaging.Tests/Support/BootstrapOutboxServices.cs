@@ -6,14 +6,19 @@ using Orleans.Runtime;
 
 namespace Orleans.Messaging.Tests.Support;
 
-public sealed class BootstrapDeliveryProbe : IOutgoingGrainCallFilter, IObserver<MessagingEvents.MessagingEvent>
+public sealed class BootstrapDeliveryProbe : IOutgoingGrainCallFilter, IObserver<MessagingEvents.MessagingEvent>, IDisposable
 {
     private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly ConcurrentDictionary<GrainId, TaskCompletionSource<(MessageId MessageId, int Value)>> _outputs = new();
 
     private readonly ConcurrentDictionary<GrainId, TaskCompletionSource> _drains = new();
 
-    public BootstrapDeliveryProbe() => MessagingEvents.AllEvents.Subscribe(this);
+    // The event stream is process-wide, so the fixture disposes the subscription with its cluster.
+    private readonly IDisposable _subscription;
+
+    public BootstrapDeliveryProbe() => _subscription = MessagingEvents.AllEvents.Subscribe(this);
+
+    public void Dispose() => _subscription.Dispose();
 
     /// <summary>Waits until the sender's outbox retires a delivered message.</summary>
     public Task WaitForDrainAsync(GrainId sender) =>
