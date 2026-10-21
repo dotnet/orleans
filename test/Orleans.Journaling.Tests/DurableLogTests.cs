@@ -1157,6 +1157,27 @@ public class DurableLogTests : JournalingTestBase
     });
 
     [Fact]
+    public Task StagedRead_DeliversEligibleWatermarkBeforeLaterEntries() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        await using var read = log.ReadAsync(mode: DurableWatchMode.Staged, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await read.NextAsync());
+
+        // The producer commits the delivered entry and appends another before every read. The watermark still advances.
+        log.Append("e0");
+        Assert.Equal(Entry(0, "e0", DurableChangeStatus.Staged), await read.NextAsync());
+        for (var i = 1; i <= 5; i++)
+        {
+            await sut.Manager.WriteStateAsync(CancellationToken);
+            log.Append($"e{i}");
+            Assert.Equal(Watermark(i), await read.NextAsync());
+            Assert.Equal(Entry(i, $"e{i}", DurableChangeStatus.Staged), await read.NextAsync());
+        }
+    });
+
+    [Fact]
     public Task EmptyDraftCommit_IsReportedAsCommittedAfterItsRecordIsDurable() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();
