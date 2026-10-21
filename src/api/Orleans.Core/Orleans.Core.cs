@@ -1811,6 +1811,7 @@ namespace Orleans.Runtime
         public static void Import(System.Collections.Generic.Dictionary<string, object>? contextData) { }
     }
 
+    [System.Obsolete("Use the orleans-messaging-sent-messages-size and orleans-messaging-received-messages-size histograms through OpenTelemetry instead.")]
     public static partial class SiloRuntimeMetricsListener
     {
         public static long ConnectedClientCount { get { throw null; } }
@@ -1854,12 +1855,14 @@ namespace Orleans.Runtime
         public long? MemoryUsage { get { throw null; } }
 
         [Id(8)]
+        [System.Obsolete("Use the orleans-messaging-received-messages-size histogram through OpenTelemetry instead.")]
         public long ReceivedMessages { get { throw null; } }
 
         [Id(1)]
         public int RecentlyUsedActivationCount { get { throw null; } }
 
         [Id(9)]
+        [System.Obsolete("Use the orleans-messaging-sent-messages-size histogram through OpenTelemetry instead.")]
         public long SentMessages { get { throw null; } }
 
         [Id(5)]
@@ -6051,6 +6054,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public global::Orleans.Runtime.GrainId arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
