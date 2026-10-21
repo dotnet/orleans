@@ -138,10 +138,13 @@ the inbox journals an admission floor: its clock minus `DeduplicationWindow`, wh
 only advances. Pending and processed records determine known outcomes first. A
 message the inbox no longer tracks whose `SentAt` is at or below the floor receives
 `Expired` before any sink or handler runs. Recovery and migration preserve the floor.
-A delivery whose `SentAt` is later than the inbox's clock plus `DeduplicationWindow`
-is rejected with `ArgumentOutOfRangeException` before deduplication and without
-staging anything, so the sender retries it within its retry budget. Every record
-therefore becomes eligible for removal within twice the window.
+The inbox never stores a `SentAt` later than its clock plus `DeduplicationWindow`.
+It rejects such a delivery with `ArgumentOutOfRangeException`, staging nothing, when
+the message is untracked or the time would extend its record, so the sender retries
+it within its retry budget. A tracked message with an equal or earlier `SentAt`
+still receives its recorded outcome, including after the receiver's clock steps
+backward. Every record therefore becomes eligible for removal within twice the
+window.
 
 A forward clock jump can expire undelivered work early; a backward jump can delay
 cleanup and prolong retries. The journaled floor keeps removed messages expired in
