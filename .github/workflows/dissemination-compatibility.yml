@@ -1,0 +1,78 @@
+name: Dissemination compatibility
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/dissemination-compatibility.yml'
+      - '.github/scripts/dissemination-compatibility.ps1'
+      - 'test/Dissemination.IntegrationHarness/**'
+      - 'src/Orleans.Core.Abstractions/IDs/SiloAddress.cs'
+      - 'src/Orleans.Runtime/Dissemination/**'
+      - 'src/Orleans.Runtime/MembershipService/**'
+      - 'src/Orleans.Runtime/Placement/DeploymentLoadPublisher.cs'
+      - 'src/Orleans.Runtime/Configuration/Options/DeploymentLoadPublisherOptions.cs'
+      - 'src/Orleans.Runtime/Configuration/Options/DisseminationOptionsValidator.cs'
+      - 'src/Orleans.Runtime/Hosting/DefaultSiloServices.cs'
+      - 'src/Orleans.Runtime/OrleansContracts.txt'
+      - 'src/Orleans.Core/OrleansContracts.txt'
+      - 'src/Orleans.Core/Runtime/Constants.cs'
+      - 'src/Orleans.Core/Runtime/MembershipTableSnapshot.cs'
+      - 'src/Orleans.Core/SystemTargetInterfaces/IDisseminationSystemTarget.cs'
+      - 'src/Orleans.Core/SystemTargetInterfaces/IDeploymentLoadPublisher.cs'
+      - 'src/Orleans.Core/SystemTargetInterfaces/IMembershipTable.cs'
+      - 'src/Orleans.Core/Configuration/Options/ClusterMembershipOptions.cs'
+      - 'src/Orleans.Core/Configuration/Options/DisseminationOptions.cs'
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dissemination-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+
+jobs:
+  version-skew:
+    name: Pinned-binary upgrade, rollback and recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - name: Isolated pre-dissemination checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: dotnet/orleans
+          ref: 6739589254b746a8790cf53524e6abe372bb53d4
+          path: .dissemination-baseline
+          persist-credentials: false
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - name: Build isolated binaries and run bounded merge-gate checks
+        shell: pwsh
+        run: ./.github/scripts/dissemination-compatibility.ps1
+      - name: Preserve test results and process diagnostics
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: dissemination-compatibility-results
+          retention-days: 14
+          path: |
+            Artifacts/DisseminationCompatibility/results
+            Artifacts/DisseminationCompatibility/*.binlog
+      - name: Preserve reproducible binary pair
+        if: success()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: dissemination-compatibility-binaries
+          retention-days: 7
+          path: Artifacts/DisseminationCompatibility/bin
