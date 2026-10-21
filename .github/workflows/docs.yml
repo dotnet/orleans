@@ -7,9 +7,11 @@ on:
   push:
     branches:
       - main
+      - 10.x
   pull_request:
     branches:
       - main
+      - 10.x
   merge_group:
     types:
       - checks_requested

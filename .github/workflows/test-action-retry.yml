@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - 10.x
     paths:
       - .github/actions/run-tests/**
       - .github/actions/dotnet-test/**
@@ -12,6 +13,7 @@ on:
   push:
     branches:
       - main
+      - 10.x
     paths:
       - .github/actions/run-tests/**
       - .github/actions/dotnet-test/**
