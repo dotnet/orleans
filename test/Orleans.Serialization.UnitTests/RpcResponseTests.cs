@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -660,6 +661,105 @@ public sealed class RpcResponseTests : IDisposable
 
     private sealed class UnregisteredResult;
 
+    // RPC response registrations are defaults, so registered metadata implementations take precedence.
+    [Fact]
+    public void ResponseSerializersYieldToCustomMetadataImplementations()
+    {
+        using var services = new ServiceCollection()
+            .AddSerializer(builder => builder.Configure(options =>
+            {
+                options.AddCopier(typeof(CustomResponseCopier), typeof(Response));
+                options.AddSerializer(typeof(CustomCompletedResponseCodec), typeof(CompletedResponse));
+            }))
+            .BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        Assert.IsType<CustomResponseCopier>(provider.GetDeepCopier<Response>());
+        Assert.IsType<CustomResponseCopier>(provider.GetDeepCopier(typeof(Response)));
+        Assert.IsType<CustomCompletedResponseCodec>(provider.GetCodec<CompletedResponse>());
+        Assert.IsType<CustomCompletedResponseCodec>(provider.GetCodec(typeof(CompletedResponse)));
+    }
+
+    [Fact]
+    public void ResponseSerializersSupplyDefaultResponseServices()
+    {
+        var provider = _services.GetRequiredService<CodecProvider>();
+        Assert.Equal("Orleans.Serialization.Invocation.ResponseFieldCopier", provider.GetDeepCopier<Response>().GetType().FullName);
+        Assert.IsType<OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse>(provider.GetCodec<CompletedResponse>());
+        Assert.IsType<ShallowCopier<CompletedResponse>>(provider.GetDeepCopier<CompletedResponse>());
+    }
+
+    // Generated model members dispatch through the selected codec and copier for collection types outside the
+    // generator's well-known member set, so explicit registrations apply to members as they do at the top level.
+    [Fact]
+    public void GeneratedModelMembersHonorCustomImmutableCollectionServices()
+    {
+        var copier = new CountingImmutableListCopier();
+        CountingImmutableListCodec? codec = null;
+        using var services = new ServiceCollection()
+            .AddSerializer(builder => builder.Configure(options => options.AddSerializer<ImmutableList<MutableMemberPayload>>(
+                provider => codec = new CountingImmutableListCodec(provider.GetCodec<List<MutableMemberPayload>>()),
+                _ => copier)))
+            .BuildServiceProvider();
+        var model = new ImmutableMemberModel { Items = [new MutableMemberPayload { Value = 42 }] };
+
+        var copy = services.GetRequiredService<DeepCopier>().Copy(model);
+        Assert.Equal(1, copier.Copies);
+        Assert.Same(model.Items, copy.Items);
+
+        var serializer = services.GetRequiredService<Serializer>();
+        var result = serializer.Deserialize<ImmutableMemberModel>(serializer.SerializeToArray(model));
+        Assert.NotNull(codec);
+        Assert.Equal(1, codec.Writes);
+        Assert.Equal(1, codec.Reads);
+        Assert.NotNull(result);
+        Assert.Equal(42, Assert.Single(result.Items).Value);
+    }
+
+    private sealed class CustomResponseCopier : IDeepCopier<Response>
+    {
+        public Response? DeepCopy(Response? input, CopyContext context) => input;
+    }
+
+    private sealed class CustomCompletedResponseCodec : IFieldCodec<CompletedResponse>
+    {
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta,
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] CompletedResponse value)
+            where TBufferWriter : IBufferWriter<byte> => throw new NotSupportedException();
+
+        public CompletedResponse ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+    }
+
+    private sealed class CountingImmutableListCopier : IDeepCopier<ImmutableList<MutableMemberPayload>>
+    {
+        public int Copies { get; private set; }
+
+        public ImmutableList<MutableMemberPayload>? DeepCopy(ImmutableList<MutableMemberPayload>? input, CopyContext context)
+        {
+            Copies++;
+            return input;
+        }
+    }
+
+    private sealed class CountingImmutableListCodec(IFieldCodec<List<MutableMemberPayload>> codec) : IFieldCodec<ImmutableList<MutableMemberPayload>>
+    {
+        public int Writes { get; private set; }
+        public int Reads { get; private set; }
+
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta,
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] ImmutableList<MutableMemberPayload> value)
+            where TBufferWriter : IBufferWriter<byte>
+        {
+            Writes++;
+            codec.WriteField(ref writer, fieldIdDelta, typeof(List<MutableMemberPayload>), value is null ? null! : [.. value]);
+        }
+
+        public ImmutableList<MutableMemberPayload> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        {
+            Reads++;
+            return [.. codec.ReadValue(ref reader, field)!];
+        }
+    }
+
     private sealed class CustomResponseCodec() : ResponseCodec<int, Int32Codec>(new Int32Codec());
 
     private sealed class DelegatingCodec<T>(IFieldCodec<T> codec) : IFieldCodec<T>
@@ -727,4 +827,18 @@ public sealed class RpcResponseTests : IDisposable
         writer.Commit();
         return buffer.WrittenSpan.ToArray();
     }
+}
+
+[GenerateSerializer]
+public sealed class ImmutableMemberModel
+{
+    [Id(0)]
+    public ImmutableList<MutableMemberPayload> Items { get; set; } = [];
+}
+
+[GenerateSerializer]
+public sealed class MutableMemberPayload
+{
+    [Id(0)]
+    public int Value { get; set; }
 }

@@ -285,16 +285,19 @@ namespace Orleans.Serialization.Configuration
         {
             AddDefaultSerializerService(static _ => new ResponseFieldCodec());
             AddDefaultSerializerService(static _ => new ResponseFieldCopier());
-            AddDefaultSerializer<Response>(
+            // The implementation-aware overload lets metadata-selected custom codecs and copiers take precedence.
+            AddDefaultSerializer<Response, ResponseFieldCodec, ResponseFieldCopier>(
                 static provider => GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCodec>(null!, provider),
-                static provider => GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCopier>(null!, provider));
+                static provider => GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCopier>(null!, provider),
+                codecDependencies: [typeof(ResponseFieldCodec)], copierDependencies: [typeof(ResponseFieldCopier)]);
             AddDefaultSerializerService(static _ => new CompletedResponseActivator());
             AddDefaultSerializerService(static provider => new OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse(
                 GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<CompletedResponseActivator>(null!, provider)));
             AddDefaultSerializerService(static _ => new ShallowCopier<CompletedResponse>());
-            AddDefaultSerializer<CompletedResponse>(
+            AddDefaultSerializer<CompletedResponse, OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse, ShallowCopier<CompletedResponse>>(
                 static provider => GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse>(null!, provider),
-                static provider => GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ShallowCopier<CompletedResponse>>(null!, provider));
+                static provider => GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ShallowCopier<CompletedResponse>>(null!, provider),
+                codecDependencies: [typeof(CompletedResponseActivator)]);
             AddAllowedType(typeof(CompletedResponse));
         }
 

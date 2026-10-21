@@ -2820,7 +2820,7 @@ public class DemoClass
         {
             var type = (INamedTypeSymbol)field.Type;
             var graph = SerializerFactoryGenerator.CreateRpcConstructionRoot(services, type, TestContext.Current.CancellationToken);
-            var codec = services.LibraryTypes.WellKnownCodecs.FindByUnderlyingType(type.OriginalDefinition)!.CodecType.Construct([.. type.TypeArguments]);
+            var codec = services.LibraryTypes.GraphCodecs.FindByUnderlyingType(type.OriginalDefinition)!.CodecType.Construct([.. type.TypeArguments]);
             var surrogate = ((INamedTypeSymbol)codec.InstanceConstructors.Single().Parameters.Single().Type).TypeArguments.Single();
             var typeName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var codecName = codec.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);

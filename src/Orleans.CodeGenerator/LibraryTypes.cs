@@ -133,16 +133,7 @@ internal sealed class LibraryTypes
                 new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCodec`2")),
                 new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCodec`1")),
                 new(Type("System.Collections.Generic.HashSet`1"), Type("Orleans.Serialization.Codecs.HashSetCodec`1")),
-                new(Type("System.Collections.Generic.KeyValuePair`2"), Type("Orleans.Serialization.Codecs.KeyValuePairCodec`2")),
                 new(compilation.GetSpecialType(SpecialType.System_Nullable_T), Type("Orleans.Serialization.Codecs.NullableCodec`1")),
-                new(Type("System.Collections.Immutable.ImmutableArray`1"), Type("Orleans.Serialization.Codecs.ImmutableArrayCodec`1")),
-                new(Type("System.Collections.Immutable.ImmutableList`1"), Type("Orleans.Serialization.Codecs.ImmutableListCodec`1")),
-                new(Type("System.Collections.Immutable.ImmutableQueue`1"), Type("Orleans.Serialization.Codecs.ImmutableQueueCodec`1")),
-                new(Type("System.Collections.Immutable.ImmutableStack`1"), Type("Orleans.Serialization.Codecs.ImmutableStackCodec`1")),
-                new(Type("System.Collections.Immutable.ImmutableHashSet`1"), Type("Orleans.Serialization.Codecs.ImmutableHashSetCodec`1")),
-                new(Type("System.Collections.Immutable.ImmutableSortedSet`1"), Type("Orleans.Serialization.Codecs.ImmutableSortedSetCodec`1")),
-                new(Type("System.Collections.Immutable.ImmutableDictionary`2"), Type("Orleans.Serialization.Codecs.ImmutableDictionaryCodec`2")),
-                new(Type("System.Collections.Immutable.ImmutableSortedDictionary`2"), Type("Orleans.Serialization.Codecs.ImmutableSortedDictionaryCodec`2")),
         ];
         StaticCopiers =
         [
@@ -157,8 +148,25 @@ internal sealed class LibraryTypes
                 new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCopier`2")),
                 new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCopier`1")),
                 new(Type("System.Collections.Generic.HashSet`1"), Type("Orleans.Serialization.Codecs.HashSetCopier`1")),
-                new(Type("System.Collections.Generic.KeyValuePair`2"), Type("Orleans.Serialization.Codecs.KeyValuePairCopier`2")),
                 new(compilation.GetSpecialType(SpecialType.System_Nullable_T), Type("Orleans.Serialization.Codecs.NullableCopier`1")),
+        ];
+        GraphCodecs =
+        [
+                .. WellKnownCodecs,
+                new(Type("System.Collections.Generic.KeyValuePair`2"), Type("Orleans.Serialization.Codecs.KeyValuePairCodec`2")),
+                new(Type("System.Collections.Immutable.ImmutableArray`1"), Type("Orleans.Serialization.Codecs.ImmutableArrayCodec`1")),
+                new(Type("System.Collections.Immutable.ImmutableList`1"), Type("Orleans.Serialization.Codecs.ImmutableListCodec`1")),
+                new(Type("System.Collections.Immutable.ImmutableQueue`1"), Type("Orleans.Serialization.Codecs.ImmutableQueueCodec`1")),
+                new(Type("System.Collections.Immutable.ImmutableStack`1"), Type("Orleans.Serialization.Codecs.ImmutableStackCodec`1")),
+                new(Type("System.Collections.Immutable.ImmutableHashSet`1"), Type("Orleans.Serialization.Codecs.ImmutableHashSetCodec`1")),
+                new(Type("System.Collections.Immutable.ImmutableSortedSet`1"), Type("Orleans.Serialization.Codecs.ImmutableSortedSetCodec`1")),
+                new(Type("System.Collections.Immutable.ImmutableDictionary`2"), Type("Orleans.Serialization.Codecs.ImmutableDictionaryCodec`2")),
+                new(Type("System.Collections.Immutable.ImmutableSortedDictionary`2"), Type("Orleans.Serialization.Codecs.ImmutableSortedDictionaryCodec`2")),
+        ];
+        GraphCopiers =
+        [
+                .. WellKnownCopiers,
+                new(Type("System.Collections.Generic.KeyValuePair`2"), Type("Orleans.Serialization.Codecs.KeyValuePairCopier`2")),
                 new(Type("System.Collections.Immutable.ImmutableArray`1"), Type("Orleans.Serialization.Codecs.ImmutableArrayCopier`1")),
                 new(Type("System.Collections.Immutable.ImmutableList`1"), Type("Orleans.Serialization.Codecs.ImmutableListCopier`1")),
                 new(Type("System.Collections.Immutable.ImmutableQueue`1"), Type("Orleans.Serialization.Codecs.ImmutableQueueCopier`1")),
@@ -273,6 +281,18 @@ internal sealed class LibraryTypes
     public WellKnownCodecDescription[] WellKnownCodecs { get; private set; }
     public WellKnownCopierDescription[] StaticCopiers { get; private set; }
     public WellKnownCopierDescription[] WellKnownCopiers { get; private set; }
+
+    /// <summary>
+    /// Canonical codecs for closed serializer factory graphs. Generated model members keep selection-aware dispatch
+    /// for types outside <see cref="WellKnownCodecs"/>, so the additional mappings apply only to factory construction.
+    /// </summary>
+    public WellKnownCodecDescription[] GraphCodecs { get; private set; }
+
+    /// <summary>
+    /// Canonical copiers for closed serializer factory graphs. See <see cref="GraphCodecs"/>.
+    /// </summary>
+    public WellKnownCopierDescription[] GraphCopiers { get; private set; }
+
     public INamedTypeSymbol RegisterCopierAttribute { get; private set; }
     public INamedTypeSymbol RegisterSerializerAttribute { get; private set; }
     public INamedTypeSymbol ResponseTimeoutAttribute { get; private set; }

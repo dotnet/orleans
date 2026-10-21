@@ -416,7 +416,7 @@ internal static class SerializerFactoryGenerator
         if (dependency is INamedTypeSymbol named)
         {
             foreach (var argument in named.TypeArguments) AppendConstructionDependency(services, argument, cancellationToken, constructionTypes, result);
-            if (services.LibraryTypes.WellKnownCodecs.FindByUnderlyingType(named.OriginalDefinition) is { } knownCodec
+            if (services.LibraryTypes.GraphCodecs.FindByUnderlyingType(named.OriginalDefinition) is { } knownCodec
                 && knownCodec.CodecType.IsGenericType)
             {
                 var codec = knownCodec.CodecType.Construct([.. named.TypeArguments]);
@@ -993,8 +993,8 @@ internal static class SerializerFactoryGenerator
     {
         codec = null;
         copier = null;
-        var codecDefinition = services.LibraryTypes.WellKnownCodecs.FindByUnderlyingType(type.OriginalDefinition)?.CodecType;
-        var copierDefinition = services.LibraryTypes.WellKnownCopiers.FindByUnderlyingType(type.OriginalDefinition)?.CopierType;
+        var codecDefinition = services.LibraryTypes.GraphCodecs.FindByUnderlyingType(type.OriginalDefinition)?.CodecType;
+        var copierDefinition = services.LibraryTypes.GraphCopiers.FindByUnderlyingType(type.OriginalDefinition)?.CopierType;
         if (codecDefinition is null || copierDefinition is null)
         {
             var name = type.OriginalDefinition.ToDisplayString() switch
