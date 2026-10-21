@@ -95,34 +95,30 @@ The distributed directory is stable and enabled by default. Upgrade an existing 
 ### Prepare and defer migration
 
 1. Inventory the default and named directories selected by every grain type. Keep named-provider selections and cluster identity unchanged during this procedure.
-1. Qualify the exact application versions, serialized contracts, persistence providers, and deployment configuration under representative traffic. Verify duplicate-activation detection, registration preservation, graceful silo departure, and application recovery.
-1. Persist state needed after reactivation and budget capacity for activation recovery. Legacy directory-owner departures can deactivate affected grains on surviving silos; later calls recreate them through the current directory owner.
+1. Qualify the exact application versions, serialized contracts, persistence providers, and deployment configuration under representative traffic. Verify successful calls during rollout, graceful silo departure, and duplicate resolution and directory integrity after completion.
+1. Persist state needed after reactivation and budget capacity for activation recovery. During the mixed-directory phase, temporary duplicate activations can run concurrently. Use persistence concurrency controls and idempotent external operations to tolerate concurrent activations and retries.
 1. Roll out the new runtime with <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalGrainDirectory*> configured on **every replacement silo**. This explicitly retains the local directory while the runtime versions coexist. Keep that configuration on scale-out instances too.
 1. Wait until every silo runs the new runtime, membership is stable, and grain-call and activation behavior match the baseline. Applications can remain in this all-local configuration until ready for the directory migration.
 
 `UseLocalGrainDirectory` is a migration-deferral option. Choose it before the directory migration starts. Its API reference provides the configuration surface; the released package used by the hosting snippets predates this API.
-
-### Local defaults with a named distributed directory
-
-A cluster using the local default alongside a named `DistributedGrainDirectory` has separate authorities for those grain types. Retain both selections during the runtime upgrade. Migrating its default requires a **coordinated full-cluster restart**: gracefully stop every silo, then start the distributed-default deployment with the established named selections and partition mapping. Persist application state and arrange the required maintenance window before the restart.
-
-The runtime rejects rolling default-directory migration into named-only distributed partition targets because those targets serve the named directory's registrations. Named external providers, such as Redis or Azure Table Storage, retain their independent selections during the standard rolling procedure below.
 
 ### Migrate the directory
 
 1. Keep <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> at `1` and retain the default <xref:Orleans.Configuration.GrainDirectoryOptions.GetPartitionBoundaries> function throughout the local-to-distributed rollout.
 1. Remove `UseLocalGrainDirectory` from the deployment configuration. The runtime default selects the distributed directory; an explicit call to <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> also selects it.
 1. Replace a bounded number of silos at a time, preserving the tested ready-silo and surge-capacity floor. Gracefully stop each departing silo, and allow membership and directory ownership transfers to complete before the next replacement.
-1. During each mixed-directory stage, exercise existing grains and newly activated grains. Verify activation uniqueness and that active grains retain their directory registrations, including after a local-directory silo leaves.
-1. Continue until every silo uses the distributed directory. Keep the distributed selection and partition configuration on later deployments and scale-out instances.
+1. During each mixed-directory stage, exercise existing grains and newly activated grains and monitor call failures and activation churn. Temporary duplicate activations are accepted during this phase.
+1. Continue until every silo uses the distributed directory, then allow membership, range recovery, and duplicate resolution to converge. Verify one registered activation per single-activation grain and matching registrations for active grains. Keep the distributed selection and partition configuration on later deployments and scale-out instances.
 
-The runtime compatibility endpoints let local- and distributed-directory silos route registrations and transfer ownership during this transition. The staged runtime upgrade ensures every participant has the migration protocol used by the new release.
+The runtime compatibility endpoints let local- and distributed-directory silos route registrations and transfer ownership during this transition. The staged runtime upgrade ensures every participant uses the new runtime before directory migration begins. Keep named-provider selections consistent throughout both rollouts.
+
+For workloads which require exclusive activation ownership throughout the cutover, use a coordinated full-cluster restart instead of a rolling directory migration: gracefully stop every silo, then start the distributed-default deployment.
 
 ### Watch the migration
 
-Compare grain-call error rate and latency, activation churn and failures, duplicate-activation reports, membership churn, and directory registration errors with the pre-upgrade baseline. Observe directory snapshot transfers, range recovery, and range-lock duration alongside silo departures. A healthy checkpoint has a stable membership view, completed transfers, successful calls to existing and new grains, and one registered activation per single-activation grain.
+Compare grain-call error rate and latency, activation churn and failures, duplicate-activation reports, membership churn, and directory registration errors with the pre-upgrade baseline. Observe directory snapshot transfers, range recovery, and range-lock duration alongside silo departures. Temporary mixed-phase duplicates should resolve once the upgrade completes. The final healthy checkpoint has an all-distributed cluster, a stable membership view, completed recovery, successful calls to existing and new grains, and one registered activation per single-activation grain.
 
-Pause replacements when a safety or availability threshold is exceeded. Preserve directory and membership logs, retain sufficient distributed-directory capacity, and investigate the failed transition before continuing. Recover application state using the qualified recovery procedure while retaining the distributed directory.
+Pause replacements when an application safety or availability threshold is exceeded. Preserve directory and membership logs and retain sufficient distributed-directory capacity. Investigate duplicate activations or registration mismatches which persist after the all-distributed cluster has converged. Recover application state using the qualified recovery procedure while retaining the distributed directory.
 
 ### Clusters already using the experimental distributed directory
 
