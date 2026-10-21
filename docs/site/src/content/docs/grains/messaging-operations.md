@@ -39,9 +39,9 @@ behavior through `AddMessaging`, and is validated at startup.
 | Setting | Default | Operational effect |
 | --- | --- | --- |
 | `MaxCapacity` | 1,000 | Bounds pending inbox messages. Every pending message, including a scheduled message waiting for its `DeliverAt` time, counts from its acceptance until it completes. New messages receive `Backpressured` at capacity; repeats of existing messages receive `Duplicate`. Messages a grain sends to itself are admitted regardless of the limit and count until they complete. |
-| `DeduplicationWindow` | 7 days | Retains completed identities until their latest observed `SentAt` is at or below the durable admission floor. The floor advances from observed Durable Jobs time minus this period; acknowledged snapshots and recovery reclaim eligible records. Newly admitted or extended send times are bounded by receiver time plus this window. |
+| `DeduplicationWindow` | 7 days | Retains completed identities until their latest observed `SentAt` is at or below the durable admission floor. The floor advances from observed Durable Jobs time minus this period; acknowledged snapshots and recovery reclaim eligible records. Newly admitted or extended delivery times are bounded by receiver time plus this window; self-sends use the local clock or the first time above the floor after rollback. |
 | `RetryInitialInterval` | 1 second | Delay before the first inbox processing retry or outbox delivery retry. Each retry doubles the delay, up to 64 times this interval. |
-| `InboxRetryTimeout` | 6 hours | Moves a message to the inbox dead letters when its handler attempts keep failing for this long after the first failure. The last attempt runs when the timeout elapses, and the retrying message keeps its place in `MaxCapacity`. `TimeSpan.Zero` dead-letters at the first failure. |
+| `InboxRetryTimeout` | 6 hours | Moves a message to the inbox dead letters when its handler attempts keep failing for this long after the first failure. The last attempt runs when the timeout elapses, and the retrying message keeps its place in `MaxCapacity`. `TimeSpan.Zero` dead-letters at the first failure. Recovery after an unclean stop, such as a crash or a handler which failed after staging changes, counts one attempt for each due message; a graceful deactivation counts none. |
 | `OutboxRetryTimeout` | 6 hours | Bounds attempts until `SentAt + OutboxRetryTimeout`, including backpressure. The sending write journals `SentAt`, and every attempt and recovery preserves it. Must be shorter than `DeduplicationWindow`. |
 | `DeadLetterRetentionPeriod` | 30 days | Removes dead letters older than this age, using the grain's clock for their timestamps and retention. |
 | `MaxRetainedDeadLetters` | 1,000 | Bounds the inbox and the outbox dead letters separately, removing the oldest first. |
@@ -58,7 +58,7 @@ The floor only advances and survives recovery. Clock jumps can expire new work
 early or retain more history, while the send time and durable floor preserve
 admission decisions for the original send.
 
-Future-time validation bounds newly admitted sends and retention extensions.
+Future-time validation bounds newly admitted deliveries and their retention extensions.
 A tracked identity with an equal or earlier `SentAt` receives its recorded answer,
 including after clock rollback puts that time beyond receiver time plus the
 window. A later time beyond that bound throws
@@ -66,6 +66,11 @@ window. A later time beyond that bound throws
 equality at the bound is admitted. An untracked time at or below the admission
 floor receives `Expired` first, even if a large rollback puts it above the bound.
 Other untracked times beyond the bound throw the same exception.
+
+A grain's messages to itself use the local staging time, or the first time above
+the admission floor after a backward clock jump. That first time remains just
+beyond the existing floor for compaction, including when it exceeds the
+delivery-time bound.
 
 Dead-letter retention applies when an activation starts and whenever a new dead
 letter is added. A snapshot persists its admission floor and compacted history
@@ -118,13 +123,14 @@ end-to-end business confirmation.
 | Repeated handler errors | Validate subject registration, body compatibility, command ID, response destination, and preparation dependencies. Handler exceptions retry until `InboxRetryTimeout` and hold a capacity slot meanwhile, so reserve them for transient faults. Dead-letter permanently invalid input with `Fail(reason)`, or send a typed rejection reply and call `Complete()`. |
 | Messages dead-lettered with "No handler is registered" | A handler is registered, but none accepts the subject. The message retried until `InboxRetryTimeout`. Register a handler for every subject the grain receives. |
 | Conflicting pending command reuse | The sender or receiver throws `InvalidOperationException`. Keep the original command ID, subject, destination, and payload; use a distinct ID for a new command. |
-| Grain deactivates after a handler fails | The handler staged journaled changes, then threw or returned without calling `Complete()` or `Fail(reason)`. Recovery from the journal discards those changes and the message runs again. Move fallible work before the first change. |
+| Grain deactivates after a handler fails | The handler staged journaled changes, then threw or returned without calling `Complete()` or `Fail(reason)`, or the grain holds state which can't report its changes, such as journaled `IPersistentState`. Recovery from the journal discards the changes and counts the attempt, so the message retries with backoff until `InboxRetryTimeout`. Move fallible work before the first change. |
+| Dead letters with `The activation stopped without recording the outcome of an attempt.` | Recovery counted an attempt which an unclean stop interrupted after the message's retry window had started, and the window had elapsed. Look for a handler which fails after staging changes, or repeated crashes, in the grain's logs. A single crash counts one attempt and never dead-letters a message by itself. |
 | Grain deactivates after a handler returns | The handler called `Complete()` and `Fail(reason)` with conflicting outcomes. Ensure every branch stages exactly one outcome. |
 | Handler error logged after `Complete()` | The staged completion and outgoing messages persist. Diagnose the error using committed state. |
 | Grain deactivates after a storage or staging failure | Messaging vetoes every later journal write of the activation, and the grain deactivates. The next activation recovers the committed journal and resumes pending work. |
 | Outbox dead letter whose reason states that the retry timeout elapsed | No terminal answer was recorded within the original send's `OutboxRetryTimeout`. Check receiver availability and handler registration, then reconcile the possibly accepted command before authorizing replay. |
 | Sender dead-letters with `Expired` and an unknown receiver outcome | Delivery was delayed past `SentAt + DeduplicationWindow`, or a forward receiver clock jump advanced its durable admission floor. Reconcile business state through the application, check sender/receiver clocks, and size `DeduplicationWindow` for tolerated delivery delays and clock variation. Keep `OutboxRetryTimeout` shorter than that window. |
-| Receiver warns that `SentAt` is too far ahead; sender retries `ArgumentOutOfRangeException` | A newly admitted send or retention extension is ahead of receiver time by more than `DeduplicationWindow`. Check both clocks and direct-caller timestamp creation. Known equal/earlier retries still receive their recorded answer after rollback. Preserve the original logical send time on retries; once its original retry budget ends, reconcile the dead-lettered send through the application before authorizing a new submission. |
+| Receiver warns that `SentAt` is too far ahead; sender retries `ArgumentOutOfRangeException` | A newly admitted delivery or retention extension is ahead of receiver time by more than `DeduplicationWindow`. Check both clocks and direct-caller timestamp creation. Known equal/earlier retries still receive their recorded answer after rollback. Preserve the original logical send time on retries; once its original retry budget ends, reconcile the dead-lettered send through the application before authorizing a new submission. |
 | Caller cancellation | An accepted write or delivery continues through its actual outcome. Query durable business status or retry with the same command ID. |
 
 Handlers follow a two-phase pattern: all asynchronous and fallible preparation uses
