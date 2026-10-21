@@ -178,7 +178,7 @@ namespace Orleans.Messaging
         bool TryAccept(InboxMessage message, out DeliveryResult result);
     }
 
-    [Alias("IMessagingExtension")]
+    [Alias("Orleans.Messaging.IMessagingExtension")]
     public partial interface IMessagingExtension : Runtime.IGrainExtension, Runtime.IAddressable
     {
         [Alias("DeliverAsync")]
