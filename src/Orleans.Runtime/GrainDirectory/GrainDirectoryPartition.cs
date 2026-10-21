@@ -19,6 +19,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     private const float MaxActivationQueryRangePercent = 5f;
     private const int MaxActivationQueryRangeCount = 32;
     private const int DuplicateActivationCleanupBatchSize = 1_000;
+    internal static readonly GrainId CapabilityProbeGrainId = GrainId.Create("sys.directory-capabilities", "probe");
     private static readonly IBackoffProvider ClusterMemberRetryBackoff = new ExponentialBackoff(
         TimeSpan.FromMilliseconds(100),
         TimeSpan.FromSeconds(5),

@@ -172,7 +172,8 @@ namespace Orleans.Hosting
                     sp.GetRequiredService<IInternalGrainFactory>(),
                     sp.GetRequiredService<ILogger<DirectoryMembershipService>>(),
                     options.PartitionsPerSilo,
-                    options.GetPartitionBoundaries);
+                    options.GetPartitionBoundaries,
+                    () => sp.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory is DistributedGrainDirectory);
             });
             if (!services.Contains(DirectoryDescriptor))
             {

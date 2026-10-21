@@ -244,7 +244,7 @@ public sealed class DirectoryMembershipSnapshotTests
     public void PartitionBoundariesRejectNullFunction()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new DirectoryMembershipService(null!, null!, null!, 3, null!));
+            new DirectoryMembershipService(null!, null!, null!, 3, null!, static () => true));
     }
 
     private static GrainDirectoryOptions GetDocumentedLegacyOptions()
@@ -297,7 +297,8 @@ public sealed class DirectoryMembershipSnapshotTests
                 }
 
                 return returnedCount == -1 ? default : new uint[returnedCount].ToImmutableArray();
-            });
+            },
+            static () => true);
         var initialView = await directoryMembership.RefreshViewAsync(membership.CurrentVersion, timeout.Token);
         Assert.Equal(membership.CurrentVersion, initialView.Version);
         Assert.Equal(0, boundaryCalls);
@@ -353,8 +354,11 @@ public sealed class DirectoryMembershipSnapshotTests
         var logger = Substitute.For<ILogger<DirectoryMembershipService>>();
         logger.IsEnabled(LogLevel.Error).Returns(true);
 
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        grainFactory.GetSystemTarget<IGrainDirectoryPartition>(Arg.Any<GrainId>())
+            .Returns(Substitute.For<IGrainDirectoryPartition>());
         await using var directoryMembership = new DirectoryMembershipService(
-            clusterMembershipService, null!, logger, 3, DirectoryMembershipSnapshot.DefaultGetRingBoundaries);
+            clusterMembershipService, grainFactory, logger, 3, DirectoryMembershipSnapshot.DefaultGetRingBoundaries, static () => true);
         var view = await directoryMembership.RefreshViewAsync(membership.CurrentVersion, timeout.Token);
 
         Assert.Equal(membership.CurrentVersion, view.Version);
@@ -364,6 +368,110 @@ public sealed class DirectoryMembershipSnapshotTests
         Assert.Same(streamFailure, log.GetArguments()[3]);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RecoveryCapabilityIsConfirmedBeforePublishingAndScopedToSiloIncarnation(bool supportsRecovery)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11117), 1);
+        var replacement = SiloAddress.New(member.Endpoint, member.Generation + 1);
+        var membership = new MockClusterMembershipService();
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var partition = Substitute.For<IGrainDirectoryPartition>();
+        var probeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var probe = new TaskCompletionSource<DirectoryResult<GrainAddress?>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        grainFactory.GetSystemTarget<IGrainDirectoryPartition>(GrainDirectoryPartition.CreateGrainId(member, 0).GrainId)
+            .Returns(partition);
+        partition.LookupAsync(MembershipVersion.MinValue, GrainDirectoryPartition.CapabilityProbeGrainId, Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                probeStarted.TrySetResult();
+                return new(probe.Task);
+            });
+        var replacementPartition = Substitute.For<IGrainDirectoryPartition>();
+        grainFactory.GetSystemTarget<IGrainDirectoryPartition>(GrainDirectoryPartition.CreateGrainId(replacement, 0).GrainId)
+            .Returns(replacementPartition);
+        replacementPartition.LookupAsync(MembershipVersion.MinValue, GrainDirectoryPartition.CapabilityProbeGrainId, Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<DirectoryResult<GrainAddress?>>(
+                DirectoryResult.FromResult<GrainAddress?>(null, MembershipVersion.MinValue,
+                    supportsRecovery ? DirectoryPartitionKind.Legacy : DirectoryPartitionKind.Distributed)));
+
+        await using var directoryMembership = new DirectoryMembershipService(
+            membership.Target, grainFactory, NullLogger<DirectoryMembershipService>.Instance, 1, DirectoryMembershipSnapshot.DefaultGetRingBoundaries, static () => true);
+        var initial = await directoryMembership.RefreshViewAsync(membership.CurrentVersion, timeout.Token);
+        await using var updates = directoryMembership.ViewUpdates.GetAsyncEnumerator(timeout.Token);
+        Assert.True(await updates.MoveNextAsync());
+        var nextUpdate = updates.MoveNextAsync().AsTask();
+
+        membership.UpdateSiloStatus(member, SiloStatus.Active, "Silo");
+        await probeStarted.Task.WaitAsync(timeout.Token);
+        Assert.False(nextUpdate.IsCompleted);
+        Assert.Same(initial, directoryMembership.CurrentView);
+
+        // An older response omits the capability field and retains legacy invalidation semantics.
+        probe.SetResult(supportsRecovery
+            ? DirectoryResult.FromResult<GrainAddress?>(null, MembershipVersion.MinValue, DirectoryPartitionKind.Distributed)
+            : default);
+        Assert.True(await nextUpdate);
+        var view = updates.Current;
+        Assert.Equal(membership.CurrentVersion, view.Version);
+        Assert.Equal(supportsRecovery, view.RecoveryCapableSilos.Contains(member));
+
+        var joiningMember = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11118), 1);
+        membership.UpdateSiloStatus(joiningMember, SiloStatus.Joining, "JoiningSilo");
+        var retained = await directoryMembership.RefreshViewAsync(membership.CurrentVersion, timeout.Token);
+        Assert.Equal(supportsRecovery, retained.RecoveryCapableSilos.Contains(member));
+
+        membership.UpdateSiloStatus(member, SiloStatus.Dead, "Silo");
+        var removed = await directoryMembership.RefreshViewAsync(membership.CurrentVersion, timeout.Token);
+        Assert.Empty(removed.RecoveryCapableSilos);
+
+        membership.UpdateSiloStatus(replacement, SiloStatus.Active, "Silo");
+        var replaced = await directoryMembership.RefreshViewAsync(membership.CurrentVersion, timeout.Token);
+        Assert.Equal(!supportsRecovery, replaced.RecoveryCapableSilos.Contains(replacement));
+        Assert.DoesNotContain(member, replaced.RecoveryCapableSilos);
+        Assert.Equal(supportsRecovery, view.RecoveryCapableSilos.Contains(member));
+        await partition.Received(1).LookupAsync(MembershipVersion.MinValue, GrainDirectoryPartition.CapabilityProbeGrainId, Arg.Any<CancellationToken>());
+        await replacementPartition.Received(1).LookupAsync(MembershipVersion.MinValue, GrainDirectoryPartition.CapabilityProbeGrainId, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NamedPartitionEndpointIsRejectedOnlyForDefaultDirectoryMigration(bool isDefaultDirectory)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11119), 1);
+        var membership = new MockClusterMembershipService(new() { [member] = (SiloStatus.Active, "NamedDirectorySilo") });
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var partition = Substitute.For<IGrainDirectoryPartition>();
+        grainFactory.GetSystemTarget<IGrainDirectoryPartition>(Arg.Any<GrainId>()).Returns(partition);
+        partition.LookupAsync(MembershipVersion.MinValue, GrainDirectoryPartition.CapabilityProbeGrainId, Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<DirectoryResult<GrainAddress?>>(
+                DirectoryResult.FromResult<GrainAddress?>(null, MembershipVersion.MinValue, DirectoryPartitionKind.NamedDistributed)));
+        await using var directoryMembership = new DirectoryMembershipService(
+            membership.Target, grainFactory, NullLogger<DirectoryMembershipService>.Instance, 1,
+            DirectoryMembershipSnapshot.DefaultGetRingBoundaries, () => isDefaultDirectory);
+
+        if (isDefaultDirectory)
+        {
+            var failure = await Assert.ThrowsAsync<OrleansConfigurationException>(() =>
+                directoryMembership.RefreshViewAsync(membership.CurrentVersion, timeout.Token).AsTask());
+            Assert.Contains(member.ToString(), failure.Message);
+            Assert.Contains("named distributed directory", failure.Message);
+            Assert.Same(failure, Assert.Throws<OrleansConfigurationException>(() => directoryMembership.CurrentView));
+        }
+        else
+        {
+            var view = await directoryMembership.RefreshViewAsync(membership.CurrentVersion, timeout.Token);
+            Assert.Equal(member, Assert.Single(view.Members));
+            Assert.Empty(view.RecoveryCapableSilos);
+        }
+    }
+
     [Fact]
     public async Task DisposeCompletesMembershipReadersNormally()
     {
@@ -371,7 +479,7 @@ public sealed class DirectoryMembershipSnapshotTests
         timeout.CancelAfter(TimeSpan.FromSeconds(10));
         var membership = new MockClusterMembershipService();
         await using var directoryMembership = new DirectoryMembershipService(
-            membership.Target, null!, NullLogger<DirectoryMembershipService>.Instance, 3, DirectoryMembershipSnapshot.DefaultGetRingBoundaries);
+            membership.Target, null!, NullLogger<DirectoryMembershipService>.Instance, 3, DirectoryMembershipSnapshot.DefaultGetRingBoundaries, static () => true);
         await directoryMembership.RefreshViewAsync(membership.CurrentVersion, timeout.Token);
         await using var updates = directoryMembership.ViewUpdates.GetAsyncEnumerator(timeout.Token);
         Assert.True(await updates.MoveNextAsync());

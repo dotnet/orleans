@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
@@ -32,6 +33,8 @@ namespace Orleans.Runtime.GrainDirectory
         private ClusterMembershipSnapshot appliedClusterMembershipSnapshot = ClusterMembershipSnapshot.Default;
         private GrainDirectoryResolver? grainDirectoryResolver;
         private bool hasAppliedClusterMembershipSnapshot;
+        private readonly DirectoryMembershipService? _distributedDirectoryMembershipService;
+        private DirectoryMembershipSnapshot? _appliedDistributedDirectoryView;
 
         // Consider: move these constants into an appropriate place
         internal const int HOP_LIMIT = 6; // forward a remote request no more than 5 times
@@ -90,6 +93,7 @@ namespace Orleans.Runtime.GrainDirectory
             // Legacy remote endpoints serve the default directory. Named directories use their own endpoints.
             var distributedDirectoryActive = serviceProvider.GetService<DistributedGrainDirectory>() is not null;
             var distributedDirectoryIsDefault = serviceProvider.GetKeyedService<IGrainDirectory>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY) is DistributedGrainDirectory;
+            _distributedDirectoryMembershipService = distributedDirectoryIsDefault ? serviceProvider.GetRequiredService<DirectoryMembershipService>() : null;
             RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, systemTargetShared, registerAsSystemTarget: !distributedDirectoryIsDefault);
             CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, systemTargetShared, registerAsSystemTarget: !distributedDirectoryIsDefault);
             DistributedGrainDirectoryClientCompatibility = distributedDirectoryActive ? null : new LocalGrainDirectoryClientCompatibility(systemTargetShared);
@@ -213,15 +217,34 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
+        /// <summary>
+        /// Applies the ownership view before a distributed-default registration uses it, so owner-loss
+        /// invalidation observes every view in which this silo can commit an activation registration.
+        /// </summary>
+        internal async Task<DirectoryMembershipSnapshot> PrepareDistributedRegistrationAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!Running)
+            {
+                throw new OrleansMessageRejectionException("The local grain directory is not running.");
+            }
+
+            await ApplyMembershipSnapshot();
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!Running)
+            {
+                throw new OrleansMessageRejectionException("The local grain directory is not running.");
+            }
+
+            Debug.Assert(_appliedDistributedDirectoryView is not null);
+            return _appliedDistributedDirectoryView!;
+        }
+
         private Task ApplyMembershipSnapshot()
         {
-            return CacheValidator.RunOrQueueTask(() =>
-            {
-                ApplyMembershipSnapshotCore();
-                return Task.CompletedTask;
-            });
+            return CacheValidator.RunOrQueueTask(ApplyMembershipSnapshotCore);
 
-            void ApplyMembershipSnapshotCore()
+            async Task ApplyMembershipSnapshotCore()
             {
                 if (!Running)
                 {
@@ -229,6 +252,17 @@ namespace Orleans.Runtime.GrainDirectory
                 }
 
                 var snapshot = clusterMembershipService.CurrentSnapshot;
+                DirectoryMembershipSnapshot? distributedView = null;
+                if (_distributedDirectoryMembershipService is { } distributedMembership)
+                {
+                    distributedView = await distributedMembership.RefreshViewAsync(snapshot.Version, _membershipUpdatesCancellation.Token);
+                    snapshot = distributedView.ClusterMembershipSnapshot;
+                    if (!Running)
+                    {
+                        return;
+                    }
+                }
+
                 var previousSnapshot = hasAppliedClusterMembershipSnapshot ? appliedClusterMembershipSnapshot : ClusterMembershipSnapshot.Default;
                 if (hasAppliedClusterMembershipSnapshot && snapshot.Version <= previousSnapshot.Version)
                 {
@@ -242,7 +276,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var removedSilos = GetMembershipDifference(previousMembership, targetMembership);
                 var addedSilos = GetMembershipDifference(targetMembership, previousMembership);
 
-                ProcessSiloStatusChanges(snapshot, previousSnapshot, previousMembership);
+                ProcessSiloStatusChanges(snapshot, previousSnapshot, previousMembership, distributedView);
                 AdjustLocalDirectory(snapshot);
                 AdjustLocalCache(snapshot, targetMembership);
 
@@ -258,6 +292,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
 
                 appliedClusterMembershipSnapshot = snapshot;
+                _appliedDistributedDirectoryView = distributedView;
                 hasAppliedClusterMembershipSnapshot = true;
                 GrainDirectoryEvents.EmitMembershipVersionApplied(MyAddress, snapshot.Version);
             }
@@ -266,7 +301,8 @@ namespace Orleans.Runtime.GrainDirectory
         private void ProcessSiloStatusChanges(
             ClusterMembershipSnapshot snapshot,
             ClusterMembershipSnapshot previousSnapshot,
-            DirectoryMembership previousMembership)
+            DirectoryMembership previousMembership,
+            DirectoryMembershipSnapshot? distributedView)
         {
             var changes = previousSnapshot.Version != MembershipVersion.MinValue
                 ? snapshot.CreateUpdate(previousSnapshot)
@@ -283,7 +319,7 @@ namespace Orleans.Runtime.GrainDirectory
             statusChanges.Sort(static (left, right) => CompareSiloAddress(left.SiloAddress, right.SiloAddress));
             foreach (var change in statusChanges)
             {
-                OnSiloStatusChange(previousMembership, change.SiloAddress, change.Status);
+                OnSiloStatusChange(previousMembership, distributedView, change.SiloAddress, change.Status);
             }
         }
 
@@ -351,7 +387,11 @@ namespace Orleans.Runtime.GrainDirectory
             await ApplyMembershipSnapshot();
         }
 
-        private void OnSiloStatusChange(DirectoryMembership previousMembership, SiloAddress updatedSilo, SiloStatus status)
+        private void OnSiloStatusChange(
+            DirectoryMembership previousMembership,
+            DirectoryMembershipSnapshot? distributedView,
+            SiloAddress updatedSilo,
+            SiloStatus status)
         {
             if (updatedSilo.Equals(MyAddress) || !status.IsTerminating())
             {
@@ -367,12 +407,37 @@ namespace Orleans.Runtime.GrainDirectory
                     var activationData = activation.Value;
                     var placementStrategy = activationData.GetComponent<PlacementStrategy>();
                     var isUsingGrainDirectory = placementStrategy is { IsUsingGrainDirectory: true };
-                    if (!isUsingGrainDirectory || !resolver.IsUsingDefaultDirectory(activationData.GrainId.Type))
+                    if (!isUsingGrainDirectory)
                     {
                         continue;
                     }
 
-                    if (!updatedSilo.Equals(CalculateGrainDirectoryPartition(activationData.GrainId, previousMembership)))
+                    var directory = resolver.Resolve(activationData.GrainId.Type);
+                    if (directory is not null
+                        && (directory is not DistributedGrainDirectory || directory != resolver.DefaultGrainDirectory))
+                    {
+                        continue;
+                    }
+
+                    if (directory is DistributedGrainDirectory)
+                    {
+                        if (_appliedDistributedDirectoryView is not { } previousView
+                            || !previousView.TryGetOwner(activationData.GrainId, out var previousOwner, out _)
+                            || !updatedSilo.Equals(previousOwner))
+                        {
+                            continue;
+                        }
+
+                        // Distributed-to-distributed ownership changes preserve registrations. A legacy owner on either
+                        // side requires the same activation invalidation as the local directory's owner-loss protocol.
+                        if (previousView.RecoveryCapableSilos.Contains(previousOwner)
+                            && distributedView!.TryGetOwner(activationData.GrainId, out var nextOwner, out _)
+                            && distributedView.RecoveryCapableSilos.Contains(nextOwner))
+                        {
+                            continue;
+                        }
+                    }
+                    else if (!updatedSilo.Equals(CalculateGrainDirectoryPartition(activationData.GrainId, previousMembership)))
                     {
                         continue;
                     }

@@ -12,6 +12,7 @@ using Orleans.GrainDirectory;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -45,6 +46,90 @@ internal class RollingUpgradeTestGrain : Grain, IRollingUpgradeTestGrain
 public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 {
     private static readonly TimeSpan DirectoryConvergenceTimeout = TimeSpan.FromSeconds(30);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DistributedOwnerDeparture_PreservesDirectoryIntegrity(bool mixedCluster)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var builder = new InProcessTestClusterBuilder(mixedCluster ? (short)4 : (short)3);
+        builder.Options.UseTestClusterGrainDirectory = false;
+        builder.ConfigureSilo((siloOptions, siloBuilder) =>
+        {
+            if (mixedCluster && siloOptions.SiloName == "Silo_1")
+            {
+                return;
+            }
+
+#pragma warning disable ORLEANSEXP003
+            siloBuilder.AddDistributedGrainDirectory();
+#pragma warning restore ORLEANSEXP003
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync(cancellationToken);
+        await WaitForDirectoryConvergenceAsync(cluster, "before distributed owner departure", cancellationToken);
+
+        var distributedSilos = cluster.Silos
+            .Where(silo => silo.ServiceProvider.GetService<DirectoryMembershipService>() is not null)
+            .ToArray();
+        var membership = distributedSilos[0].ServiceProvider.GetRequiredService<DirectoryMembershipService>().CurrentView;
+        var grainFactory = distributedSilos[0].ServiceProvider.GetRequiredService<IInternalGrainFactory>();
+        var postDepartureViews = distributedSilos.ToDictionary(
+            static silo => silo.SiloAddress,
+            silo => new DirectoryMembershipSnapshot(
+                new ClusterMembershipSnapshot(membership.ClusterMembershipSnapshot.Members.Remove(silo.SiloAddress), membership.Version),
+                grainFactory,
+                1,
+                DirectoryMembershipSnapshot.DefaultGetRingBoundaries));
+        var grainKey = 1L;
+        var grain = cluster.Client!.GetGrain<IRollingUpgradeIdentityGrain>(grainKey);
+        SiloAddress? directoryOwner = null;
+        for (; grainKey < 10_000; grain = cluster.Client.GetGrain<IRollingUpgradeIdentityGrain>(++grainKey))
+        {
+            if (membership.TryGetOwner(grain.GetGrainId(), out var owner, out _)
+                && postDepartureViews.TryGetValue(owner, out var nextView)
+                && nextView.TryGetOwner(grain.GetGrainId(), out var nextOwner, out _)
+                && (!mixedCluster || !postDepartureViews.ContainsKey(nextOwner)))
+            {
+                directoryOwner = owner;
+                break;
+            }
+        }
+
+        Assert.NotNull(directoryOwner);
+        var departingSilo = Assert.Single(cluster.Silos, silo => silo.SiloAddress.Equals(directoryOwner));
+        var host = distributedSilos.First(silo => !silo.SiloAddress.Equals(directoryOwner));
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, host.SiloAddress);
+        RollingUpgradeGrainObservation original;
+        try
+        {
+            original = await grain.Observe().AsTask().WaitAsync(cancellationToken);
+        }
+        finally
+        {
+            RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+        }
+
+        Assert.Equal(host.SiloAddress, original.Address.SiloAddress);
+        await cluster.StopSiloAsync(departingSilo, cancellationToken);
+        await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
+        await WaitForDirectoryConvergenceAsync(cluster, "after distributed owner departure", cancellationToken);
+
+        var current = await grain.Observe().AsTask().WaitAsync(cancellationToken);
+        if (mixedCluster)
+        {
+            Assert.NotEqual(original.Address.ActivationId, current.Address.ActivationId);
+        }
+        else
+        {
+            Assert.Equal(original.Address.ActivationId, current.Address.ActivationId);
+            Assert.Equal(original.Address.SiloAddress, current.Address.SiloAddress);
+        }
+
+        await ValidateDirectoryPhaseInvariantsAsync(cluster, "after distributed owner departure", cancellationToken);
+    }
 
     [Fact]
     public async Task RollingUpgrade_LocalToDistributed_NoErrors()
@@ -407,7 +492,6 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
         var activations = GetDirectoryActivations(cluster);
         var distributedPartitions = new List<IGrainDirectoryTestHooks>();
-        var distributedSiloCount = 0;
         foreach (var silo in cluster.Silos)
         {
             var membershipService = silo.ServiceProvider.GetService<DirectoryMembershipService>();
@@ -416,23 +500,12 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 continue;
             }
 
-            distributedSiloCount++;
             for (var partitionIndex = 0; partitionIndex < membershipService.PartitionsPerSilo; partitionIndex++)
             {
                 var replica = cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
                     GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId);
                 distributedPartitions.Add(replica);
             }
-        }
-
-        var isMixedDirectoryCluster = distributedSiloCount > 0 && distributedSiloCount < cluster.Silos.Count;
-        if (isMixedDirectoryCluster)
-        {
-            output.WriteLine(
-                $"  Observed {activations.Count} activations across {distributedSiloCount} DistributedGrainDirectory "
-                + $"and {cluster.Silos.Count - distributedSiloCount} LocalGrainDirectory silos {stage}; "
-                + "steady-state uniqueness and partition integrity are validated after the upgrade completes.");
-            return;
         }
 
         var activationGroups = activations.GroupBy(static activation => activation.Address.GrainId).ToArray();
@@ -1335,9 +1408,6 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         CancellationToken cancellationToken)
     {
         var activations = GetDirectoryActivations(cluster);
-        var distributedSiloCount = cluster.Silos.Count(
-            static silo => silo.ServiceProvider.GetService<DirectoryMembershipService>() is not null);
-        var isMixedDirectoryCluster = distributedSiloCount > 0 && distributedSiloCount < cluster.Silos.Count;
         foreach (var (grainKey, observation) in observations)
         {
             var observedAddress = observation.Address;
@@ -1352,14 +1422,11 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 activation =>
                     activation.Address.SiloAddress?.Equals(observedAddress.SiloAddress) == true
                     && activation.Address.ActivationId.Equals(observedAddress.ActivationId));
-            if (!isMixedDirectoryCluster)
-            {
-                Assert.True(
-                    activationMatches.Length == 1,
-                    $"Expected exactly one live activation for grain {grainKey} during '{stage}', but found "
-                    + $"{activationMatches.Length}: "
-                    + $"[{string.Join(", ", activationMatches.Select(static activation => activation.Address.ToFullString()))}].");
-            }
+            Assert.True(
+                activationMatches.Length == 1,
+                $"Expected exactly one live activation for grain {grainKey} during '{stage}', but found "
+                + $"{activationMatches.Length}: "
+                + $"[{string.Join(", ", activationMatches.Select(static activation => activation.Address.ToFullString()))}].");
 
             Assert.Equal(observedAddress.MembershipVersion, observedActivation.Address.MembershipVersion);
 

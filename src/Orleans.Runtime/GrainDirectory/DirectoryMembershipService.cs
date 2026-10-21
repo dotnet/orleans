@@ -21,6 +21,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     private readonly AsyncEnumerable<DirectoryMembershipSnapshot> _viewUpdates;
     private readonly int _partitionsPerSilo;
     private readonly Func<SiloAddress, int, ImmutableArray<uint>> _getRingBoundaries;
+    private readonly Func<bool> _isDefaultDirectory;
     private DirectoryMembershipSnapshot _currentView = DirectoryMembershipSnapshot.Default;
 
     public DirectoryMembershipSnapshot CurrentView
@@ -79,10 +80,13 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         IInternalGrainFactory grainFactory,
         ILogger<DirectoryMembershipService> logger,
         int partitionsPerSilo,
-        Func<SiloAddress, int, ImmutableArray<uint>> getRingBoundaries)
+        Func<SiloAddress, int, ImmutableArray<uint>> getRingBoundaries,
+        Func<bool> isDefaultDirectory)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(partitionsPerSilo, 1);
         ArgumentNullException.ThrowIfNull(getRingBoundaries);
+        ArgumentNullException.ThrowIfNull(isDefaultDirectory);
+        _isDefaultDirectory = isDefaultDirectory;
         _partitionsPerSilo = partitionsPerSilo;
         _getRingBoundaries = getRingBoundaries;
         _viewUpdates = new(
@@ -118,6 +122,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
                                 exception);
                         }
 
+                        view.RecoveryCapableSilos = await GetRecoveryCapableSilos(view);
                         _viewUpdates.Publish(view);
                     }
                 }
@@ -142,6 +147,55 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         finally
         {
             _viewUpdates.Dispose();
+        }
+    }
+
+    private async Task<ImmutableHashSet<SiloAddress>> GetRecoveryCapableSilos(DirectoryMembershipSnapshot view)
+    {
+        var result = ImmutableHashSet.CreateBuilder<SiloAddress>();
+        var probes = new List<Task<(SiloAddress Silo, bool SupportsRecovery)>>();
+        var previous = _currentView;
+        foreach (var silo in view.Members)
+        {
+            if (previous.ClusterMembershipSnapshot.Members.TryGetValue(silo, out var member)
+                && member.Status == SiloStatus.Active)
+            {
+                if (previous.RecoveryCapableSilos.Contains(silo))
+                {
+                    result.Add(silo);
+                }
+            }
+            else
+            {
+                probes.Add(Probe(silo));
+            }
+        }
+
+        foreach (var (silo, supportsRecovery) in await Task.WhenAll(probes))
+        {
+            if (supportsRecovery)
+            {
+                result.Add(silo);
+            }
+        }
+
+        return result.ToImmutable();
+
+        async Task<(SiloAddress, bool)> Probe(SiloAddress silo)
+        {
+            var partition = _grainFactory.GetSystemTarget<IGrainDirectoryPartition>(GrainDirectoryPartition.CreateGrainId(silo, 0).GrainId);
+            var response = await partition.LookupAsync(
+                MembershipVersion.MinValue,
+                GrainDirectoryPartition.CapabilityProbeGrainId,
+                _shutdownCts.Token);
+            if (_isDefaultDirectory() && response.PartitionKind == DirectoryPartitionKind.NamedDistributed)
+            {
+                throw new OrleansConfigurationException(
+                    $"Silo '{silo}' serves a named distributed directory at the default partition endpoint. "
+                    + "Migrate a cluster whose default directory uses the legacy compatibility endpoints.");
+            }
+
+            return (silo, response.PartitionKind == DirectoryPartitionKind.Distributed);
         }
     }
 

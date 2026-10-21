@@ -61,7 +61,8 @@ namespace DefaultCluster.Tests
                             sp.GetRequiredService<IInternalGrainFactory>(),
                             sp.GetRequiredService<ILogger<DirectoryMembershipService>>(),
                             sp.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value.PartitionsPerSilo,
-                            DirectoryMembershipSnapshot.DefaultGetRingBoundaries)));
+                            DirectoryMembershipSnapshot.DefaultGetRingBoundaries,
+                            static () => true)));
                     });
                     hostBuilder.AddStartupTask<CallGrainStartupTask>();
                     hostBuilder.AddStartupTask(

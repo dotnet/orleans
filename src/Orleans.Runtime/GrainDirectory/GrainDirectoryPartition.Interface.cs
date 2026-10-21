@@ -20,7 +20,7 @@ internal sealed partial class GrainDirectoryPartition
         var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken);
         if (!IsOwner(currentView, address.GrainId))
         {
-            return DirectoryResult.RefreshRequired<GrainAddress>(currentView.Version);
+            return DirectoryResult.RefreshRequired<GrainAddress>(currentView.Version, _owner.PartitionKind);
         }
 
         DebugAssertOwnership(currentView, address.GrainId);
@@ -48,7 +48,7 @@ internal sealed partial class GrainDirectoryPartition
                 {
                     var retryAfter = expiration - utcNow;
                     GrainDirectoryEvents.EmitRegistrationBlockedByRangeLease(_id, address.GrainId, lockedRange, expiration, retryAfter);
-                    return DirectoryResult.RetryAfter<GrainAddress>(retryAfter);
+                    return DirectoryResult.RetryAfter<GrainAddress>(retryAfter, _owner.PartitionKind);
                 }
             }
 
@@ -64,13 +64,13 @@ internal sealed partial class GrainDirectoryPartition
                     {
                         var retryAfter = expiration - utcNow;
                         GrainDirectoryEvents.EmitRegistrationBlockedBySiloLease(_id, address.GrainId, existingActivation.SiloAddress!, expiration, retryAfter);
-                        return DirectoryResult.RetryAfter<GrainAddress>(retryAfter);
+                        return DirectoryResult.RetryAfter<GrainAddress>(retryAfter, _owner.PartitionKind);
                     }
                 }
             }
         }
 
-        return DirectoryResult.FromResult(RegisterCore(address, currentRegistration, currentView.Version), version);
+        return DirectoryResult.FromResult(RegisterCore(address, currentRegistration, currentView.Version), version, _owner.PartitionKind);
     }
 
     async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(
@@ -79,15 +79,21 @@ internal sealed partial class GrainDirectoryPartition
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (version == MembershipVersion.MinValue && grainId == CapabilityProbeGrainId)
+        {
+            // Capability discovery precedes publishing the membership view, so it must not wait for range recovery.
+            return DirectoryResult.FromResult<GrainAddress?>(null, version, _owner.PartitionKind);
+        }
+
         LogLookupAsync(version, grainId);
 
         var currentView = await WaitForOwnershipViewAsync(grainId, version, cancellationToken);
         if (!IsOwner(currentView, grainId))
         {
-            return DirectoryResult.RefreshRequired<GrainAddress?>(currentView.Version);
+            return DirectoryResult.RefreshRequired<GrainAddress?>(currentView.Version, _owner.PartitionKind);
         }
 
-        return DirectoryResult.FromResult(LookupCore(grainId), version);
+        return DirectoryResult.FromResult(LookupCore(grainId), version, _owner.PartitionKind);
     }
 
     async ValueTask<DirectoryResult<bool>> IGrainDirectoryPartition.DeregisterAsync(
@@ -102,11 +108,11 @@ internal sealed partial class GrainDirectoryPartition
         var currentView = await WaitForOwnershipViewAsync(address.GrainId, version, cancellationToken);
         if (!IsOwner(currentView, address.GrainId))
         {
-            return DirectoryResult.RefreshRequired<bool>(currentView.Version);
+            return DirectoryResult.RefreshRequired<bool>(currentView.Version, _owner.PartitionKind);
         }
 
         DebugAssertOwnership(currentView, address.GrainId);
-        return DirectoryResult.FromResult(DeregisterCore(address), version);
+        return DirectoryResult.FromResult(DeregisterCore(address), version, _owner.PartitionKind);
     }
 
     private bool DeregisterCore(GrainAddress address)

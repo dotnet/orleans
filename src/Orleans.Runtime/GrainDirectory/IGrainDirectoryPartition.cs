@@ -15,6 +15,10 @@ internal interface IGrainDirectoryPartition : ISystemTarget
         GrainAddress? currentRegistration,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Looks up a registration. A request for <see cref="GrainDirectoryPartition.CapabilityProbeGrainId"/> at
+    /// <see cref="MembershipVersion.MinValue"/> reports the endpoint's directory protocol before ownership is ready.
+    /// </summary>
     [Alias("LookupAsync")]
     ValueTask<DirectoryResult<GrainAddress?>> LookupAsync(
         MembershipVersion version,

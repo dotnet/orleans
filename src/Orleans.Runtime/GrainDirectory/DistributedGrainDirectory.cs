@@ -82,6 +82,15 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     // for each recovery version.
     private long _recoveryMembershipVersion;
     internal long RecoveryMembershipVersion => Volatile.Read(ref _recoveryMembershipVersion);
+    internal DirectoryPartitionKind PartitionKind
+    {
+        get
+        {
+            // Probes also reach instances whose keyed registration was replaced, so lifecycle participation is optional.
+            var resolver = _grainDirectoryResolver ??= _serviceProvider.GetRequiredService<GrainDirectoryResolver>();
+            return resolver.DefaultGrainDirectory == this ? DirectoryPartitionKind.Distributed : DirectoryPartitionKind.NamedDistributed;
+        }
+    }
     private Task _runTask = Task.CompletedTask;
     private ActivationDirectory _localActivations;
     private GrainDirectoryResolver? _grainDirectoryResolver;
@@ -198,7 +207,8 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         address.GrainId,
         static (partition, version, state, cancellationToken) => partition.RegisterAsync(version, state.Address, state.PreviousAddress, cancellationToken),
         (Address: address, PreviousAddress: previousAddress),
-        cancellationToken);
+        cancellationToken,
+        isRegistration: true);
 
     internal Task UnregisterAsync(GrainAddress address, CancellationToken cancellationToken) => InvokeAsync(
         address.GrainId,
@@ -226,6 +236,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         Func<IGrainDirectoryPartition, MembershipVersion, TState, CancellationToken, ValueTask<DirectoryResult<TResult>>> func,
         TState state,
         CancellationToken cancellationToken,
+        bool isRegistration = false,
         [CallerMemberName] string operation = "")
     {
         DirectoryResult<TResult> invokeResult;
@@ -246,6 +257,19 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             view = ownerView.View;
             var owner = ownerView.Owner;
             var partitionReference = ownerView.PartitionReference;
+
+            if (isRegistration
+                && _grainDirectoryResolver!.DefaultGrainDirectory == this
+                && view.RecoveryCapableSilos.Count < view.Members.Length)
+            {
+                var appliedView = await _serviceProvider.GetRequiredService<LocalGrainDirectory>()
+                    .PrepareDistributedRegistrationAsync(cancellationToken);
+                if (appliedView.Version != view.Version)
+                {
+                    view = appliedView;
+                    continue;
+                }
+            }
 
 #if false
             if (logger.IsEnabled(LogLevel.Trace))

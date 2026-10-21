@@ -144,6 +144,9 @@ internal sealed class DirectoryMembershipSnapshot
 
     public MembershipVersion Version => ClusterMembershipSnapshot.Version;
 
+    // Populated by DirectoryMembershipService before publishing this view.
+    internal ImmutableHashSet<SiloAddress> RecoveryCapableSilos { get; set; } = [];
+
     internal int PartitionCount { get; }
 
     public ImmutableArray<SiloAddress> Members { get; }

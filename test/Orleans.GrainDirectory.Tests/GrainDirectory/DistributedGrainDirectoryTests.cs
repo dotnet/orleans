@@ -51,7 +51,8 @@ public sealed class DistributedGrainDirectoryMembershipTests
                 sp.GetRequiredService<IInternalGrainFactory>(),
                 sp.GetRequiredService<ILogger<DirectoryMembershipService>>(),
                 sp.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value.PartitionsPerSilo,
-                DirectoryMembershipSnapshot.DefaultGetRingBoundaries)));
+                DirectoryMembershipSnapshot.DefaultGetRingBoundaries,
+                static () => true)));
         }));
         var cluster = builder.Build();
 

@@ -48,6 +48,14 @@ public sealed class NamedGrainDirectoryTests
             {
                 Assert.Null(resolver.DefaultGrainDirectory);
             }
+
+            var partition = cluster.InternalClient!.GetSystemTarget<IGrainDirectoryPartition>(
+                GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, 0).GrainId);
+            var capability = await partition.LookupAsync(
+                MembershipVersion.MinValue, GrainDirectoryPartition.CapabilityProbeGrainId, cancellationToken);
+            Assert.Equal(
+                directoryName is null ? DirectoryPartitionKind.Distributed : DirectoryPartitionKind.NamedDistributed,
+                capability.PartitionKind);
         }
 
         for (var key = 0L; key < 10; key++)
