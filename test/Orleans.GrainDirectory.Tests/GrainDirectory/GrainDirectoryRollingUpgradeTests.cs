@@ -427,6 +427,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         var isMixedDirectoryCluster = distributedSiloCount > 0 && distributedSiloCount < cluster.Silos.Count;
         if (isMixedDirectoryCluster)
         {
+            // Mixed-directory upgrades can temporarily have duplicate activations.
+            // Final all-distributed checkpoints require those duplicates to be resolved.
             output.WriteLine(
                 $"  Observed {activations.Count} activations across {distributedSiloCount} DistributedGrainDirectory "
                 + $"and {cluster.Silos.Count - distributedSiloCount} LocalGrainDirectory silos {stage}; "
