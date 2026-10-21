@@ -26,9 +26,9 @@ public interface IOrderGrain : IGrainWithGuidKey
 // PlaceOrder is one durable task. After a deactivation, the runtime replays it from the start: completed child tasks
 // return their recorded results, so the workflow resumes where it stopped. The order's state is its history: the
 // workflow keeps the current snapshot in a local variable, computes each transition from the request, recorded results,
-// and logical time, and appends the new snapshot to the history log in a recorded effect, DurableTask.RunInline. The effect
-// appends once per position in the workflow, so a replay returns the recorded entry's sequence without appending it
-// again. Cancel and ship are ordinary methods which read the
+// and logical time, and appends the new snapshot to the history log in a recorded effect, DurableTask.RunInline. Each
+// effect and each buyer update is named for its transition, so a replay finds its record although the cancellation and
+// failure paths run different operations, and returns the recorded entry's sequence without appending it again. Cancel and ship are ordinary methods which read the
 // latest snapshot: cancel requests durable cancellation of the workflow with the buyer's reason, and ship sends the
 // workflow its Shipped signal.
 public sealed class OrderGrain : DurableGrain, IOrderGrain
@@ -83,8 +83,8 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
     {
         var lines = request.Lines;
         var order = OrderDetails.Submit(OrderId, request, DurableTask.Current.UtcNow);
-        DurableTask.RunInline(() => _history.Append(order));
-        Record(order.Order);
+        DurableTask.RunInline("submitted", () => _history.Append(order));
+        Record(order.Order, "submitted");
 
         // While the order awaits validation, CancelAsync can cancel this task. The next durable operation, up to the
         // payment authorization, observes the cancellation and throws OperationCanceledException, and the workflow
@@ -96,8 +96,8 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             await DurableTask.Delay(_options.GracePeriod).WithId("grace-period");
             order = order.BeginValidation();
             reservable = lines;
-            DurableTask.RunInline(() => _history.Append(order));
-            Record(order.Order);
+            DurableTask.RunInline("validating", () => _history.Append(order));
+            Record(order.Order, "validating");
 
             // Reserves every line concurrently, as the children reserve/0, reserve/1, and so on. WhenAll waits for every
             // reservation, including after a cancellation, so each line's reservation is settled when it returns or throws.
@@ -109,8 +109,8 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
                 return await CancelOrderAsync(order, lines, $"'{lines[rejected].ProductName}' is out of stock.");
             }
 
-            DurableTask.RunInline(() => _history.Append(order));
-            Record(order.Order);
+            DurableTask.RunInline("stock-confirmed", () => _history.Append(order));
+            Record(order.Order, "stock-confirmed");
 
             // The authorization runs as authorize-payment/0 and its timeout as authorize-payment/1. When the timeout
             // elapses first, the payment grain observes a cancellation request, and an authorization which then ends
@@ -135,15 +135,15 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         }
 
         order = order.MarkPaid();
-        DurableTask.RunInline(() => _history.Append(order));
-        Record(order.Order);
+        DurableTask.RunInline("paid", () => _history.Append(order));
+        Record(order.Order, "paid");
         await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).CommitAsync(OrderId))).WithId("commit");
 
         // The order ships when ShipAsync signals it; the wait returns at once for a shipment which arrived earlier.
         await Shipped.WaitAsync();
         order = order.MarkShipped();
-        DurableTask.RunInline(() => _history.Append(order));
-        Record(order.Order);
+        DurableTask.RunInline("shipped", () => _history.Append(order));
+        Record(order.Order, "shipped");
         return Result(order);
     }
 
@@ -182,17 +182,20 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             .WithId("release")
             .Shielded();
         order = order.Cancel([.. lines.Where((_, i) => released[i]).Select(line => line.ProductId)], reason);
-        DurableTask.RunInline(() => _history.Append(order));
-        Record(order.Order);
+        DurableTask.RunInline("cancelled", () => _history.Append(order));
+        Record(order.Order, "cancelled");
         return Result(order);
     }
 
-    // Posts the buyer's projection update as a detached task, whose root ID derives from the workflow's ID, so the
-    // workflow continues without waiting for the buyer and the update runs independently of the workflow. The update
-    // commits with the workflow's next journal write, after the snapshot which the workflow records in the order's
-    // history. Updates arrive in any order; the buyer keeps the summary with the highest version.
-    private void Record(OrderState order) =>
-        _ = GrainFactory.GetGrain<IBuyerGrain>(order.BuyerId).RecordOrderAsync(order.ToSummary()).Detached().Post();
+    // Posts the buyer's projection update as a detached task, whose root ID derives from the workflow's ID and the
+    // update's name, so the workflow continues without waiting for the buyer and the update runs independently of the
+    // workflow. The update commits with the workflow's next journal write, after the snapshot which the workflow records
+    // in the order's history. Updates arrive in any order; the buyer keeps the summary with the highest version.
+    private void Record(OrderState order, string transition) =>
+        _ = GrainFactory.GetGrain<IBuyerGrain>(order.BuyerId).RecordOrderAsync(order.ToSummary())
+            .WithId($"record-{transition}")
+            .Detached()
+            .Post();
 
     private ICatalogItemGrain Catalog(int productId) => GrainFactory.GetGrain<ICatalogItemGrain>(productId);
 
