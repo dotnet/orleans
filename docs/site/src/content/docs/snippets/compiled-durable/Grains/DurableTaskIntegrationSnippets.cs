@@ -52,9 +52,10 @@ public interface ICheckoutGrain : IGrainWithGuidKey
 public sealed class CheckoutGrain(IPaymentProvider payments) : DurableGrain, ICheckoutGrain
 {
     // <durable_tasks_idempotency_key>
-    // The grain and the task's ID identify this execution in every replay and every retry. The operation's name
-    // distinguishes the execution's external requests from each other.
-    private string IdempotencyKey(string operation) => $"{this.GetGrainId()}/{DurableTask.Current.Id}/{operation}";
+    // The grain, the task's ID, and its incarnation identify this run in every replay and every retry. The operation's
+    // name distinguishes the run's external requests from each other.
+    private string IdempotencyKey(string operation) =>
+        $"{this.GetGrainId()}/{DurableTask.Current.Id}/{DurableTask.Current.Incarnation:N}/{operation}";
     // </durable_tasks_idempotency_key>
 
     // <durable_tasks_charge_in_step>
@@ -165,7 +166,7 @@ public sealed class ShipmentGrain(IShipmentStore store) : DurableGrain, IShipmen
 
         // A write keyed by an ID which the task derives, so a write which a replay repeats changes nothing.
         var shipment = new ShipmentRecord(orderId, carrier, trackingNumber);
-        var operationId = $"{this.GetGrainId()}/{DurableTask.Current.Id}/insert";
+        var operationId = $"{this.GetGrainId()}/{DurableTask.Current.Id}/{DurableTask.Current.Incarnation:N}/insert";
         await DurableTask.Run(ct => store.UpsertAsync(operationId, shipment, ct)).WithId("insert");
         return shipment;
     }
@@ -225,7 +226,7 @@ public sealed class LabelPrinterGrain(HttpClient http) : DurableGrain, ILabelPri
 {
     public async DurableTask<string> PrintLabelAsync(string address)
     {
-        var key = $"{this.GetGrainId()}/{DurableTask.Current.Id}/submit";
+        var key = $"{this.GetGrainId()}/{DurableTask.Current.Id}/{DurableTask.Current.Incarnation:N}/submit";
 
         // Submits the job. The service answers 202 Accepted with the job's status URI, and deduplicates by the key.
         var job = await DurableTask.Run(async cancellationToken =>
