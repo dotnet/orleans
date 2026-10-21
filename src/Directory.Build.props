@@ -16,7 +16,7 @@
       Update this after each stable Orleans release and remove suppressions made obsolete by that baseline.
       See CONTRIBUTING.md for the intentional-breaking-change workflow.
     -->
-    <OrleansPackageValidationBaselineVersion>10.3.1</OrleansPackageValidationBaselineVersion>
+    <OrleansPackageValidationBaselineVersion>10.4.0</OrleansPackageValidationBaselineVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0' and ('$(MSBuildProjectName)' == 'Orleans.Core' or '$(MSBuildProjectName)' == 'Orleans.Runtime')">
