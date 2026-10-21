@@ -412,9 +412,10 @@ Follow these rules in re-executed code:
   grain state whose value decides later operations, and produce random values, identifiers, and
   clock and environment values in `DurableTask.RunInline`, in a child, or in the tail, so a replay
   observes the values the first run recorded. Read logical time from `DurableTask.Current.UtcNow`. A
-  tail whose result didn't commit runs again, so a value which the tail sends to an external service,
-  such as an idempotency key, comes from `DurableTask.RunInline` or a step. Call external services in
-  children, whose external effects need their own idempotency.
+  tail whose result didn't commit runs again, together with the effects in it, so derive a value which
+  the tail sends to an external service, such as an idempotency key, from the task's identity, such as
+  `$"{grainId}/{DurableTask.Current.Id}"`. Call external services in children, whose external effects
+  need their own idempotency.
 - Store immutable values, such as records and immutable collections, in journaled grain state, and
   assign a new value to change one. The state's API records each assignment, and a change made in
   place to an object which the state holds bypasses it.
