@@ -75,7 +75,6 @@ internal sealed class MessageCodec(
             var header = reader.ReadFieldHeader();
             if (header.IsEndBaseOrEndObject)
             {
-                // Failed-RPC cleanup still owns the receive slices while package structure is validated.
                 if (result.MigrationContext is null)
                 {
                     throw new InvalidMessageFrameException("A migration package must contain a migration context.");

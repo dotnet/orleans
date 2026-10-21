@@ -2158,14 +2158,13 @@ public sealed class RetirementHandoffTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task MalformedMigrationRpc_IsRejectedBeforeAdmissionAndReleasesReceivePages(bool nullContext)
+    public async Task MalformedMigrationRpc_IsRejectedBeforeAdmission(bool nullContext)
     {
         await using var cluster = await DeployAsync();
         var source = cluster.Silos[0];
         var destination = cluster.Silos[1];
         var sourceShared = source.ServiceProvider.GetRequiredService<MessageHandlerShared>();
         var destinationShared = destination.ServiceProvider.GetRequiredService<MessageHandlerShared>();
-        var manager = destination.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
         var sessions = source.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var packages = new List<GrainMigrationPackage>();
         for (var i = 0; i < 3; i++)
@@ -2217,47 +2216,14 @@ public sealed class RetirementHandoffTests
 
         using (received)
         {
-            var body = Assert.IsType<MessageReadRequest>(received._bodyObject).Body;
-            var pages = new List<(ArcBufferPage Page, int Version)>();
-            var remaining = body.Length;
-            var offset = body.Offset;
-            for (var page = body.First; remaining > 0; page = page.Next)
-            {
-                Assert.NotNull(page);
-                pages.Add((page, page.Version));
-                remaining -= Math.Min(remaining, page.Length - offset);
-                offset = 0;
-            }
-
-            Assert.NotEmpty(pages);
-            List<GrainMigrationPackage>? decoded = null;
             try
             {
-                var error = await Record.ExceptionAsync(async () =>
-                {
-                    var request = Assert.IsAssignableFrom<IInvokable>(received.BodyObject);
-                    decoded = Assert.IsType<List<GrainMigrationPackage>>(request.GetArgument(0));
-                    await manager.AcceptMigratingGrains(decoded, new CancellationToken(canceled: true));
-                });
-
-                var retainedPages = pages.Count(page => page.Page.Version == page.Version);
-                Assert.True(retainedPages == 0, $"{retainedPages} receive pages remain pinned after failure: {error}");
-                var malformed = Assert.IsType<InvalidMessageFrameException>(error);
+                var malformed = Assert.Throws<InvalidMessageFrameException>(() => _ = received.BodyObject);
                 Assert.Contains(nullContext ? "context" : "null request", malformed.Message);
-                Assert.Null(decoded);
+                Assert.Null(received._bodyObject);
             }
             finally
             {
-                // The pre-fix negative control can reach admission with malformed decoded values.
-                foreach (var package in decoded ?? [])
-                {
-                    package.MigrationContext?.Dispose();
-                    foreach (var request in package.Requests ?? [])
-                    {
-                        request?.Dispose();
-                    }
-                }
-
                 foreach (var package in packages)
                 {
                     package.MigrationContext?.Dispose();

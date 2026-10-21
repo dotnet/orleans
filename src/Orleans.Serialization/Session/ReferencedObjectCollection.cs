@@ -63,28 +63,6 @@ namespace Orleans.Serialization.Session
             return null;
         }
 
-        internal void VisitReferences<T>(Action<T> visitor) where T : class
-        {
-            for (var i = 0; i < ReferenceToObjectCount; i++)
-            {
-                if (_referenceToObject[i].Object is T value)
-                {
-                    visitor(value);
-                }
-            }
-
-            if (_referenceToObjectOverflow is { } overflow)
-            {
-                foreach (var item in overflow.Values)
-                {
-                    if (item is T value)
-                    {
-                        visitor(value);
-                    }
-                }
-            }
-        }
-
         /// <summary>
         /// Marks a value field.
         /// </summary>

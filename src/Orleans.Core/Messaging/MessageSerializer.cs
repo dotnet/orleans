@@ -67,11 +67,6 @@ namespace Orleans.Runtime.Messaging
                 DeserializeHeaders(ref headersReader, message);
                 readRequest._originalResponseType = message.Result;
             }
-            catch
-            {
-                _deserializationSession.ReferencedObjects.VisitReferences<Message>(static message => message.Dispose());
-                throw;
-            }
             finally
             {
                 readRequest.ReleaseHeaders();
@@ -98,12 +93,6 @@ namespace Orleans.Runtime.Messaging
                     var bodyCodec = _codecProvider.GetCodec(field.FieldType!);
                     message._bodyObject = bodyCodec.ReadValue(ref reader, field);
                 }
-            }
-            catch
-            {
-                // Embedded messages already decoded from a failed RPC still own receive-buffer slices.
-                _deserializationSession.ReferencedObjects.VisitReferences<Message>(static message => message.Dispose());
-                throw;
             }
             finally
             {

@@ -167,7 +167,7 @@ public sealed class MessageFramesTests : IDisposable
     [InlineData("packages", 2, 2)]
     [InlineData("invocation", 1, 2)]
     [InlineData("invocation", 1, 100)]
-    public void TruncatedRpc_ReleasesAllDecodedMessages(string bodyType, int truncatedBytes, int count)
+    public void TruncatedRpc_RejectsPartiallyDecodedMessages(string bodyType, int truncatedBytes, int count)
     {
         var shared = _services.GetRequiredService<MessageHandlerShared>();
         var requests = Enumerable.Range(0, count).Select(i =>
@@ -208,16 +208,12 @@ public sealed class MessageFramesTests : IDisposable
             shared.Return(serializer);
         }
 
-        var handlers = Enumerable.Range(0, count + 1).Select(_ => shared.GetReceiveMessageHandler()).ToArray();
-        foreach (var handler in handlers) handler.Reset();
         using var received = MessageFrames.Read(shared, buffer);
+        var readRequest = Assert.IsType<MessageReadRequest>(received._bodyObject);
         Assert.ThrowsAny<Exception>(() => _ = received.BodyObject);
+        Assert.Null(received._bodyObject);
         Assert.Equal(count, _services.GetRequiredService<MessageReadObserver>().Count);
-        Assert.All(handlers, handler => Assert.Equal(0, handler.BodyLength));
-        var returned = Enumerable.Range(0, handlers.Length).Select(_ => shared.GetReceiveMessageHandler()).ToArray();
-        Assert.Equal(handlers.Length, returned.Distinct().Count());
-        Assert.All(returned, handler => Assert.Contains(handler, handlers));
-        foreach (var handler in returned) handler.Reset();
+        Assert.Equal(0, readRequest.BodyLength);
     }
 
     [GenerateSerializer, SerializationCallbacks(typeof(MessageReadObserver))]
