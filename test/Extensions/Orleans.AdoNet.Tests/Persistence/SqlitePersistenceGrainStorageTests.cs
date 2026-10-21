@@ -116,12 +116,21 @@ namespace Tester.AdoNet.Persistence
             Assert.Equal(1, updated);
 
             await this.fixture.InitializeSchemaAsync(cancellationToken);
-            var read = new GrainState<TestState1>();
-            await storage.ReadStateAsync(grainType, grainId, read, cancellationToken);
-            read.State = new TestState1 { A = "written-after-repair" };
-            await storage.WriteStateAsync(grainType, grainId, read, cancellationToken);
+            var repaired = new GrainState<TestState1>();
+            await storage.ReadStateAsync(grainType, grainId, repaired, cancellationToken);
 
-            Assert.Equal("2", read.ETag);
+            Assert.True(repaired.RecordExists);
+            Assert.Equal("1", repaired.ETag);
+            Assert.Equal(grainState.State, repaired.State);
+
+            repaired.State = new TestState1 { A = "written-after-repair" };
+            await storage.WriteStateAsync(grainType, grainId, repaired, cancellationToken);
+            var written = new GrainState<TestState1>();
+            await storage.ReadStateAsync(grainType, grainId, written, cancellationToken);
+
+            Assert.Equal("2", repaired.ETag);
+            Assert.Equal("2", written.ETag);
+            Assert.Equal(repaired.State, written.State);
         }
 
         [Fact]

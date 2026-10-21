@@ -35,13 +35,20 @@ namespace UnitTests.StorageTests.Relational
 
             Assert.Equal("1", grainState.ETag);
             Assert.Equal("1", read.ETag);
+            Assert.True(read.RecordExists);
             Assert.Equal(grainState.State, read.State);
 
             await SetVersionToMaximumAsync(database, key, cancellationToken);
             grainState.ETag = MaximumVersion;
             await storage.ClearStateAsync(grainType, grainId, grainState, cancellationToken);
+            var cleared = new GrainState<TestState1>();
+            await storage.ReadStateAsync(grainType, grainId, cleared, cancellationToken);
 
-            Assert.Equal(deleteStateOnClear ? null : "1", grainState.ETag);
+            var expectedClearedVersion = deleteStateOnClear ? null : "1";
+            Assert.Equal(expectedClearedVersion, grainState.ETag);
+            Assert.Equal(expectedClearedVersion, cleared.ETag);
+            Assert.False(cleared.RecordExists);
+            Assert.Equal(new TestState1(), cleared.State);
         }
 
         private static async Task SetVersionToMaximumAsync(IRelationalStorage database, string grainKey, CancellationToken cancellationToken)
