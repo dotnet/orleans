@@ -31,9 +31,11 @@ namespace Orleans.DurableTasks.Runtime;
 /// <see cref="DurableTaskConflictException"/>. A grain which receives an invocation after its admission window, Messaging's
 /// <c>DeduplicationWindow</c> since the invocation was first staged, dead-letters it with the
 /// <see cref="DurableTaskRejectionCodes.Expired"/> code. Another rejection, with another code or none, fails the record with
-/// a <see cref="DurableTaskRejectedException"/>, which reports the code. An invocation which the outbox can't deliver
-/// before Messaging's <c>OutboxRetryTimeout</c>, including one which the grain fails to accept, such as one which doesn't
-/// decode, retires as dead-lettered, which fails the record with a <see cref="DurableTaskDeliveryException"/>. Awaiting the task, or a start which awaits its acceptance, throws the
+/// a <see cref="DurableTaskRejectedException"/>, which reports the code. An invocation whose delivery the outbox can't
+/// confirm before Messaging's <c>OutboxRetryTimeout</c>, including one which the grain fails to accept, such as one which
+/// doesn't decode, or which the grain fences after its admission cutoff, retires as dead-lettered, which fails the record
+/// with a <see cref="DurableTaskDeliveryException"/>: an earlier attempt may have reached the grain, so the outcome is
+/// unknown. Awaiting the task, or a start which awaits its acceptance, throws the
 /// failure, in every replay.
 /// </para>
 /// </remarks>

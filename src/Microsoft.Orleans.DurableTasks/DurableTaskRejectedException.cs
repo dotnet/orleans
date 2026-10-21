@@ -8,9 +8,11 @@ namespace Orleans.DurableTasks;
 /// conflict, which it reports with a rejection code of its own, or without one.
 /// </summary>
 /// <remarks>
-/// The task's grain dead-lettered the invocation and stored nothing, so the starter's record of the task fails with this
-/// exception: awaiting the task, or a <c>ScheduleAsync</c> which awaits its acceptance, throws it, in every replay. A
-/// rejection for a conflicting task identifier fails with <see cref="DurableTaskConflictException"/> instead.
+/// The task's grain dead-lettered the invocation and stored nothing for it, so the starter's record of the task fails with
+/// this exception: awaiting the task, or a <c>ScheduleAsync</c> which awaits its acceptance, throws it, in every replay. A
+/// rejection for a conflicting task identifier fails with <see cref="DurableTaskConflictException"/> instead. A rejection
+/// with the <see cref="DurableTaskRejectionCodes.Expired"/> code leaves the outcome unknown: the grain may have run the
+/// task, and deleted it after its retention, before the late delivery arrived.
 /// </remarks>
 [GenerateSerializer]
 [Alias("Orleans.DurableTasks.DurableTaskRejectedException")]
