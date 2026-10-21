@@ -5,9 +5,11 @@ on:
   push:
     branches:
       - main
+      - 10.x
   pull_request:
     branches:
       - main
+      - 10.x
   schedule:
     - cron: "0 8 * * 2" # Run the preview audit weekly on Tuesday at 8:00 UTC.
 
