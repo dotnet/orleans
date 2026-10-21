@@ -18,6 +18,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 #endif
     private readonly Dictionary<string, IStateMachine> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, IStateMachine> _statesMap = [];
+
+    // Whether a registered state journals changes which StagedChangeCount can't observe.
+    private bool _hasUnreportedChanges;
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
     private readonly IGrainContext? _grainContext;
@@ -147,6 +150,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             }
 
             _states.Add(name, stateMachine);
+            if (stateMachine is not IReportsStagedChanges) _hasUnreportedChanges = true;
             _workQueue.Enqueue(new RegisterStateWorkItem(name));
         }
 
@@ -1109,15 +1113,16 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     public long PendingWriteByteCount => _journalWriter.CommittedLength;
 
     /// <summary>
-    /// Gets a count which advances whenever a registered state stages a change and never decreases.
+    /// Gets a count which advances whenever a registered state stages a change and never decreases, or a negative value
+    /// when a registered state doesn't report its changes.
     /// </summary>
     /// <remarks>
-    /// The built-in durable states advance it when they are modified, and any state advances it when it commits a
-    /// journal entry outside a write. A write captures changes without advancing it. Comparing two readings taken on the
-    /// activation's scheduler shows whether any state staged a change between them. Orleans.Messaging uses it to tell
-    /// whether a failed handler attempt staged changes.
+    /// Every state which implements <see cref="IReportsStagedChanges"/> advances it when it is modified. A write captures
+    /// changes without advancing it. Comparing two readings taken on the activation's scheduler shows whether any state
+    /// staged a change between them. Orleans.Messaging uses it to tell whether a failed handler attempt staged changes,
+    /// and treats a negative value as staged.
     /// </remarks>
-    internal long StagedChangeCount => _journalWriter.StagedChangeCount;
+    internal long StagedChangeCount => _hasUnreportedChanges ? -1 : _journalWriter.StagedChangeCount;
 
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer)
         => observer.Subscribe(GrainLifecycleStage.SetupState, this);
@@ -1389,7 +1394,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     /// This keeps buffering entries and dumps them back into the journal upon compaction.
     /// </summary>
     [DebuggerDisplay("RetiredStateMachine Id = {StreamId.Value}")]
-    private sealed class RetiredStateMachine(JournalStreamId streamId) : IStateMachine
+    private sealed class RetiredStateMachine(JournalStreamId streamId) : IStateMachine, IReportsStagedChanges
     {
         private readonly List<IPreservedJournalEntry> _preservedEntries = [];
 

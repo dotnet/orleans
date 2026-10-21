@@ -42,7 +42,7 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IDurableTaskCompletionSourceCommandHandler<T>
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IReportsStagedChanges, IDurableTaskCompletionSourceCommandHandler<T>
 {
     private readonly IDurableTaskCompletionSourceCommandCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
