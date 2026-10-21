@@ -526,9 +526,15 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         var resetSequence = reader.IncludesStaged ? _resetSequence : _committed.ResetSequence;
         if (reader.Cursor < resetSequence)
         {
-            logEvent = resetSequence <= _committed.ResetSequence
-                ? ResetReader(reader, _committed.FirstSequence, DurableChangeStatus.Committed, unconfirmedSequence: -1)
-                : ResetReader(reader, _firstSequence, DurableChangeStatus.Staged, unconfirmedSequence: resetSequence - 1);
+            if (resetSequence <= _committed.ResetSequence)
+            {
+                logEvent = ResetReader(reader, _committed.FirstSequence, DurableChangeStatus.Committed, unconfirmedSequence: -1);
+                return true;
+            }
+
+            // A staged reset reports the staged first sequence. When a trim moved it beyond the clear, the trim's write confirms it.
+            logEvent = ResetReader(reader, _firstSequence, DurableChangeStatus.Staged, unconfirmedSequence: resetSequence - 1);
+            reader.UnconfirmedTrimSequence = _firstSequence > resetSequence ? _firstSequence : -1;
             return true;
         }
 
