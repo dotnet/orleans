@@ -41,6 +41,9 @@ internal sealed partial class ActivationData :
     IDisposable
 {
     internal const string GrainAddressMigrationContextKey = "sys.addr";
+
+    // The request which the current code belongs to, recorded for activations whose type tracks it.
+    private static readonly AsyncLocal<Message?> CurrentRequest = new();
     private readonly Lock _lock = new();
     private readonly GrainTypeSharedContext _shared;
     private readonly IServiceScope _serviceScope;
@@ -1379,32 +1382,15 @@ internal sealed partial class ActivationData :
             foreach (var runningRequest in _runningRequests)
             {
                 var runningMessage = runningRequest.Key;
-                if (runningMessage.IsAlwaysInterleave
-                    || (runningMessage.IsReadOnly && incoming.IsReadOnly))
+                if (MayInterleaveWith(runningMessage, incoming, canInterleave, ref incomingMayInterleave))
                 {
+                    // A predicate which admits the incoming request admits it alongside every running request.
+                    if (incomingMayInterleave == true)
+                    {
+                        return true;
+                    }
+
                     continue;
-                }
-
-                if (canInterleave is not null)
-                {
-                    try
-                    {
-                        incomingMayInterleave ??= canInterleave.MayInterleave(GrainInstance, incoming);
-                        if (incomingMayInterleave.Value)
-                        {
-                            return true;
-                        }
-
-                        if (canInterleave.MayInterleave(GrainInstance, runningMessage))
-                        {
-                            continue;
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        LogErrorInvokingMayInterleavePredicate(_shared.Logger, exception, this, incoming);
-                        throw;
-                    }
                 }
 
                 _blockingRequest = runningMessage;
@@ -1621,12 +1607,92 @@ internal sealed partial class ActivationData :
 
 
     /// <summary>
+    /// Returns whether <paramref name="incoming"/> may run while <paramref name="running"/> runs, by the activation's
+    /// interleaving rules for a pair of requests.
+    /// </summary>
+    /// <param name="incomingMayInterleave">
+    /// Caches whether the activation's may-interleave predicates admit <paramref name="incoming"/>, across the running
+    /// requests which one admission decision compares it with.
+    /// </param>
+    private bool MayInterleaveWith(Message running, Message incoming, GrainCanInterleave? canInterleave, ref bool? incomingMayInterleave)
+    {
+        if (running.IsAlwaysInterleave
+            || (running.IsReadOnly && incoming.IsReadOnly))
+        {
+            return true;
+        }
+
+        if (canInterleave is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            incomingMayInterleave ??= canInterleave.MayInterleave(GrainInstance, incoming);
+            return incomingMayInterleave.Value || canInterleave.MayInterleave(GrainInstance, running);
+        }
+        catch (Exception exception)
+        {
+            LogErrorInvokingMayInterleavePredicate(_shared.Logger, exception, this, incoming);
+            throw;
+        }
+    }
+
+    void IGrainRequestAdmission.TrackCurrentRequest() => _shared.TracksCurrentRequest = true;
+
+    bool IGrainRequestAdmission.IsBlockedByCurrentRequest(ILocalRequest request, LocalRequestOptions options, bool holdsSuchRequest)
+    {
+        Debug.Assert(_shared.TracksCurrentRequest, "The activation's type tracks the request which the current code belongs to.");
+        var current = CurrentRequest.Value;
+        if (current is null && !holdsSuchRequest)
+        {
+            return false;
+        }
+
+        // The probe goes through the same factory and per-request check as the request which the activation would receive,
+        // and the incoming-only rules of MayInvokeRequest, which a local request doesn't meet, don't apply to it.
+        var incoming = _shared.InternalRuntime.RuntimeClient.CreateLocalRequest(this, request, options);
+        Debug.Assert(incoming.GetReentrancyId() == Guid.Empty, "A local request starts a new call chain.");
+        if (incoming.IsAlwaysInterleave)
+        {
+            return false;
+        }
+
+        var canInterleave = GetComponent<GrainCanInterleave>();
+        bool? incomingMayInterleave = null;
+
+        // The calling code holds a running request like the probe, such as a durable task's segment, until its wait ends.
+        if (holdsSuchRequest && !MayInterleaveWith(incoming, incoming, canInterleave, ref incomingMayInterleave))
+        {
+            return true;
+        }
+
+        lock (_lock)
+        {
+            if (current is null || !_runningRequests.ContainsKey(current))
+            {
+                return false;
+            }
+        }
+
+        return !MayInterleaveWith(current, incoming, canInterleave, ref incomingMayInterleave);
+    }
+
+    /// <summary>
     /// Handle an incoming message and queue/invoke appropriate handler
     /// </summary>
     /// <param name="message"></param>
     private void InvokeIncomingRequest(Message message)
     {
         _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
+
+        // The request's code captures the value as it first awaits, and the message loop's own flow is restored after.
+        var tracksCurrentRequest = _shared.TracksCurrentRequest;
+        if (tracksCurrentRequest)
+        {
+            CurrentRequest.Value = message;
+        }
 
         try
         {
@@ -1645,6 +1711,13 @@ internal sealed partial class ActivationData :
         catch
         {
             OnCompletedRequest(message);
+        }
+        finally
+        {
+            if (tracksCurrentRequest)
+            {
+                CurrentRequest.Value = null;
+            }
         }
 
         static async Task OnCompleteAsync(ActivationData activation, Message message, Task task)

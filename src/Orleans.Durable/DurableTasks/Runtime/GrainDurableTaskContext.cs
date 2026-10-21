@@ -56,7 +56,7 @@ namespace Orleans.Durable.Tasks.Runtime;
 /// </remarks>
 internal sealed class GrainDurableTaskContext : DurableTaskContext
 {
-    private static readonly LocalRequestOptions SegmentOptions = new();
+    internal static readonly LocalRequestOptions SegmentOptions = new();
 
     private readonly IDurableTaskGrainRuntime _runtime;
     private readonly IGrainContext _grainContext;
@@ -74,6 +74,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     private int _parkedWaits;
     private HashSet<TaskId>? _awaited;
     private bool _resumePending;
+
+    // Whether the attempt's code starts a wait which it then parks for, which ends its segment while the wait is pending.
+    private bool _startingParkedWait;
 
     // Completes once the attempt's code has ended or, for a discarded attempt, once no segment of it runs.
     private readonly TaskCompletionSource _settled = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -152,6 +155,30 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// still resumes it after a crash.
     /// </remarks>
     internal bool IsRunnable => _segment is not null || _queuedSegments > 0 || _resumePending;
+
+    /// <summary>Gets a task which completes once the attempt's running segment ends, or <see langword="null"/> while none runs.</summary>
+    internal Task? RunningSegment => _segment?.Task;
+
+    /// <summary>
+    /// Gets whether the attempt's code which waits now holds its running segment while it waits: a segment runs, and the
+    /// code doesn't start a wait which the attempt parks for, which ends the segment.
+    /// </summary>
+    internal bool HoldsSegmentWhileWaiting => _segment is not null && !_startingParkedWait;
+
+    /// <summary>Starts a wait which the attempt then parks for, so the wait's start sees the attempt's segment as released.</summary>
+    internal TResult StartParkedWait<TState, TResult>(TState state, Func<TState, TResult> start)
+    {
+        AssertOnScheduler();
+        _startingParkedWait = true;
+        try
+        {
+            return start(state);
+        }
+        finally
+        {
+            _startingParkedWait = false;
+        }
+    }
 
     /// <summary>Notes that the runtime completed <paramref name="awaited"/>, a task or signal record, which can release a parked wait.</summary>
     internal void OnAwaitedCompleted(TaskId awaited)
@@ -1109,7 +1136,8 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             owner.ReachCancellationPoint();
             owner.ThrowIfAttemptCanceled();
             using var operationCts = owner.CreateOperationCancellationSource(cancellationToken);
-            return Observe(await owner.CompleteOperationAsync(owner.ParkAsync(inner.WaitAsync(operationCts.Token).AsTask(), [inner.TaskId])));
+            var wait = owner.StartParkedWait((inner, operationCts.Token), static state => state.inner.WaitAsync(state.Token).AsTask());
+            return Observe(await owner.CompleteOperationAsync(owner.ParkAsync(wait, [inner.TaskId])));
         }
 
         private DurableTaskResponse Observe(DurableTaskResponse response)
