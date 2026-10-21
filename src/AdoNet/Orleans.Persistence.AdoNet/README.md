@@ -98,6 +98,26 @@ Before using the ADO.NET provider, you need to set up the necessary database tab
 The SQLite scripts are idempotent: reapplying them refreshes the persistence
 queries while preserving grain state.
 
+## Storage Key Format
+
+`AdoNetGrainStorageOptions.KeyFormat` controls how grain state maps to rows.
+For new databases, use `GrainTypeQualified`, which gives each combination of
+grain type, state name, and grain key its own row:
+
+```csharp
+options.KeyFormat = AdoNetGrainStorageKeyFormat.GrainTypeQualified;
+```
+
+With `GrainTypeQualified`, grain keys, and grain type and state name combined,
+are each limited to about 255 UTF-8 bytes; longer ones fail with an
+`ArgumentException`.
+
+The default, `Legacy`, reads and writes state in the format used by earlier
+releases. In that format, grains of different types which share a key and state
+name share one row. Databases which already hold state keep `Legacy`, because
+state written in one format is not visible in the other. `GrainTypeQualified`
+cannot be combined with `UseOrleans3CompatibleHasher()`.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

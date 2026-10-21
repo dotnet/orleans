@@ -138,5 +138,35 @@ namespace UnitTests.StorageTests.Relational
             var key = deleteStateOnClear ? $"{storageInvariant}_DeleteOnClear" : storageInvariant;
             return StorageProviders[key];
         }
+
+        /// <summary>
+        /// Creates an uncached storage provider with the given key format and a constant hasher over the database
+        /// prepared by <see cref="GetStorageProvider(string, bool, CancellationToken)"/>.
+        /// </summary>
+        public async Task<AdoNetGrainStorage> CreateConstantHashStorageProviderAsync(
+            string storageInvariant,
+            AdoNetGrainStorageKeyFormat keyFormat,
+            CancellationToken cancellationToken)
+        {
+            var storage = Storage ?? throw new InvalidOperationException("The test database has not been prepared.");
+            var options = new AdoNetGrainStorageOptions()
+            {
+                ConnectionString = storage.Storage.ConnectionString,
+                Invariant = storageInvariant,
+                GrainStorageSerializer = new JsonGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<OrleansJsonSerializer>()!),
+                HashPicker = new StorageHasherPicker(new[] { new ConstantHasher() }),
+                KeyFormat = keyFormat,
+            };
+            var storageProvider = new AdoNetGrainStorage(
+                DefaultProviderRuntime.ServiceProvider.GetRequiredService<IActivatorProvider>(),
+                DefaultProviderRuntime.ServiceProvider.GetRequiredService<ILogger<AdoNetGrainStorage>>(),
+                Options.Create(options),
+                Options.Create(new ClusterOptions { ServiceId = Guid.NewGuid().ToString() }),
+                $"{storageInvariant}_{keyFormat}_StorageProvider");
+            ISiloLifecycleSubject siloLifeCycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
+            storageProvider.Participate(siloLifeCycle);
+            await siloLifeCycle.OnStart(cancellationToken);
+            return storageProvider;
+        }
     }
 }

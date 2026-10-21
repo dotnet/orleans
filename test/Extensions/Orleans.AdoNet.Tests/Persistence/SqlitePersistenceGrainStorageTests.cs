@@ -1,5 +1,7 @@
+using System.Text;
 using System.Globalization;
 using Microsoft.Data.Sqlite;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Storage;
 using TestExtensions;
@@ -126,6 +128,128 @@ namespace Tester.AdoNet.Persistence
             Assert.Equal(grainStateA.State, readA.State);
             Assert.Equal(grainStateB.State, readB.State);
             Assert.NotEqual(readA.State, readB.State);
+        }
+
+        [Fact]
+        public async Task GrainTypeQualifiedKeyFormat_GrainTypesSharingKeyAreIsolated()
+        {
+            var storage = await this.CreateConstantHashStorageAsync(AdoNetGrainStorageKeyFormat.GrainTypeQualified);
+            await GrainStorageKeyFormatTests.GrainTypesSharingKeyAreIsolated(storage);
+        }
+
+        [Fact]
+        public async Task GrainTypeQualifiedKeyFormat_StateNamesOfOneGrainAreIsolated()
+        {
+            var storage = await this.CreateConstantHashStorageAsync(AdoNetGrainStorageKeyFormat.GrainTypeQualified);
+            await GrainStorageKeyFormatTests.StateNamesOfOneGrainAreIsolated(storage);
+        }
+
+        [Fact]
+        public async Task GrainTypeQualifiedKeyFormat_KeysParsingToSameValueAreIsolated()
+        {
+            var storage = await this.CreateConstantHashStorageAsync(AdoNetGrainStorageKeyFormat.GrainTypeQualified);
+            await GrainStorageKeyFormatTests.KeysParsingToSameValueAreIsolated(storage);
+        }
+
+        [Fact]
+        public async Task GrainTypeQualifiedKeyFormat_KeysOfDifferentKindsAreIsolated()
+        {
+            var storage = await this.CreateConstantHashStorageAsync(AdoNetGrainStorageKeyFormat.GrainTypeQualified);
+            await GrainStorageKeyFormatTests.KeysOfDifferentKindsAreIsolated(storage);
+        }
+
+        [Fact]
+        public async Task LegacyKeyFormat_SharesRowAcrossGrainTypes()
+        {
+            var storage = await this.CreateConstantHashStorageAsync(AdoNetGrainStorageKeyFormat.Legacy);
+            await GrainStorageKeyFormatTests.LegacyFormatSharesRowAcrossGrainTypes(storage);
+        }
+
+        [Fact]
+        public async Task GrainTypeQualifiedKeyFormat_GrainTypeAndStateNameBoundariesAreIsolated()
+        {
+            var storage = await this.CreateConstantHashStorageAsync(AdoNetGrainStorageKeyFormat.GrainTypeQualified);
+            await GrainStorageKeyFormatTests.GrainTypeAndStateNameBoundariesAreIsolated(storage);
+        }
+
+        [Fact]
+        public async Task LegacyKeyFormat_StoresStateNameAndDecodedIntegerKey()
+        {
+            var stateName = $"legacy-columns-{Guid.NewGuid():N}";
+            var row = await this.WriteAndReadKeyColumnsAsync(AdoNetGrainStorageKeyFormat.Legacy, "cart", stateName, GrainIdKeyExtensions.CreateIntegerKey(0x1000, "ext"), stateName);
+
+            Assert.Equal((stateName, 0L, 0x1000L, "ext"), row);
+        }
+
+        [Fact]
+        public async Task GrainTypeQualifiedKeyFormat_StoresHexOfExactIdentityBytes()
+        {
+            var grainType = $"cart-{Guid.NewGuid():N}";
+            var expectedGrainTypeString = $"{Convert.ToHexString(Encoding.UTF8.GetBytes(grainType))}/7374617465";
+            var row = await this.WriteAndReadKeyColumnsAsync(AdoNetGrainStorageKeyFormat.GrainTypeQualified, grainType, "state", GrainIdKeyExtensions.CreateIntegerKey(0x1A, "ext"), expectedGrainTypeString);
+
+            Assert.Equal((expectedGrainTypeString, 0L, 0L, "31412B657874"), row);
+        }
+
+        [Fact]
+        public async Task GrainTypeQualifiedKeyFormat_RejectsIdentityLongerThanKeyColumns()
+        {
+            var storage = await this.fixture.CreateGrainStorageAsync(
+                TestContext.Current.CancellationToken,
+                $"SqliteKeyLength-{Guid.NewGuid():N}",
+                AdoNetGrainStorageKeyFormat.GrainTypeQualified);
+            var grainType = GrainType.Create("sqlite-key-length");
+            var longestKey = GrainId.Create(grainType, IdSpan.Create(new string('k', 256)));
+            var tooLongKey = GrainId.Create(grainType, IdSpan.Create(new string('k', 257)));
+
+            await storage.WriteStateAsync("state", longestKey, new GrainState<TestState1> { State = new TestState1 { A = "fits" } });
+            await Assert.ThrowsAsync<ArgumentException>(() => storage.WriteStateAsync("state", tooLongKey, new GrainState<TestState1> { State = new TestState1() }));
+            await Assert.ThrowsAsync<ArgumentException>(() => storage.ReadStateAsync(new string('s', 256), longestKey, new GrainState<TestState1> { State = new TestState1() }));
+        }
+
+        /// <summary>
+        /// Writes one state and returns the key columns of the row whose <c>GrainTypeString</c> is
+        /// <paramref name="expectedGrainTypeString"/>.
+        /// </summary>
+        private async Task<(string GrainTypeString, long N0, long N1, string? Extension)> WriteAndReadKeyColumnsAsync(
+            AdoNetGrainStorageKeyFormat keyFormat,
+            string grainType,
+            string stateName,
+            IdSpan key,
+            string expectedGrainTypeString)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var storage = await this.fixture.CreateGrainStorageAsync(
+                cancellationToken,
+                $"SqliteKeyColumns-{Guid.NewGuid():N}",
+                keyFormat);
+            var grainId = GrainId.Create(GrainType.Create(grainType), key);
+            await storage.WriteStateAsync(stateName, grainId, new GrainState<TestState1> { State = new TestState1 { A = "columns" } });
+
+            await using var connection = new SqliteConnection(this.fixture.ConnectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT GrainTypeString, GrainIdN0, GrainIdN1, GrainIdExtensionString FROM OrleansStorage WHERE GrainTypeString = @GrainTypeString;";
+            command.Parameters.AddWithValue("@GrainTypeString", expectedGrainTypeString);
+
+            var rows = new List<(string, long, long, string?)>();
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                rows.Add((reader.GetString(0), reader.GetInt64(1), reader.GetInt64(2), reader.IsDBNull(3) ? null : reader.GetString(3)));
+            }
+
+            return Assert.Single(rows);
+        }
+
+        private async Task<AdoNetGrainStorage> CreateConstantHashStorageAsync(AdoNetGrainStorageKeyFormat keyFormat)
+        {
+            var storage = await this.fixture.CreateGrainStorageAsync(
+                TestContext.Current.CancellationToken,
+                $"SqliteKeyFormat-{keyFormat}-{Guid.NewGuid():N}",
+                keyFormat);
+            storage.HashPicker = new StorageHasherPicker(new[] { new ConstantHasher() });
+            return storage;
         }
 
         [Fact]
