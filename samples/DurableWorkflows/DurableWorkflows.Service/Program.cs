@@ -14,8 +14,10 @@ builder.Services.AddHealthChecks()
 
 builder.UseOrleans(siloBuilder =>
 {
-    // Grain journals and Durable Jobs share the Azure Blob journal provider, so every replica recovers the same task
-    // state and delays. The Orleans binary journal format stores the sample's [GenerateSerializer] state types.
+    // UseAzureBlobDurableJobs registers the default Azure Blob journal provider (AddAzureBlobJournalStorage), which
+    // grain journals and Durable Jobs share, so every replica recovers the same task state and delays. Its
+    // BlobServiceClient comes from the AddOptions call below. The Orleans binary journal format stores the sample's
+    // [GenerateSerializer] state types.
     siloBuilder
         .AddJournaling()
         .UseAzureBlobDurableJobs(options => options.ContainerName = "durable-workflows")
