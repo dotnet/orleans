@@ -88,9 +88,9 @@ The partition count and boundary function are captured when the directory is cre
 
 <a id="local-to-distributed-directory-upgrade"></a>
 
-The distributed directory is stable and enabled by default. Clusters upgrading from a runtime which selected `LocalGrainDirectory` by default should separate the runtime upgrade from the directory migration. See [Distributed-directory upgrade compatibility](../deployment/upgrades.md#distributed-directory-upgrade-compatibility) for release-specific prerequisites.
+The distributed directory is stable and enabled by default. Upgrade an existing `LocalGrainDirectory` cluster in two separate rollouts: upgrade every runtime while retaining the local directory, then migrate the directory. See [Distributed-directory upgrade compatibility](../deployment/upgrades.md#distributed-directory-upgrade-compatibility) for release-specific prerequisites.
 
-**Directory migration is one-way.** Once a distributed-directory silo joins the migration, continue toward an all-distributed cluster. Returning that cluster to the local directory is unsupported. Decide the recovery procedure and qualify the deployment before introducing the first distributed-directory silo.
+**Directory migration is one-way.** Once the cluster begins using the distributed default, continue toward an all-distributed cluster. Returning that cluster to the local directory is unsupported. Decide the recovery procedure and qualify the deployment before introducing the first distributed-default silo.
 
 ### Prepare and defer migration
 
@@ -101,6 +101,12 @@ The distributed directory is stable and enabled by default. Clusters upgrading f
 1. Wait until every silo runs the new runtime, membership is stable, and grain-call and activation behavior match the baseline. Applications can remain in this all-local configuration until ready for the directory migration.
 
 `UseLocalGrainDirectory` is a migration-deferral option. Choose it before the directory migration starts. Its API reference provides the configuration surface; the released package used by the hosting snippets predates this API.
+
+### Local defaults with a named distributed directory
+
+A cluster using the local default alongside a named `DistributedGrainDirectory` has separate authorities for those grain types. Retain both selections during the runtime upgrade. Migrating its default requires a **coordinated full-cluster restart**: gracefully stop every silo, then start the distributed-default deployment with the established named selections and partition mapping. Persist application state and arrange the required maintenance window before the restart.
+
+The runtime rejects rolling default-directory migration into named-only distributed partition targets because those targets serve the named directory's registrations. Named external providers, such as Redis or Azure Table Storage, retain their independent selections during the standard rolling procedure below.
 
 ### Migrate the directory
 
