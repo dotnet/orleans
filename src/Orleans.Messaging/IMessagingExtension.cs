@@ -11,7 +11,7 @@ namespace Orleans.Messaging;
 /// <summary>
 /// The grain extension through which other grains exchange durable messages with this grain.
 /// </summary>
-[Alias("IMessagingExtension")]
+[Alias("Orleans.Messaging.IMessagingExtension")]
 public interface IMessagingExtension : IGrainExtension
 {
     /// <summary>
