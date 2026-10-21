@@ -112,6 +112,20 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
         var options = GetOptions(services);
 
         Assert.Equal(string.Empty, options.ServiceId);
+        Assert.Single(services.GetServices<IConfigurationValidator>()).ValidateConfiguration();
+    }
+
+    [Fact]
+    public void Configure_ServiceIdNotSet_RegistersRejectingValidator()
+    {
+        var (builder, _) = ConfigureBuilder();
+        using var services = builder.Services.BuildServiceProvider();
+        var validator = Assert.Single(services.GetServices<IConfigurationValidator>());
+
+        var exception = Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+
+        Assert.Contains(ProviderName, exception.Message);
+        Assert.Contains(nameof(DynamoDBStorageOptions.ServiceId), exception.Message);
     }
 
     [Theory]
@@ -315,6 +329,8 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
 
         Assert.Contains(ProviderName, exception.Message);
         Assert.Contains(nameof(DynamoDBStorageOptions.ServiceId), exception.Message);
+        Assert.Contains("retain the ServiceId used to write its state", exception.Message);
+        Assert.Contains("string.Empty", exception.Message);
     }
 
     [Theory]

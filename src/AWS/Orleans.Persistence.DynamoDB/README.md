@@ -37,6 +37,12 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.RunAsync();
 ```
 
+## Service identity and upgrades
+
+Set `DynamoDBStorageOptions.ServiceId` explicitly for every provider. It prefixes each grain state key as `{ServiceId}_{grainId}` and must remain stable across deployments that share state. Startup validation reports an `OrleansConfigurationException` when it is unset.
+
+For new deployments, choose a stable application identifier, such as the cluster's `ServiceId`. When upgrading, retain the identifier used to write the existing state. If the deployment used the previous empty-string default, set `ServiceId = string.Empty` in code or `"ServiceId": ""` in configuration to preserve access to those keys. Choosing a different identifier selects a different state namespace; accessing existing state under that prefix requires a separate data migration.
+
 ## Endpoints and credentials
 
 `Service` selects an AWS region or an HTTP/HTTPS endpoint URL. `AccessKey` and `SecretKey` supply explicit credentials; adding `Token` supplies session credentials. `ProfileName` selects a named AWS profile when explicit keys are omitted. These credentials apply to both regions and endpoint URLs.
