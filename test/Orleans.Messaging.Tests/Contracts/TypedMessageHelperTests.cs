@@ -1977,7 +1977,10 @@ public sealed class TypedMessageHelperTests
                 Payload = envelope.Payload,
                 Subject = "\ud800"
             };
-            Assert.Throws<EncoderFallbackException>(() => validate(invalidUtf16));
+            var utf16Exception = Assert.Throws<ArgumentException>(() => validate(invalidUtf16));
+            Assert.IsType<ArgumentException>(utf16Exception);
+            Assert.Equal("subject", utf16Exception.ParamName);
+            Assert.Contains("unpaired surrogate", utf16Exception.Message, StringComparison.Ordinal);
             var missingPayload = new Envelope { MessageId = MessageKey, Payload = null!, Subject = Subject };
             Assert.Equal("envelope", Assert.Throws<ArgumentException>(() =>
                 validate(missingPayload)).ParamName);
