@@ -394,6 +394,8 @@ namespace Orleans.Hosting
 
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Net.IPEndPoint? primarySiloEndpoint) { throw null; }
 
+        public static ISiloBuilder UseLocalGrainDirectory(this ISiloBuilder siloBuilder) { throw null; }
+
         public static ISiloBuilder UseLocalhostClustering(this ISiloBuilder builder, int siloPort = 11111, int gatewayPort = 30000, System.Net.IPEndPoint? primarySiloEndpoint = null, string serviceId = "dev", string clusterId = "dev") { throw null; }
     }
 
