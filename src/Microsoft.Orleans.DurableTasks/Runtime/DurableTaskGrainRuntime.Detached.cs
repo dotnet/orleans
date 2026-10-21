@@ -186,8 +186,9 @@ internal sealed partial class DurableTaskGrainRuntime
     /// <remarks>
     /// The grain admits an invocation before <see cref="DurableTaskGrainRuntimeShared.InvocationAdmissionWindow"/> has
     /// elapsed since <paramref name="sentAt"/>. A cancellation or signal which its sender staged with or after the
-    /// invocation arrives after <paramref name="sentAt"/>, and its record is kept for the same window, so an admitted
-    /// invocation finds it. Like Messaging's <c>DeliverAt</c>, the check compares the sender's clock with the grain's. A
+    /// invocation is recorded for <see cref="DurableTaskGrainRuntimeShared.EarlyRecordRetention"/> after it arrives, which
+    /// covers the skew between the sender's clock and the grain's, so an admitted invocation finds it. Like Messaging's
+    /// <c>DeliverAt</c>, the check compares the sender's clock with the grain's. A
     /// redelivery of an invocation which the grain stores stages nothing new, so the grain admits it at any time.
     /// </remarks>
     internal string? GetInvocationAdmissionRejection(TaskId taskId, DateTimeOffset sentAt)

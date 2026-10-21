@@ -40,9 +40,10 @@ Messaging settings in `DurableMessagingOptions` govern the transport; see
   messages. It is also the invocation admission window: a grain admits an invocation until
   this period has elapsed since its sender first staged it, and dead-letters a later one,
   which backpressure or a delivery pipeline held, with the `durable-rpc/expired` code. A
-  cancellation or signal which arrives before its invocation is retained for this period,
-  so an admitted invocation terminates as canceled, or observes the signal. A signal whose
-  invocation doesn't arrive in this period is deleted, and the grain logs a warning.
+  cancellation or signal which arrives before its invocation is retained for twice this
+  period, which covers the skew between the sender's clock and the grain's, so an admitted
+  invocation terminates as canceled, or observes the signal. A signal whose invocation
+  doesn't arrive in that time is deleted, and the grain logs a warning.
 - Invocations, completions, cancellations, and signals are accepted directly into task
   state, so they don't occupy inbox capacity. Delay resumes are scheduled messages which
   the grain sends itself, so they don't count toward `MaxCapacity`, like other scheduled
