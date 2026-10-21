@@ -45,6 +45,8 @@ internal static class EnvelopeValidation
     public static void ValidateSubject(string subject)
     {
         ArgumentException.ThrowIfNullOrEmpty(subject);
+        if (!HierarchicalKey.IsWellFormedUtf16(subject))
+            throw new ArgumentException("The subject must not contain unpaired surrogate characters.", nameof(subject));
         if (Utf8.GetByteCount(subject) > MaxSubjectBytes)
             throw new ArgumentException($"The subject exceeds {MaxSubjectBytes} UTF-8 bytes.", nameof(subject));
     }
