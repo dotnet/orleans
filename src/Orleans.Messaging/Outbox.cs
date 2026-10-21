@@ -17,7 +17,7 @@ namespace Orleans.Messaging;
 /// <summary>
 /// Delivers journal-acknowledged messages to their receivers' inboxes.
 /// </summary>
-internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandler<OutboxCommand>, IOutbox
+internal sealed partial class Outbox : IStateMachine, IReportsStagedChanges, IDurableValueCommandHandler<OutboxCommand>, IOutbox
 {
     private readonly MessagingPump _pump;
     private JournalStreamWriter _writer;
