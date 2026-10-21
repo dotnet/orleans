@@ -78,11 +78,10 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
         Encoder.CreateInvocation(
             GetInvocationMessageId(sender, target, taskId, subscriberId),
             target,
-            Encoding.UTF8.GetBytes($"{detached}:{IDurableTaskRequest.GetMethod(request)}"),
-            sentAt: default);
+            Encoding.UTF8.GetBytes($"{detached}:{IDurableTaskRequest.GetMethod(request)}"));
 
-    public OutboxMessage CreateInvocation(MessageId messageId, GrainId target, byte[] payload, DateTimeOffset sentAt) =>
-        Encoder.CreateInvocation(messageId, target, payload, sentAt);
+    public OutboxMessage CreateInvocation(MessageId messageId, GrainId target, byte[] payload) =>
+        Encoder.CreateInvocation(messageId, target, payload);
 
     /// <summary>Gets the IDs of the invocations which the runtime staged by reference, in order.</summary>
     public List<MessageId> SentInvocations { get; } = [];

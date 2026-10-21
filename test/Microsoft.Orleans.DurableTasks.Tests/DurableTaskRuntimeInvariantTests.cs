@@ -203,6 +203,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 Payload = [],
                 Subject = "orders/reserve",
             },
+            SentAt = DateTimeOffset.UtcNow,
         };
         var raw = new InboxMessage
         {
@@ -211,6 +212,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 MessageId = MessageId.Create("raw", "one"),
                 Payload = [],
             },
+            SentAt = DateTimeOffset.UtcNow,
         };
 
         Assert.False(handler.TryAccept(resume, out _));

@@ -267,7 +267,7 @@ internal sealed partial class DurableTaskGrainRuntime
             return;
         }
 
-        _invocations.Add(messageId, new(invocation.ReceiverId, invocation.Envelope.Payload, recordId, UtcNow));
+        _invocations.Add(messageId, new(invocation.ReceiverId, invocation.Envelope.Payload, recordId));
         MessageTransport.Send(messageId);
     }
 
