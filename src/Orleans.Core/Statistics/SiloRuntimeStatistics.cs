@@ -89,11 +89,12 @@ namespace Orleans.Runtime
             int recentlyUsedActivationCount,
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
+            long clientCount,
             DateTime dateTime)
         {
             ActivationCount = activationCount;
             RecentlyUsedActivationCount = recentlyUsedActivationCount;
-            ClientCount = SiloRuntimeMetricsListener.ConnectedClientCount;
+            ClientCount = clientCount;
             ReceivedMessages = SiloRuntimeMetricsListener.MessageReceivedTotal;
             SentMessages = SiloRuntimeMetricsListener.MessageSentTotal;
             DateTime = dateTime;
