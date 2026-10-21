@@ -25,6 +25,10 @@ namespace Orleans.Journaling;
 /// <para>
 /// <see cref="Seal"/> durably ends the log, so that readers' streams end after its final entry.
 /// </para>
+/// <para>
+/// The log takes ownership of the entries and draft items passed to it, and the journal records each entry when it is appended.
+/// To change an entry's content, append a new entry.
+/// </para>
 /// </remarks>
 public interface IDurableLog<T> : IReadOnlyCollection<T>
 {

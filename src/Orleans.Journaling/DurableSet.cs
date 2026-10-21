@@ -8,6 +8,9 @@ namespace Orleans.Journaling;
 /// Represents a set whose mutations are recorded in a journal.
 /// </summary>
 /// <typeparam name="T">The type of elements in the set.</typeparam>
+/// <remarks>
+/// The set takes ownership of the elements passed to it, and the journal records each mutation when it is made. To change an element, remove it and add a new instance.
+/// </remarks>
 public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<T>
 {
     /// <inheritdoc/>
