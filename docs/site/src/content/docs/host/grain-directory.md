@@ -11,9 +11,11 @@ A grain directory maps a grain identity to the silo that currently hosts its act
 
 ## Start with the default directory
 
-Orleans uses the built-in `LocalGrainDirectory` by default. Despite its name, the directory is distributed across the cluster using a consistent-hash ring. It requires no external service and is the right starting point for most applications.
+Orleans uses the built-in `DistributedGrainDirectory` by default. It keeps registrations in the cluster and coordinates partition ownership using versioned membership views. It requires no external service.
 
-The default directory is eventually consistent during membership changes. A brief duplicate activation is possible during failures; Orleans resolves the conflict and deactivates the duplicate. Grain state and operations should therefore tolerate activation races and retries.
+The directory coordinates registration and ownership transfer so that callers agree on an activation's location as membership changes. Keep grain operations idempotent: failed calls and retries can still repeat application work.
+
+Applications retaining the previous `LocalGrainDirectory` select it with <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalGrainDirectory*> on every silo before migrating. See [Upgrade from the local directory](#local-to-distributed-directory-upgrade) for the one-way migration procedure.
 
 ## Which grain directory should you use?
 
@@ -70,11 +72,9 @@ Named directories can also be configured under `Orleans:GrainDirectory:{name}` w
 <a id="key-features"></a>
 <a id="when-to-use"></a>
 
-<xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> adds a strongly consistent in-cluster directory based on partitioned ranges and membership views.
+The default `DistributedGrainDirectory` is a strongly consistent in-cluster directory based on partitioned ranges and membership views. <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> selects it explicitly or registers an additional name for the same directory instance.
 
-Register the same default and named directory mappings on every silo in the cluster. Multiple calls with different names register the same distributed directory instance for those grain types.
-
-:::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="distributed_grain_directory":::
+Keep the final default and named directory mappings consistent across the cluster. Multiple names share the same distributed directory instance. Use the upgrade procedure below to transition an existing local-directory cluster.
 
 The distributed directory defaults to one partition per silo (<xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> = `1`). Change this only after testing with the expected cluster size and workload.
 
@@ -84,7 +84,42 @@ If the boundary function throws or returns an invalid result, Orleans stops dire
 
 The partition count and boundary function are captured when the directory is created. Keep both consistent across the cluster, including during rollout and rollback. See [Distributed-directory upgrade compatibility](../deployment/upgrades.md#distributed-directory-upgrade-compatibility) for retaining the mapping used by an existing cluster.
 
-Use it when membership changes require stronger coordination. Validate rollout, rollback, and mixed-version behavior with the expected cluster size and workload.
+## Upgrade from the local directory
+
+<a id="local-to-distributed-directory-upgrade"></a>
+
+The distributed directory is stable and enabled by default. Clusters upgrading from a runtime which selected `LocalGrainDirectory` by default should separate the runtime upgrade from the directory migration. See [Distributed-directory upgrade compatibility](../deployment/upgrades.md#distributed-directory-upgrade-compatibility) for release-specific prerequisites.
+
+**Directory migration is one-way.** Once a distributed-directory silo joins the migration, continue toward an all-distributed cluster. Returning that cluster to the local directory is unsupported. Decide the recovery procedure and qualify the deployment before introducing the first distributed-directory silo.
+
+### Prepare and defer migration
+
+1. Inventory the default and named directories selected by every grain type. Keep named-provider selections and cluster identity unchanged during this procedure.
+1. Qualify the exact application versions, serialized contracts, persistence providers, and deployment configuration under representative traffic. Verify duplicate-activation detection, registration preservation, graceful silo departure, and application recovery.
+1. Roll out the new runtime with <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalGrainDirectory*> configured on **every replacement silo**. This explicitly retains the local directory while the runtime versions coexist. Keep that configuration on scale-out instances too.
+1. Wait until every silo runs the new runtime, membership is stable, and grain-call and activation behavior match the baseline. Applications can remain in this all-local configuration until ready for the directory migration.
+
+`UseLocalGrainDirectory` is a migration-deferral option. Choose it before the directory migration starts. Its API reference provides the configuration surface; the released package used by the hosting snippets predates this API.
+
+### Migrate the directory
+
+1. Keep <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> at `1` and retain the default <xref:Orleans.Configuration.GrainDirectoryOptions.GetPartitionBoundaries> function throughout the local-to-distributed rollout.
+1. Remove `UseLocalGrainDirectory` from the deployment configuration. The runtime default selects the distributed directory; an explicit call to <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> also selects it.
+1. Replace a bounded number of silos at a time, preserving the tested ready-silo and surge-capacity floor. Gracefully stop each departing silo, and allow membership and directory ownership transfers to complete before the next replacement.
+1. During each mixed-directory stage, exercise existing grains and newly activated grains. Verify activation uniqueness and that active grains retain their directory registrations, including after a local-directory silo leaves.
+1. Continue until every silo uses the distributed directory. Keep the distributed selection and partition configuration on later deployments and scale-out instances.
+
+The runtime compatibility endpoints let local- and distributed-directory silos route registrations and transfer ownership during this transition. The staged runtime upgrade ensures every participant has the migration protocol used by the new release.
+
+### Watch the migration
+
+Compare grain-call error rate and latency, activation failures, duplicate-activation reports, membership churn, and directory registration errors with the pre-upgrade baseline. Observe directory snapshot transfers, range recovery, and range-lock duration alongside silo departures. A healthy checkpoint has a stable membership view, completed transfers, successful calls to existing and new grains, and one registered activation per single-activation grain.
+
+Pause replacements when a safety or availability threshold is exceeded. Preserve directory and membership logs, retain sufficient distributed-directory capacity, and investigate the failed transition before continuing. Recover application state using the qualified recovery procedure while retaining the distributed directory.
+
+### Clusters already using the experimental distributed directory
+
+Keep their established partition count and boundary-to-partition mapping throughout the runtime upgrade. Experimental releases used `30` partitions per silo with uniform hashes sorted by unsigned value. Current releases use one partition by default and use hash-generation order when multiple partitions are configured. Configure the established mapping explicitly before newer silos join; see [Distributed-directory upgrade compatibility](../deployment/upgrades.md#distributed-directory-upgrade-compatibility) for the release boundaries and configuration.
 
 ## Operational guidance
 
