@@ -34,12 +34,14 @@ public readonly struct InboxMessage
     /// applications reconcile an uncertain outcome before doing so.
     /// </para>
     /// <para>
-    /// The inbox never stores a send time later than its own clock plus <c>DeduplicationWindow</c>. It rejects such a
-    /// delivery with an <see cref="ArgumentOutOfRangeException"/>, staging nothing, when the message is untracked and
-    /// above the admission floor or the send time would extend its record, so the sender retries it within its retry
+    /// The inbox never accepts a delivered send time later than its own clock plus <c>DeduplicationWindow</c>. It rejects
+    /// such a delivery with an <see cref="ArgumentOutOfRangeException"/>, staging nothing, when the message is untracked
+    /// and above the admission floor or the send time would extend its record, so the sender retries it within its retry
     /// budget. A tracked message whose send time is equal to or earlier than its record's still receives its recorded
     /// outcome, and an untracked message at or below the floor still receives <see cref="DeliveryStatus.Expired"/>.
-    /// Every record therefore becomes eligible for removal within twice the window of the receiver's clock.
+    /// A message a grain sends to itself uses its clock, or the first time above the admission floor after a backward
+    /// clock jump. Every record therefore becomes eligible for removal within twice the window of the receiver's clock,
+    /// or just after the floor when a self-send follows a backward jump.
     /// </para>
     /// </remarks>
     [Id(1)]
