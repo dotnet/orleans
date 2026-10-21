@@ -43,7 +43,8 @@ public sealed record TestMessage(
     [property: Id(6)] bool DeleteDuringHandling = false,
     [property: Id(9)] bool ThrowOnceDuringPreparation = false,
     [property: Id(10)] int ThrowForAttempts = 0,
-    [property: Id(11)] bool ThrowAfterStaging = false);
+    [property: Id(11)] bool ThrowAfterStaging = false,
+    [property: Id(12)] bool ThrowAfterSending = false);
 
 [GenerateSerializer, Immutable]
 public sealed record MessageEffect(
@@ -411,6 +412,13 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
                 NextApplyFailure = null;
                 throw failure;
             }
+            if (message.ThrowAfterSending && outgoing is { } unsent)
+            {
+                // The handler fails after its outbox send, before it stages its effect.
+                _outbox.Send(unsent);
+                throw new InvalidOperationException($"Injected handler failure after sending for {message.LogicalId}.");
+            }
+
             _effects.TryGetValue(message.LogicalId, out var prior);
             _effects[message.LogicalId] = new MessageEffect(message.LogicalId, (prior?.Count ?? 0) + 1, message.Sequence, message.Value);
             if (message.ThrowAfterStaging)

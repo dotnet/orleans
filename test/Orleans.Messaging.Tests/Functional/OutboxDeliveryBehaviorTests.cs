@@ -19,6 +19,32 @@ public sealed class OutboxDeliveryBehaviorTests : MessagingBehaviorTestBase
     }
 
     [Fact]
+    public async Task HandlerFailureAfterAnOutboxSend_DiscardsTheSendThroughRecovery()
+    {
+        // A handler which ends without an outcome fails the activation, so recovery from the journal discards its send.
+        // Each recovery charges the interrupted attempt, and the second dead-letters the message.
+        var receiver = NewGrain();
+        var target = NewGrain();
+        var activationId = (await receiver.GetSnapshotAsync()).ActivationId;
+        var envelope = CreateEnvelope(receiver, NewMessage(151, "fails-after-sending") with
+        {
+            ForwardTo = target.GetGrainId(),
+            ThrowAfterSending = true
+        });
+
+        DeliveryResultAssert.IsCase<DeliveryResult.Accepted>(await DeliverAsync(receiver, envelope));
+
+        var final = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
+        var letter = Assert.Single(final.InboxDeadLetters);
+        Assert.Equal(envelope.Envelope.MessageId, letter.MessageId);
+        Assert.Equal(InboxTestAccess.InterruptedAttemptReason, letter.Reason);
+        Assert.Equal(2, letter.AttemptCount);
+        Assert.NotEqual(activationId, final.ActivationId);
+        Assert.Equal(0, final.OutboxCount);
+        Assert.Empty((await target.GetSnapshotAsync()).Effects);
+    }
+
+    [Fact]
     public async Task StagedOutboxWithoutCommit_IsRemovedOnReactivationAndNeverDispatched()
     {
         var sender = NewGrain();
