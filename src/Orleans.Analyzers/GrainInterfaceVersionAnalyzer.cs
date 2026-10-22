@@ -1350,6 +1350,33 @@ internal static class GrainInterfaceFileParser
             ? $"[GrainInterfaceType(\"{EscapeIdentity(value)}\", Escaped = true)]"
             : $"[GrainInterfaceType(\"{value}\")]";
 
+    /// <summary>
+    /// Formats an active interface declaration as retired. A legacy declaration whose name resolves to an identity
+    /// other than the one the name implies records the resolved identity, so that renaming the source interface it
+    /// denotes cannot change the meaning of the retired declaration.
+    /// </summary>
+    internal static string FormatRetiredInterfaceDeclaration(
+        string declaration,
+        LegacyGrainInterfaceTypeResolver? legacyGrainInterfaceTypes)
+    {
+        var match = InterfacePattern.Match(StripClrComment(declaration));
+        if (match.Success && legacyGrainInterfaceTypes is not null && GetRecordedGrainInterfaceType(match) is null)
+        {
+            var name = match.Groups["name"].Value;
+            var grainInterfaceType = legacyGrainInterfaceTypes.Resolve(name);
+            if (!string.Equals(
+                grainInterfaceType,
+                GrainInterfaceVersionAnalyzer.GetDefaultGrainInterfaceType(name),
+                StringComparison.Ordinal))
+            {
+                declaration = $"interface {FormatGrainInterfaceTypeAttribute(grainInterfaceType)} {name} "
+                    + $"[Version({match.Groups["version"].Value})]{GetClrComment(declaration)}";
+            }
+        }
+
+        return $"{GrainInterfaceVersionAnalyzer.RetiredPrefix} {declaration}";
+    }
+
     private static bool RequiresEscaping(string value)
     {
         if (value.IndexOf('"') >= 0 || value.IndexOf(ClrCommentPrefix, StringComparison.Ordinal) >= 0)

@@ -562,7 +562,9 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                 {
                     result.Add(blockIndex == index
                         && !declaration.StartsWith(GrainInterfaceVersionAnalyzer.RetiredPrefix, StringComparison.Ordinal)
-                            ? $"{GrainInterfaceVersionAnalyzer.RetiredPrefix} {declaration}"
+                            ? isInterface
+                                ? GrainInterfaceFileParser.FormatRetiredInterfaceDeclaration(declaration, legacyGrainInterfaceTypes)
+                                : $"{GrainInterfaceVersionAnalyzer.RetiredPrefix} {declaration}"
                             : lines[blockIndex]);
                 }
             }
@@ -1529,6 +1531,9 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         var newLine = GetNewLine(text);
         var lines = text.ToString().Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
         var newLines = new StringBuilder();
+        var legacyGrainInterfaceTypes = grainInterfaceType is null
+            ? await GetLegacyGrainInterfaceTypesAsync(project, cancellationToken).ConfigureAwait(false)
+            : null;
 
         foreach (var line in lines)
         {
@@ -1538,8 +1543,10 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             if (IsMatchingInterface(trimmedLine, interfaceName, grainInterfaceType, legacyGrainInterfaceTypes: null) &&
                 !trimmedLine.StartsWith(GrainInterfaceVersionAnalyzer.RetiredPrefix, StringComparison.Ordinal))
             {
-                // Add *RETIRED* prefix
-                AppendLine(newLines, $"{GrainInterfaceVersionAnalyzer.RetiredPrefix} {trimmedLine}", newLine);
+                AppendLine(
+                    newLines,
+                    GrainInterfaceFileParser.FormatRetiredInterfaceDeclaration(trimmedLine, legacyGrainInterfaceTypes),
+                    newLine);
                 continue;
             }
 
@@ -1600,7 +1607,10 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                         StringComparison.Ordinal);
         }
 
-        return string.Equals(declaredInterfaceName, interfaceName, StringComparison.Ordinal);
+        // Without an identity, only a legacy declaration of the same name matches; a recorded declaration of that
+        // name describes a different contract.
+        return !GrainInterfaceFileParser.TryGetGrainInterfaceType(line, out _)
+            && string.Equals(declaredInterfaceName, interfaceName, StringComparison.Ordinal);
     }
 
     private static bool IsMatchingGrainClass(string line, string className, string? grainType)
