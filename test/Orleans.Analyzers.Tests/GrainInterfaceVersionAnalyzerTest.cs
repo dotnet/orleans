@@ -1442,6 +1442,75 @@ namespace MyApp.Counters
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0019);
     }
 
+    [Theory]
+    [InlineData("[Alias(\"Outer.IMyGrain\")]", true)]
+    [InlineData("", false)]
+    public async Task LegacyNestedDeclaration_MatchesOnlyConventionalIdentity(string interfaceAttributes, bool isBreaking)
+    {
+        var source = $"public class Outer {{ {interfaceAttributes} public interface IMyGrain : IGrain {{ }} }}";
+        const string contractsFile = "interface Outer.IMyGrain [Version(0)]";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        if (isBreaking)
+        {
+            Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0016);
+            Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0019);
+        }
+        else
+        {
+            Assert.Empty(diagnostics);
+        }
+    }
+
+    [Fact]
+    public async Task CodeFix_AddInterface_KeepsLegacyNestedDeclarationWhenAliasMatchesDottedName()
+    {
+        const string source = @"
+public class Outer
+{
+    [Alias(""Outer.IMyGrain"")]
+    public interface IMyGrain : IGrain
+    {
+    }
+}
+";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            "interface Outer.IMyGrain [Version(0)]",
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        Assert.Contains("interface [GrainInterfaceType(\"Outer.IMyGrain\")] Outer.IMyGrain [Version(0)]", content);
+        Assert.Matches(new Regex("^interface Outer\\.IMyGrain \\[Version\\(0\\)\\]$", RegexOptions.Multiline), content.Replace("\r", ""));
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateProject_RetiresLegacyNestedDeclarationWhenAliasMatchesDottedName()
+    {
+        const string source = @"
+public class Outer
+{
+    [Alias(""Outer.IMyGrain"")]
+    public interface IMyGrain : IGrain
+    {
+    }
+}
+";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            source,
+            "interface Outer.IMyGrain [Version(0)]",
+            GrainInterfaceVersionAnalyzer.RuleId0016,
+            RegenerateCodeActionTitle);
+
+        var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+        Assert.Contains("interface [GrainInterfaceType(\"Outer.IMyGrain\")] Outer.IMyGrain [Version(0)]", content);
+        Assert.Contains("*RETIRED* interface Outer.IMyGrain [Version(0)]", content);
+        Assert.Empty(await GetDiagnosticsAsync(source, content));
+    }
+
     [Fact]
     public async Task CodeFix_RegenerateProject_RetiresLegacyIdentityWhenAliasIntroduced()
     {
