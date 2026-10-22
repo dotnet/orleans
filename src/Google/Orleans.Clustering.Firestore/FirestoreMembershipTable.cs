@@ -229,7 +229,8 @@ internal partial class FirestoreMembershipTable : IMembershipTable
                 if (!snapshot.Exists)
                     throw new KeyNotFoundException($"Could not find silo entry for {id}");
 
-                if (snapshot.ConvertTo<SiloInstanceEntity>().IAmAliveTime >= iAmAliveTime)
+                var stored = snapshot.ConvertTo<SiloInstanceEntity>();
+                if (stored.IAmAliveTime >= iAmAliveTime)
                 {
                     return false;
                 }
@@ -238,7 +239,7 @@ internal partial class FirestoreMembershipTable : IMembershipTable
                 {
                     [nameof(SiloInstanceEntity.IAmAliveTime)] = iAmAliveTime,
                 };
-                if (entry.Metadata is not null && !snapshot.ContainsField(nameof(SiloInstanceEntity.Metadata)))
+                if (entry.Metadata is not null && stored.Metadata is null)
                 {
                     updates[nameof(SiloInstanceEntity.Metadata)] = entry.Metadata.ToDictionary(item => item.Key, item => item.Value);
                 }

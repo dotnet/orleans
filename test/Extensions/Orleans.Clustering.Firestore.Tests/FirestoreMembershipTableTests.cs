@@ -1,4 +1,6 @@
+using System.Collections.Immutable;
 using System.Net;
+using Google.Cloud.Firestore;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -81,6 +83,93 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
 
     [Fact]
     public Task UpdateIAmAlive() => MembershipTable_UpdateIAmAlive();
+
+    [Theory]
+    [InlineData(false, null, null)]
+    [InlineData(false, null, "")]
+    [InlineData(false, null, "west")]
+    [InlineData(true, null, null)]
+    [InlineData(true, null, "")]
+    [InlineData(true, null, "west")]
+    [InlineData(true, "", null)]
+    [InlineData(true, "", "")]
+    [InlineData(true, "", "west")]
+    [InlineData(true, "east", null)]
+    [InlineData(true, "east", "")]
+    [InlineData(true, "east", "west")]
+    public async Task UpdateIAmAlive_RepairsUnavailableMetadataAndPreservesAvailableMetadata(
+        bool storedFieldPresent, string? storedRegion, string? incomingRegion)
+    {
+        var clusterId = $"metadata-{Guid.NewGuid():N}";
+        var options = new FirestoreOptions
+        {
+            ProjectId = GoogleEmulatorHost.ProjectId,
+            EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint,
+        };
+        var table = new FirestoreMembershipTable(
+            this.loggerFactory,
+            Options.Create(options),
+            Options.Create(new ClusterOptions { ClusterId = clusterId }));
+        await table.InitializeMembershipTable(true);
+        try
+        {
+            var initial = await table.ReadAll();
+            var entry = CreateMembershipEntry(SiloAddress.New(IPAddress.Loopback, 12_000, 1), proxyPort: 30_000);
+            Assert.True(await table.InsertRow(entry, initial.Version.Next()));
+            var storage = new FirestoreDataManager(
+                "Cluster", Utils.SanitizeId(clusterId), options, this.loggerFactory.CreateLogger<FirestoreDataManager>());
+            var document = storage.GetCollection().Document(entry.SiloAddress.ToParsableString());
+            var storedMetadata = storedRegion switch
+            {
+                null => null,
+                "" => new Dictionary<string, string>(),
+                _ => new Dictionary<string, string> { ["region"] = storedRegion },
+            };
+            await document.UpdateAsync(
+                new Dictionary<string, object?>
+                {
+                    [nameof(SiloInstanceEntity.Metadata)] = storedFieldPresent ? storedMetadata : FieldValue.Delete,
+                },
+                cancellationToken: TestContext.Current.CancellationToken);
+            var before = await document.GetSnapshotAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(storedFieldPresent, before.ContainsField(nameof(SiloInstanceEntity.Metadata)));
+            Assert.Equal(storedMetadata, before.ConvertTo<SiloInstanceEntity>().Metadata);
+
+            entry.Metadata = incomingRegion switch
+            {
+                null => null,
+                "" => ImmutableDictionary<string, string>.Empty,
+                _ => ImmutableDictionary<string, string>.Empty.Add("region", incomingRegion),
+            };
+            entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
+            await table.UpdateIAmAlive(entry);
+
+            var after = await document.GetSnapshotAsync(TestContext.Current.CancellationToken);
+            var result = after.ConvertTo<SiloInstanceEntity>();
+            IReadOnlyDictionary<string, string>? expected = storedMetadata is not null ? storedMetadata : entry.Metadata;
+            if (expected is null)
+            {
+                Assert.Null(result.Metadata);
+                Assert.Equal(storedFieldPresent, after.ContainsField(nameof(SiloInstanceEntity.Metadata)));
+            }
+            else
+            {
+                Assert.NotNull(result.Metadata);
+                Assert.Equal(expected.Count, result.Metadata.Count);
+                foreach (var pair in expected)
+                {
+                    Assert.Equal(pair.Value, result.Metadata[pair.Key]);
+                }
+            }
+
+            Assert.Equal(entry.IAmAliveTime, result.IAmAliveTime.UtcDateTime);
+            Assert.Equal(initial.Version.Version + 1, (await table.ReadAll()).Version.Version);
+        }
+        finally
+        {
+            await table.DeleteMembershipTableEntries(clusterId);
+        }
+    }
 
     [Fact]
     public async Task MembershipReadsReturnAtomicSnapshotsDuringConcurrentUpdates()

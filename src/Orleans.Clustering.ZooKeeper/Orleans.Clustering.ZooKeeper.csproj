@@ -15,8 +15,4 @@
     <InternalsVisibleTo Include="Orleans.Clustering.ZooKeeper.Tests" />
   </ItemGroup>
 
-  <ItemGroup>
-    <InternalsVisibleTo Include="Orleans.Clustering.ZooKeeper.Tests" />
-  </ItemGroup>
-
 </Project>
