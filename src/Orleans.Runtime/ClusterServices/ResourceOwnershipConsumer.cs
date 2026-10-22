@@ -63,7 +63,8 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
     }
 
     /// <summary>
-    /// Registers every gate synchronously before exposing the new local ownership decision.
+    /// Installs the provider's current canonical view, registering every gate synchronously before
+    /// exposing the new local ownership decision. Callers refresh the provider before delivering newer views.
     /// A caller may cancel waiting on the returned task without cancelling shared transitions.
     /// </summary>
     public Task InstallViewAsync(RegisteredClusterServiceView view)
@@ -529,9 +530,9 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
     private RegisteredClusterServiceView ValidateProviderView(RegisteredServiceViewId view)
     {
         var current = ValidateProviderAuthority(view);
-        if (current.Id.CompareTo(view) > 0)
+        if (current.Id != view)
         {
-            throw new ClusterServiceViewUnavailableException($"Service view '{view}' was superseded by '{current.Id}'.");
+            throw new ClusterServiceViewUnavailableException($"Service view '{view}' does not match the provider's current view '{current.Id}'.");
         }
 
         return current;
