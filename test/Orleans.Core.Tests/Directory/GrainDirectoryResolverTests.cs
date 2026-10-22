@@ -91,6 +91,9 @@ namespace NonSilo.Tests.Directory
             var directory = Assert.IsType<DistributedGrainDirectory>(resolver.DefaultGrainDirectory);
             Assert.Same(directory, resolver.Resolve(GrainType.Create(DefaultDirectoryGrain.DIRECTORY)));
             Assert.Same(directory, Assert.Single(resolver.Directories));
+            Assert.Same(
+                services.GetRequiredService<CachedGrainLocator>(),
+                services.GetRequiredService<GrainLocatorResolver>().GetGrainLocator(GrainType.Create(DefaultDirectoryGrain.DIRECTORY)));
             if (addNamedAlias)
             {
                 Assert.Same(directory, services.GetRequiredKeyedService<IGrainDirectory>("named"));
