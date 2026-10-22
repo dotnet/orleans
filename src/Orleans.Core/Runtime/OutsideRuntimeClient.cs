@@ -390,7 +390,10 @@ namespace Orleans
                 // We need to import the RequestContext here as well.
                 // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
                 // RequestContextExtensions.Import(response.RequestContextData);
-                callbackData!.DoCallback(response);
+                if (!callbackData!.TryDoCallback(response))
+                {
+                    response.Dispose();
+                }
             }
             else
             {
