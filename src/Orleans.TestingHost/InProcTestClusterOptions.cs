@@ -53,10 +53,6 @@ public sealed class InProcessTestClusterOptions
     /// Gets or sets a value indicating whether to use the distributed grain directory.
     /// </summary>
     /// <value><see langword="true" /> if the distributed grain directory should be used; otherwise, <see langword="false" />.</value>
-    /// <remarks>
-    /// With external cluster membership, a value of <see langword="false"/> selects the local directory by default.
-    /// Explicit silo configuration can select another default or named provider.
-    /// </remarks>
     public bool UseDistributedGrainDirectory { get; set; }
 
     /// <summary>
