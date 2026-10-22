@@ -10,6 +10,31 @@ namespace Orleans.Journaling.Tests;
 [TestCategory("BVT")]
 public sealed class VolatileJournalStorageProviderTests
 {
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task ObservedAbsenceFencesCompetingCreation(string operation)
+    {
+        var provider = new VolatileJournalStorageProvider();
+        return JournalStorageContractTests.ObservedAbsenceFencesCompetingCreation(
+            () => provider.CreateStorage(new("absence")), operation);
+    }
+
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public async Task MetadataPreservesStalePrecondition(string operation)
+    {
+        var provider = new VolatileJournalStorageProvider(
+            Options.Create(new JournaledStateManagerOptions()),
+            Options.Create(new VolatileJournalStorageOptions { MaxAppendsBeforeSnapshot = 2 }), null);
+        await JournalStorageContractTests.MetadataPreservesStalePrecondition(
+            () => provider.CreateStorage(new("stale")), operation);
+        Assert.True(provider.CreateStorage(new("stale")).IsCompactionRequested);
+    }
+
     [Fact]
     public async Task Compaction_ByteThresholdExcludesSnapshotAndResetsAfterReplacement()
     {
@@ -18,6 +43,7 @@ public sealed class VolatileJournalStorageProviderTests
             MaxAppendsBeforeSnapshot = int.MaxValue,
             MaxBytesBeforeSnapshot = 1000
         });
+        await storage.ReadForWriteAsync();
         var token = TestContext.Current.CancellationToken;
         await storage.ReplaceAsync(new ReadOnlySequence<byte>(new byte[1000]), token);
         Assert.False(storage.IsCompactionRequested);
@@ -41,7 +67,7 @@ public sealed class VolatileJournalStorageProviderTests
     [InlineData(true)]
     public async Task Compaction_DefaultAppendThresholdAndResetExcludeSnapshot(bool recreate)
     {
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         var token = TestContext.Current.CancellationToken;
         await storage.ReplaceAsync(new ReadOnlySequence<byte>(new byte[1000]), token);
         Assert.False(storage.IsCompactionRequested);
@@ -80,7 +106,7 @@ public sealed class VolatileJournalStorageProviderTests
     [Fact]
     public async Task Compaction_DefaultByteThresholdRequestsAtOneMiBIndependentlyOfAppendCount()
     {
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         var token = TestContext.Current.CancellationToken;
         await storage.AppendAsync(new ReadOnlySequence<byte>(new byte[1024 * 1024 - 1]), token);
         Assert.False(storage.IsCompactionRequested);
@@ -102,6 +128,7 @@ public sealed class VolatileJournalStorageProviderTests
             MaxAppendsBeforeSnapshot = appends,
             MaxBytesBeforeSnapshot = bytes
         });
+        await storage.ReadForWriteAsync();
         var token = TestContext.Current.CancellationToken;
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), token);
         Assert.False(storage.IsCompactionRequested);
@@ -139,9 +166,9 @@ public sealed class VolatileJournalStorageProviderTests
                 MaxBytesBeforeSnapshot = bytes
             }), null);
         var firstId = JournalId.FromGrainId(GrainId.Create("test-grain", "first"));
-        var first = provider.CreateStorage(firstId);
+        var first = await provider.CreateStorage(firstId).ReadForWriteAsync();
         var second = provider.CreateStorage(firstId);
-        var other = provider.CreateStorage(JournalId.FromGrainId(GrainId.Create("test-grain", "other")));
+        var other = await provider.CreateStorage(JournalId.FromGrainId(GrainId.Create("test-grain", "other"))).ReadForWriteAsync();
         var token = TestContext.Current.CancellationToken;
         for (var index = 0; index < 2; index++)
         {
@@ -149,6 +176,8 @@ public sealed class VolatileJournalStorageProviderTests
             Assert.False(second.IsCompactionRequested);
         }
 
+        // Each handle holds its own write precondition, so a handle reads the journal before writing after another handle.
+        await second.ReadForWriteAsync();
         await second.AppendAsync(new ReadOnlySequence<byte>([2]), token);
         Assert.True(first.IsCompactionRequested);
         Assert.False(other.IsCompactionRequested);
@@ -157,6 +186,7 @@ public sealed class VolatileJournalStorageProviderTests
         await second.ReplaceAsync(new ReadOnlySequence<byte>(new byte[100]), token);
         Assert.False(first.IsCompactionRequested);
         Assert.False(other.IsCompactionRequested);
+        first = await provider.CreateStorage(firstId).ReadForWriteAsync();
         await first.AppendAsync(new ReadOnlySequence<byte>([4]), token);
         Assert.False(second.IsCompactionRequested);
         await other.AppendAsync(new ReadOnlySequence<byte>([5]), token);
@@ -177,6 +207,7 @@ public sealed class VolatileJournalStorageProviderTests
             MaxAppendsBeforeSnapshot = 2,
             MaxBytesBeforeSnapshot = maxBytes
         });
+        await storage.ReadForWriteAsync();
         byte[] prefix = [1];
         var suffix = Enumerable.Range(2, length - 1).Select(static value => (byte)value).ToArray();
         var first = new BufferSegment(prefix);
@@ -193,9 +224,13 @@ public sealed class VolatileJournalStorageProviderTests
         snapshot[0] = 99;
         Assert.Equal([5, 6, 7, 8], Assert.Single(storage.Segments));
         Assert.False(storage.IsCompactionRequested);
-        await storage.AppendAsync(ReadOnlySequence<byte>.Empty, TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => storage.AppendAsync(ReadOnlySequence<byte>.Empty, TestContext.Current.CancellationToken).AsTask());
         Assert.False(storage.IsCompactionRequested);
-        await storage.AppendAsync(ReadOnlySequence<byte>.Empty, TestContext.Current.CancellationToken);
+        Assert.Single(storage.Segments);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        Assert.False(storage.IsCompactionRequested);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
         Assert.True(storage.IsCompactionRequested);
         Assert.Equal(3, storage.Segments.Count);
     }
@@ -203,7 +238,7 @@ public sealed class VolatileJournalStorageProviderTests
     [Theory]
     [InlineData(8, long.MaxValue)]
     [InlineData(int.MaxValue, 8)]
-    public async Task Compaction_ConcurrentHandlesPreserveEveryAppendAndResetTogether(int appends, long bytes)
+    public async Task Compaction_HandlesShareEveryAppendAndResetTogether(int appends, long bytes)
     {
         var provider = new VolatileJournalStorageProvider(
             Options.Create(new JournaledStateManagerOptions()),
@@ -217,27 +252,38 @@ public sealed class VolatileJournalStorageProviderTests
         var other = provider.CreateStorage(new("isolated-thresholds"));
         var storage = Assert.IsType<VolatileJournalStorage>(handles[0]);
         var token = TestContext.Current.CancellationToken;
-        await AppendConcurrently(8);
+        await AppendFromEachHandle(8);
         Assert.Equal(Enumerable.Range(0, 8).Select(static index => (byte)index),
             storage.Segments.SelectMany(static segment => segment).Order());
         Assert.All(handles, static handle => Assert.True(handle.IsCompactionRequested));
         Assert.False(other.IsCompactionRequested);
 
+        handles[^1] = provider.CreateStorage(id);
+        await handles[^1].ReadForWriteAsync();
         await handles[^1].ReplaceAsync(new ReadOnlySequence<byte>([99]), token);
         Assert.Equal([99], Assert.Single(storage.Segments));
         Assert.All(handles, static handle => Assert.False(handle.IsCompactionRequested));
-        await AppendConcurrently(7);
+        await AppendFromEachHandle(7);
         Assert.Equal(8, storage.Segments.Count);
         Assert.Equal(Enumerable.Range(0, 7).Select(static index => (byte)index),
             storage.Segments.Skip(1).SelectMany(static segment => segment).Order());
         Assert.All(handles, static handle => Assert.False(handle.IsCompactionRequested));
+        handles[^1] = provider.CreateStorage(id);
+        await handles[^1].ReadForWriteAsync();
         await handles[^1].AppendAsync(new ReadOnlySequence<byte>([7]), token);
         Assert.All(handles, static handle => Assert.True(handle.IsCompactionRequested));
         Assert.False(other.IsCompactionRequested);
 
-        Task AppendConcurrently(int count) => Task.WhenAll(
-            Enumerable.Range(0, count).Select(index => Task.Run(
-                async () => await handles[index].AppendAsync(new ReadOnlySequence<byte>([(byte)index]), token), token)));
+        // Each handle reads the journal before writing, as a writer which takes over the journal does.
+        async Task AppendFromEachHandle(int count)
+        {
+            for (var index = 0; index < count; index++)
+            {
+                handles[index] = provider.CreateStorage(id);
+                await handles[index].ReadForWriteAsync();
+                await handles[index].AppendAsync(new ReadOnlySequence<byte>([(byte)index]), token);
+            }
+        }
     }
 
     [Theory]
@@ -250,6 +296,7 @@ public sealed class VolatileJournalStorageProviderTests
             MaxAppendsBeforeSnapshot = 2,
             MaxBytesBeforeSnapshot = 3
         });
+        await storage.ReadForWriteAsync();
         var token = TestContext.Current.CancellationToken;
         await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2]), token);
         if (thresholdReached)
@@ -305,11 +352,12 @@ public sealed class VolatileJournalStorageProviderTests
             MaxBytesBeforeSnapshot = long.MaxValue
         };
         var storage = new VolatileJournalStorage(null, options);
+        await storage.ReadForWriteAsync();
         var provider = new VolatileJournalStorageProvider(
             Options.Create(new JournaledStateManagerOptions()), Options.Create(options), null);
         options.MaxAppendsBeforeSnapshot = 1;
         options.MaxBytesBeforeSnapshot = 1;
-        var fromProvider = provider.CreateStorage(new("maximum-limits"));
+        var fromProvider = await provider.CreateStorage(new("maximum-limits")).ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         await fromProvider.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
         Assert.False(storage.IsCompactionRequested);
@@ -438,7 +486,7 @@ public sealed class VolatileJournalStorageProviderTests
             await provider.CreateStorage(new(name)).CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);
         }
 
-        var deleted = provider.CreateStorage(new("range/c"));
+        var deleted = await provider.CreateStorage(new("range/c")).ReadForWriteAsync();
         await deleted.DeleteAsync(TestContext.Current.CancellationToken);
         var options = new JournalCatalogListOptions { MinId = lower, MaxId = upper };
         Assert.Equal([lower, upper], await ToListAsync(provider.ListAsync(options, TestContext.Current.CancellationToken), TestContext.Current.CancellationToken));
@@ -539,6 +587,7 @@ public sealed class VolatileJournalStorageProviderTests
 
         Assert.Null(await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
 
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var appendProperties = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(appendProperties);
@@ -596,5 +645,10 @@ public sealed class VolatileJournalStorageProviderTests
         }
 
         return result;
+    }
+
+    private sealed class DiscardingConsumer : IJournalStorageConsumer
+    {
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata) => buffer.Skip(buffer.Length);
     }
 }

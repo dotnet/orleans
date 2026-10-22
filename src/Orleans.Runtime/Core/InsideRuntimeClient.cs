@@ -42,8 +42,8 @@ namespace Orleans.Runtime
         private MessageCenter messageCenter = null!;
         private List<IIncomingGrainCallFilter> grainCallFilters = null!;
         private readonly DeepCopier _deepCopier;
-        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private IGrainCallCancellationManager _cancellationManager = null!;
+        private Func<SiloAddress, bool> _isDeadSilo = null!;
         private HostedClient hostedClient = null!;
 
         private HostedClient HostedClient => this.hostedClient;
@@ -71,7 +71,7 @@ namespace Orleans.Runtime
             TimeProvider = timeProvider;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
             this._deepCopier = deepCopier;
-            this._applicationRequestInstruments = new(orleansInstruments);
+            var applicationRequestInstruments = new ApplicationRequestInstruments(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
             this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
@@ -94,7 +94,8 @@ namespace Orleans.Runtime
                 this.messagingOptions.ResponseTimeout,
                 this.messagingOptions.CancelRequestOnTimeout,
                 this.messagingOptions.WaitForCancellationAcknowledgement,
-                cancellationManager: null!);
+                cancellationManager: null!,
+                applicationRequestInstruments);
 
             this.systemSharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
@@ -103,7 +104,8 @@ namespace Orleans.Runtime
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
                 waitForCancellationAcknowledgement: this.messagingOptions.WaitForCancellationAcknowledgement,
-                cancellationManager: null!);
+                cancellationManager: null!,
+                applicationRequestInstruments);
         }
 
         public IServiceProvider ServiceProvider { get; }
@@ -130,6 +132,7 @@ namespace Orleans.Runtime
             this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
             this.hostedClient = this.ServiceProvider.GetRequiredService<HostedClient>();
             _cancellationManager = this.ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
+            _isDeadSilo = this.ServiceProvider.GetRequiredService<ISiloStatusOracle>().IsDeadSilo;
             sharedCallbackData.CancellationManager = _cancellationManager;
             systemSharedCallbackData.CancellationManager = _cancellationManager;
         }
@@ -196,7 +199,7 @@ namespace Orleans.Runtime
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                callbackData = new CallbackData(sharedData, context, message);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
@@ -303,6 +306,7 @@ namespace Orleans.Runtime
                 if (message.IsExpired)
                 {
                     this.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
+                    message.Dispose();
                     return;
                 }
 
@@ -639,8 +643,19 @@ namespace Orleans.Runtime
             {
                 if (deadSilo.Equals(callback.Value.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callback.Value.OnTargetSiloFail(deadSilo);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Moves a pending call to the silo which accepted its request, so the call survives the original silo's departure.
+        /// </summary>
+        internal void RetargetCallback(GrainId sendingGrain, CorrelationId messageId, SiloAddress targetSilo, int forwardCount)
+        {
+            if (callbacks.TryGetValue((sendingGrain, messageId), out var callback))
+            {
+                callback.TryRetarget(targetSilo, forwardCount, _isDeadSilo);
             }
         }
 

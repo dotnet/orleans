@@ -53,7 +53,8 @@ public sealed class DurableJobsOptions
 
     /// <summary>
     /// Gets or sets the interval between periodic shard discovery and writable-shard cleanup checks.
-    /// Membership changes also trigger a fresh discovery sweep.
+    /// A silo joining or leaving the active set, or being declared dead, also triggers a fresh discovery sweep,
+    /// which adopts a dead silo's shards.
     /// Must be between 1 and 4294967294 milliseconds, inclusive. Default: 5 minutes.
     /// </summary>
     public TimeSpan ShardCheckInterval { get; set; } = TimeSpan.FromMinutes(5);

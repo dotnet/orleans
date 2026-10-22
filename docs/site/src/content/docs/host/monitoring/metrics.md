@@ -64,7 +64,7 @@ Configure boundaries according to the application's latency objectives and expec
 | `orleans-messaging-pings-reply-missed` | Counter, count; `Destination` | Failed direct or indirect membership probes. Alert on a sustained increase or missed-reply ratio and correlate with membership transitions. Isolated misses can occur during pauses, restarts, or transient packet loss. |
 | `orleans-networking-sockets-opened` / `orleans-networking-sockets-closed` | Counters, count; `Direction` | Connection churn. Compare their rates and correlate with send failures. Their difference is only meaningful within one process lifetime. |
 
-Message-size instruments `orleans-messaging-sent-messages-size` and `orleans-messaging-received-messages-size` are histograms in `bytes`. Use them for payload growth and bandwidth diagnosis, not primary availability alerts. They include `ConnectionDirection`, `MessageDirection`, and sometimes a remote `silo` attribute.
+Message-size instruments `orleans-messaging-sent-messages-size` and `orleans-messaging-received-messages-size` are histograms in `bytes`. Use their distributions for payload growth and their sums for bandwidth diagnosis. They include `ConnectionDirection`, `MessageDirection`, and sometimes a remote `silo` attribute.
 
 ### Scheduling and activations
 

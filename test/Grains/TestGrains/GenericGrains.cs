@@ -639,7 +639,9 @@ namespace UnitTests.Grains
         [MaybeNull]
         private T lastValue;
 
+#pragma warning disable CS0618 // Preserve the legacy token callback test implementation.
         public async Task GrainCancellationTokenCallbackThrow(GrainCancellationToken ct, Guid callId, ILongRunningTaskObserver observer)
+#pragma warning restore CS0618
         {
             ct.CancellationToken.Register(() =>
             {
@@ -677,14 +679,18 @@ namespace UnitTests.Grains
 
         public async Task<bool> CallOtherGrainCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target, Guid callId)
         {
+#pragma warning disable CS0618 // Exercise cancellation initiated by a legacy token source.
             using var cts = new GrainCancellationTokenSource();
+#pragma warning restore CS0618
             var grainTask = target.GrainCancellationTokenCallbackResolve(cts.Token, callId);
             await Task.Delay(300);
             await cts.Cancel();
             return await grainTask;
         }
 
+#pragma warning disable CS0618 // Preserve the legacy token callback test implementation.
         public Task<bool> GrainCancellationTokenCallbackResolve(GrainCancellationToken tc, Guid callId)
+#pragma warning restore CS0618
         {
             var tcs = new TaskCompletionSource<bool>();
             var orleansTs = TaskScheduler.Current;
@@ -744,7 +750,9 @@ namespace UnitTests.Grains
             return t;
         }
 
+#pragma warning disable CS0618 // Preserve grain-to-grain propagation of the legacy token.
         public async Task CallOtherLongRunningTaskGrainCancellation(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay, Guid callId)
+#pragma warning restore CS0618
         {
             await target.LongWaitGrainCancellation(tc, delay, callId);
         }
@@ -769,14 +777,23 @@ namespace UnitTests.Grains
 
         public async Task CallOtherLongRunningTaskWithLocalGrainCancellationToken(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel, Guid callId)
         {
+#pragma warning disable CS0618 // Exercise cancellation initiated by a legacy token source.
             using var cts = new GrainCancellationTokenSource();
+#pragma warning restore CS0618
             var task = target.LongWaitGrainCancellation(cts.Token, delay, callId);
             await Task.Delay(delayBeforeCancel);
             await cts.Cancel();
             await task;
         }
 
+#pragma warning disable CS0618 // Preserve the legacy token test implementations, including object-typed arguments.
         public Task LongWaitGrainCancellationInterleaving(GrainCancellationToken tc, TimeSpan delay, Guid callId) => LongWaitGrainCancellation(tc, delay, callId);
+
+        public Task LongWaitGrainCancellationAsObject(object tc, TimeSpan delay, Guid callId, ILongRunningTaskObserver observer)
+        {
+            observer.OnCallStarted(callId);
+            return LongWaitGrainCancellation((GrainCancellationToken)tc, delay, callId);
+        }
 
         public async Task LongWaitGrainCancellation(GrainCancellationToken ct, TimeSpan delay, Guid callId)
         {
@@ -790,6 +807,7 @@ namespace UnitTests.Grains
                 throw;
             }
         }
+#pragma warning restore CS0618
 
         public Task LongWaitInterleaving(TimeSpan delay, Guid callId, CancellationToken ct) => LongWait(delay, callId, ct);
 

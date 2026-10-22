@@ -87,12 +87,11 @@ namespace Orleans.Runtime.GrainDirectory
             DirectoryPartition = grainDirectoryPartitionFactory();
             HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, clusterMembershipService, grainFactory, loggerFactory);
 
-            // When DistributedGrainDirectory is active, it registers its own IRemoteGrainDirectory system targets.
-            // In that case, create the RemoteGrainDirectory objects (still needed for WorkItemGroup scheduling)
-            // but skip registering them as system targets to avoid conflicts.
+            // Legacy remote endpoints serve the default directory. Named directories use their own endpoints.
             var distributedDirectoryActive = serviceProvider.GetService<DistributedGrainDirectory>() is not null;
-            RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, systemTargetShared, registerAsSystemTarget: !distributedDirectoryActive);
-            CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, systemTargetShared, registerAsSystemTarget: !distributedDirectoryActive);
+            var distributedDirectoryIsDefault = serviceProvider.GetKeyedService<IGrainDirectory>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY) is DistributedGrainDirectory;
+            RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, systemTargetShared, registerAsSystemTarget: !distributedDirectoryIsDefault);
+            CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, systemTargetShared, registerAsSystemTarget: !distributedDirectoryIsDefault);
             DistributedGrainDirectoryClientCompatibility = distributedDirectoryActive ? null : new LocalGrainDirectoryClientCompatibility(systemTargetShared);
             if (!distributedDirectoryActive)
             {

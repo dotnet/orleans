@@ -1115,6 +1115,8 @@ namespace OrleansCodeGen.Orleans.TestingHost
     {
         public global::Orleans.Runtime.GrainId arg0;
         public System.Exception arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1148,6 +1150,8 @@ namespace OrleansCodeGen.Orleans.TestingHost
     {
         public global::Orleans.Runtime.GrainId arg0;
         public System.Exception arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1180,6 +1184,8 @@ namespace OrleansCodeGen.Orleans.TestingHost
     public sealed partial class Invokable_IStorageFaultGrain_GrainReference_5D91E1AF : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Runtime.GrainId arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1213,6 +1219,8 @@ namespace OrleansCodeGen.Orleans.TestingHost
     {
         public global::Orleans.Runtime.GrainId arg0;
         public System.Exception arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1245,6 +1253,8 @@ namespace OrleansCodeGen.Orleans.TestingHost
     public sealed partial class Invokable_IStorageFaultGrain_GrainReference_C94BA77C : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Runtime.GrainId arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -1277,6 +1287,8 @@ namespace OrleansCodeGen.Orleans.TestingHost
     public sealed partial class Invokable_IStorageFaultGrain_GrainReference_E8594820 : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Runtime.GrainId arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }

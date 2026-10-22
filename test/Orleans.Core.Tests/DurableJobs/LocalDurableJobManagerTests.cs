@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Net;
 using System.Runtime.CompilerServices;
+using System.Threading.Channels;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -21,6 +22,7 @@ using Orleans.Journaling.Json;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
+using Orleans.Storage;
 using Xunit;
 
 namespace NonSilo.Tests.DurableJobs;
@@ -322,6 +324,175 @@ public class LocalDurableJobManagerTests
         {
             await lifecycle.OnStop(cancellationToken).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
         }
+    }
+
+    [Theory]
+    [InlineData(null, SiloStatus.Active, true)]
+    [InlineData(SiloStatus.Joining, SiloStatus.Active, true)]
+    [InlineData(SiloStatus.Active, SiloStatus.ShuttingDown, true)]
+    [InlineData(SiloStatus.Active, SiloStatus.Stopping, true)]
+    [InlineData(SiloStatus.Active, SiloStatus.Dead, true)]
+    [InlineData(SiloStatus.Active, null, true)]
+    [InlineData(SiloStatus.ShuttingDown, SiloStatus.Dead, true)]
+    [InlineData(SiloStatus.Stopping, SiloStatus.Dead, true)]
+    [InlineData(SiloStatus.Joining, SiloStatus.Dead, true)]
+    [InlineData(null, SiloStatus.Dead, true)]
+    [InlineData(SiloStatus.Stopping, null, true)]
+    [InlineData(null, SiloStatus.Joining, false)]
+    [InlineData(SiloStatus.Created, SiloStatus.Joining, false)]
+    [InlineData(SiloStatus.ShuttingDown, SiloStatus.Stopping, false)]
+    [InlineData(SiloStatus.Dead, null, false)]
+    [InlineData(SiloStatus.Active, SiloStatus.Active, false)]
+    [InlineData(SiloStatus.Dead, SiloStatus.Dead, false)]
+    public void ShouldCheckShards_WhenSiloJoinsOrLeavesActiveSetOrIsDeclaredDead(SiloStatus? previous, SiloStatus? current, bool expected)
+    {
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
+        var other = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5002), 0);
+        var otherMember = new ClusterMember(other, SiloStatus.Active, other.ToParsableString());
+
+        Assert.Equal(expected, LocalDurableJobManager.ShouldCheckShards(CreateSnapshot(previous, 1), CreateSnapshot(current, 2)));
+
+        ClusterMembershipSnapshot CreateSnapshot(SiloStatus? status, long version)
+        {
+            var members = ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(other, otherMember);
+            if (status is { } value)
+            {
+                members = members.Add(silo, new ClusterMember(silo, value, silo.ToParsableString()));
+            }
+
+            return new(members, new MembershipVersion(version));
+        }
+    }
+
+    [Theory]
+    [InlineData(new[] { SiloStatus.Dead })]
+    [InlineData(new[] { SiloStatus.ShuttingDown, SiloStatus.Dead })]
+    [InlineData(new[] { SiloStatus.Stopping, SiloStatus.Dead })]
+    public async Task MembershipDeclaringOwnerDead_AdoptsItsShardWithoutPeriodicCheck(SiloStatus[] transitions)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        options.ShardLoadLookaheadPeriod = TimeSpan.FromHours(2);
+        var storage = new VolatileJournalStorageProvider();
+        await using var services = CreateJournaledServices(storage, time);
+        var formerOwner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
+        var adopter = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5002), 0);
+        var membership = new PublishingClusterMembershipService();
+        membership.Publish((formerOwner, SiloStatus.Active), (adopter, SiloStatus.Active));
+        var formerShardManager = CreateJournaledShardManager(formerOwner, services, membership, options);
+        var adopterShardManager = CreateJournaledShardManager(adopter, services, membership, options);
+        var start = time.GetUtcNow().AddHours(1);
+        await using var original = await formerShardManager.CreateShardAsync(start, start.Add(options.ShardDuration), new Dictionary<string, string>(), token);
+        Assert.NotNull(await original.TryScheduleJobAsync(CreateScheduleRequest(start.AddSeconds(30)), token));
+        var (shardManager, sweeps) = CreateSweepTrackingShardManager(adopterShardManager);
+        var manager = CreateManager(shardManager, time, options, siloAddress: adopter, membership: membership);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+        manager.Participate(lifecycle);
+        await lifecycle.OnStart(token);
+        try
+        {
+            await WaitForSweepAsync(sweeps, token);
+            Assert.Equal(formerOwner, await GetShardOwnerAsync(storage, original.Id, token));
+
+            foreach (var status in transitions[..^1])
+            {
+                membership.Publish((formerOwner, status));
+                await WaitForSweepAsync(sweeps, token);
+                Assert.Equal(formerOwner, await GetShardOwnerAsync(storage, original.Id, token));
+                Assert.Equal(0, accessor.CachedShardCount);
+            }
+
+            membership.Publish((formerOwner, transitions[^1]));
+            await WaitForSweepAsync(sweeps, token);
+
+            Assert.Equal(adopter, await GetShardOwnerAsync(storage, original.Id, token));
+            Assert.Equal(1, accessor.CachedShardCount);
+        }
+        finally
+        {
+            await lifecycle.OnStop(token).WaitAsync(TimeSpan.FromSeconds(5), token);
+        }
+    }
+
+    [Theory]
+    [InlineData(new[] { SiloStatus.Dead })]
+    [InlineData(new[] { SiloStatus.Stopping, SiloStatus.Dead })]
+    public async Task MembershipDeclaringSlowOwnerDead_FencesItsInFlightWrite(SiloStatus[] transitions)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        options.ShardLoadLookaheadPeriod = TimeSpan.FromHours(2);
+        var storage = new VolatileJournalStorageProvider();
+        var fencingStorage = new ContentFencingJournalStorageProvider(storage);
+        await using var services = CreateJournaledServices(storage, time, fencingStorage);
+        var formerOwner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
+        var adopter = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5002), 0);
+        var membership = new PublishingClusterMembershipService();
+        membership.Publish((formerOwner, SiloStatus.Active), (adopter, SiloStatus.Active));
+        var formerShardManager = CreateJournaledShardManager(formerOwner, services, membership, options);
+        var adopterShardManager = CreateJournaledShardManager(adopter, services, membership, options);
+        var start = time.GetUtcNow().AddHours(1);
+        var original = await formerShardManager.CreateShardAsync(start, start.Add(options.ShardDuration), new Dictionary<string, string>(), token);
+        var job = await original.TryScheduleJobAsync(CreateScheduleRequest(start.AddSeconds(30), "before-adoption"), token);
+        Assert.NotNull(job);
+        var (shardManager, sweeps) = CreateSweepTrackingShardManager(adopterShardManager);
+        var manager = CreateManager(shardManager, time, options, siloAddress: adopter, membership: membership);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+        manager.Participate(lifecycle);
+        await lifecycle.OnStart(token);
+        var gate = fencingStorage.GateNextAppend();
+        try
+        {
+            await WaitForSweepAsync(sweeps, token);
+
+            // The former owner passes its ownership check, then stalls before its journal append reaches storage.
+            var pending = original.TryScheduleJobAsync(CreateScheduleRequest(start.AddSeconds(40), "in-flight"), token);
+            await gate.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            Assert.False(pending.IsCompleted);
+
+            foreach (var status in transitions[..^1])
+            {
+                membership.Publish((formerOwner, status));
+                await WaitForSweepAsync(sweeps, token);
+                Assert.Equal(formerOwner, await GetShardOwnerAsync(storage, original.Id, token));
+            }
+
+            membership.Publish((formerOwner, transitions[^1]));
+            await WaitForSweepAsync(sweeps, token);
+            Assert.Equal(adopter, await GetShardOwnerAsync(storage, original.Id, token));
+            Assert.Equal(1, accessor.CachedShardCount);
+
+            gate.Resume.SetResult();
+            await Assert.ThrowsAsync<InconsistentStateException>(() => pending.WaitAsync(TimeSpan.FromSeconds(5), token));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => formerShardManager.UnregisterShardAsync(original, token));
+
+            var adopted = Assert.Single(await adopterShardManager.AssignJobShardsAsync(start, 0, token));
+            Assert.Equal(original.Id, adopted.Id);
+            Assert.Equal(1, await adopted.GetJobCountAsync());
+            Assert.Equal(adopter, await GetShardOwnerAsync(storage, original.Id, token));
+        }
+        finally
+        {
+            gate.Resume.TrySetResult();
+            await lifecycle.OnStop(token).WaitAsync(TimeSpan.FromSeconds(5), token);
+        }
+
+        var replacement = Assert.Single(await adopterShardManager.AssignJobShardsAsync(start, int.MaxValue, token));
+        try
+        {
+            Assert.Equal(1, await replacement.GetJobCountAsync());
+            Assert.Equal(DurableJobMutationResult.Applied, await replacement.RemoveJobAsync(job.Id, token));
+        }
+        finally
+        {
+            await adopterShardManager.UnregisterShardAsync(replacement, token);
+        }
+
+        Assert.Null(await storage.CreateStorage(JobShardId.Parse(original.Id).ToJournalId()).GetMetadataAsync(token));
     }
 
     [Theory]
@@ -4022,7 +4193,8 @@ public class LocalDurableJobManagerTests
         DurableJobsOptions options,
         IInternalGrainFactory? grainFactory = null,
         ILogger<LocalDurableJobManager>? logger = null,
-        SiloAddress? siloAddress = null)
+        SiloAddress? siloAddress = null,
+        IClusterMembershipService? membership = null)
     {
         siloAddress ??= SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var localSiloDetails = new TestLocalSiloDetails(siloAddress);
@@ -4041,7 +4213,7 @@ public class LocalDurableJobManagerTests
             shardManager,
             shardExecutor,
             grainFactory,
-            new TestClusterMembershipService(),
+            membership ?? new TestClusterMembershipService(),
             overloadDetector,
             timeProvider,
             optionsWrapper,
@@ -4875,6 +5047,168 @@ public class LocalDurableJobManagerTests
         public SiloAddress SiloAddress { get; } = siloAddress;
 
         public SiloAddress GatewayAddress => SiloAddress;
+    }
+
+    private static (TestJobShardManager ShardManager, Channel<bool> Sweeps) CreateSweepTrackingShardManager(JournaledJobShardManager inner)
+    {
+        var sweeps = Channel.CreateUnbounded<bool>();
+        var shardManager = new TestJobShardManager
+        {
+            DiscoverShards = DiscoverAsync,
+            UnregisterShard = inner.UnregisterShardAsync
+        };
+        return (shardManager, sweeps);
+
+        async IAsyncEnumerable<IJobShard> DiscoverAsync(DateTimeOffset maxDueTime, int maxNewClaims, [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await foreach (var shard in inner.DiscoverJobShardsAsync(maxDueTime, maxNewClaims, cancellationToken))
+            {
+                yield return shard;
+            }
+
+            sweeps.Writer.TryWrite(true);
+        }
+    }
+
+    private static async Task WaitForSweepAsync(Channel<bool> sweeps, CancellationToken cancellationToken)
+        => await sweeps.Reader.ReadAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+
+    private static async Task<SiloAddress?> GetShardOwnerAsync(VolatileJournalStorageProvider storage, string shardId, CancellationToken cancellationToken)
+    {
+        var metadata = await storage.CreateStorage(JobShardId.Parse(shardId).ToJournalId()).GetMetadataAsync(cancellationToken);
+        Assert.NotNull(metadata);
+        return metadata.Properties.TryGetValue("DurableJobsOwner", out var owner) ? SiloAddress.FromParsableString(owner) : null;
+    }
+
+    private sealed class PublishingClusterMembershipService : IClusterMembershipService
+    {
+        private readonly Channel<ClusterMembershipSnapshot> _updates = Channel.CreateUnbounded<ClusterMembershipSnapshot>();
+        private ImmutableDictionary<SiloAddress, ClusterMember> _members = ImmutableDictionary<SiloAddress, ClusterMember>.Empty;
+        private long _version;
+
+        public ClusterMembershipSnapshot CurrentSnapshot { get; private set; } = new(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, new MembershipVersion(0));
+
+        public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => _updates.Reader.ReadAllAsync();
+
+        public void Publish(params (SiloAddress Silo, SiloStatus Status)[] changes)
+        {
+            foreach (var (silo, status) in changes)
+            {
+                _members = _members.SetItem(silo, new ClusterMember(silo, status, silo.ToParsableString()));
+            }
+
+            CurrentSnapshot = new(_members, new MembershipVersion(++_version));
+            Assert.True(_updates.Writer.TryWrite(CurrentSnapshot));
+        }
+
+        public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+
+        public Task<bool> TryKill(SiloAddress siloAddress) => Task.FromResult(false);
+    }
+
+    /// <summary>
+    /// Applies the conditional content writes which persistent journal providers enforce: a storage instance writes
+    /// only when the journal content is unchanged since that instance last read or wrote it.
+    /// </summary>
+    private sealed class ContentFencingJournalStorageProvider(VolatileJournalStorageProvider storage) : IJournalStorageProvider
+    {
+        private readonly ConcurrentDictionary<JournalId, long> _contentVersions = new();
+        private readonly SemaphoreSlim _writeLock = new(1, 1);
+        private AppendGate? _nextAppend;
+
+        public AppendGate GateNextAppend()
+        {
+            var gate = new AppendGate();
+            Assert.Null(Interlocked.Exchange(ref _nextAppend, gate));
+            return gate;
+        }
+
+        public IJournalStorage CreateStorage(JournalId journalId) => new FencingStorage(this, journalId, storage.CreateStorage(journalId));
+
+        public sealed class AppendGate
+        {
+            public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public TaskCompletionSource Resume { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        private sealed class FencingStorage(ContentFencingJournalStorageProvider provider, JournalId journalId, IJournalStorage inner) : IJournalStorage
+        {
+            private long? _observedVersion;
+
+            public bool IsCompactionRequested => inner.IsCompactionRequested;
+
+            public async ValueTask<bool> CreateIfNotExistsAsync(IReadOnlyDictionary<string, string>? metadata = null, CancellationToken cancellationToken = default)
+            {
+                var created = await inner.CreateIfNotExistsAsync(metadata, cancellationToken);
+                if (created)
+                {
+                    _observedVersion = provider._contentVersions.AddOrUpdate(journalId, 0, static (_, version) => version + 1);
+                }
+
+                return created;
+            }
+
+            public ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default) => inner.GetMetadataAsync(cancellationToken);
+
+            public ValueTask<IJournalMetadata?> UpdateMetadataAsync(
+                IReadOnlyDictionary<string, string>? set = null,
+                IEnumerable<string>? remove = null,
+                string? expectedETag = null,
+                CancellationToken cancellationToken = default)
+                => inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
+
+            public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+            {
+                await provider._writeLock.WaitAsync(cancellationToken);
+                try
+                {
+                    _observedVersion = provider._contentVersions.GetOrAdd(journalId, 0);
+                    await inner.ReadAsync(consumer, cancellationToken);
+                }
+                finally
+                {
+                    provider._writeLock.Release();
+                }
+            }
+
+            public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+            {
+                if (Interlocked.Exchange(ref provider._nextAppend, null) is { } gate)
+                {
+                    gate.Entered.SetResult();
+                    await gate.Resume.Task.WaitAsync(cancellationToken);
+                }
+
+                await WriteAsync(() => inner.AppendAsync(value, cancellationToken), cancellationToken);
+            }
+
+            public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+                => WriteAsync(() => inner.ReplaceAsync(value, cancellationToken), cancellationToken);
+
+            public ValueTask DeleteAsync(CancellationToken cancellationToken)
+                => WriteAsync(() => inner.DeleteAsync(cancellationToken), cancellationToken);
+
+            private async ValueTask WriteAsync(Func<ValueTask> write, CancellationToken cancellationToken)
+            {
+                await provider._writeLock.WaitAsync(cancellationToken);
+                try
+                {
+                    var current = provider._contentVersions.GetOrAdd(journalId, 0);
+                    if (_observedVersion != current)
+                    {
+                        throw new InconsistentStateException($"Journal '{journalId}' content changed since this instance observed it.");
+                    }
+
+                    await write();
+                    _observedVersion = provider._contentVersions[journalId] = current + 1;
+                }
+                finally
+                {
+                    provider._writeLock.Release();
+                }
+            }
+        }
     }
 
     private sealed class TestClusterMembershipService : IClusterMembershipService

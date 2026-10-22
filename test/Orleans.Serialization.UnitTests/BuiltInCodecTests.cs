@@ -40,6 +40,12 @@ using System.Threading.Tasks;
 
 namespace Orleans.Serialization.UnitTests
 {
+    [AttributeUsage(AttributeTargets.Class)]
+    internal sealed class OwnershipCodecTestsAttribute(Type valueType) : Attribute
+    {
+        public Type ValueType { get; } = valueType;
+    }
+
     internal static class CsCheckAdaptor
     {
         public static Action<Action<TValue>> ToValueProvider<TValue>(this Gen<TValue> gen) => value => gen.Sample(value);
@@ -122,6 +128,12 @@ namespace Orleans.Serialization.UnitTests
             var typesWithCopierTests = new HashSet<Type>();
             foreach (var type in typeof(CodecTestTests).Assembly.GetTypes())
             {
+                if (type.GetCustomAttribute<OwnershipCodecTestsAttribute>() is { } ownershipTests)
+                {
+                    typesWithCodecTests.Add(ownershipTests.ValueType);
+                    typesWithCopierTests.Add(ownershipTests.ValueType);
+                }
+
                 if (type.BaseType is not { IsGenericType: true } baseType)
                 {
                     continue;
@@ -1262,8 +1274,58 @@ namespace Orleans.Serialization.UnitTests
         protected override ImmutableArray<int>[] TestValues => [default, [], CreateValue(), CreateValue(), CreateValue()];
     }
 
+    // The ownership test observes returned segments before another test can rent them.
+    [CollectionDefinition("Pooled buffer ownership", DisableParallelization = true)]
+    public sealed class PooledBufferOwnershipCollection;
+
+    [Collection("Pooled buffer ownership")]
     public class PooledBufferCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<PooledBuffer, PooledBufferCodec>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
+        [Fact]
+        public void WriterFailure_ReleasesAllConsumedBufferSegments()
+        {
+            var value = new PooledBuffer();
+            value.Write(new byte[20_000]);
+            _ = value.AsReadOnlySequence();
+            var segments = new List<PooledBuffer.SequenceSegment>();
+            for (var segment = value.First; segment is not null; segment = segment.Next as PooledBuffer.SequenceSegment)
+            {
+                segments.Add(segment);
+            }
+
+            Assert.NotEmpty(segments);
+            Assert.All(segments, segment => Assert.False(segment.CommittedMemory.IsEmpty));
+            using var session = SessionPool.GetSession();
+            var writer = Writer.Create(new FailingBufferWriter(), session);
+            Exception? failure = null;
+            try
+            {
+                CreateCodec().WriteField(ref writer, 0, typeof(PooledBuffer), value);
+            }
+            catch (InvalidOperationException exception)
+            {
+                failure = exception;
+            }
+
+            Assert.Equal("Writer failed.", Assert.IsType<InvalidOperationException>(failure).Message);
+            Assert.All(segments, segment => Assert.True(segment.CommittedMemory.IsEmpty));
+        }
+
+        private sealed class FailingBufferWriter : System.Buffers.IBufferWriter<byte>
+        {
+            private readonly byte[] _buffer = new byte[8];
+            private bool _started;
+            public void Advance(int count) { }
+            public Memory<byte> GetMemory(int sizeHint = 0) => GetBuffer();
+            public Span<byte> GetSpan(int sizeHint = 0) => GetBuffer();
+            private byte[] GetBuffer()
+            {
+                if (_started) throw new InvalidOperationException("Writer failed.");
+                _started = true;
+                return _buffer;
+            }
+        }
+
         protected override PooledBuffer CreateValue()
         {
             var result = new PooledBuffer();
@@ -4265,6 +4327,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
 #if NET8_0_OR_GREATER
+#pragma warning disable CS0618 // Verify serialization compatibility for the legacy cancellation token.
     public class GrainCancellationTokenCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<GrainCancellationToken, IFieldCodec<GrainCancellationToken>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         private static readonly PropertyInfo TokenIdProperty = typeof(GrainCancellationToken).GetProperty("Id", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -4321,6 +4384,7 @@ namespace Orleans.Serialization.UnitTests
         private static Guid GetTokenId(GrainCancellationToken token)
             => (Guid)TokenIdProperty.GetValue(token)!;
     }
+#pragma warning restore CS0618
 
     public class IdSpanCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IdSpan, IdSpanCodec>(output, fixture), IClassFixture<SerializationTesterFixture>
     {

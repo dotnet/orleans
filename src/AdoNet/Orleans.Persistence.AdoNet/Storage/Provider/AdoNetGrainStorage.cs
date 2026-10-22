@@ -182,8 +182,7 @@ namespace Orleans.Storage
 
             //It assumed these parameters are always valid. If not, an exception will be thrown,
             //even if not as clear as when using explicitly checked parameters.
-            var grainId = GrainIdAndExtensionAsString(grainReference);
-            var baseGrainType = ExtractBaseClass(grainType);
+            var (grainId, baseGrainType) = GetStorageKey(grainType, grainReference);
             LogTraceClearingGrainState(serviceId, name, baseGrainType, grainId, grainState.ETag);
 
             if (!grainState.RecordExists && string.IsNullOrWhiteSpace(grainState.ETag))
@@ -256,8 +255,7 @@ namespace Orleans.Storage
 
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.
-            var grainId = GrainIdAndExtensionAsString(grainReference);
-            var baseGrainType = ExtractBaseClass(grainType);
+            var (grainId, baseGrainType) = GetStorageKey(grainType, grainReference);
             LogTraceReadingGrainState(serviceId, name, baseGrainType, grainId, grainState.ETag);
 
             try
@@ -328,8 +326,7 @@ namespace Orleans.Storage
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.
             var data = grainState.State;
-            var grainId = GrainIdAndExtensionAsString(grainReference);
-            var baseGrainType = ExtractBaseClass(grainType);
+            var (grainId, baseGrainType) = GetStorageKey(grainType, grainReference);
             LogTraceWritingGrainState(serviceId, name, baseGrainType, grainId, grainState.ETag);
 
             string? storageVersion = null;
@@ -441,6 +438,48 @@ namespace Orleans.Storage
 
             return null;
         }
+
+        /// <summary>
+        /// Maps a grain state to the grain key and grain type values stored in the key columns, as selected by
+        /// <see cref="AdoNetGrainStorageOptions.KeyFormat"/>.
+        /// </summary>
+        /// <param name="stateName">The state name passed to the <see cref="IGrainStorage"/> operation.</param>
+        /// <param name="grainId">The grain ID.</param>
+        private (AdoGrainKey GrainKey, string GrainType) GetStorageKey(string stateName, GrainId grainId)
+        {
+            if (options.KeyFormat == AdoNetGrainStorageKeyFormat.Legacy)
+            {
+                return (GrainIdAndExtensionAsString(grainId), ExtractBaseClass(stateName));
+            }
+
+            Debug.Assert(options.KeyFormat == AdoNetGrainStorageKeyFormat.GrainTypeQualified, "Options validation admits only defined key formats.");
+
+            // Identity components are stored as hexadecimal text of their exact bytes. Database collations may
+            // compare text case-, accent-, or trailing-space-insensitively, and GrainIdHash/GrainTypeHash can be made
+            // to collide, so the key columns must differ for every distinct identity. Hex digits compare exactly
+            // under any collation, preserve bytes which are not valid UTF-8, and never contain the '/' separator.
+            // The whole key is stored as a string key: the integer and GUID columns carry no key kind.
+            var grainType = $"{Convert.ToHexString(grainId.Type.AsSpan())}/{Convert.ToHexString(StrictUtf8.GetBytes(stateName))}";
+            var grainKey = Convert.ToHexString(grainId.Key.AsSpan());
+            if (grainType.Length > MaxKeyColumnLength || grainKey.Length > MaxKeyColumnLength)
+            {
+                throw new ArgumentException(
+                    $"Grain {grainId} with state name \"{stateName}\" exceeds the {MaxKeyColumnLength}-character key columns of the {nameof(AdoNetGrainStorageKeyFormat.GrainTypeQualified)} storage key format, which stores grain types, state names, and grain keys as hexadecimal text.",
+                    nameof(grainId));
+            }
+
+            return (new AdoGrainKey(grainKey), grainType);
+        }
+
+        /// <summary>
+        /// The length of the <c>GrainTypeString</c> and <c>GrainIdExtensionString</c> columns in the persistence scripts.
+        /// </summary>
+        private const int MaxKeyColumnLength = 512;
+
+        /// <summary>
+        /// Encodes state names without replacing invalid UTF-16, which would map distinct names to the same bytes.
+        /// </summary>
+        private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
         /// <summary>
         /// Extracts a grain ID as a string and appends the key extension with '#' infix is present.

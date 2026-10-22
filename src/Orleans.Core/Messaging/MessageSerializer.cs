@@ -165,6 +165,76 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        /// <summary>
+        /// Gives a local request an owned serialized body, as a received request already has.
+        /// Subsequent migration or forwarding sends these bytes instead of serializing its values again.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability", "CA2000:Dispose objects before losing scope",
+            Justification = "The message takes ownership of the pooled read request and its serialized body.")]
+        internal int PrepareRequestBody(MessageHandlerShared shared, ArcBufferWriter buffer, Message message)
+        {
+            Debug.Assert(message.Direction is Directions.Request or Directions.OneWay);
+            Debug.Assert(buffer.Length == 0);
+            if (message._bodyObject is MessageReadRequest received)
+            {
+                return received.BodyLength;
+            }
+
+            if (message._bodyObject is not { } body)
+            {
+                return 0;
+            }
+
+            try
+            {
+                var writer = Writer.Create(buffer, _serializationSession);
+                _codecProvider.GetCodec(body.GetType()).WriteField(ref writer, 0, null, body);
+                writer.Commit();
+                var bodyLength = buffer.Length;
+                if (bodyLength > _maxBodyLength) ThrowInvalidBodyLength(bodyLength);
+                var readRequest = shared.GetReceiveMessageHandler();
+                readRequest.Initialize(default, buffer.ConsumeSlice(bodyLength));
+                message.SetMessageReadRequest(readRequest);
+                return bodyLength;
+            }
+            finally
+            {
+                _serializationSession.Reset();
+            }
+        }
+
+        /// <summary>
+        /// Bounds valid current headers without consuming arbitrary request-context values.
+        /// </summary>
+        /// <remarks>
+        /// The migration owns the headers while requests are queued. A pending local callback can still retarget a silo,
+        /// so the bound allows address growth. Opaque request context uses the configured header limit.
+        /// </remarks>
+        internal long GetHeaderSizeBound(ArcBufferWriter buffer, Message message)
+        {
+            Debug.Assert(buffer.Length == 0);
+            if (message.RequestContextData is { Count: > 0 })
+            {
+                return _maxHeaderLength;
+            }
+
+            try
+            {
+                var writer = Writer.Create(buffer, _serializationSession);
+                SerializeHeaders(ref writer, message, message.Headers);
+                writer.Commit();
+                var headerLength = writer.Position;
+                if (headerLength > _maxHeaderLength) ThrowInvalidHeaderLength(headerLength);
+                return Math.Min(_maxHeaderLength, (long)headerLength + 2 * CachingSiloAddressCodec.MaxEncodedSize);
+            }
+            finally
+            {
+                _serializationSession.Reset();
+                buffer.AdvanceReader(buffer.Length);
+            }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void ValidateFrameLengths(int headerLength, int bodyLength)
         {
@@ -267,7 +337,8 @@ namespace Orleans.Runtime.Messaging
                 var list = new List<GrainAddressCacheUpdate>(retainedCount);
                 for (uint i = 0; i < count; i++)
                 {
-                    var entry = _activationAddressCodec.ReadValue(ref reader, reader.ReadFieldHeader())!;
+                    var entry = _activationAddressCodec.ReadValue(ref reader, reader.ReadFieldHeader())
+                        ?? throw new InvalidMessageFrameException("A cache invalidation header entry cannot be null.");
                     if (list.Count < Message.MaxCacheInvalidationHeaderEntries)
                     {
                         list.Add(entry);

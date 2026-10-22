@@ -2736,6 +2736,8 @@ namespace OrleansCodeGen.Orleans.Providers
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -2772,6 +2774,8 @@ namespace OrleansCodeGen.Orleans.Providers
     public sealed partial class Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341 : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Providers.MemoryMessageData arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -2804,6 +2808,8 @@ namespace OrleansCodeGen.Orleans.Providers
     public sealed partial class Invokable_IMemoryStreamQueueGrain_GrainReference_7A8F8C1A : global::Orleans.Runtime.TaskRequest<System.Collections.Generic.List<global::Orleans.Providers.MemoryMessageData>>
     {
         public int arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -2838,6 +2844,8 @@ namespace OrleansCodeGen.Orleans.Providers
         public global::Orleans.Providers.MemoryMessageData arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3427,6 +3435,8 @@ namespace OrleansCodeGen.Orleans.Streams
         public System.Threading.CancellationToken arg2;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3464,6 +3474,8 @@ namespace OrleansCodeGen.Orleans.Streams
     {
         public System.Threading.CancellationToken arg0;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 

@@ -35,7 +35,7 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
     public async Task OrleansBinary_RecoversUpstreamMainWrittenJournal()
     {
         var journalBytes = LoadUpstreamMainJournal();
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>(journalBytes), TestContext.Current.CancellationToken);
 
         var states = CreateStates(storage);

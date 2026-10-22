@@ -723,6 +723,91 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     public sealed class S3JournalStorageRequestTests
     {
         [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task MetadataRefresh_GenerationlessWalRetainsContentOwnership(bool recreated, bool changeMetadata)
+        {
+            var token = TestContext.Current.CancellationToken;
+            var client = Substitute.For<IAmazonS3>();
+            var eTag = "original";
+            byte[] content = [1];
+            var metadata = new Dictionary<string, string>();
+            var exists = true;
+            client.GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    var request = call.Arg<GetObjectMetadataRequest>();
+                    if (request.EtagToMatch is { } expected && expected != eTag)
+                    {
+                        throw CreateS3Exception(HttpStatusCode.PreconditionFailed);
+                    }
+
+                    var response = new GetObjectMetadataResponse { ETag = eTag, ContentLength = content.Length, PartsCount = 1 };
+                    foreach (var (key, value) in metadata)
+                    {
+                        response.Metadata.Add(key, value);
+                    }
+
+                    return Task.FromResult(response);
+                });
+            client.GetObjectAsync(Arg.Any<GetObjectRequest>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    Assert.Equal(eTag, call.Arg<GetObjectRequest>().EtagToMatch);
+                    return Task.FromResult(new GetObjectResponse
+                    {
+                        ETag = eTag,
+                        ContentLength = content.Length,
+                        ResponseStream = new MemoryStream(content, writable: false),
+                    });
+                });
+            client.PutObjectAsync(Arg.Any<PutObjectRequest>(), Arg.Any<CancellationToken>())
+                .Returns(async call =>
+                {
+                    var request = call.Arg<PutObjectRequest>();
+                    Assert.Equal(eTag, request.IfMatch);
+                    using var buffer = new MemoryStream();
+                    await request.InputStream.CopyToAsync(buffer, token);
+                    content = buffer.ToArray();
+                    metadata = request.Metadata.Keys.ToDictionary(key => key, key => request.Metadata[key]);
+                    eTag = "metadata-update";
+                    return new PutObjectResponse { ETag = eTag };
+                });
+            client.DeleteObjectAsync(Arg.Any<DeleteObjectRequest>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    Assert.Equal(eTag, call.Arg<DeleteObjectRequest>().IfMatch);
+                    exists = false;
+                    return Task.FromResult(new DeleteObjectResponse());
+                });
+            var storage = CreateStorage(client, new() { BucketName = BucketName, MetadataOnlyConflictInitialBackoff = TimeSpan.Zero });
+            await storage.ReadAsync(new CapturingJournalStorageConsumer(), token);
+            if (recreated)
+            {
+                eTag = "recreated";
+                content = [9];
+            }
+
+            Assert.NotNull(await storage.UpdateMetadataAsync(
+                set: changeMetadata ? new Dictionary<string, string> { ["owner"] = "test" } : null,
+                cancellationToken: token));
+
+            if (recreated)
+            {
+                await Assert.ThrowsAsync<InconsistentStateException>(() => storage.DeleteAsync(token).AsTask());
+                Assert.True(exists);
+                Assert.Equal(9, content[^1]);
+            }
+            else
+            {
+                await storage.DeleteAsync(token);
+                Assert.False(exists);
+            }
+        }
+
+        [Theory]
         [InlineData(false)]
         [InlineData(true)]
         public async Task ReplaceAsync_SeparatesWalAndCheckpointNamespaces(bool customMapping)
@@ -779,6 +864,8 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     Arg.Any<CancellationToken>())
                 .Returns(_ => Task.FromResult(new PutObjectResponse { ETag = $"etag-{requests.Count}" }));
             var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
+            // Creating the journal establishes the write precondition, as recovering an absent journal does.
+            Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken.None));
 
             await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
             await storage.AppendAsync(new ReadOnlySequence<byte>([4, 5]), CancellationToken.None);
@@ -1016,12 +1103,16 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 Arg.Any<CancellationToken>());
         }
 
-        [Fact]
-        public async Task AppendAsync_WhenConditionalRewriteExceedsSinglePutLimit_ThrowsBeforeDownload()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task AppendAsync_WhenConditionalRewriteExceedsSinglePutLimit_ThrowsBeforeStorageMutation(bool exists)
         {
             var client = Substitute.For<IAmazonS3>();
             client.PutObjectAsync(Arg.Any<PutObjectRequest>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new PutObjectResponse { ETag = "etag-1" }));
+            client.GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>())
+                .Returns<GetObjectMetadataResponse>(_ => throw CreateS3Exception(HttpStatusCode.NotFound));
             var storage = CreateStorage(
                 client,
                 new S3JournalStorageOptions
@@ -1029,6 +1120,16 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     BucketName = BucketName,
                     UseS3ExpressAppend = false,
                 });
+            if (exists)
+            {
+                Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken.None));
+            }
+            else
+            {
+                await storage.ReadForWriteAsync();
+            }
+
+            client.ClearReceivedCalls();
             var first = new SparseSequenceSegment(new byte[] { 0 }, runningIndex: 0);
             var last = first.Append(new byte[] { 0 }, nextRunningIndex: 4_999_999_984);
             var oversizedCombinedValue = new ReadOnlySequence<byte>(first, 0, last, 1);
@@ -1040,6 +1141,13 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             await client.DidNotReceive().GetObjectAsync(
                 Arg.Any<GetObjectRequest>(),
                 Arg.Any<CancellationToken>());
+            await client.DidNotReceive().PutObjectAsync(
+                Arg.Any<PutObjectRequest>(),
+                Arg.Any<CancellationToken>());
+            if (!exists)
+            {
+                Assert.Null(await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
+            }
         }
 
         [Fact]
@@ -1088,6 +1196,8 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     BucketName = BucketName,
                     UseS3ExpressAppend = false,
                 });
+            // Creating the journal establishes the write precondition, as recovering an absent journal does.
+            Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken.None));
 
             await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
 
@@ -1225,57 +1335,21 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         }
 
         [Fact]
-        public async Task DeleteAsync_WhenUncachedMetadataChangesDuringDelete_RetriesWithRefreshedState()
+        public async Task DeleteAsync_BeforeRead_ThrowsWithoutRequests()
         {
             var client = Substitute.For<IAmazonS3>();
-            var metadataCalls = 0;
-            client.GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>())
-                .Returns(_ =>
-                {
-                    metadataCalls++;
-                    var properties = new GetObjectMetadataResponse
-                    {
-                        ETag = metadataCalls == 1 ? "etag-1" : "etag-2",
-                        ContentLength = 16,
-                        LastModified = DateTime.UtcNow,
-                        PartsCount = 1,
-                    };
-                    properties.Metadata.Add(S3JournalStorage.WalGenerationMetadataKey, "generation");
-                    properties.Metadata.Add(
-                        S3JournalStorage.MetadataVersionMetadataKey,
-                        metadataCalls == 1 ? "version-1" : "version-2");
-                    return Task.FromResult(properties);
-                });
-            var deleteCalls = 0;
-            DeleteObjectRequest? successfulDelete = null;
-            client.DeleteObjectAsync(
-                    Arg.Do<DeleteObjectRequest>(request =>
-                    {
-                        deleteCalls++;
-                        if (deleteCalls == 2)
-                        {
-                            successfulDelete = request;
-                        }
-                    }),
-                    Arg.Any<CancellationToken>())
-                .Returns(_ => deleteCalls == 1
-                    ? Task.FromException<DeleteObjectResponse>(CreateS3Exception(HttpStatusCode.PreconditionFailed))
-                    : Task.FromResult(new DeleteObjectResponse()));
             var storage = CreateStorage(
                 client,
                 new S3JournalStorageOptions
                 {
                     BucketName = BucketName,
                     UseS3ExpressAppend = false,
-                    MetadataOnlyConflictInitialBackoff = TimeSpan.Zero,
                 });
 
-            await storage.DeleteAsync(CancellationToken.None);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => storage.DeleteAsync(CancellationToken.None).AsTask());
 
-            Assert.NotNull(successfulDelete);
-            Assert.Equal("etag-2", successfulDelete.IfMatch);
+            Assert.Empty(client.ReceivedCalls());
         }
-
         [Fact]
         public void GetRetryDelay_WhenMultiplicationWouldOverflow_ReturnsMaximum()
         {
@@ -1310,6 +1384,8 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     Arg.Any<CancellationToken>())
                 .Returns(_ => Task.FromResult(new PutObjectResponse { ETag = $"etag-{requests.Count}" }));
             var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
+            // Creating the journal establishes the write precondition, as recovering an absent journal does.
+            Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken.None));
             await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
 
             var properties = new GetObjectMetadataResponse
@@ -1446,15 +1522,38 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             };
             properties.Metadata.Add(S3JournalStorage.WalGenerationMetadataKey, "generation");
             properties.Metadata.Add(S3JournalStorage.MetadataVersionMetadataKey, "version");
+            var partsCountCalls = 0;
             client.GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>())
                 .Returns(call =>
                 {
                     var request = call.Arg<GetObjectMetadataRequest>();
-                    return Task.FromResult(request.PartNumber == 1
-                        ? new GetObjectMetadataResponse { ETag = "etag-1", PartsCount = 9_801 }
-                        : properties);
+                    if (request.PartNumber != 1)
+                    {
+                        return Task.FromResult(properties);
+                    }
+
+                    // Recovery observes one part; other appends grow the WAL before the metadata update.
+                    partsCountCalls++;
+                    return Task.FromResult(new GetObjectMetadataResponse { ETag = "etag-1", PartsCount = partsCountCalls == 1 ? 1 : 9_801 });
                 });
-            var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
+            client.GetObjectAsync(Arg.Any<GetObjectRequest>(), Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    var response = new GetObjectResponse
+                    {
+                        ETag = "etag-1",
+                        ContentLength = 16,
+                        ResponseStream = new MemoryStream(new byte[16], writable: false),
+                    };
+                    foreach (var key in properties.Metadata.Keys)
+                    {
+                        response.Metadata.Add(key, properties.Metadata[key]);
+                    }
+
+                    return Task.FromResult(response);
+                });
+            var storage = await CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName }).ReadForWriteAsync();
+            Assert.False(storage.IsCompactionRequested);
 
             var metadata = await storage.UpdateMetadataAsync(cancellationToken: CancellationToken.None);
 
@@ -1950,6 +2049,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     {
         EnsureDockerAvailable();
         var storage = CreateStorage("journals/metadata", journalFormatKey: "json-lines");
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var before = await storage.GetMetadataAsync(CancellationToken.None);
@@ -1982,9 +2082,11 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     {
         EnsureDockerAvailable();
         var original = CreateStorage("journals/format-migration", journalFormatKey: "old-format");
+        await original.ReadForWriteAsync();
         await original.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), CancellationToken.None);
 
         var replacement = CreateStorage("journals/format-migration", journalFormatKey: "new-format");
+        await replacement.ReadForWriteAsync();
         await replacement.ReplaceAsync(new ReadOnlySequence<byte>([4, 5]), CancellationToken.None);
 
         var consumer = new CapturingJournalStorageConsumer();
@@ -2000,9 +2102,9 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     {
         EnsureDockerAvailable();
         var provider = CreateProvider();
-        await CreateStorage("journals/zeta").AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
-        await CreateStorage("journals/alpha").AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
-        await CreateStorage("other/beta").AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await (await CreateStorage("journals/zeta").ReadForWriteAsync()).AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await (await CreateStorage("journals/alpha").ReadForWriteAsync()).AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await (await CreateStorage("other/beta").ReadForWriteAsync()).AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var listed = new List<JournalCatalogEntry>();
         await foreach (var entry in provider.ListAsync(new() { Prefix = new JournalId("journals") }, CancellationToken.None))
@@ -2013,14 +2115,38 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         Assert.Equal(["journals/alpha", "journals/zeta"], listed.Select(static entry => entry.Id.Value).Order(StringComparer.Ordinal));
     }
 
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task ObservedAbsenceFencesCompetingCreation(string operation)
+    {
+        EnsureDockerAvailable();
+        return JournalStorageContractTests.ObservedAbsenceFencesCompetingCreation(
+            () => CreateStorage("journals/absence"), operation);
+    }
+
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("delete")]
+    public Task MetadataPreservesStalePrecondition(string operation)
+    {
+        EnsureDockerAvailable();
+        return JournalStorageContractTests.MetadataPreservesStalePrecondition(
+            () => CreateStorage("journals/stale-metadata"), operation);
+    }
+
     [Fact]
     public async Task AppendAsync_WhenWalChangedExternally_RequiresRecovery()
     {
         EnsureDockerAvailable();
         var storage = CreateStorage("journals/conflict");
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var other = CreateStorage("journals/conflict");
+        await other.ReadForWriteAsync();
         await other.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
@@ -2033,6 +2159,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     {
         EnsureDockerAvailable();
         var storage = CreateStorage("journals/delete-conflict");
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var other = CreateStorage("journals/delete-conflict");
@@ -2054,9 +2181,11 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     {
         EnsureDockerAvailable();
         var stale = CreateStorage("journals/recreated");
+        await stale.ReadForWriteAsync();
         await stale.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var replacement = CreateStorage("journals/recreated");
+        await replacement.ReadForWriteAsync();
         await replacement.DeleteAsync(CancellationToken.None);
         await replacement.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
@@ -2120,7 +2249,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         }
     }
 
-    private static string? GetDockerSkipReason()
+    internal static string? GetDockerSkipReason()
     {
         try
         {

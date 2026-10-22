@@ -1,7 +1,7 @@
 ---
 title: Redis journal storage
 description: Configure Redis as a storage provider for experimental Orleans Journaling durable state.
-ms.date: 08/21/2026
+ms.date: 10/19/2026
 ms.topic: how-to
 ---
 
@@ -54,7 +54,7 @@ Optimistic concurrency protects append, replace, and delete operations. A stale 
 
 The key prefix and key-name function define the location of existing journals. Retain the previous mapping or migrate the stored data before deploying a new mapping.
 
-The default compaction threshold is 128 MiB and the default recovery chunk size is 1 MiB. Compaction replaces the append history with a snapshot of the grain's current durable states.
+The default compaction threshold is 128 MiB and the default recovery chunk size is 1 MiB. Each journal is one Redis string, so the whole journal, including an append, fits the server's string size limit (proto-max-bulk-len, 512 MB by default). A write which exceeds that limit fails before the script changes any key. Compaction replaces the append history with a snapshot of the grain's current durable states.
 
 Redis returns the journal string as one value. <xref:Orleans.Journaling.RedisJournalStorageOptions.ReadChunkSize> divides that value into replay segments after retrieval; capacity planning should account for the full journal value in the Redis client and silo process.
 

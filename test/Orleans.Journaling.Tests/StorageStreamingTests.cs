@@ -17,7 +17,7 @@ public sealed class StorageStreamingTests
     [Fact]
     public async Task VolatileStorage_AppendAndReplaceStoreRawBuffers()
     {
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         var segmentBytes = new byte[] { 1, 2, 3, 4 };
         var snapshotBytes = new byte[] { 5, 6, 7 };
 
@@ -38,7 +38,7 @@ public sealed class StorageStreamingTests
     [Fact]
     public async Task VolatileStorage_ReadsRawBuffersWithoutFormatDecoding()
     {
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         var rawBytes = new byte[] { 255, 0, 1 };
         var consumer = new CapturingJournalStorageConsumer();
 
@@ -56,7 +56,7 @@ public sealed class StorageStreamingTests
     [Fact]
     public async Task VolatileStorage_InvokesConsumerForEachStoredSegment()
     {
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         var first = new byte[] { 1, 2, 3 };
         var second = new byte[] { 4, 5 };
         var consumer = new CapturingJournalStorageConsumer();
