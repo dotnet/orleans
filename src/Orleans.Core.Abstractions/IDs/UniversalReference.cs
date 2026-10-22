@@ -63,6 +63,12 @@ public readonly struct UniversalReference : IEquatable<UniversalReference>, ISpa
     /// <summary>
     /// Gets the grain interface represented by this reference.
     /// </summary>
+    /// <remarks>
+    /// This value selects the interface projection used to invoke the grain.
+    /// Grain identity is defined by <see cref="GrainId"/>, <see cref="ServiceId"/>,
+    /// <see cref="Binding"/>, and <see cref="ClusterId"/>.
+    /// Interface projections of the same grain compare equal and have matching hash codes.
+    /// </remarks>
     [Id(1)]
     public GrainInterfaceType InterfaceType { get; }
 

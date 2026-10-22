@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -33,7 +34,8 @@ public static class ClusterPlacementSiloBuilderExtensions
     /// <summary>
     /// Registers a named cluster locator.
     /// </summary>
-    public static ISiloBuilder AddClusterLocator<TLocator>(this ISiloBuilder builder, string name)
+    /// <typeparam name="TLocator">The locator implementation to activate using public constructors.</typeparam>
+    public static ISiloBuilder AddClusterLocator<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TLocator>(this ISiloBuilder builder, string name)
         where TLocator : class, IClusterLocator
         => builder.ConfigureServices(services => services.AddClusterLocator<TLocator>(name));
 
@@ -46,14 +48,19 @@ public static class ClusterPlacementSiloBuilderExtensions
     /// <summary>
     /// Registers a directory-backed cluster locator.
     /// </summary>
-    public static ISiloBuilder AddDirectoryClusterLocator<TDirectory>(this ISiloBuilder builder, string name)
+    /// <typeparam name="TDirectory">The directory implementation to activate using public constructors.</typeparam>
+    public static ISiloBuilder AddDirectoryClusterLocator<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TDirectory>(this ISiloBuilder builder, string name)
         where TDirectory : class, IClusterDirectory
         => builder.ConfigureServices(services => services.AddDirectoryClusterLocator<TDirectory>(name));
 
     /// <summary>
     /// Registers a cluster placement strategy and director.
     /// </summary>
-    public static ISiloBuilder AddClusterPlacement<TStrategy, TDirector>(this ISiloBuilder builder)
+    /// <typeparam name="TStrategy">The placement strategy to activate using public constructors.</typeparam>
+    /// <typeparam name="TDirector">The placement director to activate using public constructors.</typeparam>
+    public static ISiloBuilder AddClusterPlacement<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TStrategy,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TDirector>(this ISiloBuilder builder)
         where TStrategy : ClusterPlacementStrategy, new()
         where TDirector : class, IClusterPlacementDirector
         => builder.ConfigureServices(services => services.AddClusterPlacement<TStrategy, TDirector>());
@@ -61,21 +68,24 @@ public static class ClusterPlacementSiloBuilderExtensions
     /// <summary>
     /// Registers the transport used to send requests to other clusters.
     /// </summary>
-    public static ISiloBuilder AddInterClusterTransport<TTransport>(this ISiloBuilder builder)
+    /// <typeparam name="TTransport">The transport implementation to activate using public constructors.</typeparam>
+    public static ISiloBuilder AddInterClusterTransport<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TTransport>(this ISiloBuilder builder)
         where TTransport : class, IInterClusterTransport
         => builder.ConfigureServices(services => services.AddSingleton<IInterClusterTransport, TTransport>());
 
     /// <summary>
     /// Registers the policy which authorizes requests received from other clusters.
     /// </summary>
-    public static ISiloBuilder AddInterClusterRequestAuthorizer<TAuthorizer>(this ISiloBuilder builder)
+    /// <typeparam name="TAuthorizer">The request authorizer implementation to activate using public constructors.</typeparam>
+    public static ISiloBuilder AddInterClusterRequestAuthorizer<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAuthorizer>(this ISiloBuilder builder)
         where TAuthorizer : class, IInterClusterRequestAuthorizer
         => builder.ConfigureServices(services => services.AddSingleton<IInterClusterRequestAuthorizer, TAuthorizer>());
 
     /// <summary>
     /// Uses connected Orleans clients to relay requests between clusters.
     /// </summary>
-    public static ISiloBuilder UseClientInterClusterTransport<TClientProvider>(this ISiloBuilder builder)
+    /// <typeparam name="TClientProvider">The client provider implementation to activate using public constructors.</typeparam>
+    public static ISiloBuilder UseClientInterClusterTransport<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TClientProvider>(this ISiloBuilder builder)
         where TClientProvider : class, IInterClusterClientProvider
         => builder.ConfigureServices(services =>
         {
@@ -86,7 +96,8 @@ public static class ClusterPlacementSiloBuilderExtensions
     /// <summary>
     /// Registers a metacluster topology provider.
     /// </summary>
-    public static ISiloBuilder AddMetaclusterTopologyProvider<TProvider>(this ISiloBuilder builder)
+    /// <typeparam name="TProvider">The topology provider implementation to activate using public constructors.</typeparam>
+    public static ISiloBuilder AddMetaclusterTopologyProvider<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TProvider>(this ISiloBuilder builder)
         where TProvider : class, IMetaclusterTopologyProvider
         => builder.ConfigureServices(services => services.AddSingleton<IMetaclusterTopologyProvider, TProvider>());
 }
