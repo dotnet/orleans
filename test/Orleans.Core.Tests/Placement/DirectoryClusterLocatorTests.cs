@@ -23,6 +23,35 @@ public sealed class DirectoryClusterLocatorTests
     private static readonly DateTimeOffset Start = new(2036, 2, 3, 4, 5, 6, TimeSpan.Zero);
     private static readonly TimeSpan Lease = TimeSpan.FromMinutes(4);
 
+    [Theory]
+    [InlineData("other-service")]
+    [InlineData("SERVICE")]
+    public async Task Locate_ServiceMismatch_RejectsBeforeDirectoryAccess(string topologyServiceId)
+    {
+        var topology = new MutableTopologyProvider(new MetaclusterTopology(
+            topologyServiceId,
+            1,
+            Topology(1, ("east", MetaclusterClusterState.Active)).Clusters));
+        var directory = Substitute.For<IClusterDirectory>();
+        directory.Lookup(GrainId, Arg.Any<CancellationToken>())
+            .Returns((ClusterDirectoryEntry?)null);
+        directory.GetOrCreate(GrainId, "east", 1, Lease, Arg.Any<CancellationToken>())
+            .Returns(new ClusterDirectoryEntry(GrainId, "east", 1, 1, 1, Start + Lease));
+        directory.ClearReceivedCalls();
+        var locator = CreateLocator(directory, topology);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => locator.Locate(
+                GrainId,
+                Context("east"),
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal(
+            $"Topology service '{topologyServiceId}' does not match reference service 'service'.",
+            exception.Message);
+        Assert.Empty(directory.ReceivedCalls());
+    }
+
     [Fact]
     public async Task Locate_MissingEntry_PlacesAndAcquiresOwnership()
     {

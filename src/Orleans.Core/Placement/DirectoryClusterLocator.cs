@@ -26,6 +26,12 @@ public sealed class DirectoryClusterLocator(
         CancellationToken cancellationToken = default)
     {
         var topology = await topologyProvider.GetTopology(cancellationToken);
+        if (!string.Equals(topology.ServiceId, context.ServiceId, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Topology service '{topology.ServiceId}' does not match reference service '{context.ServiceId}'.");
+        }
+
         var existing = await directory.Lookup(grainId, cancellationToken);
         if (existing is not null)
         {

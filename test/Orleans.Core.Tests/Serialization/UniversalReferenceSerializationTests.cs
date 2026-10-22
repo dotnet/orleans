@@ -128,6 +128,66 @@ public sealed class UniversalReferenceSerializationTests(TestEnvironmentFixture 
     }
 
     [Fact]
+    public void BinaryReader_NullServiceIdentity_ReactivatesWithLocalIdentity()
+    {
+        var expected = environment.InternalGrainFactory.GetGrain(
+            GrainId.Create("binary.service", "null-service")).GetUniversalReference();
+        var reference = ReadWireValue<ReferenceWireData, UniversalReference>(new ReferenceWireData
+        {
+            GrainId = expected.GrainId,
+            InterfaceType = expected.InterfaceType,
+            ServiceId = null,
+            Binding = UniversalReferenceBinding.Virtual
+        });
+
+        var actual = ReferenceActivator.CreateReference(reference);
+
+        Assert.Null(reference.ServiceId);
+        AssertUniversalReference(expected, actual.UniversalReference);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("\t")]
+    public void BinaryReader_BlankServiceIdentity_IsRejected(string serviceId)
+    {
+        var reference = ReadWireValue<ReferenceWireData, UniversalReference>(new ReferenceWireData
+        {
+            GrainId = GrainId.Create("binary.service", "blank-service"),
+            ServiceId = serviceId,
+            Binding = UniversalReferenceBinding.Virtual
+        });
+
+        var exception = Assert.Throws<ArgumentException>(() => ReferenceActivator.CreateReference(reference));
+
+        Assert.Equal(serviceId, reference.ServiceId);
+        Assert.Equal(nameof(UniversalReference.ServiceId), exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void BinaryReader_ValidServiceIdentity_PreservesLocalOrForeignService(bool foreignService)
+    {
+        var local = environment.InternalGrainFactory.GetGrain(
+            GrainId.Create("binary.service", "valid-service")).GetUniversalReference();
+        var serviceId = foreignService ? local.ServiceId + "-foreign" : local.ServiceId;
+        var expected = UniversalReference.CreateVirtual(local.GrainId, local.InterfaceType, serviceId);
+        var reference = ReadWireValue<ReferenceWireData, UniversalReference>(new ReferenceWireData
+        {
+            GrainId = expected.GrainId,
+            InterfaceType = expected.InterfaceType,
+            ServiceId = serviceId,
+            Binding = expected.Binding
+        });
+
+        var actual = ReferenceActivator.CreateReference(reference);
+
+        AssertUniversalReference(expected, actual.UniversalReference);
+    }
+
+    [Fact]
     public void GrainReferenceActivator_ActivatesVirtualClusterObserverAndSystemTargetBindings()
     {
         var virtualReference = CreateUntypedReference(64, UniversalReferenceBinding.Virtual);

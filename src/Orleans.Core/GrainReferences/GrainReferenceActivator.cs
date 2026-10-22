@@ -78,7 +78,8 @@ namespace Orleans.GrainReferences
                 entry = CreateActivator(reference.GrainId.Type, reference.InterfaceType);
             }
 
-            if (string.IsNullOrWhiteSpace(reference.ServiceId))
+            // Released two-field surrogates leave the service identity null.
+            if (reference.ServiceId is null)
             {
                 if (reference.Binding != UniversalReferenceBinding.Virtual || reference.ClusterId is not null)
                 {
