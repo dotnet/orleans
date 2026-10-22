@@ -810,7 +810,38 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             return grainInterfaceType;
         }
 
+        return GetGrainInterfaceTypeByConvention(type);
+    }
+
+    /// <summary>
+    /// Mirrors <c>GrainInterfaceTypeResolver.GetGrainInterfaceTypeByConvention</c>, whose type formatting substitutes
+    /// the <c>[Alias]</c> of the interface, or of a containing type, for its CLR name.
+    /// </summary>
+    private static string GetGrainInterfaceTypeByConvention(INamedTypeSymbol type)
+    {
+        if (GetStringAttributeValue(type, Constants.AliasAttributeFullyQualifiedName) is { } alias)
+        {
+            return alias;
+        }
+
+        if (type.ContainingType is { } containingType)
+        {
+            return $"{GetGrainInterfaceTypeByConvention(containingType)}+{type.MetadataName}";
+        }
+
         return GetDefaultGrainInterfaceType(type);
+    }
+
+    /// <summary>
+    /// Gets the grain interface type when it differs from the CLR naming convention, or <see langword="null"/> otherwise.
+    /// </summary>
+    internal static string? GetNonDefaultGrainInterfaceType(INamedTypeSymbol type)
+    {
+        var grainInterfaceType = GetGrainInterfaceType(type);
+        return GetStringAttributeValue(type, Constants.GrainInterfaceTypeAttributeFullyQualifiedName) is not null
+            || !string.Equals(grainInterfaceType, GetDefaultGrainInterfaceType(type), StringComparison.Ordinal)
+                ? grainInterfaceType
+                : null;
     }
 
     internal static string GetDefaultGrainInterfaceType(INamedTypeSymbol type)

@@ -31,15 +31,15 @@ interface [GrainInterfaceType("Orleans.ISiloControl")] Orleans.ISiloControl [Ver
   1422B0B7: Ping(string, System.Threading.CancellationToken) -> Task
   355CA3FA: SendControlCommandToProvider`1(string, int, object?, System.Threading.CancellationToken) -> Task<object?>
 
-interface [GrainInterfaceType("Orleans.Placement.Rebalancing.IActivationRebalancerMonitor")] Orleans.Placement.Rebalancing.IActivationRebalancerMonitor [Version(0)]
+interface [GrainInterfaceType("IActivationRebalancerMonitor")] Orleans.Placement.Rebalancing.IActivationRebalancerMonitor [Version(0)]
   Report: Report(RebalancingReport, System.Threading.CancellationToken) -> Task
 
-interface [GrainInterfaceType("Orleans.Placement.Rebalancing.IActivationRebalancerWorker")] Orleans.Placement.Rebalancing.IActivationRebalancerWorker [Version(0)]
+interface [GrainInterfaceType("IActivationRebalancerWorker")] Orleans.Placement.Rebalancing.IActivationRebalancerWorker [Version(0)]
   GetReport: GetReport(System.Threading.CancellationToken) -> ValueTask<RebalancingReport>
   ResumeRebalancing: ResumeRebalancing(System.Threading.CancellationToken) -> Task
   SuspendRebalancing: SuspendRebalancing(System.TimeSpan?, System.Threading.CancellationToken) -> Task
 
-interface [GrainInterfaceType("Orleans.Placement.Repartitioning.IActivationRepartitionerSystemTarget")] Orleans.Placement.Repartitioning.IActivationRepartitionerSystemTarget [Version(0)]
+interface [GrainInterfaceType("IActivationRepartitionerSystemTarget")] Orleans.Placement.Repartitioning.IActivationRepartitionerSystemTarget [Version(0)]
   9D8EDC44: AcceptExchangeRequest(Orleans.Placement.Repartitioning.AcceptExchangeRequest, System.Threading.CancellationToken) -> ValueTask<Orleans.Placement.Repartitioning.AcceptExchangeResponse>
   11731652: FlushBuffers(System.Threading.CancellationToken) -> ValueTask
   9FB525F3: GetActivationCount(System.Threading.CancellationToken) -> ValueTask<int>
