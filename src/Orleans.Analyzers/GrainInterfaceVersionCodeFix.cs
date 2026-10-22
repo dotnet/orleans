@@ -162,7 +162,6 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         var newLine = existingText is null ? DefaultNewLine : GetNewLine(existingText);
         var lines = new List<string>();
         var activeInterfaces = new Dictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
-        var activeInterfacesByName = new Dictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
         var activeClassIdentities = new HashSet<string>(StringComparer.Ordinal);
         var activeConventionClassNames = new HashSet<string>(StringComparer.Ordinal);
         var iAddressableType = compilation.GetTypeByMetadataName(Constants.IAddressibleFullyQualifiedName);
@@ -191,11 +190,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                 && type.AllInterfaces.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, iAddressableType)))
             {
                 hasActiveContracts = true;
-                AppendInterface(
-                    lines,
-                    type,
-                    activeInterfaces,
-                    activeInterfacesByName);
+                AppendInterface(lines, type, activeInterfaces);
             }
             else if (type.TypeKind == TypeKind.Class && !type.IsAbstract && type.IsGrainClass())
             {
@@ -216,7 +211,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                 lines,
                 existingText.ToString(),
                 activeInterfaces,
-                activeInterfacesByName,
+                new LegacyGrainInterfaceTypeResolver(compilation),
                 activeClassIdentities,
                 activeConventionClassNames);
         }
@@ -445,14 +440,12 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
     private static void AppendInterface(
         List<string> lines,
         INamedTypeSymbol type,
-        Dictionary<string, INamedTypeSymbol> activeInterfaces,
-        Dictionary<string, INamedTypeSymbol> activeInterfacesByName)
+        Dictionary<string, INamedTypeSymbol> activeInterfaces)
     {
         AppendBlockSeparator(lines);
         var interfaceName = GetFullyQualifiedName(type);
         var interfaceType = GrainInterfaceVersionAnalyzer.GetGrainInterfaceType(type);
         activeInterfaces[interfaceType] = type;
-        activeInterfacesByName[interfaceName] = type;
         if (GrainInterfaceVersionAnalyzer.IdentityDiffersFromClrName(
             GrainInterfaceVersionAnalyzer.GetNonDefaultGrainInterfaceType(type),
             type))
@@ -503,7 +496,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         List<string> result,
         string existingContent,
         Dictionary<string, INamedTypeSymbol> activeInterfaces,
-        Dictionary<string, INamedTypeSymbol> activeInterfacesByName,
+        LegacyGrainInterfaceTypeResolver legacyGrainInterfaceTypes,
         HashSet<string> activeClassIdentities,
         HashSet<string> activeConventionClassNames)
     {
@@ -530,11 +523,8 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
 
             INamedTypeSymbol? activeInterface = null;
             var isActive = isInterface
-                ? TryGetActiveInterface(
-                    explicitIdentity,
-                    contractName,
-                    activeInterfaces,
-                    activeInterfacesByName,
+                ? activeInterfaces.TryGetValue(
+                    explicitIdentity ?? legacyGrainInterfaceTypes.Resolve(contractName),
                     out activeInterface)
                 : explicitIdentity is null
                     ? activeClassIdentities.Contains(GrainInterfaceVersionAnalyzer.GetDefaultGrainType(contractName))
@@ -589,22 +579,6 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
 
             index = blockEnd - 1;
         }
-    }
-
-    private static bool TryGetActiveInterface(
-        string? recordedIdentity,
-        string contractName,
-        Dictionary<string, INamedTypeSymbol> activeInterfaces,
-        Dictionary<string, INamedTypeSymbol> activeInterfacesByName,
-        out INamedTypeSymbol? activeInterface)
-    {
-        // As in GrainInterfaceVersionAnalyzer.GetLegacyGrainInterfaceType, a legacy declaration naming an active
-        // interface describes that interface's conventional identity, not one derived from the name.
-        var identity = recordedIdentity
-            ?? (activeInterfacesByName.TryGetValue(contractName, out var namedInterface)
-                ? GrainInterfaceVersionAnalyzer.GetDefaultGrainInterfaceType(namedInterface)
-                : GrainInterfaceVersionAnalyzer.GetDefaultGrainInterfaceType(contractName));
-        return activeInterfaces.TryGetValue(identity, out activeInterface);
     }
 
     private static void MergeHistoricalMembers(
@@ -948,11 +922,6 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         public SourceText Text { get; } = text;
     }
 
-    private static string? GetDefaultGrainInterfaceType(Diagnostic diagnostic)
-        => diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.DefaultGrainInterfaceTypePropertyKey, out var value)
-            ? value
-            : null;
-
     private static void RegisterAddInterfaceCodeFix(CodeFixContext context, Diagnostic diagnostic)
     {
         if (!diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.InterfaceNamePropertyKey, out var interfaceName) ||
@@ -965,12 +934,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         context.RegisterCodeFix(
             CodeAction.Create(
                 title: Resources.AddToOrleansContractsFileTitle,
-                createChangedSolution: ct => AddInterfaceToFileAsync(
-                    context.Document,
-                    interfaceName!,
-                    grainInterfaceType,
-                    GetDefaultGrainInterfaceType(diagnostic),
-                    ct),
+                createChangedSolution: ct => AddInterfaceToFileAsync(context.Document, interfaceName!, grainInterfaceType, ct),
                 equivalenceKey: GrainInterfaceVersionAnalyzer.RuleId0016),
             diagnostic);
     }
@@ -993,13 +957,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         context.RegisterCodeFix(
             CodeAction.Create(
                 title: Resources.UpdateGrainInterfaceVersionTitle,
-                createChangedSolution: ct => UpdateVersionInFileAsync(
-                    context.Document,
-                    interfaceName!,
-                    grainInterfaceType,
-                    GetDefaultGrainInterfaceType(diagnostic),
-                    actualVersion!,
-                    ct),
+                createChangedSolution: ct => UpdateVersionInFileAsync(context.Document, interfaceName!, grainInterfaceType, actualVersion!, ct),
                 equivalenceKey: GrainInterfaceVersionAnalyzer.RuleId0017),
             diagnostic);
     }
@@ -1030,7 +988,6 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                     context.Document,
                     interfaceName!,
                     grainInterfaceType,
-                    GetDefaultGrainInterfaceType(diagnostic),
                     memberSignature!,
                     memberWireIdentity!,
                     ct),
@@ -1265,7 +1222,6 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         Document document,
         string interfaceName,
         string? grainInterfaceType,
-        string? defaultGrainInterfaceType,
         CancellationToken cancellationToken)
     {
         var project = document.Project;
@@ -1279,6 +1235,8 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         {
             return solution;
         }
+
+        var legacyGrainInterfaceTypes = new LegacyGrainInterfaceTypeResolver(semanticModel.Compilation);
 
         var interfaceDecl = root.DescendantNodes()
             .OfType<InterfaceDeclarationSyntax>()
@@ -1347,7 +1305,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             var lines = existingContent.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
             for (var i = 0; i < lines.Length; i++)
             {
-                if (IsMatchingInterface(lines[i], interfaceName, grainInterfaceType, defaultGrainInterfaceType))
+                if (IsMatchingInterface(lines[i], interfaceName, grainInterfaceType, legacyGrainInterfaceTypes))
                 {
                     var updatedLines = lines.ToList();
                     i = SetClrCommentBefore(updatedLines, i, interfaceClrComment);
@@ -1412,7 +1370,6 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         Document document,
         string interfaceName,
         string? grainInterfaceType,
-        string? defaultGrainInterfaceType,
         string newVersion,
         CancellationToken cancellationToken)
     {
@@ -1432,6 +1389,8 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             return solution;
         }
 
+        var legacyGrainInterfaceTypes = await GetLegacyGrainInterfaceTypesAsync(project, cancellationToken).ConfigureAwait(false);
+
         var newLine = GetNewLine(text);
         var lines = text.ToString().Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
         var newLines = new StringBuilder();
@@ -1441,7 +1400,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             var trimmedLine = line.Trim();
 
             // Check if this line contains the interface declaration
-            if (IsMatchingInterface(trimmedLine, interfaceName, grainInterfaceType, defaultGrainInterfaceType))
+            if (IsMatchingInterface(trimmedLine, interfaceName, grainInterfaceType, legacyGrainInterfaceTypes))
             {
                 // Replace the version number
                 var versionStart = trimmedLine.IndexOf("[Version(", StringComparison.Ordinal);
@@ -1475,7 +1434,6 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         Document document,
         string interfaceName,
         string? grainInterfaceType,
-        string? defaultGrainInterfaceType,
         string memberSignature,
         string memberWireIdentity,
         CancellationToken cancellationToken)
@@ -1495,6 +1453,8 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         {
             return solution;
         }
+
+        var legacyGrainInterfaceTypes = await GetLegacyGrainInterfaceTypesAsync(project, cancellationToken).ConfigureAwait(false);
 
         var newLine = GetNewLine(text);
         var lines = text.ToString().Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
@@ -1518,7 +1478,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             }
 
             // Check if this line contains the interface declaration
-            if (!foundInterface && IsMatchingInterface(trimmedLine, interfaceName, grainInterfaceType, defaultGrainInterfaceType))
+            if (!foundInterface && IsMatchingInterface(trimmedLine, interfaceName, grainInterfaceType, legacyGrainInterfaceTypes))
             {
                 foundInterface = true;
             }
@@ -1575,7 +1535,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             var trimmedLine = line.Trim();
 
             // Check if this line contains the interface declaration
-            if (IsMatchingInterface(trimmedLine, interfaceName, grainInterfaceType, defaultGrainInterfaceType: null) &&
+            if (IsMatchingInterface(trimmedLine, interfaceName, grainInterfaceType, legacyGrainInterfaceTypes: null) &&
                 !trimmedLine.StartsWith(GrainInterfaceVersionAnalyzer.RetiredPrefix, StringComparison.Ordinal))
             {
                 // Add *RETIRED* prefix
@@ -1611,11 +1571,18 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         return DefaultNewLine;
     }
 
+    private static async Task<LegacyGrainInterfaceTypeResolver?> GetLegacyGrainInterfaceTypesAsync(
+        Project project,
+        CancellationToken cancellationToken)
+        => await project.GetCompilationAsync(cancellationToken).ConfigureAwait(false) is { } compilation
+            ? new LegacyGrainInterfaceTypeResolver(compilation)
+            : null;
+
     private static bool IsMatchingInterface(
         string line,
         string interfaceName,
         string? grainInterfaceType,
-        string? defaultGrainInterfaceType)
+        LegacyGrainInterfaceTypeResolver? legacyGrainInterfaceTypes)
     {
         if (!GrainInterfaceFileParser.TryGetInterfaceName(line, out var declaredInterfaceName))
         {
@@ -1626,12 +1593,9 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         {
             return GrainInterfaceFileParser.TryGetGrainInterfaceType(line, out var declaredGrainInterfaceType)
                 ? string.Equals(declaredGrainInterfaceType, grainInterfaceType, StringComparison.Ordinal)
-                : defaultGrainInterfaceType is not null
+                : legacyGrainInterfaceTypes is not null
                     && string.Equals(
-                        GrainInterfaceVersionAnalyzer.GetLegacyGrainInterfaceType(
-                            declaredInterfaceName,
-                            interfaceName,
-                            defaultGrainInterfaceType),
+                        legacyGrainInterfaceTypes.Resolve(declaredInterfaceName),
                         grainInterfaceType,
                         StringComparison.Ordinal);
         }
