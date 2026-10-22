@@ -469,6 +469,8 @@ items:
         href: migration-guide.md
       - name: Migrate contract identities
         href: migration/contract-identities.md
+      - name: Grain directory migration
+        href: migration/grain-directory.md
       - name: Deployment and rollback
         href: migration/deployment-and-rollback.md
       - name: Upgrade from Orleans 9

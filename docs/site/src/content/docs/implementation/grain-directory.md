@@ -1,6 +1,6 @@
 ---
 title: Grain directory architecture
-description: Understand the default view-synchronous distributed directory and the legacy local-directory DHT.
+description: Understand the default view-synchronous distributed directory and the local-directory DHT.
 ms.date: 08/21/2026
 ms.topic: concept-article
 ---
@@ -9,9 +9,9 @@ ms.topic: concept-article
 
 The grain directory maps a grain identity to an activation address. It is on the critical path when a caller has no usable cached address and when the runtime creates, moves, or removes an activation. Placement chooses a silo; the directory coordinates which activation address is authoritative.
 
-Orleans uses `DistributedGrainDirectory` by default, with versioned range ownership and coordinated membership-view transitions. Applications can retain `LocalGrainDirectory` before migrating by selecting <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalGrainDirectory*>.
+Orleans uses `DistributedGrainDirectory` by default, with versioned range ownership and coordinated membership-view transitions. Select `LocalGrainDirectory` with <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalGrainDirectory*>.
 
-## Legacy: `LocalGrainDirectory` <a name="overview-and-architecture"></a>
+## `LocalGrainDirectory` <a name="overview-and-architecture"></a>
 
 `LocalGrainDirectory` partitions registrations over the membership ring. Hashing a grain identity selects the silo whose local `LocalGrainDirectoryPartition` is authoritative for that key. This follows the broad consistent-hashing distributed-hash-table model described by [Chord](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf), adapted to Orleans membership and activation semantics. Each silo also keeps non-authoritative cache entries to avoid repeated remote lookups.
 
@@ -80,23 +80,17 @@ Requests and responses carry view information. A range cannot serve a request un
 
 API: <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> and <xref:Orleans.Configuration.GrainDirectoryOptions>. Implementation: [hosting registration](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/CoreHostingExtensions.cs) and [`DistributedGrainDirectory`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/GrainDirectory/DistributedGrainDirectory.cs).
 
-## Local-to-distributed transition
-
-During migration, compatibility system targets bridge the two directory protocols. A distributed-default silo serves legacy remote-directory requests through its distributed directory. Local-directory silos expose compatibility endpoints for distributed partition requests and activation recovery.
-
-The mixed-directory phase accepts temporary duplicate activations while legacy and distributed ownership protocols coexist. Once every silo uses the distributed directory, range recovery and duplicate resolution converge on a single registered activation per single-activation grain. Upgrade qualification checks uniqueness and registration integrity after that final convergence. Applications use persistence concurrency controls and idempotent operations to tolerate concurrent activations during the transition.
-
-The local-to-distributed transition is one-way. First upgrade all silo runtimes while explicitly retaining the local directory, then migrate the directory in a separate rolling deployment. Keep one partition per silo and the default boundary function during that migration. Existing experimental distributed-directory clusters retain their original partition identities, including the sorted 30-partition mapping used by earlier experimental releases. The [upgrade procedure](../host/grain-directory.md#local-to-distributed-directory-upgrade) defines deployment prerequisites and checkpoints.
-
 ## Tradeoffs
 
 | Property | `LocalGrainDirectory` | Default `DistributedGrainDirectory` |
 | --- | --- | --- |
-| Selection | <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalGrainDirectory*?displayProperty=nameWithType> before migration | Runtime default |
+| Selection | <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalGrainDirectory*?displayProperty=nameWithType> | Runtime default |
 | Ownership | Membership consistent-hash ring | Versioned ranges over membership views |
 | Normal lookup | Owner partition plus per-silo cache | Owner partition plus view coordination |
 | View change | Partition split/merge and cache repair | Sealed ranges and snapshot transfer |
 | Recovery emphasis | Duplicate detection and invalidation | Explicit range recovery |
-| Configuration | Explicit migration deferral | <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType>, default 1 |
+| Configuration | Explicit directory selection | <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType>, default 1 |
 
 More partitions can improve ownership granularity but increase transfer and coordination work. Production rollouts should include compatibility, failure, and load testing.
+
+For directory changes during a version upgrade, follow [Grain directory migration](../migration/grain-directory.md#local-to-distributed-directory-upgrade).

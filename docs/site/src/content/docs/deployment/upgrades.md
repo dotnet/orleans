@@ -47,29 +47,12 @@ Replace a bounded number of silos at a time. Pause when error rate, latency, mem
 
 Orleans grain versioning can route calls among compatible grain implementations, but it doesn't make arbitrary application or storage changes compatible. See [Deploy new versions of grains](../grains/grain-versioning/deploying-new-versions-of-grains.md) and [Backward compatibility guidelines](../grains/grain-versioning/backward-compatibility-guidelines.md).
 
-### Uniform silo hash API compatibility
+### Release-specific migration guidance
 
-<xref:Orleans.Runtime.SiloAddress.GetUniformHashCodes*> returns an <xref:System.Collections.Immutable.ImmutableArray`1> which shares the silo's cached hash storage. Rebuild callers compiled against the earlier `uint[]` return type. Use `ToArray()` when a mutable buffer is needed, or `Sort()` to obtain a sorted immutable result while preserving the cached values.
+<a id="uniform-silo-hash-api-compatibility"></a>
+<a id="distributed-directory-upgrade-compatibility"></a>
 
-### Distributed-directory upgrade compatibility
-
-Orleans 11.0.0-preview.1 enables the stable distributed grain directory by default. For a cluster using the Orleans 10 local directory, first upgrade every silo with <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalGrainDirectory*> selected, then migrate the directory in a separate rollout. Follow [Upgrade from the local directory](../host/grain-directory.md#local-to-distributed-directory-upgrade) for prerequisites, checkpoints, and operational recovery.
-
-The local-to-distributed migration is one-way. The local-directory option lets applications defer migration; once migration starts, recovery retains the distributed directory. Choose compatible application images, storage changes, and recovery procedures before that point.
-
-Temporary duplicate activations are accepted while local- and distributed-directory silos coexist. Qualify persistence concurrency control and idempotent side effects before starting. Once every silo uses the distributed directory and recovery has converged, verify that duplicates have resolved and active grains have matching registrations. Workloads requiring exclusive activation ownership throughout cutover can use a coordinated full-cluster restart instead.
-
-Rolling upgrades of an existing [distributed-directory cluster](../host/grain-directory.md#strongly-consistent-in-cluster-directory) preserve both the partition count and the mapping from hash boundaries to partition numbers. Directory requests and ownership-transfer snapshots address those numbered partitions, so all silos must agree on their ranges.
-
-Orleans 10.1 used 30 partitions per silo and assigned partition numbers after sorting each silo's uniform hashes by unsigned value. Orleans 10.2 changed the default count to one and assigned multiple partitions in hash-generation order.
-
-When upgrading a distributed-directory cluster running Orleans 10.1, configure newer silos with <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> set to `30` and provide an application-defined <xref:Orleans.Configuration.GrainDirectoryOptions.GetPartitionBoundaries> delegate which returns each silo's uniform hashes in sorted order:
-
-:::code language="csharp" source="../snippets/compiled/Deployment/DirectoryPartitioningSnippet.cs" id="legacy_directory_partitions":::
-
-Sorting the immutable hash array preserves the silo's cached hash order and produces the existing partition identities. Retain this configuration after the upgrade and in every compatible distributed-directory recovery deployment.
-
-Clusters already using the Orleans 10.2-and-later generated-order mapping retain the default boundary function and their existing partition count. Qualify runtime upgrades and compatible application rollback under sustained traffic, checking directory registration preservation and activation uniqueness. Changing an established cluster's partition count or boundary mapping requires a coordinated full-cluster restart or a blue-green cutover with controlled grain-state ownership.
+Follow [Grain directory migration](../migration/grain-directory.md#local-to-distributed-directory-upgrade) for its directory cutover procedure and [uniform-hash API adaptation](../migration/grain-directory.md#uniform-silo-hash-api-compatibility) for affected callers.
 
 ## Blue-green upgrades
 
@@ -91,7 +74,5 @@ Never point two incompatible active clusters at the same mutable grain state and
 ## Rollback
 
 A rollback plan must cover code, configuration, schema, credentials, and persisted state. If the new version has written data the old version can't read, reverting only the image isn't a rollback.
-
-For a cluster which has started the [local-to-distributed directory migration](../host/grain-directory.md#local-to-distributed-directory-upgrade), recovery deployments continue using the distributed directory with the same partition configuration. Returning to the local directory is unsupported.
 
 Stop a rollout when safety thresholds are exceeded. Preserve logs and traces from failed instances, restore capacity with a known-compatible version, and avoid repeated automated retries that churn membership.

@@ -15,7 +15,11 @@ Orleans uses the built-in `DistributedGrainDirectory` by default. It keeps regis
 
 The directory coordinates registration and ownership transfer so that callers agree on an activation's location as membership changes. Keep grain operations idempotent: failed calls and retries can still repeat application work.
 
-Applications retaining the previous `LocalGrainDirectory` select it with <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalGrainDirectory*> on every silo before migrating. See [Upgrade from the local directory](#local-to-distributed-directory-upgrade) for the one-way migration procedure.
+To select `LocalGrainDirectory`, call <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalGrainDirectory*> on every silo.
+
+<a id="local-to-distributed-directory-upgrade"></a>
+
+For version upgrades, follow [Grain directory migration](../migration/grain-directory.md#local-to-distributed-directory-upgrade).
 
 ## Which grain directory should you use?
 
@@ -74,7 +78,7 @@ Named directories can also be configured under `Orleans:GrainDirectory:{name}` w
 
 The default `DistributedGrainDirectory` is a strongly consistent in-cluster directory based on partitioned ranges and membership views. <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> selects it explicitly or registers an additional name for the same directory instance.
 
-Keep the final default and named directory mappings consistent across the cluster. Multiple names share the same distributed directory instance. Use the upgrade procedure below to transition an existing local-directory cluster.
+Configure default and named directory mappings consistently across the cluster. Multiple names share the same distributed directory instance.
 
 The distributed directory defaults to one partition per silo (<xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> = `1`). Change this only after testing with the expected cluster size and workload.
 
@@ -82,47 +86,7 @@ The distributed directory defaults to one partition per silo (<xref:Orleans.Conf
 
 If the boundary function throws or returns an invalid result, Orleans stops directory membership processing and reports an <xref:Orleans.Runtime.OrleansConfigurationException> to membership readers and refresh calls. Correct the boundary configuration and restart the affected silos.
 
-The partition count and boundary function are captured when the directory is created. Keep both consistent across the cluster, including during rollout and rollback. See [Distributed-directory upgrade compatibility](../deployment/upgrades.md#distributed-directory-upgrade-compatibility) for retaining the mapping used by an existing cluster.
-
-## Upgrade from the local directory
-
-<a id="local-to-distributed-directory-upgrade"></a>
-
-The distributed directory is stable and enabled by default. Upgrade an existing `LocalGrainDirectory` cluster in two separate rollouts: upgrade every runtime while retaining the local directory, then migrate the directory. See [Distributed-directory upgrade compatibility](../deployment/upgrades.md#distributed-directory-upgrade-compatibility) for release-specific prerequisites.
-
-**Directory migration is one-way.** Once the cluster begins using the distributed default, continue toward an all-distributed cluster. Returning that cluster to the local directory is unsupported. Decide the recovery procedure and qualify the deployment before introducing the first distributed-default silo.
-
-### Prepare and defer migration
-
-1. Inventory the default and named directories selected by every grain type. Keep named-provider selections and cluster identity unchanged during this procedure.
-1. Qualify the exact application versions, serialized contracts, persistence providers, and deployment configuration under representative traffic. Verify successful calls during rollout, graceful silo departure, and duplicate resolution and directory integrity after completion.
-1. Persist state needed after reactivation and budget capacity for activation recovery. During the mixed-directory phase, temporary duplicate activations can run concurrently. Use persistence concurrency controls and idempotent external operations to tolerate concurrent activations and retries.
-1. Roll out the new runtime with <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalGrainDirectory*> configured on **every replacement silo**. This explicitly retains the local directory while the runtime versions coexist. Keep that configuration on scale-out instances too.
-1. Wait until every silo runs the new runtime, membership is stable, and grain-call and activation behavior match the baseline. Applications can remain in this all-local configuration until ready for the directory migration.
-
-`UseLocalGrainDirectory` is a migration-deferral option. Choose it before the directory migration starts. Its API reference provides the configuration surface; the released package used by the hosting snippets predates this API.
-
-### Migrate the directory
-
-1. Keep <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> at `1` and retain the default <xref:Orleans.Configuration.GrainDirectoryOptions.GetPartitionBoundaries> function throughout the local-to-distributed rollout.
-1. Remove `UseLocalGrainDirectory` from the deployment configuration. The runtime default selects the distributed directory; an explicit call to <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> also selects it.
-1. Replace a bounded number of silos at a time, preserving the tested ready-silo and surge-capacity floor. Gracefully stop each departing silo, and allow membership and directory ownership transfers to complete before the next replacement.
-1. During each mixed-directory stage, exercise existing grains and newly activated grains and monitor call failures and activation churn. Temporary duplicate activations are accepted during this phase.
-1. Continue until every silo uses the distributed directory, then allow membership, range recovery, and duplicate resolution to converge. Verify one registered activation per single-activation grain and matching registrations for active grains. Keep the distributed selection and partition configuration on later deployments and scale-out instances.
-
-The runtime compatibility endpoints let local- and distributed-directory silos route registrations and transfer ownership during this transition. The staged runtime upgrade ensures every participant uses the new runtime before directory migration begins. Keep named-provider selections consistent throughout both rollouts.
-
-For workloads which require exclusive activation ownership throughout the cutover, use a coordinated full-cluster restart instead of a rolling directory migration: gracefully stop every silo, then start the distributed-default deployment.
-
-### Watch the migration
-
-Compare grain-call error rate and latency, activation churn and failures, duplicate-activation reports, membership churn, and directory registration errors with the pre-upgrade baseline. Observe directory snapshot transfers, range recovery, and range-lock duration alongside silo departures. Temporary mixed-phase duplicates should resolve once the upgrade completes. The final healthy checkpoint has an all-distributed cluster, a stable membership view, completed recovery, successful calls to existing and new grains, and one registered activation per single-activation grain.
-
-Pause replacements when an application safety or availability threshold is exceeded. Preserve directory and membership logs and retain sufficient distributed-directory capacity. Investigate duplicate activations or registration mismatches which persist after the all-distributed cluster has converged. Recover application state using the qualified recovery procedure while retaining the distributed directory.
-
-### Clusters already using the experimental distributed directory
-
-Keep their established partition count and boundary-to-partition mapping throughout the runtime upgrade. Experimental releases used `30` partitions per silo with uniform hashes sorted by unsigned value. Current releases use one partition by default and use hash-generation order when multiple partitions are configured. Configure the established mapping explicitly before newer silos join; see [Distributed-directory upgrade compatibility](../deployment/upgrades.md#distributed-directory-upgrade-compatibility) for the release boundaries and configuration.
+The partition count and boundary function are captured when the directory is created. Keep both consistent across the cluster.
 
 ## Operational guidance
 
