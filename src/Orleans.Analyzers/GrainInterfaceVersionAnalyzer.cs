@@ -339,21 +339,15 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             }
 
             // Check if interface is declared in the file
-            var explicitGrainInterfaceType = GetStringAttributeValue(
-                namedType,
-                Constants.GrainInterfaceTypeAttributeFullyQualifiedName);
             var grainInterfaceType = GetGrainInterfaceType(namedType);
             var declaredInterface = FindDeclaredInterface(
                 interfaceName,
                 grainInterfaceType,
-                explicitGrainInterfaceType is null
-                    || string.Equals(
-                        explicitGrainInterfaceType,
-                        GetDefaultGrainInterfaceType(namedType),
-                        StringComparison.Ordinal));
+                HasDefaultGrainInterfaceType(namedType));
             if (declaredInterface is null)
             {
-                _visitedInterfaces.TryAdd(interfaceName, true);
+                // Visit by identity: a same-named declaration with a different identity has still been removed.
+                _visitedInterfaces.TryAdd(grainInterfaceType, true);
                 // Interface not found in file
                 var properties = ImmutableDictionary<string, string?>.Empty
                     .Add(InterfaceNamePropertyKey, interfaceName)
@@ -833,6 +827,13 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>
+    /// Gets a value indicating whether the grain interface type is the CLR naming convention, which is the only identity
+    /// a legacy declaration without a recorded identity can describe.
+    /// </summary>
+    internal static bool HasDefaultGrainInterfaceType(INamedTypeSymbol type)
+        => string.Equals(GetGrainInterfaceType(type), GetDefaultGrainInterfaceType(type), StringComparison.Ordinal);
+
+    /// <summary>
     /// Gets the grain interface type when it differs from the CLR naming convention, or <see langword="null"/> otherwise.
     /// </summary>
     internal static string? GetNonDefaultGrainInterfaceType(INamedTypeSymbol type)
@@ -1228,8 +1229,9 @@ internal static class GrainInterfaceFileParser
     // Interface line: interface [GrainInterfaceType("x")] Namespace.IInterface<T> [Version(N)]
     // Or with retired: *RETIRED* interface [GrainInterfaceType("x")] Namespace.IInterface<T> [Version(N)]
     // The name can include generic type parameters like IMyGrain<T> or IMyGrain<TKey, TValue>
+    // Quoted identities are backslash-escaped; see FormatQuotedIdentity.
     private static readonly Regex InterfacePattern = new(
-        @"^(?<retired>\*RETIRED\*\s*)?(?:interface\s+)?(\[GrainInterfaceType\(""(?<grainInterfaceType>[^""]+)""\)\]\s*)?(\[Alias\(""(?<alias>[^""]+)""\)\]\s*)?(?<name>[\w]+(?:<[\w,\s]+>)?(?:\.[\w]+(?:<[\w,\s]+>)?)*)\s*\[Version\((?<version>\d+)\)\]$",
+        @"^(?<retired>\*RETIRED\*\s*)?(?:interface\s+)?(\[GrainInterfaceType\(""(?<grainInterfaceType>(?:[^""\\]|\\.)+)""\)\]\s*)?(\[Alias\(""(?<alias>(?:[^""\\]|\\.)+)""\)\]\s*)?(?<name>[\w]+(?:<[\w,\s]+>)?(?:\.[\w]+(?:<[\w,\s]+>)?)*)\s*\[Version\((?<version>\d+)\)\]$",
         RegexOptions.Compiled);
 
     // Grain class line: class [GrainType("x")] Namespace.GrainClass
@@ -1260,14 +1262,50 @@ internal static class GrainInterfaceFileParser
     internal static bool TryGetGrainInterfaceType(string line, out string grainInterfaceType)
     {
         var match = InterfacePattern.Match(StripClrComment(line));
-        if (match.Success && match.Groups["grainInterfaceType"].Success)
+        if (match.Success && GetRecordedGrainInterfaceType(match) is { } recorded)
         {
-            grainInterfaceType = match.Groups["grainInterfaceType"].Value;
+            grainInterfaceType = recorded;
             return true;
         }
 
         grainInterfaceType = string.Empty;
         return false;
+    }
+
+    // Legacy declarations record an interface's [Alias], which is its runtime identity when it has no [GrainInterfaceType].
+    private static string? GetRecordedGrainInterfaceType(Match match)
+    {
+        if (match.Groups["grainInterfaceType"].Success)
+        {
+            return UnescapeWireIdentity(match.Groups["grainInterfaceType"].Value);
+        }
+
+        return match.Groups["alias"].Success ? UnescapeWireIdentity(match.Groups["alias"].Value) : null;
+    }
+
+    /// <summary>
+    /// Escapes an identity for a quoted declaration attribute so that quotes and inline comment markers round-trip.
+    /// </summary>
+    internal static string FormatQuotedIdentity(string value)
+    {
+        var result = new StringBuilder(value.Length);
+        foreach (var character in value)
+        {
+            result.Append(character switch
+            {
+                '\\' => @"\\",
+                '"' => @"\""",
+                '#' => @"\#",
+                '\r' => @"\r",
+                '\n' => @"\n",
+                '\t' => @"\t",
+                _ when char.IsControl(character) || char.IsWhiteSpace(character) && character != ' '
+                    => $"\\u{((int)character).ToString("X4", CultureInfo.InvariantCulture)}",
+                _ => character.ToString()
+            });
+        }
+
+        return result.ToString();
     }
 
     internal static bool TryGetGrainClassName(string line, out string name)
@@ -1525,8 +1563,8 @@ internal static class GrainInterfaceFileParser
             if (interfaceMatch.Success)
             {
                 var name = interfaceMatch.Groups["name"].Value;
-                var alias = interfaceMatch.Groups["alias"].Success ? interfaceMatch.Groups["alias"].Value : null;
-                var grainInterfaceType = interfaceMatch.Groups["grainInterfaceType"].Success ? interfaceMatch.Groups["grainInterfaceType"].Value : null;
+                var alias = interfaceMatch.Groups["alias"].Success ? UnescapeWireIdentity(interfaceMatch.Groups["alias"].Value) : null;
+                var grainInterfaceType = GetRecordedGrainInterfaceType(interfaceMatch);
                 if (!ushort.TryParse(interfaceMatch.Groups["version"].Value, out var version))
                 {
                     currentInterface = null;

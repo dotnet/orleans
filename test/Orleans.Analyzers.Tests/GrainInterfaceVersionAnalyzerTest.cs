@@ -1428,6 +1428,90 @@ namespace MyApp.Counters
         Assert.Empty(diagnostics);
     }
 
+    [Theory]
+    [InlineData("[Alias(\"new-id\")]", "interface IMyGrain [Version(0)]")]
+    [InlineData("", "[Alias(\"my-grain\")] IMyGrain [Version(0)]")]
+    [InlineData("[Alias(\"new-id\")]", "[Alias(\"my-grain\")] IMyGrain [Version(0)]")]
+    public async Task LegacyDeclaration_InterfaceAliasChange_IsBreaking(string interfaceAttributes, string contractsFile)
+    {
+        var source = $"{interfaceAttributes} public interface IMyGrain : IGrain {{ }}";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0016);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0019);
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateProject_RetiresLegacyIdentityWhenAliasIntroduced()
+    {
+        const string source = @"
+[Alias(""new-id"")]
+public interface IMyGrain : IGrain
+{
+}
+";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            source,
+            "interface IMyGrain [Version(0)]",
+            GrainInterfaceVersionAnalyzer.RuleId0016,
+            RegenerateCodeActionTitle);
+
+        var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+
+        Assert.Contains("interface [GrainInterfaceType(\"new-id\")] IMyGrain [Version(0)]", content);
+        Assert.Contains("*RETIRED* interface IMyGrain [Version(0)]", content);
+        Assert.Empty(await GetDiagnosticsAsync(source, content));
+    }
+
+    [Fact]
+    public async Task CodeFix_UpdateVersion_LegacyAliasedDeclaration()
+    {
+        const string source = @"
+[Alias(""my-grain"")]
+[Version(2)]
+public interface IMyGrain : IGrain
+{
+    [Alias(""do"")]
+    Task DoSomething();
+}
+";
+        const string contractsFile = "[Alias(\"my-grain\")] IMyGrain [Version(1)]\ndo: DoSomething() -> Task\n";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+        Assert.Equal(GrainInterfaceVersionAnalyzer.RuleId0017, Assert.Single(diagnostics).Id);
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0017);
+
+        Assert.Contains("IMyGrain [Version(2)]", content);
+        Assert.DoesNotContain("[Version(1)]", content);
+        Assert.Empty(await GetDiagnosticsAsync(source, content));
+    }
+
+    [Theory]
+    [InlineData("counter\"v2")]
+    [InlineData("counter # CLR: v2")]
+    [InlineData("counter\\v2")]
+    [InlineData("counter\nv2")]
+    [InlineData("counter\u2028v2")]
+    public async Task CodeFix_AddInterface_EscapedAliasRoundTrips(string alias)
+    {
+        var source = $"[Alias({SymbolDisplay.FormatLiteral(alias, quote: true)})] public interface ICounterGrain : IGrain {{ }}";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            string.Empty,
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        Assert.Contains("interface [GrainInterfaceType(\"counter", content);
+        Assert.Empty(await GetDiagnosticsAsync(source, content));
+    }
+
     [Fact]
     public async Task StableGrainTypeChange_IsBreaking()
     {

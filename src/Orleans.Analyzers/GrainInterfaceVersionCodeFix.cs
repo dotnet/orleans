@@ -458,16 +458,11 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
     {
         AppendBlockSeparator(lines);
         var interfaceName = GetFullyQualifiedName(type);
-        var explicitInterfaceType = GetGrainInterfaceTypeFromAttributes(type);
         var interfaceType = GrainInterfaceVersionAnalyzer.GetGrainInterfaceType(type);
         activeInterfaceIdentities.Add(interfaceType);
         activeInterfaces[interfaceType] = type;
         activeInterfacesByName[interfaceName] = type;
-        if (explicitInterfaceType is null
-            || string.Equals(
-                explicitInterfaceType,
-                GrainInterfaceVersionAnalyzer.GetDefaultGrainInterfaceType(type),
-                StringComparison.Ordinal))
+        if (GrainInterfaceVersionAnalyzer.HasDefaultGrainInterfaceType(type))
         {
             activeConventionInterfaceNames.Add(interfaceName);
         }
@@ -478,7 +473,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             lines.Add($"# {interfaceName}");
         }
 
-        lines.Add($"interface [GrainInterfaceType(\"{interfaceType}\")] {interfaceName} [Version({GetVersionFromAttributes(type)})]");
+        lines.Add($"interface [GrainInterfaceType(\"{GrainInterfaceFileParser.FormatQuotedIdentity(interfaceType)}\")] {interfaceName} [Version({GetVersionFromAttributes(type)})]");
         foreach (var member in type.GetMembers()
             .OfType<IMethodSymbol>()
             .Where(member => member.MethodKind == MethodKind.Ordinary && !member.IsStatic)
@@ -1305,7 +1300,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         sb.Append("interface ");
         if (!string.IsNullOrEmpty(grainInterfaceType))
         {
-            sb.Append($"[GrainInterfaceType(\"{grainInterfaceType}\")] ");
+            sb.Append($"[GrainInterfaceType(\"{GrainInterfaceFileParser.FormatQuotedIdentity(grainInterfaceType)}\")] ");
         }
         sb.Append(interfaceName);
         sb.Append($" [Version({version})]");
