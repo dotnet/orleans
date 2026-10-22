@@ -1,3 +1,4 @@
+using System.Net;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Orleans;
@@ -7,10 +8,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.GrainDirectory;
 using Orleans.GrainDirectory.AdoNet;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Tests.SqlUtils;
 using TestExtensions;
+using UnitTests.General;
 
 namespace UnitTests.AdoNet;
 
@@ -225,4 +229,63 @@ public sealed class AdoNetAspireIntegrationTests
             _ => throw new ArgumentOutOfRangeException(nameof(capability), capability, null),
         };
 
+}
+
+[Collection(TestEnvironmentFixture.DefaultCollection)]
+[TestCategory("AdoNet"), TestCategory("SqlServer"), TestCategory("Functional")]
+[TestSuite("Functional")]
+[TestProvider("SqlServer")]
+[TestArea("GrainDirectory")]
+public sealed class AdoNetAspireSqlServerIntegrationTests
+{
+    [Fact]
+    public async Task GeneratedConfiguration_RegistersLooksUpAndUnregistersActivation()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var database = await RelationalStorageForTesting.SetupInstance(
+            AdoNetInvariants.InvariantNameSqlServer,
+            "OrleansAspireSqlServer",
+            cancellationToken: cancellationToken);
+        using var generated = await AdoNetAspireTestConfiguration.CreateAsync(
+            AdoNetAspireDatabase.SqlServer,
+            [AdoNetAspireCapability.GrainDirectory],
+            connectionString: database.CurrentConnectionString);
+        var builder = Host.CreateApplicationBuilder();
+        builder.Configuration.AddConfiguration(generated.HostConfiguration);
+        builder.UseOrleans();
+        using var host = builder.Build();
+        var directory = host.Services.GetRequiredKeyedService<IGrainDirectory>(generated.ProviderName);
+        var options = host.Services.GetRequiredService<IOptionsMonitor<AdoNetGrainDirectoryOptions>>()
+            .Get(generated.ProviderName);
+        Assert.Equal(database.CurrentConnectionString, options.ConnectionString);
+        Assert.Equal(AdoNetInvariants.InvariantNameSqlServer, options.Invariant);
+
+        var address = new GrainAddress
+        {
+            GrainId = GrainId.Create("aspire", Guid.NewGuid().ToString("N")),
+            SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1),
+            ActivationId = ActivationId.NewId(),
+        };
+        Assert.Null(await directory.Lookup(address.GrainId, cancellationToken));
+        var registered = await directory.Register(address, cancellationToken);
+        try
+        {
+            Assert.NotNull(registered);
+            Assert.Equal(address.GrainId, registered.GrainId);
+            Assert.Equal(address.SiloAddress, registered.SiloAddress);
+            Assert.Equal(address.ActivationId, registered.ActivationId);
+
+            var stored = await directory.Lookup(address.GrainId, cancellationToken);
+            Assert.NotNull(stored);
+            Assert.Equal(address.GrainId, stored.GrainId);
+            Assert.Equal(address.SiloAddress, stored.SiloAddress);
+            Assert.Equal(address.ActivationId, stored.ActivationId);
+        }
+        finally
+        {
+            await directory.Unregister(address, cancellationToken);
+        }
+
+        Assert.Null(await directory.Lookup(address.GrainId, cancellationToken));
+    }
 }

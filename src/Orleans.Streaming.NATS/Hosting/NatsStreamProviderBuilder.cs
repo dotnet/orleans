@@ -214,7 +214,7 @@ public sealed class NatsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, 
             || !Enum.IsDefined(result))
         {
             throw new OrleansConfigurationException(
-                $"NATS stream provider setting '{key}' has invalid value '{value}'.");
+                $"NATS stream provider configuration section '{configurationSection.Path}' setting '{key}' has invalid value '{value}'.");
         }
 
         return result;

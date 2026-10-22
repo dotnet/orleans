@@ -33,7 +33,8 @@ internal sealed class AdoNetAspireTestConfiguration
     public static async Task<GeneratedConfiguration> CreateAsync(
         AdoNetAspireDatabase databaseType,
         IReadOnlyList<AdoNetAspireCapability> capabilities,
-        string? explicitInvariant = null)
+        string? explicitInvariant = null,
+        string? connectionString = null)
     {
         var id = Interlocked.Increment(ref s_resourceId);
         var stem = $"{databaseType.ToString().ToLowerInvariant()}-{id}";
@@ -69,6 +70,12 @@ internal sealed class AdoNetAspireTestConfiguration
             .WithReference(orleans);
         var client = builder.AddContainer($"client-{stem}", "unused")
             .WithReference(orleans.AsClient());
+
+        if (connectionString is not null)
+        {
+            silo.WithEnvironment($"ConnectionStrings__{databaseName}", connectionString);
+            client.WithEnvironment($"ConnectionStrings__{databaseName}", connectionString);
+        }
 
         await using var app = await builder.BuildAsync();
         var hostConfiguration = await AspireResourceConfiguration.CreateAsync(

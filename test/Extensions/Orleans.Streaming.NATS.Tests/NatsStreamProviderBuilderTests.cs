@@ -195,6 +195,27 @@ public sealed class NatsStreamProviderBuilderTests
     }
 
     [Fact]
+    public void Configure_InvalidStorageType_IdentifiesConfigurationSection()
+    {
+        const string providerName = "orders";
+        const string invalidValue = "invalid-storage";
+        var configurationSectionPath = $"Orleans:Streaming:{providerName}";
+        var builder = new TestSiloBuilder(CreateConfiguration(
+            ($"{configurationSectionPath}:ConnectionString", "nats://localhost:4222"),
+            ($"{configurationSectionPath}:StorageType", invalidValue)));
+
+        Configure(builder, providerName);
+
+        using var services = builder.Services.BuildServiceProvider();
+        var exception = Assert.Throws<OrleansConfigurationException>(
+            () => services.GetRequiredService<IOptionsMonitor<NatsOptions>>().Get(providerName));
+
+        Assert.Equal(
+            $"NATS stream provider configuration section '{configurationSectionPath}' setting 'StorageType' has invalid value '{invalidValue}'.",
+            exception.Message);
+    }
+
+    [Fact]
     public void Assembly_RegistersStableManualAndAspireProviderTypes()
     {
         var registrations = typeof(NatsStreamProviderBuilder)
