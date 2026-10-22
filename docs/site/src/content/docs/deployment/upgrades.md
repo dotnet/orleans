@@ -52,7 +52,7 @@ Orleans grain versioning can route calls among compatible grain implementations,
 <a id="uniform-silo-hash-api-compatibility"></a>
 <a id="distributed-directory-upgrade-compatibility"></a>
 
-Follow [Grain directory migration](../migration/grain-directory.md#local-to-distributed-directory-upgrade) for its directory cutover procedure and [uniform-hash API adaptation](../migration/grain-directory.md#uniform-silo-hash-api-compatibility) for affected callers.
+Follow [Grain directory migration](../migration/grain-directory.md#local-to-distributed-directory-upgrade) for the local-directory cutover procedure, [existing distributed-directory upgrades](../migration/grain-directory.md#upgrade-existing-distributed-directory-clusters) for partition compatibility, and [uniform-hash API adaptation](../migration/grain-directory.md#uniform-silo-hash-api-compatibility) for affected callers.
 
 ## Blue-green upgrades
 

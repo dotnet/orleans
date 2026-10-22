@@ -1,6 +1,6 @@
 ---
 title: Grain directory migration
-description: Upgrade an Orleans 10 local-directory cluster to the Orleans 11 distributed-directory default.
+description: Upgrade Orleans grain directory configurations while preserving activation and partition identities.
 ms.date: 10/21/2026
 ms.topic: how-to
 ---
@@ -10,6 +10,8 @@ ms.topic: how-to
 <a id="local-to-distributed-directory-upgrade"></a>
 
 Orleans 11.0.0-preview.1 uses the distributed grain directory by default. For an Orleans 10 cluster using `LocalGrainDirectory`, separate the runtime upgrade from the directory migration: first upgrade every runtime while retaining the local directory, then migrate the directory in a second rollout.
+
+For clusters already using the distributed directory, follow [Upgrade existing distributed-directory clusters](#upgrade-existing-distributed-directory-clusters) to retain their partition configuration.
 
 Qualify the exact runtime and application versions using the [deployment compatibility guidance](deployment-and-rollback.md#compatibility-boundary) before choosing a rolling runtime upgrade.
 
@@ -25,7 +27,7 @@ Qualify the exact runtime and application versions using the [deployment compati
 
 ## Migrate the directory
 
-1. Keep <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> at `1` and retain the default <xref:Orleans.Configuration.GrainDirectoryOptions.GetPartitionBoundaries> function throughout the local-to-distributed rollout.
+1. For this local-to-distributed rollout, keep <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> at `1` and retain the default <xref:Orleans.Configuration.GrainDirectoryOptions.GetPartitionBoundaries> function.
 1. Remove `UseLocalGrainDirectory` from the deployment configuration. The runtime default selects the distributed directory; an explicit call to <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> also selects it.
 1. Replace a bounded number of silos at a time, preserving the tested ready-silo and surge-capacity floor. Gracefully stop each departing silo, and allow membership and directory ownership transfers to complete before the next replacement.
 1. During each mixed-directory stage, exercise existing grains and newly activated grains and monitor call failures and activation churn. Temporary duplicate activations are accepted during this phase.
@@ -48,6 +50,20 @@ Pause replacements when an application safety or availability threshold is excee
 Once the cluster begins using the distributed default, continue toward an all-distributed cluster. Returning that cluster to the local directory is unsupported. Decide the recovery procedure and qualify the deployment before introducing the first distributed-default silo.
 
 Recover application state using the qualified recovery procedure while retaining the distributed directory and its partition configuration. Include compatible application images, storage changes, and recovery points in that plan.
+
+## Upgrade existing distributed-directory clusters
+
+Rolling runtime upgrades of an existing distributed-directory cluster preserve both the partition count and the mapping from hash boundaries to partition numbers. Directory requests and ownership-transfer snapshots address those numbered partitions, so all silos must agree on their ranges.
+
+Orleans 10.1 used 30 partitions per silo and assigned partition numbers after sorting each silo's uniform hashes by unsigned value. Orleans 10.2 changed the default count to one and assigned multiple partitions in hash-generation order.
+
+When upgrading a distributed-directory cluster running Orleans 10.1, configure newer silos with <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> set to `30` and an application-defined <xref:Orleans.Configuration.GrainDirectoryOptions.GetPartitionBoundaries> delegate which returns each silo's uniform hashes in sorted order:
+
+:::code language="csharp" source="../snippets/compiled/Deployment/DirectoryPartitioningSnippet.cs" id="legacy_directory_partitions":::
+
+Sorting the immutable hash array preserves the silo's cached hash order and produces the existing partition identities. Retain this configuration after the upgrade and in every compatible distributed-directory recovery deployment.
+
+Clusters already using the Orleans 10.2-and-later generated-order mapping retain the default boundary function and their existing partition count. Qualify runtime upgrades and compatible application recovery under sustained traffic, checking directory registration preservation and activation uniqueness. Changing an established cluster's partition count or boundary mapping requires a coordinated full-cluster restart or a blue-green cutover with controlled grain-state ownership.
 
 ## Rebuild uniform-hash callers
 
