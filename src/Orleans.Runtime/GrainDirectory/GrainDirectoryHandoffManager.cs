@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -24,6 +25,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly object _lock = new();
         private readonly Queue<(string name, object state, Func<GrainDirectoryHandoffManager, object, Task> action)> pendingOperations = new();
         private readonly AsyncLock executorLock = new AsyncLock();
+        private readonly List<Task> _pendingOperationTasks = new();
 
         internal GrainDirectoryHandoffManager(
             LocalGrainDirectory localDirectory,
@@ -221,11 +223,35 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (_lock)
             {
+                if (!localDirectory.Running)
+                {
+                    return;
+                }
+
                 this.pendingOperations.Enqueue((name, state, action));
                 if (this.pendingOperations.Count <= 2)
                 {
-                    this.localDirectory.RemoteGrainDirectory.WorkItemGroup.QueueTask(ExecutePendingOperations, localDirectory.RemoteGrainDirectory);
+                    _pendingOperationTasks.RemoveAll(static task => task.IsCompletedSuccessfully);
+                    _pendingOperationTasks.Add(this.localDirectory.RemoteGrainDirectory.WorkItemGroup.QueueTask(ExecutePendingOperations, localDirectory.RemoteGrainDirectory));
                 }
+            }
+        }
+
+        internal async Task StopAsync()
+        {
+            Debug.Assert(!localDirectory.Running);
+            Task[] tasks;
+            lock (_lock)
+            {
+                tasks = _pendingOperationTasks.ToArray();
+            }
+
+            // LocalGrainDirectory stops membership updates before joining handoff work, so no new work can be added.
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+            lock (_lock)
+            {
+                pendingOperations.Clear();
+                _pendingOperationTasks.Clear();
             }
         }
 

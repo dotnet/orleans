@@ -183,13 +183,12 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
                     taskEnd = Environment.TickCount64;
                     var taskDurationMs = taskEnd - taskStart;
                     taskStart = taskEnd;
+                    _currentTask = null;
                     if (taskDurationMs > turnWarningDurationMs)
                     {
                         _schedulerInstruments.OnLongRunningTurn();
                         LogLongRunningTurn(task, taskDurationMs);
                     }
-
-                    _currentTask = null;
                 }
             }
             while (activationSchedulingQuantumMs <= 0 || taskEnd - loopStart < activationSchedulingQuantumMs);
@@ -235,7 +234,16 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTaskLoopError(Exception ex)
     {
-        LogErrorTaskLoop(Logger, ex, Environment.CurrentManagedThreadId);
+        try
+        {
+            LogErrorTaskLoop(Logger, ex, Environment.CurrentManagedThreadId);
+        }
+        catch (Exception loggingException)
+        {
+            // A turn can complete before its scheduler epilogue, even when shutdown joined the task.
+            // Do not let a disposed or failing provider turn error reporting into an unhandled pool exception.
+            Console.Error.WriteLine($"Scheduler task loop failed: {ex}{Environment.NewLine}Error reporting scheduler task loop failure: {loggingException}");
+        }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

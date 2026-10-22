@@ -6,6 +6,7 @@ using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.ConsistentRing;
@@ -33,11 +34,8 @@ namespace Orleans.Runtime
         private readonly Watchdog platformWatchdog;
         private readonly TimeSpan waitForMessageToBeQueuedForOutbound;
         private readonly TimeSpan initTimeout;
-#if NET9_0_OR_GREATER
-        private readonly Lock lockable = new();
-#else
-        private readonly object lockable = new();
-#endif
+        // Start, rollback, stop and disposal must not run lifecycle callbacks concurrently.
+        private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
         private readonly List<GrainService> grainServices = new List<GrainService>();
@@ -55,6 +53,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets a <see cref="Task"/> which completes once the silo has terminated.
         /// </summary>
+        /// <remarks>The task faults if lifecycle shutdown cannot complete.</remarks>
         public Task SiloTerminated { get { return this.siloTerminatedTask.Task; } } // one event for all types of termination (shutdown, stop and fast kill).
 
         /// <summary>
@@ -140,31 +139,81 @@ namespace Orleans.Runtime
         /// <summary>
         /// Starts the silo.
         /// </summary>
+        /// <remarks>
+        /// If startup fails or is canceled, started lifecycle stages are stopped before the startup exception is rethrown.
+        /// Cleanup uses the host shutdown timeout independently of startup cancellation and is awaited to completion.
+        /// </remarks>
         /// <param name="cancellationToken">A cancellation token which can be used to cancel the operation.</param>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
         public async Task StartAsync(CancellationToken cancellationToken)
         {
+            await _lifecycleLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
             try
             {
-                await Task.Run(() => this.siloLifecycle.OnStart(cancellationToken), cancellationToken);
+                if (!SystemStatus.Equals(SystemStatus.Created))
+                {
+                    throw new InvalidOperationException($"Calling Silo.Start() on a silo which is not in the Created state. This silo is in the {SystemStatus} state.");
+                }
+
+                try
+                {
+                    await Task.Run(() => siloLifecycle.OnStart(cancellationToken), cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    ReportStartupFailure(exception, cleanupException: null);
+                    try
+                    {
+                        // Startup cancellation must not prevent acquired resources from being stopped.
+                        // Expiry cancels graceful work, but we still join cleanup before DI can be disposed.
+                        var timeout = Services.GetRequiredService<IOptions<HostOptions>>().Value.ShutdownTimeout;
+                        using var cleanup = new CancellationTokenSource(timeout);
+                        await StopCoreAsync(cleanup.Token).ConfigureAwait(false);
+                        if (cleanup.IsCancellationRequested)
+                        {
+                            LogWarningStartupCleanupTimeout(logger, timeout);
+                        }
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        ReportStartupFailure(exception, cleanupException);
+                    }
+
+                    throw;
+                }
             }
-            catch (Exception exc)
+            finally
             {
-                LogErrorSiloStart(logger, exc);
-                throw;
+                _lifecycleLock.Release();
+            }
+        }
+
+        private void ReportStartupFailure(Exception startupException, Exception? cleanupException)
+        {
+            var exception = cleanupException is null
+                ? startupException
+                : new AggregateException("Silo startup rollback failed.", startupException, cleanupException);
+            try
+            {
+                if (cleanupException is null)
+                {
+                    LogErrorSiloStart(logger, exception);
+                }
+                else
+                {
+                    LogErrorStartupCleanup(logger, exception);
+                }
+            }
+            catch (Exception loggingException)
+            {
+                Console.Error.WriteLine($"Error reporting silo startup failure: {exception}{Environment.NewLine}Logging failed: {loggingException}");
             }
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken ct)
         {
-            lock (lockable)
-            {
-                if (!this.SystemStatus.Equals(SystemStatus.Created))
-                    throw new InvalidOperationException(string.Format("Calling Silo.Start() on a silo which is not in the Created state. This silo is in the {0} state.", this.SystemStatus));
-
-                this.SystemStatus = SystemStatus.Starting;
-            }
-
+            Debug.Assert(SystemStatus.Equals(SystemStatus.Created));
+            SystemStatus = SystemStatus.Starting;
             LogInfoSiloStarting(logger);
             return Task.CompletedTask;
         }
@@ -289,77 +338,75 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="cancellationToken">
         /// A cancellation token which can be used to promptly terminate the silo.
+        /// Canceling this token skips graceful work, but does not abandon startup rollback or resource cleanup.
         /// </param>
+        /// <remarks>An in-progress startup or shutdown is joined before this operation completes.</remarks>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            bool gracefully = !cancellationToken.IsCancellationRequested;
-            bool stopAlreadyInProgress = false;
-            lock (lockable)
+            // Even an already-cancelled stop/dispose must join startup or its rollback.
+            await _lifecycleLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            try
             {
-                if (this.SystemStatus.Equals(SystemStatus.Stopping) ||
-                    this.SystemStatus.Equals(SystemStatus.ShuttingDown) ||
-                    this.SystemStatus.Equals(SystemStatus.Terminated))
+                if (SystemStatus.Equals(SystemStatus.Terminated))
                 {
-                    stopAlreadyInProgress = true;
-                    // Drop through to wait below
+                    return;
                 }
-                else if (!this.SystemStatus.Equals(SystemStatus.Running))
+
+                if (SystemStatus.Equals(SystemStatus.Stopping) || SystemStatus.Equals(SystemStatus.ShuttingDown))
                 {
-                    throw new InvalidOperationException($"Attempted to shutdown a silo which is not in the {nameof(SystemStatus.Running)} state. This silo is in the {this.SystemStatus} state.");
+                    await SiloTerminated.ConfigureAwait(false);
+                    return;
                 }
-                else
+
+                if (!SystemStatus.Equals(SystemStatus.Running))
                 {
-                    if (gracefully)
-                        this.SystemStatus = SystemStatus.ShuttingDown;
-                    else
-                        this.SystemStatus = SystemStatus.Stopping;
+                    throw new InvalidOperationException($"Attempted to shutdown a silo which is not in the {nameof(SystemStatus.Running)} state. This silo is in the {SystemStatus} state.");
                 }
+
+                await StopCoreAsync(cancellationToken).ConfigureAwait(false);
             }
-
-            if (stopAlreadyInProgress)
+            finally
             {
-                LogDebugSiloStopInProgress(logger);
-                var pause = TimeSpan.FromSeconds(1);
-
-                while (!this.SystemStatus.Equals(SystemStatus.Terminated))
-                {
-                    LogDebugSiloStopStillInProgress(logger);
-                    await Task.Delay(pause, cancellationToken).ConfigureAwait(false);
-                }
-
-                await this.SiloTerminated.ConfigureAwait(false);
-                return;
+                _lifecycleLock.Release();
             }
+        }
 
-            if (gracefully)
+        private async Task StopCoreAsync(CancellationToken cancellationToken)
+        {
+            var gracefully = !cancellationToken.IsCancellationRequested;
+            SystemStatus = gracefully ? SystemStatus.ShuttingDown : SystemStatus.Stopping;
+            try
             {
-                LogSiloShuttingDown(logger, LogLevel.Debug, "graceful");
+                LogSiloShuttingDown(logger, LogLevel.Debug, gracefully ? "graceful" : "non-graceful");
             }
-            else
+            catch (Exception loggingException)
             {
-                LogSiloShuttingDown(logger, LogLevel.Debug, "non-graceful");
+                Console.Error.WriteLine($"Error reporting silo shutdown initiation: {loggingException}");
             }
 
             try
             {
-                await Task.Run(() => this.siloLifecycle.OnStop(cancellationToken), CancellationToken.None).ConfigureAwait(false);
+                await Task.Run(() => siloLifecycle.OnStop(cancellationToken), CancellationToken.None).ConfigureAwait(false);
             }
-            finally
+            catch (Exception exception)
             {
-                // log final status
-                if (gracefully)
-                {
-                    LogSiloShutDown(logger, LogLevel.Debug, "graceful");
-                }
-                else
-                {
-                    LogSiloShutDown(logger, LogLevel.Warning, "non-graceful");
-                }
-
-                // signal to all awaiters that the silo has terminated.
-                await Task.Run(() => this.siloTerminatedTask.TrySetResult(0)).ConfigureAwait(false);
+                // A failed lifecycle traversal is not successful termination. Repeated stops observe its failure.
+                siloTerminatedTask.TrySetException(exception);
+                throw;
             }
+
+            SystemStatus = SystemStatus.Terminated;
+            try
+            {
+                LogSiloShutDown(logger, gracefully ? LogLevel.Debug : LogLevel.Warning, gracefully ? "graceful" : "non-graceful");
+            }
+            catch (Exception loggingException)
+            {
+                Console.Error.WriteLine($"Error reporting silo shutdown completion: {loggingException}");
+            }
+
+            siloTerminatedTask.TrySetResult(0);
         }
 
         private Task OnRuntimeServicesStop(CancellationToken ct)
@@ -380,8 +427,6 @@ namespace Orleans.Runtime
             {
                 LogErrorStoppingMessageCenter(logger, exception);
             }
-
-            SystemStatus = SystemStatus.Terminated;
         }
 
         private async Task OnBecomeActiveStop(CancellationToken ct)
@@ -575,6 +620,12 @@ namespace Orleans.Runtime
             Message = "Exception during Silo.Start"
         )]
         private static partial void LogErrorSiloStart(ILogger logger, Exception exc);
+
+        [LoggerMessage(Level = LogLevel.Error, Message = "Error cleaning up a failed silo startup.")]
+        private static partial void LogErrorStartupCleanup(ILogger logger, Exception exception);
+
+        [LoggerMessage(Level = LogLevel.Warning, Message = "Failed-startup cleanup exceeded the graceful shutdown timeout of {Timeout}.")]
+        private static partial void LogWarningStartupCleanupTimeout(ILogger logger, TimeSpan timeout);
 
         [LoggerMessage(
             Level = LogLevel.Information,

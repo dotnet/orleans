@@ -157,6 +157,8 @@ namespace Orleans.Runtime.GrainDirectory
                 _membershipUpdatesCancellation.Dispose();
             }
 
+            await HandoffManager.StopAsync();
+
             if (this.disposeDirectoryCache)
             {
                 try

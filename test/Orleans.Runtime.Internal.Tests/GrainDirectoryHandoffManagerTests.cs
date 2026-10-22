@@ -184,6 +184,51 @@ public class GrainDirectoryHandoffManagerTests
         Assert.Equal(0, fixture.CatalogDeletionCount);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StopDirectoryAsync_JoinsInFlightHandoffAndRejectsNewWork(bool registrationFails)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var fixture = await HandoffManagerFixture.CreateAsync(cancellationToken);
+        var registration = fixture.CreateRemoteOwnedAddress(fixture.AcceptedSourceSilo, "in-flight-stop");
+        var rejected = fixture.CreateRemoteOwnedAddress(fixture.AcceptedSourceSilo, "after-stop");
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completed = false;
+        fixture.RegistrationHandler = async address =>
+        {
+            entered.TrySetResult();
+            await release.Task.WaitAsync(cancellationToken);
+            completed = true;
+            if (registrationFails)
+            {
+                throw new InvalidOperationException("Controlled in-flight handoff failure.");
+            }
+
+            return new AddressAndTag(address, 1);
+        };
+        fixture.HandoffManager.AcceptExistingRegistrations([registration]);
+        await entered.Task.WaitAsync(cancellationToken);
+        var stop = fixture.StopDirectoryAsync();
+        try
+        {
+            Assert.False(fixture.LocalDirectory.Running);
+            Assert.False(stop.IsCompleted);
+            Assert.False(completed);
+            fixture.HandoffManager.AcceptExistingRegistrations([rejected]);
+            release.TrySetResult();
+            await stop.WaitAsync(cancellationToken);
+            await fixture.DrainSchedulerAsync(cancellationToken);
+            Assert.True(completed);
+            Assert.Equal(new[] { registration }, fixture.ForwardedRegistrations.ToArray());
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+    }
+
     private static ClusterMembershipSnapshot CreateSnapshot(long version, params ClusterMember[] members)
     {
         var builder = ImmutableDictionary.CreateBuilder<SiloAddress, ClusterMember>();
@@ -253,6 +298,7 @@ public class GrainDirectoryHandoffManagerTests
         private readonly ICatalog catalog;
         private int catalogResolutionCount;
         private int catalogDeletionCount;
+        private Task? _stopTask;
 
         private HandoffManagerFixture(
             ServiceProvider services,
@@ -469,9 +515,11 @@ public class GrainDirectoryHandoffManagerTests
             await barrierTask.WaitAsync(cancellationToken);
         }
 
+        public Task StopDirectoryAsync() => _stopTask ??= LocalDirectory.StopAsync();
+
         public async ValueTask DisposeAsync()
         {
-            await LocalDirectory.StopAsync();
+            await StopDirectoryAsync();
             services.Dispose();
         }
     }
