@@ -1229,9 +1229,9 @@ internal static class GrainInterfaceFileParser
     // Interface line: interface [GrainInterfaceType("x")] Namespace.IInterface<T> [Version(N)]
     // Or with retired: *RETIRED* interface [GrainInterfaceType("x")] Namespace.IInterface<T> [Version(N)]
     // The name can include generic type parameters like IMyGrain<T> or IMyGrain<TKey, TValue>
-    // Quoted identities are backslash-escaped; see FormatQuotedIdentity.
+    // Identities are verbatim unless marked Escaped = true; see FormatGrainInterfaceTypeAttribute.
     private static readonly Regex InterfacePattern = new(
-        @"^(?<retired>\*RETIRED\*\s*)?(?:interface\s+)?(\[GrainInterfaceType\(""(?<grainInterfaceType>(?:[^""\\]|\\.)+)""\)\]\s*)?(\[Alias\(""(?<alias>(?:[^""\\]|\\.)+)""\)\]\s*)?(?<name>[\w]+(?:<[\w,\s]+>)?(?:\.[\w]+(?:<[\w,\s]+>)?)*)\s*\[Version\((?<version>\d+)\)\]$",
+        @"^(?<retired>\*RETIRED\*\s*)?(?:interface\s+)?(\[GrainInterfaceType\((?:""(?<grainInterfaceType>[^""]+)""|""(?<escapedGrainInterfaceType>(?:[^""\\]|\\.)+)"",\s*Escaped\s*=\s*true)\)\]\s*)?(\[Alias\(""(?<alias>[^""]+)""\)\]\s*)?(?<name>[\w]+(?:<[\w,\s]+>)?(?:\.[\w]+(?:<[\w,\s]+>)?)*)\s*\[Version\((?<version>\d+)\)\]$",
         RegexOptions.Compiled);
 
     // Grain class line: class [GrainType("x")] Namespace.GrainClass
@@ -1277,16 +1277,46 @@ internal static class GrainInterfaceFileParser
     {
         if (match.Groups["grainInterfaceType"].Success)
         {
-            return UnescapeWireIdentity(match.Groups["grainInterfaceType"].Value);
+            return match.Groups["grainInterfaceType"].Value;
         }
 
-        return match.Groups["alias"].Success ? UnescapeWireIdentity(match.Groups["alias"].Value) : null;
+        if (match.Groups["escapedGrainInterfaceType"].Success)
+        {
+            return UnescapeWireIdentity(match.Groups["escapedGrainInterfaceType"].Value);
+        }
+
+        return match.Groups["alias"].Success ? match.Groups["alias"].Value : null;
     }
 
     /// <summary>
-    /// Escapes an identity for a quoted declaration attribute so that quotes and inline comment markers round-trip.
+    /// Formats the <c>[GrainInterfaceType]</c> attribute of an interface declaration. Identities are written verbatim,
+    /// as earlier manifests record them, unless they cannot be read back verbatim; those are backslash-escaped and
+    /// marked <c>Escaped = true</c> so that existing verbatim backslashes keep their meaning.
     /// </summary>
-    internal static string FormatQuotedIdentity(string value)
+    internal static string FormatGrainInterfaceTypeAttribute(string value)
+        => RequiresEscaping(value)
+            ? $"[GrainInterfaceType(\"{EscapeIdentity(value)}\", Escaped = true)]"
+            : $"[GrainInterfaceType(\"{value}\")]";
+
+    private static bool RequiresEscaping(string value)
+    {
+        if (value.IndexOf('"') >= 0 || value.IndexOf(ClrCommentPrefix, StringComparison.Ordinal) >= 0)
+        {
+            return true;
+        }
+
+        foreach (var character in value)
+        {
+            if (char.IsControl(character) || char.IsWhiteSpace(character) && character != ' ')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string EscapeIdentity(string value)
     {
         var result = new StringBuilder(value.Length);
         foreach (var character in value)
@@ -1432,17 +1462,17 @@ internal static class GrainInterfaceFileParser
         return $"`{arity}";
     }
 
+    private const string ClrCommentPrefix = " # CLR: ";
+
     internal static string GetClrComment(string line)
     {
-        const string Prefix = " # CLR: ";
-        var index = line.IndexOf(Prefix, StringComparison.Ordinal);
+        var index = line.IndexOf(ClrCommentPrefix, StringComparison.Ordinal);
         return index < 0 ? string.Empty : line.Substring(index);
     }
 
     internal static string StripClrComment(string line)
     {
-        const string Prefix = " # CLR: ";
-        var index = line.IndexOf(Prefix, StringComparison.Ordinal);
+        var index = line.IndexOf(ClrCommentPrefix, StringComparison.Ordinal);
         return (index < 0 ? line : line.Substring(0, index)).Trim();
     }
 
@@ -1563,7 +1593,7 @@ internal static class GrainInterfaceFileParser
             if (interfaceMatch.Success)
             {
                 var name = interfaceMatch.Groups["name"].Value;
-                var alias = interfaceMatch.Groups["alias"].Success ? UnescapeWireIdentity(interfaceMatch.Groups["alias"].Value) : null;
+                var alias = interfaceMatch.Groups["alias"].Success ? interfaceMatch.Groups["alias"].Value : null;
                 var grainInterfaceType = GetRecordedGrainInterfaceType(interfaceMatch);
                 if (!ushort.TryParse(interfaceMatch.Groups["version"].Value, out var version))
                 {

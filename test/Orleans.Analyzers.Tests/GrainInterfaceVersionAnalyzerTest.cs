@@ -1494,12 +1494,13 @@ public interface IMyGrain : IGrain
     }
 
     [Theory]
-    [InlineData("counter\"v2")]
-    [InlineData("counter # CLR: v2")]
-    [InlineData("counter\\v2")]
-    [InlineData("counter\nv2")]
-    [InlineData("counter\u2028v2")]
-    public async Task CodeFix_AddInterface_EscapedAliasRoundTrips(string alias)
+    [InlineData("counter\"v2", @"[GrainInterfaceType(""counter\""v2"", Escaped = true)]")]
+    [InlineData("counter # CLR: v2", @"[GrainInterfaceType(""counter \# CLR: v2"", Escaped = true)]")]
+    [InlineData("counter\nv2", @"[GrainInterfaceType(""counter\nv2"", Escaped = true)]")]
+    [InlineData("counter\u2028v2", @"[GrainInterfaceType(""counter\u2028v2"", Escaped = true)]")]
+    [InlineData("counter\"v2\\x", @"[GrainInterfaceType(""counter\""v2\\x"", Escaped = true)]")]
+    [InlineData("counter\\v2", @"[GrainInterfaceType(""counter\v2"")]")]
+    public async Task CodeFix_AddInterface_EscapedAliasRoundTrips(string alias, string expectedAttribute)
     {
         var source = $"[Alias({SymbolDisplay.FormatLiteral(alias, quote: true)})] public interface ICounterGrain : IGrain {{ }}";
 
@@ -1508,7 +1509,54 @@ public interface IMyGrain : IGrain
             string.Empty,
             GrainInterfaceVersionAnalyzer.RuleId0016);
 
-        Assert.Contains("interface [GrainInterfaceType(\"counter", content);
+        Assert.Contains($"interface {expectedAttribute} ICounterGrain [Version(0)]", content);
+        Assert.Empty(await GetDiagnosticsAsync(source, content));
+    }
+
+    [Theory]
+    [InlineData(@"counter\v2", false)]
+    [InlineData(@"counter\\v2", false)]
+    [InlineData("counterv2", true)]
+    public async Task LegacyVerbatimIdentity_KeepsLiteralBackslashes(string sourceIdentity, bool isBreaking)
+    {
+        var source = $"[GrainInterfaceType({SymbolDisplay.FormatLiteral(sourceIdentity, quote: true)})] public interface IMyGrain : IGrain {{ }}";
+        var contractsFile = $"interface [GrainInterfaceType(\"{sourceIdentity.Replace("counterv2", @"counter\v2")}\")] IMyGrain [Version(0)]";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        if (isBreaking)
+        {
+            Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0016);
+            Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0019);
+        }
+        else
+        {
+            Assert.Empty(diagnostics);
+        }
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateProject_PreservesLegacyVerbatimIdentity()
+    {
+        const string source = @"
+[GrainInterfaceType(@""counter\v2"")]
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+}
+";
+        const string contractsFile = @"interface [GrainInterfaceType(""counter\v2"")] IMyGrain [Version(0)]";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0017,
+            RegenerateCodeActionTitle);
+
+        var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+        Assert.Contains(@"interface [GrainInterfaceType(""counter\v2"")] IMyGrain [Version(1)]", content);
+        Assert.DoesNotContain("*RETIRED*", content);
         Assert.Empty(await GetDiagnosticsAsync(source, content));
     }
 
