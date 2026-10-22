@@ -1548,6 +1548,17 @@ public class Outer
 
         Assert.Contains("interface [GrainInterfaceType(\"Outer.IMyGrain\")] Outer.IMyGrain [Version(0)]", content);
         Assert.Matches(new Regex("^interface Outer\\.IMyGrain \\[Version\\(0\\)\\]$", RegexOptions.Multiline), content.Replace("\r", ""));
+
+        var retiredContent = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            content,
+            GrainInterfaceVersionAnalyzer.RuleId0019);
+
+        Assert.Contains("*RETIRED* interface [GrainInterfaceType(\"Outer+IMyGrain\")] Outer.IMyGrain [Version(0)]", retiredContent);
+        Assert.Matches(
+            new Regex("^interface \\[GrainInterfaceType\\(\"Outer\\.IMyGrain\"\\)\\] Outer\\.IMyGrain \\[Version\\(0\\)\\]$", RegexOptions.Multiline),
+            retiredContent.Replace("\r", ""));
+        Assert.Empty(await GetDiagnosticsAsync(source, retiredContent));
     }
 
     [Fact]
@@ -1562,6 +1573,8 @@ public class Outer
     }
 }
 ";
+        const string retiredDeclaration =
+            "*RETIRED* interface [GrainInterfaceType(\"Outer+IMyGrain\")] Outer.IMyGrain [Version(0)]";
 
         var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
             source,
@@ -1572,8 +1585,35 @@ public class Outer
         var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
             .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
         Assert.Contains("interface [GrainInterfaceType(\"Outer.IMyGrain\")] Outer.IMyGrain [Version(0)]", content);
-        Assert.Contains("*RETIRED* interface Outer.IMyGrain [Version(0)]", content);
+        Assert.Contains(retiredDeclaration, content);
         Assert.Empty(await GetDiagnosticsAsync(source, content));
+
+        // Renaming the nested interface's containing type must not change the retired identity.
+        const string movedSource = @"
+public class RenamedOuter
+{
+    [Alias(""Outer.IMyGrain"")]
+    [Version(1)]
+    public interface IMyGrain : IGrain
+    {
+    }
+}
+";
+        Assert.Equal(
+            GrainInterfaceVersionAnalyzer.RuleId0017,
+            Assert.Single(await GetDiagnosticsAsync(movedSource, content)).Id);
+
+        (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            movedSource,
+            content,
+            GrainInterfaceVersionAnalyzer.RuleId0017,
+            RegenerateCodeActionTitle);
+
+        content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+        Assert.Contains("interface [GrainInterfaceType(\"Outer.IMyGrain\")] RenamedOuter.IMyGrain [Version(1)]", content);
+        Assert.Contains(retiredDeclaration, content);
+        Assert.Empty(await GetDiagnosticsAsync(movedSource, content));
     }
 
     [Fact]
