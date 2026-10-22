@@ -45,7 +45,7 @@ Before rollout:
 
 Replace a bounded number of silos at a time. Pause when error rate, latency, membership churn, dependency load, or activation failures exceed the rollout threshold.
 
-For the Orleans 11 preview's directory, transport, and provider prerequisites, follow [Upgrade Orleans 10.x to 11](../migration/10-to-11.md) and [Upgrade deployment and rollback](../migration/deployment-and-rollback.md).
+For release-specific runtime, directory, and provider prerequisites, follow the [migration guides](../migration-guide.md) and [Upgrade deployment and rollback](../migration/deployment-and-rollback.md).
 
 Orleans grain versioning can route calls among compatible grain implementations, but it doesn't make arbitrary application or storage changes compatible. See [Deploy new versions of grains](../grains/grain-versioning/deploying-new-versions-of-grains.md) and [Backward compatibility guidelines](../grains/grain-versioning/backward-compatibility-guidelines.md).
 
