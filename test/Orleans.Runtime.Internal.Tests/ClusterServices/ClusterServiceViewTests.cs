@@ -112,7 +112,7 @@ public sealed class ClusterServiceViewTests
     private static ClusterMembershipSnapshot Snapshot(long version) =>
         new(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, new(version));
 
-    private static uint[] Boundaries(SiloAddress _, int count) =>
-        Enumerable.Range(0, count).Select(value => (uint)value).ToArray();
+    private static ImmutableArray<uint> Boundaries(SiloAddress _, int count) =>
+        Enumerable.Range(0, count).Select(value => (uint)value).ToImmutableArray();
 
 }

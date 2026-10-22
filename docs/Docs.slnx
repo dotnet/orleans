@@ -54,6 +54,9 @@
   <Folder Name="/site/src/content/docs/host/configuration-guide/snippets/">
     <Project Path="site/src/content/docs/host/configuration-guide/snippets/serialization/serialization.csproj" />
   </Folder>
+  <Folder Name="/site/src/content/docs/host/configuration-guide/snippets/serializer-contexts/">
+    <Project Path="site/src/content/docs/host/configuration-guide/snippets/serializer-contexts/SerializerContexts.csproj" />
+  </Folder>
   <Folder Name="/site/src/content/docs/host/monitoring/" />
   <Folder Name="/site/src/content/docs/host/monitoring/snippets/" />
   <Folder Name="/site/src/content/docs/host/monitoring/snippets/observability/">

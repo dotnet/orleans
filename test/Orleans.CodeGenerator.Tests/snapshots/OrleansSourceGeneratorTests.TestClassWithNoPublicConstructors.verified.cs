@@ -118,8 +118,10 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_NoPublicCtor));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_NoPublicCtor));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_NoPublicCtor), typeof(global::TestProject.NoPublicCtor));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_NoPublicCtor), typeof(global::TestProject.NoPublicCtor));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_NoPublicCtor), typeof(global::TestProject.NoPublicCtor));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_NoPublicCtor), typeof(global::TestProject.NoPublicCtor));
         }
     }
 }

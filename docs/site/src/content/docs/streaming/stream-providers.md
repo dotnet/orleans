@@ -76,6 +76,8 @@ Register [ADO.NET](https://learn.microsoft.com/dotnet/framework/data/adonet/ado-
 
 Register [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) with `AddNatsStreams`. The provider creates or uses a JetStream stream and deterministic subject partitions. File-backed storage is the default; memory-backed JetStream storage is optional and not durable across server loss. Changes to `NatsOptions.PartitionCount` require corresponding server-side stream updates. The provider isn't rewindable.
 
+Stream namespaces and keys are byte identities. The provider encodes subject separators, wildcards, whitespace, control characters, and binary values into individual NATS tokens while preserving the original identity in the payload. Existing safe UTF-8 tokens retain their subjects and partition assignments; `~`-prefixed tokens and the literal namespace `null` use the encoded form. When upgrading from raw-subject routing, pause producers, drain deliverable messages, upgrade all provider silos and clients, and then resume publishing. Existing partitioned messages remain consumable, and previously retained unpartitioned messages require replay through the upgraded provider.
+
 ## Redis Streams streaming (alpha)
 
 Register [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams/) with `AddRedisStreams`. The provider stores events and checkpoints in Redis and is rewindable while entries remain. Redis durability depends on its [persistence](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/) and replication configuration. `RedisStreamingOptions.MaxStreamLength` can bound retention; without it, stream length is unbounded, so capacity planning is required.

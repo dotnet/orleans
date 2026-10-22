@@ -242,6 +242,9 @@ namespace Orleans.Runtime.MembershipService
                         await _onProbeResult(this, probeResult).ConfigureAwait(false);
                     }
                 }
+                catch (OperationCanceledException) when (_stoppingCancellation.IsCancellationRequested)
+                {
+                }
                 catch (Exception exception)
                 {
                     LogErrorExceptionMonitoringSilo(_log, exception, TargetSiloAddress);

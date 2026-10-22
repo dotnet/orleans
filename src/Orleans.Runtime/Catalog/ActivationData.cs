@@ -29,6 +29,7 @@ namespace Orleans.Runtime;
 internal sealed partial class ActivationData :
     IGrainContext,
     ICollectibleGrainContext,
+    IActivationKeepAlive,
     IGrainExtensionBinder,
     IActivationWorkingSetMember,
     IGrainTimerRegistry,
@@ -38,7 +39,7 @@ internal sealed partial class ActivationData :
     IAsyncDisposable,
     IDisposable
 {
-    private const string GrainAddressMigrationContextKey = "sys.addr";
+    internal const string GrainAddressMigrationContextKey = "sys.addr";
 #if NET10_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
@@ -53,6 +54,8 @@ internal sealed partial class ActivationData :
     private GrainLifecycle? _lifecycle;
     private Queue<object>? _pendingOperations;
     private Message? _blockingRequest;
+    private int _runningNonAlwaysInterleaveCount;
+    private int _runningNonAlwaysInterleaveWritableCount;
     private bool _isInWorkingSet = true;
     private CoarseStopwatch _busyDuration;
     private CoarseStopwatch _idleDuration;
@@ -450,6 +453,8 @@ internal sealed partial class ActivationData :
             _shared.OnCreateActivation(this);
             GetComponent<IActivationLifecycleObserver>()?.OnCreateActivation(this);
 
+            _shared.SetupActivation(this);
+
             if (grainInstance is ILifecycleParticipant<IGrainLifecycle> participant)
             {
                 participant.Participate(ObservableLifecycle);
@@ -521,27 +526,6 @@ internal sealed partial class ActivationData :
         }
     }
 
-    internal List<Message> DequeueAllWaitingRequests()
-    {
-        lock (_lock)
-        {
-            var result = new List<Message>(_waitingRequests.Count);
-            foreach (var (message, _) in _waitingRequests)
-            {
-                // Local-only messages are not allowed to escape the activation.
-                if (message.IsLocalOnly)
-                {
-                    continue;
-                }
-
-                result.Add(message);
-            }
-
-            _waitingRequests.Clear();
-            return result;
-        }
-    }
-
     /// <summary>
     /// Returns how long this activation has been idle.
     /// </summary>
@@ -582,6 +566,29 @@ internal sealed partial class ActivationData :
         }
     }
 
+    void IActivationKeepAlive.AcquireKeepAlive()
+    {
+        lock (_lock)
+        {
+            _extras ??= new();
+            ++_extras.KeepAliveHolds;
+        }
+    }
+
+    void IActivationKeepAlive.ReleaseKeepAlive()
+    {
+        lock (_lock)
+        {
+            Debug.Assert(_extras is { KeepAliveHolds: > 0 });
+
+            // A deactivating or disposed activation must not re-enter the working set.
+            if (--_extras!.KeepAliveHolds == 0 && State is ActivationState.Valid)
+            {
+                MarkActive();
+            }
+        }
+    }
+
     public void ResetKeepAliveRequest()
     {
         lock (_lock)
@@ -611,7 +618,10 @@ internal sealed partial class ActivationData :
                     TimeSpan.FromTicks(Math.Max(keepAliveDuration.Ticks, CollectionAgeLimit.Ticks)));
             }
 
-            if (_waitingRequests.Count > 0 || _runningRequests.Count > 0 || _idleDuration.Elapsed < ageLimit)
+            if (_waitingRequests.Count > 0
+                || _runningRequests.Count > 0
+                || _idleDuration.Elapsed < ageLimit
+                || respectKeepAlive && _extras is { KeepAliveHolds: > 0 })
             {
                 return ActivationCollectionResult.Reschedule(CollectionAgeLimit);
             }
@@ -1098,7 +1108,7 @@ internal sealed partial class ActivationData :
         const int IdlenessLowerBound = 10_000;
         lock (_lock)
         {
-            var inactive = IsInactive && _idleDuration.ElapsedMilliseconds > IdlenessLowerBound;
+            var inactive = IsInactive && _idleDuration.ElapsedMilliseconds > IdlenessLowerBound && _extras is not { KeepAliveHolds: > 0 };
 
             // This instance will remain in the working set if it is either not pending removal or if it is currently active.
             _isInWorkingSet = !wouldRemove || !inactive;
@@ -1146,11 +1156,16 @@ internal sealed partial class ActivationData :
 
         void ProcessPendingRequests()
         {
+            // Requests which this activation will not process are removed from the queue under the lock and rejected or forwarded
+            // after it is released, since that can deliver messages to other activations and complete local requests, which can
+            // queue further requests on this activation.
+            List<Message>? unprocessableRequests = null;
             var i = 0;
 
             do
             {
                 Message? message = null;
+                Exception? rejection = null;
                 lock (_lock)
                 {
                     if (_waitingRequests.Count <= i)
@@ -1164,7 +1179,7 @@ internal sealed partial class ActivationData :
                     // Local-only messages are used for internal system operations and should not be rejected while the grain is valid or deactivating.
                     if (State != ActivationState.Valid && !(message.IsLocalOnly && State is ActivationState.Deactivating))
                     {
-                        ProcessRequestsToInvalidActivation();
+                        unprocessableRequests = DequeueUnprocessableRequests();
                         break;
                     }
 
@@ -1220,34 +1235,49 @@ internal sealed partial class ActivationData :
                     }
                     catch (Exception exception)
                     {
-                        if (!message.IsLocalOnly)
-                        {
-                            _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exception);
-                        }
-
-                        _waitingRequests.RemoveAt(i);
-                        continue;
+                        rejection = exception;
                     }
 
-                    // Process this message, removing it from the queue.
+                    // Remove the message from the queue to either process or reject it.
                     _waitingRequests.RemoveAt(i);
+                    if (rejection is null)
+                    {
+                        Debug.Assert(State == ActivationState.Valid || message.IsLocalOnly);
+                        RecordRunning(message, message.IsAlwaysInterleave);
+                    }
+                }
 
-                    Debug.Assert(State == ActivationState.Valid || message.IsLocalOnly);
-                    RecordRunning(message, message.IsAlwaysInterleave);
+                if (rejection is not null)
+                {
+                    RejectRequest(message, rejection);
+                    continue;
                 }
 
                 // Start invoking the message outside of the lock
                 InvokeIncomingRequest(message);
             }
             while (true);
+
+            if (unprocessableRequests is not null)
+            {
+                RejectOrForwardRequests(unprocessableRequests);
+            }
         }
 
-        void RecordRunning(Message message, bool isInterleavable)
+        void RecordRunning(Message message, bool isAlwaysInterleave)
         {
             var stopwatch = CoarseStopwatch.StartNew();
             _runningRequests.Add(message, stopwatch);
 
-            if (_blockingRequest != null || isInterleavable) return;
+            if (isAlwaysInterleave) return;
+
+            ++_runningNonAlwaysInterleaveCount;
+            if (!message.IsReadOnly)
+            {
+                ++_runningNonAlwaysInterleaveWritableCount;
+            }
+
+            if (_blockingRequest != null) return;
 
             // This logic only works for non-reentrant activations
             // Consider: Handle long request detection for reentrant activations.
@@ -1255,12 +1285,14 @@ internal sealed partial class ActivationData :
             _busyDuration = stopwatch;
         }
 
-        void ProcessRequestsToInvalidActivation()
+        // Called with the lock held. Dequeues the waiting requests once this activation can no longer process them,
+        // or returns null while it may still process them.
+        List<Message>? DequeueUnprocessableRequests()
         {
             if (State is ActivationState.Creating or ActivationState.Activating)
             {
                 // Do nothing until the activation becomes either valid or invalid
-                return;
+                return null;
             }
 
             if (State is ActivationState.Deactivating)
@@ -1283,21 +1315,11 @@ internal sealed partial class ActivationData :
                 {
                     // Do not forward messages while the grain is still deactivating and has not been declared stuck, since they
                     // will be forwarded to the same grain instance.
-                    return;
+                    return null;
                 }
             }
 
-            if (DeactivationException is null || ForwardingAddress is { })
-            {
-                // Either this was a duplicate activation or it was at some point successfully activated
-                // Forward all pending messages
-                RerouteAllQueuedMessages();
-            }
-            else
-            {
-                // Reject all pending messages
-                RejectAllQueuedMessages();
-            }
+            return TakeWaitingRequests();
         }
 
         void AbandonStuckDeactivatingActivation()
@@ -1327,12 +1349,8 @@ internal sealed partial class ActivationData :
                 return true;
             }
 
-            if (_blockingRequest is null)
-            {
-                return true;
-            }
-
-            if (_blockingRequest.IsReadOnly && incoming.IsReadOnly)
+            if (_runningNonAlwaysInterleaveCount == 0
+                || (incoming.IsReadOnly && _runningNonAlwaysInterleaveWritableCount == 0))
             {
                 return true;
             }
@@ -1344,21 +1362,45 @@ internal sealed partial class ActivationData :
                 return true;
             }
 
-            if (GetComponent<GrainCanInterleave>() is GrainCanInterleave canInterleave)
+            var canInterleave = GetComponent<GrainCanInterleave>();
+            bool? incomingMayInterleave = null;
+            foreach (var runningRequest in _runningRequests)
             {
-                try
+                var runningMessage = runningRequest.Key;
+                if (runningMessage.IsAlwaysInterleave
+                    || (runningMessage.IsReadOnly && incoming.IsReadOnly))
                 {
-                    return canInterleave.MayInterleave(GrainInstance, incoming)
-                        || canInterleave.MayInterleave(GrainInstance, _blockingRequest);
+                    continue;
                 }
-                catch (Exception exception)
+
+                if (canInterleave is not null)
                 {
-                    LogErrorInvokingMayInterleavePredicate(_shared.Logger, exception, this, incoming);
-                    throw;
+                    try
+                    {
+                        incomingMayInterleave ??= canInterleave.MayInterleave(GrainInstance, incoming);
+                        if (incomingMayInterleave.Value)
+                        {
+                            return true;
+                        }
+
+                        if (canInterleave.MayInterleave(GrainInstance, runningMessage))
+                        {
+                            continue;
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorInvokingMayInterleavePredicate(_shared.Logger, exception, this, incoming);
+                        throw;
+                    }
                 }
+
+                _blockingRequest = runningMessage;
+                _busyDuration = runningRequest.Value;
+                return false;
             }
 
-            return false;
+            return true;
         }
 
         async Task ProcessOperationsAsync()
@@ -1457,10 +1499,20 @@ internal sealed partial class ActivationData :
                 if (context.TryGetValue(GrainAddressMigrationContextKey, out GrainAddress? previousRegistration) &&
                     previousRegistration is not null)
                 {
+                    if (previousRegistration.GrainId != GrainId)
+                    {
+                        throw new ArgumentException("The previous registration must identify the grain being rehydrated.", nameof(context));
+                    }
+
                     PreviousRegistration = previousRegistration;
                     LogPreviousActivationAddress(_shared.Logger, previousRegistration);
                     rehydrateSpan?.SetTag(ActivityTagKeys.RehydratePreviousRegistration,
                         previousRegistration.ToFullString());
+
+                    foreach (var (message, _) in _waitingRequests)
+                    {
+                        message.AddToCacheInvalidationHeader(previousRegistration, Address);
+                    }
                 }
 
                 if (_lifecycle is { } lifecycle)
@@ -1607,19 +1659,23 @@ internal sealed partial class ActivationData :
     {
         lock (_lock)
         {
-            _runningRequests.Remove(message);
+            if (_runningRequests.Remove(message) && !message.IsAlwaysInterleave)
+            {
+                --_runningNonAlwaysInterleaveCount;
+                if (!message.IsReadOnly)
+                {
+                    --_runningNonAlwaysInterleaveWritableCount;
+                }
+
+                Debug.Assert(_runningNonAlwaysInterleaveCount >= 0);
+                Debug.Assert(_runningNonAlwaysInterleaveWritableCount >= 0);
+            }
 
             // If the message is meant to keep the activation active, reset the idle timer and ensure the activation
             // is in the activation working set.
             if (message.IsKeepAlive)
             {
-                _idleDuration = CoarseStopwatch.StartNew();
-
-                if (!_isInWorkingSet)
-                {
-                    _isInWorkingSet = true;
-                    _shared.InternalRuntime.ActivationWorkingSet.OnActive(this);
-                }
+                MarkActive();
             }
 
             // The below logic only works for non-reentrant activations
@@ -1634,6 +1690,20 @@ internal sealed partial class ActivationData :
         _workSignal.Signal();
     }
 
+    /// <summary>
+    /// Restarts the idle period and ensures the activation is in the working set. Must be called under <see cref="_lock"/>.
+    /// </summary>
+    private void MarkActive()
+    {
+        _idleDuration = CoarseStopwatch.StartNew();
+
+        if (!_isInWorkingSet)
+        {
+            _isInWorkingSet = true;
+            _shared.InternalRuntime.ActivationWorkingSet.OnActive(this);
+        }
+    }
+
     public void ReceiveMessage(object message) => ReceiveMessage((Message)message);
     public void ReceiveMessage(Message message)
     {
@@ -1644,6 +1714,7 @@ internal sealed partial class ActivationData :
         {
             _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             _shared.InternalRuntime.MessagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Dispatch);
+            message.Dispose();
             return;
         }
 
@@ -1655,6 +1726,13 @@ internal sealed partial class ActivationData :
         {
             ReceiveRequest(message);
         }
+    }
+
+    public void ReceiveLocalRequest(ILocalRequest request, LocalRequestOptions options)
+    {
+        var message = _shared.InternalRuntime.RuntimeClient.CreateLocalRequest(this, request, options);
+        _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveMessage(message);
+        ReceiveRequest(message);
     }
 
     private void ReceiveResponse(Message message)
@@ -1692,52 +1770,97 @@ internal sealed partial class ActivationData :
     }
 
     /// <summary>
-    /// Rejects all messages enqueued for the provided activation.
+    /// Rejects a request which this activation removed from its queue without processing it.
     /// </summary>
-    private void RejectAllQueuedMessages()
+    private void RejectRequest(Message message, Exception exception)
     {
-        lock (_lock)
+        if (message.IsLocalOnly)
         {
-            List<Message> msgs = DequeueAllWaitingRequests();
-            if (msgs == null || msgs.Count <= 0) return;
-
-            LogRejectAllQueuedMessages(_shared.Logger, msgs.Count, this);
-            _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
-            _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(
-                msgs,
-                Address,
-                forwardingAddress: ForwardingAddress,
-                failedOperation: DeactivationReason.Description,
-                exc: DeactivationException,
-                rejectMessages: true);
+            LocalRequests.Reject(message, exception, _shared.Logger);
+        }
+        else
+        {
+            _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exception);
         }
     }
 
-    private void RerouteAllQueuedMessages()
+    /// <summary>
+    /// Removes all queued requests. The caller holds <see cref="_lock"/>.
+    /// </summary>
+    /// <returns>The requests, or <see langword="null"/> if there are none.</returns>
+    private List<Message>? TakeWaitingRequests()
     {
-        lock (_lock)
+        if (_waitingRequests.Count == 0)
         {
-            List<Message> msgs = DequeueAllWaitingRequests();
-            if (msgs is not { Count: > 0 })
-            {
-                return;
-            }
-
-            if (_shared.Logger.IsEnabled(LogLevel.Debug))
-            {
-                if (ForwardingAddress is { } address)
-                {
-                    LogReroutingMessages(_shared.Logger, msgs.Count, this, address);
-                }
-                else
-                {
-                    LogReroutingMessagesNoForwarding(_shared.Logger, msgs.Count, this);
-                }
-            }
-
-            _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
-            _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(msgs, Address, ForwardingAddress, DeactivationReason.Description, DeactivationException);
+            return null;
         }
+
+        var requests = new List<Message>(_waitingRequests.Count);
+        foreach (var (message, _) in _waitingRequests)
+        {
+            requests.Add(message);
+        }
+
+        _waitingRequests.Clear();
+        return requests;
+    }
+
+    /// <summary>
+    /// Removes and rejects local requests, which never leave the activation.
+    /// </summary>
+    private void RejectLocalOnlyRequests(List<Message> requests)
+    {
+        foreach (var message in requests)
+        {
+            if (message.IsLocalOnly)
+            {
+                RejectRequest(message, new OrleansMessageRejectionException($"Activation {this} is no longer valid."));
+            }
+        }
+
+        requests.RemoveAll(static message => message.IsLocalOnly);
+    }
+
+    /// <summary>
+    /// Rejects or forwards requests which this activation dequeued once it could no longer process them.
+    /// </summary>
+    /// <remarks>
+    /// Requests are forwarded if this was a duplicate activation or it was at some point successfully activated, and rejected otherwise.
+    /// Local requests never leave the activation, so they are rejected.
+    /// </remarks>
+    private void RejectOrForwardRequests(List<Message> requests)
+    {
+        RejectLocalOnlyRequests(requests);
+        if (requests.Count == 0)
+        {
+            return;
+        }
+
+        var reject = DeactivationException is not null && ForwardingAddress is null;
+        if (reject)
+        {
+            LogRejectAllQueuedMessages(_shared.Logger, requests.Count, this);
+        }
+        else if (_shared.Logger.IsEnabled(LogLevel.Debug))
+        {
+            if (ForwardingAddress is { } address)
+            {
+                LogReroutingMessages(_shared.Logger, requests.Count, this, address);
+            }
+            else
+            {
+                LogReroutingMessagesNoForwarding(_shared.Logger, requests.Count, this);
+            }
+        }
+
+        _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
+        _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(
+            requests,
+            Address,
+            ForwardingAddress,
+            DeactivationReason.Description,
+            DeactivationException,
+            rejectMessages: reject);
     }
 
     #region Activation
@@ -1906,7 +2029,11 @@ internal sealed partial class ActivationData :
                     if (_lifecycle is { } lifecycle)
                     {
                         _activationActivity?.AddEvent(new ActivityEvent("lifecycle-start"));
-                        await lifecycle.OnStart(cancellationToken).WaitAsync(cancellationToken);
+
+                        // The activation timeout cancels this token. The runtime awaits user code to completion, so the activation keeps
+                        // its registration and services while that code runs. Activation fails if the token was canceled.
+                        await lifecycle.OnStart(cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
                         _activationActivity?.AddEvent(new ActivityEvent("lifecycle-started"));
                     }
                 }
@@ -1933,7 +2060,8 @@ internal sealed partial class ActivationData :
 
                     try
                     {
-                        await grainBase.OnActivateAsync(cancellationToken).WaitAsync(cancellationToken);
+                        await grainBase.OnActivateAsync(cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
                     }
                     catch (Exception exception)
                     {
@@ -1941,9 +2069,8 @@ internal sealed partial class ActivationData :
                         {
                             _shared.CatalogInstruments.OnActivationFailedToActivate(_shared.GrainTypeMetricName);
 
-                            // This captures the case where user code in OnActivateAsync doesn't use the passed cancellation token
-                            // and makes a call that tries to resolve the scoped IServiceProvider or other type that has been disposed because of cancellation,
-                            // or a direct OperationCanceledException from cancellation.
+                            // User code observed activation cancellation, either by throwing OperationCanceledException
+                            // or by accessing an object which was disposed because of cancellation.
                             if (exception is ObjectDisposedException ode)
                             {
                                 LogActivationDisposedObjectAccessed(_shared.Logger, ode.ObjectName, this);
@@ -1978,6 +2105,7 @@ internal sealed partial class ActivationData :
                 {
                     if (State is ActivationState.Activating)
                     {
+                        _idleDuration = CoarseStopwatch.StartNew();
                         SetState(ActivationState.Valid);
                         _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
                     }
@@ -2055,6 +2183,7 @@ internal sealed partial class ActivationData :
 
         var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start(_shared.CatalogInstruments, _shared.GrainTypeMetricName);
         var migrating = false;
+        ActivationMigration? migration = null;
         var encounteredError = false;
         try
         {
@@ -2088,7 +2217,9 @@ internal sealed partial class ActivationData :
                         {
                             LogBeforeOnDeactivateAsync(_shared.Logger, this);
 
-                            await grainBase.OnDeactivateAsync(DeactivationReason, cancellationToken).WaitAsync(cancellationToken);
+                            // The deactivation timeout cancels this token. The runtime awaits user code to completion before it
+                            // unregisters the activation or disposes its services.
+                            await grainBase.OnDeactivateAsync(DeactivationReason, cancellationToken);
 
                             LogAfterOnDeactivateAsync(_shared.Logger, this);
                         }
@@ -2109,7 +2240,7 @@ internal sealed partial class ActivationData :
                     {
                         // Stops the lifecycle stages which were previously started.
                         // Stages which were never started are ignored.
-                        await lifecycle.OnStop(cancellationToken).WaitAsync(cancellationToken);
+                        await lifecycle.OnStop(cancellationToken);
                     }
                 }
                 catch (Exception exception)
@@ -2118,6 +2249,17 @@ internal sealed partial class ActivationData :
 
                     // Swallow the exception and continue with deactivation.
                     encounteredError = true;
+                }
+
+                // When its silo retires, an activation which still has queued requests migrates, carrying the requests with it.
+                // Only an activation which completed activation migrates, since an interrupted activation may hold partially initialized state.
+                if (!encounteredError
+                    && deactivateCommand.PreviousState == ActivationState.Valid
+                    && DehydrationContext is null
+                    && WaitingCount > 0
+                    && MigratesOnRetirement())
+                {
+                    DehydrationContext = new(_shared.SerializerSessionPool, requestContext: null);
                 }
 
                 if (!encounteredError
@@ -2175,8 +2317,6 @@ internal sealed partial class ActivationData :
                 _shared.CatalogInstruments.ActivationShutdownViaCollection(_shared.GrainTypeMetricName);
             }
 
-            UnregisterMessageTarget();
-
             try
             {
                 await DisposeAsync();
@@ -2194,8 +2334,39 @@ internal sealed partial class ActivationData :
 
             deactivationMetrics = deactivationMetrics.Record();
 
-            // Signal deactivation
-            GetDeactivationCompletionSource().TrySetResult(true);
+            // The activation leaves the catalog only now, so the catalog awaits all of its deactivation, and no new local activation of the grain is created before it completes.
+            // Leaving, forwarding queued requests, and signaling deactivation are synchronous, and forwarding follows leaving so that forwarded requests do not return to this activation.
+            UnregisterMessageTarget();
+            try
+            {
+                if (migration is not null)
+                {
+                    _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
+                    migration.Deliver();
+                }
+            }
+            finally
+            {
+                try
+                {
+                    // Requests outside the original handoff remain owned by this activation.
+                    List<Message>? queued;
+                    lock (_lock)
+                    {
+                        queued = TakeWaitingRequests();
+                    }
+
+                    if (queued is not null)
+                    {
+                        RejectOrForwardRequests(queued);
+                    }
+                }
+                finally
+                {
+                    GetDeactivationCompletionSource().TrySetResult(true);
+                }
+            }
+
             _workSignal.Signal();
         }
         finally
@@ -2226,8 +2397,11 @@ internal sealed partial class ActivationData :
 
                 OnDehydrate(context.MigrationContext);
 
-                // Send the dehydration context to the target host.
-                await migrationManager.MigrateAsync(ForwardingAddress, GrainId, context.MigrationContext).AsTask().WaitAsync(cancellationToken);
+                // Send the dehydration context and queued requests to the target host, which admits them through its ordinary request queue.
+                // This activation remains in the catalog until the migration completes, so that the requests which reach this silo for the grain reach it.
+                // Cancellation stops a migration which has not been sent. One which has been sent completes when the target responds.
+                migration = migrationManager.StartMigration(ForwardingAddress, Address, context.MigrationContext, TakeRequestsForMigration(), cancellationToken);
+                await migration.Completion;
                 _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, ForwardingAddress);
                 return true;
             }
@@ -2469,6 +2643,11 @@ internal sealed partial class ActivationData :
         private const int IsStuckDeactivatingFlag = 1 << 1;
         private const int IsDisposingFlag = 1 << 2;
         private byte _flags;
+
+        /// <summary>
+        /// The number of <see cref="IActivationKeepAlive"/> holds which prevent idle collection.
+        /// </summary>
+        public int KeepAliveHolds;
 
         public HashSet<IGrainTimer>? Timers { get => GetValueOrDefault<HashSet<IGrainTimer>>(nameof(Timers)); set => SetOrRemoveValue(nameof(Timers), value); }
 

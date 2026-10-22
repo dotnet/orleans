@@ -50,6 +50,20 @@ namespace UnitTests.StorageTests.Relational
 
         [Fact]
         [TestCategory("Functional")]
+        public async Task GrainTypeQualifiedKeyFormat_IsolatesGrains()
+        {
+            await Relational_GrainTypeQualifiedKeyFormatIsolatesGrains();
+        }
+
+        [Fact]
+        [TestCategory("Functional")]
+        public async Task LegacyKeyFormat_SharesRowAcrossGrainTypes()
+        {
+            await Relational_LegacyKeyFormatSharesRowAcrossGrainTypes();
+        }
+
+        [Fact]
+        [TestCategory("Functional")]
         public async Task WriteDuplicateFailsWithInconsistentStateException()
         {
             await Relational_WriteDuplicateFailsWithInconsistentStateException();

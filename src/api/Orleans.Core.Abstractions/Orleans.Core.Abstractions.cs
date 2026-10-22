@@ -1118,9 +1118,34 @@ namespace Orleans
         public static Runtime.IGrainTimer RegisterGrainTimer<TState>(this IGrainBase grain, System.Func<TState, System.Threading.Tasks.Task> callback, TState state, Runtime.GrainTimerCreationOptions options) { throw null; }
 
         public static Runtime.IGrainTimer RegisterGrainTimer<TState>(this IGrainBase grain, System.Func<TState, System.Threading.Tasks.Task> callback, TState state, System.TimeSpan dueTime, System.TimeSpan period) { throw null; }
+
+        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Action<System.Threading.CancellationToken> callback, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Action<System.Threading.CancellationToken> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Action<TState, System.Threading.CancellationToken> callback, TState state, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Action<TState, System.Threading.CancellationToken> callback, TState state, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, TState state, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, TState state, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, TState state, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, TState state, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     public delegate System.Threading.Tasks.Task GrainCallFilterDelegate(IGrainCallContext context);
+    [System.Obsolete("Use CancellationToken instead.")]
     [Immutable]
     public sealed partial class GrainCancellationToken : System.IDisposable
     {
@@ -1131,6 +1156,7 @@ namespace Orleans
         public void Dispose() { }
     }
 
+    [System.Obsolete("Use CancellationTokenSource instead.")]
     public sealed partial class GrainCancellationTokenSource : System.IDisposable
     {
         public bool IsCancellationRequested { get { throw null; } }
@@ -2611,6 +2637,7 @@ namespace Orleans.Runtime
         void Activate(System.Collections.Generic.Dictionary<string, object>? requestContext, System.Threading.CancellationToken cancellationToken = default);
         void Deactivate(DeactivationReason deactivationReason, System.Threading.CancellationToken cancellationToken = default);
         void Migrate(System.Collections.Generic.Dictionary<string, object>? requestContext, System.Threading.CancellationToken cancellationToken = default);
+        void ReceiveLocalRequest(ILocalRequest request, LocalRequestOptions options);
         void ReceiveMessage(object message);
         void Rehydrate(IRehydrationContext context);
         void SetComponent<TComponent>(TComponent? value)
@@ -2687,6 +2714,11 @@ namespace Orleans.Runtime
     public partial interface IGrainTimer : System.IDisposable
     {
         void Change(System.TimeSpan dueTime, System.TimeSpan period);
+    }
+
+    public partial interface ILocalRequest : Orleans.Serialization.Invocation.IInvokable, System.IDisposable
+    {
+        void Complete(Orleans.Serialization.Invocation.Response response);
     }
 
     public partial interface IRehydrationContext
@@ -2788,6 +2820,14 @@ namespace Orleans.Runtime
         public LimitExceededException(string limitName, int current, int threshold, object extraInfo) { }
 
         public LimitExceededException(string message) { }
+    }
+
+    public readonly partial struct LocalRequestOptions
+    {
+        private readonly int _dummyPrimitive;
+        public bool Interleave { get { throw null; } init { } }
+
+        public bool KeepAlive { get { throw null; } init { } }
     }
 
     public static partial class LogFormatter
@@ -2927,6 +2967,8 @@ namespace Orleans.Runtime
     {
         public virtual bool IsCancellable { get { throw null; } }
 
+        public virtual bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public CodeGeneration.InvokeMethodOptions Options { get { throw null; } protected set { } }
 
         public void AddInvokeMethodOptions(CodeGeneration.InvokeMethodOptions options) { }
@@ -3033,7 +3075,7 @@ namespace Orleans.Runtime
 
         public override int GetHashCode() { throw null; }
 
-        public uint[] GetUniformHashCodes(int numHashes) { throw null; }
+        public System.Collections.Immutable.ImmutableArray<uint> GetUniformHashCodes(int numHashes) { throw null; }
 
         public bool IsPredecessorOf(SiloAddress other) { throw null; }
 
@@ -3740,6 +3782,8 @@ namespace OrleansCodeGen.Orleans.Core.Internal
         public System.Threading.CancellationToken arg0;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3777,6 +3821,8 @@ namespace OrleansCodeGen.Orleans.Core.Internal
     {
         public System.Threading.CancellationToken arg0;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -4714,6 +4760,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     {
         public System.Guid arg0;
         public global::Orleans.Runtime.IAsyncEnumerableRequest<T> arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -4746,6 +4794,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Invokable_IAsyncEnumerableGrainExtension_GrainReference_Ext_3C6D7209 : global::Orleans.Runtime.Request
     {
         public System.Guid arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -4781,6 +4831,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public global::Orleans.Runtime.IAsyncEnumerableRequest<T> arg1;
         public System.Threading.CancellationToken arg2;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -4818,6 +4870,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Invokable_IAsyncEnumerableGrainExtension_GrainReference_Ext_A7FA7E30_1<T> : global::Orleans.Runtime.Request<(global::Orleans.Runtime.EnumerationResult, object)>
     {
         public System.Guid arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -4852,6 +4906,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public System.Guid arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -4891,6 +4947,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public System.Guid arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 

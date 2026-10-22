@@ -42,8 +42,8 @@ namespace Orleans.Runtime
         private MessageCenter messageCenter = null!;
         private List<IIncomingGrainCallFilter> grainCallFilters = null!;
         private readonly DeepCopier _deepCopier;
-        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private IGrainCallCancellationManager _cancellationManager = null!;
+        private Func<SiloAddress, bool> _isDeadSilo = null!;
         private HostedClient hostedClient = null!;
 
         private HostedClient HostedClient => this.hostedClient;
@@ -71,7 +71,7 @@ namespace Orleans.Runtime
             TimeProvider = timeProvider;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
             this._deepCopier = deepCopier;
-            this._applicationRequestInstruments = new(orleansInstruments);
+            var applicationRequestInstruments = new ApplicationRequestInstruments(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
             this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
@@ -94,7 +94,8 @@ namespace Orleans.Runtime
                 this.messagingOptions.ResponseTimeout,
                 this.messagingOptions.CancelRequestOnTimeout,
                 this.messagingOptions.WaitForCancellationAcknowledgement,
-                cancellationManager: null!);
+                cancellationManager: null!,
+                applicationRequestInstruments);
 
             this.systemSharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
@@ -103,7 +104,8 @@ namespace Orleans.Runtime
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
                 waitForCancellationAcknowledgement: this.messagingOptions.WaitForCancellationAcknowledgement,
-                cancellationManager: null!);
+                cancellationManager: null!,
+                applicationRequestInstruments);
         }
 
         public IServiceProvider ServiceProvider { get; }
@@ -130,9 +132,16 @@ namespace Orleans.Runtime
             this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
             this.hostedClient = this.ServiceProvider.GetRequiredService<HostedClient>();
             _cancellationManager = this.ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
+            _isDeadSilo = this.ServiceProvider.GetRequiredService<ISiloStatusOracle>().IsDeadSilo;
             sharedCallbackData.CancellationManager = _cancellationManager;
             systemSharedCallbackData.CancellationManager = _cancellationManager;
         }
+
+        /// <summary>
+        /// Creates the message which queues <paramref name="request"/> on <paramref name="target"/> as a local request.
+        /// </summary>
+        public Message CreateLocalRequest(IGrainContext target, ILocalRequest request, LocalRequestOptions options)
+            => messageFactory.CreateLocalRequest(target, request, options);
 
         public void SendRequest(
             GrainReference target,
@@ -190,7 +199,7 @@ namespace Orleans.Runtime
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                callbackData = new CallbackData(sharedData, context, message);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
@@ -289,12 +298,15 @@ namespace Orleans.Runtime
 
         public async Task Invoke(IGrainContext target, Message message)
         {
+            // Local requests are one-way: they complete themselves on the target instead of sending a response.
+            Debug.Assert(!message.IsLocalOnly || message.Direction == Message.Directions.OneWay);
             try
             {
                 // Don't process messages that have already timed out
                 if (message.IsExpired)
                 {
                     this.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
+                    message.Dispose();
                     return;
                 }
 
@@ -322,11 +334,21 @@ namespace Orleans.Runtime
                                 else
                                 {
                                     response = await invokable.Invoke();
-                                    // The copier preserves the null state of its input.
-                                    response = this.responseCopier.Copy(response)!;
+
+                                    // A local request is passed by reference, and so is its response.
+                                    if (!message.IsLocalOnly)
+                                    {
+                                        // The copier preserves the null state of its input.
+                                        response = this.responseCopier.Copy(response)!;
+                                    }
                                 }
 
-                                invokable.Dispose();
+                                // A local request is disposed once it is completed.
+                                if (!message.IsLocalOnly)
+                                {
+                                    invokable.Dispose();
+                                }
+
                                 break;
                             }
                         default:
@@ -340,7 +362,8 @@ namespace Orleans.Runtime
 
                 if (response.Exception is { } invocationException)
                 {
-                    LogGrainInvokeException(this.invokeExceptionLogger, message.Direction != Message.Directions.OneWay ? LogLevel.Debug : LogLevel.Warning, invocationException, message);
+                    var logLevel = message.Direction != Message.Directions.OneWay || message.IsLocalOnly ? LogLevel.Debug : LogLevel.Warning;
+                    LogGrainInvokeException(this.invokeExceptionLogger, logLevel, invocationException, message);
 
                     // If a grain allowed an inconsistent state exception to escape and the exception originated from
                     // this activation, then deactivate it.
@@ -362,6 +385,13 @@ namespace Orleans.Runtime
                     }
                 }
 
+                // A local request owns its outcome, including reporting its failure, in place of a response.
+                // Completing it is the last step, so a failure before it completes the request exactly once.
+                if (message.IsLocalOnly)
+                {
+                    LocalRequests.Complete(message, response, this.logger);
+                }
+
                 if (message.Direction != Message.Directions.OneWay)
                 {
                     SafeSendResponse(message, response);
@@ -372,6 +402,10 @@ namespace Orleans.Runtime
             catch (Exception exc2)
             {
                 LogWarningInvokeException(this.logger, exc2, message);
+                if (message.IsLocalOnly)
+                {
+                    LocalRequests.Reject(message, exc2, this.logger);
+                }
 
                 if (message.Direction != Message.Directions.OneWay)
                 {
@@ -454,6 +488,7 @@ namespace Orleans.Runtime
                         break;
                     case Message.RejectionTypes.CacheInvalidation when message.HasCacheInvalidationHeader:
                         // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
+                        message.Dispose();
                         return;
                     default:
                         LogErrorUnsupportedRejectionType(this.logger, rejection.RejectionType);
@@ -479,11 +514,13 @@ namespace Orleans.Runtime
             else
             {
                 LogDebugNoCallbackForResponse(this.logger, message);
+                message.Dispose();
             }
         }
 
         private void ProcessStatusResponse(Message message)
         {
+            using var statusMessage = message;
             var status = (StatusResponse)message.BodyObject!;
             callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
             var request = callback?.Message;
@@ -606,8 +643,19 @@ namespace Orleans.Runtime
             {
                 if (deadSilo.Equals(callback.Value.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callback.Value.OnTargetSiloFail(deadSilo);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Moves a pending call to the silo which accepted its request, so the call survives the original silo's departure.
+        /// </summary>
+        internal void RetargetCallback(GrainId sendingGrain, CorrelationId messageId, SiloAddress targetSilo, int forwardCount)
+        {
+            if (callbacks.TryGetValue((sendingGrain, messageId), out var callback))
+            {
+                callback.TryRetarget(targetSilo, forwardCount, _isDeadSilo);
             }
         }
 

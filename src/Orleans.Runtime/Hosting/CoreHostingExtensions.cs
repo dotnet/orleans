@@ -171,7 +171,7 @@ namespace Orleans.Hosting
                     sp.GetRequiredService<ClusterMembershipService>(),
                     DirectoryMembershipSnapshot.CreateConfiguration(
                         sp.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value.PartitionsPerSilo),
-                    DirectoryMembershipSnapshot.DefaultGetRingBoundaries,
+                    sp.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value.GetPartitionBoundaries,
                     sp.GetRequiredService<ILogger<MembershipBasedClusterServiceViewProvider>>(),
                     ClusterMembershipSnapshot.Default));
             services.TryAddSingleton(static sp => new DirectoryMembershipService(

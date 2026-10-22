@@ -21,7 +21,7 @@ public class IntegrationTestFixture : IAsyncLifetime
         var storageProvider = new VolatileJournalStorageProvider();
         builder.ConfigureSilo((options, siloBuilder) =>
         {
-            siloBuilder.AddJournalStorage();
+            siloBuilder.AddJournaling();
             siloBuilder.UseJsonJournalFormat(JournalingTestsJsonContext.Default);
             siloBuilder.Services.AddSingleton(storageProvider);
             siloBuilder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);

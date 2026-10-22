@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
@@ -17,6 +18,41 @@ namespace Orleans.Serialization.UnitTests
     [TestArea("Serialization")]
     public class TypeConverterTests
     {
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        public void AllowingVectorAndRankOneArraysKeepsVectorResolutionIndependentOfRegistrationOrder(bool vectorFirst, bool withContext)
+        {
+            var vector = typeof(int[]);
+            var nonVector = typeof(int).MakeArrayType(1);
+            Assert.NotEqual(vector, nonVector);
+            var options = new TypeManifestOptions();
+            AllowArrays(options);
+            Assert.Equal("System.Int32[]", Assert.Single(options.AllowedTypes));
+
+            var registrations = new ServiceCollection().AddSerializer();
+            if (withContext) registrations.AddSerializerContext(new AllowedArrayContext());
+            registrations.Configure<TypeManifestOptions>(AllowArrays);
+            using var services = registrations.BuildServiceProvider();
+            var resolver = services.GetRequiredService<TypeResolver>();
+            Assert.Same(vector, resolver.ResolveType("System.Int32[]"));
+            Assert.Same(vector, services.GetRequiredService<TypeConverter>().Parse("int[]"));
+            var serializer = services.GetRequiredService<Serializer>();
+            int[] input = [13, 17];
+            var restored = Assert.IsType<int[]>(serializer.Deserialize<object>(serializer.SerializeToArray((object)input)));
+            Assert.Equal(input, restored);
+            Assert.NotSame(input, restored);
+            Assert.Same(vector, resolver.ResolveType("System.Int32[]"));
+
+            void AllowArrays(TypeManifestOptions manifest)
+            {
+                manifest.AddAllowedType(vectorFirst ? vector : nonVector);
+                manifest.AddAllowedType(vectorFirst ? nonVector : vector);
+            }
+        }
+
         [Fact]
         public void TypeConverter_FailsClosed_WhenAllFiltersHaveNoOpinion_AndAllowAllTypesIsFalse()
         {
@@ -264,7 +300,11 @@ namespace Orleans.Serialization.UnitTests
         [Fact]
         public void TypeConverter_AllowsConfiguredAllowedAssemblies()
         {
-            var converter = CreateConverter(configureOptions: options => options.AddAllowedAssembly(typeof(TypeConverterTestsAssemblyAllowedType).Assembly));
+            var converter = CreateConverter(configureOptions: options =>
+            {
+                options.AddAllowedAssembly(typeof(TypeConverterTestsAssemblyAllowedType).Assembly);
+                options.AddAllowedType(typeof(List<>));
+            });
 
             AssertRoundTrips(converter, typeof(TypeConverterTestsAssemblyAllowedType));
             AssertRoundTrips(converter, typeof(List<TypeConverterTestsAssemblyAllowedType>));
@@ -273,7 +313,11 @@ namespace Orleans.Serialization.UnitTests
         [Fact]
         public void TypeConverter_AllowsConfiguredAllowedAssemblyTypesAlongsideWellKnownGenericArguments()
         {
-            var converter = CreateConverter(configureOptions: options => options.AddAllowedAssembly(typeof(TypeConverterTestsAssemblyAllowedType).Assembly));
+            var converter = CreateConverter(configureOptions: options =>
+            {
+                options.AddAllowedAssembly(typeof(TypeConverterTestsAssemblyAllowedType).Assembly);
+                options.AddAllowedType(typeof(IReadOnlyDictionary<,>));
+            });
 
             AssertRoundTrips(converter, typeof(IReadOnlyDictionary<TypeConverterTestsAssemblyAllowedType, int>));
         }
@@ -310,7 +354,52 @@ namespace Orleans.Serialization.UnitTests
             var converter = CreateConverter(configureOptions: options => options.AddAllowedAssembly(typeof(TypeConverterTestsAssemblyAllowedType).Assembly));
             var formatted = $"{typeof(System.Text.StringBuilder).FullName},{CachedTypeResolver.GetName(typeof(TypeConverterTestsAssemblyAllowedType).Assembly)}";
 
-            Assert.Throws<InvalidOperationException>(() => converter.Parse(formatted));
+            Assert.False(converter.TryParse(formatted, out var resolved));
+            Assert.Null(resolved);
+            Assert.Throws<TypeLoadException>(() => converter.Parse(formatted));
+        }
+
+        [Fact]
+        public void CachedTypeResolver_QualifiedMissRemainsBoundToTheSpecifiedAssembly()
+        {
+            var resolver = new CachedTypeResolver();
+            var type = typeof(System.Text.StringBuilder);
+            var assembly = typeof(TypeConverterTestsAssemblyAllowedType).Assembly;
+            var name = $"{type.FullName},{CachedTypeResolver.GetName(assembly)}";
+            Assert.Null(assembly.GetType(type.FullName!));
+
+            Assert.False(resolver.TryResolveType(name, out var resolved));
+            Assert.Null(resolved);
+            Assert.Throws<TypeAccessException>(() => resolver.ResolveType(name));
+
+            Assert.Same(type, resolver.ResolveType(type.AssemblyQualifiedName!));
+            Assert.Same(type, resolver.ResolveType(type.FullName!));
+            Assert.False(resolver.TryResolveType(name, out resolved));
+            Assert.Null(resolved);
+        }
+
+        [Fact]
+        public void CachedTypeResolver_ResolvesQualifiedAndUnqualifiedTypes()
+        {
+            var resolver = new CachedTypeResolver();
+            var type = typeof(TypeConverterTestsUnconfiguredType);
+
+            Assert.Same(type, resolver.ResolveType(type.AssemblyQualifiedName!));
+            Assert.Same(type, resolver.ResolveType(type.FullName!));
+            Assert.Same(typeof(int), resolver.ResolveType("System.Int32"));
+        }
+
+        [Fact]
+        public void CachedTypeResolver_ResolvesTypesForwardedByTheSpecifiedAssembly()
+        {
+            var forwardingAssembly = Assembly.Load("System.Runtime");
+            var type = typeof(int);
+            Assert.NotSame(forwardingAssembly, type.Assembly);
+            Assert.Same(type, forwardingAssembly.GetType(type.FullName!));
+            var resolver = new CachedTypeResolver();
+
+            Assert.Same(type, resolver.ResolveType($"{type.FullName},{forwardingAssembly.FullName}"));
+            Assert.Same(type, resolver.ResolveType($"{type.FullName},{CachedTypeResolver.GetName(forwardingAssembly)}"));
         }
 
         [Fact]
@@ -353,6 +442,7 @@ namespace Orleans.Serialization.UnitTests
         public void TypeConverter_UsesTypeFiltersForGenericArguments_WhenNameFiltersHaveNoOpinion()
         {
             var converter = CreateConverter(
+                configureOptions: options => options.AddAllowedType(typeof(List<>)),
                 typeFilters:
                 [
                     new DelegateTypeFilter(type => type == typeof(TypeConverterTestsGenericArgumentAllowedByTypeFilter) ? true : null)
@@ -365,12 +455,118 @@ namespace Orleans.Serialization.UnitTests
         public void TypeConverter_UsesTypeFiltersAlongsideWellKnownGenericArguments_WhenNameFiltersHaveNoOpinion()
         {
             var converter = CreateConverter(
+                configureOptions: options => options.AddAllowedType(typeof(IReadOnlyDictionary<,>)),
                 typeFilters:
                 [
                     new DelegateTypeFilter(type => type == typeof(TypeConverterTestsGenericArgumentAllowedByTypeFilter) ? true : null)
                 ]);
 
             AssertRoundTrips(converter, typeof(IReadOnlyDictionary<TypeConverterTestsGenericArgumentAllowedByTypeFilter, int>));
+        }
+
+        [Theory]
+        [InlineData(typeof(int))]
+        [InlineData(typeof(TypeConverterTestsEnum))]
+        [InlineData(typeof(TypeConverterTestsGenericArgumentAllowedByTypeFilter))]
+        public void TypeConverter_RejectsUnknownGenericRoots_WithApprovedArguments(Type argument)
+        {
+            var converter = CreateConverter(
+                typeFilters: [new DelegateTypeFilter(type => type == argument ? true : null)]);
+            var type = typeof(TypeConverterTestsGenericTypeAllowedByTypeFilter<>).MakeGenericType(argument);
+
+            AssertTypeNotAllowed(converter, type);
+        }
+
+        [Fact]
+        public void TypeConverter_AllowsMetadataRegisteredGenericRoots_WithApprovedArguments()
+        {
+            var converter = CreateConverter(
+                configureOptions: options => options.AddActivator(typeof(TypeConverterTestsGenericTypeActivator<>)),
+                typeFilters:
+                [
+                    new DelegateTypeFilter(type => type == typeof(TypeConverterTestsGenericArgumentAllowedByTypeFilter) ? true : null)
+                ]);
+
+            AssertRoundTrips(converter, typeof(TypeConverterTestsGenericTypeAllowedByTypeFilter<int>));
+            AssertRoundTrips(converter, typeof(TypeConverterTestsGenericTypeAllowedByTypeFilter<TypeConverterTestsGenericArgumentAllowedByTypeFilter>));
+        }
+
+        [Fact]
+        public void TypeConverter_AllowsGenericDefinitionsApprovedByTypeFilters_WithApprovedArguments()
+        {
+            var definition = typeof(TypeConverterTestsGenericTypeAllowedByTypeFilter<>);
+            var converter = CreateConverter(
+                typeFilters: [new DelegateTypeFilter(type => type == definition ? true : null)]);
+
+            AssertRoundTrips(converter, typeof(TypeConverterTestsGenericTypeAllowedByTypeFilter<int>));
+        }
+
+        [Fact]
+        public void TypeConverter_UsesRegisteredArgumentGrants_AlongsideTypeFilteredArguments()
+        {
+            var converter = CreateConverter(
+                configureOptions: options =>
+                {
+                    options.AddAllowedType(typeof(Dictionary<,>));
+                    options.AddActivator(typeof(TypeConverterTestsMetadataAllowedTypeActivator));
+                },
+                typeFilters:
+                [
+                    new DelegateTypeFilter(type => type == typeof(TypeConverterTestsGenericArgumentAllowedByTypeFilter) ? true : null)
+                ]);
+
+            AssertRoundTrips(converter, typeof(Dictionary<TypeConverterTestsMetadataAllowedType, TypeConverterTestsGenericArgumentAllowedByTypeFilter>));
+        }
+
+        [Fact]
+        public void TypeConverter_RejectsRegisteredGenericRoots_WithUnknownArguments()
+        {
+            var converter = CreateConverter(
+                configureOptions: options => options.AddActivator(typeof(TypeConverterTestsGenericTypeActivator<>)));
+
+            AssertTypeNotAllowed(converter, typeof(TypeConverterTestsGenericTypeAllowedByTypeFilter<UriBuilder>));
+        }
+
+        [Fact]
+        public void TypeConverter_RejectsRegisteredGenericRoots_WithDeniedArguments()
+        {
+            var converter = CreateConverter(
+                configureOptions: options => options.AddActivator(typeof(TypeConverterTestsGenericTypeActivator<>)),
+                typeFilters: [new DelegateTypeFilter(type => type == typeof(UriBuilder) ? false : null)]);
+
+            AssertTypeNotAllowed(converter, typeof(TypeConverterTestsGenericTypeAllowedByTypeFilter<UriBuilder>));
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void TypeConverter_ChecksLaterArgumentsForDenials_AfterAnUnknownArgument(bool allowClosedType)
+        {
+            var type = typeof(Dictionary<UriBuilder, TypeConverterTestsUnconfiguredType>);
+            var deniedArgumentChecks = 0;
+            var converter = CreateConverter(
+                configureOptions: options => options.AddAllowedType(typeof(Dictionary<,>)),
+                typeFilters:
+                [
+                    new DelegateTypeFilter(candidate =>
+                    {
+                        if (allowClosedType && candidate == type)
+                        {
+                            return true;
+                        }
+
+                        if (candidate == typeof(TypeConverterTestsUnconfiguredType))
+                        {
+                            deniedArgumentChecks++;
+                            return false;
+                        }
+
+                        return null;
+                    })
+                ]);
+
+            AssertTypeNotAllowed(converter, type);
+            Assert.Equal(2, deniedArgumentChecks);
         }
 
         [Fact]
@@ -430,7 +626,7 @@ namespace Orleans.Serialization.UnitTests
         [Fact]
         public void TypeConverter_AllowsEnums_AsGenericArguments_WhenAllFiltersHaveNoOpinion()
         {
-            var converter = CreateConverter();
+            var converter = CreateConverter(configureOptions: options => options.AddAllowedType(typeof(List<>)));
 
             AssertRoundTrips(converter, typeof(List<TypeConverterTestsEnum>));
         }
@@ -512,6 +708,95 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(typeof(TypeConverterTestsCompoundAliasedType), converter.Parse(alias));
         }
 
+        [Theory]
+        [InlineData(typeof(TypeConverterTestsAttributedCompoundAliasedType[]))]
+        [InlineData(typeof(TypeConverterTestsAttributedCompoundAliasedType[][]))]
+        [InlineData(typeof(List<TypeConverterTestsAttributedCompoundAliasedType[]>))]
+        public void TypeConverter_RejectsCompoundAliasedArrays_WhenResolvedTypeNameIsDenied(Type type)
+        {
+            var converter = CreateConverter(
+                configureOptions: options => options.CompoundTypeAliases
+                    .Add("type_converter_attributed_alias")
+                    .Add("v1", typeof(TypeConverterTestsAttributedCompoundAliasedType)),
+                typeNameFilters:
+                [
+                    new DelegateTypeNameFilter((typeName, _) =>
+                        typeName == typeof(TypeConverterTestsAttributedCompoundAliasedType).FullName ? false : null)
+                ]);
+
+            var exception = Assert.Throws<InvalidOperationException>(() => converter.Parse(RuntimeTypeNameFormatter.Format(type)));
+
+            Assert.Contains("not allowed", exception.Message);
+            Assert.Contains(typeof(TypeConverterTestsAttributedCompoundAliasedType).FullName!, exception.Message);
+        }
+
+        [Theory]
+        [InlineData(typeof(TypeConverterTestsAttributedCompoundAliasedType[]))]
+        [InlineData(typeof(TypeConverterTestsAttributedCompoundAliasedType[][]))]
+        [InlineData(typeof(List<TypeConverterTestsAttributedCompoundAliasedType[]>))]
+        public void TypeConverter_RejectsCompoundAliasedArrays_WhenElementTypeFilterDeniesThem(Type type)
+        {
+            var converter = CreateConverter(
+                configureOptions: options => options.CompoundTypeAliases
+                    .Add("type_converter_attributed_alias")
+                    .Add("v1", typeof(TypeConverterTestsAttributedCompoundAliasedType)),
+                typeNameFilters:
+                [
+                    new DelegateTypeNameFilter((typeName, _) =>
+                        typeName.StartsWith("System.Collections.", StringComparison.Ordinal) ? true : null)
+                ],
+                typeFilters:
+                [
+                    new DelegateTypeFilter(candidate =>
+                        candidate == typeof(TypeConverterTestsAttributedCompoundAliasedType) ? false : null)
+                ]);
+
+            var exception = Assert.Throws<InvalidOperationException>(() => converter.Parse(RuntimeTypeNameFormatter.Format(type)));
+
+            Assert.Contains("not allowed", exception.Message);
+        }
+
+        [Theory]
+        [InlineData(typeof(TypeConverterTestsAttributedCompoundAliasedType[]))]
+        [InlineData(typeof(TypeConverterTestsAttributedCompoundAliasedType[][]))]
+        public void TypeConverter_FailsClosed_ForUnconfiguredCompoundAliasArrayElements(Type type)
+        {
+            var converter = CreateConverter(
+                configureOptions: options => options.CompoundTypeAliases
+                    .Add("type_converter_attributed_alias")
+                    .Add("v1", typeof(TypeConverterTestsAttributedCompoundAliasedType)));
+
+            AssertTypeNotAllowed(converter, type);
+        }
+
+        [Theory]
+        [InlineData("[]")]
+        [InlineData("[][]")]
+        [InlineData("[,]")]
+        public void TypeConverter_RejectsCompoundAliasedArrays_WhenAliasComponentNameIsDenied(string suffix)
+        {
+            var component = typeof(TypeConverterTestsAliasComponentType);
+            var converter = CreateConverter(
+                configureOptions: options =>
+                {
+                    options.AddAllowedType(typeof(TypeConverterTestsCompoundAliasedWithComponentType));
+                    options.CompoundTypeAliases
+                        .Add("type_converter_compound_alias_with_component")
+                        .Add(component)
+                        .Add("v1", typeof(TypeConverterTestsCompoundAliasedWithComponentType));
+                },
+                typeNameFilters:
+                [
+                    new DelegateTypeNameFilter((typeName, _) => typeName == component.FullName ? false : null)
+                ]);
+            var alias = $"(\"type_converter_compound_alias_with_component\",[{RuntimeTypeNameFormatter.Format(component)}],\"v1\"){suffix}";
+
+            var exception = Assert.Throws<InvalidOperationException>(() => converter.Parse(alias));
+
+            Assert.Contains("not allowed", exception.Message);
+            Assert.Contains(component.FullName!, exception.Message);
+        }
+
         private static void AssertRoundTrips(TypeConverter converter, Type type)
         {
             var formatted = converter.Format(type);
@@ -574,6 +859,9 @@ namespace Orleans.Serialization.UnitTests
             public bool? IsTypeAllowed(Type type) => filter(type);
         }
     }
+
+    [GenerateSerializerContext<int[]>]
+    internal partial class AllowedArrayContext : SerializerContext;
 
     internal sealed class TypeConverterTestsUnconfiguredType
     {
@@ -641,5 +929,10 @@ namespace Orleans.Serialization.UnitTests
     internal sealed class TypeConverterTestsMetadataAllowedTypeActivator : IActivator<TypeConverterTestsMetadataAllowedType>
     {
         public TypeConverterTestsMetadataAllowedType Create() => throw new NotSupportedException();
+    }
+
+    internal sealed class TypeConverterTestsGenericTypeActivator<T> : IActivator<TypeConverterTestsGenericTypeAllowedByTypeFilter<T>>
+    {
+        public TypeConverterTestsGenericTypeAllowedByTypeFilter<T> Create() => throw new NotSupportedException();
     }
 }

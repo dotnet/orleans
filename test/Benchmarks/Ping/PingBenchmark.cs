@@ -98,24 +98,27 @@ public class PingBenchmark : IDisposable
         grainFactory: this.client!,
         blocksPerWorker: 10);
 
-    public Task PingConcurrent() => this.Run(
-        runs: 10,
+    public Task PingConcurrent(int runs = 10, int blocksPerWorker = 10, int warmupBlocksPerWorker = 3) => this.Run(
+        runs,
         grainFactory: this.client!,
-        blocksPerWorker: 10);
+        blocksPerWorker,
+        warmupBlocksPerWorker);
 
-    public Task PingConcurrentHostedClient(int blocksPerWorker = 30) => this.Run(
-        runs: 10,
+    public Task PingConcurrentHostedClient(int blocksPerWorker = 30, int runs = 10, int warmupBlocksPerWorker = 3) => this.Run(
+        runs,
         grainFactory: (IGrainFactory)this.hosts[0].Services.GetService(typeof(IGrainFactory))!,
-        blocksPerWorker: blocksPerWorker);
+        blocksPerWorker,
+        warmupBlocksPerWorker);
 
-    private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker)
+    private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker, int warmupBlocksPerWorker = 3)
     {
         var loadGenerator = new ConcurrentLoadGenerator<IPingGrain>(
             maxConcurrency: 100,
             blocksPerWorker: blocksPerWorker,
             requestsPerBlock: 500,
             issueRequest: g => g.Run(),
-            getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId));
+            getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId),
+            warmupBlocksPerWorker: warmupBlocksPerWorker);
         await loadGenerator.Warmup();
         while (runs-- > 0) await loadGenerator.Run();
     }

@@ -41,6 +41,14 @@ Pagefind indexing, and production build with:
 npm run validate
 ```
 
+Astro generates one route at a time by default on Windows to avoid the
+concurrent prerender output race tracked in
+[#10672](https://github.com/dotnet/orleans/issues/10672). Other platforms
+generate four routes concurrently. Set `ORLEANS_DOCS_BUILD_CONCURRENCY` to a
+positive integer to select a different worker count. Windows users who enable
+concurrent generation should use Node.js 24.20 or later, which includes the
+upstream fix for the secondary libuv shutdown assertion.
+
 The source audit reports a rule ID, file, line, and remediation. It enforces:
 
 - Orleans 10 guidance outside migration pages and explicitly versioned compatibility zones.
@@ -112,8 +120,12 @@ build transitively and aren't direct `Docs.slnx` entries.
 Fix `LINK001` using the canonical URL in its remediation. Rendered-link failures
 name the source file/line when the authored link can be mapped, otherwise the
 rendered route. `src/data/external-link-allowlist.json` accepts exact URLs only;
-each entry needs a narrow reason and remains actively probed, so reachable or
-unreferenced entries fail as stale. A generated API package awaiting its first
+each entry records a narrow probe-reliability reason and remains actively probed.
+The audit reports each response status with its reason, including successful
+responses from intermittently accessible targets. Remove an entry after reviewing
+evidence that the target reliably accepts the bounded automated probe.
+Unreferenced entries fail as stale, and destination safety checks apply to every
+entry and redirect. A generated API package awaiting its first
 NuGet publication also needs a temporary entry in
 `src/data/unpublished-api-packages.json`; remove both entries after publication.
 

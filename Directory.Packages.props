@@ -36,16 +36,17 @@
     <PackageVersion Include="Google.Protobuf" Version="3.33.5" />
     <PackageVersion Include="Grpc.Tools" Version="2.78.0" />
     <PackageVersion Include="Hyperion" Version="0.12.2" />
-    <PackageVersion Include="KubernetesClient" Version="18.0.13" />
-    <PackageVersion Include="MessagePack" Version="3.1.7" />
+    <!-- Generated KubernetesClient method signatures can change between major versions. -->
+    <PackageVersion Include="KubernetesClient" Version="[21.0.8,22.0.0)" />
+    <PackageVersion Include="MessagePack" Version="3.1.11" />
     <PackageVersion Include="Microsoft.NET.StringTools" Version="17.11.4" />
     <PackageVersion Include="Microsoft.Accordant" Version="0.1.6" />
-    <PackageVersion Include="Microsoft.AspNetCore.Connections.Abstractions" Version="8.0.24" />
     <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.57.0" />
     <PackageVersion Include="Microsoft.Build" Version="17.10.4" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Common" Version="4.5.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Features" Version="4.5.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.5.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.5.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.Common" Version="4.5.0" />
@@ -81,11 +82,11 @@
     <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" />
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="10.0.111" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.111" />
-    <PackageVersion Include="Microsoft.Testing.Extensions.CrashDump" Version="2.4.0" />
-    <PackageVersion Include="Microsoft.Testing.Extensions.HangDump" Version="2.4.0" />
-    <PackageVersion Include="Microsoft.Testing.Extensions.TrxReport" Version="2.4.0" />
-    <PackageVersion Include="Microsoft.Testing.Platform" Version="2.4.0" />
-    <PackageVersion Include="Microsoft.Testing.Platform.MSBuild" Version="2.4.0" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.CrashDump" Version="2.4.1" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.HangDump" Version="2.4.1" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.TrxReport" Version="2.4.1" />
+    <PackageVersion Include="Microsoft.Testing.Platform" Version="2.4.1" />
+    <PackageVersion Include="Microsoft.Testing.Platform.MSBuild" Version="2.4.1" />
     <PackageVersion Include="MySql.Data" Version="8.0.31" />
     <PackageVersion Include="NATS.Net" Version="2.7.2" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
@@ -116,17 +117,24 @@
     <PackageVersion Include="System.IO.Pipelines" Version="8.0.0" />
     <PackageVersion Include="System.Memory.Data" Version="8.0.1" />
     <PackageVersion Include="System.Reactive" Version="6.1.0" />
+    <!-- Pin patched Pkcs for Microsoft.Data.SqlClient consumers (GHSA-2fmv-rv2c-59x7 and GHSA-846f-f764-76mx). -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="8.0.2" />
     <PackageVersion Include="System.Text.Json" Version="8.0.5" />
     <PackageVersion Include="Testcontainers" Version="4.10.0" />
     <PackageVersion Include="Testcontainers.Consul" Version="4.10.0" />
     <PackageVersion Include="Utf8Json" Version="1.3.7" />
     <PackageVersion Include="Verify.XunitV3" Version="29.5.0" />
-    <PackageVersion Include="xunit.v3.assert" Version="3.2.2" />
-    <PackageVersion Include="xunit.v3.core.mtp-v2" Version="3.2.2" />
-    <PackageVersion Include="xunit.v3.extensibility.core" Version="3.2.2" />
-    <PackageVersion Include="xunit.v3.mtp-v2" Version="3.2.2" />
+    <PackageVersion Include="xunit.v3.assert" Version="4.0.0" />
+    <PackageVersion Include="xunit.v3.core.mtp-v2" Version="4.0.0" />
+    <PackageVersion Include="xunit.v3.extensibility.core" Version="4.0.0" />
+    <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.0" />
     <PackageVersion Include="ZeroFormatter" Version="1.6.4" />
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Orleans.Clustering.TestKit'">
+    <PackageVersion Update="System.Collections.Immutable" Version="10.0.0" />
+    <PackageVersion Update="System.IO.Pipelines" Version="10.0.5" />
+    <PackageVersion Update="System.Text.Json" Version="10.0.5" />
   </ItemGroup>
   <!-- Updates for later TFMs -->
   <ItemGroup Condition=" '$(TargetFramework)' == 'net10.0' ">
@@ -142,8 +150,8 @@
     <PackageVersion Update="Aspire.StackExchange.Redis" Version="13.2.4" />
     <PackageVersion Update="BenchmarkDotNet" Version="0.15.6" />
     <PackageVersion Update="FSharp.Core" Version="10.0.103" />
-    <PackageVersion Update="Microsoft.AspNetCore.Connections.Abstractions" Version="10.0.3" />
     <PackageVersion Update="Microsoft.CodeAnalysis.Common" Version="5.0.0" />
+    <PackageVersion Update="Microsoft.CodeAnalysis.CSharp.Features" Version="5.0.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis.Workspaces.Common" Version="5.0.0" />
@@ -178,6 +186,7 @@
     <PackageVersion Update="System.Drawing.Common" Version="10.0.3" />
     <PackageVersion Update="System.IO.Pipelines" Version="10.0.5" />
     <PackageVersion Update="System.Memory.Data" Version="10.0.3" />
+    <PackageVersion Update="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <PackageVersion Update="System.Text.Json" Version="10.0.5" />
   </ItemGroup>
 </Project>

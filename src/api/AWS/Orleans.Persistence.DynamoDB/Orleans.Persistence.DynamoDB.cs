@@ -28,7 +28,7 @@ namespace Orleans.Configuration
 
         public int ReadCapacityUnits { get { throw null; } set { } }
 
-        public string ServiceId { get { throw null; } set { } }
+        public string? ServiceId { get { throw null; } set { } }
 
         public string TableName { get { throw null; } set { } }
 
@@ -81,6 +81,7 @@ namespace Orleans.Persistence.DynamoDB
 
         public string Service { get { throw null; } set { } }
 
+        [Redact]
         public string? Token { get { throw null; } set { } }
     }
 }
@@ -91,6 +92,8 @@ namespace Orleans.Storage
     {
         public DynamoDBGrainStorage(string name, Configuration.DynamoDBStorageOptions options, Serialization.Serializers.IActivatorProvider activatorProvider, Microsoft.Extensions.Logging.ILogger<DynamoDBGrainStorage> logger) { }
 
+        public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
 
         public System.Threading.Tasks.Task Close(System.Threading.CancellationToken ct) { throw null; }
@@ -99,7 +102,11 @@ namespace Orleans.Storage
 
         public void Participate(Runtime.ISiloLifecycle lifecycle) { }
 
+        public System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
+
+        public System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
     }

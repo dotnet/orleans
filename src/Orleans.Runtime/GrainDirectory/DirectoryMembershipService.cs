@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -23,7 +24,18 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     private readonly bool _ownsViewProvider;
     private DirectoryMembershipSnapshot _currentView = DirectoryMembershipSnapshot.Default;
 
-    public DirectoryMembershipSnapshot CurrentView => Volatile.Read(ref _currentView);
+    public DirectoryMembershipSnapshot CurrentView
+    {
+        get
+        {
+            if (_runTask.IsFaulted)
+            {
+                _runTask.GetAwaiter().GetResult();
+            }
+
+            return Volatile.Read(ref _currentView);
+        }
+    }
 
     public int PartitionsPerSilo => _membership.CurrentView.Topology.PartitionCount;
 
@@ -93,7 +105,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         IInternalGrainFactory grainFactory,
         ILogger<DirectoryMembershipService> logger,
         int partitionsPerSilo,
-        Func<SiloAddress, int, uint[]> getRingBoundaries)
+        Func<SiloAddress, int, ImmutableArray<uint>> getRingBoundaries)
         : this(
             new MembershipBasedClusterServiceViewProvider(
                 clusterMembershipService,
@@ -129,7 +141,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         _ownsViewProvider = ownsViewProvider;
         _currentView = new(_membership.CurrentView, grainFactory);
         _viewUpdates = new(
-            CurrentView,
+            _currentView,
             (previous, proposed) => proposed.Version > previous.Version,
             update => Volatile.Write(ref _currentView, update));
         _grainFactory = grainFactory;

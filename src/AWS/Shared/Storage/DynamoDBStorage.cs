@@ -147,49 +147,56 @@ namespace Orleans.Transactions.DynamoDB
         [MemberNotNull(nameof(_ddbClient))]
         private void CreateClient()
         {
-            if (this._service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                this._service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            var isServiceUrl = Uri.TryCreate(this._service, UriKind.Absolute, out var serviceUri)
+                && (serviceUri.Scheme == Uri.UriSchemeHttp || serviceUri.Scheme == Uri.UriSchemeHttps);
+            var config = isServiceUrl
+                ? new AmazonDynamoDBConfig { ServiceURL = this._service }
+                : new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) };
+            var credentials = GetClientCredentials(serviceUri);
+
+            this._ddbClient = credentials is null
+                ? new AmazonDynamoDBClient(config)
+                : new AmazonDynamoDBClient(credentials, config);
+        }
+
+        private AWSCredentials? GetClientCredentials(Uri? serviceUri)
+        {
+            var credentials = GetExplicitCredentials();
+            if (credentials is null && serviceUri?.Scheme == Uri.UriSchemeHttp)
             {
-                // Local DynamoDB instance (for testing)
-                var credentials = new BasicAWSCredentials("dummy", "dummyKey");
-                this._ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = this._service });
+                credentials = new BasicAWSCredentials("dummy", "dummyKey");
             }
-            else if (!string.IsNullOrEmpty(this._accessKey) && !string.IsNullOrEmpty(this.secretKey) && !string.IsNullOrEmpty(this._token))
+
+            return credentials;
+        }
+
+        private AWSCredentials? GetExplicitCredentials()
+        {
+            if (!string.IsNullOrEmpty(this._accessKey)
+                && !string.IsNullOrEmpty(this.secretKey)
+                && !string.IsNullOrEmpty(this._token))
             {
-                // AWS DynamoDB instance (auth via explicit credentials and token)
-                var credentials = new SessionAWSCredentials(this._accessKey, this.secretKey, this._token);
-                this._ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) });
+                return new SessionAWSCredentials(this._accessKey, this.secretKey, this._token);
             }
-            else if (!string.IsNullOrEmpty(this._accessKey) && !string.IsNullOrEmpty(this.secretKey))
+
+            if (!string.IsNullOrEmpty(this._accessKey) && !string.IsNullOrEmpty(this.secretKey))
             {
-                // AWS DynamoDB instance (auth via explicit credentials)
-                var credentials = new BasicAWSCredentials(this._accessKey, this.secretKey);
-                this._ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) });
+                return new BasicAWSCredentials(this._accessKey, this.secretKey);
             }
-            else if (!string.IsNullOrEmpty(this._profileName))
+
+            if (!string.IsNullOrEmpty(this._profileName))
             {
-                // AWS DynamoDB instance (auth via explicit credentials and token found in a named profile)
                 var chain = new CredentialProfileStoreChain();
                 if (chain.TryGetAWSCredentials(this._profileName, out var credentials))
                 {
-                    this._ddbClient = new AmazonDynamoDBClient(
-                        credentials,
-                        new AmazonDynamoDBConfig
-                        {
-                            RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service)
-                        });
+                    return credentials;
                 }
-                else
-                {
-                    throw new InvalidOperationException(
-                        $"AWS named profile '{this._profileName}' provided, but credentials could not be retrieved");
-                }
+
+                throw new InvalidOperationException(
+                    $"AWS named profile '{this._profileName}' provided, but credentials could not be retrieved");
             }
-            else
-            {
-                // AWS DynamoDB instance (implicit auth - EC2 IAM Roles etc)
-                this._ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) });
-            }
+
+            return null;
         }
 
         private async Task<TableDescription?> GetTableDescription(string tableName, CancellationToken cancellationToken = default)
@@ -656,7 +663,12 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
         /// <returns></returns>
         public Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null)
+            => DeleteEntryAsync(tableName, keys, CancellationToken.None, conditionExpression, conditionValues);
+
+        internal Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, CancellationToken cancellationToken,
+            string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceDeletingTableEntry(_logger, tableName, new(keys));
 
             try
@@ -673,7 +685,7 @@ namespace Orleans.Transactions.DynamoDB
                 if (conditionValues != null && conditionValues.Keys.Count > 0)
                     request.ExpressionAttributeValues = conditionValues;
 
-                return _ddbClient.DeleteItemAsync(request);
+                return _ddbClient.DeleteItemAsync(request, cancellationToken);
             }
             catch (Exception exc)
             {
@@ -695,7 +707,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="tableName">The table name.</param>
         /// <param name="toDelete">The keys of the entries to delete.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete, CancellationToken cancellationToken)
+        public async Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogTraceDeletingTableEntries(_logger, tableName);
@@ -703,7 +715,7 @@ namespace Orleans.Transactions.DynamoDB
             if (toDelete == null) throw new ArgumentNullException(nameof(toDelete));
 
             if (toDelete.Count == 0)
-                return Task.CompletedTask;
+                return;
 
             try
             {
@@ -719,7 +731,12 @@ namespace Orleans.Transactions.DynamoDB
                     batch.Add(writeRequest);
                 }
                 request.RequestItems.Add(tableName, batch);
-                return _ddbClient.BatchWriteItemAsync(request, cancellationToken);
+                var response = await _ddbClient.BatchWriteItemAsync(request, cancellationToken);
+                var unprocessedCount = response.UnprocessedItems?.Values.Sum(items => items.Count) ?? 0;
+                if (unprocessedCount > 0)
+                {
+                    throw new InvalidOperationException($"Amazon DynamoDB failed to delete {unprocessedCount} item(s) from table {tableName}.");
+                }
             }
             catch (Exception exc)
             {

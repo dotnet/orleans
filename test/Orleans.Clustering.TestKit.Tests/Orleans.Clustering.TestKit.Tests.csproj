@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\TestInfrastructure\TestExtensions\TestTraits.cs" Link="TestTraits.cs" />
+    <ProjectReference Include="..\..\src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

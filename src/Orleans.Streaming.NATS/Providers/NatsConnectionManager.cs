@@ -1,5 +1,7 @@
 using System;
+using System.Linq;
 using System.Text;
+using System.Text.Unicode;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -19,6 +21,7 @@ internal sealed partial class NatsConnectionManager
     private readonly string _providerName;
     private readonly NatsOpts _natsClientOptions;
     private readonly NatsConnection _natsConnection;
+    private readonly string _natsServer;
     private readonly ILogger _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly NatsOptions _options;
@@ -56,6 +59,7 @@ internal sealed partial class NatsConnectionManager
         }
 
         this._natsClientOptions = this._options.NatsClientOptions;
+        this._natsServer = GetLogSafeServerDescription(this._natsClientOptions.Url);
         this._natsConnection = new NatsConnection(this._natsClientOptions);
         this._natsContext = new NatsJSContext(this._natsConnection);
 
@@ -80,13 +84,13 @@ internal sealed partial class NatsConnectionManager
 
             if (this._natsConnection.ConnectionState != NatsConnectionState.Open)
             {
-                this.LogUnableToConnectToNatsServer(this._natsClientOptions.Url);
+                this.LogUnableToConnectToNatsServer(this._natsServer);
                 return;
             }
 
             if (!this._natsConnection.ServerInfo!.JetStreamAvailable)
             {
-                this.LogJetStreamUnavailable(this._natsClientOptions.Url, this._providerName);
+                this.LogJetStreamUnavailable(this._natsServer, this._providerName);
                 return;
             }
 
@@ -96,12 +100,13 @@ internal sealed partial class NatsConnectionManager
 
                 if (producerContext.Connection.ConnectionState != NatsConnectionState.Open)
                 {
-                    this.LogUnableToConnectToNatsServer(producerContext.Connection.Opts.Url);
+                    this.LogUnableToConnectToNatsServer(
+                        GetLogSafeServerDescription(producerContext.Connection.Opts.Url));
                     return;
                 }
             }
 
-            this.LogConnectedToNatsServer(this._natsClientOptions.Url);
+            this.LogConnectedToNatsServer(this._natsServer);
 
             try
             {
@@ -120,7 +125,7 @@ internal sealed partial class NatsConnectionManager
                 await this._natsContext.UpdateStreamAsync(BuildStreamConfig(), cancellationToken);
             }
 
-            this.LogInitializedJetStreamStream(this._options.StreamName, this._natsClientOptions.Url);
+            this.LogInitializedJetStreamStream(this._options.StreamName, this._natsServer);
         }
         catch (Exception ex)
         {
@@ -128,6 +133,25 @@ internal sealed partial class NatsConnectionManager
             throw;
         }
     }
+
+    internal static string GetLogSafeServerDescription(string connectionUrls)
+        => string.Join(
+            ',',
+            connectionUrls.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(static value =>
+                {
+                    if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+                    {
+                        return "configured NATS endpoint";
+                    }
+
+                    var builder = new UriBuilder(uri)
+                    {
+                        UserName = string.Empty,
+                        Password = string.Empty,
+                    };
+                    return builder.Uri.ToString();
+                }));
 
     private StreamConfig BuildStreamConfig() => new(this._options.StreamName, [$"{this._providerName}.>"])
     {
@@ -155,12 +179,12 @@ internal sealed partial class NatsConnectionManager
             throw new InvalidOperationException("Unable to enqueue message because the NATS context is not initialized.");
         }
 
-        var ns = message.StreamId.Namespace.IsEmpty ? "null" : Encoding.UTF8.GetString(message.StreamId.Namespace.Span);
-        var id = Encoding.UTF8.GetString(message.StreamId.Key.Span);
+        var ns = GetSubjectToken(message.StreamId.Namespace.Span, isNamespace: true);
+        var id = GetSubjectToken(message.StreamId.Key.Span);
 
         var subject = $"{this._providerName}.{ns}.{id}";
 
-        var context = this._producerNatsContexts[Math.Abs(id.GetHashCode()) % this._producerNatsContexts.Length];
+        var context = this._producerNatsContexts[GetProducerIndex(id.GetHashCode(), this._producerNatsContexts.Length)];
 
         var ack = await context.TryPublishAsync(
             subject,
@@ -191,6 +215,39 @@ internal sealed partial class NatsConnectionManager
             partition,
             this._options.BatchSize,
             this._natsClientOptions.SerializerRegistry.GetDeserializer<NatsStreamMessage>());
+
+    internal static int GetProducerIndex(int hashCode, int producerCount)
+        => (int)((uint)hashCode % (uint)producerCount);
+
+    internal static string GetSubjectToken(ReadOnlySpan<byte> value, bool isNamespace = false)
+    {
+        if (isNamespace && value.IsEmpty)
+        {
+            return "null";
+        }
+
+        if (!value.IsEmpty && value[0] != (byte)'~' && Utf8.IsValid(value))
+        {
+            var token = Encoding.UTF8.GetString(value);
+            var valid = !isNamespace || token != "null";
+            foreach (var character in token)
+            {
+                if (character is '.' or '*' or '>' || char.IsWhiteSpace(character) || char.IsControl(character))
+                {
+                    valid = false;
+                    break;
+                }
+            }
+
+            if (valid)
+            {
+                return token;
+            }
+        }
+
+        // Reserve '~' so encoded bytes and literal tokens have distinct identities.
+        return $"~{Convert.ToHexString(value)}";
+    }
 
     /// <summary>
     /// Acknowledge messages on a subject in a NATS JetStream stream

@@ -36,6 +36,13 @@ CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
   rowcount NUMBER;
   PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
+    UPDATE OrleansMembershipVersionTable
+    SET Timestamp = sys_extract_utc(systimestamp),
+        Version = Version + 1
+    WHERE DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
+      AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL;
+    rowcount := SQL%ROWCOUNT;
+
     INSERT INTO OrleansMembershipTable
     (
       DeploymentId,
@@ -60,7 +67,7 @@ CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
       PARAM_PROXYPORT,
       PARAM_STARTTIME,
       PARAM_IAMALIVETIME
-    FROM DUAL WHERE NOT EXISTS
+    FROM DUAL WHERE rowcount > 0 AND NOT EXISTS
     (
       SELECT 1 FROM OrleansMembershipTable WHERE
         DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
@@ -68,14 +75,6 @@ CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
         AND Port = PARAM_PORT AND PARAM_PORT IS NOT NULL
         AND Generation = PARAM_GENERATION AND PARAM_GENERATION IS NOT NULL
     );
-    rowcount :=	SQL%ROWCOUNT;
-    UPDATE OrleansMembershipVersionTable
-    SET Timestamp = sys_extract_utc(systimestamp),
-        Version = Version + 1
-    WHERE
-  		DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
-    	AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL
-      AND rowcount > 0;
     rowcount :=	SQL%ROWCOUNT;
     IF rowcount = 0 THEN
       ROLLBACK;
@@ -88,6 +87,9 @@ CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
     ELSE
       RETURN(0);
     END IF;
+  EXCEPTION WHEN OTHERS THEN
+    ROLLBACK;
+    RAISE;
   END;
 /
 
@@ -110,15 +112,22 @@ CREATE OR REPLACE FUNCTION UpdateMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
       SET
         Status = PARAM_STATUS,
         SuspectTimes = PARAM_SUSPECTTIMES,
-        IAmAliveTime = PARAM_IAMALIVETIME
+        IAmAliveTime = GREATEST(IAmAliveTime, PARAM_IAMALIVETIME)
       WHERE DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
         AND Address = PARAM_ADDRESS AND PARAM_ADDRESS IS NOT NULL
         AND Port = PARAM_PORT AND PARAM_PORT IS NOT NULL
         AND Generation = PARAM_GENERATION AND PARAM_GENERATION IS NOT NULL
         AND rowcount > 0;
     rowcount := SQL%ROWCOUNT;
-    COMMIT;
+    IF rowcount = 0 THEN
+      ROLLBACK;
+    ELSE
+      COMMIT;
+    END IF;
     RETURN(rowcount);
+  EXCEPTION WHEN OTHERS THEN
+    ROLLBACK;
+    RAISE;
   END;
 /
 
@@ -153,10 +162,10 @@ BEGIN
         SET
             IAmAliveTime = PARAM_IAMALIVE
         WHERE
-            DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
-            AND Address = PARAM_ADDRESS AND PARAM_ADDRESS IS NOT NULL
-            AND Port = PARAM_PORT AND PARAM_PORT IS NOT NULL
-            AND Generation = PARAM_GENERATION AND PARAM_GENERATION IS NOT NULL;
+            DeploymentId = PARAM_DEPLOYMENTID
+            AND Address = PARAM_ADDRESS
+            AND Port = PARAM_PORT
+            AND Generation = PARAM_GENERATION;
       COMMIT;
       RETURN(0);
 END;
@@ -247,7 +256,9 @@ VALUES
       WHERE DeploymentId = :DeploymentId
         AND :DeploymentId IS NOT NULL
         AND IAmAliveTime < :IAmAliveTime
-        AND Status != 3;
+        AND StartTime < :IAmAliveTime
+        AND SuspectTimes IS NULL
+        AND Status = 6;
   END;
 ');
 /
@@ -261,6 +272,18 @@ VALUES
     WHERE DeploymentId = :DeploymentId AND :DeploymentId IS NOT NULL
       AND Status = :Status AND :Status IS NOT NULL
       AND ProxyPort > 0
+');
+/
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'CleanupDefunctSiloEntryKey','
+    DELETE FROM OrleansMembershipTable
+    WHERE DeploymentId = :DeploymentId AND Status = 6
+        AND Address = :Address AND Port = :Port AND Generation = :Generation
+        AND IAmAliveTime = :IAmAliveTime AND StartTime = :StartTime
+        AND (SuspectTimes = :SuspectTimes OR (SuspectTimes IS NULL AND :SuspectTimes IS NULL))
 ');
 /
 

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
@@ -46,7 +47,12 @@ public static class ServiceCollectionExtensions
         Action<DashboardOptions>? configureOptions = null)
     {
         services.AddGrainService<SiloGrainService>();
-        services.AddHostedService<DashboardHost>();
+        if (!services.Any(descriptor => descriptor.ServiceType == typeof(DashboardHost)))
+        {
+            services.AddSingleton<DashboardHost>();
+            services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<DashboardHost>());
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DashboardHost>();
+        }
         services.Configure(configureOptions ?? (x => { }));
         services.AddSingleton<DashboardTelemetryExporter>();
         services.AddOptions<GrainProfilerOptions>();

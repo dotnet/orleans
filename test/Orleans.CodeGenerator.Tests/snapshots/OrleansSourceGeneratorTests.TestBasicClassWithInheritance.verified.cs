@@ -176,10 +176,14 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_BaseData));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DerivedData));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_BaseData));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DerivedData));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_BaseData), typeof(global::TestProject.BaseData));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_BaseData), typeof(global::TestProject.BaseData));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DerivedData), typeof(global::TestProject.DerivedData));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_DerivedData), typeof(global::TestProject.DerivedData));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_BaseData), typeof(global::TestProject.BaseData));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_BaseData), typeof(global::TestProject.BaseData));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DerivedData), typeof(global::TestProject.DerivedData));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_DerivedData), typeof(global::TestProject.DerivedData));
         }
     }
 }

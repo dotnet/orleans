@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using TestExtensions;
@@ -10,6 +11,7 @@ using Orleans.Providers.Streams.Common;
 using Xunit;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
+using NATS.Client.JetStream.Models;
 
 namespace NATS.Tests;
 
@@ -101,6 +103,88 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
             NullLoggerFactory.Instance);
         adapterFactory.Init();
         await SendAndReceiveFromQueueAdapter(adapterFactory, TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [MemberData(nameof(NatsStreamMessageTests.StreamIdentities), MemberType = typeof(NatsStreamMessageTests))]
+    public Task SendAndReceiveStreamIdentity(byte[] streamNamespace, byte[] streamKey)
+        => VerifyStreamIdentity(StreamId.Create(streamNamespace, streamKey));
+
+    [Fact]
+    public Task SendAndReceivePersistedLegacyMessage()
+        => VerifyStreamIdentity(StreamId.Create("chat", "key"), useLegacyPayload: true);
+
+    private async Task VerifyStreamIdentity(StreamId streamId, bool useLegacyPayload = false)
+    {
+        var providerName = $"{NATS_STREAM_PROVIDER_NAME}-{testStreamName}";
+        var options = new NatsOptions
+        {
+            StreamName = testStreamName,
+            NatsClientOptions = NatsTestConstants.NatsClientOptions,
+            PartitionCount = 2,
+            ProducerCount = 1,
+        };
+        var adapterFactory = new NatsAdapterFactory(
+            providerName,
+            options,
+            new HashRingStreamQueueMapperOptions { TotalQueueCount = options.PartitionCount },
+            new SimpleQueueCacheOptions(),
+            Options.Create(new ClusterOptions()),
+            fixture.Serializer,
+            NullLoggerFactory.Instance);
+        adapterFactory.Init();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        if (useLegacyPayload)
+        {
+            await natsContext.CreateStreamAsync(
+                new StreamConfig(testStreamName, [$"{providerName}.>"])
+                {
+                    Retention = StreamConfigRetention.Workqueue,
+                    Storage = options.StorageType,
+                    NumReplicas = options.NumReplicas,
+                    SubjectTransform = new SubjectTransform
+                    {
+                        Src = $"{providerName}.*.*",
+                        Dest = $"{providerName}.{{{{partition(2,1,2)}}}}.{{{{wildcard(1)}}}}.{{{{wildcard(2)}}}}",
+                    },
+                },
+                cancellationToken);
+            var message = NatsAdapter.CreateMessage(fixture.Serializer, streamId, new[] { "event" }, null);
+            var legacyPayload = JsonSerializer.SerializeToUtf8Bytes(new { sid = streamId.ToString(), p = message.Payload });
+            var ack = await natsContext.TryPublishAsync(
+                $"{providerName}.chat.key",
+                legacyPayload,
+                NatsRawSerializer<byte[]>.Default,
+                cancellationToken: cancellationToken);
+            Assert.True(ack.Success);
+        }
+
+        var adapter = await ((IQueueAdapterFactory)adapterFactory).CreateAdapter(cancellationToken);
+        if (!useLegacyPayload)
+        {
+            await adapter.QueueMessageBatchAsync(streamId, new[] { "event" }, null!, null!);
+        }
+
+        var stream = await natsContext.GetStreamAsync(
+            testStreamName,
+            new StreamInfoRequest { SubjectsFilter = ">" },
+            cancellationToken);
+        var subject = Assert.Single(stream.Info.State.Subjects!).Key;
+        var tokens = subject.Split('.');
+        Assert.Equal(4, tokens.Length);
+        Assert.Equal(providerName, tokens[0]);
+        Assert.True(uint.TryParse(tokens[1], CultureInfo.InvariantCulture, out var partition), $"Missing partition in stored subject '{subject}'");
+        Assert.True(partition < options.PartitionCount);
+        var queue = Assert.Single(adapterFactory.GetStreamQueueMapper().GetAllQueues(), queue => queue.GetNumericId() == partition);
+        var receiver = adapter.CreateReceiver(queue);
+        await receiver.Initialize(TimeSpan.FromSeconds(5), cancellationToken);
+
+        var batch = Assert.Single(await receiver.GetQueueMessagesAsync(1, cancellationToken));
+        Assert.Equal(streamId.Namespace.ToArray(), batch.StreamId.Namespace.ToArray());
+        Assert.Equal(streamId.Key.ToArray(), batch.StreamId.Key.ToArray());
+        Assert.Equal(["event"], batch.GetEvents<string>().Select(item => item.Item1));
+        await receiver.MessagesDeliveredAsync([batch], cancellationToken);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5), cancellationToken);
     }
 
     private async Task SendAndReceiveFromQueueAdapter(

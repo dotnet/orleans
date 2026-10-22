@@ -146,7 +146,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
             entry => Assert.Equal([0xCC], entry.Payload));
 
         using var replay = new OrleansBinaryJournalBufferWriter();
-        bufferingConsumer.AppendSnapshot(replay.CreateJournalStreamWriter(new JournalStreamId(8)));
+        bufferingConsumer.WriteSnapshot(replay.CreateJournalStreamWriter(new JournalStreamId(8)));
         using var replayed = replay.GetBuffer();
         var activeConsumer = new CollectingConsumer();
 
@@ -516,7 +516,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
 
     private interface IReplayConsumer
     {
-        (JournalStreamId StreamId, IJournaledState State)[] Bind(params uint[] streamIds);
+        (JournalStreamId StreamId, IStateMachine State)[] Bind(params uint[] streamIds);
     }
 
     private sealed class CollectingConsumer : IReplayConsumer
@@ -524,9 +524,9 @@ public sealed class OrleansBinaryJournalBufferWriterTests
 
         public List<(uint StreamId, byte[] Payload)> Entries { get; } = [];
 
-        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params uint[] streamIds)
+        public (JournalStreamId StreamId, IStateMachine State)[] Bind(params uint[] streamIds)
         {
-            var bindings = new (JournalStreamId StreamId, IJournaledState State)[streamIds.Length];
+            var bindings = new (JournalStreamId StreamId, IStateMachine State)[streamIds.Length];
             for (var i = 0; i < streamIds.Length; i++)
             {
                 var streamId = new JournalStreamId(streamIds[i]);
@@ -536,15 +536,14 @@ public sealed class OrleansBinaryJournalBufferWriterTests
             return bindings;
         }
 
-        private sealed class StreamConsumer(CollectingConsumer owner, JournalStreamId streamId) : IJournaledState
+        private sealed class StreamConsumer(CollectingConsumer owner, JournalStreamId streamId) : IStateMachine
         {
-            void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+            void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
                 owner.Entries.Add((streamId.Value, entry.Reader.ToArray()));
 
             public void Reset(JournalStreamWriter writer) { }
-            public void AppendEntries(JournalStreamWriter writer) { }
-            public void AppendSnapshot(JournalStreamWriter writer) { }
-            public IJournaledState DeepCopy() => throw new NotSupportedException();
+            public void WritePendingEntries(JournalStreamWriter writer) { }
+            public void WriteSnapshot(JournalStreamWriter writer) { }
         }
     }
 
@@ -556,9 +555,9 @@ public sealed class OrleansBinaryJournalBufferWriterTests
 
         public IReadOnlyList<IPreservedJournalEntry> PreservedEntries => _preservedEntries;
 
-        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params uint[] streamIds)
+        public (JournalStreamId StreamId, IStateMachine State)[] Bind(params uint[] streamIds)
         {
-            var bindings = new (JournalStreamId StreamId, IJournaledState State)[streamIds.Length];
+            var bindings = new (JournalStreamId StreamId, IStateMachine State)[streamIds.Length];
             for (var i = 0; i < streamIds.Length; i++)
             {
                 var streamId = new JournalStreamId(streamIds[i]);
@@ -568,7 +567,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
             return bindings;
         }
 
-        public void AppendSnapshot(JournalStreamWriter writer)
+        public void WriteSnapshot(JournalStreamWriter writer)
         {
             foreach (var entry in _preservedEntries)
             {
@@ -576,9 +575,9 @@ public sealed class OrleansBinaryJournalBufferWriterTests
             }
         }
 
-        private sealed class StreamConsumer(BufferingConsumer owner, JournalStreamId streamId) : IJournaledState
+        private sealed class StreamConsumer(BufferingConsumer owner, JournalStreamId streamId) : IStateMachine
         {
-            void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context)
+            void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context)
             {
                 var preservedEntry = new TestPreservedJournalEntry(entry.FormatKey, entry.Reader.ToArray());
                 owner._preservedEntries.Add(preservedEntry);
@@ -586,9 +585,8 @@ public sealed class OrleansBinaryJournalBufferWriterTests
             }
 
             public void Reset(JournalStreamWriter writer) => owner._preservedEntries.Clear();
-            public void AppendEntries(JournalStreamWriter writer) { }
-            public void AppendSnapshot(JournalStreamWriter writer) { }
-            public IJournaledState DeepCopy() => throw new NotSupportedException();
+            public void WritePendingEntries(JournalStreamWriter writer) { }
+            public void WriteSnapshot(JournalStreamWriter writer) { }
         }
     }
 

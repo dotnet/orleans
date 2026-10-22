@@ -195,8 +195,8 @@ public sealed class ClusterServiceViewProviderTests
         IClusterMembershipService membership, string serviceId, int partitions, long epoch) =>
         new(membership, new(serviceId, partitions, "test-ring"), Boundaries, NullLogger.Instance, providerEpoch: epoch);
 
-    private static uint[] Boundaries(SiloAddress silo, int count) =>
-        Enumerable.Range(0, count).Select(index => (uint)(silo.Generation * 100 + index)).ToArray();
+    private static ImmutableArray<uint> Boundaries(SiloAddress silo, int count) =>
+        Enumerable.Range(0, count).Select(index => (uint)(silo.Generation * 100 + index)).ToImmutableArray();
 
     private static ClusterMembershipSnapshot Snapshot(long version) =>
         new(ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(Silo, new(Silo, SiloStatus.Active, "silo")), new(version));

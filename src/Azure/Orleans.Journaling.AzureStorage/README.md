@@ -3,7 +3,17 @@
 ## Introduction
 Microsoft Orleans Journaling for Azure Storage provides an Azure Storage implementation of the Orleans Journaling provider. This allows journaling and tracking of grain operations using Azure Storage as a backing store.
 
-Blob names are derived from the configured journal storage identity and do not use journal format file extensions. Azure append blobs store the journal format key in blob metadata and, when the selected journal format provides a MIME type, are created with that content type. The WAL blob name and checkpoint blob name can be customized using `AzureBlobJournalStorageOptions.GetWalBlobName` and `GetCheckpointBlobName`.
+Blob names are derived from the configured journal storage identity and do not use journal format file extensions. Azure append blobs store the journal format key in blob metadata and, when the selected journal format provides a MIME type, are created with that content type. The WAL blob name and checkpoint blob name can be customized using `AzureBlobJournalStorageOptions.GetWalBlobName` and `GetCheckpointBlobName`. Each append is written as one append block of at most 100 MiB, so Azure commits the whole batch or none of it; a larger batch fails before any request is sent. Replacements upload a checkpoint blob and publish it through one conditional WAL update.
+
+Provider registration also calls `AddJournaling` for core services, durable-state factories, and
+activation lifecycle integration. Application code can inject `IDurableStateManager` into an ordinary
+`Grain` or use `DurableGrain` as a convenience base class. Declare states before initialization through
+`GetOrAddState<TState>(name)`, its typed helpers, or keyed injection. Compatible requests for the same
+name return the same object, and one `WriteStateAsync` acknowledges their shared journal batch.
+
+Journal metadata exposes its stored format key as `IJournalMetadata.FormatKey` and
+`JournalMetadata.FormatKey`. The provider's persisted metadata keys, blob names, table properties,
+and format-key values remain stable through this API naming change.
 
 ## Using an alternative blob layout
 
@@ -19,7 +29,9 @@ siloBuilder.AddAzureBlobJournalStorage(options =>
 
 ## Azure Table journal storage
 
-The package also provides an Azure Table implementation, `AddAzureTableJournalStorage`. Each journal is stored as one table partition: a header row carries the journal manifest and is the optimistic concurrency fence, and journal bytes are stored in data rows whose keys order the current generation by sequence. Every append commits its rows together with the header update in a single entity group transaction, and recovery replays the whole journal with a single partition range query, avoiding the per-block pacing which append blob replay is subject to. Because an append is limited by entity group transaction limits, a single journal batch must not exceed 2 MiB; replace operations may be any size.
+The package also provides an Azure Table implementation, `AddAzureTableJournalStorage`. Each journal is stored as one table partition: a header row carries the journal manifest and is the optimistic concurrency fence, and journal bytes are stored in data rows whose keys order the current generation by sequence. Every append commits its rows together with the header update in a single entity group transaction, and recovery replays the whole journal with a single partition range query, avoiding the per-block pacing which append blob replay is subject to. Because an append is limited by entity group transaction limits (100 entities and 4 MiB), a single journal batch must not exceed 2 MiB, and a larger batch fails before any request is sent; replace operations may be any size, and their rows become visible only when the header update publishes them.
+
+After a failed publication attempt, staged rows are retained so a delayed header update can still publish a complete generation. Deleting the journal reclaims the partition's retained rows.
 
 ```csharp
 siloBuilder.AddAzureTableJournalStorage(options =>
@@ -33,9 +45,9 @@ siloBuilder.AddAzureTableJournalStorage(options =>
 
 ## Catalog enumeration
 
-Both Azure providers implement `IJournalStorageCatalog.ListAsync`, returning `JournalCatalogEntry` values incrementally in service traversal order. Each entry carries its journal identity in `Id`. `ListOptions.Prefix` is a raw ordinal string prefix and may end within a segment; use a trailing `/` when selecting only entries inside a namespace. `MinId` and `MaxId` are inclusive ordinal bounds, each unlimited by default. All constraints apply and are snapshotted when enumeration starts. Consumers requiring due order must sort selected ids using `StringComparer.Ordinal`. The provider handles service continuations internally and yields entries from the current page before fetching the next page.
+Both Azure providers implement `IJournalStorageCatalog.ListAsync`, returning `JournalCatalogEntry` values incrementally in service traversal order. Each entry carries its journal identity in `Id`. `JournalCatalogListOptions.Prefix` is a raw ordinal string prefix and may end within a segment; use a trailing `/` when selecting only entries inside a namespace. `MinId` and `MaxId` are inclusive ordinal bounds, each unlimited by default. All constraints apply and are snapshotted when enumeration starts. Consumers requiring due order must sort selected ids using `StringComparer.Ordinal`. The provider handles service continuations internally and yields entries from the current page before fetching the next page.
 
-Set `ListOptions.IncludeMetadata` to include each entry's format, ETag, and caller-owned properties in `Metadata`. The snapshot is observed together in the listing response and has the same semantics as `GetMetadataAsync`; its ETag can be supplied to `UpdateMetadataAsync` for a conditional update. Blob listing requests metadata traits, while Table listing selects the header's format and serialized caller metadata alongside the identity and timestamp. Both providers construct snapshots directly from listing pages. By default, enumeration projects identities with `Metadata` set to `null`. `IncludeMetadata` is snapshotted with the range options when enumeration starts.
+Set `JournalCatalogListOptions.IncludeMetadata` to include each entry's format, ETag, and caller-owned properties in `Metadata`. The snapshot is observed together in the listing response and has the same semantics as `GetMetadataAsync`; its ETag can be supplied to `UpdateMetadataAsync` for a conditional update. Blob listing requests metadata traits, while Table listing selects the header's format and serialized caller metadata alongside the identity and timestamp. Both providers construct snapshots directly from listing pages. By default, enumeration projects identities with `Metadata` set to `null`. `IncludeMetadata` is snapshotted with the range options when enumeration starts.
 
 The Blob catalog scans the configured `ContainerName` and interprets append blobs named `wal/<journalId>` as journal identities. This traversal applies equally when a custom naming delegate or container factory produces the same entries. Requests use `wal/` followed by the raw journal-id prefix, narrowed by the common prefix of `MinId` and `MaxId` when possible, and up to 5000 blobs per page. Checkpoints occupy their own namespace and are excluded before pagination, including for unbounded catalog queries. Recovery and checkpoint cleanup use the full checkpoint name published in WAL metadata.
 
@@ -141,11 +153,13 @@ await host.WaitForShutdownAsync();
 
 ## Example - Using Journaling in a Grain
 ```csharp
-using Orleans.Runtime;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans;
+using Orleans.Journaling;
 
 namespace MyGrainNamespace;
 
-public interface IShoppingCartGrain : IGrain
+public interface IShoppingCartGrain : IGrainWithStringKey
 {
     ValueTask<(bool success, long version)> UpdateItem(string itemId, int quantity, long version);
     ValueTask<(Dictionary<string, int> Contents, long Version)> GetCart();
@@ -154,7 +168,7 @@ public interface IShoppingCartGrain : IGrain
 }
 
 public class ShoppingCartGrain(
-    [FromKeyedServices("shopping-cart")] IDurableDictionary cart,
+    [FromKeyedServices("shopping-cart")] IDurableDictionary<string, int> cart,
     [FromKeyedServices("version")] IDurableValue<long> version) : DurableGrain, IShoppingCartGrain
 {
     private readonly IDurableValue<long> _version = version;
@@ -199,6 +213,12 @@ public class ShoppingCartGrain(
     }
 }
 ```
+
+The keyed constructor parameters declare both states during setup. Orleans recovers them before
+grain methods run. `StateManager.GetOrAddDictionary<string, int>("shopping-cart")` subsequently
+returns the injected `cart` instance; adding a missing name after initialization fails immediately.
+Keep the names `"shopping-cart"` and `"version"` stable across deployments. `WriteStateAsync`
+acknowledges pending changes to both states through the shared manager.
 
 ## Documentation
 For more comprehensive documentation, please refer to:

@@ -35,12 +35,12 @@ namespace Tester.AzureUtils
         public async Task AzureTableDataManager_CreateTableEntryAsync()
         {
             var data = GenerateNewData();
-            await manager.CreateTableEntryAsync(data);
+            await manager.CreateTableEntryAsync(data, TestContext.Current.CancellationToken);
             try
             {
                 var data2 = data.Clone();
                 data2.StringData = "NewData";
-                await manager.CreateTableEntryAsync(data2);
+                await manager.CreateTableEntryAsync(data2, TestContext.Current.CancellationToken);
                 Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -267,7 +267,7 @@ namespace Tester.AzureUtils
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
             }
 
-            string etag = await manager.CreateTableEntryAsync(data2.Clone());
+            string etag = await manager.CreateTableEntryAsync(data2.Clone(), TestContext.Current.CancellationToken);
             var result = await manager.CreateAndUpdateTableEntriesAsync(data1, (data2, etag), cancellationToken: TestContext.Current.CancellationToken);
             try
             {
@@ -332,7 +332,7 @@ namespace Tester.AzureUtils
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
             }
 
-            string etag = await manager.CreateTableEntryAsync(data2.Clone());
+            string etag = await manager.CreateTableEntryAsync(data2.Clone(), TestContext.Current.CancellationToken);
             var createResult = await manager.CreateAndUpdateTableEntriesAsync(data1, (data2, etag), cancellationToken: TestContext.Current.CancellationToken);
             _ = await manager.UpdateTableEntriesAsync(
                 (data1, createResult.CreatedEntryETag),

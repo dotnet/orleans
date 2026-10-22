@@ -2293,6 +2293,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public System.Collections.Generic.List<global::Orleans.Transactions.TestKit.ITransactionAttributionGrain>[] arg1;
         public Invokable_ICreateAttributionGrain_GrainReference_3EFBDD5D(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -2327,6 +2329,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public int arg0;
         public System.Collections.Generic.List<global::Orleans.Transactions.TestKit.ITransactionAttributionGrain>[] arg1;
         public Invokable_ICreateOrJoinAttributionGrain_GrainReference_C9B8ECB8(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -2363,6 +2367,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public int arg1;
         public Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -2397,6 +2403,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public global::Orleans.Transactions.TestKit.IExclusiveLockTransactionTestGrain arg0;
         public int arg1;
         public Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -2459,6 +2467,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public int arg0;
         public Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -2492,6 +2502,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
     {
         public int arg0;
         public Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -2527,6 +2539,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public System.Collections.Generic.List<global::Orleans.Transactions.TestKit.IFaultInjectionTransactionTestGrain> arg0;
         public int arg1;
         public Invokable_IFaultInjectionTransactionCoordinatorGrain_GrainReference_70FF7C60(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -2564,6 +2578,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public global::Orleans.Transactions.TestKit.FaultInjectionControl arg2;
         public Invokable_IFaultInjectionTransactionCoordinatorGrain_GrainReference_E67D54A5(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -2597,6 +2613,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
     {
         public int arg0;
         public Invokable_IFaultInjectionTransactionTestGrain_GrainReference_8389970A(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -2632,6 +2650,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public int arg0;
         public global::Orleans.Transactions.TestKit.FaultInjectionControl arg1;
         public Invokable_IFaultInjectionTransactionTestGrain_GrainReference_A4CAE05C(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -2720,6 +2740,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public System.Collections.Generic.List<global::Orleans.Transactions.TestKit.ITransactionAttributionGrain>[] arg1;
         public Invokable_IJoinAttributionGrain_GrainReference_B1619F67(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -2753,6 +2775,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
     {
         public int arg0;
         public System.Collections.Generic.List<global::Orleans.Transactions.TestKit.ITransactionAttributionGrain>[] arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -2787,6 +2811,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public int arg0;
         public System.Collections.Generic.List<global::Orleans.Transactions.TestKit.ITransactionAttributionGrain>[] arg1;
         public Invokable_INotAllowedAttributionGrain_GrainReference_891D027E(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -2823,6 +2849,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public System.Collections.Generic.List<global::Orleans.Transactions.TestKit.ITransactionAttributionGrain>[] arg1;
         public Invokable_ISupportedAttributionGrain_GrainReference_BC7DBC0A(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -2858,6 +2886,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public System.Collections.Generic.List<global::Orleans.Transactions.TestKit.ITransactionAttributionGrain>[] arg1;
         public Invokable_ISuppressAttributionGrain_GrainReference_5A02311D(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -2891,6 +2921,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
     {
         public global::Orleans.Transactions.Abstractions.ITransactionCommitOperation<global::Orleans.Transactions.TestKit.IRemoteCommitService> arg0;
         public Invokable_ITransactionCommitterTestGrain_GrainReference_C44BE2A4(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -2928,6 +2960,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public int arg2;
         public Invokable_ITransactionCoordinatorGrain_GrainReference_2760260D(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -2962,6 +2996,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public System.Collections.Generic.List<global::Orleans.Transactions.TestKit.ITransactionTestGrain> arg0;
         public int arg1;
         public Invokable_ITransactionCoordinatorGrain_GrainReference_3A6B9237(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -2998,6 +3034,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public int arg1;
         public Invokable_ITransactionCoordinatorGrain_GrainReference_485592B2(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3031,6 +3069,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
     {
         public System.Collections.Generic.List<global::Orleans.Transactions.TestKit.ITransactionTestGrain> arg0;
         public Invokable_ITransactionCoordinatorGrain_GrainReference_5FC2E7A1(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3067,6 +3107,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public int arg1;
         public Invokable_ITransactionCoordinatorGrain_GrainReference_5FF4F216(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3101,6 +3143,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public System.Collections.Generic.List<global::Orleans.Transactions.TestKit.ITransactionTestGrain> arg0;
         public int arg1;
         public Invokable_ITransactionCoordinatorGrain_GrainReference_78D54907(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3139,6 +3183,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public int arg3;
         public Invokable_ITransactionCoordinatorGrain_GrainReference_8EE5E563(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3173,6 +3219,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public System.Collections.Generic.List<global::Orleans.Transactions.TestKit.ITransactionTestGrain> arg0;
         public int arg1;
         public Invokable_ITransactionCoordinatorGrain_GrainReference_9EFEA7F3(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3209,6 +3257,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public int arg1;
         public Invokable_ITransactionCoordinatorGrain_GrainReference_B4376B4D(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3243,6 +3293,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public global::Orleans.Transactions.TestKit.ITransactionTestGrain arg0;
         public int arg1;
         public Invokable_ITransactionCoordinatorGrain_GrainReference_D3EF444F(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3305,6 +3357,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public int arg0;
         public Invokable_ITransactionTestGrain_GrainReference_25B066B5(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3338,6 +3392,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
     {
         public int arg0;
         public Invokable_ITransactionTestGrain_GrainReference_35C87F81(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3425,6 +3481,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public int arg0;
         public Invokable_ITransactionTestGrain_GrainReference_CE9EC80B(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3458,6 +3516,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
     {
         public int arg0;
         public Invokable_ITransactionTestGrain_GrainReference_DC07DAEA(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3597,6 +3657,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit.Consistency
         public int arg3;
         public System.DateTime arg4;
         public Invokable_IConsistencyTestGrain_GrainReference_2EB318CB(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3773,6 +3835,8 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit.Correctnesss
     {
         public int arg0;
         public Invokable_ITransactionalBitArrayGrain_GrainReference_0183C2F5(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 

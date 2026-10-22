@@ -2,7 +2,8 @@
 param(
     [string] $Configuration = 'Release',
     [switch] $NoIncremental,
-    [switch] $SkipExternalAssets
+    [switch] $SkipExternalAssets,
+    [switch] $DisableSharedCompilation
 )
 
 $ErrorActionPreference = 'Stop'
@@ -10,6 +11,7 @@ $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $sourceSolution = Join-Path $repositoryRoot 'Orleans.slnx'
 $sampleSolution = Join-Path $PSScriptRoot 'Samples.slnx'
 $packageSource = Join-Path $repositoryRoot "Artifacts/Samples/$Configuration/packages"
+$sampleBinlog = Join-Path $repositoryRoot "Artifacts/Samples/$Configuration/samples.binlog"
 $packageVersion = "10.0.0-dev.$([System.DateTime]::UtcNow.Ticks)"
 $buildExternalAssets = (-not $SkipExternalAssets).ToString().ToLowerInvariant()
 
@@ -35,10 +37,14 @@ $buildArguments = @(
     "-p:OrleansSamplePackageVersion=$packageVersion"
     "-p:OrleansSamplePackageSource=$packageSource"
     '-p:RestoreForceEvaluate=true'
+    "-bl:$sampleBinlog"
     '--nologo'
 )
 if ($NoIncremental) {
     $buildArguments += '--no-incremental'
+}
+if ($DisableSharedCompilation) {
+    $buildArguments += '-p:UseSharedCompilation=false'
 }
 
 & dotnet @buildArguments

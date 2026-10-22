@@ -1,4 +1,5 @@
 using System.Net;
+using Google.Cloud.Firestore;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -8,11 +9,13 @@ using Orleans.Configuration;
 using Orleans.Messaging;
 using UnitTests.MembershipTests;
 using Orleans.Clustering.Firestore;
+using Orleans.Clustering.TestKit;
 
 namespace Orleans.Clustering.Firestore.Tests;
 
 [TestSuite("Functional")]
 [TestProvider("GoogleCloud")]
+[TestArea("Membership")]
 [TestCategory("Functional"), TestCategory("Firestore"), TestCategory("GoogleCloud")]
 public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFixture<TestEnvironmentFixture>
 {
@@ -32,14 +35,55 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
     }
 
     protected override IMembershipTable CreateMembershipTable(ILogger logger)
+        => CreateMembershipTable(logger, _clusterOptions);
+
+    protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
     {
-        var options = new FirestoreOptions
+        return new FirestoreMembershipTable(this.loggerFactory, Options.Create(CreateClusteringOptions()), clusterOptions);
+    }
+
+    // RunQuery streams a document per response message.
+    protected override int ConformanceConcurrencyRowCount => 17;
+
+    protected override MembershipTableTestFixture CreateConformanceFixture()
+    {
+        var options = CreateClusteringOptions();
+        var probe = new FirestoreDbBuilder
         {
-            ProjectId = "orleans-test",
+            ProjectId = options.ProjectId,
+            Endpoint = new Uri(options.EmulatorHost!).Authority,
+            ChannelCredentials = ChannelCredentials.Insecure
+        }.Build();
+        return new MembershipTableTestFixture(
+            GetType().Name,
+            (serviceId, clusterId, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ValueTask.FromResult(new MembershipTableTestHandle(new FirestoreMembershipTable(
+                    loggerFactory,
+                    Options.Create(options),
+                    Options.Create(new ClusterOptions { ServiceId = serviceId, ClusterId = clusterId }))));
+            },
+            async (clusterId, cancellationToken) =>
+            {
+                // Any document, including the cluster version, proves that this scope remains populated.
+                // The parent "Cluster" document is a shared header, not cluster-owned membership metadata.
+                var snapshot = await probe.Collection(options.RootCollectionName)
+                    .Document("Cluster")
+                    .Collection(Utils.SanitizeId(clusterId))
+                    .Limit(1)
+                    .GetSnapshotAsync(cancellationToken);
+                return snapshot.Count == 0;
+            });
+    }
+
+    private static FirestoreOptions CreateClusteringOptions()
+    {
+        return new FirestoreOptions
+        {
+            ProjectId = GoogleEmulatorHost.ProjectId,
             EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint
         };
-
-        return new FirestoreMembershipTable(this.loggerFactory, Options.Create(options), this._clusterOptions);
     }
 
     protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
@@ -65,7 +109,7 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
     public Task InsertRow() => MembershipTable_InsertRow();
 
     [Fact]
-    public Task ReadRow_Insert_Read() => MembershipTable_ReadRow_Insert_Read();
+    public Task ReadAll_Insert_TryGet() => MembershipTable_ReadRow_Insert_Read();
 
     [Fact]
     public Task ReadAll_Insert_ReadAll() => MembershipTable_ReadAll_Insert_ReadAll();
@@ -127,11 +171,13 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
 
             var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var writer = WriteUpdates();
-            var readAll = ReadSnapshots(() => table.ReadAllAsync(TestContext.Current.CancellationToken));
-            var readRow = ReadSnapshots(() => table.ReadRowAsync(address, TestContext.Current.CancellationToken));
+            var readAll = ReadSnapshots(nameof(FirestoreMembershipTable.ReadAllAsync),
+                () => table.ReadAllAsync(TestContext.Current.CancellationToken));
+            var secondReader = ReadSnapshots("ReadAllAsync second handle",
+                () => table.ReadAllAsync(TestContext.Current.CancellationToken));
             start.SetResult();
 
-            await Task.WhenAll(writer, readAll, readRow).WaitAsync(
+            await Task.WhenAll(writer, readAll, secondReader).WaitAsync(
                 TimeSpan.FromMinutes(2),
                 TestContext.Current.CancellationToken);
 
@@ -144,9 +190,9 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
                     while (!updated)
                     {
                         var snapshot = await ReadWithRetries(
-                            () => table.ReadRowAsync(address, TestContext.Current.CancellationToken),
+                            () => table.ReadAllAsync(TestContext.Current.CancellationToken),
                             TestContext.Current.CancellationToken);
-                        var row = Assert.Single(snapshot.Members);
+                        var row = Assert.IsType<Tuple<MembershipEntry, string>>(snapshot.TryGet(address));
                         var nextVersion = snapshot.Version.Next();
                         row.Item1.ProxyPort = nextVersion.Version;
                         updated = await table.UpdateRowAsync(row.Item1, row.Item2, nextVersion, TestContext.Current.CancellationToken);
@@ -155,7 +201,7 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
 
             }
 
-            async Task ReadSnapshots(Func<Task<MembershipTableData>> read)
+            async Task ReadSnapshots(string operation, Func<Task<MembershipTableData>> read)
             {
                 await start.Task.WaitAsync(TestContext.Current.CancellationToken);
                 var previousVersion = -1;
@@ -164,11 +210,13 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
                     var snapshot = await ReadWithRetries(
                         read,
                         TestContext.Current.CancellationToken);
-                    Assert.True(snapshot.Version.Version >= previousVersion);
-                    var row = Assert.Single(
-                        snapshot.Members,
-                        member => member.Item1.SiloAddress.Equals(address));
-                    Assert.Equal(snapshot.Version.Version, row.Item1.ProxyPort);
+                    Assert.True(
+                        snapshot.Version.Version >= previousVersion,
+                        $"{operation} read {i} returned version {snapshot.Version.Version} after version {previousVersion}.");
+                    var row = Assert.IsType<Tuple<MembershipEntry, string>>(snapshot.TryGet(address));
+                    Assert.True(
+                        snapshot.Version.Version == row.Item1.ProxyPort,
+                        $"{operation} read {i} returned table version {snapshot.Version.Version} with row version {row.Item1.ProxyPort}.");
                     previousVersion = snapshot.Version.Version;
                 }
             }

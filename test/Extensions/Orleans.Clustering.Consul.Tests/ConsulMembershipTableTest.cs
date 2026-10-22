@@ -1,4 +1,7 @@
+using System.Net;
+using Consul;
 using Orleans.Messaging;
+using Orleans.Clustering.TestKit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -31,6 +34,8 @@ namespace Consul.Tests
     [TestArea("Membership")]
     public class ConsulMembershipTableTest : MembershipTableTestsBase
     {
+        private IConsulClient _legacyGatewayClient = null!;
+
         public ConsulMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
@@ -49,6 +54,9 @@ namespace Consul.Tests
         /// and creates the membership table implementation.
         /// </summary>
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
+            => CreateMembershipTable(logger, _clusterOptions);
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
         {
             ConsulTestUtils.EnsureConsul();
             var options = new ConsulClusteringOptions();
@@ -56,7 +64,45 @@ namespace Consul.Tests
 
             options.ConfigureConsulClient(address);
 
-            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), this._clusterOptions);
+            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), clusterOptions);
+        }
+
+        protected override MembershipTableTestHandle CreateConformanceHandle(ILogger logger, IOptions<ClusterOptions> clusterOptions)
+        {
+            var options = new ConsulClusteringOptions();
+            options.ConfigureConsulClient(new Uri(connectionString));
+            var client = options.CreateClient();
+            options.ConfigureConsulClient(() => client);
+            var table = new ConsulBasedMembershipTable(
+                loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), clusterOptions);
+            return new MembershipTableTestHandle(table, () =>
+            {
+                client.Dispose();
+                return ValueTask.CompletedTask;
+            });
+        }
+
+        protected override MembershipTableTestHandle CreateLegacyMembershipTableHandle(ILogger logger)
+            => CreateConformanceHandle(logger, _clusterOptions);
+
+        protected override MembershipTableTestFixture CreateConformanceFixture()
+            => CreateConformanceFixture(IsConformanceClusterDeletedAsync);
+
+        private async ValueTask<bool> IsConformanceClusterDeletedAsync(string clusterId, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var client = new ConsulClient(options => options.Address = new Uri(connectionString));
+            var response = await client.KV.Keys(
+                $"orleans/{clusterId}/",
+                separator: null,
+                new QueryOptions { Consistency = ConsistencyMode.Consistent },
+                cancellationToken);
+            if (response.StatusCode is not (HttpStatusCode.OK or HttpStatusCode.NotFound))
+            {
+                throw new InvalidOperationException($"Consul deletion probe returned {response.StatusCode}.");
+            }
+
+            return response.Response is null or { Length: 0 };
         }
 
         /// <summary>
@@ -71,8 +117,17 @@ namespace Consul.Tests
             var address = new Uri(this.connectionString);
 
             options.ConfigureConsulClient(address);
+            var client = options.CreateClient();
+            _legacyGatewayClient = client;
+            options.ConfigureConsulClient(() => client);
 
             return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), Options.Create(options), this._gatewayOptions, this._clusterOptions);
+        }
+
+        protected override ValueTask DisposeLegacyGatewayListProviderAsync(IGatewayListProvider gatewayListProvider)
+        {
+            _legacyGatewayClient.Dispose();
+            return ValueTask.CompletedTask;
         }
 
         protected override async Task<string> GetConnectionString()
@@ -107,31 +162,31 @@ namespace Consul.Tests
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_InsertRow()
         {
-            await MembershipTable_InsertRow(false);
+            await MembershipTable_InsertRow();
         }
 
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_ReadRow_Insert_Read()
         {
-            await MembershipTable_ReadRow_Insert_Read(false);
+            await MembershipTable_ReadRow_Insert_Read();
         }
 
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_ReadAll_Insert_ReadAll()
         {
-            await MembershipTable_ReadAll_Insert_ReadAll(false);
+            await MembershipTable_ReadAll_Insert_ReadAll();
         }
 
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_UpdateRow()
         {
-            await MembershipTable_UpdateRow(false);
+            await MembershipTable_UpdateRow();
         }
 
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_UpdateRowInParallel()
         {
-            await MembershipTable_UpdateRowInParallel(false);
+            await MembershipTable_UpdateRowInParallel();
         }
 
         /// <summary>
@@ -142,7 +197,7 @@ namespace Consul.Tests
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_UpdateIAmAlive()
         {
-            await MembershipTable_UpdateIAmAlive(false);
+            await MembershipTable_UpdateIAmAlive();
         }
 
         /// <summary>
@@ -154,7 +209,7 @@ namespace Consul.Tests
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_CleanupDefunctSiloEntries()
         {
-            await MembershipTable_CleanupDefunctSiloEntries(false);
+            await MembershipTable_CleanupDefunctSiloEntries();
         }
     }
 }

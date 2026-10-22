@@ -62,7 +62,17 @@ Field headers carry an ID and wire type, so readers can consume fields in a diff
 
 Reference tracking is scoped to a writer/reader session and preserves repeated references and cycles within one payload. Applications own identity and request deduplication across calls and retries. A deep copier uses a corresponding session so a copied graph has the same aliasing relationships as the serialized graph.
 
+### Serialization constructor initialization
+
+For <xref:System.Runtime.Serialization.ISerializable> reference types, deserialization allocates an uninitialized object and records it in the reader session before reading its fields. The serialization constructor initializes that same object, so references read from the payload resolve to the final instance, including cycles. `OnDeserializing` runs before constructor initialization; `OnDeserialized` and <xref:System.Runtime.Serialization.IDeserializationCallback.OnDeserialization*> run afterward.
+
+Orleans caches constructor delegates by owner type and delegate shape and uses the same existing-instance initialization path on managed runtimes and NativeAOT. The base <xref:System.Exception> serialization constructor uses a statically bound accessor on .NET 8 and later, including the fallback for exception subtypes which inherit the base serialization contract. Runtime-selected serialization constructors use reflection to initialize the existing object; the .NET Standard asset also uses reflection for the base exception constructor. Preserve public and non-public constructors on those types so native compilation retains the constructor metadata and implementation. Reflection invokes constructors with `BindingFlags.DoNotWrapExceptions`, preserving the original exception's identity and constructor stack, including constructor-thrown <xref:System.Reflection.TargetInvocationException>.
+
+Boxed value-type delegates initialize the existing box. Statically closed value-type constructor delegates box the caller's `ref` value, initialize that box, and copy it back in a `finally` block, including mutations performed before a constructor throws. Runtime-created generic value-type serializers and attributed callback delegates have additional runtime code-generation requirements. NativeAOT constructor support targets .NET 10 and later; native application support also depends on type manifests, codec factories, and callback paths used by the application.
+
 ## RPC generation
+
+Grain-reference construction resolves the generated proxy from the registered type manifest and invokes its `(GrainReferenceShared, IdSpan)` constructor. The activator caches the constructor delegate and shares the runtime, interface version, invocation options, and serialization services across references for the same grain type and interface. Each reference retains its own grain key. JIT runtimes use an emitted constructor delegate; NativeAOT uses a cached reflection constructor invoker. Generated `AddInterfaceProxy` registrations preserve the public proxy constructor during trimming.
 
 For each grain interface method, generated code captures arguments in an invokable object. The generated proxy submits that object through its proxy base. On the target, generated dispatch metadata invokes the concrete implementation and encodes the response.
 
@@ -157,6 +167,12 @@ The manifest records:
 <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowAllTypes?displayProperty=nameWithType> defaults to `false`. This is a type-resolution boundary: receiving a formatted type name does not make every loadable CLR type valid input.
 
 API: <xref:Orleans.Serialization.Configuration.TypeManifestOptions>, <xref:Orleans.Serialization.ISerializerBuilder>, and <xref:Orleans.Serialization.SerializerBuilderExtensions.AddAssembly*?displayProperty=nameWithType>. Implementation: [manifest options](https://github.com/dotnet/orleans/blob/main/src/Orleans.Serialization/Configuration/TypeManifestOptions.cs), [serializer builder extensions](https://github.com/dotnet/orleans/blob/main/src/Orleans.Serialization/Hosting/SerializerBuilderExtensions.cs), and [serializer service registration](https://github.com/dotnet/orleans/blob/main/src/Orleans.Serialization/Hosting/ServiceCollectionExtensions.cs).
+
+### Default object activation
+
+The default serializer activator invokes a public parameterless constructor, including an explicit parameterless value-type constructor, for each new instance. For types with no public parameterless constructor, it allocates an uninitialized instance with zero-initialized fields. A registered custom activator controls construction for its target type.
+
+The default activator caches whether the type has a public parameterless constructor and uses generic construction through <xref:System.Activator.CreateInstance*> on both managed runtimes and NativeAOT. The runtime supplies the constructor and allocator implementation. Generic construction wraps constructor failures in <xref:System.Reflection.TargetInvocationException>; the activator removes that outer wrapper and propagates the original constructor exception, preserving its identity, inner exception, and stack trace. Closed default activator types carry the constructor-preservation annotations required by constructor lookup and uninitialized allocation.
 
 ## Extension points
 

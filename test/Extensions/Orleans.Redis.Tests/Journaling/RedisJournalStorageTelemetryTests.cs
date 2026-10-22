@@ -82,7 +82,7 @@ public sealed class RedisJournalStorageTelemetryTests
         using var fixture = await Fixture.CreateAsync(customMapping);
         var ids = new List<JournalId>();
         await foreach (var entry in fixture.Provider.ListAsync(
-            new ListOptions { MinId = new("tenant/b") }, TestContext.Current.CancellationToken))
+            new JournalCatalogListOptions { MinId = new("tenant/b") }, TestContext.Current.CancellationToken))
         {
             ids.Add(entry.Id);
         }

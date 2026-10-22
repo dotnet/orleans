@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
+using Orleans.Providers;
 using Orleans.Runtime;
 using Xunit;
 
@@ -27,6 +28,56 @@ public sealed class AzureTableStorageHostingExtensionsTests
         Assert.Equal(AzureTableJournalStorageOptions.DEFAULT_COMPACTION_ROW_COUNT_THRESHOLD, options.CompactionRowCountThreshold);
         Assert.Null(options.TableServiceClient);
         Assert.Null(options.CreateClient);
+    }
+
+    [Fact]
+    public void AddAzureTableJournalStorage_DefaultOptionsComposeUnnamedDelegatesAndConfigureAllExactlyOnce()
+    {
+        var builder = CreateBuilder();
+        var invocations = new List<string>();
+        builder.Services.Configure<AzureTableJournalStorageOptions>(options =>
+        {
+            invocations.Add("unnamed-before");
+            options.TableName = "before";
+        });
+        builder.Services.ConfigureAll<AzureTableJournalStorageOptions>(options =>
+        {
+            invocations.Add("all");
+            options.CompactionRowCountThreshold += 100;
+        });
+        builder.AddAzureTableJournalStorage(options =>
+        {
+            invocations.Add("default");
+            options.TableName = "default";
+        });
+        builder.Services.Configure<AzureTableJournalStorageOptions>(options =>
+        {
+            invocations.Add("unnamed-after");
+            options.TableName = "after";
+        });
+        builder.AddAzureTableJournalStorage("other", options =>
+        {
+            invocations.Add("other");
+            options.TableName = "other";
+        });
+        using var services = builder.Services.BuildServiceProvider();
+
+        var defaultOptions = services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value;
+
+        Assert.Equal("after", defaultOptions.TableName);
+        Assert.Equal(AzureTableJournalStorageOptions.DEFAULT_COMPACTION_ROW_COUNT_THRESHOLD + 100,
+            defaultOptions.CompactionRowCountThreshold);
+        Assert.Equal(["unnamed-before", "all", "default", "unnamed-after"], invocations);
+        var namedOptions = services.GetRequiredService<IOptionsMonitor<AzureTableJournalStorageOptions>>().Get("other");
+        Assert.Equal("other", namedOptions.TableName);
+        Assert.Equal(AzureTableJournalStorageOptions.DEFAULT_COMPACTION_ROW_COUNT_THRESHOLD + 100,
+            namedOptions.CompactionRowCountThreshold);
+        Assert.NotSame(defaultOptions, namedOptions);
+        Assert.Same(defaultOptions, services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value);
+        Assert.Same(defaultOptions, services.GetJournalStorageOptions<AzureTableJournalStorageOptions>(
+            ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME).Value);
+        Assert.Same(namedOptions, services.GetJournalStorageOptions<AzureTableJournalStorageOptions>("other").Value);
+        Assert.Equal(["unnamed-before", "all", "default", "unnamed-after", "all", "other"], invocations);
     }
 
     [Fact]
@@ -85,6 +136,12 @@ public sealed class AzureTableStorageHostingExtensionsTests
         AssertSingleRegistration<ILifecycleParticipant<ISiloLifecycle>>(builder.Services);
         AssertSingleRegistration<IJournaledStateManager>(builder.Services);
         AssertSingleRegistration<IJournaledStateManagerFactory>(builder.Services);
+        foreach (var serviceType in new[] { typeof(IJournalStorageProvider), typeof(IJournalStorageCatalog), typeof(IJournaledStateManagerFactory) })
+        {
+            Assert.Single(builder.Services, descriptor => descriptor.IsKeyedService
+                && Equals(descriptor.ServiceKey, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
+                && descriptor.ServiceType == serviceType);
+        }
 
         using var services = builder.Services.BuildServiceProvider();
         var optionsMonitor = services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>();
@@ -108,7 +165,7 @@ public sealed class AzureTableStorageHostingExtensionsTests
     }
 
     private static void AssertSingleRegistration<TService>(IServiceCollection services)
-        => Assert.Single(services, descriptor => descriptor.ServiceType == typeof(TService));
+        => Assert.Single(services, descriptor => !descriptor.IsKeyedService && descriptor.ServiceType == typeof(TService));
 
     private sealed class TestSiloBuilder : ISiloBuilder
     {

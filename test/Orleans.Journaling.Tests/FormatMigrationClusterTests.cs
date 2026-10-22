@@ -22,13 +22,13 @@ public sealed class FormatMigrationClusterTests
         builder.ConfigureSilo((siloOptions, siloBuilder) =>
         {
             var isInitialBinarySilo = string.Equals(siloOptions.SiloName, "Silo_0", StringComparison.Ordinal);
-            siloBuilder.AddJournalStorage();
+            siloBuilder.AddJournaling();
             siloBuilder.UseJsonJournalFormat(JournalingTestsJsonContext.Default);
             siloBuilder.Services.Configure<JournaledStateManagerOptions>(options =>
             {
                 options.JournalFormatKey = isInitialBinarySilo
                     ? OrleansBinaryJournalFormat.JournalFormatKey
-                    : JsonJournalExtensions.JournalFormatKey;
+                    : JsonLinesJournalFormat.JournalFormatKey;
             });
             siloBuilder.Services.AddSingleton(storageProvider);
             siloBuilder.Services.AddScoped<IJournalStorageProvider>(sp => new SharedVolatileJournalStorageProviderAdapter(
@@ -65,7 +65,7 @@ public sealed class FormatMigrationClusterTests
             grain = cluster.Client.GetGrain<ITestDurableGrain>(grainId);
             Assert.Equal("json", await grain.GetName());
             Assert.Equal(2, await grain.GetCounter());
-            Assert.Contains(JsonJournalExtensions.JournalFormatKey, storageProvider.StoredFormatKeys);
+            Assert.Contains(JsonLinesJournalFormat.JournalFormatKey, storageProvider.StoredFormatKeys);
             Assert.Contains(jsonSilo, cluster.Silos);
         }
         finally

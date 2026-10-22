@@ -79,7 +79,7 @@ public sealed class RedisJournalStorageCatalogTests
                 return Task.FromResult((RedisValue)RedisJournalStorage.EncodeKeyName(ids[call.ArgAt<RedisKey>(0)].Value));
             });
         var provider = await CreateProviderAsync(database, CustomMappingOptions(), CreateServer(ScanAsync(TestContext.Current.CancellationToken)));
-        var options = new ListOptions { Prefix = nonmatchingId, MinId = firstId, MaxId = new("a") };
+        var options = new JournalCatalogListOptions { Prefix = nonmatchingId, MinId = firstId, MaxId = new("a") };
         var listing = provider.ListAsync(options, TestContext.Current.CancellationToken);
         options.Prefix = JournalId.Create("redis", "list");
         options.MinId = secondId;
@@ -388,7 +388,7 @@ public sealed class RedisJournalStorageCatalogTests
         var database = Substitute.For<IDatabase>();
         var server = CreateServer(ScanAsync(), "jobs/2026/09/");
         var provider = await CreateProviderAsync(database, server);
-        var options = new ListOptions { Prefix = unrelated, MinId = first, MaxId = new("a") };
+        var options = new JournalCatalogListOptions { Prefix = unrelated, MinId = first, MaxId = new("a") };
         var listing = provider.ListAsync(options, TestContext.Current.CancellationToken);
         options.Prefix = new("jobs/2026/0");
         options.MinId = second;
@@ -778,7 +778,7 @@ public sealed class RedisJournalStorageCatalogTests
         }
     }
 
-    private static async Task<List<JournalId>> ReadIdsAsync(RedisJournalStorageProvider provider, ListOptions? options = null)
+    private static async Task<List<JournalId>> ReadIdsAsync(RedisJournalStorageProvider provider, JournalCatalogListOptions? options = null)
     {
         var result = new List<JournalId>();
         await foreach (var id in provider.ListAsync(options, TestContext.Current.CancellationToken))

@@ -65,7 +65,7 @@ public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 
 [DebuggerTypeProxy(typeof(DurableQueueDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDurableQueueCommandHandler<T>
+internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurableQueueCommandHandler<T>
 {
     private readonly IDurableQueueCommandCodec<T> _codec;
     private readonly Queue<T> _items = new();
@@ -79,33 +79,33 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDura
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableQueueCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
-        manager.RegisterState(key, this);
+        manager.RegisterStateMachine(key, this);
     }
 
     internal DurableQueue(string key, IJournaledStateManager manager, IDurableQueueCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
-        manager.RegisterState(key, this);
+        manager.RegisterStateMachine(key, this);
     }
 
     public int Count => _items.Count;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
-    void IJournaledState.Reset(JournalStreamWriter writer)
+    void IStateMachine.Reset(JournalStreamWriter writer)
     {
         _items.Clear();
         _writer = writer;
     }
 
-    void IJournaledState.AppendEntries(JournalStreamWriter writer)
+    void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
         // This state implementation appends journal entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)
+    void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter)
     {
         _codec.WriteSnapshot(_items, snapshotWriter);
     }
@@ -168,7 +168,6 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDura
         return _writer;
     }
 
-    public IJournaledState DeepCopy() => throw new NotImplementedException();
 }
 
 internal sealed class DurableQueueDebugView<T>

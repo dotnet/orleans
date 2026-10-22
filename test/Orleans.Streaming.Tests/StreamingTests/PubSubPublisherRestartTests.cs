@@ -27,7 +27,6 @@ public class PubSubPublisherRestartTests
         var serviceId = Guid.NewGuid().ToString("N");
         var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
         await using var originalCluster = CreateCluster();
-        await using var replacementCluster = CreateCluster();
         await originalCluster.DeployAsync(cancellationToken);
         var originalSilo = Assert.Single(originalCluster.Silos);
         var originalSnapshot = originalSilo.ServiceProvider.GetRequiredService<IClusterMembershipService>().CurrentSnapshot;
@@ -41,6 +40,9 @@ public class PubSubPublisherRestartTests
         var persistedPublisher = Assert.Single(Assert.IsType<PubSubGrainState>(storage.GetLastState()).Producers);
         Assert.Equal(originalProducer, persistedPublisher.Producer);
         Assert.Equal(originalSnapshot.Version, persistedPublisher.MembershipVersion);
+
+        // Allocate the replacement cluster while the original silo still owns its endpoint.
+        await using var replacementCluster = CreateCluster();
         await originalCluster.DisposeAsync();
 
         await replacementCluster.DeployAsync(cancellationToken);

@@ -258,7 +258,7 @@ public static class JournalSnapshotFormatting
 
 public static class JournalTestReplayContext
 {
-    public static JournalReplayContext Create(string journalFormatKey, params (JournalStreamId StreamId, IJournaledState State)[] states)
+    public static JournalReplayContext Create(string journalFormatKey, params (JournalStreamId StreamId, IStateMachine State)[] states)
     {
         var manager = CreateManager(journalFormatKey);
         foreach (var (streamId, state) in states)
@@ -326,11 +326,11 @@ public static class JournalTestReplayContext
 }
 
 /// <summary>
-/// Recording <see cref="IJournaledState"/> for dictionary-codec snapshot tests. Implements both the
+/// Recording <see cref="IStateMachine"/> for dictionary-codec snapshot tests. Implements both the
 /// state contract (so the journal readers will dispatch into it) and the dictionary operation handler
 /// (so the codec accepts it via <c>state is THandler</c>).
 /// </summary>
-public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, IDurableDictionaryCommandHandler<TKey, TValue>
+public sealed class RecordingDictionaryState<TKey, TValue> : IStateMachine, IDurableDictionaryCommandHandler<TKey, TValue>
     where TKey : notnull
 {
     private readonly IDurableDictionaryCommandCodec<TKey, TValue> _codec;
@@ -342,7 +342,7 @@ public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, ID
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
@@ -359,15 +359,14 @@ public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, ID
 
     public void Reset(JournalStreamWriter writer) { }
 
-    public void AppendEntries(JournalStreamWriter writer) { }
+    public void WritePendingEntries(JournalStreamWriter writer) { }
 
-    public void AppendSnapshot(JournalStreamWriter writer) { }
+    public void WriteSnapshot(JournalStreamWriter writer) { }
 
-    public IJournaledState DeepCopy() => throw new NotSupportedException();
 }
 
 /// <summary>Recording state for list-codec snapshot tests.</summary>
-public sealed class RecordingListState<T> : IJournaledState, IDurableListCommandHandler<T>
+public sealed class RecordingListState<T> : IStateMachine, IDurableListCommandHandler<T>
 {
     private readonly IDurableListCommandCodec<T> _codec;
     private readonly RecordingListCommandHandler<T> _handler = new();
@@ -378,7 +377,7 @@ public sealed class RecordingListState<T> : IJournaledState, IDurableListCommand
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
@@ -397,15 +396,14 @@ public sealed class RecordingListState<T> : IJournaledState, IDurableListCommand
 
     public void Reset(JournalStreamWriter writer) { }
 
-    public void AppendEntries(JournalStreamWriter writer) { }
+    public void WritePendingEntries(JournalStreamWriter writer) { }
 
-    public void AppendSnapshot(JournalStreamWriter writer) { }
+    public void WriteSnapshot(JournalStreamWriter writer) { }
 
-    public IJournaledState DeepCopy() => throw new NotSupportedException();
 }
 
 /// <summary>Recording state for queue-codec snapshot tests.</summary>
-public sealed class RecordingQueueState<T> : IJournaledState, IDurableQueueCommandHandler<T>
+public sealed class RecordingQueueState<T> : IStateMachine, IDurableQueueCommandHandler<T>
 {
     private readonly IDurableQueueCommandCodec<T> _codec;
     private readonly RecordingQueueCommandHandler<T> _handler = new();
@@ -416,7 +414,7 @@ public sealed class RecordingQueueState<T> : IJournaledState, IDurableQueueComma
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
@@ -431,15 +429,14 @@ public sealed class RecordingQueueState<T> : IJournaledState, IDurableQueueComma
 
     public void Reset(JournalStreamWriter writer) { }
 
-    public void AppendEntries(JournalStreamWriter writer) { }
+    public void WritePendingEntries(JournalStreamWriter writer) { }
 
-    public void AppendSnapshot(JournalStreamWriter writer) { }
+    public void WriteSnapshot(JournalStreamWriter writer) { }
 
-    public IJournaledState DeepCopy() => throw new NotSupportedException();
 }
 
 /// <summary>Recording state for set-codec snapshot tests.</summary>
-public sealed class RecordingSetState<T> : IJournaledState, IDurableSetCommandHandler<T>
+public sealed class RecordingSetState<T> : IStateMachine, IDurableSetCommandHandler<T>
 {
     private readonly IDurableSetCommandCodec<T> _codec;
     private readonly RecordingSetCommandHandler<T> _handler = new();
@@ -450,7 +447,7 @@ public sealed class RecordingSetState<T> : IJournaledState, IDurableSetCommandHa
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
@@ -465,15 +462,14 @@ public sealed class RecordingSetState<T> : IJournaledState, IDurableSetCommandHa
 
     public void Reset(JournalStreamWriter writer) { }
 
-    public void AppendEntries(JournalStreamWriter writer) { }
+    public void WritePendingEntries(JournalStreamWriter writer) { }
 
-    public void AppendSnapshot(JournalStreamWriter writer) { }
+    public void WriteSnapshot(JournalStreamWriter writer) { }
 
-    public IJournaledState DeepCopy() => throw new NotSupportedException();
 }
 
 /// <summary>Recording state for value-codec snapshot tests.</summary>
-public sealed class RecordingValueState<T> : IJournaledState, IDurableValueCommandHandler<T>
+public sealed class RecordingValueState<T> : IStateMachine, IDurableValueCommandHandler<T>
 {
     private readonly IDurableValueCommandCodec<T> _codec;
     private readonly RecordingValueCommandHandler<T> _handler = new();
@@ -484,7 +480,7 @@ public sealed class RecordingValueState<T> : IJournaledState, IDurableValueComma
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public T? Value => _handler.Value;
@@ -499,15 +495,14 @@ public sealed class RecordingValueState<T> : IJournaledState, IDurableValueComma
 
     public void Reset(JournalStreamWriter writer) { }
 
-    public void AppendEntries(JournalStreamWriter writer) { }
+    public void WritePendingEntries(JournalStreamWriter writer) { }
 
-    public void AppendSnapshot(JournalStreamWriter writer) { }
+    public void WriteSnapshot(JournalStreamWriter writer) { }
 
-    public IJournaledState DeepCopy() => throw new NotSupportedException();
 }
 
 /// <summary>Recording state for state-codec snapshot tests.</summary>
-public sealed class RecordingStateState<T> : IJournaledState, IPersistentStateCommandHandler<T>
+public sealed class RecordingStateState<T> : IStateMachine, IPersistentStateCommandHandler<T>
 {
     private readonly IPersistentStateCommandCodec<T> _codec;
     private readonly RecordingPersistentStateCommandHandler<T> _handler = new();
@@ -518,7 +513,7 @@ public sealed class RecordingStateState<T> : IJournaledState, IPersistentStateCo
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
@@ -533,15 +528,14 @@ public sealed class RecordingStateState<T> : IJournaledState, IPersistentStateCo
 
     public void Reset(JournalStreamWriter writer) { }
 
-    public void AppendEntries(JournalStreamWriter writer) { }
+    public void WritePendingEntries(JournalStreamWriter writer) { }
 
-    public void AppendSnapshot(JournalStreamWriter writer) { }
+    public void WriteSnapshot(JournalStreamWriter writer) { }
 
-    public IJournaledState DeepCopy() => throw new NotSupportedException();
 }
 
 /// <summary>Recording state for task-completion-source codec snapshot tests.</summary>
-public sealed class RecordingTcsState<T> : IJournaledState, IDurableTaskCompletionSourceCommandHandler<T>
+public sealed class RecordingTcsState<T> : IStateMachine, IDurableTaskCompletionSourceCommandHandler<T>
 {
     private readonly IDurableTaskCompletionSourceCommandCodec<T> _codec;
     private readonly RecordingTaskCompletionSourceCommandHandler<T> _handler = new();
@@ -552,7 +546,7 @@ public sealed class RecordingTcsState<T> : IJournaledState, IDurableTaskCompleti
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
@@ -567,9 +561,8 @@ public sealed class RecordingTcsState<T> : IJournaledState, IDurableTaskCompleti
 
     public void Reset(JournalStreamWriter writer) { }
 
-    public void AppendEntries(JournalStreamWriter writer) { }
+    public void WritePendingEntries(JournalStreamWriter writer) { }
 
-    public void AppendSnapshot(JournalStreamWriter writer) { }
+    public void WriteSnapshot(JournalStreamWriter writer) { }
 
-    public IJournaledState DeepCopy() => throw new NotSupportedException();
 }

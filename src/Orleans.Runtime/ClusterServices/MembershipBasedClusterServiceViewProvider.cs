@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
@@ -14,7 +15,7 @@ internal sealed partial class MembershipBasedClusterServiceViewProvider
 {
     private readonly IClusterMembershipService _clusterMembershipService;
     private readonly ClusterServiceConfiguration _configuration;
-    private readonly Func<SiloAddress, int, uint[]> _getRingBoundaries;
+    private readonly Func<SiloAddress, int, ImmutableArray<uint>> _getRingBoundaries;
     private readonly long _providerEpoch;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _shutdownCts = new();
@@ -25,12 +26,13 @@ internal sealed partial class MembershipBasedClusterServiceViewProvider
     public MembershipBasedClusterServiceViewProvider(
         IClusterMembershipService clusterMembershipService,
         ClusterServiceConfiguration configuration,
-        Func<SiloAddress, int, uint[]> getRingBoundaries,
+        Func<SiloAddress, int, ImmutableArray<uint>> getRingBoundaries,
         ILogger logger,
         ClusterMembershipSnapshot? initialSnapshot = null,
         long providerEpoch = 0)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(providerEpoch, 0);
+        ArgumentNullException.ThrowIfNull(getRingBoundaries);
         _clusterMembershipService = clusterMembershipService;
         _configuration = configuration;
         _getRingBoundaries = getRingBoundaries;
@@ -43,7 +45,7 @@ internal sealed partial class MembershipBasedClusterServiceViewProvider
             getRingBoundaries,
             providerEpoch);
         _viewUpdates = new(
-            CurrentView,
+            _currentView,
             static (previous, proposed) =>
                 proposed.Id > previous.Id,
             update => Volatile.Write(ref _currentView, update));
@@ -52,7 +54,18 @@ internal sealed partial class MembershipBasedClusterServiceViewProvider
         _runTask = Task.Run(ProcessMembershipUpdates);
     }
 
-    public MembershipBasedClusterServiceView CurrentView => Volatile.Read(ref _currentView);
+    public MembershipBasedClusterServiceView CurrentView
+    {
+        get
+        {
+            if (_runTask.IsFaulted)
+            {
+                _runTask.GetAwaiter().GetResult();
+            }
+
+            return Volatile.Read(ref _currentView);
+        }
+    }
 
     public IAsyncEnumerable<MembershipBasedClusterServiceView> ViewUpdates => ReadUpdates();
 
@@ -144,7 +157,19 @@ internal sealed partial class MembershipBasedClusterServiceViewProvider
         {
             await foreach (var update in _clusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
             {
-                _viewUpdates.TryPublish(new(update, _configuration, _getRingBoundaries, _providerEpoch));
+                MembershipBasedClusterServiceView view;
+                try
+                {
+                    view = new(update, _configuration, _getRingBoundaries, _providerEpoch);
+                }
+                catch (Exception exception)
+                {
+                    throw new OrleansConfigurationException(
+                        $"Failed to construct service '{_configuration.ServiceId}' membership version '{update.Version}'.",
+                        exception);
+                }
+
+                _viewUpdates.TryPublish(view);
             }
         }
         catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)

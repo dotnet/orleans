@@ -483,6 +483,75 @@ public partial class JournaledJobShardManagerTests
     }
 
     [Fact]
+    public async Task ShardCreatedFromCallerScheduler_PersistsOnThreadPool()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var appendSchedulers = new ConcurrentQueue<TaskScheduler>();
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: false, _ =>
+        {
+            appendSchedulers.Enqueue(TaskScheduler.Current);
+            return ValueTask.CompletedTask;
+        });
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5045), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(services, membership, silo);
+        var callerScheduler = new ConcurrentExclusiveSchedulerPair().ExclusiveScheduler;
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+
+        var shard = await Task.Factory.StartNew(
+            () => manager.CreateShardAsync(start, start.AddHours(1), new Dictionary<string, string>(), cancellationToken),
+            cancellationToken,
+            TaskCreationOptions.None,
+            callerScheduler).Unwrap();
+        await ScheduleJobAsync(shard, "caller-scheduler-job", cancellationToken);
+
+        Assert.NotEmpty(appendSchedulers);
+        Assert.All(appendSchedulers, scheduler => Assert.Same(TaskScheduler.Default, scheduler));
+        await DrainAndUnregisterAsync(manager, shard, cancellationToken, expectedJobs: 1);
+    }
+
+    [Fact]
+    public async Task ShardCreatedWithCallerAsyncLocal_ProcessesOperationsWithoutCallerExecutionContext()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: false);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5046), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(services, membership, silo);
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+        var callerValue = new object();
+        var callerAsyncLocal = new AsyncLocal<object?>();
+        var processorValues = new ConcurrentQueue<object?>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == "Microsoft.Orleans" && instrument.Name == "orleans-durablejobs-storage-batch-size")
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, _, _, _) => processorValues.Enqueue(callerAsyncLocal.Value));
+        listener.Start();
+
+        var shard = await Task.Run(
+            () =>
+            {
+                callerAsyncLocal.Value = callerValue;
+                return manager.CreateShardAsync(start, start.AddHours(1), new Dictionary<string, string>(), cancellationToken);
+            },
+            cancellationToken);
+        await ScheduleJobAsync(shard, "caller-async-local-job", cancellationToken);
+
+        Assert.NotEmpty(processorValues);
+        Assert.All(processorValues, Assert.Null);
+        await DrainAndUnregisterAsync(manager, shard, cancellationToken, expectedJobs: 1);
+    }
+
+    [Fact]
     public async Task ActiveRemoteOwnerShard_IsNotClaimedUntilOwnerDies()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -597,7 +666,7 @@ public partial class JournaledJobShardManagerTests
     private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider, TimeProvider? timeProvider = null, IJournalStorageCatalog? catalog = null)
     {
         var builder = new TestSiloBuilder();
-        builder.AddJournalStorage();
+        builder.AddJournaling();
         builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
         builder.Services.AddLogging();
         builder.Services.AddSingleton(timeProvider ?? TimeProvider.System);
@@ -626,6 +695,12 @@ public partial class JournaledJobShardManagerTests
     {
         public ConcurrentQueue<JournalId> MetadataReads { get; } = new();
         public ConcurrentQueue<(JournalId Id, string? ExpectedETag)> MetadataUpdates { get; } = new();
+        public ConcurrentQueue<JournalId> JournalReads { get; } = new();
+        public ConcurrentQueue<JournalId> JournalAppends { get; } = new();
+        public ConcurrentQueue<JournalId> JournalDeletes { get; } = new();
+        public ConcurrentQueue<JournalId> JournalReplacements { get; } = new();
+        public List<JournalCatalogListOptions?> ListRequests { get; } = [];
+        public Func<JournalCatalogListOptions?, CancellationToken, IAsyncEnumerable<JournalCatalogEntry>>? ListOverride { get; set; }
         public Func<JournalId, CancellationToken, ValueTask>? BeforeMetadataRead { get; set; }
         public Func<JournalId, IJournalMetadata?, CancellationToken, ValueTask>? AfterMetadataUpdate { get; set; }
         public bool OmitMetadataETags { get; set; }
@@ -684,10 +759,11 @@ public partial class JournaledJobShardManagerTests
             return new CountingJournalStorage(this, journalId, _inner.CreateStorage(journalId));
         }
 
-        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(JournalCatalogListOptions? options = null, CancellationToken cancellationToken = default)
         {
+            ListRequests.Add(options);
             LastListPrefix = options?.Prefix ?? default;
-            return _inner.ListAsync(options, cancellationToken);
+            return ListOverride?.Invoke(options, cancellationToken) ?? _inner.ListAsync(options, cancellationToken);
         }
 
         private async ValueTask OnAppendAsync(CancellationToken cancellationToken)
@@ -728,7 +804,7 @@ public partial class JournaledJobShardManagerTests
 
                 var metadata = await inner.GetMetadataAsync(cancellationToken);
                 return owner.OmitMetadataETags && metadata is not null
-                    ? new JournalMetadata(metadata.Format, properties: metadata.Properties)
+                    ? new JournalMetadata(metadata.FormatKey, properties: metadata.Properties)
                     : metadata;
             }
 
@@ -749,19 +825,29 @@ public partial class JournaledJobShardManagerTests
             }
 
             public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
-                => inner.ReadAsync(consumer, cancellationToken);
+            {
+                owner.JournalReads.Enqueue(journalId);
+                return inner.ReadAsync(consumer, cancellationToken);
+            }
 
             public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             {
+                owner.JournalAppends.Enqueue(journalId);
                 await owner.OnAppendAsync(cancellationToken).ConfigureAwait(false);
                 await inner.AppendAsync(value, cancellationToken).ConfigureAwait(false);
             }
 
             public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
-                => inner.ReplaceAsync(value, cancellationToken);
+            {
+                owner.JournalReplacements.Enqueue(journalId);
+                return inner.ReplaceAsync(value, cancellationToken);
+            }
 
             public ValueTask DeleteAsync(CancellationToken cancellationToken)
-                => inner.DeleteAsync(cancellationToken);
+            {
+                owner.JournalDeletes.Enqueue(journalId);
+                return inner.DeleteAsync(cancellationToken);
+            }
         }
     }
 
@@ -863,12 +949,13 @@ public partial class JournaledJobShardManagerTests
         public int DisposeCalls { get; private set; }
         public int YieldedIds { get; private set; }
         public List<(JournalId Prefix, JournalId MaxId)> Requests { get; } = [];
+        public bool ExpectUnbounded { get; set; }
 
-        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(JournalCatalogListOptions? options = null, CancellationToken cancellationToken = default)
         {
             Assert.NotNull(options);
             Assert.Equal(JobShardId.StoragePrefix.Value + "/", options.Prefix.Value);
-            Assert.False(options.MaxId.IsDefault);
+            Assert.Equal(ExpectUnbounded, options.MaxId.IsDefault);
             Assert.True(options.IncludeMetadata);
             ListCalls++;
             var prefix = options.Prefix;
@@ -883,7 +970,7 @@ public partial class JournaledJobShardManagerTests
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             var snapshot = Ids.Where(id => id.Value.StartsWith(prefix.Value, StringComparison.Ordinal)
-                && StringComparer.Ordinal.Compare(id.Value, maxId.Value) <= 0).ToArray();
+                && (maxId.IsDefault || StringComparer.Ordinal.Compare(id.Value, maxId.Value) <= 0)).ToArray();
             try
             {
                 for (var index = 0; ; index++)

@@ -17,4 +17,8 @@
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.GrainDirectory.Compatibility.ReleaseHost\Orleans.GrainDirectory.Compatibility.ReleaseHost.csproj"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(SourceRoot)docs\site\src\content\docs\snippets\compiled\Deployment\DirectoryPartitioningSnippet.cs" Link="GrainDirectory\DirectoryPartitioningSnippet.cs" />
+  </ItemGroup>
 </Project>

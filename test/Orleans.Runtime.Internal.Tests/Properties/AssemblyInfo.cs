@@ -1,2 +1,1 @@
-// Disable XUnit concurrency limit
-[assembly: Xunit.CollectionBehavior(MaxParallelThreads = -1)]
+[assembly: Xunit.v3.Parallelization(MaxThreads = -1)]

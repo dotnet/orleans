@@ -2,6 +2,9 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using NSubstitute;
+using Orleans.Metadata;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
@@ -14,6 +17,23 @@ namespace Orleans.Journaling.Tests;
 /// </summary>
 public abstract class JournalingTestBase
 {
+    internal static GrainPropertiesResolver CreateGrainPropertiesResolver(params (Type GrainClass, GrainType GrainType)[] grainTypes)
+    {
+        var attributes = new AttributeGrainPropertiesProvider(Substitute.For<IServiceProvider>());
+        var grains = ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>();
+        foreach (var (grainClass, grainType) in grainTypes)
+        {
+            var properties = new Dictionary<string, string>(StringComparer.Ordinal);
+            attributes.Populate(grainClass, grainType, properties);
+            grains.Add(grainType, new GrainProperties(properties.ToImmutableDictionary(StringComparer.Ordinal)));
+        }
+
+        var manifest = new GrainManifest(grains.ToImmutable(), ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
+        var provider = Substitute.For<IClusterManifestProvider>();
+        provider.Current.Returns(new ClusterManifest(default, ImmutableDictionary<SiloAddress, GrainManifest>.Empty, [manifest]));
+        return new GrainPropertiesResolver(provider);
+    }
+
     protected readonly ServiceProvider ServiceProvider;
     protected readonly SerializerSessionPool SessionPool;
     protected readonly ICodecProvider CodecProvider;

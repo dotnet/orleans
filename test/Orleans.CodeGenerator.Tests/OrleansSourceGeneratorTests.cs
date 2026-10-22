@@ -1,7 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGenerator.Diagnostics;
 using Orleans.Serialization;
@@ -588,7 +587,7 @@ public class UsesGenericWithCtor
 {
     [Id(0)]
     public GenericWithCtor<string> StringGen { get; set; }
-}");
+}", snapshotName: nameof(TestGenericClassWithConstructorParameters));
 
     [Fact]
     public Task TestClassWithNoPublicConstructors() => AssertSuccessfulSourceGeneration(
@@ -2213,6 +2212,7 @@ public class DemoClass
         var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [generator],
+            optionsProvider: TestCompilationHelper.CreateOptionsProvider(),
             driverOptions: new GeneratorDriverOptions(default));
         driver = driver.RunGeneratorsAndUpdateCompilation(
             compilation,
@@ -2245,14 +2245,10 @@ public class DemoClass
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string>? globalOptions = null)
     {
-        AnalyzerConfigOptionsProvider? optionsProvider = globalOptions is null
-            ? null
-            : new TestAnalyzerConfigOptionsProvider(globalOptions);
-
         var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [generator],
-            optionsProvider: optionsProvider,
+            optionsProvider: TestCompilationHelper.CreateOptionsProvider(globalOptions),
             driverOptions: new GeneratorDriverOptions(default));
         driver = driver.RunGenerators(compilation);
         return driver.GetRunResult().Results.Single();
@@ -2263,7 +2259,7 @@ public class DemoClass
     /// and verifies successful generation without errors.
     /// Uses snapshot testing to verify the generated code matches expectations.
     /// </summary>
-    private static async Task AssertSuccessfulSourceGeneration(string code)
+    private static async Task AssertSuccessfulSourceGeneration(string code, string? snapshotName = null)
     {
         var projectName = "TestProject";
         var compilation = await CreateCompilation(code, projectName);
@@ -2276,7 +2272,14 @@ public class DemoClass
             Assert.StartsWith($"{projectName}.orleans.", generated.HintName, StringComparison.Ordinal));
         var generatedSource = ConcatenateGeneratedSources(result);
 
-        await Verify(generatedSource, extension: "cs").UseDirectory("snapshots");
+        var snapshot = Verify(generatedSource, extension: "cs").UseDirectory("snapshots");
+        if (snapshotName is not null)
+        {
+            var supportsGenericAccessors = SourceGeneratorOptionsParser.ParseOptions(TestCompilationHelper.CreateOptionsProvider().GlobalOptions).SupportsGenericUnsafeAccessors;
+            snapshot = snapshot.UseFileName($"{nameof(OrleansSourceGeneratorTests)}.{snapshotName}.{(supportsGenericAccessors ? "UnsafeAccessor" : "FieldAccessor")}");
+        }
+
+        await snapshot;
     }
 
     private static string ConcatenateGeneratedSources(GeneratorRunResult result)
@@ -2537,35 +2540,6 @@ public class DemoClass
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
-
-    private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
-    {
-        private static readonly AnalyzerConfigOptions EmptyOptions = new TestAnalyzerConfigOptions(new Dictionary<string, string>());
-        private readonly AnalyzerConfigOptions _globalOptions;
-
-        public TestAnalyzerConfigOptionsProvider(IReadOnlyDictionary<string, string> globalOptions)
-        {
-            _globalOptions = new TestAnalyzerConfigOptions(globalOptions);
-        }
-
-        public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
-
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => EmptyOptions;
-
-        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => EmptyOptions;
-    }
-
-    private sealed class TestAnalyzerConfigOptions : AnalyzerConfigOptions
-    {
-        private readonly IReadOnlyDictionary<string, string> _options;
-
-        public TestAnalyzerConfigOptions(IReadOnlyDictionary<string, string> options)
-        {
-            _options = options;
-        }
-
-        public override bool TryGetValue(string key, out string value) => _options.TryGetValue(key, out value!);
-    }
 
     private sealed class NamespaceMembers(SyntaxList<UsingDirectiveSyntax> usings)
     {

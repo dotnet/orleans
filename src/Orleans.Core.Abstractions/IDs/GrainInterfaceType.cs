@@ -93,6 +93,12 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> if a <see cref="GrainInterfaceType"/> corresponding to the provided type was found, otherwise <see langword="false"/>.
         /// </returns>
+        /// <remarks>
+        /// Implementations must return a stable success result and identifier for each CLR interface type
+        /// for the lifetime of the resolver using this provider. The resolver caches resolved identities,
+        /// including closed generic interface types. Implementations must support concurrent calls;
+        /// concurrent cache misses can invoke this method more than once for the same type.
+        /// </remarks>
         bool TryGetGrainInterfaceType(Type type, out GrainInterfaceType grainInterfaceType);
     }
 
@@ -145,6 +151,11 @@ namespace Orleans.Runtime
         /// <returns>
         /// The <see cref="GrainInterfaceType"/> corresponding to the provided type.
         /// </returns>
+        /// <remarks>
+        /// The identifier must remain stable for each CLR interface type for the lifetime of the resolver
+        /// using this attribute. Implementations must support concurrent calls, including repeated calls
+        /// for the same type during concurrent identity resolution.
+        /// </remarks>
         GrainInterfaceType GetGrainInterfaceType(IServiceProvider services, Type type);
     }
 

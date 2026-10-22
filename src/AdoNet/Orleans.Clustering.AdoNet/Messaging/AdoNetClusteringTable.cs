@@ -70,23 +70,15 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        [Obsolete("Use ReadRowAsync instead.")]
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            LogTraceReadRow(key);
-            try
-            {
-                return await orleansQueries.MembershipReadRowAsync(this.clusterId, key, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                LogDebugReadRowFailed(ex);
-                throw;
-            }
+            return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
         }
 
         /// <inheritdoc />
@@ -170,6 +162,12 @@ namespace Orleans.Runtime.MembershipService
             {
                 LogDebugUpdateRowAbortedNullTableVersion();
                 throw new ArgumentNullException(nameof(tableVersion));
+            }
+
+            // Relational reads use the table version as the row etag.
+            if (!string.Equals(etag, tableVersion.VersionEtag, StringComparison.Ordinal))
+            {
+                return false;
             }
 
             try

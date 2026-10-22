@@ -186,6 +186,7 @@ namespace Orleans.Runtime.MembershipService
 
             LogInformationReceivedClusterMembershipSnapshot(this.log, snapshot);
 
+            cancellationToken.ThrowIfCancellationRequested();
             this.TryProcessMembershipUpdate(MembershipTableSnapshot.Update, snapshot, nameof(RefreshFromSnapshot));
         }
 
@@ -562,6 +563,11 @@ namespace Orleans.Runtime.MembershipService
             MembershipTableSnapshot previous,
             MembershipTableSnapshot updated)
         {
+            if (updated.Version < previous.Version)
+            {
+                return previous;
+            }
+
             if (!previous.Entries.TryGetValue(this.myAddress, out var previousLocalSiloEntry)
                 || previousLocalSiloEntry.Status == SiloStatus.Created)
             {

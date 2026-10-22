@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Clustering.Firestore\Orleans.Clustering.Firestore.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" PrivateAssets="all" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
   </ItemGroup>
 

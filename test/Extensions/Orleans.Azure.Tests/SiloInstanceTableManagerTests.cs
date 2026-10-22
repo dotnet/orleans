@@ -163,10 +163,12 @@ namespace Tester.AzureUtils
             var after = await manager.ReadSingleTableEntryAsync(
                 clusterId,
                 SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX);
-            Assert.Equal("0", before.Entity?.MembershipVersion);
-            Assert.Equal("0", after.Entity?.MembershipVersion);
-            Assert.Equal(SiloInstanceTableTestConstants.INSTANCE_STATUS_ACTIVE, before.Entity?.Status);
-            Assert.Equal(SiloInstanceTableTestConstants.INSTANCE_STATUS_ACTIVE, after.Entity?.Status);
+            Assert.NotNull(before.Entity);
+            Assert.NotNull(after.Entity);
+            Assert.Equal("0", before.Entity.MembershipVersion);
+            Assert.Equal("0", after.Entity.MembershipVersion);
+            Assert.Null(before.Entity.Status);
+            Assert.Null(after.Entity.Status);
         }
 
         [Fact, TestCategory("Functional")]

@@ -58,11 +58,25 @@ By default, Orleans serializes your type by encoding its full name. You can over
 
 ## Serializing `record` types
 
-Members defined in a record's primary constructor have implicit IDs by default. In other words, Orleans supports serializing `record` types. This means you cannot change the parameter order for an already deployed type, as that breaks compatibility with previous versions of your application (in a rolling upgrade scenario) and with serialized instances of that type in storage and streams. Members defined in the body of a record type don't share identities with the primary constructor parameters.
+Orleans assigns implicit IDs to record primary-constructor members by their parameter position. Preserve the parameter order of an already deployed type to maintain compatibility during rolling upgrades and with serialized instances in storage and streams. Primary-constructor members and ordinary members occupy separate sections of the serialized representation, so members defined in the body can reuse the same numeric IDs.
 
 :::code language="csharp" source="snippets/serialization/BasicTypes.cs" id="record_primary_constructor":::
 
-If you don't want the primary constructor parameters automatically included as serializable fields, use `[GenerateSerializer(IncludePrimaryConstructorParameters = false)]`.
+Set <xref:Orleans.GenerateSerializerAttribute.IncludePrimaryConstructorParameters> to `false` to select serializable members using explicit <xref:Orleans.IdAttribute> annotations.
+
+### Generating for record structs in referenced assemblies
+
+When an SDK project generates serialization code for a referenced assembly using <xref:Orleans.GenerateCodeForDeclaringAssemblyAttribute>, Orleans reads the type's compiled metadata. For a `record struct` with custom accessors, make primary-constructor membership explicit in the assembly which declares the type:
+
+:::code language="csharp" source="snippets/serialization/BasicTypes.cs" id="record_struct_metadata_constructor":::
+
+`IncludePrimaryConstructorParameters = true` enables the primary-member section. `[method: ActivatorUtilitiesConstructor]` applies <xref:Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute> to the primary constructor, selecting its parameters from metadata even when the type has other constructors. Annotate exactly one constructor. Orleans matches its parameters to properties by name and type and restores the custom init properties through their setters. These annotations also apply to mutable `record struct` types.
+
+Compile the contracts assembly with a compiler which emits the method-target attribute on the primary constructor. For compiler warning `CS0657` on `[method: ActivatorUtilitiesConstructor]`, use a current .NET SDK or apply `[ActivatorUtilitiesConstructor]` directly to an explicitly declared constructor with the same parameter names, types, and IDs.
+
+For `ORLEANS0106` reporting "no field ids were assigned to any candidate serializable members" on an imported custom-accessor record struct, add both annotations to the declaring type and rebuild the contracts assembly. They provide the constructor identity and member inclusion information used by the generator.
+
+Keep the existing parameter order and any parameter-level `[Id(n)]` annotations when adding this metadata. This preserves the primary-member section and its field IDs, matching serialization generated from the record's source. A property-level `[Id(n)]` selects the ordinary-member section; choosing that layout for a deployed primary-constructor member changes its wire identity even when the numeric ID is unchanged.
 
 ## MessagePack serialization
 

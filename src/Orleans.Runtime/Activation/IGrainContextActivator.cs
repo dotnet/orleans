@@ -205,6 +205,7 @@ namespace Orleans.Runtime
                 configurator.Configure(grainType, properties, result);
             }
 
+            result.CompleteConfiguration();
             return result;
         }
     }

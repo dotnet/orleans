@@ -3843,7 +3843,7 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
 
         public IReadOnlyList<(SiloAddress Silo, uint Boundary)> Boundaries => _boundaries;
 
-        public uint[] GetBoundaries(SiloAddress silo, int count)
+        public ImmutableArray<uint> GetBoundaries(SiloAddress silo, int count)
         {
             Assert.Equal(1, count);
             return [Assert.Single(_boundaries, entry => entry.Silo.Equals(silo)).Boundary];

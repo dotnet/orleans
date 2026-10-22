@@ -12,6 +12,8 @@ namespace Orleans.Journaling
     {
         public static Hosting.ISiloBuilder AddS3JournalStorage(this Hosting.ISiloBuilder builder, System.Action<S3JournalStorageOptions>? configure) { throw null; }
 
+        public static Hosting.ISiloBuilder AddS3JournalStorage(this Hosting.ISiloBuilder builder, string name, System.Action<S3JournalStorageOptions>? configure) { throw null; }
+
         public static Hosting.ISiloBuilder AddS3JournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
     }
 

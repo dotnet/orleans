@@ -1,5 +1,8 @@
+using System.Net;
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 using Orleans.Configuration;
 using Orleans.GrainDirectory.Redis;
 using Orleans.Runtime;
@@ -100,6 +103,72 @@ public sealed class RedisGrainDirectoryUnitTests
         var result = directory.GetKey(GrainId.Create("type", "key"));
 
         Assert.Equal((RedisKey)"cluster/directory/type/key", result);
+    }
+
+    [Fact]
+    public async Task RegisterAndUnregister_RequirePrimaryForScripts()
+    {
+        var database = Substitute.For<IDatabase>();
+        database.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>(), Arg.Any<CommandFlags>())
+            .Returns(
+                Task.FromResult(RedisResult.Create(RedisValue.Null)),
+                Task.FromResult(RedisResult.Create(RedisValue.Null)),
+                Task.FromResult(RedisResult.Create(1)));
+        using var directory = CreateDirectory(database);
+        await directory.Initialize(TestContext.Current.CancellationToken);
+        var address = CreateAddress();
+        var replacement = CreateAddress();
+
+        Assert.Same(address, await directory.Register(address));
+        Assert.Same(replacement, await directory.Register(replacement, address));
+        await directory.Unregister(replacement);
+
+        var commands = database.ReceivedCalls().ToArray();
+        Assert.Equal(3, commands.Length);
+        Assert.All(commands, call =>
+        {
+            Assert.Equal(nameof(IDatabase.ScriptEvaluateAsync), call.GetMethodInfo().Name);
+            Assert.Equal(CommandFlags.DemandMaster, Assert.IsType<CommandFlags>(call.GetArguments()[3]));
+            Assert.Equal(directory.GetKey(address.GrainId), Assert.Single(Assert.IsType<RedisKey[]>(call.GetArguments()[1])));
+        });
+        Assert.Equal(address.ActivationId.ToString(), Assert.IsType<RedisValue[]>(commands[1].GetArguments()[2])[1].ToString());
+        Assert.Equal(replacement.ActivationId.ToString(), Assert.Single(Assert.IsType<RedisValue[]>(commands[2].GetArguments()[2])).ToString());
+    }
+
+    [Fact]
+    public async Task Lookup_RequiresPrimaryForCurrentRegistration()
+    {
+        var address = CreateAddress();
+        var database = Substitute.For<IDatabase>();
+        database.StringGetAsync(Arg.Any<RedisKey>(), Arg.Any<CommandFlags>())
+            .Returns(Task.FromResult((RedisValue)JsonSerializer.Serialize(address)));
+        using var directory = CreateDirectory(database);
+        await directory.Initialize(TestContext.Current.CancellationToken);
+
+        var result = await directory.Lookup(address.GrainId);
+
+        Assert.NotNull(result);
+        Assert.Equal(address.GrainId, result.GrainId);
+        Assert.Equal(address.ActivationId, result.ActivationId);
+        Assert.Equal(address.SiloAddress, result.SiloAddress);
+        await database.Received(1).StringGetAsync(directory.GetKey(address.GrainId), CommandFlags.DemandMaster);
+    }
+
+    private static GrainAddress CreateAddress() => new()
+    {
+        GrainId = GrainId.Create("type", "key"),
+        ActivationId = ActivationId.NewId(),
+        SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1)
+    };
+
+    private static RedisGrainDirectory CreateDirectory(IDatabase database)
+    {
+        var multiplexer = Substitute.For<IConnectionMultiplexer>();
+        multiplexer.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(database);
+        return new(
+            new RedisGrainDirectoryOptions { CreateMultiplexer = _ => Task.FromResult((multiplexer, true)) },
+            CreateClusterOptions(),
+            NullLogger<RedisGrainDirectory>.Instance);
     }
 
     private static RedisGrainDirectory CreateDirectory(string serviceId = "service") =>

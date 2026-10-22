@@ -4,7 +4,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.DurableJobs.AzureStorage</PackageId>
     <Title>Microsoft Orleans Azure Storage Durable Jobs Provider</Title>
-    <Description>Microsoft Orleans durable jobs provider backed by Azure Blob Storage</Description>
+    <Description>Microsoft Orleans durable jobs provider backed by Azure Blob or Azure Table journal storage</Description>
     <PackageTags>$(PackageTags) Azure Storage</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.DurableJobs.AzureStorage</AssemblyName>
@@ -16,6 +16,12 @@
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
     <OrleansPackageValidationBaselineSuffix>alpha.1</OrleansPackageValidationBaselineSuffix>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
   </PropertyGroup>
 
   <ItemGroup>

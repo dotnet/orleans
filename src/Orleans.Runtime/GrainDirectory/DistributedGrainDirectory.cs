@@ -137,10 +137,6 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
         _partitions = partitions.ToImmutable();
         shared.ActivationDirectory.RecordNewTarget(this);
-
-        // Register IRemoteGrainDirectory system targets so that silos running LocalGrainDirectory
-        // can forward directory requests to this silo during a rolling upgrade.
-        DistributedRemoteGrainDirectory.Create(this, membershipService, shared);
     }
 
     internal static TimeSpan CalculateDeadSiloLeaseDuration(
@@ -484,6 +480,12 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle observer)
     {
         _grainDirectoryResolver = _serviceProvider.GetRequiredService<GrainDirectoryResolver>();
+
+        // Legacy remote endpoints serve the default directory during rolling upgrades.
+        if (_grainDirectoryResolver.DefaultGrainDirectory == this)
+        {
+            DistributedRemoteGrainDirectory.Create(this, _membershipService, _serviceProvider.GetRequiredService<SystemTargetShared>());
+        }
 
         observer.Subscribe(nameof(DistributedGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
 

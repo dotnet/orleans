@@ -11,6 +11,7 @@ The [Journaling with Azure Blob JSON](https://github.com/dotnet/orleans/tree/mai
 
 The sample demonstrates:
 
+- An ordinary <xref:Orleans.Grain> with an injected <xref:Orleans.Journaling.IDurableStateManager>, using constructor-time `GetOrAdd` declarations and activation lifecycle recovery.
 - <xref:Orleans.Journaling.IDurableDictionary`2>, <xref:Orleans.Journaling.IDurableList`1>, <xref:Orleans.Journaling.IDurableQueue`1>, and <xref:Orleans.Journaling.IDurableSet`1>.
 - <xref:Orleans.Journaling.IDurableValue`1>, journal-backed <xref:Orleans.Runtime.IPersistentState`1>, and <xref:Orleans.Journaling.IDurableTaskCompletionSource`1>.
 - JSON source-generation metadata for all journaled payload types.
@@ -28,13 +29,15 @@ aspire run --project JournalingAzureBlobJson.AppHost
 
 The app host starts the Azure Storage emulator and the sample service. The service writes every built-in durable state category, deactivates the grain, verifies the recovered values on a new activation, and prints the stored JSON Lines.
 
+This sample keeps its own NuGet package declarations. While the manager APIs await publication, the repository's `samples\Build-Samples.ps1` supplies packages built from the current sources.
+
 ## Run the Redis sample
 
-The [compiled Redis Journaling sample](https://github.com/dotnet/orleans/tree/main/docs/site/src/content/docs/grains/journaling/snippets/redis-journaling) configures Redis, writes an <xref:Orleans.Journaling.IDurableValue`1>, deactivates the grain, and verifies recovery on a new activation:
+The [Redis Journaling snippet project](https://github.com/dotnet/orleans/tree/main/docs/site/src/content/docs/grains/journaling/snippets/redis-journaling) retains keyed injection and the <xref:Orleans.Journaling.DurableGrain> helper. It configures Redis, writes an <xref:Orleans.Journaling.IDurableValue`1>, deactivates the grain, and verifies recovery on a new activation:
 
 :::code language="csharp" source="./snippets/redis-journaling/Program.cs" id="redis_journal_counter":::
 
-Start a local Redis server, then run the sample from the repository root:
+The journaling snippet projects reference the current repository sources, so they exercise the documented APIs without substituting an older package. Start a local Redis server, then run the sample from the repository root:
 
 ```powershell
 dotnet run --project docs/site/src/content/docs/grains/journaling/snippets/redis-journaling -- "localhost:6379"

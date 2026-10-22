@@ -87,14 +87,6 @@ namespace Orleans
         public void Populate(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) { }
     }
 
-    public static partial class ConnectionMiddlewareExtensions
-    {
-        public static Microsoft.AspNetCore.Connections.IConnectionBuilder UseMiddleware(this Microsoft.AspNetCore.Connections.IConnectionBuilder builder, Runtime.Messaging.IConnectionMiddleware middleware) { throw null; }
-
-        public static Microsoft.AspNetCore.Connections.IConnectionBuilder UseMiddleware<T>(this Microsoft.AspNetCore.Connections.IConnectionBuilder builder)
-            where T : Runtime.Messaging.IConnectionMiddleware { throw null; }
-    }
-
     public delegate void ConnectionToClusterLostHandler(object? sender, System.EventArgs e);
     public delegate TInstance Factory<out TInstance>();
     public delegate TInstance Factory<in TParam1, out TInstance>(TParam1 param1);
@@ -193,8 +185,9 @@ namespace Orleans
         System.Threading.Tasks.Task<MembershipTableData> ReadAll();
         [Alias("00BCE16F")]
         System.Threading.Tasks.Task<MembershipTableData> ReadAllAsync(System.Threading.CancellationToken cancellationToken = default);
-        [System.Obsolete("Use ReadRowAsync instead.")]
+        [System.Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         System.Threading.Tasks.Task<MembershipTableData> ReadRow(Runtime.SiloAddress key);
+        [System.Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         [Alias("D851FB33")]
         System.Threading.Tasks.Task<MembershipTableData> ReadRowAsync(Runtime.SiloAddress key, System.Threading.CancellationToken cancellationToken = default);
         [System.Obsolete("Use UpdateIAmAliveAsync instead.")]
@@ -441,11 +434,6 @@ namespace Orleans
 
 namespace Orleans.Configuration
 {
-    public partial class ClientConnectionOptions
-    {
-        public void ConfigureConnection(System.Action<Microsoft.AspNetCore.Connections.IConnectionBuilder> configure) { }
-    }
-
     public partial class ClientMessagingOptions : MessagingOptions
     {
         public const int DEFAULT_CLIENT_SENDER_BUCKETS = 8192;
@@ -522,7 +510,10 @@ namespace Orleans.Configuration
 
     public partial class ConnectionOptions
     {
+        public static readonly System.TimeSpan DEFAULT_CLOSECONNECTION_TIMEOUT;
         public static readonly System.TimeSpan DEFAULT_OPENCONNECTION_TIMEOUT;
+        public System.TimeSpan CloseConnectionTimeout { get { throw null; } set { } }
+
         public System.TimeSpan ConnectionRetryDelay { get { throw null; } set { } }
 
         public int ConnectionsPerEndpoint { get { throw null; } set { } }
@@ -545,6 +536,8 @@ namespace Orleans.Configuration
         public System.Collections.Generic.HashSet<System.Type> Classes { get { throw null; } }
 
         public System.Collections.Generic.HashSet<System.Type> Interfaces { get { throw null; } }
+
+        public void AddClass(System.Type grainClass) { }
     }
 
     public sealed partial class GrainTypeOptionsValidator : IConfigurationValidator
@@ -644,6 +637,261 @@ namespace Orleans.Configuration.Overrides
     public static partial class OptionsOverrides
     {
         public static Microsoft.Extensions.Options.IOptions<ClusterOptions> GetProviderClusterOptions(this System.IServiceProvider services, string providerName) { throw null; }
+    }
+}
+
+namespace Orleans.Connections.Transport
+{
+    public partial class ConnectionAbortedException : System.Exception
+    {
+        public ConnectionAbortedException() { }
+
+        [System.Obsolete]
+        protected ConnectionAbortedException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
+
+        public ConnectionAbortedException(string? message, System.Exception? innerException) { }
+
+        public ConnectionAbortedException(string? message) { }
+    }
+
+    public partial class ConnectionClosedException : System.Exception
+    {
+        public ConnectionClosedException() { }
+
+        [System.Obsolete]
+        protected ConnectionClosedException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
+
+        public ConnectionClosedException(string? message, System.Exception? innerException) { }
+
+        public ConnectionClosedException(string? message) { }
+    }
+
+    public partial class ConnectionResetException : System.Exception
+    {
+        public ConnectionResetException() { }
+
+        [System.Obsolete]
+        protected ConnectionResetException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
+
+        public ConnectionResetException(string? message, System.Exception? innerException) { }
+
+        public ConnectionResetException(string? message) { }
+    }
+
+    public partial class FeatureCollection : IFeatureCollection, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<System.Type, object>>, System.Collections.IEnumerable
+    {
+        public FeatureCollection() { }
+
+        public FeatureCollection(IFeatureCollection defaults) { }
+
+        public FeatureCollection(int initialCapacity) { }
+
+        public bool IsReadOnly { get { throw null; } }
+
+        public object? this[System.Type key] { get { throw null; } set { } }
+
+        public virtual int Revision { get { throw null; } }
+
+        public TFeature? Get<TFeature>() { throw null; }
+
+        public System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<System.Type, object>> GetEnumerator() { throw null; }
+
+        public void Set<TFeature>(TFeature? instance) { }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() { throw null; }
+    }
+
+    public partial interface IConnectionEndPointFeature
+    {
+        System.Net.EndPoint? LocalEndPoint { get; set; }
+
+        System.Net.EndPoint? RemoteEndPoint { get; set; }
+    }
+
+    public partial interface IFeatureCollection : System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<System.Type, object>>, System.Collections.IEnumerable
+    {
+        bool IsReadOnly { get; }
+
+        object? this[System.Type key] { get; set; }
+
+        int Revision { get; }
+
+        TFeature? Get<TFeature>();
+        void Set<TFeature>(TFeature? instance);
+    }
+
+    public partial interface IMessageTransportConnectorMiddleware
+    {
+        MessageTransportConnector Apply(MessageTransportConnector transport);
+    }
+
+    public partial interface IMessageTransportListenerMiddleware
+    {
+        MessageTransportListener Apply(MessageTransportListener listener);
+    }
+
+    public abstract partial class MessageTransport : System.IAsyncDisposable
+    {
+        public abstract System.Threading.CancellationToken Closed { get; }
+        public abstract IFeatureCollection Features { get; }
+
+        public abstract System.Threading.Tasks.ValueTask CloseAsync(System.Exception? closeException, System.Threading.CancellationToken cancellationToken = default);
+        public virtual System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+
+        public abstract bool EnqueueRead(ReadRequest request);
+        public abstract bool EnqueueWrite(WriteRequest request);
+    }
+
+    public abstract partial class MessageTransportBase : MessageTransport
+    {
+        public override FeatureCollection Features { get { throw null; } }
+    }
+
+    public abstract partial class MessageTransportConnector : System.IAsyncDisposable
+    {
+        public abstract IFeatureCollection Features { get; }
+        public abstract bool IsValid { get; }
+
+        public abstract System.Threading.Tasks.ValueTask<MessageTransport> CreateAsync(System.Net.EndPoint endpoint, System.Threading.CancellationToken cancellationToken = default);
+        public virtual System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+    }
+
+    public abstract partial class MessageTransportListener : System.IAsyncDisposable
+    {
+        public abstract IFeatureCollection Features { get; }
+        public abstract bool IsValid { get; }
+        public abstract string ListenerName { get; }
+
+        public abstract System.Threading.Tasks.ValueTask<MessageTransport?> AcceptAsync(System.Threading.CancellationToken cancellationToken = default);
+        public abstract System.Threading.Tasks.ValueTask BindAsync(System.Threading.CancellationToken cancellationToken = default);
+        public virtual System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+
+        public abstract System.Threading.Tasks.ValueTask UnbindAsync(System.Threading.CancellationToken cancellationToken = default);
+    }
+
+    public abstract partial class ReadRequest
+    {
+        public abstract void OnCanceled();
+        public abstract void OnError(System.Exception error);
+        public abstract bool OnRead(Serialization.Buffers.ArcBufferReader buffer);
+    }
+
+    public abstract partial class WriteRequest
+    {
+        public Serialization.Buffers.ArcBufferReader Buffers { get { throw null; } protected set { } }
+
+        public abstract void SetException(System.Exception error);
+        public abstract void SetResult();
+    }
+}
+
+namespace Orleans.Connections.Transport.Security
+{
+    public static partial class CertificateLoader
+    {
+        public static System.Security.Cryptography.X509Certificates.X509Certificate2 LoadFromStoreCert(string subject, string storeName, System.Security.Cryptography.X509Certificates.StoreLocation storeLocation, bool allowInvalid, bool server) { throw null; }
+    }
+
+    public delegate System.Security.Cryptography.X509Certificates.X509Certificate? ClientCertificateSelectionCallback(object sender, string targetHost, System.Security.Cryptography.X509Certificates.X509CertificateCollection localCertificates, System.Security.Cryptography.X509Certificates.X509Certificate? remoteCertificate, string[] acceptableIssuers);
+    public partial interface ITlsApplicationProtocolFeature
+    {
+        System.ReadOnlyMemory<byte> ApplicationProtocol { get; }
+    }
+
+    public partial interface ITlsConnectionFeature
+    {
+        System.Security.Cryptography.X509Certificates.X509Certificate2? RemoteCertificate { get; set; }
+
+        System.Threading.Tasks.Task<System.Security.Cryptography.X509Certificates.X509Certificate2?> GetRemoteCertificateAsync(System.Threading.CancellationToken cancellationToken);
+    }
+
+    public partial interface ITlsHandshakeFeature
+    {
+        System.Security.Authentication.CipherAlgorithmType CipherAlgorithm { get; }
+
+        int CipherStrength { get; }
+
+        System.Security.Authentication.HashAlgorithmType HashAlgorithm { get; }
+
+        int HashStrength { get; }
+
+        string HostName { get; }
+
+        System.Security.Authentication.ExchangeAlgorithmType KeyExchangeAlgorithm { get; }
+
+        int KeyExchangeStrength { get; }
+
+        System.Net.Security.TlsCipherSuite? NegotiatedCipherSuite { get; }
+
+        System.Security.Authentication.SslProtocols Protocol { get; }
+    }
+
+    public enum RemoteCertificateMode
+    {
+        NoCertificate = 0,
+        AllowCertificate = 1,
+        RequireCertificate = 2
+    }
+
+    public delegate bool RemoteCertificateValidator(System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Security.Cryptography.X509Certificates.X509Chain? chain, System.Net.Security.SslPolicyErrors policyErrors);
+    public delegate System.Security.Cryptography.X509Certificates.X509Certificate? ServerCertificateSelectionCallback(object sender, string? hostName);
+    public partial class TlsClientAuthenticationOptions
+    {
+        public System.Security.Cryptography.X509Certificates.X509RevocationMode CertificateRevocationCheckMode { get { throw null; } set { } }
+
+        public System.Security.Cryptography.X509Certificates.X509CertificateCollection? ClientCertificates { get { throw null; } set { } }
+
+        public System.Security.Authentication.SslProtocols EnabledSslProtocols { get { throw null; } set { } }
+
+        public ClientCertificateSelectionCallback? LocalCertificateSelectionCallback { get { throw null; } set { } }
+
+        public object SslClientAuthenticationOptions { get { throw null; } }
+
+        public string? TargetHost { get { throw null; } set { } }
+    }
+
+    public partial class TlsOptions
+    {
+        public bool CheckCertificateRevocation { get { throw null; } set { } }
+
+        public RemoteCertificateMode ClientCertificateMode { get { throw null; } set { } }
+
+        public System.TimeSpan HandshakeTimeout { get { throw null; } set { } }
+
+        public System.Security.Cryptography.X509Certificates.X509Certificate2? LocalCertificate { get { throw null; } set { } }
+
+        public System.Func<object, string, System.Security.Cryptography.X509Certificates.X509CertificateCollection, System.Security.Cryptography.X509Certificates.X509Certificate?, string[], System.Security.Cryptography.X509Certificates.X509Certificate2?>? LocalClientCertificateSelector { get { throw null; } set { } }
+
+        public System.Func<MessageTransport, string?, System.Security.Cryptography.X509Certificates.X509Certificate2?>? LocalServerCertificateSelector { get { throw null; } set { } }
+
+        public System.Buffers.MemoryPool<byte> MemoryPool { get { throw null; } set { } }
+
+        public System.Action<MessageTransport, TlsClientAuthenticationOptions>? OnAuthenticateAsClient { get { throw null; } set { } }
+
+        public System.Action<MessageTransport, TlsServerAuthenticationOptions>? OnAuthenticateAsServer { get { throw null; } set { } }
+
+        public RemoteCertificateMode RemoteCertificateMode { get { throw null; } set { } }
+
+        public RemoteCertificateValidator? RemoteCertificateValidation { get { throw null; } set { } }
+
+        public System.Security.Authentication.SslProtocols SslProtocols { get { throw null; } set { } }
+
+        public void AllowAnyRemoteCertificate() { }
+    }
+
+    public partial class TlsServerAuthenticationOptions
+    {
+        public System.Security.Cryptography.X509Certificates.X509RevocationMode CertificateRevocationCheckMode { get { throw null; } set { } }
+
+        public bool ClientCertificateRequired { get { throw null; } set { } }
+
+        public System.Security.Authentication.SslProtocols EnabledSslProtocols { get { throw null; } set { } }
+
+        public System.Security.Cryptography.X509Certificates.X509Certificate? ServerCertificate { get { throw null; } set { } }
+
+        public ServerCertificateSelectionCallback? ServerCertificateSelectionCallback { get { throw null; } set { } }
+
+        public object SslServerAuthenticationOptions { get { throw null; } }
     }
 }
 
@@ -847,6 +1095,17 @@ namespace Orleans.Hosting
 
         public static IClientBuilder AddOutgoingGrainCallFilter<TImplementation>(this IClientBuilder builder)
             where TImplementation : class, IOutgoingGrainCallFilter { throw null; }
+    }
+
+    public static partial class ClientTlsHostingExtensions
+    {
+        public static IClientBuilder UseTls(this IClientBuilder builder, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static IClientBuilder UseTls(this IClientBuilder builder, System.Security.Cryptography.X509Certificates.StoreName storeName, string subject, bool allowInvalid, System.Security.Cryptography.X509Certificates.StoreLocation location, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static IClientBuilder UseTls(this IClientBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static IClientBuilder UseTls(this IClientBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) { throw null; }
     }
 
     public static partial class GrainCallFilterServiceCollectionExtensions
@@ -1066,35 +1325,6 @@ namespace Orleans.Metadata
         public GrainTypeResolver(System.Collections.Generic.IEnumerable<IGrainTypeProvider> resolvers, Serialization.TypeSystem.TypeConverter argumentFormatter) { }
 
         public Runtime.GrainType GetGrainType(System.Type type) { throw null; }
-    }
-}
-
-namespace Orleans.Networking.Shared
-{
-    [GenerateSerializer]
-    public sealed partial class SocketConnectionException : Runtime.OrleansException
-    {
-        [System.Obsolete]
-        public SocketConnectionException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
-
-        public SocketConnectionException(string message, System.Exception innerException) { }
-
-        public SocketConnectionException(string message) { }
-    }
-
-    public partial class SocketConnectionOptions
-    {
-        public int IOQueueCount { get { throw null; } set { } }
-
-        public bool KeepAlive { get { throw null; } set { } }
-
-        public int KeepAliveIntervalSeconds { get { throw null; } set { } }
-
-        public int KeepAliveRetryCount { get { throw null; } set { } }
-
-        public int KeepAliveTimeSeconds { get { throw null; } set { } }
-
-        public bool NoDelay { get { throw null; } set { } }
     }
 }
 
@@ -1430,6 +1660,8 @@ namespace Orleans.Runtime
 
     public partial interface IManagementGrain : IGrainWithIntegerKey, IGrain, IAddressable, IVersionManager
     {
+        [Alias("DeactivateGrain")]
+        System.Threading.Tasks.Task DeactivateGrain(GrainId grainId, System.Threading.CancellationToken cancellationToken = default);
         [Alias("329F9A1B")]
         System.Threading.Tasks.Task ForceActivationCollection(SiloAddress[] hostsIds, System.TimeSpan ageLimit, System.Threading.CancellationToken cancellationToken);
         [Alias("ForceActivationCollectionOnSilos")]
@@ -1579,6 +1811,7 @@ namespace Orleans.Runtime
         public static void Import(System.Collections.Generic.Dictionary<string, object>? contextData) { }
     }
 
+    [System.Obsolete("Use the orleans-messaging-sent-messages-size and orleans-messaging-received-messages-size histograms through OpenTelemetry instead.")]
     public static partial class SiloRuntimeMetricsListener
     {
         public static long ConnectedClientCount { get { throw null; } }
@@ -1622,12 +1855,14 @@ namespace Orleans.Runtime
         public long? MemoryUsage { get { throw null; } }
 
         [Id(8)]
+        [System.Obsolete("Use the orleans-messaging-received-messages-size histogram through OpenTelemetry instead.")]
         public long ReceivedMessages { get { throw null; } }
 
         [Id(1)]
         public int RecentlyUsedActivationCount { get { throw null; } }
 
         [Id(9)]
+        [System.Obsolete("Use the orleans-messaging-sent-messages-size histogram through OpenTelemetry instead.")]
         public long SentMessages { get { throw null; } }
 
         [Id(5)]
@@ -1710,26 +1945,6 @@ namespace Orleans.Runtime.Messaging
         public ConnectionFailedException(string message, System.Exception innerException) { }
 
         public ConnectionFailedException(string message) { }
-    }
-
-    public static partial class ConnectionFrameHelper
-    {
-        public const int DefaultMaxFrameLength = 1048576;
-        public const int FramePrefixSize = 5;
-        public static System.Threading.Tasks.ValueTask<(byte FrameType, byte[] Payload)> ReadFrameAsync(Microsoft.AspNetCore.Connections.ConnectionContext connection, System.Threading.CancellationToken cancellationToken, int maxFrameLength = 1048576) { throw null; }
-
-        public static string ReadLengthPrefixedString(byte[] data, ref int offset) { throw null; }
-
-        public static System.Threading.Tasks.ValueTask WriteFrameAsync(Microsoft.AspNetCore.Connections.ConnectionContext connection, byte frameType, System.Action<System.Buffers.IBufferWriter<byte>> writePayload, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public static System.Threading.Tasks.ValueTask WriteFrameAsync(Microsoft.AspNetCore.Connections.ConnectionContext connection, byte frameType, byte[] payload, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public static void WriteLengthPrefixedString(System.Buffers.IBufferWriter<byte> writer, string value) { }
-    }
-
-    public partial interface IConnectionMiddleware
-    {
-        System.Threading.Tasks.Task OnConnectionAsync(Microsoft.AspNetCore.Connections.ConnectionContext context, Microsoft.AspNetCore.Connections.ConnectionDelegate next);
     }
 
     [GenerateSerializer]
@@ -2926,6 +3141,8 @@ namespace OrleansCodeGen.Orleans
         public System.Threading.CancellationToken arg0;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -2967,6 +3184,8 @@ namespace OrleansCodeGen.Orleans
         public System.Threading.CancellationToken arg3;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3007,6 +3226,8 @@ namespace OrleansCodeGen.Orleans
         public System.Threading.CancellationToken arg2;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3042,6 +3263,8 @@ namespace OrleansCodeGen.Orleans
     public sealed partial class Invokable_IMembershipTable_GrainReference_7A519C2E : global::Orleans.Runtime.TaskRequest
     {
         public System.DateTimeOffset arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3076,6 +3299,8 @@ namespace OrleansCodeGen.Orleans
         public global::Orleans.Runtime.SiloAddress arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3116,6 +3341,8 @@ namespace OrleansCodeGen.Orleans
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3151,6 +3378,8 @@ namespace OrleansCodeGen.Orleans
     public sealed partial class Invokable_IMembershipTable_GrainReference_B1A52D2B : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.MembershipEntry arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3185,6 +3414,8 @@ namespace OrleansCodeGen.Orleans
         public string arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3221,6 +3452,8 @@ namespace OrleansCodeGen.Orleans
     public sealed partial class Invokable_IMembershipTable_GrainReference_BF899C85 : global::Orleans.Runtime.TaskRequest
     {
         public string arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3255,6 +3488,8 @@ namespace OrleansCodeGen.Orleans
         public bool arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3291,6 +3526,8 @@ namespace OrleansCodeGen.Orleans
     public sealed partial class Invokable_IMembershipTable_GrainReference_D851FB33 : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableData>
     {
         public global::Orleans.Runtime.SiloAddress arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3324,6 +3561,8 @@ namespace OrleansCodeGen.Orleans
         public global::Orleans.MembershipEntry arg0;
         public string arg1;
         public global::Orleans.TableVersion arg2;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3358,6 +3597,8 @@ namespace OrleansCodeGen.Orleans
         public System.DateTimeOffset arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3394,6 +3635,8 @@ namespace OrleansCodeGen.Orleans
     public sealed partial class Invokable_IMembershipTable_GrainReference_FB89E5E9 : global::Orleans.Runtime.TaskRequest
     {
         public bool arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3426,6 +3669,8 @@ namespace OrleansCodeGen.Orleans
     {
         public global::Orleans.MembershipEntry arg0;
         public global::Orleans.TableVersion arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3461,6 +3706,8 @@ namespace OrleansCodeGen.Orleans
         public global::Orleans.Versions.Selector.VersionSelectorStrategy arg1;
         public System.Threading.CancellationToken arg2;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3498,6 +3745,8 @@ namespace OrleansCodeGen.Orleans
     public sealed partial class Invokable_IVersionManager_GrainReference_4AAEAFCE : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Versions.Selector.VersionSelectorStrategy arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3530,6 +3779,8 @@ namespace OrleansCodeGen.Orleans
     public sealed partial class Invokable_IVersionManager_GrainReference_8F5C15A9 : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Versions.Compatibility.CompatibilityStrategy arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3563,6 +3814,8 @@ namespace OrleansCodeGen.Orleans
     {
         public global::Orleans.Runtime.GrainInterfaceType arg0;
         public global::Orleans.Versions.Selector.VersionSelectorStrategy arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3597,6 +3850,8 @@ namespace OrleansCodeGen.Orleans
         public global::Orleans.Versions.Selector.VersionSelectorStrategy arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3638,6 +3893,8 @@ namespace OrleansCodeGen.Orleans
         public System.Threading.CancellationToken arg2;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3675,6 +3932,8 @@ namespace OrleansCodeGen.Orleans
     {
         public global::Orleans.Runtime.GrainInterfaceType arg0;
         public global::Orleans.Versions.Compatibility.CompatibilityStrategy arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -3709,6 +3968,8 @@ namespace OrleansCodeGen.Orleans
         public global::Orleans.Versions.Compatibility.CompatibilityStrategy arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -3805,35 +4066,6 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.LeaseProviders.ResponseCode value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-}
-
-namespace OrleansCodeGen.Orleans.Networking.Shared
-{
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_SocketConnectionException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Networking.Shared.SocketConnectionException>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public Codec_SocketConnectionException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Networking.Shared.SocketConnectionException> _activator) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Networking.Shared.SocketConnectionException instance) { }
-
-        public global::Orleans.Networking.Shared.SocketConnectionException ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Networking.Shared.SocketConnectionException instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Networking.Shared.SocketConnectionException value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_SocketConnectionException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Networking.Shared.SocketConnectionException, global::Orleans.Runtime.OrleansException>
-    {
-        public Copier_SocketConnectionException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 }
 
@@ -4023,6 +4255,8 @@ namespace OrleansCodeGen.Orleans.Placement.Rebalancing
     public sealed partial class Invokable_IActivationRebalancer_GrainReference_25E91D88 : global::Orleans.Runtime.VoidRequest
     {
         public global::Orleans.Placement.Rebalancing.IActivationRebalancerReportListener arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -4080,6 +4314,8 @@ namespace OrleansCodeGen.Orleans.Placement.Rebalancing
     public sealed partial class Invokable_IActivationRebalancer_GrainReference_D7EB6469 : global::Orleans.Runtime.Request<global::Orleans.Placement.Rebalancing.RebalancingReport>
     {
         public bool arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -4112,6 +4348,8 @@ namespace OrleansCodeGen.Orleans.Placement.Rebalancing
     public sealed partial class Invokable_IActivationRebalancer_GrainReference_D9CA3E16 : global::Orleans.Runtime.VoidRequest
     {
         public global::Orleans.Placement.Rebalancing.IActivationRebalancerReportListener arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -4144,6 +4382,8 @@ namespace OrleansCodeGen.Orleans.Placement.Rebalancing
     public sealed partial class Invokable_IActivationRebalancer_GrainReference_DCF3A7BB : global::Orleans.Runtime.TaskRequest
     {
         public System.TimeSpan? arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -4561,6 +4801,24 @@ namespace OrleansCodeGen.Orleans.Runtime
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_4208E55B_1<T> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_4A80022F : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_4A80022F>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IManagementGrain_GrainReference_4A80022F(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_4A80022F instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_4A80022F ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_4A80022F instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_4A80022F value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -5106,6 +5364,14 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_4A80022F : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_4A80022F>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Invokable_IManagementGrain_GrainReference_4A80022F DeepCopy(Invokable_IManagementGrain_GrainReference_4A80022F original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_4C0864C2 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_4C0864C2>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Invokable_IManagementGrain_GrainReference_4C0864C2 DeepCopy(Invokable_IManagementGrain_GrainReference_4C0864C2 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
@@ -5301,6 +5567,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     {
         public string[] arg0;
         public global::Orleans.Runtime.SiloAddress[] arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -5335,6 +5603,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public global::Orleans.Runtime.IAddressable arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -5372,6 +5642,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Invokable_IManagementGrain_GrainReference_0F06E027 : global::Orleans.Runtime.TaskRequest<System.Collections.Generic.List<global::Orleans.Runtime.GrainCallFrequency>>
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -5406,6 +5678,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public global::Orleans.Runtime.SiloAddress[] arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -5445,6 +5719,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public System.Threading.CancellationToken arg0;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -5481,6 +5757,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Invokable_IManagementGrain_GrainReference_2D761B36 : global::Orleans.Runtime.TaskRequest<global::Orleans.Runtime.SiloRuntimeStatistics[]>
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -5513,6 +5791,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Invokable_IManagementGrain_GrainReference_317D82B6 : global::Orleans.Runtime.Request<global::Orleans.Runtime.SiloAddress>
     {
         public global::Orleans.Runtime.IAddressable arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -5546,6 +5826,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
         public System.TimeSpan arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -5580,6 +5862,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public System.TimeSpan arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -5617,6 +5901,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Invokable_IManagementGrain_GrainReference_3CFF788C : global::Orleans.Runtime.TaskRequest<global::Orleans.Runtime.SimpleGrainStatistic[]>
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -5649,6 +5935,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Invokable_IManagementGrain_GrainReference_3DB7923B : global::Orleans.Runtime.Request<System.Collections.Generic.List<global::Orleans.Runtime.GrainId>>
     {
         public global::Orleans.Runtime.GrainType arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -5684,6 +5972,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public global::Orleans.Runtime.SiloAddress[] arg1;
         public System.Threading.CancellationToken arg2;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -5758,10 +6048,53 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "DeactivateGrain" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_4A80022F : global::Orleans.Runtime.TaskRequest
+    {
+        public global::Orleans.Runtime.GrainId arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetHosts" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_4C0864C2 : global::Orleans.Runtime.TaskRequest<System.Collections.Generic.Dictionary<global::Orleans.Runtime.SiloAddress, global::Orleans.Runtime.SiloStatus>>
     {
         public bool arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -5796,6 +6129,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public global::Orleans.Runtime.GrainReference arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -5836,6 +6171,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -5872,6 +6209,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Invokable_IManagementGrain_GrainReference_54E6D1D1 : global::Orleans.Runtime.TaskRequest
     {
         public System.TimeSpan arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -5904,6 +6243,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Invokable_IManagementGrain_GrainReference_54FE0FEC : global::Orleans.Runtime.Request
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -5938,6 +6279,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public global::Orleans.Runtime.SiloAddress[] arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -5975,6 +6318,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Invokable_IManagementGrain_GrainReference_5922EB76 : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -6009,6 +6354,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public global::Orleans.Runtime.GrainType arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -6049,6 +6396,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -6087,6 +6436,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public global::Orleans.Runtime.SiloAddress[] arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -6149,6 +6500,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Invokable_IManagementGrain_GrainReference_AEDE93F6 : global::Orleans.Runtime.TaskRequest<int>
     {
         public global::Orleans.Runtime.GrainReference arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -6182,6 +6535,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     {
         public System.Threading.CancellationToken arg0;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -6219,6 +6574,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Invokable_IManagementGrain_GrainReference_B761B345 : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -6251,6 +6608,8 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Invokable_IManagementGrain_GrainReference_CC6CCBC3 : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipEntry[]>
     {
         public bool arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -6286,6 +6645,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public System.TimeSpan arg1;
         public System.Threading.CancellationToken arg2;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -6351,6 +6712,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -6389,6 +6752,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public bool arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -6462,6 +6827,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public global::Orleans.Runtime.SiloAddress[] arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -6737,6 +7104,8 @@ namespace OrleansCodeGen.Orleans.Storage
     public sealed partial class Invokable_IMemoryStorageGrain_GrainReference_45659318_1<T> : global::Orleans.Runtime.TaskRequest<global::Orleans.IGrainState<T>>
     {
         public string arg0;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -6772,6 +7141,8 @@ namespace OrleansCodeGen.Orleans.Storage
         public global::Orleans.IGrainState<T> arg1;
         public System.Threading.CancellationToken arg2;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -6810,6 +7181,8 @@ namespace OrleansCodeGen.Orleans.Storage
     {
         public string arg0;
         public global::Orleans.IGrainState<T> arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -6843,6 +7216,8 @@ namespace OrleansCodeGen.Orleans.Storage
     {
         public string arg0;
         public string arg1;
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
@@ -6877,6 +7252,8 @@ namespace OrleansCodeGen.Orleans.Storage
         public string arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 
@@ -6917,6 +7294,8 @@ namespace OrleansCodeGen.Orleans.Storage
         public string arg1;
         public System.Threading.CancellationToken arg2;
         public override bool IsCancellable { get { throw null; } }
+
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
 
         public override void Dispose() { }
 

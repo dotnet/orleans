@@ -28,7 +28,6 @@ For installation guidance, see [`dotnet package add`](https://learn.microsoft.co
 | [Microsoft.Orleans.Hosting.Kubernetes](https://www.nuget.org/packages/Microsoft.Orleans.Hosting.Kubernetes) | Kubernetes hosting integration. |
 | [Microsoft.Orleans.Dashboard](https://www.nuget.org/packages/Microsoft.Orleans.Dashboard) | Built-in Orleans Dashboard server and UI. |
 | [Microsoft.Orleans.Dashboard.Abstractions](https://www.nuget.org/packages/Microsoft.Orleans.Dashboard.Abstractions) | Dashboard contracts for components which don't host the UI. |
-| [Microsoft.Orleans.Connections.Security](https://www.nuget.org/packages/Microsoft.Orleans.Connections.Security) | TLS support for Orleans connections. |
 
 `Microsoft.Orleans.Runtime`, `Microsoft.Orleans.Core`, and the abstractions packages are lower-level dependencies of the metapackages. Reference them directly only when building a library with a narrower dependency requirement.
 
@@ -139,6 +138,7 @@ Orleans source-generates serializers for annotated application types. Add an int
 | Package | Purpose |
 | --- | --- |
 | [Microsoft.Orleans.TestingHost](https://www.nuget.org/packages/Microsoft.Orleans.TestingHost) | Host configurable in-process test clusters. |
+| [Microsoft.Orleans.Clustering.TestKit](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.TestKit) | [Membership provider conformance tests](../implementation/provider-authoring.md#membership-provider-conformance), including Accordant-generated behavioral histories. |
 | [Microsoft.Orleans.Serialization.TestKit](https://www.nuget.org/packages/Microsoft.Orleans.Serialization.TestKit) | Verify custom serializer behavior. |
 | [Microsoft.Orleans.Transactions.TestKit.Base](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.TestKit.Base) | Shared transaction test kit. |
 | [Microsoft.Orleans.Transactions.TestKit.xUnit](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.TestKit.xUnit) | xUnit integration for the transaction test kit. |

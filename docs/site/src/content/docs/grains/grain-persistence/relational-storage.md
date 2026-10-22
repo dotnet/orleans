@@ -49,7 +49,7 @@ The `OrleansQuery` table contains vendor-specific statements used by the provide
 
 The provider supplies the common identity parameters `GrainIdHash`, `GrainIdN0`, `GrainIdN1`, `GrainTypeHash`, `GrainTypeString`, `GrainIdExtensionString`, and `ServiceId`. `WriteToStorageKey` also receives `GrainStateVersion` and `PayloadBinary`; `ClearStorageKey` and the optional `DeleteStorageKey` receive `GrainStateVersion`.
 
-`ReadFromStorageKey` must return columns named `PayloadBinary` and `Version`. `WriteToStorageKey` must return the resulting version as `NewGrainStateVersion`. Clear and delete queries return one version value in their first result column; its name is ignored. A successful operation returns an advanced version, while an unchanged or missing value signals an ETag conflict. Versions must be representable as a signed 32-bit integer.
+`ReadFromStorageKey` must return columns named `PayloadBinary` and `Version`. `WriteToStorageKey` must return the resulting version as `NewGrainStateVersion`. Clear and delete queries return one version value in their first result column; its name is ignored. A successful operation returns exactly one row across all result sets, containing the advanced version. An unchanged or missing value signals an ETag conflict. Versions must be representable as a signed 32-bit integer.
 
 Each provider instance reads `OrleansQuery` during silo startup and doesn't poll it afterward. Changing the table therefore affects newly initialized providers only. A rolling silo restart is appropriate when old and new queries and schemas can coexist; coordinate an outage or staged migration when they can't.
 

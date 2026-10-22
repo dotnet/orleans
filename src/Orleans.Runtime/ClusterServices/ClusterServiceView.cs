@@ -10,7 +10,7 @@ internal sealed class MembershipBasedClusterServiceView : IClusterServiceView<Cl
     public MembershipBasedClusterServiceView(
         ClusterMembershipSnapshot snapshot,
         ClusterServiceConfiguration configuration,
-        Func<SiloAddress, int, uint[]> getRingBoundaries,
+        Func<SiloAddress, int, ImmutableArray<uint>> getRingBoundaries,
         long providerEpoch = 0)
     {
         Id = GetId(snapshot, providerEpoch);
@@ -52,7 +52,7 @@ internal sealed class MembershipBasedClusterServiceView : IClusterServiceView<Cl
     private static ClusterServiceTopology CreateTopology(
         ClusterMembershipSnapshot snapshot,
         ClusterServiceConfiguration configuration,
-        Func<SiloAddress, int, uint[]> getRingBoundaries)
+        Func<SiloAddress, int, ImmutableArray<uint>> getRingBoundaries)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         var members = ImmutableArray.CreateBuilder<SiloAddress>();

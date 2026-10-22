@@ -176,8 +176,10 @@ public class IncrementalOrderingStabilityTests
         var metadataSource = GetMetadataSource(result);
         var reorderedMetadataSource = GetMetadataSource(reorderedResult);
         Assert.Equal(metadataSource, reorderedMetadataSource);
-        Assert.Equal(1, CountOccurrences(metadataSource, "WellKnownTypeAliases.Add(\"A.Alias\""));
-        Assert.Equal(1, CountOccurrences(metadataSource, "WellKnownTypeAliases.Add(\"B.Alias\""));
+        Assert.Equal(1, CountOccurrences(metadataSource, "WellKnownTypeAliases[\"A.Alias\"] = registeredType"));
+        Assert.Equal(1, CountOccurrences(metadataSource, "WellKnownTypeAliases[\"B.Alias\"] = registeredType"));
+        Assert.Equal(1, CountOccurrences(metadataSource, "WellKnownTypeAliases.TryGetValue(\"A.Alias\", out var existingType)"));
+        Assert.Equal(1, CountOccurrences(metadataSource, "WellKnownTypeAliases.TryGetValue(\"B.Alias\", out var existingType)"));
         Assert.Equal(1, CountOccurrences(metadataSource, "AddSerializer(typeof(global::LibraryB.SerializerType))"));
         Assert.Equal(1, CountOccurrences(metadataSource, "AddCopier(typeof(global::LibraryB.CopierType))"));
         Assert.Equal(1, CountOccurrences(metadataSource, "AddActivator(typeof(global::LibraryB.ActivatorType))"));

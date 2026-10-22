@@ -4,7 +4,7 @@
 
 Microsoft Orleans Journaling for Redis provides a Redis-backed implementation of the Orleans Journaling storage and catalog abstractions. Orleans Durable Jobs can use Orleans Journaling as a backing store, so this provider can persist durable job state through the journaling layer.
 
-The provider stores each journal as Redis string data plus Redis hash metadata. Per-journal reads and mutations use atomic Lua scripts. Journal discovery scans metadata keys on each connected primary Redis server. The default key mapping preserves journal ids in the keys, so discovery does not read the metadata hashes. Configure Redis persistence, such as AOF with an appropriate `appendfsync` setting, according to the durability guarantees required by your application.
+The provider stores each journal as Redis string data plus Redis hash metadata. Per-journal reads and mutations use atomic Lua scripts, so each append or replacement is written whole or not at all. Each journal is one Redis string, so the whole journal, including an append, fits the server's string size limit (`proto-max-bulk-len`, 512 MB by default); a write which exceeds it fails before the script changes any key. Journal discovery scans metadata keys on each connected primary Redis server. The default key mapping preserves journal ids in the keys, so discovery does not read the metadata hashes. Configure Redis persistence, such as AOF with an appropriate `appendfsync` setting, according to the durability guarantees required by your application.
 
 ## Getting Started
 
@@ -31,26 +31,37 @@ builder.UseOrleans(siloBuilder =>
 });
 ```
 
-If the Redis connection is already registered in dependency injection, configure it using a keyed service and the `GrainJournaling` provider configuration `ServiceKey`.
+Set `Orleans:Journaling:{name}:ProviderType` to `Redis` to configure a named journal storage provider. Use `Default` as the name for grain journaling. If the Redis connection is already registered in dependency injection, select the keyed client using `Orleans:Journaling:{name}:ServiceKey`. Each entry has its own connection and storage options.
+
+`AddRedisJournalStorage` also registers core services through `AddJournaling`. Inject
+`IDurableStateManager` into a grain and declare states during construction with
+`GetOrAddState<TState>(name)` or its typed helpers, such as `GetOrAddValue<int>("count")`.
+Orleans recovers those states before application methods run. Keyed injection resolves the same named
+object, and `DurableGrain` remains a convenience base class. After initialization, `GetOrAdd` resolves
+existing states; adding a missing name fails immediately. Await `WriteStateAsync` for the manager-wide
+journal acknowledgement before returning success.
 
 ## Journal discovery
 
-Use `IJournalStorageCatalog.ListAsync` with optional `ListOptions` to filter by a journal id prefix:
+Use `IJournalStorageCatalog.ListAsync` with optional `JournalCatalogListOptions` to filter by a journal id prefix:
 
 ```csharp
 await foreach (var entry in catalog.ListAsync(
-    new ListOptions { Prefix = JournalId.Create("jobs") },
+    new JournalCatalogListOptions { Prefix = JournalId.Create("jobs") },
     cancellationToken))
 {
     var journalId = entry.Id;
 }
 ```
 
-`ListOptions.Prefix` matches the raw journal id using ordinal `StartsWith`, including partial segments. For example, `new JournalId("jobs/2026/0")` matches both `jobs/2026/01` and `jobs/2026/09`. `ListOptions.MinId` and `MaxId` add inclusive ordinal lower and upper bounds; their default values are unlimited. All filters apply together and are snapshotted when enumeration begins. Empty intersections perform no scans or metadata reads.
+`JournalCatalogListOptions.Prefix` matches the raw journal id using ordinal `StartsWith`, including partial segments. For example, `new JournalId("jobs/2026/0")` matches both `jobs/2026/01` and `jobs/2026/09`. `JournalCatalogListOptions.MinId` and `MaxId` add inclusive ordinal lower and upper bounds; their default values are unlimited. All filters apply together and are snapshotted when enumeration begins. Empty intersections perform no scans or metadata reads.
 
 Entries contain the journal `Id` and null `Metadata`, including when `IncludeMetadata` is requested.
 Redis key scans supply identities; callers requiring complete metadata retrieve it using
 `IJournalStorage.GetMetadataAsync`. The listing retains its existing key-scan and canonical-id read costs.
+
+`IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey` expose the stored format key.
+This API name leaves Redis metadata fields, key layout, and format-key values unchanged.
 
 With the default `GetKeyName` mapping, discovery supplies an escaped `SCAN MATCH` pattern for metadata keys beginning with the encoded raw prefix. A common prefix of `MinId` and `MaxId` can narrow this pattern further. Returned keys contain the journal id, which is decoded and filtered against both bounds locally without `HGET` requests. Malformed matching keys are errors, not silently ignored entries.
 

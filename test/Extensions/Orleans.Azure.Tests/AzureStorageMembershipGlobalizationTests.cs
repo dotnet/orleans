@@ -164,6 +164,7 @@ public class AzureStorageMembershipGlobalizationTests
         Assert.Equal("Legacy-Silo-Ii", member.Item1.SiloName, StringComparer.Ordinal);
         Assert.Equal("+0007", versionRow.MembershipVersion, StringComparer.Ordinal);
         Assert.Equal("entity-version-etag", versionRow.ETag.ToString(), StringComparer.Ordinal);
+        Assert.Equal("opaque-entity-etag", siloRow.ETag.ToString(), StringComparer.Ordinal);
     }
 
     [Theory]

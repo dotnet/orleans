@@ -16,7 +16,7 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDurableValueCommandHandler<T>
+internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurableValueCommandHandler<T>
 {
     private readonly IDurableValueCommandCodec<T> _codec;
     private T? _value;
@@ -30,14 +30,14 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableValueCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
-        manager.RegisterState(key, this);
+        manager.RegisterStateMachine(key, this);
     }
 
     internal DurableValue(string key, IJournaledStateManager manager, IDurableValueCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
-        manager.RegisterState(key, this);
+        manager.RegisterStateMachine(key, this);
     }
 
     public T? Value
@@ -56,19 +56,19 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
 
     public void OnModified() => _isDirty = true;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
-    void IJournaledState.OnRecoveryCompleted() => OnValuePersisted();
-    void IJournaledState.OnWriteCompleted() => OnValuePersisted();
+    void IStateMachine.OnRecoveryCompleted() => OnValuePersisted();
+    void IStateMachine.OnWriteCompleted() => OnValuePersisted();
 
-    void IJournaledState.Reset(JournalStreamWriter writer)
+    void IStateMachine.Reset(JournalStreamWriter writer)
     {
         _value = default;
         _isDirty = false;
     }
 
-    void IJournaledState.AppendEntries(JournalStreamWriter writer)
+    void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
         if (_isDirty)
         {
@@ -77,9 +77,8 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
         }
     }
 
-    void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter) => WriteState(snapshotWriter);
 
-    public IJournaledState DeepCopy() => throw new NotImplementedException();
 
     private void WriteState(JournalStreamWriter writer)
     {

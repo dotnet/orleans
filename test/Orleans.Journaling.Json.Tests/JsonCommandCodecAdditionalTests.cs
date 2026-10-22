@@ -151,9 +151,9 @@ public sealed class JsonCommandCodecAdditionalTests
         builder.UseJsonJournalFormat(JsonCodecTestJsonContext.Default);
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonJournalExtensions.JournalFormatKey));
+        Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonLinesJournalFormat.JournalFormatKey));
         Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredService<IJournalFormat>());
-        CodecTestHelpers.AssertCommandCodecRegistrations(serviceProvider, JsonJournalExtensions.JournalFormatKey);
+        CodecTestHelpers.AssertCommandCodecRegistrations(serviceProvider, JsonLinesJournalFormat.JournalFormatKey);
     }
 
     [Fact]
@@ -163,7 +163,7 @@ public sealed class JsonCommandCodecAdditionalTests
         builder.UseJsonJournalFormat(JsonCodecTestJsonContext.Default);
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        var key = JsonJournalExtensions.JournalFormatKey;
+        var key = JsonLinesJournalFormat.JournalFormatKey;
 
         Assert.Same(
             serviceProvider.GetRequiredKeyedService<IDurableDictionaryCommandCodec<string, int>>(key),

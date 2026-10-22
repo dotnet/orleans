@@ -66,6 +66,7 @@ namespace Orleans.Streaming.Kinesis.Tests
                     .AddDynamoDBGrainStorage("DynamoDBStore", options =>
                     {
                         options.Service = KinesisTestConstants.DynamoDbService;
+                        options.ServiceId = string.Empty;
                         options.SecretKey = KinesisTestConstants.DynamoDbSecretKey;
                         options.AccessKey = KinesisTestConstants.DynamoDbAccessKey;
                         options.DeleteStateOnClear = true;
@@ -73,6 +74,7 @@ namespace Orleans.Streaming.Kinesis.Tests
                     .AddDynamoDBGrainStorage("PubSubStore", options =>
                     {
                         options.Service = KinesisTestConstants.DynamoDbService;
+                        options.ServiceId = string.Empty;
                         options.SecretKey = KinesisTestConstants.DynamoDbSecretKey;
                         options.AccessKey = KinesisTestConstants.DynamoDbAccessKey;
                     })

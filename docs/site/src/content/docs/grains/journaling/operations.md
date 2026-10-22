@@ -25,6 +25,40 @@ At minimum, dashboard and alert on:
 
 Correlate these signals with grain identity, provider dependency health, deployment version, and storage throttling.
 
+### Monitor Durable Jobs provider draining
+
+Track the configured provider name separately from the backend category in
+journaling catalog metrics. Two named Blob providers use the same backend but
+can have different availability and remaining work.
+
+Use <xref:Orleans.DurableJobs.IDurableJobsStorageInspector.InspectAsync*> to
+collect a complete shard-namespace snapshot per selected provider. Record the
+inventory's start/completion timestamps, caller, configured write provider,
+success/failure, counts, and oldest/newest shard start time. Keep the last
+successful result with its timestamp for history; mark current status unknown
+on failure.
+
+Successful inspection also emits a structured Information-level inventory log.
+Provider errors emit structured Error-level logs with the configured provider
+name. Use inspector snapshots and these logs for provider-scoped drain progress;
+existing execution and catalog metrics provide complementary workload signals.
+
+During cutover, alert on old-provider write-permission failures, failed
+discovery or known-ID lookups, inventory failures, poisoned or unrecognized
+entries, and an unexpectedly flat drain curve. Each shard may contain many jobs,
+and retries or rescheduling can extend its
+lifetime beyond its original time window. Oldest/newest shard start times
+describe recognized shard windows; retries and reschedules can move attempts
+beyond those windows.
+
+Normal discovery uses lookahead bounds and can skip future or poisoned work.
+Use the complete inspector results and deployment evidence in the
+[retirement checklist](durable-jobs-migration.md#verify-retirement) to decide
+whether old storage can be removed. Execution throughput and eligible-work
+sweeps provide complementary workload signals. Run inspection as a protected
+operator command or background diagnostic task, and apply authentication and
+authorization to operational interfaces.
+
 ### Monitor catalog traversal and retries
 
 Use `orleans-journaling-provider-catalog-pages` to track pages received during S3 and Azure catalog
@@ -103,8 +137,8 @@ Exercise restore procedures regularly:
 | --- | --- | --- |
 | Activation fails with a journal format key | Recovery leaves storage unchanged | Deploy the required format and command codecs, or restore metadata which names the actual stored format |
 | Activation reports malformed or truncated journal data | Recovery stops before activation completes | Quarantine writes, restore a consistent backup, and preserve the failed data for diagnosis |
-| <xref:Orleans.Storage.InconsistentStateException> during a write | The write faults and the manager recovers before later work | Find stale or competing writers, confirm grain identity and cluster configuration, then retry the application command according to its idempotency contract |
-| Snapshot replacement fails after its pending append succeeds | The write faults while the mutation remains durable in the append history | Reconcile using the operation identifier and retry the command only through its idempotency protocol |
+| <xref:Orleans.Storage.InconsistentStateException> during a write | The manager fences operations and requests deactivation; a fresh activation recovers durable state | Find stale or competing writers, confirm grain identity and cluster configuration, then retry the application command according to its idempotency contract |
+| Storage commits a write but its acknowledgement is lost | The manager fences operations and requests deactivation; the new activation observes the committed mutation | Reconcile using the operation identifier and retry the command only through its idempotency protocol |
 | Write latency rises with storage queue duration | Writes for the journal are waiting behind earlier operations | Inspect provider latency and throttling, hot-grain traffic, write frequency, and snapshot size |
 | Recovery time and journal bytes grow | The current append history is large | Confirm compaction thresholds are enabled and that snapshot replacements succeed |
 | Format migration reports an unregistered state | A retired stream still requires its previous codec | Re-register the state for migration or retain the previous write format until retirement and compaction remove it |

@@ -17,6 +17,9 @@ namespace Orleans.GrainDirectory.Redis
     /// <summary>
     /// Provides a grain directory backed by Redis.
     /// </summary>
+    /// <remarks>
+    /// Directory lookups and registration changes use the Redis primary.
+    /// </remarks>
     public partial class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>, IDisposable, IAsyncDisposable
     {
         private readonly RedisGrainDirectoryOptions _directoryOptions;
@@ -66,7 +69,7 @@ namespace Orleans.GrainDirectory.Redis
         {
             try
             {
-                var result = _disposed ? null : (string?)await _database.StringGetAsync(GetKey(grainId));
+                var result = _disposed ? null : (string?)await _database.StringGetAsync(GetKey(grainId), CommandFlags.DemandMaster);
 
                 LogDebugLookup(grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
 
@@ -137,7 +140,8 @@ namespace Orleans.GrainDirectory.Redis
                 var entryString = (string?)await _database.ScriptEvaluateAsync(
                     RegisterScript,
                     keys: new RedisKey[] { key },
-                    values: new RedisValue[] { value, previousActivationId, _ttl })!;
+                    values: new RedisValue[] { value, previousActivationId, _ttl },
+                    flags: CommandFlags.DemandMaster)!;
 
                 if (entryString is null)
                 {
@@ -194,7 +198,8 @@ namespace Orleans.GrainDirectory.Redis
                 var result = (int)await _database.ScriptEvaluateAsync(
                     DeleteScript,
                     keys: new RedisKey[] { GetKey(address.GrainId) },
-                    values: new RedisValue[] { address.ActivationId.ToString() });
+                    values: new RedisValue[] { address.ActivationId.ToString() },
+                    flags: CommandFlags.DemandMaster);
 
                 LogDebugUnregister(address.GrainId, new(address), (result != 0) ? "OK" : "Conflict");
             }

@@ -15,4 +15,7 @@ internal enum RegisteredCodecKind : byte
 /// Describes a type annotated with <c>[RegisterSerializer]</c>, <c>[RegisterCopier]</c>,
 /// <c>[RegisterActivator]</c>, or <c>[RegisterConverter]</c>.
 /// </summary>
-internal readonly record struct RegisteredCodecModel(TypeRef Type, RegisteredCodecKind Kind);
+internal readonly record struct RegisteredCodecModel(
+    TypeRef Type,
+    RegisteredCodecKind Kind,
+    EquatableArray<SerializationContractModel> Contracts = default);

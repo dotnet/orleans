@@ -11,10 +11,14 @@ namespace Orleans.Runtime
         private const int StateCompleted = 1;
         private const int StateCancellationRegistrationPending = 2;
         private const int StateCancellationRegistrationPublished = 4;
+        private const int StateCancellationRequested = 8;
 
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
-        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
+
+        // The request's invocation describes its cancellation and response timeout. The message's body can change after it is sent:
+        // a retried message holds its serialized body, which is released once the retry is sent.
+        private readonly IInvokable? _invokable;
         private readonly long _startTimestamp;
         private int _state;
         private StatusResponse? lastKnownStatus;
@@ -23,13 +27,12 @@ namespace Orleans.Runtime
         public CallbackData(
             SharedCallbackData shared,
             IResponseCompletionSource ctx,
-            Message msg,
-            ApplicationRequestInstruments applicationRequestInstruments)
+            Message msg)
         {
             this.shared = shared;
             this.context = ctx;
             this.Message = msg;
-            _applicationRequestInstruments = applicationRequestInstruments;
+            _invokable = msg.BodyObject as IInvokable;
             _startTimestamp = shared.TimeProvider.GetTimestamp();
         }
 
@@ -44,10 +47,10 @@ namespace Orleans.Runtime
                 return;
             }
 
-            if (Interlocked.CompareExchange(
-                ref _state,
-                StateCancellationRegistrationPending,
-                StateNone) != StateNone)
+            if (!TryUpdateState(
+                blockingFlags: StateCompleted | StateCancellationRegistrationPending | StateCancellationRegistrationPublished,
+                clearFlags: StateNone,
+                setFlags: StateCancellationRegistrationPending))
             {
                 return;
             }
@@ -59,13 +62,30 @@ namespace Orleans.Runtime
             }, this);
 
             _cancellationTokenRegistration = registration;
-            if (Interlocked.CompareExchange(
-                ref _state,
-                StateCancellationRegistrationPublished,
-                StateCancellationRegistrationPending) != StateCancellationRegistrationPending)
+            if (!TryUpdateState(
+                blockingFlags: StateCompleted,
+                clearFlags: StateCancellationRegistrationPending,
+                setFlags: StateCancellationRegistrationPublished))
             {
                 registration.Dispose();
             }
+        }
+
+        private bool TryUpdateState(int blockingFlags, int clearFlags, int setFlags)
+        {
+            var state = Volatile.Read(ref _state);
+            while ((state & blockingFlags) == 0)
+            {
+                var observed = Interlocked.CompareExchange(ref _state, (state & ~clearFlags) | setFlags, state);
+                if (observed == state)
+                {
+                    return true;
+                }
+
+                state = observed;
+            }
+
+            return false;
         }
 
         private void SignalCancellation()
@@ -73,7 +93,7 @@ namespace Orleans.Runtime
             // Only cancel requests which honor cancellation token.
             // Not all targets support IGrainCallCancellationExtension, so sending a cancellation in those cases could result in an error.
             // There are opportunities to cancel requests at the infrastructure layer which this will not exploit if the target method does not support cancellation.
-            if (Message.BodyObject is IInvokable invokable && invokable.IsCancellable)
+            if (_invokable is { IsCancellable: true })
             {
                 shared.CancellationManager?.SignalCancellation(Message.TargetSilo, Message.TargetGrain, Message.SendingGrain, Message.Id);
             }
@@ -84,6 +104,47 @@ namespace Orleans.Runtime
             this.lastKnownStatus = status;
         }
 
+        /// <summary>
+        /// Moves this call's target to the silo which now owns the request, after that silo has accepted it.
+        /// </summary>
+        /// <param name="targetSilo">The silo which now hosts the request.</param>
+        /// <param name="forwardCount">The request's forward count at <paramref name="targetSilo"/>, which orders retargets for the same call.</param>
+        /// <param name="isDeadSilo">Determines whether a silo has been declared dead. The call fails if <paramref name="targetSilo"/> is dead.</param>
+        /// <returns><see langword="true"/> if the call was retargeted; <see langword="false"/> if the retarget was superseded.</returns>
+        /// <remarks>
+        /// A retarget which races with completion has no effect on the call's outcome. It only propagates a requested cancellation to the new target.
+        /// </remarks>
+        public bool TryRetarget(SiloAddress targetSilo, int forwardCount, Func<SiloAddress, bool> isDeadSilo)
+        {
+            // The call owns its message, and only this class locks it, so the message serves as the lock without adding a field to every pending call.
+            lock (Message)
+            {
+                if (forwardCount <= Message.ForwardCount)
+                {
+                    return false;
+                }
+
+                Message.ForwardCount = forwardCount;
+                Message.TargetSilo = targetSilo;
+            }
+
+            // Publish the new target before observing cancellation, so either this or OnCancellation signals the new target.
+            Interlocked.MemoryBarrier();
+            if ((Volatile.Read(ref _state) & StateCancellationRequested) != 0)
+            {
+                SignalCancellation();
+            }
+
+            // The new target's failure sweep only completes calls which it observes targeting that silo.
+            // Membership marks a silo dead before sweeping its calls, so either the sweep observes this retarget or this check observes the death.
+            if (isDeadSilo(targetSilo))
+            {
+                OnTargetSiloFail(targetSilo);
+            }
+
+            return true;
+        }
+
         public bool IsExpired(long currentTimestamp)
         {
             var duration = currentTimestamp - _startTimestamp;
@@ -92,7 +153,7 @@ namespace Orleans.Runtime
 
         private long GetResponseTimeoutTimestampTicks()
         {
-            var defaultResponseTimeout = (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
+            var defaultResponseTimeout = _invokable?.GetDefaultResponseTimeout();
             if (defaultResponseTimeout.HasValue)
             {
                 return shared.GetTimestampTicks(defaultResponseTimeout.Value);
@@ -101,7 +162,7 @@ namespace Orleans.Runtime
             return shared.ResponseTimeoutTimestampTicks;
         }
 
-        private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
+        private TimeSpan GetResponseTimeout() => _invokable?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
 
         private string GetTargetGrainType()
         {
@@ -111,6 +172,8 @@ namespace Orleans.Runtime
 
         private void OnCancellation(CancellationToken cancellationToken)
         {
+            Interlocked.Or(ref _state, StateCancellationRequested);
+
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
             // is requested and return.
             if (shared.WaitForCancellationAcknowledgement)
@@ -129,7 +192,7 @@ namespace Orleans.Runtime
             RecordElapsedTime();
             SignalCancellation();
             shared.Unregister(Message);
-            _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
+            shared.ApplicationRequests.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
             DisposeCancellationRegistration();
@@ -145,12 +208,14 @@ namespace Orleans.Runtime
             RecordElapsedTime();
             if (shared.CancelRequestOnTimeout)
             {
+                // Record the request before signaling, so that a concurrent retarget also signals its new target.
+                Interlocked.Or(ref _state, StateCancellationRequested);
                 SignalCancellation();
             }
 
             this.shared.Unregister(this.Message);
             DisposeCancellationRegistration();
-            _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
+            shared.ApplicationRequests.OnAppRequestsTimedOut(GetTargetGrainType());
 
             OrleansCallBackDataEvent.Instance.OnTimeout(this.Message);
 
@@ -164,11 +229,18 @@ namespace Orleans.Runtime
             context.Complete(Response.FromException(exception));
         }
 
-        public void OnTargetSiloFail()
+        /// <summary>
+        /// Fails the call because <paramref name="failedSilo"/> became unavailable, unless the call has since been retargeted to another silo.
+        /// </summary>
+        public void OnTargetSiloFail(SiloAddress failedSilo)
         {
-            if (!TryComplete())
+            // Retargeting changes the target under this lock, so the call fails only if it still targets the failed silo.
+            lock (Message)
             {
-                return;
+                if (!failedSilo.Equals(Message.TargetSilo) || !TryComplete())
+                {
+                    return;
+                }
             }
 
             RecordElapsedTime();
@@ -219,10 +291,10 @@ namespace Orleans.Runtime
 
         private void RecordElapsedTime()
         {
-            if (_applicationRequestInstruments.AppRequestsLatencyEnabled)
+            if (shared.ApplicationRequests.AppRequestsLatencyEnabled)
             {
                 var elapsedMilliseconds = shared.TimeProvider.GetElapsedTime(_startTimestamp).TotalMilliseconds;
-                _applicationRequestInstruments.OnAppRequestsEnd(elapsedMilliseconds);
+                shared.ApplicationRequests.OnAppRequestsEnd(elapsedMilliseconds);
             }
         }
 

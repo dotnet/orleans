@@ -15,13 +15,21 @@ namespace Orleans.Runtime.MembershipService
     {
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
+        private readonly IFatalErrorHandler fatalErrorHandler;
+        private IMembershipManager? membershipManager;
+        private int fatalErrorReported;
         private IMembershipTableSystemTarget grain = null!;
 
-        public SystemTargetBasedMembershipTable(IServiceProvider serviceProvider, ILogger<SystemTargetBasedMembershipTable> logger)
+        public SystemTargetBasedMembershipTable(
+            IServiceProvider serviceProvider,
+            ILogger<SystemTargetBasedMembershipTable> logger,
+            IFatalErrorHandler fatalErrorHandler)
         {
             this.serviceProvider = serviceProvider;
             this.logger = logger;
+            this.fatalErrorHandler = fatalErrorHandler;
         }
+
         [Obsolete("Use InitializeMembershipTableAsync instead.")]
         public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
 
@@ -100,15 +108,53 @@ namespace Orleans.Runtime.MembershipService
 
         public Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default) => this.grain.DeleteMembershipTableEntriesAsync(clusterId, cancellationToken);
 
-        [Obsolete("Use ReadRowAsync instead.")]
-        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) =>
+            Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
 
-        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default) => this.grain.ReadRowAsync(key, cancellationToken);
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
+        }
 
         [Obsolete("Use ReadAllAsync instead.")]
         public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
 
-        public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default) => this.grain.ReadAllAsync(cancellationToken);
+        public async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var observedVersion = GetCurrentVersion();
+            var table = await this.grain.ReadAllAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            ValidateVersion(observedVersion, table);
+            return table;
+        }
+
+        private MembershipVersion GetCurrentVersion()
+        {
+            // Resolve after owner construction, and include versions learned through committed writes and gossip.
+            var manager = this.membershipManager ??= this.serviceProvider.GetRequiredService<IMembershipManager>();
+            return manager.CurrentSnapshot.Version;
+        }
+
+        private void ValidateVersion(MembershipVersion observedVersion, MembershipTableData table)
+        {
+            // Compare with the version known before this read began so overlapping reads can finish out of order.
+            if (table.Version.Version < observedVersion.Value)
+            {
+                var reason = $"The development membership table version decreased from {observedVersion} to {table.Version.Version}. "
+                    + "The cluster's membership state has been lost and this silo must terminate.";
+                var exception = new OrleansException(reason);
+                if (Interlocked.Exchange(ref this.fatalErrorReported, 1) == 0)
+                {
+                    this.fatalErrorHandler.OnFatalException(this, reason, exception);
+                }
+
+                throw exception;
+            }
+        }
 
         [Obsolete("Use InsertRowAsync instead.")]
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
@@ -164,14 +210,17 @@ namespace Orleans.Runtime.MembershipService
     {
         private InMemoryMembershipTable table;
         private readonly ILogger logger;
+        private readonly string clusterId;
 
         public MembershipTableSystemTarget(
             ILogger<MembershipTableSystemTarget> logger,
             DeepCopier deepCopier,
-            SystemTargetShared shared)
+            SystemTargetShared shared,
+            IOptions<ClusterOptions> clusterOptions)
             : base(CreateId(shared.SiloAddress), shared)
         {
             this.logger = logger;
+            clusterId = clusterOptions.Value.ClusterId;
             table = new InMemoryMembershipTable(deepCopier);
             LogInformationGrainBasedMembershipTableActivated(logger);
             shared.ActivationDirectory.RecordNewTarget(this);
@@ -198,18 +247,25 @@ namespace Orleans.Runtime.MembershipService
         public Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!string.Equals(this.clusterId, clusterId, StringComparison.Ordinal))
+            {
+                throw new ArgumentException("The cluster ID must match the cluster served by this membership table.", nameof(clusterId));
+            }
+
             LogInformationDeleteMembershipTableEntries(logger, clusterId);
             table = null!;
             return Task.CompletedTask;
         }
 
-        [Obsolete("Use ReadRowAsync instead.")]
-        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) =>
+            Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
 
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(table.Read(key));
+            return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
         }
 
         [Obsolete("Use ReadAllAsync instead.")]

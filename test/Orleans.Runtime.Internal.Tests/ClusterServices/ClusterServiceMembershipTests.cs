@@ -542,7 +542,7 @@ public sealed class ClusterServiceMembershipTests
     private static SiloAddress CreateSilo(int index) =>
         SiloAddress.New(IPAddress.Loopback, 10_000 + index, generation: index);
 
-    private static uint[] GetBoundaries(SiloAddress silo, int count) =>
+    private static ImmutableArray<uint> GetBoundaries(SiloAddress silo, int count) =>
         count == 1
             ? [unchecked((uint)silo.GetConsistentHashCode())]
             : silo.GetUniformHashCodes(count);

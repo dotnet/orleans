@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Orleans.CodeGenerator.SyntaxGeneration;
@@ -8,11 +9,14 @@ namespace Orleans.CodeGenerator;
 
 internal sealed class LibraryTypes
 {
+    private static readonly ConditionalWeakTable<Compilation, LibraryTypes> Cache = new();
+
     private readonly ConcurrentDictionary<ITypeSymbol, bool> _shallowCopyableTypes = new(SymbolEqualityComparer.Default);
 
-    public static LibraryTypes FromCompilation(Compilation compilation, CodeGeneratorOptions options) => new LibraryTypes(compilation, options);
+    public static LibraryTypes FromCompilation(Compilation compilation, CodeGeneratorOptions options)
+        => Cache.GetValue(compilation, static compilation => new LibraryTypes(compilation));
 
-    private LibraryTypes(Compilation compilation, CodeGeneratorOptions options)
+    private LibraryTypes(Compilation compilation)
     {
         Compilation = compilation;
         ApplicationPartAttribute = Type("Orleans.ApplicationPartAttribute");
@@ -38,6 +42,7 @@ internal sealed class LibraryTypes
         IInvokable = Type("Orleans.Serialization.Invocation.IInvokable");
         InvokeMethodNameAttribute = Type("Orleans.InvokeMethodNameAttribute");
         RuntimeHelpers = Type("System.Runtime.CompilerServices.RuntimeHelpers");
+        HasUnsafeAccessorAttribute = TypeOrDefault("System.Runtime.CompilerServices.UnsafeAccessorAttribute") is not null;
         InvokableCustomInitializerAttribute = Type("Orleans.InvokableCustomInitializerAttribute");
         DefaultInvokableBaseTypeAttribute = Type("Orleans.DefaultInvokableBaseTypeAttribute");
         GenerateCodeForDeclaringAssemblyAttribute = Type("Orleans.GenerateCodeForDeclaringAssemblyAttribute");
@@ -152,6 +157,8 @@ internal sealed class LibraryTypes
         _ipEndPoint = Type("System.Net.IPEndPoint");
         CancellationToken = Type("System.Threading.CancellationToken");
         CancellationTokenSource = Type("System.Threading.CancellationTokenSource");
+        GrainCancellationTokenOrDefault = TypeOrDefault("Orleans.GrainCancellationToken");
+        RequestBaseOrDefault = TypeOrDefault("Orleans.Runtime.RequestBase");
         _immutableContainerTypes =
         [
                 compilation.GetSpecialType(SpecialType.System_Nullable_T),
@@ -202,6 +209,7 @@ internal sealed class LibraryTypes
     }
 
     public INamedTypeSymbol Action_2 { get; private set; }
+    public bool HasUnsafeAccessorAttribute { get; }
     public INamedTypeSymbol TypeManifestProviderBase { get; private set; }
     public INamedTypeSymbol Field { get; private set; }
     public INamedTypeSymbol DeepCopier_1 { get; private set; }
@@ -259,6 +267,8 @@ internal sealed class LibraryTypes
     public INamedTypeSymbol CopyContext { get; private set; }
     public INamedTypeSymbol CancellationToken { get; private set; }
     public INamedTypeSymbol CancellationTokenSource { get; }
+    public INamedTypeSymbol? GrainCancellationTokenOrDefault { get; }
+    public INamedTypeSymbol? RequestBaseOrDefault { get; }
     public INamedTypeSymbol Guid { get; private set; }
     public Compilation Compilation { get; private set; }
     public INamedTypeSymbol TimeSpan { get; private set; }

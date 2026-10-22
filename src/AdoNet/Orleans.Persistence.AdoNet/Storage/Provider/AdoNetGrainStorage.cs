@@ -172,17 +172,22 @@ namespace Orleans.Storage
 
         /// <summary>Clear state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.ClearStateAsync{T}(string, GrainId, IGrainState{T})"/>.
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
+        public Task ClearStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
+            => ClearStateAsync(grainType, grainReference, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task ClearStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             //It assumed these parameters are always valid. If not, an exception will be thrown,
             //even if not as clear as when using explicitly checked parameters.
-            var grainId = GrainIdAndExtensionAsString(grainReference);
-            var baseGrainType = ExtractBaseClass(grainType);
+            var (grainId, baseGrainType) = GetStorageKey(grainType, grainReference);
             LogTraceClearingGrainState(serviceId, name, baseGrainType, grainId, grainState.ETag);
 
             if (!grainState.RecordExists && string.IsNullOrWhiteSpace(grainState.ETag))
             {
-                await ReadStateAsync(grainType, grainReference, grainState).ConfigureAwait(false);
+                await ReadStateAsync(grainType, grainReference, grainState, cancellationToken).ConfigureAwait(false);
                 if (!grainState.RecordExists)
                 {
                     return;
@@ -212,10 +217,10 @@ namespace Orleans.Storage
                     command.AddParameter("GrainIdExtensionString", grainId.StringKey);
                     command.AddParameter("ServiceId", serviceId);
                     command.AddParameter("GrainStateVersion", !string.IsNullOrWhiteSpace(grainState.ETag) ? int.Parse(grainState.ETag, CultureInfo.InvariantCulture) : default(int?));
-                }, (selector, resultSetCount, token) => Task.FromResult(selector.GetValue(0).ToString()), cancellationToken: CancellationToken.None).ConfigureAwait(false));
+                }, (selector, resultSetCount, token) => Task.FromResult(selector.GetValue(0).ToString()), cancellationToken: cancellationToken).ConfigureAwait(false));
                 storageVersion = clearRecord.SingleOrDefault();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorClearingGrainState(ex, serviceId, name, baseGrainType, grainId, grainState.ETag);
                 throw;
@@ -240,12 +245,17 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.ReadStateAsync{T}(string, GrainId, IGrainState{T})"/>.
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
+        public Task ReadStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
+            => ReadStateAsync(grainType, grainReference, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task ReadStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.
-            var grainId = GrainIdAndExtensionAsString(grainReference);
-            var baseGrainType = ExtractBaseClass(grainType);
+            var (grainId, baseGrainType) = GetStorageKey(grainType, grainReference);
             LogTraceReadingGrainState(serviceId, name, baseGrainType, grainId, grainState.ETag);
 
             try
@@ -279,7 +289,7 @@ namespace Orleans.Storage
                         var result = Tuple.Create(storageState, version?.ToString(CultureInfo.InvariantCulture), payload is not null);
                         return Task.FromResult(result);
                     },
-                    commandBehavior, CancellationToken.None).ConfigureAwait(false)).SingleOrDefault();
+                    commandBehavior, cancellationToken).ConfigureAwait(false)).SingleOrDefault();
 
                 T? state = readRecords != null ? (T)readRecords.Item1! : default;
                 string? etag = readRecords != null ? readRecords.Item2 : null;
@@ -295,7 +305,7 @@ namespace Orleans.Storage
                 grainState.RecordExists = recordExists;
                 LogTraceReadGrainState(serviceId, name, baseGrainType, grainId, grainState.ETag);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorReadingGrainState(ex, serviceId, name, baseGrainType, grainId, grainState.ETag);
                 throw;
@@ -305,13 +315,18 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}(string, GrainId, IGrainState{T})"/>
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
+        public Task WriteStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
+            => WriteStateAsync(grainType, grainReference, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task WriteStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.
             var data = grainState.State;
-            var grainId = GrainIdAndExtensionAsString(grainReference);
-            var baseGrainType = ExtractBaseClass(grainType);
+            var (grainId, baseGrainType) = GetStorageKey(grainType, grainReference);
             LogTraceWritingGrainState(serviceId, name, baseGrainType, grainId, grainState.ETag);
 
             string? storageVersion = null;
@@ -333,10 +348,10 @@ namespace Orleans.Storage
                     command.AddParameter("GrainStateVersion", !string.IsNullOrWhiteSpace(grainState.ETag) ? int.Parse(grainState.ETag, CultureInfo.InvariantCulture) : default(int?));
                     command.AddParameter("PayloadBinary", serialized.ToArray());
                 }, (selector, resultSetCount, token) =>
-                { return Task.FromResult(selector.GetNullableInt32("NewGrainStateVersion").ToString()); }, cancellationToken: CancellationToken.None).ConfigureAwait(false);
+                { return Task.FromResult(selector.GetNullableInt32("NewGrainStateVersion").ToString()); }, cancellationToken: cancellationToken).ConfigureAwait(false);
                 storageVersion = writeRecord.SingleOrDefault();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorWritingGrainState(ex, serviceId, name, baseGrainType, grainId, grainState.ETag);
                 throw;
@@ -423,6 +438,48 @@ namespace Orleans.Storage
 
             return null;
         }
+
+        /// <summary>
+        /// Maps a grain state to the grain key and grain type values stored in the key columns, as selected by
+        /// <see cref="AdoNetGrainStorageOptions.KeyFormat"/>.
+        /// </summary>
+        /// <param name="stateName">The state name passed to the <see cref="IGrainStorage"/> operation.</param>
+        /// <param name="grainId">The grain ID.</param>
+        private (AdoGrainKey GrainKey, string GrainType) GetStorageKey(string stateName, GrainId grainId)
+        {
+            if (options.KeyFormat == AdoNetGrainStorageKeyFormat.Legacy)
+            {
+                return (GrainIdAndExtensionAsString(grainId), ExtractBaseClass(stateName));
+            }
+
+            Debug.Assert(options.KeyFormat == AdoNetGrainStorageKeyFormat.GrainTypeQualified, "Options validation admits only defined key formats.");
+
+            // Identity components are stored as hexadecimal text of their exact bytes. Database collations may
+            // compare text case-, accent-, or trailing-space-insensitively, and GrainIdHash/GrainTypeHash can be made
+            // to collide, so the key columns must differ for every distinct identity. Hex digits compare exactly
+            // under any collation, preserve bytes which are not valid UTF-8, and never contain the '/' separator.
+            // The whole key is stored as a string key: the integer and GUID columns carry no key kind.
+            var grainType = $"{Convert.ToHexString(grainId.Type.AsSpan())}/{Convert.ToHexString(StrictUtf8.GetBytes(stateName))}";
+            var grainKey = Convert.ToHexString(grainId.Key.AsSpan());
+            if (grainType.Length > MaxKeyColumnLength || grainKey.Length > MaxKeyColumnLength)
+            {
+                throw new ArgumentException(
+                    $"Grain {grainId} with state name \"{stateName}\" exceeds the {MaxKeyColumnLength}-character key columns of the {nameof(AdoNetGrainStorageKeyFormat.GrainTypeQualified)} storage key format, which stores grain types, state names, and grain keys as hexadecimal text.",
+                    nameof(grainId));
+            }
+
+            return (new AdoGrainKey(grainKey), grainType);
+        }
+
+        /// <summary>
+        /// The length of the <c>GrainTypeString</c> and <c>GrainIdExtensionString</c> columns in the persistence scripts.
+        /// </summary>
+        private const int MaxKeyColumnLength = 512;
+
+        /// <summary>
+        /// Encodes state names without replacing invalid UTF-16, which would map distinct names to the same bytes.
+        /// </summary>
+        private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
         /// <summary>
         /// Extracts a grain ID as a string and appends the key extension with '#' infix is present.

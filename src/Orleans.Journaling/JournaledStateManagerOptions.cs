@@ -10,11 +10,11 @@ public sealed class JournaledStateManagerOptions
     /// <summary>
     /// Gets or sets the journal format key used to write journal data.
     /// </summary>
-    public string JournalFormatKey { get; set; } = JsonJournalExtensions.JournalFormatKey;
+    public string JournalFormatKey { get; set; } = JsonLinesJournalFormat.JournalFormatKey;
 
     /// <summary>
     /// Specifies the period of time to wait until the manager retires
-    /// a <see cref="IJournaledState"/> if it's not registered in the manager anymore.
+    /// a <see cref="IStateMachine"/> if it's not registered in the manager anymore.
     /// </summary>
     /// <remarks>
     /// <para>The act of retirement removes this state from the journal.</para>

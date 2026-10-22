@@ -1,8 +1,11 @@
 using System;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Connections.Transport;
 using Orleans.Hosting;
-using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 
 namespace Orleans.TestingHost.UnixSocketTransport;
@@ -19,13 +22,14 @@ public static class UnixSocketConnectionExtensions
     /// <returns>The provided silo builder.</returns>
     public static ISiloBuilder UseUnixSocketConnection(this ISiloBuilder siloBuilder)
     {
-        siloBuilder.ConfigureServices(services =>
-        {
-            services.AddKeyedSingleton<object, IConnectionFactory>(SiloConnectionFactory.ServicesKey, CreateUnixSocketConnectionFactory());
-            services.AddKeyedSingleton<object, IConnectionListenerFactory>(SiloConnectionListener.ServicesKey, CreateUnixSocketConnectionListenerFactory());
-            services.AddKeyedSingleton<object, IConnectionListenerFactory>(GatewayConnectionListener.ServicesKey, CreateUnixSocketConnectionListenerFactory());
-        });
-
+        var services = siloBuilder.Services;
+        services.RemoveAll<MessageTransportConnector>();
+        services.RemoveAll<MessageTransportListener>();
+        services.AddSingleton<MessageTransportConnector>(sp => new UnixDomainSocketMessageTransportConnector(
+            sp.GetRequiredService<IOptions<UnixSocketConnectionOptions>>(),
+            sp.GetRequiredService<ILoggerFactory>()));
+        AddListener(services, GatewayConnectionListener.DefaultListenerName, static options => options.GetListeningProxyEndpoint());
+        AddListener(services, SiloConnectionListener.DefaultListenerName, static options => options.GetListeningSiloEndpoint());
         return siloBuilder;
     }
 
@@ -36,21 +40,31 @@ public static class UnixSocketConnectionExtensions
     /// <returns>The provided client builder.</returns>
     public static IClientBuilder UseUnixSocketConnection(this IClientBuilder clientBuilder)
     {
-        clientBuilder.ConfigureServices(services =>
-        {
-            services.AddKeyedSingleton<object, IConnectionFactory>(ClientOutboundConnectionFactory.ServicesKey, CreateUnixSocketConnectionFactory());
-        });
-
+        clientBuilder.Services.RemoveAll<MessageTransportConnector>();
+        clientBuilder.Services.AddSingleton<MessageTransportConnector>(sp => new UnixDomainSocketMessageTransportConnector(
+            sp.GetRequiredService<IOptions<UnixSocketConnectionOptions>>(),
+            sp.GetRequiredService<ILoggerFactory>()));
         return clientBuilder;
     }
 
-    private static Func<IServiceProvider, object?, IConnectionFactory> CreateUnixSocketConnectionFactory()
+    private static void AddListener(
+        IServiceCollection services,
+        string listenerName,
+        Func<EndpointOptions, System.Net.IPEndPoint?> getEndpoint)
     {
-        return (IServiceProvider sp, object? key) => ActivatorUtilities.CreateInstance<UnixSocketConnectionFactory>(sp);
-    }
-
-    private static Func<IServiceProvider, object?, IConnectionListenerFactory> CreateUnixSocketConnectionListenerFactory()
-    {
-        return (IServiceProvider sp, object? key) => ActivatorUtilities.CreateInstance<UnixSocketConnectionListenerFactory>(sp);
+        services.AddSingleton<MessageTransportListener>(sp => new UnixDomainSocketMessageTransportListener(
+            listenerName,
+            sp.GetRequiredService<IOptionsMonitor<UnixDomainSocketMessageTransportListenerOptions>>(),
+            sp.GetRequiredService<ILoggerFactory>()));
+        services.AddOptions<UnixDomainSocketMessageTransportListenerOptions>(listenerName)
+            .Configure<IOptions<EndpointOptions>, IOptions<UnixSocketConnectionOptions>>((listenerOptions, endpointOptions, connectionOptions) =>
+            {
+                var endpoint = getEndpoint(endpointOptions.Value);
+                listenerOptions.Enabled = endpoint is not null;
+                if (endpoint is not null)
+                {
+                    listenerOptions.Path = connectionOptions.Value.ConvertEndpointToPath(endpoint);
+                }
+            });
     }
 }

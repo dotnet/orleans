@@ -1,14 +1,20 @@
 using System.Buffers;
+using Azure;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 using Orleans.Hosting;
 using Orleans.Journaling.Json;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
+using Orleans.Providers;
+using Orleans.Runtime;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -21,18 +27,477 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     private const string CustomFormatKey = "custom-test-format";
 
     [Fact]
+    public async Task VolatileProviders_UseIndependentNamedSnapshotThresholds()
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddVolatileJournalStorage(options =>
+        {
+            options.MaxAppendsBeforeSnapshot = 2;
+            options.MaxBytesBeforeSnapshot = 100;
+        });
+        builder.AddVolatileJournalStorage("small-bytes", options =>
+        {
+            options.MaxAppendsBeforeSnapshot = 100;
+            options.MaxBytesBeforeSnapshot = 3;
+        });
+        builder.AddVolatileJournalStorage("large", options =>
+        {
+            options.MaxAppendsBeforeSnapshot = int.MaxValue;
+            options.MaxBytesBeforeSnapshot = long.MaxValue;
+        });
+        await using var services = builder.Services.BuildServiceProvider();
+        var defaults = await services.GetRequiredService<IJournalStorageProvider>().CreateStorage(new("threshold")).ReadForWriteAsync();
+        var named = await services.GetRequiredKeyedService<IJournalStorageProvider>("small-bytes").CreateStorage(new("threshold")).ReadForWriteAsync();
+        var large = await services.GetRequiredKeyedService<IJournalStorageProvider>("large").CreateStorage(new("threshold")).ReadForWriteAsync();
+        var token = TestContext.Current.CancellationToken;
+        await defaults.AppendAsync(new ReadOnlySequence<byte>([1]), token);
+        await named.AppendAsync(new ReadOnlySequence<byte>([1, 2]), token);
+        await large.AppendAsync(new ReadOnlySequence<byte>([1, 2, 3]), token);
+        Assert.False(defaults.IsCompactionRequested);
+        Assert.False(named.IsCompactionRequested);
+        Assert.False(large.IsCompactionRequested);
+        await defaults.AppendAsync(new ReadOnlySequence<byte>([2]), token);
+        Assert.True(defaults.IsCompactionRequested);
+        Assert.False(named.IsCompactionRequested);
+        await named.AppendAsync(new ReadOnlySequence<byte>([3]), token);
+        Assert.True(named.IsCompactionRequested);
+        await defaults.ReplaceAsync(new ReadOnlySequence<byte>([4]), token);
+        Assert.False(defaults.IsCompactionRequested);
+        Assert.True(named.IsCompactionRequested);
+        Assert.False(large.IsCompactionRequested);
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(-1, 1)]
+    [InlineData(1, 0)]
+    [InlineData(1, -1)]
+    public void VolatileProviders_InvalidSnapshotThresholdsFailDefaultAndNamedResolution(int appends, long bytes)
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddVolatileJournalStorage(Configure);
+        builder.AddVolatileJournalStorage("invalid", Configure);
+        using var services = builder.Services.BuildServiceProvider();
+        foreach (var name in new[] { ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, "invalid" })
+        {
+            var exception = Assert.Throws<OptionsValidationException>(() =>
+                services.GetRequiredKeyedService<IJournalStorageProvider>(name));
+            Assert.Equal(typeof(VolatileJournalStorageOptions), exception.OptionsType);
+            Assert.Equal(name == ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME ? Options.DefaultName : name, exception.OptionsName);
+            Assert.Equal([appends <= 0 ? "MaxAppendsBeforeSnapshot must be positive." : "MaxBytesBeforeSnapshot must be positive."],
+                exception.Failures);
+        }
+
+        void Configure(VolatileJournalStorageOptions options)
+        {
+            options.MaxAppendsBeforeSnapshot = appends;
+            options.MaxBytesBeforeSnapshot = bytes;
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)]
+    [InlineData("configured")]
+    public async Task VolatileProviders_SeparateOptionsPipelineAppliesOnceAndIsCapturedAtConstruction(string name)
+    {
+        var builder = CreateNamedProviderBuilder();
+        var optionsName = name == ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME ? Options.DefaultName : name;
+        builder.Services.Configure<VolatileJournalStorageOptions>(optionsName, options =>
+        {
+            options.MaxAppendsBeforeSnapshot = 2;
+            options.MaxBytesBeforeSnapshot = long.MaxValue;
+        });
+        builder.AddVolatileJournalStorage(name, configureOptions: null);
+        builder.Services.ConfigureAll<VolatileJournalStorageOptions>(options => options.MaxAppendsBeforeSnapshot++);
+        builder.Services.PostConfigure<VolatileJournalStorageOptions>(optionsName, options => options.MaxAppendsBeforeSnapshot++);
+        await using var services = builder.Services.BuildServiceProvider();
+        var configured = name == ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME
+            ? services.GetRequiredService<IOptions<VolatileJournalStorageOptions>>().Value
+            : services.GetRequiredService<IOptionsMonitor<VolatileJournalStorageOptions>>().Get(optionsName);
+        Assert.Equal(4, configured.MaxAppendsBeforeSnapshot);
+        Assert.Equal(long.MaxValue, configured.MaxBytesBeforeSnapshot);
+        var provider = services.GetRequiredKeyedService<IJournalStorageProvider>(name);
+        var storage = await provider.CreateStorage(new("options-pipeline")).ReadForWriteAsync();
+        if (name == ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
+        {
+            Assert.Same(provider, services.GetRequiredService<IJournalStorageProvider>());
+        }
+
+        configured.MaxAppendsBeforeSnapshot = 1;
+        var token = TestContext.Current.CancellationToken;
+        for (var index = 0; index < 3; index++)
+        {
+            await storage.AppendAsync(new ReadOnlySequence<byte>([1]), token);
+            Assert.False(storage.IsCompactionRequested);
+        }
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([2]), token);
+        Assert.True(storage.IsCompactionRequested);
+        var second = await provider.CreateStorage(new("options-pipeline")).ReadForWriteAsync();
+        Assert.True(second.IsCompactionRequested);
+        await second.ReplaceAsync(new ReadOnlySequence<byte>([3]), token);
+        Assert.False(storage.IsCompactionRequested);
+        await second.AppendAsync(new ReadOnlySequence<byte>([4]), token);
+        Assert.False(storage.IsCompactionRequested);
+    }
+
+    [Theory]
+    [InlineData(OrleansBinaryJournalFormat.JournalFormatKey)]
+    [InlineData(JsonLinesJournalFormat.JournalFormatKey)]
+    public async Task VolatileProviders_ThresholdSnapshotIsAcknowledgedAndReplaysCurrentFormats(string formatKey)
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddVolatileJournalStorage(options =>
+        {
+            options.MaxAppendsBeforeSnapshot = 2;
+            options.MaxBytesBeforeSnapshot = long.MaxValue;
+        });
+        builder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = formatKey);
+        await using var services = builder.Services.BuildServiceProvider();
+        var journalId = JournalId.FromGrainId(GrainId.Create("test-grain", "snapshot-recovery"));
+        var storage = Assert.IsType<VolatileJournalStorage>(
+            services.GetRequiredService<IJournalStorageProvider>().CreateStorage(journalId));
+        var factory = services.GetRequiredService<IJournaledStateManagerFactory>();
+        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(formatKey);
+        var token = TestContext.Current.CancellationToken;
+        await using (var manager = factory.CreateStandalone(journalId))
+        {
+            var value = new DurableValue<int>("value", manager, codec);
+            await manager.InitializeAsync(token);
+            value.Value = 1;
+            await manager.WriteStateAsync(token);
+            Assert.False(storage.IsCompactionRequested);
+            Assert.Single(storage.Segments);
+            value.Value = 2;
+            await manager.WriteStateAsync(token);
+            Assert.True(storage.IsCompactionRequested);
+            Assert.Equal(2, storage.Segments.Count);
+
+            value.Value = 3;
+            await manager.WriteStateAsync(token);
+            Assert.False(storage.IsCompactionRequested);
+            Assert.Single(storage.Segments);
+            Assert.Equal(formatKey, (await storage.GetMetadataAsync(token))!.FormatKey);
+            value.Value = 4;
+            await manager.WriteStateAsync(token);
+            Assert.False(storage.IsCompactionRequested);
+            Assert.Equal(2, storage.Segments.Count);
+            value.Value = 5;
+            await manager.WriteStateAsync(token);
+            Assert.True(storage.IsCompactionRequested);
+            Assert.Equal(3, storage.Segments.Count);
+        }
+
+        await using (var manager = factory.CreateStandalone(journalId))
+        {
+            var value = new DurableValue<int>("value", manager, codec);
+            await manager.InitializeAsync(token);
+            Assert.Equal(5, value.Value);
+            Assert.True(storage.IsCompactionRequested);
+            value.Value = 6;
+            await manager.WriteStateAsync(token);
+            Assert.False(storage.IsCompactionRequested);
+            Assert.Single(storage.Segments);
+        }
+
+        await using (var manager = factory.CreateStandalone(journalId))
+        {
+            var value = new DurableValue<int>("value", manager, codec);
+            await manager.InitializeAsync(token);
+            Assert.Equal(6, value.Value);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DefaultProviderOverride_GrainAndFactoryManagersShareStorageAndLifecycle(bool registerOverrideFirst)
+    {
+        var builder = CreateNamedProviderBuilder();
+        var original = new LifecycleJournalStorageProvider();
+        var replacement = new LifecycleJournalStorageProvider();
+        var grainId = GrainId.Create("test-grain", "default-override");
+        var journalId = JournalId.FromGrainId(grainId);
+        builder.Services.AddScoped<CompositionTestLifecycle>();
+        builder.Services.AddScoped<IGrainContext>(services =>
+        {
+            var context = Substitute.For<IGrainContext>();
+            context.GrainId.Returns(grainId);
+            context.ActivationServices.Returns(services);
+            context.ObservableLifecycle.Returns(services.GetRequiredService<CompositionTestLifecycle>());
+            return context;
+        });
+        if (registerOverrideFirst)
+        {
+            builder.Services.AddSingleton<IJournalStorageProvider>(replacement);
+        }
+
+        builder.AddJournalStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, _ => original);
+        builder.AddVolatileJournalStorage("other");
+        if (!registerOverrideFirst)
+        {
+            builder.Services.AddSingleton<IJournalStorageProvider>(replacement);
+        }
+
+        await using var services = builder.Services.BuildServiceProvider();
+        var token = TestContext.Current.CancellationToken;
+        await using (var scope = services.CreateAsyncScope())
+        {
+            var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+            var value = scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value");
+            var grainLifecycle = scope.ServiceProvider.GetRequiredService<CompositionTestLifecycle>();
+            Assert.Equal(1, grainLifecycle.Subscriptions);
+            await grainLifecycle.OnStart(token);
+            value.Value = 42;
+            await manager.WriteStateAsync(token);
+        }
+
+        var factory = services.GetRequiredService<IJournaledStateManagerFactory>();
+        var keyedFactory = services.GetRequiredKeyedService<IJournaledStateManagerFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME);
+        Assert.Same(factory, keyedFactory);
+        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey);
+        await using (var manager = keyedFactory.CreateStandalone(journalId))
+        {
+            var value = new DurableValue<int>("value", manager, codec);
+            await manager.InitializeAsync(token);
+            Assert.Equal(42, value.Value);
+            value.Value = 43;
+            await manager.WriteStateAsync(token);
+        }
+
+        await using (var scope = services.CreateAsyncScope())
+        {
+            var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+            var value = scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value");
+            var grainLifecycle = scope.ServiceProvider.GetRequiredService<CompositionTestLifecycle>();
+            Assert.Equal(1, grainLifecycle.Subscriptions);
+            await grainLifecycle.OnStart(token);
+            Assert.Equal(43, value.Value);
+        }
+
+        Assert.Same(replacement, services.GetRequiredService<IJournalStorageProvider>());
+        Assert.Same(replacement, services.GetRequiredKeyedService<IJournalStorageProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+        Assert.Same(replacement, services.GetRequiredService<IJournalStorageCatalog>());
+        Assert.Same(replacement, services.GetRequiredKeyedService<IJournalStorageCatalog>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+        var catalog = new List<JournalId>();
+        await foreach (var entry in services.GetRequiredService<IJournalStorageCatalog>().ListAsync(cancellationToken: token))
+        {
+            catalog.Add(entry.Id);
+        }
+
+        Assert.Equal([journalId], catalog);
+        Assert.Null(await original.CreateStorage(journalId).GetMetadataAsync(token));
+        Assert.Null(await services.GetRequiredKeyedService<IJournalStorageProvider>("other").CreateStorage(journalId).GetMetadataAsync(token));
+        var participant = Assert.Single(services.GetServices<ILifecycleParticipant<ISiloLifecycle>>());
+        Assert.Same(replacement, participant);
+        var lifecycle = new SiloLifecycleSubject(services.GetRequiredService<ILogger<SiloLifecycleSubject>>());
+        participant.Participate(lifecycle);
+        Assert.Equal(1, replacement.ParticipationCount);
+        Assert.Equal(0, original.ParticipationCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NamedVolatileProviders_KeepDefaultStableAndFactoriesReplayOnlyTheirOwnNamespace(bool registerDefaultFirst)
+    {
+        var builder = CreateNamedProviderBuilder();
+        if (registerDefaultFirst) builder.AddVolatileJournalStorage();
+        builder.AddVolatileJournalStorage("jobs-A").AddVolatileJournalStorage("jobs-B");
+        if (!registerDefaultFirst) builder.AddVolatileJournalStorage();
+        await using var services = builder.Services.BuildServiceProvider();
+        var token = TestContext.Current.CancellationToken;
+        var storageA = services.GetRequiredKeyedService<IJournalStorageProvider>("jobs-A");
+        var storageB = services.GetRequiredKeyedService<IJournalStorageProvider>("jobs-B");
+        var defaultStorage = services.GetRequiredService<IJournalStorageProvider>();
+        Assert.NotSame(storageA, storageB);
+        Assert.NotSame(storageA, defaultStorage);
+        Assert.NotSame(storageB, defaultStorage);
+        Assert.Same(defaultStorage, services.GetRequiredKeyedService<IJournalStorageProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+        Assert.Same(defaultStorage, services.GetRequiredService<IJournalStorageCatalog>());
+        Assert.Same(services.GetRequiredService<IJournaledStateManagerFactory>(),
+            services.GetRequiredKeyedService<IJournaledStateManagerFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+        Assert.Same(storageA, services.GetRequiredKeyedService<IJournalStorageCatalog>("jobs-A"));
+        Assert.Same(storageB, services.GetRequiredKeyedService<IJournalStorageCatalog>("jobs-B"));
+        var id = new JournalId("jobs/shards/isolated");
+        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey);
+        var factoryA = services.GetRequiredKeyedService<IJournaledStateManagerFactory>("jobs-A");
+        var factoryB = services.GetRequiredKeyedService<IJournaledStateManagerFactory>("jobs-B");
+        await using (var manager = factoryA.CreateStandalone(id))
+        {
+            var value = new DurableValue<int>("value", manager, codec);
+            await manager.InitializeAsync(token);
+            value.Value = 41;
+            await manager.WriteStateAsync(token);
+        }
+
+        await using (var manager = factoryB.CreateStandalone(id))
+        {
+            var value = new DurableValue<int>("value", manager, codec);
+            await manager.InitializeAsync(token);
+            Assert.Equal(0, value.Value);
+            value.Value = 100;
+            await manager.WriteStateAsync(token);
+        }
+
+        // Same identity in two physical namespaces must not share factory storage.
+        await using (var manager = factoryA.CreateStandalone(id))
+        {
+            var value = new DurableValue<int>("value", manager, codec);
+            await manager.InitializeAsync(token);
+            value.Value++;
+            await manager.WriteStateAsync(token);
+            Assert.Equal(42, value.Value);
+        }
+
+        await using (var manager = factoryB.CreateStandalone(id))
+        {
+            var value = new DurableValue<int>("value", manager, codec);
+            await manager.InitializeAsync(token);
+            Assert.Equal(100, value.Value);
+        }
+
+        Assert.Null(await defaultStorage.CreateStorage(id).GetMetadataAsync(token));
+        var catalogA = new List<JournalId>();
+        await foreach (var entry in services.GetRequiredKeyedService<IJournalStorageCatalog>("jobs-A")
+            .ListAsync(new JournalCatalogListOptions { Prefix = new JournalId("jobs/shards/") }, token))
+        {
+            catalogA.Add(entry.Id);
+        }
+        Assert.Equal(new[] { id }, catalogA);
+        await (await storageA.CreateStorage(id).ReadForWriteAsync()).DeleteAsync(token);
+        Assert.Null(await storageA.CreateStorage(id).GetMetadataAsync(token));
+        Assert.NotNull(await storageB.CreateStorage(id).GetMetadataAsync(token));
+    }
+
+    [Fact]
+    public async Task NamedAzureBlobProviders_UseIndependentOptionsAndInitializeEachBindingOnce()
+    {
+        var builder = CreateNamedProviderBuilder();
+        var serviceA = Substitute.For<BlobServiceClient>();
+        var serviceB = Substitute.For<BlobServiceClient>();
+        var containerA = Substitute.For<BlobContainerClient>();
+        var containerB = Substitute.For<BlobContainerClient>();
+        var factoryA = Substitute.For<IBlobContainerFactory>();
+        var factoryB = Substitute.For<IBlobContainerFactory>();
+        serviceA.GetBlobContainerClient("jobs-container-a").Returns(containerA);
+        serviceB.GetBlobContainerClient("jobs-container-b").Returns(containerB);
+        containerA.CreateIfNotExistsAsync(cancellationToken: Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Response<BlobContainerInfo>>(null!));
+        containerB.CreateIfNotExistsAsync(cancellationToken: Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Response<BlobContainerInfo>>(null!));
+        var optionsSeen = new List<string>();
+        builder.AddAzureBlobJournalStorage("jobs-A", options =>
+        {
+            options.ContainerName = "jobs-container-a";
+            options.BlobServiceClient = serviceA;
+            options.BuildContainerFactory = (_, configured) =>
+            {
+                optionsSeen.Add(configured.ContainerName);
+                return factoryA;
+            };
+        });
+        builder.AddAzureBlobJournalStorage("jobs-B", options =>
+        {
+            options.ContainerName = "jobs-container-b";
+            options.BlobServiceClient = serviceB;
+            options.BuildContainerFactory = (_, configured) =>
+            {
+                optionsSeen.Add(configured.ContainerName);
+                return factoryB;
+            };
+        });
+        builder.AddAzureBlobJournalStorage("jobs-A", configure: null); // Repetition must not duplicate lifecycle participation.
+        await using var services = builder.Services.BuildServiceProvider();
+        var a = services.GetRequiredKeyedService<IJournalStorageProvider>("jobs-A");
+        var b = services.GetRequiredKeyedService<IJournalStorageProvider>("jobs-B");
+        Assert.NotSame(a, b);
+        Assert.Same(a, services.GetRequiredKeyedService<IJournalStorageCatalog>("jobs-A"));
+        Assert.Same(b, services.GetRequiredKeyedService<IJournalStorageCatalog>("jobs-B"));
+        Assert.Null(services.GetService<IJournalStorageProvider>());
+        Assert.Equal(new[] { "jobs-container-a", "jobs-container-b" }, optionsSeen);
+        var participants = services.GetServices<ILifecycleParticipant<ISiloLifecycle>>().ToArray();
+        Assert.Equal(2, participants.Length);
+        Assert.Contains(participants, participant => ReferenceEquals(a, participant));
+        Assert.Contains(participants, participant => ReferenceEquals(b, participant));
+        var lifecycle = new SiloLifecycleSubject(services.GetRequiredService<ILogger<SiloLifecycleSubject>>());
+        foreach (var participant in participants) participant.Participate(lifecycle);
+
+        await lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        await factoryA.Received(1).InitializeAsync(serviceA, Arg.Any<CancellationToken>());
+        await factoryB.Received(1).InitializeAsync(serviceB, Arg.Any<CancellationToken>());
+        await containerA.Received(1).CreateIfNotExistsAsync(cancellationToken: Arg.Any<CancellationToken>());
+        await containerB.Received(1).CreateIfNotExistsAsync(cancellationToken: Arg.Any<CancellationToken>());
+        serviceA.DidNotReceive().GetBlobContainerClient("jobs-container-b");
+        serviceB.DidNotReceive().GetBlobContainerClient("jobs-container-a");
+        await lifecycle.OnStop(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public void NamedTableAndS3Options_DoNotBleedAcrossNamesOrDefault()
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddAzureTableJournalStorage(options => options.TableName = "DefaultTable");
+        builder.AddAzureTableJournalStorage("A", options => options.TableName = "TableA");
+        builder.AddAzureTableJournalStorage("B", options => options.TableName = "TableB");
+        builder.AddS3JournalStorage("s3-A", options => options.BucketName = "bucket-a");
+        builder.AddS3JournalStorage("s3-B", options => options.BucketName = "bucket-b");
+        using var services = builder.Services.BuildServiceProvider();
+
+        var tables = services.GetRequiredService<IOptionsMonitor<AzureTableJournalStorageOptions>>();
+        Assert.Equal("TableA", tables.Get("A").TableName);
+        Assert.Equal("TableB", tables.Get("B").TableName);
+        Assert.Equal("DefaultTable", services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value.TableName);
+        var buckets = services.GetRequiredService<IOptionsMonitor<S3JournalStorageOptions>>();
+        Assert.Equal("bucket-a", buckets.Get("s3-A").BucketName);
+        Assert.Equal("bucket-b", buckets.Get("s3-B").BucketName);
+        Assert.NotSame(tables.Get("A"), tables.Get("B"));
+        Assert.NotSame(buckets.Get("s3-A"), buckets.Get("s3-B"));
+    }
+
+    [Fact]
+    public void NamedRegistration_ConflictingBackendFailsWithProviderNameWithoutChangingOriginalBinding()
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddVolatileJournalStorage("jobs");
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.AddAzureBlobJournalStorage("jobs", configure: null));
+
+        Assert.Contains("jobs", exception.Message);
+        using var services = builder.Services.BuildServiceProvider();
+        Assert.IsType<VolatileJournalStorageProvider>(services.GetRequiredKeyedService<IJournalStorageProvider>("jobs"));
+        Assert.Same(services.GetRequiredKeyedService<IJournalStorageProvider>("jobs"),
+            services.GetRequiredKeyedService<IJournalStorageCatalog>("jobs"));
+    }
+
+    private static TestSiloBuilder CreateNamedProviderBuilder()
+    {
+        var builder = new TestSiloBuilder();
+        builder.Services.AddSerializer();
+        builder.Services.AddLogging();
+        builder.Services.AddMetrics();
+        builder.Services.AddSingleton(CreateGrainPropertiesResolver());
+        builder.Services.AddSingleton<OrleansInstruments>();
+        builder.Services.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(JournalingTestsJsonContext.Default));
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
+        return builder;
+    }
+
+    [Fact]
     public void AddJournalStorage_RegistersJsonFamilyByDefaultAndBinaryFamilyByFormatKey()
     {
         var builder = new TestSiloBuilder();
         builder.Services.AddSerializer();
 
-        builder.AddJournalStorage();
+        builder.AddJournaling();
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        var jsonFormat = Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonJournalExtensions.JournalFormatKey));
+        var jsonFormat = Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonLinesJournalFormat.JournalFormatKey));
         Assert.Same(jsonFormat, serviceProvider.GetRequiredService<IJournalFormat>());
         Assert.Equal("application/jsonl", jsonFormat.MimeType);
-        CodecTestHelpers.AssertCommandCodecServiceRegistrations(serviceProvider, JsonJournalExtensions.JournalFormatKey);
+        CodecTestHelpers.AssertCommandCodecServiceRegistrations(serviceProvider, JsonLinesJournalFormat.JournalFormatKey);
 
         var binaryFormat = Assert.IsType<OrleansBinaryJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey));
         Assert.Equal("application/octet-stream", binaryFormat.MimeType);
@@ -75,7 +540,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         services.AddOptions();
         services.AddSingleton(TimeProvider.System);
         services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
-        services.AddScoped<IGrainContext>(_ => new JournalBatchTests.TestGrainContext(GrainId.Create("test-grain", "keyed")));
+        services.AddScoped<IGrainContext>(sp => new JournalBatchTests.TestGrainContext(GrainId.Create("test-grain", "keyed"), sp));
         services.AddScoped<IJournalStorageProvider>(_ => new TestJournalStorageProvider(storage));
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = CustomFormatKey);
         services.AddScoped<JournaledStateManagerShared>();
@@ -96,6 +561,128 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         _ = scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value");
 
         Assert.True(wasUsed);
+        Assert.Equal(1, Assert.IsType<CompositionTestLifecycle>(
+            scope.ServiceProvider.GetRequiredService<IGrainContext>().ObservableLifecycle).Subscriptions);
+    }
+
+    [Fact]
+    public async Task StateConstruction_InjectsActivationScopedCodecBeforeRecovery()
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddVolatileJournalStorage();
+        builder.Services.Configure<JournaledStateManagerOptions>(options =>
+            options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
+        builder.Services.AddScoped<IGrainContext>(services =>
+        {
+            var context = Substitute.For<IGrainContext>();
+            context.GrainId.Returns(GrainId.Create("codec-scope", Guid.NewGuid().ToString("N")));
+            context.ActivationServices.Returns(services);
+            context.ObservableLifecycle.Returns(new CompositionTestLifecycle());
+            return context;
+        });
+        builder.Services.AddKeyedScoped<IDurableValueCommandCodec<int>>(OrleansBinaryJournalFormat.JournalFormatKey,
+            static (services, _) => new OrleansBinaryDurableValueCommandCodec<int>(
+                services.GetRequiredService<ICodecProvider>().GetCodec<int>(),
+                services.GetRequiredService<SerializerSessionPool>()));
+        builder.Services.AddStateMachine<CodecState, CodecState>(static (services, _) =>
+            new CodecState(services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(OrleansBinaryJournalFormat.JournalFormatKey)));
+        await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
+        await using var first = services.CreateAsyncScope();
+        await using var second = services.CreateAsyncScope();
+        var owner = first.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        var manager = first.ServiceProvider.GetRequiredService<IDurableStateManager>();
+        Assert.Same(owner, manager);
+        var state = manager.GetOrAddState<CodecState>("value");
+        var codec = state.Codec;
+        Assert.Same(first.ServiceProvider.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(OrleansBinaryJournalFormat.JournalFormatKey), codec);
+        Assert.NotSame(codec, second.ServiceProvider.GetRequiredService<IDurableStateManager>()
+            .GetOrAddState<CodecState>("value").Codec);
+        Assert.Throws<InvalidOperationException>(() =>
+            services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(OrleansBinaryJournalFormat.JournalFormatKey));
+        Assert.Same(state, manager.GetOrAddState<CodecState>("value"));
+        Assert.Same(state, first.ServiceProvider.GetRequiredKeyedService<CodecState>("value"));
+        Assert.True(owner.TryGetStateMachine("value", out var registered));
+        Assert.Same(state, registered);
+        var lifecycle = Assert.IsType<CompositionTestLifecycle>(first.ServiceProvider.GetRequiredService<IGrainContext>().ObservableLifecycle);
+        Assert.Equal(1, lifecycle.Subscriptions);
+        await lifecycle.OnStart(TestContext.Current.CancellationToken);
+        Assert.Equal(0, state.Value);
+        state.Value = 42;
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, owner.PendingWriteByteCount);
+        await lifecycle.OnStop(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task StateConstruction_InjectsNamedFormatCodecOnEmptyJournal()
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddVolatileJournalStorage();
+        var customStorage = new VolatileJournalStorage(CustomFormatKey);
+        builder.Services.AddKeyedSingleton<IJournalFormat>(CustomFormatKey, static (services, _) =>
+            new NamedBinaryJournalFormat(services.GetRequiredService<OrleansBinaryJournalFormat>()));
+        builder.Services.AddKeyedSingleton(typeof(IDurableDictionaryCommandCodec<,>), CustomFormatKey,
+            typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
+        builder.Services.AddKeyedScoped<IDurableValueCommandCodec<int>>(CustomFormatKey, static (services, _) =>
+            new OrleansBinaryDurableValueCommandCodec<int>(
+                services.GetRequiredService<ICodecProvider>().GetCodec<int>(),
+                services.GetRequiredService<SerializerSessionPool>()));
+        builder.Services.AddKeyedSingleton<IJournaledStateManagerFactory>("custom", (services, _) =>
+            new JournaledStateManagerFactory(
+                new JournaledStateManagerShared(
+                    services.GetRequiredService<ILogger<JournaledStateManager>>(),
+                    Options.Create(new JournaledStateManagerOptions { JournalFormatKey = CustomFormatKey }),
+                    TimeProvider.System,
+                    services),
+                new TestJournalStorageProvider(customStorage)));
+        await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
+        await using var dependencies = services.CreateAsyncScope();
+        var factory = services.GetRequiredKeyedService<IJournaledStateManagerFactory>("custom");
+        await using var defaultManager = services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(new JournalId("default"));
+        await using var customManager = factory.CreateStandalone(new JournalId("custom"));
+        IJournaledStateManager delegating = new DelegatingStateManager(customManager);
+        var codec = dependencies.ServiceProvider.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(CustomFormatKey);
+        Assert.Throws<InvalidOperationException>(() =>
+            services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(CustomFormatKey));
+        var defaultCodec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey);
+        Assert.NotSame(defaultCodec, codec);
+        var state = new CodecState(codec);
+        Assert.Same(codec, state.Codec);
+        delegating.RegisterStateMachine("value", state);
+        var defaultState = new CodecState(defaultCodec);
+        defaultManager.RegisterStateMachine("value", defaultState);
+        await defaultManager.InitializeAsync(TestContext.Current.CancellationToken);
+        await delegating.InitializeAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, state.Value);
+        Assert.Empty(customStorage.Segments);
+        state.Value = 42;
+        defaultState.Value = 7;
+        await delegating.WriteStateAsync(TestContext.Current.CancellationToken);
+        await defaultManager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Single(customStorage.Segments);
+        await using var recovered = factory.CreateStandalone(new JournalId("custom"));
+        var recoveredState = new CodecState(codec);
+        recovered.RegisterStateMachine("value", recoveredState);
+        await recovered.InitializeAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(42, recoveredState.Value);
+
+        await using var recoveredDefault = services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(new JournalId("default"));
+        var recoveredDefaultState = new CodecState(defaultCodec);
+        recoveredDefault.RegisterStateMachine("value", recoveredDefaultState);
+        await recoveredDefault.InitializeAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(7, recoveredDefaultState.Value);
+    }
+
+    [Fact]
+    public void StateConstruction_MissingFormatCodecFails()
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddJournaling();
+        using var services = builder.Services.BuildServiceProvider();
+        Assert.NotNull(services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey));
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            new CodecState(services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(CustomFormatKey)));
+        Assert.Contains(nameof(IDurableValueCommandCodec<int>), exception.Message);
     }
 
     [Fact]
@@ -107,14 +694,14 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         builder.Services.AddLogging();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
-        builder.AddJournalStorage();
+        builder.AddJournaling();
         builder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
         builder.Services.AddScoped<IJournalStorageProvider>(_ => new TestJournalStorageProvider(storage));
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
         using var scope = serviceProvider.CreateScope();
         var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManagerFactory>()
-            .Create(new JournalId("on-demand-journal"));
+            .CreateStandalone(new JournalId("on-demand-journal"));
         await using (manager.ConfigureAwait(false))
         {
             var codecProvider = scope.ServiceProvider.GetRequiredService<ICodecProvider>();
@@ -135,6 +722,50 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     private sealed class TestJournalStorageProvider(IJournalStorage storage) : IJournalStorageProvider
     {
         public IJournalStorage CreateStorage(JournalId journalId) => storage;
+    }
+
+    private sealed class NamedBinaryJournalFormat(IJournalFormat inner) : IJournalFormat
+    {
+        public string FormatKey => CustomFormatKey;
+        public string? MimeType => inner.MimeType;
+        public JournalBufferWriter CreateWriter() => inner.CreateWriter();
+        public void Replay(JournalBufferReader input, JournalReplayContext context) => inner.Replay(input, context);
+    }
+
+    private sealed class CodecState(IDurableValueCommandCodec<int> codec) : IStateMachine, IDurableValueCommandHandler<int>
+    {
+        public IDurableValueCommandCodec<int> Codec { get; } = codec;
+        public int Value { get; set; }
+        public void Reset(JournalStreamWriter writer) => Value = 0;
+        public void WritePendingEntries(JournalStreamWriter writer) => Codec.WriteSet(Value, writer);
+        public void WriteSnapshot(JournalStreamWriter writer) => Codec.WriteSet(Value, writer);
+        public void ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+            context.GetRequiredCommandCodec(entry.FormatKey, Codec).Apply(entry.Reader, this);
+        public void ApplySet(int value) => Value = value;
+    }
+
+    private sealed class DelegatingStateManager(IJournaledStateManager inner) : IJournaledStateManager
+    {
+        public ValueTask InitializeAsync(CancellationToken cancellationToken) => inner.InitializeAsync(cancellationToken);
+        public void RegisterStateMachine(string name, IStateMachine state) => inner.RegisterStateMachine(name, state);
+        public bool TryGetStateMachine(string name, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IStateMachine? state)
+            => inner.TryGetStateMachine(name, out state);
+        public ValueTask WriteStateAsync(CancellationToken cancellationToken) => inner.WriteStateAsync(cancellationToken);
+        public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => inner.DeleteStateAsync(cancellationToken);
+    }
+
+    private sealed class LifecycleJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, ILifecycleParticipant<ISiloLifecycle>
+    {
+        private readonly VolatileJournalStorageProvider _storage = new();
+
+        public int ParticipationCount { get; private set; }
+
+        public IJournalStorage CreateStorage(JournalId journalId) => _storage.CreateStorage(journalId);
+
+        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(JournalCatalogListOptions? options = null, CancellationToken cancellationToken = default)
+            => _storage.ListAsync(options, cancellationToken);
+
+        public void Participate(ISiloLifecycle lifecycle) => ParticipationCount++;
     }
 
     private sealed class TestSiloBuilder : ISiloBuilder

@@ -2,7 +2,7 @@ namespace Orleans.Journaling;
 
 internal readonly struct JournalCatalogRange
 {
-    public JournalCatalogRange(ListOptions? options)
+    public JournalCatalogRange(JournalCatalogListOptions? options)
     {
         IncludeMetadata = options?.IncludeMetadata ?? false;
         Prefix = options?.Prefix.Value;

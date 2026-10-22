@@ -40,7 +40,7 @@ public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableSetCommandHandler<T>
+internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSetCommandHandler<T>
 {
     private readonly IDurableSetCommandCodec<T> _codec;
     private readonly HashSet<T> _items = [];
@@ -54,34 +54,34 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableS
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableSetCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
-        manager.RegisterState(key, this);
+        manager.RegisterStateMachine(key, this);
     }
 
     internal DurableSet(string key, IJournaledStateManager manager, IDurableSetCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
-        manager.RegisterState(key, this);
+        manager.RegisterStateMachine(key, this);
     }
 
     public int Count => _items.Count;
     public bool IsReadOnly => false;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
-    void IJournaledState.Reset(JournalStreamWriter writer)
+    void IStateMachine.Reset(JournalStreamWriter writer)
     {
         _items.Clear();
         _writer = writer;
     }
 
-    void IJournaledState.AppendEntries(JournalStreamWriter writer)
+    void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
         // This state implementation appends journal entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)
+    void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter)
     {
         _codec.WriteSnapshot(_items, snapshotWriter);
     }
@@ -144,7 +144,6 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableS
         return _writer;
     }
 
-    public IJournaledState DeepCopy() => throw new NotImplementedException();
     public void ExceptWith(IEnumerable<T> other)
     {
         foreach (var item in other)

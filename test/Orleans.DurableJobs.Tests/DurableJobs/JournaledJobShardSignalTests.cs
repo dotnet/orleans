@@ -259,8 +259,8 @@ public partial class JournaledJobShardManagerTests
             var formatKey = Services.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value.JournalFormatKey;
             var codec = Services.GetRequiredKeyedService<IDurableValueCommandCodec<DurableJobShardJournalRecord>>(formatKey);
             var state = new JournaledJobShardState(JobShardId.Parse(Shard.Id), Shard.StartTime, Shard.EndTime, codec);
-            await using var manager = Services.GetRequiredService<IJournaledStateManagerFactory>().Create(Shard.StorageId);
-            manager.RegisterState(JournaledJobShardState.StateName, state);
+            await using var manager = Services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(Shard.StorageId);
+            manager.RegisterStateMachine(JournaledJobShardState.StateName, state);
             await manager.InitializeAsync(Token);
             return state.CaptureSnapshot().Jobs.OrderBy(entry => entry.Job.DueTime).Select(entry => entry.Job.Name).ToArray();
         }

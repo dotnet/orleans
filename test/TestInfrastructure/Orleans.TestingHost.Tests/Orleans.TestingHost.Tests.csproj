@@ -12,9 +12,11 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="App.config" />
+    <Compile Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\MembershipTests\MembershipTableConformanceTestsBase.cs" Link="MembershipTableConformanceTestsBase.cs" />
   </ItemGroup>
 </Project>

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Messaging;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Diagnostics;
@@ -128,83 +129,141 @@ namespace Orleans.Runtime
         /// </remarks>
         /// <param name="grainId">The grain identity.</param>
         /// <param name="requestContextData">Optional request context data.</param>
-        /// <param name="rehydrationContext">Optional rehydration context.</param>
-        /// <returns></returns>
+        /// <param name="migration">Optional migration state and requests. The returned activation receives the requests through ordinary admission,
+        /// before a new activation begins rehydrating and activating. Admission removes requests from the package.
+        /// If this returns null, the caller retains the requests. Failure disposes requests which were not admitted.</param>
         public IGrainContext? GetOrCreateActivation(
             in GrainId grainId,
             Dictionary<string, object>? requestContextData,
-            MigrationContext? rehydrationContext)
+            GrainMigrationPackage? migration = null)
         {
-            if (TryGetGrainContext(grainId, out var result))
+            Debug.Assert(migration is null || migration.Value.GrainId == grainId);
+            var rehydrationContext = migration?.MigrationContext;
+            try
             {
-                rehydrationContext?.Dispose();
-                return result;
-            }
-            else if (grainId.IsSystemTarget())
-            {
-                rehydrationContext?.Dispose();
-                return null;
-            }
-
-            lock (GetStripedLock(grainId))
-            {
-                if (TryGetGrainContext(grainId, out result))
+                if (TryGetGrainContext(grainId, out var result))
                 {
-                    rehydrationContext?.Dispose();
+                    ReceiveRequests(result, migration);
+                    return result;
+                }
+                else if (grainId.IsSystemTarget())
+                {
+                    return null;
+                }
+
+                var created = false;
+                lock (GetStripedLock(grainId))
+                {
+                    if (!TryGetGrainContext(grainId, out result) && _siloStatusOracle.CurrentStatus == SiloStatus.Active)
+                    {
+                        var address = new GrainAddress
+                        {
+                            SiloAddress = Silo,
+                            GrainId = grainId,
+                            ActivationId = ActivationId.NewId(),
+                            MembershipVersion = MembershipVersion.MinValue,
+                        };
+
+                        result = this.grainActivator.CreateInstance(address);
+                        activations.RecordNewTarget(result);
+                        created = true;
+                    }
+                } // End lock
+
+                if (result is null)
+                {
+                    return UnableToCreateActivation(this, grainId);
+                }
+
+                if (!created)
+                {
+                    // Admission can reject a request and synchronously complete a caller, so deliver outside the catalog lock.
+                    ReceiveRequests(result, migration);
                     return result;
                 }
 
-                if (_siloStatusOracle.CurrentStatus == SiloStatus.Active)
+                try
                 {
-                    var address = new GrainAddress
+                    // Start activation span with parent context from request if available
+                    var parentContext = requestContextData.TryGetActivityContext();
+                    var activationActivity = parentContext.HasValue
+                        ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
+                        : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
+                    if (activationActivity is not null)
                     {
-                        SiloAddress = Silo,
-                        GrainId = grainId,
-                        ActivationId = ActivationId.NewId(),
-                        MembershipVersion = MembershipVersion.MinValue,
-                    };
+                        activationActivity.SetTag(ActivityTagKeys.GrainId, grainId.ToString());
+                        activationActivity.SetTag(ActivityTagKeys.GrainType, grainId.Type.ToString());
+                        activationActivity.SetTag(ActivityTagKeys.SiloId, Silo.ToString());
+                        activationActivity.SetTag(ActivityTagKeys.ActivationCause, rehydrationContext is null ? "new" : "rehydrate");
+                        if (result is ActivationData act)
+                        {
+                            activationActivity.SetTag(ActivityTagKeys.ActivationId, act.ActivationId.ToString());
+                            act.SetActivationActivity(activationActivity);
+                            activationActivity.AddEvent(new ActivityEvent("creating"));
+                        }
+                    }
 
-                    result = this.grainActivator.CreateInstance(address);
-                    activations.RecordNewTarget(result);
+                    _catalogInstruments.OnActivationCreated(GetGrainTypeMetricName(result));
+
+                    // Admit requests before rehydration can dispose the context and activation can register in the directory.
+                    ReceiveRequests(result, migration);
                 }
-            } // End lock
+                finally
+                {
+                    // Creation commits us to scheduling activation. These calls transfer work to the context, which owns failures.
+                    if (rehydrationContext is not null)
+                    {
+                        result.Rehydrate(rehydrationContext);
+                        rehydrationContext = null;
+                    }
 
-            if (result is null)
+                    result.Activate(requestContextData);
+                }
+
+                return result;
+            }
+            catch
+            {
+                if (migration?.Requests is { } requests)
+                {
+                    foreach (var request in requests)
+                    {
+                        request.Dispose();
+                    }
+
+                    requests.Clear();
+                }
+
+                throw;
+            }
+            finally
             {
                 rehydrationContext?.Dispose();
-                return UnableToCreateActivation(this, grainId);
             }
 
-            // Start activation span with parent context from request if available
-            var parentContext = requestContextData.TryGetActivityContext();
-            var activationActivity = parentContext.HasValue
-                ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
-                : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
-            if (activationActivity is not null)
+            static void ReceiveRequests(IGrainContext destination, GrainMigrationPackage? migration)
             {
-                activationActivity.SetTag(ActivityTagKeys.GrainId, grainId.ToString());
-                activationActivity.SetTag(ActivityTagKeys.GrainType, grainId.Type.ToString());
-                activationActivity.SetTag(ActivityTagKeys.SiloId, Silo.ToString());
-                activationActivity.SetTag(ActivityTagKeys.ActivationCause, rehydrationContext is null ? "new" : "rehydrate");
-                if (result is ActivationData act)
+                if (migration is not { Requests: { Count: > 0 } requests })
                 {
-                    activationActivity.SetTag(ActivityTagKeys.ActivationId, act.ActivationId.ToString());
-                    act.SetActivationActivity(activationActivity);
-                    activationActivity.AddEvent(new ActivityEvent("creating"));
+                    return;
+                }
+
+                var admitted = 0;
+                try
+                {
+                    foreach (var request in requests)
+                    {
+                        // ReceiveMessage takes ownership even if processing the request subsequently fails.
+                        admitted++;
+                        destination.ReceiveMessage(request);
+                    }
+                }
+                finally
+                {
+                    // Only the remaining suffix belongs to the package if admission fails partway through it.
+                    requests.RemoveRange(0, admitted);
                 }
             }
-
-            _catalogInstruments.OnActivationCreated(GetGrainTypeMetricName(result));
-
-            // Rehydration occurs before activation.
-            if (rehydrationContext is not null)
-            {
-                result.Rehydrate(rehydrationContext);
-            }
-
-            // Initialize the new activation asynchronously.
-            result.Activate(requestContextData);
-            return result;
 
             [MethodImpl(MethodImplOptions.NoInlining)]
             static IGrainContext? UnableToCreateActivation(Catalog self, GrainId grainId)
@@ -303,6 +362,13 @@ namespace Orleans.Runtime
             }).WaitAsync(cancellationToken);
         }
 
+        /// <summary>
+        /// Deactivates every activation in the catalog and waits for their deactivation to complete.
+        /// </summary>
+        /// <remarks>
+        /// An activation leaves the catalog in the final, synchronous step of its deactivation, unless it is abandoned as stuck,
+        /// so this also waits for deactivations which were already underway, including the migration of their queued requests.
+        /// </remarks>
         public async Task DeactivateAllActivations(CancellationToken cancellationToken)
         {
             LogDebugDeactivateAllActivations();

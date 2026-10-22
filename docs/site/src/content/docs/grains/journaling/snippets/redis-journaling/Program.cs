@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -22,32 +23,41 @@ builder.UseOrleans(siloBuilder =>
 });
 
 using var host = builder.Build();
-await host.StartAsync();
-
-var grain = host.Services.GetRequiredService<IGrainFactory>()
-    .GetGrain<IRedisJournalCounterGrain>("demo");
-var written = await grain.Increment();
-
-await grain.Deactivate();
-await Task.Delay(TimeSpan.FromMilliseconds(500));
-
-var recovered = await grain.GetSnapshot();
-if (written.ActivationId == recovered.ActivationId ||
-    written.Count != recovered.Count)
+var cancellationToken = host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping;
+try
 {
-    throw new InvalidOperationException("Redis journal recovery failed.");
-}
+    await host.StartAsync(cancellationToken);
 
-Console.WriteLine($"Recovered count: {recovered.Count}");
-await host.StopAsync();
+    var grain = host.Services.GetRequiredService<IGrainFactory>()
+        .GetGrain<IRedisJournalCounterGrain>("demo");
+    var written = await grain.Increment(cancellationToken);
+
+    await grain.Deactivate(cancellationToken);
+    await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+
+    var recovered = await grain.GetSnapshot(cancellationToken);
+    if (written.ActivationId == recovered.ActivationId ||
+        written.Count != recovered.Count)
+    {
+        throw new InvalidOperationException("Redis journal recovery failed.");
+    }
+
+    Console.WriteLine($"Recovered count: {recovered.Count}");
+}
+finally
+{
+    using var shutdown = new CancellationTokenSource(
+        host.Services.GetRequiredService<IOptions<HostOptions>>().Value.ShutdownTimeout);
+    await host.StopAsync(shutdown.Token);
+}
 
 public interface IRedisJournalCounterGrain : IGrainWithStringKey
 {
-    ValueTask<CounterSnapshot> Increment();
+    ValueTask<CounterSnapshot> Increment(CancellationToken cancellationToken);
 
-    ValueTask<CounterSnapshot> GetSnapshot();
+    ValueTask<CounterSnapshot> GetSnapshot(CancellationToken cancellationToken);
 
-    ValueTask Deactivate();
+    ValueTask Deactivate(CancellationToken cancellationToken);
 }
 
 // <redis_journal_counter>
@@ -57,18 +67,23 @@ public sealed class RedisJournalCounterGrain(
 {
     private readonly Guid _activationId = Guid.NewGuid();
 
-    public async ValueTask<CounterSnapshot> Increment()
+    public async ValueTask<CounterSnapshot> Increment(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         count.Value++;
-        await WriteStateAsync();
+        await WriteStateAsync(cancellationToken);
         return GetCurrentSnapshot();
     }
 
-    public ValueTask<CounterSnapshot> GetSnapshot() =>
-        ValueTask.FromResult(GetCurrentSnapshot());
-
-    public ValueTask Deactivate()
+    public ValueTask<CounterSnapshot> GetSnapshot(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(GetCurrentSnapshot());
+    }
+
+    public ValueTask Deactivate(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         DeactivateOnIdle();
         return ValueTask.CompletedTask;
     }

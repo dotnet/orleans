@@ -55,6 +55,12 @@ internal partial class LocalDurableJobManager
     private static partial void LogRequestingJobCancellation(ILogger logger, string jobId, string jobName, string shardId);
 
     [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Shard {ShardId} retired during cancellation. Resolving the current owner."
+    )]
+    private static partial void LogShardRetiredDuringCancellation(ILogger logger, Exception exception, string shardId);
+
+    [LoggerMessage(
         Level = LogLevel.Warning,
         Message = "Cancellation request for job {JobId} (Name: '{JobName}') was not recorded for shard {ShardId}"
     )]

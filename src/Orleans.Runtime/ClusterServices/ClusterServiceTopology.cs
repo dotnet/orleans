@@ -16,7 +16,7 @@ internal sealed class ClusterServiceTopology
     public ClusterServiceTopology(
         ImmutableArray<SiloAddress> members,
         int partitionsPerSilo,
-        Func<SiloAddress, int, uint[]> getRingBoundaries)
+        Func<SiloAddress, int, ImmutableArray<uint>> getRingBoundaries)
     {
         if (members.IsDefault || members.Any(static member => member is null))
         {
@@ -43,10 +43,10 @@ internal sealed class ClusterServiceTopology
         for (var memberIndex = 0; memberIndex < sortedActiveMembers.Count; memberIndex++)
         {
             var hashCodes = getRingBoundaries(sortedActiveMembers[memberIndex], partitionsPerSilo);
-            if (hashCodes.Length != partitionsPerSilo)
+            if (hashCodes.IsDefault || hashCodes.Length != partitionsPerSilo)
             {
                 throw new InvalidOperationException(
-                    $"The ring assignment returned {hashCodes.Length} boundaries for {partitionsPerSilo} partitions.");
+                    $"The ring assignment must return exactly {partitionsPerSilo} boundaries for silo '{sortedActiveMembers[memberIndex]}'.");
             }
 
             for (var partitionIndex = 0; partitionIndex < hashCodes.Length; partitionIndex++)

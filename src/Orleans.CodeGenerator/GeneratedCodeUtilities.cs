@@ -77,17 +77,27 @@ internal static class GeneratedCodeUtilities
 
     internal static AttributeListSyntax GetGeneratedCodeAttributes() => GeneratedCodeAttributeSyntax;
 
+    internal static AttributeListSyntax GetGeneratedMemberAttributes() => GeneratedMemberAttributeSyntax;
+
+    private static readonly AttributeSyntax GeneratedCodeAttribute =
+        Attribute(ParseName("global::System.CodeDom.Compiler.GeneratedCodeAttribute"))
+            .AddArgumentListArguments(
+                AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
+                AttributeArgument(typeof(GeneratedCodeUtilities).Assembly.GetName().Version.ToString().GetLiteralExpression()));
+
+    private static readonly AttributeSyntax ExcludeFromCodeCoverageAttribute =
+        Attribute(ParseName("global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute"));
+
     private static readonly AttributeListSyntax GeneratedCodeAttributeSyntax =
         AttributeList().AddAttributes(
-            Attribute(ParseName("global::System.CodeDom.Compiler.GeneratedCodeAttribute"))
-                .AddArgumentListArguments(
-                    AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
-                    AttributeArgument(typeof(GeneratedCodeUtilities).Assembly.GetName().Version.ToString().GetLiteralExpression())),
+            GeneratedCodeAttribute,
             Attribute(ParseName("global::System.ComponentModel.EditorBrowsableAttribute"))
                 .AddArgumentListArguments(
                     AttributeArgument(ParseName("global::System.ComponentModel.EditorBrowsableState").Member("Never"))),
-                    Attribute(ParseName("global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute"))
-        );
+            ExcludeFromCodeCoverageAttribute);
+
+    private static readonly AttributeListSyntax GeneratedMemberAttributeSyntax =
+        AttributeList().AddAttributes(GeneratedCodeAttribute, ExcludeFromCodeCoverageAttribute);
 
     internal static AttributeSyntax GetMethodImplAttributeSyntax() => MethodImplAttributeSyntax;
 

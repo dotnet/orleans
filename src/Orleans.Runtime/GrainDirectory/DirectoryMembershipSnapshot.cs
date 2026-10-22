@@ -12,7 +12,10 @@ internal sealed class DirectoryMembershipSnapshot
     internal const long ProviderEpoch = 0;
     private const string AssignmentStrategy = "uniform-hash-ring/v1";
 
-    internal static readonly Func<SiloAddress, int, uint[]> DefaultGetRingBoundaries = static (silo, count) =>
+    /// <summary>
+    /// The default hash function for directory ring boundaries, matching the <see cref="LocalGrainDirectory"/> partitioning scheme.
+    /// </summary>
+    internal static readonly Func<SiloAddress, int, ImmutableArray<uint>> DefaultGetRingBoundaries = static (silo, count) =>
     {
         if (count == 1)
         {
@@ -30,7 +33,7 @@ internal sealed class DirectoryMembershipSnapshot
         ClusterMembershipSnapshot snapshot,
         IInternalGrainFactory grainFactory,
         int partitionCount,
-        Func<SiloAddress, int, uint[]> getRingBoundaries)
+        Func<SiloAddress, int, ImmutableArray<uint>> getRingBoundaries)
         : this(
             new MembershipBasedClusterServiceView(
                 snapshot,

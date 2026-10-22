@@ -225,3 +225,158 @@ public async Task JoinRoom(string roomName)
         // </call_chain_reentrancy>
     }
 }
+
+namespace Documentation.Grains.RequestScheduling.BackgroundWork
+{
+    public interface IPriceFeed
+    {
+        IDisposable Subscribe(string symbol, Func<decimal, CancellationToken, Task> onPrice);
+    }
+
+    public interface IQuoteGrain : IGrainWithStringKey
+    {
+        ValueTask<decimal> GetPrice();
+    }
+
+    // <run_request_from_callback>
+public sealed class QuoteGrain(IPriceFeed feed) : Grain, IQuoteGrain
+{
+    private IDisposable? _subscription;
+    private decimal _price;
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        // The feed invokes OnPrice on its own threads.
+        _subscription = feed.Subscribe(this.GetPrimaryKeyString(), OnPrice);
+        return Task.CompletedTask;
+    }
+
+    public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+    {
+        _subscription?.Dispose();
+        return Task.CompletedTask;
+    }
+
+    public ValueTask<decimal> GetPrice() => ValueTask.FromResult(_price);
+
+    // Runs the update as a request on this activation, where it can safely access grain state.
+    private Task OnPrice(decimal price, CancellationToken cancellationToken) =>
+        this.RunRequestAsync(
+            static (state, _) => state.Grain._price = state.Price,
+            (Grain: this, Price: price),
+            cancellationToken);
+}
+    // </run_request_from_callback>
+
+    public interface IConnectionMonitor
+    {
+        IDisposable Subscribe(string sessionId, Func<DateTimeOffset, CancellationToken, Task> onHeartbeat);
+    }
+
+    public interface ISessionGrain : IGrainWithStringKey
+    {
+        ValueTask<DateTimeOffset> GetLastSeen();
+    }
+
+    public sealed class SessionGrain(IConnectionMonitor monitor) : Grain, ISessionGrain
+    {
+        private IDisposable? _subscription;
+        private DateTimeOffset _lastSeen;
+
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        {
+            _subscription = monitor.Subscribe(this.GetPrimaryKeyString(), OnHeartbeat);
+            return Task.CompletedTask;
+        }
+
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+        {
+            _subscription?.Dispose();
+            return Task.CompletedTask;
+        }
+
+        public ValueTask<DateTimeOffset> GetLastSeen() => ValueTask.FromResult(_lastSeen);
+
+        // <run_request_options>
+// Heartbeats don't extend the activation's lifetime, and they run between the turns of other requests.
+private Task OnHeartbeat(DateTimeOffset timestamp, CancellationToken cancellationToken) =>
+    this.RunRequestAsync(
+        static (state, _) => state.Grain._lastSeen = state.Timestamp,
+        (Grain: this, Timestamp: timestamp),
+        new LocalRequestOptions { KeepAlive = false, Interleave = true },
+        cancellationToken);
+        // </run_request_options>
+    }
+
+    public interface IIngestGrain : IGrainWithStringKey
+    {
+        ValueTask<int> GetCount();
+    }
+
+    public sealed class IngestGrain : Grain, IIngestGrain
+    {
+        private int _count;
+
+        public ValueTask<int> GetCount() => ValueTask.FromResult(_count);
+
+        internal void Increment() => _count++;
+    }
+
+    // <receive_local_request>
+// A request which increments IngestGrain's counter. Call filters observe it as IIngestRequests.Increment.
+internal sealed class IncrementRequest : Request, ILocalRequest
+{
+    private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private IngestGrain? _grain;
+
+    public Task Completion => _completion.Task;
+
+    // Receives the outcome once the request and its call filters complete, or when the activation rejects the request.
+    // The task keeps the first outcome.
+    public void Complete(Response response)
+    {
+        if (response.Exception is { } exception)
+        {
+            _completion.TrySetException(exception);
+        }
+        else
+        {
+            _completion.TrySetResult();
+        }
+    }
+
+    public override object GetTarget() => _grain!;
+
+    public override void SetTarget(ITargetHolder holder) => _grain = (IngestGrain?)holder.GetTarget();
+
+    protected override ValueTask InvokeInner()
+    {
+        _grain!.Increment();
+        return default;
+    }
+
+    public override string GetInterfaceName() => "IIngestRequests";
+
+    public override string GetMethodName() => "Increment";
+
+    public override string GetActivityName() => "IIngestRequests/Increment";
+
+    public override Type GetInterfaceType() => typeof(IIngestGrain);
+
+    public override System.Reflection.MethodInfo GetMethod() => typeof(IIngestGrain).GetMethod(nameof(IIngestGrain.GetCount))!;
+
+    public override void Dispose() { }
+}
+
+public static class IngestRequests
+{
+    // Delivers the request to the activation and returns a task which completes with the request's outcome.
+    public static Task Increment(IGrainContext activation)
+    {
+        var request = new IncrementRequest();
+        activation.ReceiveLocalRequest(request, default);
+        return request.Completion;
+    }
+}
+    // </receive_local_request>
+}

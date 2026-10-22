@@ -78,24 +78,14 @@ namespace Orleans.Runtime.MembershipService
             return tableManager.CleanupDefunctSiloEntries(beforeDate, cancellationToken);
         }
 
-        [Obsolete("Use ReadRowAsync instead.")]
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-        public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                var entries = await tableManager.FindSiloEntryAndTableVersionRow(key, cancellationToken);
-                MembershipTableData data = Convert(entries);
-                LogDebugReadMyEntry(key, data);
-                return data;
-            }
-            catch (Exception exc)
-            {
-                LogWarningIntermediateErrorReadingSiloEntry(exc, key, tableManager.TableName);
-                throw;
-            }
+            return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
         }
 
         [Obsolete("Use ReadAllAsync instead.")]
@@ -160,7 +150,7 @@ namespace Orleans.Runtime.MembershipService
                 var siloEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
-                bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag, cancellationToken);
+                bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, versionEntry, tableVersion.VersionEtag, cancellationToken);
                 if (result == false)
                     LogWarningTableContentionEtag(entry, etag, tableVersion);
                 return result;
@@ -227,7 +217,8 @@ namespace Orleans.Runtime.MembershipService
                         }
                         catch (Exception exc)
                         {
-                            LogErrorParsingMembershipTableDataIgnoring(exc, tableEntry);
+                            LogErrorParsingMembershipEntry(exc, tableEntry);
+                            throw;
                         }
                     }
                 }
@@ -376,7 +367,6 @@ namespace Orleans.Runtime.MembershipService
         {
             return new SiloInstanceTableEntry
             {
-                DeploymentId = deploymentId,
                 IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime),
                 PartitionKey = deploymentId,
                 RowKey = SiloInstanceTableEntry.ConstructRowKey(memEntry.SiloAddress)
@@ -474,9 +464,9 @@ namespace Orleans.Runtime.MembershipService
         [LoggerMessage(
             EventId = (int)TableStorageErrorCode.AzureTable_61,
             Level = LogLevel.Error,
-            Message = "Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Data}. Ignoring this entry."
+            Message = "Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Data}."
         )]
-        private partial void LogErrorParsingMembershipTableDataIgnoring(Exception ex, SiloInstanceTableEntry data);
+        private partial void LogErrorParsingMembershipEntry(Exception ex, SiloInstanceTableEntry data);
 
         [LoggerMessage(
             EventId = (int)TableStorageErrorCode.AzureTable_60,

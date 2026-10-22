@@ -68,7 +68,7 @@ public sealed class ClusterServiceTopologyTests
             {
                 var members = CreateMembers(8).ToImmutableArray();
                 var topology = new ClusterServiceTopology(members, 3, (silo, _) =>
-                    values.Skip((silo.Generation - 1) * 3).Take(3).ToArray());
+                    values.Skip((silo.Generation - 1) * 3).Take(3).ToImmutableArray());
                 for (var index = 0; index < values.Length; index++)
                 {
                     AssertVisitedOwners(topology, RingRange.Create(values[index], values[(index + 1) % values.Length]));
@@ -89,7 +89,7 @@ public sealed class ClusterServiceTopologyTests
     {
         var member = CreateMembers(1)[0];
         var topology = new ClusterServiceTopology([member], partitions, (_, count) =>
-            Enumerable.Range(0, count).Select(index => (uint)((ulong)index * uint.MaxValue / (uint)count)).ToArray());
+            Enumerable.Range(0, count).Select(index => (uint)((ulong)index * uint.MaxValue / (uint)count)).ToImmutableArray());
         foreach (var point in new uint[] { 0, 1, 123456789, uint.MaxValue })
         {
             var actual = new List<ClusterServicePartitionOwner>();
@@ -235,7 +235,7 @@ public sealed class ClusterServiceTopologyTests
         return new(builder.ToImmutable(), new MembershipVersion(7));
     }
 
-    private static uint[] GetBoundaries(SiloAddress silo, int count) =>
+    private static ImmutableArray<uint> GetBoundaries(SiloAddress silo, int count) =>
         count == 1
             ? [unchecked((uint)silo.GetConsistentHashCode())]
             : silo.GetUniformHashCodes(count);

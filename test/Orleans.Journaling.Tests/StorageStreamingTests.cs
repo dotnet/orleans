@@ -17,7 +17,7 @@ public sealed class StorageStreamingTests
     [Fact]
     public async Task VolatileStorage_AppendAndReplaceStoreRawBuffers()
     {
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         var segmentBytes = new byte[] { 1, 2, 3, 4 };
         var snapshotBytes = new byte[] { 5, 6, 7 };
 
@@ -38,7 +38,7 @@ public sealed class StorageStreamingTests
     [Fact]
     public async Task VolatileStorage_ReadsRawBuffersWithoutFormatDecoding()
     {
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         var rawBytes = new byte[] { 255, 0, 1 };
         var consumer = new CapturingJournalStorageConsumer();
 
@@ -56,7 +56,7 @@ public sealed class StorageStreamingTests
     [Fact]
     public async Task VolatileStorage_InvokesConsumerForEachStoredSegment()
     {
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         var first = new byte[] { 1, 2, 3 };
         var second = new byte[] { 4, 5 };
         var consumer = new CapturingJournalStorageConsumer();
@@ -331,9 +331,9 @@ public sealed class StorageStreamingTests
     {
         public List<(JournalStreamId StreamId, byte[] Payload)> Entries { get; } = [];
 
-        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params uint[] streamIds)
+        public (JournalStreamId StreamId, IStateMachine State)[] Bind(params uint[] streamIds)
         {
-            var bindings = new (JournalStreamId StreamId, IJournaledState State)[streamIds.Length];
+            var bindings = new (JournalStreamId StreamId, IStateMachine State)[streamIds.Length];
             for (var i = 0; i < streamIds.Length; i++)
             {
                 var streamId = new JournalStreamId(streamIds[i]);
@@ -343,15 +343,14 @@ public sealed class StorageStreamingTests
             return bindings;
         }
 
-        private sealed class StreamSink(CapturingJournalEntrySink owner, JournalStreamId streamId) : IJournaledState
+        private sealed class StreamSink(CapturingJournalEntrySink owner, JournalStreamId streamId) : IStateMachine
         {
-            void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+            void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
                 owner.Entries.Add(new(streamId, entry.Reader.ToArray()));
 
             public void Reset(JournalStreamWriter writer) { }
-            public void AppendEntries(JournalStreamWriter writer) { }
-            public void AppendSnapshot(JournalStreamWriter writer) { }
-            public IJournaledState DeepCopy() => throw new NotSupportedException();
+            public void WritePendingEntries(JournalStreamWriter writer) { }
+            public void WriteSnapshot(JournalStreamWriter writer) { }
         }
     }
 

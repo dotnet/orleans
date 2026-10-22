@@ -24,7 +24,7 @@ namespace Orleans.Metadata
             var (grainProperties, grainTypes) = CreateGrainManifest(grainPropertiesProviders, grainTypeOptions, typeProvider);
             var interfaces = CreateInterfaceManifest(grainInterfacePropertiesProviders, grainTypeOptions, interfaceIdProvider);
             this.SiloManifest = new GrainManifest(grainProperties, interfaces);
-            this.GrainTypeMap = new GrainClassMap(typeConverter, grainTypes);
+            this.GrainTypeMap = GrainClassMap.CreateRegistered(typeConverter, grainTypes);
         }
 
         public GrainManifest SiloManifest { get; }
@@ -67,7 +67,7 @@ namespace Orleans.Metadata
         {
             var propertiesMap = ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>();
             var typeMap = ImmutableDictionary.CreateBuilder<GrainType, Type>();
-            foreach (var grainClass in grainTypeOptions.Value.Classes)
+            foreach (var grainClass in grainTypeOptions.Value.GrainClasses)
             {
                 var grainType = grainTypeProvider.GetGrainType(grainClass);
                 var properties = new Dictionary<string, string>(StringComparer.Ordinal);

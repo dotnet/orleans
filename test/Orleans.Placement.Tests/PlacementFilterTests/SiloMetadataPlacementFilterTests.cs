@@ -1,8 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Placement;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.MembershipService.SiloMetadata;
+using Orleans.Runtime.Placement;
 using Orleans.Runtime.Placement.Filtering;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Diagnostics;
+using UnitTests.SiloMetadataTests;
 using Xunit;
 
 namespace UnitTests.PlacementFilterTests;
@@ -15,12 +19,21 @@ public class SiloMetadataPlacementFilterTests(SiloMetadataPlacementFilterTests.F
 {
     public class Fixture : IAsyncLifetime
     {
+        private readonly DiagnosticEventCollector _metadataEvents = new(SiloMetadataEvents.ListenerName);
+
         public InProcessTestCluster Cluster { get; private set; } = null!;
         public async ValueTask DisposeAsync()
         {
-            if (Cluster is { } cluster)
+            try
             {
-                await cluster.DisposeAsync();
+                if (Cluster is { } cluster)
+                {
+                    await cluster.DisposeAsync();
+                }
+            }
+            finally
+            {
+                _metadataEvents.Dispose();
             }
         }
 
@@ -39,6 +52,33 @@ public class SiloMetadataPlacementFilterTests(SiloMetadataPlacementFilterTests.F
             await Cluster.DeployAsync();
             await Cluster.WaitForLivenessToStabilizeAsync();
             await Cluster.WaitForClusterManifestToStabilizeAsync();
+            await Cluster.WaitForSiloMetadataConvergenceAsync(
+                _metadataEvents,
+                ["first", "second", "third", "unique"],
+                TimeSpan.FromSeconds(30),
+                TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact, TestCategory("Functional")]
+    public void PlacementFilter_CandidatesMatchCallingSilo()
+    {
+        var uniqueValues = new HashSet<string>();
+        foreach (var silo in fixture.Cluster.Silos)
+        {
+            var services = fixture.Cluster.GetSiloServiceProvider(silo.SiloAddress);
+            var cache = services.GetRequiredService<ISiloMetadataCache>();
+            Assert.True(uniqueValues.Add(cache.GetSiloMetadata(silo.SiloAddress).Metadata["unique"]));
+
+            var client = services.GetRequiredService<IClusterClient>();
+            var placement = services.GetRequiredService<PlacementService>();
+            var requiredGrain = client.GetGrain<IUniqueRequiredMatchFilteredGrain>(0);
+            var preferredGrain = client.GetGrain<IPreferredMatchFilteredGrain>(0);
+            foreach (var grainId in new[] { requiredGrain.GetGrainId(), preferredGrain.GetGrainId() })
+            {
+                var target = new PlacementTarget(grainId, new Dictionary<string, object>(), default, 0);
+                Assert.Equal(silo.SiloAddress, Assert.Single(placement.GetCompatibleSilos(target)));
+            }
         }
     }
 

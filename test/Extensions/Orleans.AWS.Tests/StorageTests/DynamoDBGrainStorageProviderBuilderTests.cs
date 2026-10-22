@@ -33,7 +33,7 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
         Assert.Null(options.Token);
         Assert.Null(options.ProfileName);
         Assert.Null(options.Service);
-        Assert.Equal(string.Empty, options.ServiceId);
+        Assert.Null(options.ServiceId);
         Assert.Equal("OrleansGrainState", options.TableName);
         Assert.Equal(10, options.ReadCapacityUnits);
         Assert.Equal(5, options.WriteCapacityUnits);
@@ -103,31 +103,113 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
         Assert.Null(options.AccessKey);
     }
 
+    [Fact]
+    public void Configure_EmptyServiceId_SetsEmptyServiceId()
+    {
+        var (builder, _) = ConfigureBuilder((nameof(DynamoDBStorageOptions.ServiceId), ""));
+
+        using var services = builder.Services.BuildServiceProvider();
+        var options = GetOptions(services);
+
+        Assert.Equal(string.Empty, options.ServiceId);
+        Assert.Single(services.GetServices<IConfigurationValidator>()).ValidateConfiguration();
+    }
+
+    [Fact]
+    public void Configure_ServiceIdNotSet_RegistersRejectingValidator()
+    {
+        var (builder, _) = ConfigureBuilder();
+        using var services = builder.Services.BuildServiceProvider();
+        var validator = Assert.Single(services.GetServices<IConfigurationValidator>());
+
+        var exception = Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+
+        Assert.Contains(ProviderName, exception.Message);
+        Assert.Contains(nameof(DynamoDBStorageOptions.ServiceId), exception.Message);
+    }
+
     [Theory]
-    [InlineData(nameof(DynamoDBStorageOptions.ReadCapacityUnits), "not-an-integer")]
-    [InlineData(nameof(DynamoDBStorageOptions.WriteCapacityUnits), "not-an-integer")]
-    [InlineData(nameof(DynamoDBStorageOptions.UseProvisionedThroughput), "not-a-boolean")]
-    [InlineData(nameof(DynamoDBStorageOptions.CreateIfNotExists), "not-a-boolean")]
-    [InlineData(nameof(DynamoDBStorageOptions.UpdateIfExists), "not-a-boolean")]
-    [InlineData(nameof(DynamoDBStorageOptions.DeleteStateOnClear), "not-a-boolean")]
-    [InlineData(nameof(DynamoDBStorageOptions.TimeToLive), "not-a-timespan")]
-    public void Configure_InvalidTypedValue_PreservesDefault(string key, string invalidValue)
+    [InlineData(nameof(DynamoDBStorageOptions.ReadCapacityUnits), "not-an-integer", typeof(int))]
+    [InlineData(nameof(DynamoDBStorageOptions.WriteCapacityUnits), "not-an-integer", typeof(int))]
+    [InlineData(nameof(DynamoDBStorageOptions.UseProvisionedThroughput), "not-a-boolean", typeof(bool))]
+    [InlineData(nameof(DynamoDBStorageOptions.CreateIfNotExists), "not-a-boolean", typeof(bool))]
+    [InlineData(nameof(DynamoDBStorageOptions.UpdateIfExists), "not-a-boolean", typeof(bool))]
+    [InlineData(nameof(DynamoDBStorageOptions.DeleteStateOnClear), "not-a-boolean", typeof(bool))]
+    [InlineData(nameof(DynamoDBStorageOptions.TimeToLive), "not-a-timespan", typeof(TimeSpan))]
+    public void Configure_InvalidTypedValue_Throws(string key, string invalidValue, Type expectedType)
     {
         var (builder, _) = ConfigureBuilder((key, invalidValue));
         using var services = builder.Services.BuildServiceProvider();
-        DynamoDBStorageOptions? options = null;
 
-        var exception = Record.Exception(() => options = GetOptions(services));
+        var exception = Assert.Throws<InvalidOperationException>(() => GetOptions(services));
 
-        Assert.Null(exception);
-        Assert.NotNull(options);
-        Assert.Equal(10, options.ReadCapacityUnits);
-        Assert.Equal(5, options.WriteCapacityUnits);
-        Assert.True(options.UseProvisionedThroughput);
-        Assert.True(options.CreateIfNotExists);
-        Assert.True(options.UpdateIfExists);
-        Assert.False(options.DeleteStateOnClear);
-        Assert.Null(options.TimeToLive);
+        Assert.Contains($"at 'Storage:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
+    }
+
+    // The configuration binding source generator treats an empty value as absent on .NET 10 and rejects it on .NET 8.
+#if NET10_0_OR_GREATER
+    private static readonly bool EmptyValueIsAbsent = true;
+#else
+    private static readonly bool EmptyValueIsAbsent = false;
+#endif
+
+    [Theory]
+    [InlineData(nameof(DynamoDBStorageOptions.ReadCapacityUnits), typeof(int))]
+    [InlineData(nameof(DynamoDBStorageOptions.UseProvisionedThroughput), typeof(bool))]
+    [InlineData(nameof(DynamoDBStorageOptions.TimeToLive), typeof(TimeSpan))]
+    public void Configure_EmptyTypedValue_FollowsBinderContract(string key, Type expectedType)
+    {
+        var (builder, _) = ConfigureBuilder(PreconfigureNonDefaultValues, (key, ""));
+        using var services = builder.Services.BuildServiceProvider();
+
+        if (EmptyValueIsAbsent)
+        {
+            AssertPreconfiguredValues(GetOptions(services));
+            return;
+        }
+
+        var exception = Assert.Throws<InvalidOperationException>(() => GetOptions(services));
+        Assert.Contains($"at 'Storage:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
+    }
+
+    [Theory]
+    [InlineData(nameof(DynamoDBStorageOptions.ReadCapacityUnits), typeof(int))]
+    [InlineData(nameof(DynamoDBStorageOptions.UseProvisionedThroughput), typeof(bool))]
+    [InlineData(nameof(DynamoDBStorageOptions.TimeToLive), typeof(TimeSpan))]
+    public void Configure_WhitespaceTypedValue_Throws(string key, Type expectedType)
+    {
+        var (builder, _) = ConfigureBuilder(PreconfigureNonDefaultValues, (key, "   "));
+        using var services = builder.Services.BuildServiceProvider();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => GetOptions(services));
+
+        Assert.Contains($"at 'Storage:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
+    }
+
+    [Fact]
+    public void Configure_AbsentTypedValues_PreservePreconfiguredValues()
+    {
+        var (builder, _) = ConfigureBuilder(PreconfigureNonDefaultValues);
+        using var services = builder.Services.BuildServiceProvider();
+
+        AssertPreconfiguredValues(GetOptions(services));
+    }
+
+    private static void PreconfigureNonDefaultValues(DynamoDBStorageOptions options)
+    {
+        options.ReadCapacityUnits = 23;
+        options.UseProvisionedThroughput = false;
+        options.TimeToLive = TimeSpan.FromHours(1);
+    }
+
+    private static void AssertPreconfiguredValues(DynamoDBStorageOptions options)
+    {
+        Assert.Equal(23, options.ReadCapacityUnits);
+        Assert.False(options.UseProvisionedThroughput);
+        Assert.Equal(TimeSpan.FromHours(1), options.TimeToLive);
     }
 
     [Fact]
@@ -202,7 +284,7 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
         Assert.Equal("named-table", namedOptions.TableName);
         Assert.Equal("named-service", namedOptions.ServiceId);
         Assert.Equal("OrleansGrainState", defaultOptions.TableName);
-        Assert.Equal(string.Empty, defaultOptions.ServiceId);
+        Assert.Null(defaultOptions.ServiceId);
         validator.ValidateConfiguration();
     }
 
@@ -234,6 +316,35 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
 
         Assert.Contains(ProviderName, exception.Message);
         Assert.Contains(nameof(DynamoDBStorageOptions.TableName), exception.Message);
+    }
+
+    [Fact]
+    public void ValidateConfiguration_ServiceIdNotSet_Throws()
+    {
+        var options = CreateValidOptions();
+        options.ServiceId = null;
+        var validator = new DynamoDBGrainStorageOptionsValidator(options, ProviderName);
+
+        var exception = Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+
+        Assert.Contains(ProviderName, exception.Message);
+        Assert.Contains(nameof(DynamoDBStorageOptions.ServiceId), exception.Message);
+        Assert.Contains("retain the ServiceId used to write its state", exception.Message);
+        Assert.Contains("string.Empty", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("service")]
+    public void ValidateConfiguration_ServiceIdSet_Succeeds(string serviceId)
+    {
+        var options = CreateValidOptions();
+        options.ServiceId = serviceId;
+        var validator = new DynamoDBGrainStorageOptionsValidator(options, ProviderName);
+
+        var exception = Record.Exception(validator.ValidateConfiguration);
+
+        Assert.Null(exception);
     }
 
     [Fact]
@@ -283,6 +394,11 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
 
     private static (TestSiloBuilder Builder, IGrainStorageSerializer DefaultSerializer) ConfigureBuilder(
         params (string Key, string? Value)[] settings)
+        => ConfigureBuilder(_ => { }, settings);
+
+    private static (TestSiloBuilder Builder, IGrainStorageSerializer DefaultSerializer) ConfigureBuilder(
+        Action<DynamoDBStorageOptions> preconfigure,
+        params (string Key, string? Value)[] settings)
     {
         var values = settings.ToDictionary(
             setting => $"Storage:{setting.Key}",
@@ -293,6 +409,7 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
         var builder = new TestSiloBuilder(configuration);
         var defaultSerializer = new FakeGrainStorageSerializer();
         builder.Services.AddSingleton<IGrainStorageSerializer>(defaultSerializer);
+        builder.Services.Configure(ProviderName, preconfigure);
 
         new DynamoDBGrainStorageProviderBuilder().Configure(
             builder,
@@ -307,6 +424,7 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
 
     private static DynamoDBStorageOptions CreateValidOptions() => new()
     {
+        ServiceId = "valid-service",
         TableName = "valid-table",
         UseProvisionedThroughput = true,
         ReadCapacityUnits = 11,

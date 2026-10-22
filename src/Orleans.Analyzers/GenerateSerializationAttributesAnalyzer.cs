@@ -30,7 +30,7 @@ namespace Orleans.Analyzers
         public override void Initialize(AnalysisContext context)
         {
             context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze);
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.RegisterCompilationStartAction(context =>
             {
                 var idAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName);
