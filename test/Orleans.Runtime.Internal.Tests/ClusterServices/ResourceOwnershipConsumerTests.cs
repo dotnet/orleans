@@ -514,9 +514,11 @@ public sealed class ResourceOwnershipConsumerTests
     }
 
     [Theory(Timeout = 30_000)]
-    [InlineData("recovery")]
-    [InlineData("fence")]
-    public async Task ProviderAdvancementDuringAcquisitionPreventsActivation(string delayedStage)
+    [InlineData("recovery", false)]
+    [InlineData("recovery", true)]
+    [InlineData("fence", false)]
+    [InlineData("fence", true)]
+    public async Task ProviderAdvancementDuringAcquisitionPreventsActivationAndSuccessorsRecover(string delayedStage, bool ownershipChanged)
     {
         await using var provider = Create(new(), new());
         var previous = await Publish(provider, TestServiceMembership.A);
@@ -524,9 +526,9 @@ public sealed class ResourceOwnershipConsumerTests
         var resume = Signal();
         var protocol = new Protocol
         {
-            Recover = async (_, _, token) =>
+            Recover = async (_, target, token) =>
             {
-                if (delayedStage == "recovery")
+                if (delayedStage == "recovery" && target == previous.Id)
                 {
                     started.SetResult();
                     await resume.Task.WaitAsync(token);
@@ -534,9 +536,9 @@ public sealed class ResourceOwnershipConsumerTests
 
                 return new byte[] { 99 };
             },
-            Fence = async (_, _, token) =>
+            Fence = async (_, target, token) =>
             {
-                if (delayedStage == "fence")
+                if (delayedStage == "fence" && target == previous.Id)
                 {
                     started.SetResult();
                     await resume.Task.WaitAsync(token);
@@ -550,16 +552,32 @@ public sealed class ResourceOwnershipConsumerTests
         await started.Task.WaitAsync(TestContext.Current.CancellationToken);
         var serving = Read(consumer, previous.Id).AsTask();
         Assert.False(serving.IsCompleted);
-        await Publish(provider, TestServiceMembership.A);
+        var current = await Publish(provider, ownershipChanged ? TestServiceMembership.B : TestServiceMembership.A);
 
         resume.SetResult();
 
-        var failure = await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => installation);
-        Assert.Same(failure, await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => serving));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => installation);
+        await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => serving);
         Assert.Equal(1, protocol.Recoveries);
         Assert.Equal(delayedStage == "fence" ? 1 : 0, protocol.Fences);
         Assert.Equal(0, protocol.Checkpoints);
         Assert.Equal(new byte[] { 1 }, protocol.Durable.ToArray());
+
+        await consumer.InstallViewAsync(current).WaitAsync(TestContext.Current.CancellationToken);
+        if (ownershipChanged)
+        {
+            await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => Read(consumer, current.Id).AsTask());
+            var skipped = await Publish(provider, TestServiceMembership.A);
+            current = await Publish(provider, TestServiceMembership.A);
+            Assert.Equal(skipped.Id, current.Predecessor);
+            await consumer.InstallViewAsync(current).WaitAsync(TestContext.Current.CancellationToken);
+        }
+
+        Assert.Equal(new byte[] { 99 }, (await Read(consumer, current.Id)).ToArray());
+        Assert.Equal(2, protocol.Recoveries);
+        Assert.Equal(delayedStage == "fence" ? 2 : 1, protocol.Fences);
+        Assert.Equal(0, protocol.Checkpoints);
+        Assert.Equal(0, protocol.Handoffs);
     }
 
     [Fact(Timeout = 30_000)]

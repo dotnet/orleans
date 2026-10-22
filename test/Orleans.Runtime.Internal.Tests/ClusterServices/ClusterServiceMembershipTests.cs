@@ -360,7 +360,8 @@ public sealed class ClusterServiceMembershipTests
     [InlineData(true)]
     public async Task ProviderFailureReachesPendingRefreshAndSubscribersWithTheOriginalException(bool refreshCompleted)
     {
-        await using var fixture = new ClusterServiceMembershipFixture();
+        var failure = new InvalidOperationException("Authoritative membership projection failed.");
+        await using var fixture = new ClusterServiceMembershipFixture(getRingBoundaries: (_, _) => throw failure);
         await fixture.Service.EnumeratorStarted;
         await using var observer = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.True(await observer.MoveNextAsync());
@@ -370,15 +371,17 @@ public sealed class ClusterServiceMembershipTests
             fixture.Service.RefreshCompletion.SetResult();
         }
 
+        var currentId = fixture.Membership.CurrentView.Id;
         var refresh = fixture.Membership.RefreshAtLeastAsync(new(0, new(5)), TestContext.Current.CancellationToken).AsTask();
-        var failure = new InvalidOperationException("Authoritative membership projection failed.");
 
-        fixture.Service.Complete(failure);
+        fixture.Service.Publish(CreateSnapshot(1, CreateSilo(1)));
 
-        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => refresh));
-        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => nextView));
-        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            fixture.Membership.RefreshAtLeastAsync(fixture.Membership.CurrentView.Id, TestContext.Current.CancellationToken).AsTask()));
+        var projectionFailure = await Assert.ThrowsAsync<OrleansConfigurationException>(() => refresh);
+        Assert.Same(failure, projectionFailure.InnerException);
+        Assert.Same(projectionFailure, await Assert.ThrowsAsync<OrleansConfigurationException>(() => nextView));
+        Assert.Same(projectionFailure, Assert.Throws<OrleansConfigurationException>(() => fixture.Membership.CurrentView));
+        Assert.Same(projectionFailure, await Assert.ThrowsAsync<OrleansConfigurationException>(() =>
+            fixture.Membership.RefreshAtLeastAsync(currentId, TestContext.Current.CancellationToken).AsTask()));
     }
 
     [Fact]
@@ -551,14 +554,16 @@ public sealed class ClusterServiceMembershipTests
     {
         private int _disposed;
 
-        public ClusterServiceMembershipFixture(ClusterMembershipSnapshot? initialSnapshot = null)
+        public ClusterServiceMembershipFixture(
+            ClusterMembershipSnapshot? initialSnapshot = null,
+            Func<SiloAddress, int, ImmutableArray<uint>>? getRingBoundaries = null)
         {
             Service = new(initialSnapshot ?? ClusterMembershipSnapshot.Default);
             Configuration = new(
                 serviceId: "test-cluster-service",
                 partitionsPerSilo: 2,
                 assignmentStrategy: "uniform-hash-ring/v1");
-            Membership = new(Service, Configuration, GetBoundaries, NullLogger.Instance);
+            Membership = new(Service, Configuration, getRingBoundaries ?? GetBoundaries, NullLogger.Instance);
         }
 
         public TestClusterMembershipService Service { get; }

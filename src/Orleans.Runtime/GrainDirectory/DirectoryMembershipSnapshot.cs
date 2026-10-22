@@ -47,6 +47,13 @@ internal sealed class DirectoryMembershipSnapshot
         MembershipBasedClusterServiceView view,
         IInternalGrainFactory grainFactory)
     {
+        if (!StringComparer.Ordinal.Equals(view.Configuration.ServiceId, ServiceId))
+        {
+            throw new ArgumentException(
+                $"The distributed directory requires service '{ServiceId}', not '{view.Configuration.ServiceId}'.",
+                nameof(view));
+        }
+
         if (view.Id.ProviderEpoch != ProviderEpoch)
         {
             throw new ArgumentException(

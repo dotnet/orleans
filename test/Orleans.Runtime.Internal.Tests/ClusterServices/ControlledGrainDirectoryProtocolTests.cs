@@ -2954,6 +2954,8 @@ public sealed partial class ControlledGrainDirectoryProtocolTests
                 .AddSingleton<MessagingInstruments>()
                 .AddSingleton<MessagingProcessingInstruments>()
                 .AddSingleton(GrainFactory)
+                // Lifecycle startup resolves this after Shared is initialized below.
+                .AddSingleton<SystemTargetShared>(_ => Shared!)
                 .AddSingleton<GrainDirectoryResolver>(serviceProvider => new(
                     serviceProvider,
                     new GrainPropertiesResolver(Substitute.For<IClusterManifestProvider>()),

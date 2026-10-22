@@ -22,7 +22,7 @@ public sealed class AzureBlobClusterServiceViewRegisterIntegrationTests : IAsync
     {
         var connectionString = Environment.GetEnvironmentVariable("ORLEANSDATACONNECTIONSTRING")
             ?? TestDefaultConfiguration.DataConnectionString;
-        Assert.False(string.IsNullOrWhiteSpace(connectionString),
+        Assert.SkipWhen(string.IsNullOrWhiteSpace(connectionString),
             "AzureStorage integration tests require ORLEANSDATACONNECTIONSTRING or the configured DataConnectionString.");
         _connectionString = connectionString!;
         _container = new BlobServiceClient(_connectionString).GetBlobContainerClient($"service-view-{Guid.NewGuid():N}");

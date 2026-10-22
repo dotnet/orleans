@@ -433,8 +433,11 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
             lock (_lock)
             {
                 if (gate.Status is TransitionGateStatus.Pending
-                    && (_view?.Id != target.Id || !_receivers.TryGetValue(resource, out var current) || !ReferenceEquals(current, receiver)))
+                    && (_view?.Id != target.Id || !_receivers.TryGetValue(resource, out var current) || !ReferenceEquals(current, receiver)
+                        || (exception is ClusterServiceViewUnavailableException
+                            && _provider.TryGetCurrentView(out var authorized) && authorized.Id.CompareTo(target.Id) > 0)))
                 {
+                    // Supersession releases admission even before the next local view is installed.
                     gate.Abort();
                     _gates.Prune(resource);
                 }

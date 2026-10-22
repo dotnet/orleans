@@ -23,6 +23,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     private readonly MembershipBasedClusterServiceViewProvider _membership;
     private readonly bool _ownsViewProvider;
     private DirectoryMembershipSnapshot _currentView = DirectoryMembershipSnapshot.Default;
+    private Task? _disposeTask;
 
     public DirectoryMembershipSnapshot CurrentView
     {
@@ -156,16 +157,22 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         {
             await foreach (var update in _membership.ViewUpdates.WithCancellation(_shutdownCts.Token))
             {
-                _viewUpdates.TryPublish(new(update, _grainFactory));
+                DirectoryMembershipSnapshot view;
+                try
+                {
+                    view = new(update, _grainFactory);
+                }
+                catch (Exception exception)
+                {
+                    LogErrorProcessingMembershipUpdates(exception);
+                    throw;
+                }
+
+                _viewUpdates.TryPublish(view);
             }
         }
         catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
         {
-        }
-        catch (Exception exception)
-        {
-            LogErrorProcessingMembershipUpdates(exception);
-            throw;
         }
         finally
         {
@@ -174,7 +181,15 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
+    {
+        lock (_shutdownCts)
+        {
+            return new(_disposeTask ??= DisposeCoreAsync());
+        }
+    }
+
+    private async Task DisposeCoreAsync()
     {
         _shutdownCts.Cancel();
         await _runTask.SuppressThrowing();

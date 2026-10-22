@@ -9,6 +9,7 @@ namespace Orleans.Runtime.ClusterServices;
 
 /// <summary>
 /// Derives service views from cluster membership and fixed assignment configuration.
+/// Membership subscription failures are logged and resubscribed; invalid projections terminate the provider.
 /// </summary>
 internal sealed partial class MembershipBasedClusterServiceViewProvider
     : IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>
@@ -155,21 +156,33 @@ internal sealed partial class MembershipBasedClusterServiceViewProvider
     {
         try
         {
-            await foreach (var update in _clusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
+            while (!_shutdownCts.IsCancellationRequested)
             {
-                MembershipBasedClusterServiceView view;
                 try
                 {
-                    view = new(update, _configuration, _getRingBoundaries, _providerEpoch);
-                }
-                catch (Exception exception)
-                {
-                    throw new OrleansConfigurationException(
-                        $"Failed to construct service '{_configuration.ServiceId}' membership version '{update.Version}'.",
-                        exception);
-                }
+                    await foreach (var update in _clusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
+                    {
+                        MembershipBasedClusterServiceView view;
+                        try
+                        {
+                            view = new(update, _configuration, _getRingBoundaries, _providerEpoch);
+                        }
+                        catch (Exception exception)
+                        {
+                            throw new OrleansConfigurationException(
+                                $"Failed to construct service '{_configuration.ServiceId}' membership version '{update.Version}'.",
+                                exception);
+                        }
 
-                _viewUpdates.TryPublish(view);
+                        _viewUpdates.TryPublish(view);
+                    }
+
+                    break;
+                }
+                catch (Exception exception) when (exception is not OrleansConfigurationException && !_shutdownCts.IsCancellationRequested)
+                {
+                    LogErrorProcessingMembershipUpdates(_configuration.ServiceId, exception);
+                }
             }
         }
         catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)

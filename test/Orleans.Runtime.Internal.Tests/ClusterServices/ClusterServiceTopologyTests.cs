@@ -119,11 +119,14 @@ public sealed class ClusterServiceTopologyTests
         Assert.Equal(index, SearchAlgorithms.RingRangeBinarySearch(length, ranges, static (entries, index) => entries[index], point));
     }
 
-    [Fact]
-    public void ExplicitAssignments_ProduceTheSameIndexAsProjectedAssignments()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExplicitAssignments_ProduceTheSameIndexAsProjectedAssignments(bool collidingBoundaries)
     {
         var members = CreateMembers(4).ToImmutableArray();
-        var projected = new ClusterServiceTopology(members, 3, GetBoundaries);
+        var projected = new ClusterServiceTopology(members, 3,
+            (silo, count) => collidingBoundaries ? [100u, 100u, 100u] : GetBoundaries(silo, count));
         var assignments = projected.RangeOwners.Select(owner =>
             new ClusterServicePartitionAssignment(owner.SiloAddress, owner.PartitionIndex, owner.Range)).Reverse().ToImmutableArray();
         var explicitTopology = new ClusterServiceTopology(members.Reverse().ToImmutableArray(), 3, assignments);

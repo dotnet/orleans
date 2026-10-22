@@ -153,6 +153,23 @@ public sealed class ClusterServiceViewProviderTests
     }
 
     [Fact]
+    public async Task DirectoryRejectsAnotherServicesMembershipView()
+    {
+        using var membership = new MembershipSource();
+        await using var provider = CreateProvider(membership, "other-service", partitions: 1, epoch: 0);
+        var factory = Substitute.For<IInternalGrainFactory>();
+
+        var adapterFailure = Assert.Throws<ArgumentException>(() =>
+            new DirectoryMembershipService(provider, factory, NullLogger<DirectoryMembershipService>.Instance));
+        var snapshotFailure = Assert.Throws<ArgumentException>(() =>
+            new DirectoryMembershipSnapshot(provider.CurrentView, factory));
+
+        Assert.Contains($"requires service '{DirectoryMembershipSnapshot.ServiceId}', not 'other-service'", adapterFailure.Message);
+        Assert.Equal(adapterFailure.Message, snapshotFailure.Message);
+        factory.DidNotReceive().GetSystemTarget<IGrainDirectoryPartition>(Arg.Any<GrainId>());
+    }
+
+    [Fact]
     public async Task DirectoryProjectionFailureReachesRefreshAndSubscribers()
     {
         using var membership = new MembershipSource();
@@ -170,7 +187,7 @@ public sealed class ClusterServiceViewProviderTests
 
         Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => refresh));
         Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => nextView));
-        Assert.Equal(MembershipVersion.MinValue, directory.CurrentView.Version);
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => directory.CurrentView));
     }
 
     [Fact]
