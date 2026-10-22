@@ -38,6 +38,26 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
     [Id(1), Immutable]
     private PooledBuffer _buffer = new();
 
+    /// <summary>
+    /// Gets an upper bound on the serialized size of this context.
+    /// </summary>
+    internal long GetMaxSerializedSize()
+    {
+        // Each entry adds its key and two variable-length integers, each with field framing.
+        const int EntryOverhead = 32;
+        const int ContextOverhead = 64;
+        lock (_lock)
+        {
+            long size = ContextOverhead + (long)_buffer.Length;
+            foreach (var key in _indices.Keys)
+            {
+                size += System.Text.Encoding.UTF8.GetByteCount(key) + EntryOverhead;
+            }
+
+            return size;
+        }
+    }
+
     public void AddBytes(string key, ReadOnlySpan<byte> value)
     {
         lock (_lock)

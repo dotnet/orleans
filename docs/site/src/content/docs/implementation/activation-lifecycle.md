@@ -55,6 +55,18 @@ A deactivation reason distinguishes normal collection, application-requested dea
 
 Migration moves an activation while preserving its grain identity. `ActivationMigrationManager` starts migration by creating a `MigrationContext`, asking registered migration participants to dehydrate state, and deactivating with the `Migrating` reason. The target creates the activation, rehydrates participants, runs activation, and waits until the activation reaches a stable state.
 
+Migratable activations retiring with the `ShuttingDown` reason also migrate when they completed activation and still have queued requests after their running calls and lifecycle callbacks finish. After dehydration, the source transfers one fixed request set to its migration. Later arrivals remain in the source activation's queue. The source stays in the catalog through migration and disposal, then synchronously leaves the catalog, completes the original handoff's disposition, and forwards or rejects its remaining queue before signaling deactivation completion. This ordering lets shutdown await deactivations already underway and prevents forwarded requests from returning to the retiring activation. Stuck activations retain their early-abandonment path.
+
+The destination catalog admits carried requests through ordinary `IGrainContext.ReceiveMessage`, preserving FIFO order, overload checks, cancellation, and failure handling. A new activation receives them before rehydration and directory registration; creation commits the catalog to scheduling rehydration and `Activate`, including when admission throws. An existing activation receives the requests and the unused context is disposed. Each context owns every submitted request, including when submission throws. During rehydration, a new activation reads its previous registration and adds cache updates to queued requests. Responses carry these updates; one-way callers converge through normal forwarding and cache repair on their next send.
+
+The source prepares ordinary connection-framed requests once into managed byte arrays. These frames bound the package size together with its context and list framing, then supply the package's single serialization. Each frame carries the remaining time-to-live sampled during preparation. Destination decoding produces ordinary eager message bodies, and admission drops expired requests individually. When a group exceeds the message budget, or cancellation prevents sending it, the source restores prepared bodies and request-context values from those frames for ordinary forwarding. Preparation or restoration failure rejects affected requests. The migration context retains its pooled storage and ordinary consuming serialization.
+
+`AcceptMigratingGrains` retains its original RPC identity and request-free package fields. The source carries requests only when the destination's manifest advertises version 1 or later of `IActivationMigrationManagerSystemTarget`; older destinations receive request-free packages with ordinary forwarding. Each migration consumes one forward, and requests which have exhausted the forward limit stay with the source for rejection.
+
+Acceptance transfers carried requests to the destination. The source then retargets pending callbacks on calling silos, preserving their original deadlines and increasing forward counts monotonically. Registered calls which were already canceled signal cancellation to their new target. Retargeting remains best-effort, and a caller which still tracks the retiring silo can fail when that silo departs. Failed or unknown acceptance rejects carried requests without replay; a request can still execute after a lost acknowledgement. Unsent work follows ordinary forwarding.
+
+<xref:Orleans.Configuration.SiloMessagingOptions.SystemResponseTimeout> bounds the acceptance invocation, including outgoing filters, using the messaging clock. <xref:Orleans.Configuration.GrainCollectionOptions.DeactivationTimeout> cancels a queued migration or completes an accepted migration's wait for retargeting. A sent migration waits for its acceptance outcome. A writer already in progress completes using the fixed request frames; completed migrations reject delayed writers. Operators should include both acceptance and retargeting in their [shutdown budget](../host/configuration-guide/shutting-down-orleans.md#queued-requests-during-shutdown).
+
 ```mermaid
 sequenceDiagram
     participant Source as Source activation
@@ -64,12 +76,14 @@ sequenceDiagram
 
     Manager->>Source: Begin migration
     Source->>Source: OnDehydrate(MigrationContext)
-    Source->>Directory: Remove or transfer registration
     Manager->>Target: AcceptMigratingGrains
-    Target->>Target: Create and OnRehydrate
-    Target->>Directory: Register target activation
+    Target->>Target: Create, admit requests, and OnRehydrate
+    Target->>Directory: Replace the source's registration
     Target->>Target: OnActivateAsync
-    Target-->>Manager: Stable activation
+    Target-->>Manager: Stable activation, requests accepted
+    Manager->>Manager: Retarget callers (best-effort)
+    Manager->>Source: Migration complete
+    Source->>Source: Leave catalog and forward later arrivals
 ```
 
 Migration state is not the same as persisted grain state. <xref:Orleans.Runtime.IGrainMigrationParticipant> is intended for runtime or application components whose in-memory state must accompany a live move. Participants write versionable data to the migration context and must tolerate rehydration on another silo.

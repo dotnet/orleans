@@ -38,7 +38,7 @@ internal sealed partial class ActivationData :
     IAsyncDisposable,
     IDisposable
 {
-    private const string GrainAddressMigrationContextKey = "sys.addr";
+    internal const string GrainAddressMigrationContextKey = "sys.addr";
 #if NET10_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
@@ -1493,6 +1493,11 @@ internal sealed partial class ActivationData :
                     LogPreviousActivationAddress(_shared.Logger, previousRegistration);
                     rehydrateSpan?.SetTag(ActivityTagKeys.RehydratePreviousRegistration,
                         previousRegistration.ToFullString());
+
+                    foreach (var (message, _) in _waitingRequests)
+                    {
+                        message.AddToCacheInvalidationHeader(previousRegistration, Address);
+                    }
                 }
 
                 if (_lifecycle is { } lifecycle)
@@ -2098,6 +2103,7 @@ internal sealed partial class ActivationData :
 
         var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start(_shared.CatalogInstruments, _shared.GrainTypeMetricName);
         var migrating = false;
+        ActivationMigration? migration = null;
         var encounteredError = false;
         try
         {
@@ -2164,6 +2170,15 @@ internal sealed partial class ActivationData :
                 }
 
                 if (!encounteredError
+                    && deactivateCommand.PreviousState == ActivationState.Valid
+                    && DehydrationContext is null
+                    && WaitingCount > 0
+                    && MigratesOnRetirement())
+                {
+                    DehydrationContext = new(_shared.SerializerSessionPool, requestContext: null);
+                }
+
+                if (!encounteredError
                     && DehydrationContext is { } context
                     && _shared.MigrationManager is { } migrationManager
                     && !cancellationToken.IsCancellationRequested)
@@ -2218,8 +2233,6 @@ internal sealed partial class ActivationData :
                 _shared.CatalogInstruments.ActivationShutdownViaCollection(_shared.GrainTypeMetricName);
             }
 
-            UnregisterMessageTarget();
-
             try
             {
                 await DisposeAsync();
@@ -2237,8 +2250,36 @@ internal sealed partial class ActivationData :
 
             deactivationMetrics = deactivationMetrics.Record();
 
-            // Signal deactivation
-            GetDeactivationCompletionSource().TrySetResult(true);
+            // Leaving the catalog, delivering the original handoff, and draining later arrivals are synchronous.
+            // Forwarding follows leaving, so requests cannot return to this activation.
+            UnregisterMessageTarget();
+            try
+            {
+                if (migration is not null)
+                {
+                    _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
+                    migration.Deliver();
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (DeactivationException is null || ForwardingAddress is not null)
+                    {
+                        RerouteAllQueuedMessages();
+                    }
+                    else
+                    {
+                        RejectAllQueuedMessages();
+                    }
+                }
+                finally
+                {
+                    GetDeactivationCompletionSource().TrySetResult(true);
+                }
+            }
+
             _workSignal.Signal();
         }
         finally
@@ -2269,8 +2310,9 @@ internal sealed partial class ActivationData :
 
                 OnDehydrate(context.MigrationContext);
 
-                // Send the dehydration context to the target host.
-                await migrationManager.MigrateAsync(ForwardingAddress, GrainId, context.MigrationContext).AsTask().WaitAsync(cancellationToken);
+                // The migration owns this fixed handoff. Later arrivals remain in this activation's queue.
+                migration = migrationManager.StartMigration(ForwardingAddress, Address, context.MigrationContext, TakeRequestsForMigration(), cancellationToken);
+                await migration.Completion;
                 _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, ForwardingAddress);
                 return true;
             }
