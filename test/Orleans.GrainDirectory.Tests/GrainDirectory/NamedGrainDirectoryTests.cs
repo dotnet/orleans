@@ -26,7 +26,7 @@ public sealed class NamedGrainDirectoryTests
         {
             if (directoryName is not null)
             {
-                siloBuilder.UseLocalGrainDirectory();
+                siloBuilder.UseLegacyGrainDirectory();
             }
 
             siloBuilder.AddDistributedGrainDirectory(directoryName);

@@ -120,33 +120,33 @@ The categories are fixed and carry no silo addresses, manifest hashes, or grain 
 | `orleans-consistent-ring-range-percentage-local` | OG | Percent, implicit | - | Percentage of the consistent-hash ring currently owned by this silo. |
 | `orleans-consistent-ring-size` | OG | Silos, implicit | - | Members in the consistent-hash ring. |
 | `orleans-directory-cache-size` | OG | Entries, implicit | - | Total entries across registered local grain-directory caches. |
-| `orleans-directory-lookups-cache-issued` | C | Lookups, implicit | - | Grain-location lookups attempted against the local directory cache. |
+| `orleans-directory-lookups-cache-issued` | C | Lookups, implicit | - | Grain-location lookups attempted against this silo's directory cache. |
 | `orleans-directory-lookups-cache-successes` | C | Lookups, implicit | - | Local directory-cache lookups which returned a usable entry. |
 | `orleans-directory-lookups-full-issued` | C | Lookups, implicit | - | Full grain-directory lookups initiated by this silo. |
-| `orleans-directory-lookups-local-directory-issued` | C | Lookups, implicit | - | Lookups issued directly against the local directory partition. |
-| `orleans-directory-lookups-local-directory-successes` | C | Lookups, implicit | - | Direct local-partition lookups which returned a grain address. |
-| `orleans-directory-lookups-local-issued` | C | Lookups, implicit | - | Grain-location lookups issued through the local grain locator. |
-| `orleans-directory-lookups-local-successes` | C | Lookups, implicit | - | Local grain-locator lookups which returned a grain address. |
+| `orleans-directory-lookups-local-directory-issued` | C | Lookups, implicit | - | Lookups issued directly against the legacy directory partition. |
+| `orleans-directory-lookups-local-directory-successes` | C | Lookups, implicit | - | Direct legacy-partition lookups which returned a grain address. |
+| `orleans-directory-lookups-local-issued` | C | Lookups, implicit | - | Grain-location lookups issued through the legacy grain locator. |
+| `orleans-directory-lookups-local-successes` | C | Lookups, implicit | - | Legacy grain-locator lookups which returned a grain address. |
 | `orleans-directory-lookups-remote-received` | C | Lookups, implicit | - | Forwarded directory lookup requests received from another silo. |
 | `orleans-directory-lookups-remote-sent` | C | Lookups, implicit | - | Directory lookup requests forwarded to another silo. |
-| `orleans-directory-partition-size` | OG | Entries, implicit | - | Grain registrations in this silo's local directory partition. |
+| `orleans-directory-partition-size` | OG | Entries, implicit | - | Grain registrations in this silo's legacy directory partition. |
 | `orleans-directory-range-lock-held-duration` | H | Milliseconds, implicit | - | Distribution of time directory range locks were held. |
 | `orleans-directory-recovery-count` | C | Recoveries, implicit | - | Directory range recoveries completed after membership changes. |
 | `orleans-directory-recovery-duration` | H | Milliseconds, implicit | - | Distribution of completed directory range-recovery durations. |
 | `orleans-directory-registration-duration` | H | `ms` | `locator`, `status` | Grain registration duration by locator implementation and `success`, `canceled`, or `error` outcome. |
 | `orleans-directory-registrations` | C | Registrations, implicit | `locator`, `status` | Completed grain registration attempts by locator implementation and outcome. |
 | `orleans-directory-registrations-single-act-issued` | C | Registrations, implicit | - | Single-activation registration requests initiated on this silo. |
-| `orleans-directory-registrations-single-act-local` | C | Registrations, implicit | - | Single-activation registrations handled by the local directory owner. |
+| `orleans-directory-registrations-single-act-local` | C | Registrations, implicit | - | Single-activation registrations handled by this silo's legacy directory partition. |
 | `orleans-directory-registrations-single-act-remote-received` | C | Registrations, implicit | - | Forwarded single-activation registration requests received from another silo. |
 | `orleans-directory-registrations-single-act-remote-sent` | C | Registrations, implicit | - | Single-activation registration requests forwarded to another silo. |
-| `orleans-directory-ring-local-portion-average-percentage` | OG | Percent, implicit | - | Equal-share percentage of the local grain-directory ring (`100 / ring size`). |
+| `orleans-directory-ring-local-portion-average-percentage` | OG | Percent, implicit | - | Equal-share percentage of the legacy grain-directory ring (`100 / ring size`). |
 | `orleans-directory-ring-local-portion-distance` | OG | Hash-ring distance, implicit | - | Raw hash-ring distance from this silo to its successor. |
-| `orleans-directory-ring-local-portion-percentage` | OG | Percent, implicit | - | Percentage of the local grain-directory ring assigned to this silo. |
-| `orleans-directory-ring-size` | OG | Silos, implicit | - | Members in the local grain-directory ring. |
+| `orleans-directory-ring-local-portion-percentage` | OG | Percent, implicit | - | Percentage of the legacy grain-directory ring assigned to this silo. |
+| `orleans-directory-ring-size` | OG | Silos, implicit | - | Members in the legacy grain-directory ring. |
 | `orleans-directory-snapshot-transfer-count` | C | Transfers, implicit | - | Directory range snapshots successfully received from the previous partition owner. |
 | `orleans-directory-snapshot-transfer-duration` | H | Milliseconds, implicit | - | Distribution of successful directory snapshot-transfer durations. |
 | `orleans-directory-unregistrations-issued` | C | Unregistrations, implicit | - | Single grain-unregistration requests initiated on this silo. |
-| `orleans-directory-unregistrations-local` | C | Unregistrations, implicit | - | Single grain-unregistration requests handled by the local directory owner. |
+| `orleans-directory-unregistrations-local` | C | Unregistrations, implicit | - | Single grain-unregistration requests handled by this silo's legacy directory partition. |
 | `orleans-directory-unregistrations-many-issued` | C | Requests, implicit | - | Batch grain-unregistration requests initiated on this silo. |
 | `orleans-directory-unregistrations-many-remote-received` | C | Requests, implicit | - | Forwarded batch unregistration requests received from another silo. |
 | `orleans-directory-unregistrations-many-remote-sent` | C | Requests, implicit | - | Batch unregistration requests forwarded to another silo. |

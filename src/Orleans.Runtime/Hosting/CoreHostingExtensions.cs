@@ -159,15 +159,15 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Selects the legacy local grain directory as the default for grain types without an explicit directory selection.
+        /// Selects the legacy grain directory as the default for grain types without an explicit directory selection.
         /// </summary>
         /// <param name="siloBuilder">The silo builder.</param>
         /// <returns>The provided silo builder.</returns>
         /// <remarks>
         /// Configure every silo with this option to defer migration to the distributed grain directory.
-        /// Migration from the local directory to the distributed directory is one-way.
+        /// Migration from the legacy directory to the distributed directory is one-way.
         /// </remarks>
-        public static ISiloBuilder UseLocalGrainDirectory(this ISiloBuilder siloBuilder)
+        public static ISiloBuilder UseLegacyGrainDirectory(this ISiloBuilder siloBuilder)
         {
             siloBuilder.Services.RemoveDefaultGrainDirectory();
             return siloBuilder;
@@ -185,7 +185,7 @@ namespace Orleans.Hosting
                 }
             }
 
-            // Removing unused distributed services lets the local directory install its compatibility endpoints.
+            // Removing unused distributed services lets the legacy directory install its compatibility endpoints.
             services.Remove(DirectoryDescriptor);
             services.Remove(DirectoryLifecycleDescriptor);
             services.Remove(DirectoryMembershipDescriptor);

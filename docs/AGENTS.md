@@ -86,6 +86,9 @@ Place updates in the appropriate category and cross-link rather than mix purpose
 - Describe implemented behavior and verified constraints: relevant triggers,
   runtime actions, outcomes, and operator responses. Attribute responsibilities to
   the mechanism that performs them.
+- Use `LegacyGrainDirectory` for the user-facing directory name and
+  `UseLegacyGrainDirectory` for its configuration API. Keep implementation
+  identifiers such as `LocalGrainDirectory` in source paths and code references.
 - Preserve useful content and authoritative references; update affected contracts
   and behavior. Remove obsolete or redundant material.
 - Treat hub pages as overviews: link to peer detail pages instead of singling out one provider or feature for inline configuration guidance.
