@@ -202,7 +202,9 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
             token = await _register.TryWriteAsync(proposed, read.Token, cancellationToken);
             if (token is not null)
             {
-                Install(new(proposed, token));
+                // Record a known committed outcome even after concurrent termination.
+                // The terminal state continues to close reads and ownership admission.
+                Install(new(proposed, token), requireAvailable: false);
             }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -299,11 +301,15 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
         }
     }
 
-    private void ValidateRead(ClusterServiceRegisterRead read)
+    private void ValidateRead(ClusterServiceRegisterRead read, bool requireAvailable = true)
     {
         lock (_lock)
         {
-            ThrowIfTerminated();
+            if (requireAvailable)
+            {
+                ThrowIfTerminated();
+            }
+
             var view = read.View;
             if (view is null)
             {
@@ -346,11 +352,11 @@ internal sealed class RegisteredClusterServiceViewProvider : IClusterServiceView
         }
     }
 
-    private void Install(ClusterServiceRegisterRead read)
+    private void Install(ClusterServiceRegisterRead read, bool requireAvailable = true)
     {
         lock (_lock)
         {
-            ValidateRead(read);
+            ValidateRead(read, requireAvailable);
             var view = read.View!;
             if (_current is { } current && view.Id.CompareTo(current.Id) <= 0)
             {

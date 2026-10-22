@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Reflection;
+using NSubstitute;
 using Orleans.Runtime;
 using Orleans.Runtime.ClusterServices;
 using Orleans.Runtime.GrainDirectory;
@@ -447,6 +449,52 @@ public sealed class RegisteredClusterServiceViewProviderTests
         {
             release.TrySetResult();
         }
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task KnownSuccessfulPublicationRecordsItsTokenAfterConcurrentLivenessFailure()
+    {
+        var register = Substitute.For<IClusterServiceViewRegister>();
+        register.ReadAsync(Arg.Any<CancellationToken>()).Returns(new ClusterServiceRegisterRead(null, null));
+        var committed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reply = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken writeToken = default;
+        register.TryWriteAsync(Arg.Any<RegisteredClusterServiceView>(), null, Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                writeToken = call.ArgAt<CancellationToken>(2);
+                committed.SetResult();
+                // The transport reports its known CAS outcome even after provider cancellation.
+                return new ValueTask<string?>(reply.Task.WaitAsync(TestContext.Current.CancellationToken));
+            });
+        var membership = new TestServiceMembership();
+        await using var provider = new RegisteredClusterServiceViewProvider(
+            "service", "authority", register, membership, pollInterval: TimeSpan.FromDays(1));
+        var publication = Publish(provider, TestServiceMembership.A).AsTask();
+        await committed.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var failure = new IOException("Membership failed after the CAS committed.");
+        membership.OnRefresh = (_, _) => ValueTask.FromException(failure);
+
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() =>
+            provider.RefreshLivenessAsync(TestContext.Current.CancellationToken).AsTask()));
+        Assert.True(writeToken.IsCancellationRequested);
+        Assert.False(publication.IsCompleted);
+        Assert.False(provider.TryGetCurrentView(out _));
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() =>
+            provider.RefreshAsync(TestContext.Current.CancellationToken).AsTask()));
+
+        reply.SetResult("committed-etag");
+        var published = await publication.WaitAsync(TestContext.Current.CancellationToken);
+
+        var recorded = Assert.IsType<ClusterServiceRegisterRead>(typeof(RegisteredClusterServiceViewProvider)
+            .GetField("_lastRead", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(provider));
+        Assert.Same(published, recorded.View);
+        Assert.Equal("committed-etag", recorded.Token);
+        Assert.Same(published, typeof(RegisteredClusterServiceViewProvider)
+            .GetField("_current", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(provider));
+        Assert.False(provider.TryGetCurrentView(out _));
+        Assert.False(provider.IsOwnerLive(TestServiceMembership.A, published.MembershipWatermark));
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => Publish(provider, TestServiceMembership.B).AsTask()));
     }
 
     [Fact(Timeout = 30_000)]
