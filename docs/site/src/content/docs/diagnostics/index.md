@@ -114,3 +114,11 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 ## ORLEANS0027
 
 [Grain interface member removed from source](orleans0027.md) — Warning. The manifest retains an RPC signature which is absent from source.
+
+## ORLEANS0028
+
+[Grain contract data types require serialization support](orleans0028.md) — Opt-in warning. A concrete type in a grain RPC data graph lacks statically declared serialization support, or its graph exceeds the static traversal limit.
+
+## ORLEANS0029
+
+[Grain state data types require serialization support](orleans0029.md) — Opt-in warning. State used by Orleans-serialized storage or live migration lacks statically declared serialization support, or its graph exceeds the static traversal limit.
