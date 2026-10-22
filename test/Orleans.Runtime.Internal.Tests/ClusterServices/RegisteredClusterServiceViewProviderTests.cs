@@ -456,11 +456,11 @@ public sealed class RegisteredClusterServiceViewProviderTests
         var membership = new TestServiceMembership();
         await using var provider = new RegisteredClusterServiceViewProvider(
             "service", "authority", register, membership, member => member.SiloAddress.Equals(TestServiceMembership.A), TimeSpan.FromDays(1));
-        await Assert.ThrowsAsync<ArgumentException>(() => Publish(provider, TestServiceMembership.B).AsTask());
+        await Assert.ThrowsAsync<ArgumentException>(() => Publish(provider, TestServiceMembership.B).AsTask().WaitAsync(TestContext.Current.CancellationToken));
         var unknown = SiloAddress.FromParsableString("127.0.0.1:33333@9");
-        await Assert.ThrowsAsync<ArgumentException>(() => Publish(provider, unknown, [unknown]).AsTask());
+        await Assert.ThrowsAsync<ArgumentException>(() => Publish(provider, unknown, [unknown]).AsTask().WaitAsync(TestContext.Current.CancellationToken));
         membership.SetStatus(TestServiceMembership.A, SiloStatus.Dead);
-        await Assert.ThrowsAsync<ArgumentException>(() => Publish(provider, TestServiceMembership.A, [TestServiceMembership.A]).AsTask());
+        await Assert.ThrowsAsync<ArgumentException>(() => Publish(provider, TestServiceMembership.A, [TestServiceMembership.A]).AsTask().WaitAsync(TestContext.Current.CancellationToken));
         Assert.Equal(0, register.SuccessfulWrites);
     }
 

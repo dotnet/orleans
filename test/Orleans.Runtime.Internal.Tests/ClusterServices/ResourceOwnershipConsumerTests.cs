@@ -76,12 +76,12 @@ public sealed class ResourceOwnershipConsumerTests
         var protocol = new Protocol { Recover = (_, _, _) => ValueTask.FromException<ReadOnlyMemory<byte>>(failure) };
         await using var consumer = new ResourceOwnershipConsumer(TestServiceMembership.A, provider, protocol);
         var first = await Publish(provider, TestServiceMembership.A);
-        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => consumer.InstallViewAsync(first)));
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => consumer.InstallViewAsync(first).WaitAsync(TestContext.Current.CancellationToken)));
 
         var second = await Publish(provider, TestServiceMembership.B);
-        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => consumer.InstallViewAsync(second)));
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => consumer.InstallViewAsync(second).WaitAsync(TestContext.Current.CancellationToken)));
         var third = await Publish(provider, TestServiceMembership.A);
-        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => consumer.InstallViewAsync(third)));
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => consumer.InstallViewAsync(third).WaitAsync(TestContext.Current.CancellationToken)));
         Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => Read(consumer, third.Id).AsTask()));
 
         Assert.Equal(1, protocol.Recoveries);
