@@ -15,11 +15,12 @@ Orleans uses the built-in `DistributedGrainDirectory` by default. It keeps regis
 
 The directory coordinates registration and ownership transfer so that callers agree on an activation's location as membership changes. Keep grain operations idempotent: failed calls and retries can still repeat application work.
 
-To select `LocalGrainDirectory`, call <xref:Orleans.Hosting.CoreHostingExtensions.UseLocalGrainDirectory*> on every silo.
+To select `LegacyGrainDirectory`, call <xref:Orleans.Hosting.CoreHostingExtensions.UseLegacyGrainDirectory*> on every silo.
 
 <a id="local-to-distributed-directory-upgrade"></a>
+<a id="legacy-to-distributed-directory-upgrade"></a>
 
-For version upgrades, follow [Grain directory migration](../migration/grain-directory.md#local-to-distributed-directory-upgrade).
+For version upgrades, follow [Grain directory migration](../migration/grain-directory.md#legacy-to-distributed-directory-upgrade).
 
 ## Which grain directory should you use?
 

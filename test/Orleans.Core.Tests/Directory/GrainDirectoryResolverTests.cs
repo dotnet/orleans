@@ -38,7 +38,7 @@ namespace NonSilo.Tests.Directory
             hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
                 siloBuilder
-                    .UseLocalGrainDirectory()
+                    .UseLegacyGrainDirectory()
                     .AddGrainDirectory(CustomDirectoryGrain.DIRECTORY, (sp, nameof) => this.azureDirectory)
                     .AddGrainDirectory("OtherDirectory", (sp, nameof) => this.otherDirectory)
                     .AddGrainDirectory("AgainAnotherDirectory", (sp, nameof) => this.againAnotherDirectory)
@@ -59,7 +59,7 @@ namespace NonSilo.Tests.Directory
         }
 
         [Fact]
-        public void DefaultDhtDirectory()
+        public void LegacyDhtDirectory()
         {
             Assert.Null(this.target.Resolve(GrainType.Create(DefaultDirectoryGrain.DIRECTORY)));
         }
@@ -107,14 +107,14 @@ namespace NonSilo.Tests.Directory
         }
 
         [Fact]
-        public void LocalDirectorySelectionRemovesDistributedDefault()
+        public void LegacyDirectorySelectionRemovesDistributedDefault()
         {
             using var configuredHost = new HostBuilder().UseOrleans(siloBuilder =>
             {
                 siloBuilder.UseLocalhostClustering();
                 siloBuilder.AddDistributedGrainDirectory();
-                siloBuilder.UseLocalGrainDirectory();
-                siloBuilder.UseLocalGrainDirectory();
+                siloBuilder.UseLegacyGrainDirectory();
+                siloBuilder.UseLegacyGrainDirectory();
             }).Build();
 
             var services = configuredHost.Services;
@@ -132,7 +132,7 @@ namespace NonSilo.Tests.Directory
         [Theory]
         [InlineData(false)]
         [InlineData(true)]
-        public void LocalDirectorySelectionPreservesNamedDistributedDirectory(bool registerNamedFirst)
+        public void LegacyDirectorySelectionPreservesNamedDistributedDirectory(bool registerNamedFirst)
         {
             using var configuredHost = new HostBuilder().UseOrleans(siloBuilder =>
             {
@@ -143,7 +143,7 @@ namespace NonSilo.Tests.Directory
                     siloBuilder.AddDistributedGrainDirectory("named");
                 }
 
-                siloBuilder.UseLocalGrainDirectory();
+                siloBuilder.UseLegacyGrainDirectory();
                 if (!registerNamedFirst)
                 {
                     siloBuilder.AddDistributedGrainDirectory("named");
@@ -165,13 +165,13 @@ namespace NonSilo.Tests.Directory
         }
 
         [Fact]
-        public void DistributedDirectoryCanBeSelectedAfterLocalDirectory()
+        public void DistributedDirectoryCanBeSelectedAfterLegacyDirectory()
         {
             using var configuredHost = new HostBuilder().UseOrleans(siloBuilder =>
             {
                 siloBuilder.UseLocalhostClustering();
                 siloBuilder.AddDistributedGrainDirectory();
-                siloBuilder.UseLocalGrainDirectory();
+                siloBuilder.UseLegacyGrainDirectory();
                 siloBuilder.AddDistributedGrainDirectory("named");
                 siloBuilder.AddDistributedGrainDirectory();
                 siloBuilder.AddDistributedGrainDirectory();
@@ -209,13 +209,13 @@ namespace NonSilo.Tests.Directory
         }
 
         [Fact]
-        public void LocalDirectorySelectionRemovesCustomDefault()
+        public void LegacyDirectorySelectionRemovesCustomDefault()
         {
             using var configuredHost = new HostBuilder().UseOrleans(siloBuilder =>
             {
                 siloBuilder.UseLocalhostClustering();
                 siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => this.otherDirectory);
-                siloBuilder.UseLocalGrainDirectory();
+                siloBuilder.UseLegacyGrainDirectory();
             }).Build();
 
             var services = configuredHost.Services;

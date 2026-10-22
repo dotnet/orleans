@@ -39,7 +39,7 @@ namespace NonSilo.Tests.Directory
             hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
                 siloBuilder
-                    .UseLocalGrainDirectory()
+                    .UseLegacyGrainDirectory()
                     .ConfigureServices(svc => svc.AddSingleton(Substitute.For<DhtGrainLocator>(null, null)))
                     .ConfigureServices(svc => svc.AddGrainDirectory(CustomDirectoryGrain.DIRECTORY, (sp, nameof) => this.customDirectory))
                     .ConfigureLogging(builder => builder.AddProvider(new XunitLoggerProvider(output)))

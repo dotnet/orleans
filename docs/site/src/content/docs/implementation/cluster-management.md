@@ -122,7 +122,7 @@ Official providers adapt transactions, ETags, lightweight transactions, or compa
 
 Membership is deliberately separate from the services which consume it:
 
-- `LocalGrainDirectory` adjusts consistent-hash ownership after view changes.
+- `LegacyGrainDirectory` adjusts consistent-hash ownership after view changes.
 - the distributed directory runs an explicit range-transfer protocol.
 - placement removes unavailable or overloaded candidates.
 - clients refresh the gateway list.
