@@ -558,14 +558,30 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                     result.Add(lines[index - 1].Trim());
                 }
 
+                var isRetired = declaration.StartsWith(GrainInterfaceVersionAnalyzer.RetiredPrefix, StringComparison.Ordinal);
                 for (var blockIndex = index; blockIndex < blockEnd; blockIndex++)
                 {
-                    result.Add(blockIndex == index
-                        && !declaration.StartsWith(GrainInterfaceVersionAnalyzer.RetiredPrefix, StringComparison.Ordinal)
-                            ? isInterface
-                                ? GrainInterfaceFileParser.FormatRetiredInterfaceDeclaration(declaration, legacyGrainInterfaceTypes)
-                                : $"{GrainInterfaceVersionAnalyzer.RetiredPrefix} {declaration}"
-                            : lines[blockIndex]);
+                    if (blockIndex != index)
+                    {
+                        result.Add(lines[blockIndex]);
+                    }
+                    else if (!isRetired)
+                    {
+                        result.Add(isInterface
+                            ? GrainInterfaceFileParser.FormatRetiredInterfaceDeclaration(declaration, legacyGrainInterfaceTypes)
+                            : $"{GrainInterfaceVersionAnalyzer.RetiredPrefix} {declaration}");
+                    }
+                    else
+                    {
+                        // Record the identity of an already-retired legacy declaration while its source interface exists.
+                        result.Add(isInterface
+                            && GrainInterfaceFileParser.TryRecordLegacyGrainInterfaceType(
+                                declaration,
+                                legacyGrainInterfaceTypes,
+                                out var recordedDeclaration)
+                                ? recordedDeclaration
+                                : lines[blockIndex]);
+                    }
                 }
             }
             else if (activeInterface is not null)

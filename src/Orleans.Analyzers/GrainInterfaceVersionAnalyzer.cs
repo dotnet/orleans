@@ -1351,13 +1351,25 @@ internal static class GrainInterfaceFileParser
             : $"[GrainInterfaceType(\"{value}\")]";
 
     /// <summary>
-    /// Formats an active interface declaration as retired. A legacy declaration whose name resolves to an identity
-    /// other than the one the name implies records the resolved identity, so that renaming the source interface it
-    /// denotes cannot change the meaning of the retired declaration.
+    /// Formats an active interface declaration as retired, recording a legacy declaration's resolved identity.
     /// </summary>
     internal static string FormatRetiredInterfaceDeclaration(
         string declaration,
         LegacyGrainInterfaceTypeResolver? legacyGrainInterfaceTypes)
+        => $"{GrainInterfaceVersionAnalyzer.RetiredPrefix} "
+            + (TryRecordLegacyGrainInterfaceType(declaration, legacyGrainInterfaceTypes, out var recorded)
+                ? recorded
+                : declaration);
+
+    /// <summary>
+    /// Rewrites a legacy interface declaration whose name resolves to an identity other than the one the name implies
+    /// so that it records the resolved identity. Renaming the source interface the name denotes then cannot change the
+    /// declaration's meaning. A retired declaration stays retired.
+    /// </summary>
+    internal static bool TryRecordLegacyGrainInterfaceType(
+        string declaration,
+        LegacyGrainInterfaceTypeResolver? legacyGrainInterfaceTypes,
+        out string recordedDeclaration)
     {
         var match = InterfacePattern.Match(StripClrComment(declaration));
         if (match.Success && legacyGrainInterfaceTypes is not null && GetRecordedGrainInterfaceType(match) is null)
@@ -1369,12 +1381,15 @@ internal static class GrainInterfaceFileParser
                 GrainInterfaceVersionAnalyzer.GetDefaultGrainInterfaceType(name),
                 StringComparison.Ordinal))
             {
-                declaration = $"interface {FormatGrainInterfaceTypeAttribute(grainInterfaceType)} {name} "
+                recordedDeclaration = (match.Groups["retired"].Success ? $"{GrainInterfaceVersionAnalyzer.RetiredPrefix} " : string.Empty)
+                    + $"interface {FormatGrainInterfaceTypeAttribute(grainInterfaceType)} {name} "
                     + $"[Version({match.Groups["version"].Value})]{GetClrComment(declaration)}";
+                return true;
             }
         }
 
-        return $"{GrainInterfaceVersionAnalyzer.RetiredPrefix} {declaration}";
+        recordedDeclaration = declaration;
+        return false;
     }
 
     private static bool RequiresEscaping(string value)
