@@ -471,7 +471,9 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         {
             activeConventionInterfaceNames.Add(interfaceName);
         }
-        if (GrainInterfaceVersionAnalyzer.IdentityDiffersFromClrName(explicitInterfaceType, type))
+        if (GrainInterfaceVersionAnalyzer.IdentityDiffersFromClrName(
+            GrainInterfaceVersionAnalyzer.GetNonDefaultGrainInterfaceType(type),
+            type))
         {
             lines.Add($"# {interfaceName}");
         }
@@ -1291,9 +1293,10 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         }
 
         var version = GetVersionFromAttributes(symbol);
-        var explicitGrainInterfaceType = GetGrainInterfaceTypeFromAttributes(symbol);
         grainInterfaceType ??= GrainInterfaceVersionAnalyzer.GetGrainInterfaceType(symbol);
-        var interfaceClrComment = GrainInterfaceVersionAnalyzer.IdentityDiffersFromClrName(explicitGrainInterfaceType, symbol)
+        var interfaceClrComment = GrainInterfaceVersionAnalyzer.IdentityDiffersFromClrName(
+                GrainInterfaceVersionAnalyzer.GetNonDefaultGrainInterfaceType(symbol),
+                symbol)
             ? interfaceName
             : null;
 
