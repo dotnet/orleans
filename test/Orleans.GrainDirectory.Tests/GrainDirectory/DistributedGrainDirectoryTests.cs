@@ -43,6 +43,7 @@ public sealed class DistributedGrainDirectoryMembershipTests
         builder.ConfigureSilo((_, siloBuilder) =>
         {
             siloBuilder.AddDistributedGrainDirectory("first");
+            siloBuilder.AddDistributedGrainDirectory("first");
             siloBuilder.AddDistributedGrainDirectory("second");
         });
         var cluster = builder.Build();
@@ -57,7 +58,7 @@ public sealed class DistributedGrainDirectoryMembershipTests
             var second = services.GetRequiredKeyedService<IGrainDirectory>("second");
             Assert.Same(defaultDirectory, first);
             Assert.Same(defaultDirectory, second);
-            Assert.Single(services.GetRequiredService<GrainDirectoryResolver>().Directories, defaultDirectory);
+            Assert.Same(defaultDirectory, Assert.Single(services.GetRequiredService<GrainDirectoryResolver>().Directories));
         }
         finally
         {
