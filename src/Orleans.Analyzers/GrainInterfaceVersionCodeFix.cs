@@ -473,7 +473,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             lines.Add($"# {interfaceName}");
         }
 
-        lines.Add($"interface [GrainInterfaceType(\"{GrainInterfaceFileParser.FormatQuotedIdentity(interfaceType)}\")] {interfaceName} [Version({GetVersionFromAttributes(type)})]");
+        lines.Add($"interface {GrainInterfaceFileParser.FormatGrainInterfaceTypeAttribute(interfaceType)} {interfaceName} [Version({GetVersionFromAttributes(type)})]");
         foreach (var member in type.GetMembers()
             .OfType<IMethodSymbol>()
             .Where(member => member.MethodKind == MethodKind.Ordinary && !member.IsStatic)
@@ -1300,7 +1300,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         sb.Append("interface ");
         if (!string.IsNullOrEmpty(grainInterfaceType))
         {
-            sb.Append($"[GrainInterfaceType(\"{GrainInterfaceFileParser.FormatQuotedIdentity(grainInterfaceType)}\")] ");
+            sb.Append($"{GrainInterfaceFileParser.FormatGrainInterfaceTypeAttribute(grainInterfaceType)} ");
         }
         sb.Append(interfaceName);
         sb.Append($" [Version({version})]");
