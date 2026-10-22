@@ -59,6 +59,14 @@ Simulated environment statistics make resource-based tests deterministic, but th
 
 These defaults are defined by <xref:Orleans.TestingHost.InProcessTestClusterBuilder> and <xref:Orleans.TestingHost.InProcessTestClusterOptions>; see their [builder](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcTestClusterBuilder.cs) and [options](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcTestClusterOptions.cs) implementations.
 
+### Directory selection
+
+Setting <xref:Orleans.TestingHost.InProcessTestClusterOptions.UseDistributedGrainDirectory> to `true` selects the distributed default after the silo configuration delegates run, replacing any default selected by those delegates. Named directory registrations remain available.
+
+With this option set to `false`, test membership and the enabled test grain directory select the shared in-process test directory. When that substitution is inapplicable, such as with an external membership provider, the silo keeps its configured directory. An unconfigured silo uses the runtime's distributed default.
+
+To select `LegacyGrainDirectory`, set the option to `false` and call <xref:Orleans.Hosting.CoreHostingExtensions.UseLegacyGrainDirectory*> in <xref:Orleans.TestingHost.InProcessTestClusterBuilder.ConfigureSilo*> while using external membership or disabling the test-directory substitution. Host configuration delegates run before the harness's final silo setup, so declarative providers read the configuration supplied by those delegates.
+
 ## Configuration layers <a name="configure-the-test-cluster"></a>
 
 The builder separates three scopes:

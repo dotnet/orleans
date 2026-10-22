@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.GrainDirectory;
 using TestExtensions;
 using Xunit;
@@ -31,6 +33,157 @@ public sealed class InProcessTestClusterDirectoryTests
         await using var cluster = builder.Build();
         await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
+        Assert.Equal("DistributedGrainDirectory", GetDefaultDirectory(cluster).GetType().Name);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Theory, TestCategory("BVT")]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public async Task DistributedDirectoryOptionFalse_UsesRuntimeDefaultWhenTestDirectoryIsUnavailable(
+        bool useTestClusterMembership,
+        bool useTestClusterGrainDirectory)
+    {
+        var builder = CreateDirectorySelectionBuilder(useTestClusterMembership);
+        builder.Options.UseTestClusterGrainDirectory = useTestClusterGrainDirectory;
+        builder.Options.UseDistributedGrainDirectory = false;
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("DistributedGrainDirectory", GetDefaultDirectory(cluster).GetType().Name);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Theory, TestCategory("BVT")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DistributedDirectoryOptionFalse_PreservesCustomDefaultAndNamedDirectory(bool useTestClusterMembership)
+    {
+        var directory = new NonObservableGrainDirectory();
+        var builder = CreateDirectorySelectionBuilder(useTestClusterMembership);
+        builder.Options.UseDistributedGrainDirectory = false;
+        builder.ConfigureSilo((_, siloBuilder) =>
+        {
+            Orleans.Runtime.Hosting.DirectorySiloBuilderExtensions.AddGrainDirectory(
+                siloBuilder,
+                GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY,
+                (_, _) => directory);
+            siloBuilder.AddDistributedGrainDirectory("named");
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
+
+        var services = cluster.Silos[0].ServiceProvider;
+        Assert.Same(directory, GetDefaultDirectory(cluster));
+        Assert.Equal(
+            "DistributedGrainDirectory",
+            services.GetRequiredKeyedService<IGrainDirectory>("named").GetType().Name);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Theory, TestCategory("BVT")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DistributedDirectoryOptionFalse_PreservesLegacySelectionAndNamedDirectory(bool useTestClusterMembership)
+    {
+        var builder = CreateDirectorySelectionBuilder(useTestClusterMembership);
+        builder.Options.UseDistributedGrainDirectory = false;
+        builder.ConfigureSilo(static (_, siloBuilder) =>
+        {
+            siloBuilder.UseLegacyGrainDirectory();
+            siloBuilder.AddDistributedGrainDirectory("named");
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
+
+        var services = cluster.Silos[0].ServiceProvider;
+        Assert.Null(services.GetKeyedService<IGrainDirectory>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY));
+        Assert.Equal(
+            "DistributedGrainDirectory",
+            services.GetRequiredKeyedService<IGrainDirectory>("named").GetType().Name);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Theory, TestCategory("BVT")]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task DistributedDirectoryOptionTrue_ReplacesConfiguredDefaultAndPreservesNamedDirectory(
+        bool useTestClusterMembership,
+        bool useCustomDefault)
+    {
+        var builder = CreateDirectorySelectionBuilder(useTestClusterMembership);
+        builder.Options.UseDistributedGrainDirectory = true;
+        builder.ConfigureSilo((_, siloBuilder) =>
+        {
+            if (useCustomDefault)
+            {
+                Orleans.Runtime.Hosting.DirectorySiloBuilderExtensions.AddGrainDirectory(
+                    siloBuilder,
+                    GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY,
+                    static (_, _) => new NonObservableGrainDirectory());
+            }
+            else
+            {
+                siloBuilder.UseLegacyGrainDirectory();
+            }
+
+            siloBuilder.AddDistributedGrainDirectory("named");
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
+
+        var services = cluster.Silos[0].ServiceProvider;
+        var defaultDirectory = GetDefaultDirectory(cluster);
+        Assert.Equal("DistributedGrainDirectory", defaultDirectory.GetType().Name);
+        Assert.Same(defaultDirectory, services.GetRequiredKeyedService<IGrainDirectory>("named"));
+        Assert.Single(
+            services.GetServices<ILifecycleParticipant<ISiloLifecycle>>(),
+            static participant => participant.GetType().Name == "DistributedGrainDirectory");
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Theory, TestCategory("BVT")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DistributedDirectoryOptionFalse_PreservesDeclarativeHostConfiguration(bool configureSharedHost)
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        builder.Options.ConfigureFileLogging = false;
+        builder.Options.InitializeClientOnDeploy = false;
+        builder.Options.UseTestClusterMembership = false;
+        builder.Options.UseDistributedGrainDirectory = false;
+        Action<IHostApplicationBuilder> configure = static host =>
+            host.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Orleans:Clustering:ProviderType"] = "Development"
+            });
+        if (configureSharedHost)
+        {
+            builder.ConfigureHost(configure);
+        }
+        else
+        {
+            builder.ConfigureSiloHost((_, host) => configure(host));
+        }
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            "SystemTargetBasedMembershipTable",
+            cluster.Silos[0].ServiceProvider.GetRequiredService<IMembershipTable>().GetType().Name);
         Assert.Equal("DistributedGrainDirectory", GetDefaultDirectory(cluster).GetType().Name);
     }
 
@@ -107,6 +260,22 @@ public sealed class InProcessTestClusterDirectoryTests
     private static IGrainDirectory GetDefaultDirectory(InProcessTestCluster cluster) =>
         cluster.Silos[0].ServiceProvider.GetRequiredKeyedService<IGrainDirectory>(
             GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY);
+
+    private static InProcessTestClusterBuilder CreateDirectorySelectionBuilder(bool useTestClusterMembership)
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        builder.Options.ConfigureFileLogging = false;
+        builder.Options.InitializeClientOnDeploy = false;
+        builder.Options.UseTestClusterMembership = useTestClusterMembership;
+        builder.Options.UseTestClusterGrainDirectory = false;
+        if (!useTestClusterMembership)
+        {
+            builder.ConfigureSilo(static (_, siloBuilder) =>
+                siloBuilder.UseDevelopmentClustering(primarySiloEndpoint: null));
+        }
+
+        return builder;
+    }
 
     [TestSuite("Functional")]
     [TestProvider("None")]

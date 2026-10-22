@@ -20,6 +20,7 @@ namespace Orleans.Hosting
     /// </summary>
     public static class CoreHostingExtensions
     {
+        // Runtime-owned descriptor identities keep alias registration, lifecycle participation, and opt-out cleanup together.
         private static readonly ServiceDescriptor DirectoryDescriptor = ServiceDescriptor.Singleton<DistributedGrainDirectory, DistributedGrainDirectory>();
         private static readonly ServiceDescriptor DirectoryLifecycleDescriptor =
             ServiceDescriptor.Singleton<ILifecycleParticipant<ISiloLifecycle>>(static sp => sp.GetRequiredService<DistributedGrainDirectory>());
