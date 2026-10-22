@@ -49,6 +49,18 @@ If the external grace period expires first, the process is killed and graceful s
 
 Grains can move or reactivate elsewhere after a silo leaves. Don't use graceful shutdown as an application-wide drain barrier unless the application separately coordinates that behavior.
 
+### Queued requests during shutdown
+
+During graceful shutdown, a migratable activation which completed activation and still has queued requests after its running calls and lifecycle callbacks finish migrates with those requests. The destination admits them through ordinary FIFO queueing, overload checks, and activation failure handling. Requests already queued at the destination keep their place. Explicit migration, including <xref:Orleans.Grain.MigrateOnIdle>, carries queued requests through the same path.
+
+After acceptance, the source asks calling silos to retarget their pending calls to the destination. Calls keep their identities and original response deadlines. Retargeting and cancellation signaling are best-effort: a caller which still tracks the source can fail with <xref:Orleans.Runtime.SiloUnavailableException> when that silo departs. The destination drops expired requests individually. Message expiry accounting across transport and retries is best-effort, so a delayed request can execute after its caller has timed out.
+
+The source forwards unsent requests and rejects requests from a failed migration or an unknown acceptance outcome. Callers can retry rejected calls using their application's retry policy. A rejected request can still execute at the destination if acceptance succeeded but its acknowledgement was lost.
+
+Ordinary forwarding handles later arrivals, stateless workers, <xref:Orleans.Placement.ImmovableAttribute> grains, activations already deactivating for another reason, and request groups which exceed <xref:Orleans.Configuration.MessagingOptions.MaxMessageBodySize> together with their migration context. The destination's manifest advertises request-carrying support with version 1 or later of `IActivationMigrationManagerSystemTarget`; older destinations receive request-free migration packages followed by ordinary forwarding. Forwarded requests retain their callers' original tracked target. A migration counts as a forward, and requests which have exhausted <xref:Orleans.Configuration.SiloMessagingOptions.MaxForwardCount> remain at the source for rejection.
+
+Budget for both destination activation and caller retargeting. <xref:Orleans.Configuration.SiloMessagingOptions.SystemResponseTimeout> bounds the complete acceptance invocation, including asynchronous outgoing call filters. <xref:Orleans.Configuration.GrainCollectionOptions.DeactivationTimeout> cancels an unsent migration, whose requests are forwarded, or ends an accepted migration's wait for retarget acknowledgements. A sent migration waits for its acceptance outcome up to the system response timeout. Set the host shutdown budget and orchestrator grace period to accommodate these phases.
+
 ## Containers and orchestrators
 
 Remove the instance from application traffic before requesting host shutdown. Then send the platform's normal termination request, allow the host shutdown budget to elapse, and reserve forceful termination for hung processes. A forced termination, power loss, or process crash can bypass the host entirely, so correctness must not depend on graceful shutdown.

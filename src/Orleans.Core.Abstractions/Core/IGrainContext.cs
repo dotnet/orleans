@@ -67,6 +67,12 @@ namespace Orleans.Runtime
         /// Submits an incoming message to this instance.
         /// </summary>
         /// <param name="message">The message.</param>
+        /// <remarks>
+        /// The context assumes ownership of the message when this method is called. It is responsible for processing
+        /// or forwarding the message, or rejecting or discarding it and releasing its resources, including if activation fails
+        /// or the context is deactivated.
+        /// Ownership remains with the context if this method throws.
+        /// </remarks>
         void ReceiveMessage(object message);
 
         /// <summary>
@@ -74,6 +80,10 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="requestContext">The request context of the request which is causing this instance to be activated, if any.</param>
         /// <param name="cancellationToken">A cancellation token which, when canceled, indicates that the process should complete promptly.</param>
+        /// <remarks>
+        /// The creator calls this method once for each newly created grain activation, after submitting any rehydration work.
+        /// This method schedules activation. The context handles activation failures through its request and lifecycle failure paths.
+        /// </remarks>
         void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -86,6 +96,10 @@ namespace Orleans.Runtime
         /// <summary>
         /// Start rehydrating this instance from the provided rehydration context.
         /// </summary>
+        /// <remarks>
+        /// This method schedules rehydration and transfers ownership of <paramref name="context"/> to this instance.
+        /// Implementations handle operational failures internally so that the creator can subsequently call <see cref="Activate"/>.
+        /// </remarks>
         void Rehydrate(IRehydrationContext context);
 
         /// <summary>

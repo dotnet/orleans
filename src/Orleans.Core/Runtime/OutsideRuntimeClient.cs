@@ -473,7 +473,7 @@ namespace Orleans
             {
                 if (deadSilo.Equals(callback.Value.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callback.Value.OnTargetSiloFail(deadSilo);
                 }
             }
         }
