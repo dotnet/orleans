@@ -153,7 +153,7 @@ public class HostedClientDrainTests
             Assert.Equal(knownRequest, callbacks.ContainsKey(request.Id));
             if (knownRequest)
             {
-                Assert.True(callbacks.TryGetResponseCallback(response.Message, out var registered));
+                Assert.True(callbacks.TryGetCallback(response.Message.Id, out var registered));
                 Assert.Same(callback, registered);
                 callback.OnTimeout();
                 Assert.Equal(1, completion.CompletionCount);
@@ -194,10 +194,10 @@ public class HostedClientDrainTests
                 TimeSpan.FromMinutes(1),
                 cancelOnTimeout: false,
                 waitForCancellationAcknowledgement: false,
-                cancellationManager: null),
+                cancellationManager: null,
+                fixture.ApplicationRequests),
             completion,
-            request,
-            fixture.ApplicationRequests);
+            request);
         try
         {
             using var body = Response.FromResult(731);

@@ -1,4 +1,5 @@
 using System.Diagnostics.Metrics;
+using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
@@ -43,11 +44,11 @@ public class CallbackRegistryTests
 
         registry.Register(callback);
         Assert.Throws<InvalidOperationException>(() => registry.Register(duplicate));
-        Assert.True(registry.TryGetResponseCallback(CreateResponse(callback.Message), out var found));
+        Assert.True(registry.TryGetCallback(callback.Message.Id, out var found));
         Assert.Same(callback, found);
         Assert.False(registry.TryRemove(duplicate));
         Assert.True(registry.TryRemove(callback));
-        Assert.False(registry.TryGetResponseCallback(CreateResponse(callback.Message), out _));
+        Assert.False(registry.TryGetCallback(callback.Message.Id, out _));
     }
 
     [Fact]
@@ -56,8 +57,8 @@ public class CallbackRegistryTests
         const int count = 10_000;
         using var serviceProvider = CreateServiceProvider();
         var registry = new CallbackRegistry();
-        var shared = CreateSharedCallbackData(callback => registry.TryRemove(callback));
         var instruments = CreateInstruments(serviceProvider);
+        var shared = CreateSharedCallbackData(callback => registry.TryRemove(callback), instruments);
         var callbacks = new CallbackData[count];
 
         Parallel.For(0, count, index =>
@@ -65,11 +66,10 @@ public class CallbackRegistryTests
             var callback = CreateCallback(
                 new TestResponseCompletionSource(),
                 CreateRequest(index),
-                shared,
-                instruments);
+                shared);
             callbacks[index] = callback;
             registry.Register(callback);
-            Assert.True(registry.TryGetResponseCallback(CreateResponse(callback.Message), out var found));
+            Assert.True(registry.TryGetCallback(callback.Message.Id, out var found));
             Assert.Same(callback, found);
         });
 
@@ -168,7 +168,7 @@ public class CallbackRegistryTests
     }
 
     [Fact]
-    public void TryGetResponseCallback_StatusUsesRegisteredCallback()
+    public void TryGetCallback_StatusUsesRegisteredCallback()
     {
         using var serviceProvider = CreateServiceProvider();
         var registry = new CallbackRegistry();
@@ -182,7 +182,7 @@ public class CallbackRegistryTests
         status.Result = Message.ResponseTypes.Status;
         status.BodyObject = new StatusResponse(true, false, []);
 
-        Assert.True(registry.TryGetResponseCallback(status, out var result));
+        Assert.True(registry.TryGetCallback(status.Id, out var result));
 
         Assert.Same(callback, result);
         callback.OnHostShutdown();
@@ -428,7 +428,7 @@ public class CallbackRegistryTests
                 callback.OnTimeout();
                 break;
             case TerminalRace.TargetFailure:
-                callback.OnTargetSiloFail();
+                callback.OnTargetSiloFail(callback.Message.TargetSilo!);
                 break;
             case TerminalRace.Shutdown:
                 callback.OnHostShutdown();
@@ -460,17 +460,15 @@ public class CallbackRegistryTests
         => CreateCallback(
             completion,
             request,
-            CreateSharedCallbackData(unregister),
-            CreateInstruments(serviceProvider));
+            CreateSharedCallbackData(unregister, CreateInstruments(serviceProvider)));
 
     private static CallbackData CreateCallback(
         IResponseCompletionSource completion,
         Message request,
-        SharedCallbackData shared,
-        ApplicationRequestInstruments instruments)
-        => new(shared, completion, request, instruments);
+        SharedCallbackData shared)
+        => new(shared, completion, request);
 
-    private static SharedCallbackData CreateSharedCallbackData(Action<CallbackData> unregister)
+    private static SharedCallbackData CreateSharedCallbackData(Action<CallbackData> unregister, ApplicationRequestInstruments instruments)
     {
         return new SharedCallbackData(
             unregister,
@@ -479,7 +477,8 @@ public class CallbackRegistryTests
             responseTimeout: TimeSpan.FromMinutes(1),
             cancelOnTimeout: false,
             waitForCancellationAcknowledgement: false,
-            cancellationManager: null);
+            cancellationManager: null,
+            instruments);
     }
 
     private static ApplicationRequestInstruments CreateInstruments(IServiceProvider serviceProvider)
@@ -490,6 +489,7 @@ public class CallbackRegistryTests
         Id = new CorrelationId(id),
         SendingGrain = GrainId.Create("callback-caller", "1"),
         TargetGrain = GrainId.Create("callback-target", "1"),
+        TargetSilo = SiloAddress.New(IPAddress.Loopback, 11111, 1),
     };
 
     private static Message CreateResponse(Message request) => new()

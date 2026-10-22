@@ -64,6 +64,9 @@ namespace Orleans.Runtime
     /// </summary>
     internal interface IRuntimeClientTestAccessor
     {
+        /// <summary>
+        /// Counts matching requests after tests synchronize their registration and completion.
+        /// </summary>
         int GetRunningRequestCount(GrainInterfaceType grainInterfaceType);
     }
 

@@ -56,12 +56,12 @@ internal sealed class CallbackRegistry
         return true;
     }
 
-    public bool TryGetResponseCallback(Message response, [NotNullWhen(true)] out CallbackData? callback)
+    public bool TryGetCallback(CorrelationId id, [NotNullWhen(true)] out CallbackData? callback)
     {
-        var stripe = GetStripe(response.Id);
+        var stripe = GetStripe(id);
         lock (stripe.Lock)
         {
-            return stripe.Callbacks.TryGetValue(response.Id, out callback);
+            return stripe.Callbacks.TryGetValue(id, out callback);
         }
     }
 
@@ -89,8 +89,8 @@ internal sealed class CallbackRegistry
         }
     }
 
-    // Test assertions synchronize the request lifecycle before calling this method. Locking one stripe
-    // at a time keeps this inspection path isolated from runtime operations and avoids global locking.
+    // Counts are exact when matching requests are quiescent. Tests synchronize their request lifecycles
+    // before inspecting each stripe, keeping this path isolated from runtime operations.
     internal int GetRunningRequestCountForTest(GrainInterfaceType grainInterfaceType)
     {
         var result = 0;
@@ -142,7 +142,8 @@ internal sealed class CallbackRegistry
             {
                 if (snapshot is not null)
                 {
-                    ArrayPool<CallbackData>.Shared.Return(snapshot, clearArray: true);
+                    Array.Clear(snapshot, 0, snapshotCount);
+                    ArrayPool<CallbackData>.Shared.Return(snapshot);
                 }
             }
         }

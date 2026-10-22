@@ -517,7 +517,7 @@ namespace Orleans.Runtime
         {
             using var statusMessage = message;
             var status = (StatusResponse)message.BodyObject!;
-            callbacks.TryGetResponseCallback(message, out var callback);
+            callbacks.TryGetCallback(message.Id, out var callback);
             var request = callback?.Message;
             if (request is not null)
             {
@@ -648,7 +648,7 @@ namespace Orleans.Runtime
         /// </summary>
         internal void RetargetCallback(GrainId sendingGrain, CorrelationId messageId, SiloAddress targetSilo, int forwardCount)
         {
-            if (callbacks.TryGetValue((sendingGrain, messageId), out var callback))
+            if (callbacks.TryGetCallback(messageId, out var callback))
             {
                 callback.TryRetarget(targetSilo, forwardCount, _isDeadSilo);
             }
