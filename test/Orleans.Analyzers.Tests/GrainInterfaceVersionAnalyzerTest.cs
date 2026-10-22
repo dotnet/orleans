@@ -1463,6 +1463,71 @@ namespace MyApp.Counters
         }
     }
 
+    private const string NestedAndDottedAliasSource = @"
+public class Outer
+{
+    public interface IMyGrain : IGrain
+    {
+    }
+}
+
+[Alias(""Outer.IMyGrain"")]
+[Version(1)]
+public interface IOther : IGrain
+{
+    [Alias(""ping"")]
+    Task Ping();
+}
+";
+
+    [Fact]
+    public async Task LegacyNestedDeclaration_DoesNotMatchOtherInterfaceWithDottedAlias()
+    {
+        var diagnostics = await GetDiagnosticsAsync(NestedAndDottedAliasSource, "interface Outer.IMyGrain [Version(0)]");
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(GrainInterfaceVersionAnalyzer.RuleId0016, diagnostic.Id);
+        Assert.Contains("IOther", diagnostic.GetMessage());
+    }
+
+    [Theory]
+    [InlineData("  ping: Ping() -> Task\n", GrainInterfaceVersionAnalyzer.RuleId0017)]
+    [InlineData("", GrainInterfaceVersionAnalyzer.RuleId0018)]
+    public async Task CodeFix_UpdatesRecordedDeclarationBesideLegacyNestedDeclaration(string otherMembers, string diagnosticId)
+    {
+        var contractsFile =
+            "interface Outer.IMyGrain [Version(0)]\n\n"
+            + "interface [GrainInterfaceType(\"Outer.IMyGrain\")] IOther [Version(" + (otherMembers.Length > 0 ? "0" : "1") + ")]\n"
+            + otherMembers;
+
+        var diagnostic = Assert.Single(await GetDiagnosticsAsync(NestedAndDottedAliasSource, contractsFile));
+        Assert.Equal(diagnosticId, diagnostic.Id);
+
+        var content = await ApplyCodeFixAndGetContractsAsync(NestedAndDottedAliasSource, contractsFile, diagnosticId);
+
+        Assert.Matches(new Regex(@"^interface Outer\.IMyGrain \[Version\(0\)\]$", RegexOptions.Multiline), content.Replace("\r", ""));
+        Assert.Contains("interface [GrainInterfaceType(\"Outer.IMyGrain\")] IOther [Version(1)]", content);
+        Assert.Empty(await GetDiagnosticsAsync(NestedAndDottedAliasSource, content));
+    }
+
+    [Fact]
+    public async Task RetiredLegacyIdentity_ReusedByRecordedDeclaration_ReportsDuplicate()
+    {
+        const string source = @"
+[GrainInterfaceType(""IOldGrain"")]
+public interface INewGrain : IGrain
+{
+}
+";
+        const string contractsFile =
+            "*RETIRED* interface IOldGrain [Version(0)]\n\n"
+            + "interface [GrainInterfaceType(\"IOldGrain\")] INewGrain [Version(0)]\n";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Equal(GrainInterfaceVersionAnalyzer.RuleId0021, Assert.Single(diagnostics).Id);
+    }
+
     [Fact]
     public async Task CodeFix_AddInterface_KeepsLegacyNestedDeclarationWhenAliasMatchesDottedName()
     {

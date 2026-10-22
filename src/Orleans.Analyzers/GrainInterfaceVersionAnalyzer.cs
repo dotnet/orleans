@@ -97,7 +97,6 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
     internal const string ClassNamePropertyKey = "ClassName";
     internal const string ActualAliasPropertyKey = "ActualAlias";
     internal const string GrainInterfaceTypePropertyKey = "GrainInterfaceType";
-    internal const string DefaultGrainInterfaceTypePropertyKey = "DefaultGrainInterfaceType";
 
     internal const string RetiredPrefix = "*RETIRED*";
 
@@ -283,8 +282,8 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         private readonly List<Diagnostic>? _fileParseErrors;
         private readonly ConcurrentDictionary<string, bool> _visitedInterfaces = new(StringComparer.Ordinal);
 
-        // Matched by reference: a legacy declaration's derived key can equal another interface's identity.
         private readonly ConcurrentDictionary<DeclaredGrainInterface, bool> _matchedInterfaces = new();
+        private readonly LegacyGrainInterfaceTypeResolver _legacyGrainInterfaceTypes;
         private readonly ConcurrentDictionary<string, bool> _visitedClasses = new(StringComparer.Ordinal);
         private readonly ConcurrentBag<Diagnostic> _removedMemberDiagnostics = new();
         private readonly INamedTypeSymbol? _iAddressableType;
@@ -302,7 +301,8 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             _data = data;
             _grainInterfacesFile = grainInterfacesFile;
             _grainInterfacesFileText = grainInterfacesFileText;
-            _fileParseErrors = fileParseErrors;
+            _legacyGrainInterfaceTypes = new LegacyGrainInterfaceTypeResolver(compilation);
+            _fileParseErrors = AddLegacyDuplicateDeclarations(fileParseErrors);
 
             _iAddressableType = compilation.GetTypeByMetadataName(Constants.IAddressibleFullyQualifiedName);
             _aliasAttributeType = compilation.GetTypeByMetadataName(Constants.AliasAttributeFullyQualifiedName);
@@ -344,16 +344,11 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
 
             // Check if interface is declared in the file
             var grainInterfaceType = GetGrainInterfaceType(namedType);
-            var defaultGrainInterfaceType = GetDefaultGrainInterfaceType(namedType);
             var interfaceProperties = ImmutableDictionary<string, string?>.Empty
                 .Add(InterfaceNamePropertyKey, interfaceName)
-                .Add(GrainInterfaceTypePropertyKey, grainInterfaceType)
-                .Add(DefaultGrainInterfaceTypePropertyKey, defaultGrainInterfaceType);
+                .Add(GrainInterfaceTypePropertyKey, grainInterfaceType);
 
-            var declaredInterface = FindDeclaredInterface(
-                interfaceName,
-                grainInterfaceType,
-                defaultGrainInterfaceType);
+            var declaredInterface = FindDeclaredInterface(grainInterfaceType);
             if (declaredInterface is null)
             {
                 // Interface not found in file
@@ -625,19 +620,43 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             }
         }
 
-        private DeclaredGrainInterface? FindDeclaredInterface(
-            string interfaceName,
-            string grainInterfaceType,
-            string defaultGrainInterfaceType)
+        private DeclaredGrainInterface? FindDeclaredInterface(string grainInterfaceType)
         {
             return _data!.Interfaces.FirstOrDefault(candidate =>
                     string.Equals(candidate.GrainInterfaceType, grainInterfaceType, StringComparison.Ordinal))
                 ?? _data.Interfaces.FirstOrDefault(candidate =>
                     candidate.GrainInterfaceType is null
                     && string.Equals(
-                        GetLegacyGrainInterfaceType(candidate.Name, interfaceName, defaultGrainInterfaceType),
+                        _legacyGrainInterfaceTypes.Resolve(candidate.Name),
                         grainInterfaceType,
                         StringComparison.Ordinal));
+        }
+
+        // Parsing compares legacy declarations only with each other, since their identities depend on source types.
+        private List<Diagnostic>? AddLegacyDuplicateDeclarations(List<Diagnostic>? errors)
+        {
+            if (_data is null || _grainInterfacesFile is null || _grainInterfacesFileText is null)
+            {
+                return errors;
+            }
+
+            foreach (var legacy in _data.Interfaces.Where(declaration => declaration.GrainInterfaceType is null))
+            {
+                var grainInterfaceType = _legacyGrainInterfaceTypes.Resolve(legacy.Name);
+                foreach (var recorded in _data.Interfaces.Where(declaration =>
+                    string.Equals(declaration.GrainInterfaceType, grainInterfaceType, StringComparison.Ordinal)))
+                {
+                    // Report the later declaration, as parsing does.
+                    var duplicate = legacy.Span.Start > recorded.Span.Start ? legacy : recorded;
+                    errors ??= new List<Diagnostic>();
+                    errors.Add(Diagnostic.Create(
+                        DuplicateInterfaceDeclarationRule,
+                        duplicate.GetLocation(_grainInterfacesFileText, _grainInterfacesFile.Path),
+                        duplicate.Name));
+                }
+            }
+
+            return errors;
         }
 
         private DeclaredGrainClass? FindDeclaredClass(string className, string? alias)
@@ -807,21 +826,6 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
 
         return GetDefaultGrainInterfaceType(type);
     }
-
-    /// <summary>
-    /// Gets the grain interface type described by a legacy declaration, which records only a CLR name.
-    /// </summary>
-    /// <remarks>
-    /// A name cannot distinguish nested types from namespaces, so when the declaration names the interface being
-    /// matched, that interface's own conventional identity is used instead of one derived from the name.
-    /// </remarks>
-    internal static string GetLegacyGrainInterfaceType(
-        string declaredName,
-        string interfaceName,
-        string defaultGrainInterfaceType)
-        => string.Equals(declaredName, interfaceName, StringComparison.Ordinal)
-            ? defaultGrainInterfaceType
-            : GetDefaultGrainInterfaceType(declaredName);
 
     /// <summary>
     /// Gets the grain interface type when it differs from the CLR naming convention, or <see langword="null"/> otherwise.
@@ -1090,6 +1094,64 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
 
     private static string? GetStringAttributeValue(ISymbol symbol, string attributeName)
         => GetAttributeValue(symbol, attributeName) as string;
+}
+
+/// <summary>
+/// Resolves the grain interface type described by a legacy declaration, which records only a CLR name.
+/// </summary>
+/// <remarks>
+/// A CLR name cannot distinguish nested types from namespaces, so the name is resolved against the source interface
+/// it denotes, and the identity is derived from the name alone only when no such interface exists.
+/// </remarks>
+internal sealed class LegacyGrainInterfaceTypeResolver
+{
+    private readonly IAssemblySymbol _assembly;
+    private readonly ConcurrentDictionary<string, string> _grainInterfaceTypes = new(StringComparer.Ordinal);
+
+    public LegacyGrainInterfaceTypeResolver(Compilation compilation)
+    {
+        _assembly = compilation.Assembly;
+    }
+
+    public string Resolve(string declaredName)
+        => _grainInterfaceTypes.GetOrAdd(
+            declaredName,
+            name => FindSourceInterface(name) is { } type
+                ? GrainInterfaceVersionAnalyzer.GetDefaultGrainInterfaceType(type)
+                : GrainInterfaceVersionAnalyzer.GetDefaultGrainInterfaceType(name));
+
+    private INamedTypeSymbol? FindSourceInterface(string declaredName)
+    {
+        var segments = declaredName.Split('.');
+
+        // Try each split between namespace and (possibly nested) type names, longest namespace first.
+        for (var namespaceLength = segments.Length - 1; namespaceLength >= 0; namespaceLength--)
+        {
+            if (segments.Take(namespaceLength).Any(segment => segment.IndexOf('<') >= 0))
+            {
+                continue;
+            }
+
+            var typeName = string.Join("+", segments.Skip(namespaceLength).Select(GetMetadataName));
+            var metadataName = namespaceLength == 0
+                ? typeName
+                : $"{string.Join(".", segments.Take(namespaceLength))}.{typeName}";
+            if (_assembly.GetTypeByMetadataName(metadataName) is { TypeKind: TypeKind.Interface } type)
+            {
+                return type;
+            }
+        }
+
+        return null;
+    }
+
+    private static string GetMetadataName(string segment)
+    {
+        var genericStart = segment.IndexOf('<');
+        return genericStart < 0
+            ? segment
+            : $"{segment.Substring(0, genericStart)}`{segment.Count(character => character == ',') + 1}";
+    }
 }
 
 /// <summary>
