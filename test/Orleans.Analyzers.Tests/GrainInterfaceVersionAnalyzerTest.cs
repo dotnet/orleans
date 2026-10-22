@@ -1617,6 +1617,52 @@ public class RenamedOuter
     }
 
     [Fact]
+    public async Task CodeFix_RegenerateProject_RecordsIdentityOfRetiredLegacyNestedDeclaration()
+    {
+        const string source = @"
+public class Outer
+{
+    [Alias(""counter"")]
+    public interface IMyGrain : IGrain
+    {
+    }
+}
+";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            source,
+            "*RETIRED* interface Outer.IMyGrain [Version(0)]",
+            GrainInterfaceVersionAnalyzer.RuleId0016,
+            RegenerateCodeActionTitle);
+
+        var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+        Assert.Contains("*RETIRED* interface [GrainInterfaceType(\"Outer+IMyGrain\")] Outer.IMyGrain [Version(0)]", content);
+        Assert.Empty(await GetDiagnosticsAsync(source, content));
+
+        // After renaming the containing type, the retired identity still cannot be reused.
+        const string movedSource = @"
+public class RenamedOuter
+{
+    [Alias(""counter"")]
+    public interface IMyGrain : IGrain
+    {
+    }
+}
+
+[GrainInterfaceType(""Outer+IMyGrain"")]
+public interface IReuse : IGrain
+{
+}
+";
+        var diagnostics = await GetDiagnosticsAsync(
+            movedSource,
+            content + "\ninterface [GrainInterfaceType(\"Outer+IMyGrain\")] IReuse [Version(0)]\n");
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0021);
+    }
+
+    [Fact]
     public async Task CodeFix_RegenerateProject_RetiresLegacyIdentityWhenAliasIntroduced()
     {
         const string source = @"
