@@ -1,5 +1,7 @@
+using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.GrainDirectory;
+using Orleans.Runtime.Hosting;
 using TestExtensions;
 using Xunit;
 
@@ -32,6 +34,64 @@ public sealed class InProcessTestClusterDirectoryTests
         await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("DistributedGrainDirectory", GetDefaultDirectory(cluster).GetType().Name);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Theory, TestCategory("BVT")]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task ExternalMembershipPreservesDirectorySelections(bool useDistributedDirectory, bool useCustomDefault)
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        builder.Options.ConfigureFileLogging = false;
+        builder.Options.InitializeClientOnDeploy = false;
+        builder.Options.UseTestClusterMembership = false;
+        builder.Options.UseDistributedGrainDirectory = useDistributedDirectory;
+        var customDirectory = new NonObservableGrainDirectory();
+        builder.ConfigureSilo((options, siloBuilder) =>
+        {
+            siloBuilder.UseLocalhostClustering(
+                siloPort: options.SiloPort,
+                gatewayPort: options.GatewayPort,
+                primarySiloEndpoint: new IPEndPoint(IPAddress.Loopback, options.SiloPort));
+            siloBuilder.AddGrainDirectory("custom", (_, _) => customDirectory);
+            if (useCustomDefault)
+            {
+                siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => customDirectory);
+            }
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
+
+        var services = Assert.Single(cluster.Silos).ServiceProvider;
+        Assert.Same(customDirectory, services.GetRequiredKeyedService<IGrainDirectory>("custom"));
+        var defaultDirectory = services.GetKeyedService<IGrainDirectory>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY);
+        if (useCustomDefault)
+        {
+            Assert.Same(customDirectory, defaultDirectory);
+        }
+        else if (useDistributedDirectory)
+        {
+            Assert.Equal("DistributedGrainDirectory", Assert.IsAssignableFrom<IGrainDirectory>(defaultDirectory).GetType().Name);
+        }
+        else
+        {
+            Assert.Null(defaultDirectory);
+        }
+
+        var distributedParticipants = services.GetServices<ILifecycleParticipant<ISiloLifecycle>>()
+            .Where(static participant => participant.GetType().Name == "DistributedGrainDirectory");
+        if (useDistributedDirectory)
+        {
+            Assert.Same(defaultDirectory, Assert.Single(distributedParticipants));
+        }
+        else
+        {
+            Assert.Empty(distributedParticipants);
+        }
     }
 
     [TestSuite("BVT")]
