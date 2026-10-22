@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -34,7 +35,7 @@ namespace UnitTests.MembershipTests
             var row = JObject.Parse(json);
 
             Assert.Equal(
-                ["SiloAddress", "HostName", "SiloName", "InstanceName", "Status", "ProxyPort", "StartTime", "SuspectTimes"],
+                ["SiloAddress", "HostName", "SiloName", "InstanceName", "Status", "ProxyPort", "StartTime", "SuspectTimes", "Metadata"],
                 row.Properties().Select(property => property.Name));
             Assert.Equal("Active", row["Status"]!.Value<string>());
             Assert.Equal(30000, row["ProxyPort"]!.Value<int>());
@@ -49,6 +50,9 @@ namespace UnitTests.MembershipTests
                 payload.AsSpan().IndexOf(Encoding.UTF8.GetBytes("東京")) >= 0,
                 "The payload should contain the UTF-8 byte sequence for 東京.");
             Assert.Equal("høst-東京", row["HostName"]!.Value<string>());
+            var metadata = Assert.IsType<JObject>(row["Metadata"]);
+            Assert.Equal(["region"], metadata.Properties().Select(property => property.Name));
+            Assert.Equal("東京", metadata["region"]!.Value<string>());
         }
 
         [Fact]
@@ -67,6 +71,52 @@ namespace UnitTests.MembershipTests
             var suspect = Assert.Single(roundTrip.SuspectTimes!);
             Assert.Equal("127.0.0.2:11112@54321", suspect.Item1.ToParsableString());
             Assert.Equal(SuspectTime, suspect.Item2);
+            var metadata = Assert.Single(roundTrip.Metadata!);
+            Assert.Equal("region", metadata.Key);
+            Assert.Equal("東京", metadata.Value);
+            Assert.IsType<ImmutableDictionary<string, string>>(roundTrip.Metadata);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void MembershipEntry_MetadataRoundTrip_DistinguishesUnavailableAndAvailableEmpty(bool available)
+        {
+            var entry = CreateMembershipEntry();
+            entry.Metadata = available ? ImmutableDictionary<string, string>.Empty : null;
+
+            var payload = Serialize(entry);
+            var row = JObject.Parse(Encoding.UTF8.GetString(payload));
+            var roundTrip = Deserialize<MembershipEntry>(payload);
+
+            Assert.Equal(available ? JTokenType.Object : JTokenType.Null, row["Metadata"]!.Type);
+            if (available)
+            {
+                Assert.Empty(Assert.IsType<JObject>(row["Metadata"]));
+                Assert.Empty(Assert.IsType<ImmutableDictionary<string, string>>(roundTrip.Metadata));
+            }
+            else
+            {
+                Assert.Null(roundTrip.Metadata);
+            }
+        }
+
+        [Fact]
+        public void MembershipEntry_Deserialization_WithoutMetadata_PreservesLegacyFields()
+        {
+            var row = CreateSerializedRow();
+            row.Remove("Metadata");
+            row.Remove("SiloName");
+            row["InstanceName"] = "silo-legacy";
+
+            var entry = Deserialize<MembershipEntry>(Encoding.UTF8.GetBytes(row.ToString(Formatting.None)));
+
+            Assert.Null(entry.Metadata);
+            Assert.Equal("silo-legacy", entry.SiloName);
+            Assert.Equal("127.0.0.1:11111@12345", entry.SiloAddress.ToParsableString());
+            Assert.Equal(SiloStatus.Active, entry.Status);
+            Assert.Equal(StartTime, entry.StartTime);
+            Assert.Equal(SuspectTime, Assert.Single(entry.SuspectTimes!).Item2);
         }
 
         [Fact]
@@ -158,6 +208,7 @@ namespace UnitTests.MembershipTests
                 ProxyPort = 30000,
                 StartTime = StartTime,
                 IAmAliveTime = iAmAliveTime ?? IAmAliveTime,
+                Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "東京"),
                 SuspectTimes =
                 [
                     Tuple.Create(

@@ -1,9 +1,12 @@
 using System.Collections.Immutable;
 using System.Net;
+using System.Net.Http;
 using System.Text.Json;
 using Azure;
+using Azure.Core.Pipeline;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.AzureUtils;
 using Orleans.Clustering.AzureStorage;
@@ -213,6 +216,83 @@ namespace Tester.AzureUtils
     [TestArea("Membership")]
     public class AzureMembershipMetadataContractTests
     {
+        [Fact]
+        public async Task UpdateIAmAlive_ChecksForRepairOnlyWhenMetadataIsAvailable()
+        {
+            using var handler = new HeartbeatTableHandler();
+            using var client = new HttpClient(handler);
+            var clientOptions = new TableClientOptions { Transport = new HttpClientTransport(client) };
+            clientOptions.Retry.MaxRetries = 0;
+            var options = new AzureStorageClusteringOptions
+            {
+                TableServiceClient = new TableServiceClient(
+                    new Uri("https://unitaccount.table.core.windows.net"),
+                    new TableSharedKeyCredential("unitaccount", Convert.ToBase64String(new byte[32])),
+                    clientOptions)
+            };
+            var membership = new AzureBasedMembershipTable(
+                NullLoggerFactory.Instance, Options.Create(options), Options.Create(new ClusterOptions { ClusterId = "cluster" }));
+            await membership.InitializeMembershipTable(false);
+            var entry = new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 123456),
+                IAmAliveTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            };
+
+            for (var heartbeat = 0; heartbeat <= AzureBasedMembershipTable.MetadataRepairCheckInterval; heartbeat++)
+            {
+                await membership.UpdateIAmAlive(entry);
+            }
+
+            Assert.Equal(0, handler.ReadCount);
+            Assert.Equal(AzureBasedMembershipTable.MetadataRepairCheckInterval + 1, handler.Heartbeats.Count);
+            Assert.All(handler.Heartbeats, json =>
+            {
+                using var row = JsonDocument.Parse(json);
+                Assert.False(row.RootElement.TryGetProperty("Metadata", out _));
+            });
+
+            entry.Metadata = ImmutableDictionary<string, string>.Empty;
+            await membership.UpdateIAmAlive(entry);
+            Assert.Equal(1, handler.ReadCount);
+            using var repaired = JsonDocument.Parse(handler.Heartbeats[^1]);
+            Assert.Equal("{}", repaired.RootElement.GetProperty("Metadata").GetString());
+
+            for (var heartbeat = 1; heartbeat < AzureBasedMembershipTable.MetadataRepairCheckInterval; heartbeat++)
+            {
+                await membership.UpdateIAmAlive(entry);
+            }
+
+            Assert.Equal(1, handler.ReadCount);
+            await membership.UpdateIAmAlive(entry);
+            Assert.Equal(2, handler.ReadCount);
+            Assert.Equal(2 * (AzureBasedMembershipTable.MetadataRepairCheckInterval + 1), handler.Heartbeats.Count);
+        }
+
+        private sealed class HeartbeatTableHandler : HttpMessageHandler
+        {
+            public int ReadCount { get; private set; }
+            public List<string> Heartbeats { get; } = [];
+
+            protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                if (request.Method == HttpMethod.Post)
+                {
+                    return new(HttpStatusCode.Created) { Content = new StringContent("""{"TableName":"OrleansSiloInstances"}""", System.Text.Encoding.UTF8, "application/json") };
+                }
+
+                if (request.Method == HttpMethod.Get)
+                {
+                    ReadCount++;
+                    return new(HttpStatusCode.OK) { Content = new StringContent("""{"PartitionKey":"cluster","RowKey":"silo"}""", System.Text.Encoding.UTF8, "application/json") };
+                }
+
+                Assert.Equal(HttpMethod.Patch, request.Method);
+                Heartbeats.Add(await request.Content!.ReadAsStringAsync(cancellationToken));
+                return new(HttpStatusCode.NoContent);
+            }
+        }
+
         [Fact]
         public void ConvertPartial_IncludesSerializedMetadata()
         {

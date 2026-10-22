@@ -213,6 +213,42 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
 public class CosmosMembershipMetadataContractTests
 {
     [Fact]
+    public void SiloEntity_SerializersPreservePersistedPropertyNamesAndMetadata()
+    {
+        var entity = new SiloEntity
+        {
+            Id = "silo",
+            ClusterId = "cluster",
+            Metadata = new Dictionary<string, string> { ["region"] = "west" }
+        };
+        var newtonsoftSettings = new Newtonsoft.Json.JsonSerializerSettings
+        {
+            ContractResolver = new Newtonsoft.Json.Serialization.DefaultContractResolver
+            {
+                NamingStrategy = new Newtonsoft.Json.Serialization.CamelCaseNamingStrategy()
+            }
+        };
+        var systemTextOptions = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+        };
+
+        var newtonsoftJson = Newtonsoft.Json.JsonConvert.SerializeObject(entity, newtonsoftSettings);
+        var systemTextJson = System.Text.Json.JsonSerializer.Serialize(entity, systemTextOptions);
+
+        foreach (var json in new[] { newtonsoftJson, systemTextJson })
+        {
+            var row = Newtonsoft.Json.Linq.JObject.Parse(json);
+            Assert.Equal("silo", row["id"]!.ToObject<string>());
+            Assert.Equal("cluster", row["ClusterId"]!.ToObject<string>());
+            Assert.Equal("west", row["Metadata"]!["region"]!.ToObject<string>());
+            Assert.Null(row.Property("metadata"));
+            Assert.Equal(entity.Metadata, Newtonsoft.Json.JsonConvert.DeserializeObject<SiloEntity>(json)!.Metadata);
+            Assert.Equal(entity.Metadata, System.Text.Json.JsonSerializer.Deserialize<SiloEntity>(json)!.Metadata);
+        }
+    }
+
+    [Fact]
     public void ApplyHeartbeat_RepairsMissingInlineMetadata()
     {
         var expected = ImmutableDictionary<string, string>.Empty.Add("region", "west");

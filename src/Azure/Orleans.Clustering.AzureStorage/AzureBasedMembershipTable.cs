@@ -157,7 +157,7 @@ namespace Orleans.Runtime.MembershipService
                 LogDebugMergeEntry(entry);
                 var includeMetadata = false;
                 var checkedMetadata = false;
-                if (ShouldCheckMetadata())
+                if (entry.Metadata is not null && ShouldCheckMetadata())
                 {
                     var rowKey = SiloInstanceTableEntry.ConstructRowKey(entry.SiloAddress);
                     var existing = await tableManager.ReadSingleTableEntryAsync(tableManager.DeploymentId, rowKey);

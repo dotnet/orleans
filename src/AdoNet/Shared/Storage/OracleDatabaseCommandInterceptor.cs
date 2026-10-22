@@ -95,8 +95,8 @@ namespace Orleans.Tests.SqlUtils
                 //The property BindByName must be set to true to change the default behaviour
                 setCommandBindByNameAction.Value(command);
 
-                //String parameters are mapped to NVarChar2 OracleDbType which is limited to 4000 bytes
-                //This sets the OracleType explicitly to CLOB
+                // Use NCLOB for Unicode membership metadata and CLOB for the existing payload columns,
+                // allowing values larger than the default NVarChar2 parameter limit.
                 if (IsNClobParameter(commandParameter.ParameterName))
                 {
                     setNClobOracleDbTypeAction.Value(commandParameter);

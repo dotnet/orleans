@@ -2,6 +2,7 @@ using Newtonsoft.Json;
 
 namespace Orleans.Clustering.Cosmos.Models;
 
+// Keep persisted names stable for the default Newtonsoft.Json serializer and clients configured to use System.Text.Json.
 internal class SiloEntity : BaseClusterEntity
 {
     public override string EntityType => nameof(SiloEntity);
