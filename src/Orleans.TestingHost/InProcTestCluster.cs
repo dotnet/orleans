@@ -991,6 +991,12 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                     services.Configure<SiloMessagingOptions>(op => op.ResponseTimeout = TimeSpan.FromMilliseconds(1000000));
                 }
 
+                if (!Options.UseTestClusterMembership && !Options.UseDistributedGrainDirectory)
+                {
+                    // Apply the local default before user callbacks so their provider selections take precedence.
+                    appBuilder.UseOrleans(static siloBuilder => siloBuilder.UseLocalGrainDirectory());
+                }
+
                 foreach (var hostDelegate in Options.SiloHostConfigurationDelegates)
                 {
                     hostDelegate(siloOptions, appBuilder);
