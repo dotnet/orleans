@@ -425,6 +425,49 @@ public sealed class UniversalReferenceSerializationTests(TestEnvironmentFixture 
     }
 
     [Theory]
+    [InlineData("""[{"GrainId":"test.grain/1","InterfaceType":"","ServiceId":"service"}]""")]
+    [InlineData("""[{"GrainId":"test.grain/1","InterfaceType":"","ServiceId":"service","Binding":null}]""")]
+    public void SystemTextJsonReader_MissingOrNullBinding_ThrowsJsonException(string json)
+    {
+        var exception = Assert.Throws<System.Text.Json.JsonException>(
+            () => SystemTextJson.Deserialize<IAddressable>(json, SystemTextJsonOptions));
+
+        Assert.Equal("The universal reference binding must be present.", exception.Message);
+    }
+
+    [Theory]
+    [InlineData(UniversalReferenceBinding.Virtual, false)]
+    [InlineData(UniversalReferenceBinding.Virtual, true)]
+    [InlineData(UniversalReferenceBinding.Cluster, false)]
+    [InlineData(UniversalReferenceBinding.Cluster, true)]
+    public void SystemTextJsonReader_ExplicitBinding_PreservesLocalOrForeignIdentity(
+        UniversalReferenceBinding binding,
+        bool foreignService)
+    {
+        var local = environment.InternalGrainFactory.GetGrain(
+            GrainId.Create("json.binding", "key")).GetUniversalReference();
+        var serviceId = foreignService ? local.ServiceId + "-foreign" : local.ServiceId;
+        var clusterId = binding == UniversalReferenceBinding.Cluster ? ClusterId : null;
+        var expected = new UniversalReference(local.GrainId, local.InterfaceType, serviceId, binding, clusterId);
+        var json = SystemTextJson.Serialize(new[]
+        {
+            new
+            {
+                GrainId = expected.GrainId.ToString(),
+                InterfaceType = expected.InterfaceType.ToString(),
+                ServiceId = serviceId,
+                Binding = (byte)binding,
+                ClusterId = clusterId
+            }
+        });
+
+        var actual = SystemTextJson.Deserialize<IAddressable>(json, SystemTextJsonOptions);
+
+        Assert.NotNull(actual);
+        AssertAddressable(expected, actual);
+    }
+
+    [Theory]
     [InlineData("[]")]
     [InlineData("""["test.grain/1"]""")]
     [InlineData("""["test.grain/1","test.interface","extra"]""")]
@@ -442,10 +485,11 @@ public sealed class UniversalReferenceSerializationTests(TestEnvironmentFixture 
     }
 
     [Theory]
-    [InlineData("""[{"grainId":"test.grain/1","interfaceType":"test.interface","serviceId":" ","binding":0}]""")]
-    [InlineData("""[{"grainId":"test.grain/1","interfaceType":"test.interface","serviceId":"service","binding":255}]""")]
-    [InlineData("""[{"grainId":"/","interfaceType":"test.interface","serviceId":"service","binding":0}]""")]
-    [InlineData("""[{"grainId":"test.grain/1","interfaceType":"test.interface","serviceId":"service","binding":1}]""")]
+    [InlineData("""[{"GrainId":"test.grain/1","InterfaceType":"test.interface","ServiceId":" ","Binding":0}]""")]
+    [InlineData("""[{"GrainId":"test.grain/1","InterfaceType":"test.interface","ServiceId":"service","Binding":255}]""")]
+    [InlineData("""[{"GrainId":"test.grain/1","InterfaceType":"test.interface","ServiceId":"service","Binding":2}]""")]
+    [InlineData("""[{"GrainId":"/","InterfaceType":"test.interface","ServiceId":"service","Binding":0}]""")]
+    [InlineData("""[{"GrainId":"test.grain/1","InterfaceType":"test.interface","ServiceId":"service","Binding":1}]""")]
     public void SystemTextJsonReader_InvalidUniversalReferenceThrowsJsonException(string json)
     {
         var exception = Assert.Throws<System.Text.Json.JsonException>(

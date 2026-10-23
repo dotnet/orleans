@@ -20,7 +20,7 @@ namespace Orleans.Serialization
             GrainId GrainId,
             string? InterfaceType,
             string? ServiceId,
-            UniversalReferenceBinding Binding,
+            UniversalReferenceBinding? Binding,
             string? ClusterId);
 
         /// <inheritdoc />
@@ -63,6 +63,8 @@ namespace Orleans.Serialization
             }
 
             var data = JsonSerializer.Deserialize<UniversalReferenceJsonData>(ref reader, options);
+            var binding = data.Binding
+                ?? throw new JsonException("The universal reference binding must be present.");
             var dataInterfaceType = string.IsNullOrEmpty(data.InterfaceType)
                 ? default
                 : GrainInterfaceType.Create(data.InterfaceType);
@@ -72,7 +74,7 @@ namespace Orleans.Serialization
                     data.GrainId,
                     dataInterfaceType,
                     data.ServiceId!,
-                    data.Binding,
+                    binding,
                     data.ClusterId);
             }
             catch (ArgumentException exception)
