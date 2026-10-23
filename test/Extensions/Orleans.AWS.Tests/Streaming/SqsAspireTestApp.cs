@@ -1,3 +1,4 @@
+using Amazon;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Orleans;
@@ -32,6 +33,8 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
     public string ProviderName { get; }
 
     public string ServiceId { get; }
+
+    public SqsStreamingResource? Streaming { get; private init; }
 
     public DistributedApplicationModel Model
         => _application.Services.GetRequiredService<DistributedApplicationModel>();
@@ -91,6 +94,46 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
                 client.Resource,
                 providerName,
                 serviceId));
+    }
+
+    public static Task<SqsAspireTestApp> CreateBridgeAsync(
+        string providerName,
+        SqsStreamingOptions options,
+        Uri sqsEndpoint)
+    {
+        var builder = DistributedApplication.CreateBuilder(
+            new DistributedApplicationOptions
+            {
+                Args = [],
+                DisableDashboard = true,
+            });
+        var aws = builder.AddAWSSDKConfig()
+            .WithRegion(RegionEndpoint.USEast1)
+            .WithSdkValidation(false);
+        var orleans = builder.AddOrleans("cluster")
+            .WithClustering(new TestClusteringConfiguration());
+        var streaming = orleans.AddSqsStreaming(providerName, aws, options);
+        var silo = builder.AddContainer(SiloResourceName, "unused")
+            .WithReference(orleans)
+            .WithEnvironment("AWS_ENDPOINT_URL_SQS", sqsEndpoint.AbsoluteUri)
+            .WithEnvironment("AWS_IGNORE_CONFIGURED_ENDPOINT_URLS", "false");
+        var client = builder.AddContainer(ClientResourceName, "unused")
+            .WithReference(orleans.AsClient())
+            .WithEnvironment("AWS_ENDPOINT_URL_SQS", sqsEndpoint.AbsoluteUri)
+            .WithEnvironment("AWS_IGNORE_CONFIGURED_ENDPOINT_URLS", "false");
+
+        // Evaluate the bridge's resource callbacks without starting CDK provisioning or containers.
+        var application = builder.Build();
+        return Task.FromResult(
+            new SqsAspireTestApp(
+                application,
+                silo.Resource,
+                client.Resource,
+                providerName,
+                options.ServiceId)
+            {
+                Streaming = streaming,
+            });
     }
 
     public Task<IReadOnlyDictionary<string, string?>> GetSiloEnvironmentAsync()
@@ -305,6 +348,9 @@ internal sealed class EnvironmentVariableScope : IDisposable
             "AWS_PROFILE",
             "AWS__Region",
             "AWS__Profile",
+            "AWS_ENDPOINT_URL",
+            "AWS_ENDPOINT_URL_SQS",
+            "AWS_IGNORE_CONFIGURED_ENDPOINT_URLS",
         })
         {
             SaveAndSet(key, null);

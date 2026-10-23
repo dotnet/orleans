@@ -1,4 +1,5 @@
 using AWSUtils.Tests.StorageTests;
+using Aspire.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -6,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Persistence.FileStorage;
+using Orleans.Streaming.SQS;
 using Orleans.TestingHost;
 using OrleansAWSUtils.Streams;
 using TestExtensions;
@@ -28,6 +30,7 @@ public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
     private EnvironmentVariableScope _environment = null!;
     private string? _ownedDirectory;
     private SingleStreamTestRunner _runner = null!;
+    private Uri _sqsEndpoint = null!;
 
     protected override void CheckPreconditionsOrThrow()
     {
@@ -35,6 +38,23 @@ public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
         {
             throw Xunit.Sdk.SkipException.ForSkip("SQS connection string is not configured.");
         }
+
+        var connection = SqsConnectionString.Parse(AWSTestConstants.SqsConnectionString);
+        if (!connection.TryGetValue("Service", out var service)
+            || !Uri.TryCreate(service, UriKind.Absolute, out var endpoint)
+            || endpoint.Scheme != Uri.UriSchemeHttp
+            || !endpoint.IsLoopback)
+        {
+            throw Xunit.Sdk.SkipException.ForSkip("The bridge live test requires a loopback HTTP SQS emulator.");
+        }
+
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID"))
+            || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY")))
+        {
+            throw Xunit.Sdk.SkipException.ForSkip("The bridge live test requires AWS SDK environment credentials for the SQS emulator.");
+        }
+
+        _sqsEndpoint = endpoint;
     }
 
     protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -57,27 +77,38 @@ public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
             nameof(SQSAspireLiveStreamTests),
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_ownedDirectory);
-        _app = await SqsAspireTestApp.CreateAsync(
+        _app = await SqsAspireTestApp.CreateBridgeAsync(
             ProviderName,
-            [
-                ("ServiceKey", "orleans-sqs"),
-                ("PartitionCount", "4"),
-                ("FifoQueue", "false"),
-            ],
-            [("ConnectionStrings:orleans-sqs", AWSTestConstants.SqsConnectionString)]);
+            new SqsStreamingOptions
+            {
+                ServiceId = $"aspire-sqs-{Guid.NewGuid():N}",
+                PartitionCount = 4,
+                ReceiveWaitTimeSeconds = 1,
+                VisibilityTimeoutSeconds = 30,
+            },
+            _sqsEndpoint);
         _environment = await _app.CreateEnvironmentScopeAsync(
             SqsAspireResourceRole.Silo,
             streamingOnly: true);
         await base.InitializeAsync();
+        var streaming = Assert.IsType<SqsStreamingResource>(_app.Streaming);
+        var services = HostedCluster.GetSiloServiceProvider();
+        var options = services.GetRequiredService<IOptionsMonitor<SqsOptions>>().Get(ProviderName);
+        Assert.Equal(streaming.Options.ServiceId, HostedCluster.Options.ServiceId);
+        Assert.Equal("Service=us-east-1", options.ConnectionString);
+        Assert.Equal(streaming.Options.ReceiveWaitTimeSeconds, options.ReceiveWaitTimeSeconds);
+        Assert.Equal(streaming.Options.VisibilityTimeoutSeconds, options.VisibilityTimeoutSeconds);
+        Assert.Equal(
+            streaming.Queues.Count,
+            services.GetRequiredService<IOptionsMonitor<HashRingStreamQueueMapperOptions>>()
+                .Get(ProviderName).TotalQueueCount);
         _runner = new SingleStreamTestRunner(HostedCluster, ProviderName);
     }
 
     [Fact]
-    public Task AspireGeneratedConfiguration_PublishesConsumesAndAcknowledgesElasticMqStream()
+    public Task AspireBridgeConfiguration_PublishesConsumesAndAcknowledgesElasticMqStream()
     {
-#pragma warning disable xUnit1051 // The shared stream runner does not expose a cancellation-token overload.
-        return _runner.StreamTest_04_OneProducerClientOneConsumerClient();
-#pragma warning restore xUnit1051
+        return _runner.StreamTest_04_OneProducerClientOneConsumerClient(TestContext.Current.CancellationToken);
     }
 
     public override async ValueTask DisposeAsync()

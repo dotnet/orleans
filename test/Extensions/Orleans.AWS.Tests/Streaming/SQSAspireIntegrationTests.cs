@@ -1,3 +1,10 @@
+using Amazon;
+using Amazon.CDK.AWS.SQS;
+using Amazon.Runtime.Endpoints;
+using Amazon.SQS;
+using Amazon.SQS.Model;
+using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -21,6 +28,69 @@ public sealed class SQSAspireIntegrationTests
     private const string ServiceKey = "orleans-sqs";
     private const string ServiceId = "aspire-sqs-service";
     private const string RegionAdapterKey = "aspire-region-adapter";
+
+    [Fact]
+    public async Task AspireBridge_EmulatorEndpoint_PreservesGeneratedTopologyAndActivatesProviders()
+    {
+        var endpoint = new Uri("http://127.0.0.1:9324");
+        await using var app = await SqsAspireTestApp.CreateBridgeAsync(
+            "Bridge",
+            new SqsStreamingOptions
+            {
+                ServiceId = ServiceId,
+                PartitionCount = 4,
+                ReceiveWaitTimeSeconds = 1,
+                VisibilityTimeoutSeconds = 30,
+            },
+            endpoint);
+        var streaming = Assert.IsType<SqsStreamingResource>(app.Streaming);
+        var siloEnvironment = await app.GetSiloEnvironmentAsync();
+        var clientEnvironment = await app.GetClientEnvironmentAsync();
+        foreach (var environment in new[] { siloEnvironment, clientEnvironment })
+        {
+            Assert.Equal(ServiceId, environment["Orleans__ServiceId"]);
+            Assert.Equal("SQS", environment["Orleans__Streaming__Bridge__ProviderType"]);
+            Assert.Equal("us-east-1", environment["Orleans__Streaming__Bridge__Region"]);
+            Assert.Equal("4", environment["Orleans__Streaming__Bridge__PartitionCount"]);
+            Assert.Equal("False", environment["Orleans__Streaming__Bridge__FifoQueue"]);
+            Assert.Equal("1", environment["Orleans__Streaming__Bridge__ReceiveWaitTimeSeconds"]);
+            Assert.Equal("30", environment["Orleans__Streaming__Bridge__VisibilityTimeoutSeconds"]);
+            Assert.Equal(endpoint.AbsoluteUri, environment["AWS_ENDPOINT_URL_SQS"]);
+            Assert.DoesNotContain("Orleans__Streaming__Bridge__ConnectionString", environment.Keys);
+            Assert.DoesNotContain("Orleans__Streaming__Bridge__ServiceKey", environment.Keys);
+        }
+
+        Assert.Same(streaming.AwsSdkConfig, streaming.Stack.Resource.AWSSDKConfig);
+        var expectedNames = Enumerable.Range(0, 4).Select(index => $"{ServiceId}-bridge-{index}").Order().ToArray();
+        Assert.Equal(
+            expectedNames,
+            streaming.Queues
+                .Select(queue => Assert.IsType<CfnQueue>(queue.Resource.Construct.Node.DefaultChild).QueueName)
+                .Order());
+        var hosts = app.Model.Resources.Where(resource => resource.Name is "silo" or "client").ToArray();
+        Assert.Equal(2, hosts.Length);
+        Assert.All(hosts, resource => Assert.Contains(
+            resource.Annotations.OfType<WaitAnnotation>(),
+            annotation => ReferenceEquals(annotation.Resource, streaming.Stack.Resource)));
+        using var siloHost = await app.BuildSiloHostAsync();
+        using var clientHost = await app.BuildClientHostAsync();
+        foreach (var host in new[] { siloHost, clientHost })
+        {
+            var factory = Assert.IsType<SQSAdapterFactory>(
+                host.Services.GetRequiredKeyedService<IQueueAdapterFactory>("Bridge"));
+            var options = GetOptions<SqsOptions>(host.Services, "Bridge");
+            Assert.Equal("Service=us-east-1", options.ConnectionString);
+            Assert.Equal(
+                expectedNames,
+                GetPhysicalQueueNames(factory.GetStreamQueueMapper().GetAllQueues(), options, app.ServiceId));
+        }
+
+        using var scope = await app.CreateEnvironmentScopeAsync(SqsAspireResourceRole.Silo);
+        var config = new AmazonSQSConfig { RegionEndpoint = RegionEndpoint.USEast1 };
+        var resolvedEndpoint = config.DetermineServiceOperationEndpoint(
+            new ServiceOperationEndpointParameters(new GetQueueUrlRequest { QueueName = $"{ServiceId}-bridge-0" }));
+        Assert.Equal(endpoint, new Uri(resolvedEndpoint.URL));
+    }
 
     [Fact]
     public async Task AspireAppModel_Region_ProducesWorkingSiloConfiguration()
