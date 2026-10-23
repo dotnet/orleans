@@ -151,10 +151,17 @@ public sealed class AdoNetMembershipSqlTests
 
         var versionWrite = insert.IndexOf("UPDATE OrleansMembershipVersionTable", StringComparison.Ordinal);
         var rowWrite = insert.IndexOf("INSERT INTO OrleansMembershipTable", StringComparison.Ordinal);
-        if (engine is "SQLServer" or "MySQL")
+        if (engine is "SQLServer")
         {
             Assert.True(rowWrite >= 0 && versionWrite > rowWrite, insert);
-            Assert.Contains(engine == "SQLServer" ? "AND @@ROWCOUNT > 0;" : "AND ROW_COUNT() > 0;", insert[versionWrite..], StringComparison.Ordinal);
+            Assert.Contains("AND @@ROWCOUNT > 0;", insert[versionWrite..], StringComparison.Ordinal);
+        }
+        else if (engine is "MySQL")
+        {
+            // MySQL 8.4 does not evaluate ROW_COUNT() in a WHERE clause as the preceding statement's count.
+            var rowCountCapture = insert.IndexOf("SET _INSERTED = ROW_COUNT();", StringComparison.Ordinal);
+            Assert.True(rowWrite >= 0 && rowCountCapture > rowWrite && versionWrite > rowCountCapture, insert);
+            Assert.Contains("AND _INSERTED > 0;", insert[versionWrite..], StringComparison.Ordinal);
         }
         else
         {

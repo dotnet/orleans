@@ -89,6 +89,7 @@ CREATE PROCEDURE InsertMembershipKey(
 )
 BEGIN
     DECLARE _ROWCOUNT INT;
+    DECLARE _INSERTED INT;
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
@@ -133,11 +134,14 @@ BEGIN
         AND Generation = _Generation AND _Generation IS NOT NULL
     );
 
+    -- MySQL 8.4 does not evaluate ROW_COUNT() in a WHERE clause as the count of the preceding statement.
+    SET _INSERTED = ROW_COUNT();
+
     UPDATE OrleansMembershipVersionTable
     SET Version = Version + 1
     WHERE DeploymentId = _DeploymentId AND _DeploymentId IS NOT NULL
         AND Version = _Version AND _Version IS NOT NULL
-        AND ROW_COUNT() > 0;
+        AND _INSERTED > 0;
 
     SET _ROWCOUNT = ROW_COUNT();
 
