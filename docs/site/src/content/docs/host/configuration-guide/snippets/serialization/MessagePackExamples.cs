@@ -43,11 +43,15 @@ public static class MessagePackConfiguration
         builder.UseOrleans(siloBuilder =>
         {
             siloBuilder.UseLocalhostClustering();
-            siloBuilder.Services.AddSerializer(serializerBuilder => serializerBuilder.AddMessagePackSerializer(
-                isSerializable: type => type.Namespace?.StartsWith("MyApp.Messages", StringComparison.Ordinal) == true,
-                isCopyable: type => false,
-                messagePackSerializerOptions: null
-            ));
+            siloBuilder.Services.AddSerializer(serializerBuilder =>
+            {
+                serializerBuilder.AddMessagePackSerializer(
+                    isSerializable: type => type == typeof(OrderMessage),
+                    isCopyable: type => false,
+                    messagePackSerializerOptions: null);
+                serializerBuilder.Configure(options =>
+                    options.AllowedTypes.Add(typeof(OrderMessage).AssemblyQualifiedName!));
+            });
         });
     }
     // </messagepack_basic_config>
@@ -60,16 +64,20 @@ public static class MessagePackConfiguration
         builder.UseOrleans(siloBuilder =>
         {
             siloBuilder.UseLocalhostClustering();
-            siloBuilder.Services.AddSerializer(serializerBuilder => serializerBuilder.AddMessagePackSerializer(
-                isSerializable: type => type.GetCustomAttribute<MessagePackObjectAttribute>() != null,
-                isCopyable: type => false,
-                configureOptions: options => options.Configure(opts =>
-                {
-                    opts.SerializerOptions = MessagePackSerializerOptions.Standard
-                        .WithCompression(MessagePackCompression.Lz4BlockArray);
-                    opts.AllowDataContractAttributes = true;
-                })
-            ));
+            siloBuilder.Services.AddSerializer(serializerBuilder =>
+            {
+                serializerBuilder.AddMessagePackSerializer(
+                    isSerializable: type => type.GetCustomAttribute<MessagePackObjectAttribute>() != null,
+                    isCopyable: type => false,
+                    configureOptions: options => options.Configure(opts =>
+                    {
+                        opts.SerializerOptions = MessagePackSerializerOptions.Standard
+                            .WithCompression(MessagePackCompression.Lz4BlockArray);
+                        opts.AllowDataContractAttributes = true;
+                    }));
+                serializerBuilder.Configure(options =>
+                    options.AllowedTypes.Add(typeof(OrderMessage).AssemblyQualifiedName!));
+            });
         });
     }
     // </messagepack_with_options>

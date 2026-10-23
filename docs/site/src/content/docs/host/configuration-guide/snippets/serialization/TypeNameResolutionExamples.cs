@@ -13,7 +13,9 @@ public static class SerializationConfigurationExamples
         siloBuilder.Services.AddSerializer(serializerBuilder =>
         {
             serializerBuilder.AddNewtonsoftJsonSerializer(
-                isSupported: type => type.Namespace?.StartsWith("Example.Namespace", StringComparison.Ordinal) is true);
+                isSupported: type => type == typeof(ApplicationPayload));
+            serializerBuilder.Configure(options =>
+                options.AllowedTypes.Add(typeof(ApplicationPayload).AssemblyQualifiedName!));
         });
         // </configure_newtonsoft_json>
     }
@@ -24,9 +26,16 @@ public static class SerializationConfigurationExamples
         siloBuilder.Services.AddSerializer(serializerBuilder =>
         {
             serializerBuilder.AddJsonSerializer(
-                isSupported: type => type.Namespace?.StartsWith("Example.Namespace", StringComparison.Ordinal) is true);
+                isSupported: type => type == typeof(ApplicationPayload));
+            serializerBuilder.Configure(options =>
+                options.AllowedTypes.Add(typeof(ApplicationPayload).AssemblyQualifiedName!));
         });
         // </configure_system_text_json>
+    }
+
+    public sealed class ApplicationPayload
+    {
+        public string Message { get; set; } = "";
     }
 
     public static void RegisterTypeNameFilter(ISiloBuilder siloBuilder)

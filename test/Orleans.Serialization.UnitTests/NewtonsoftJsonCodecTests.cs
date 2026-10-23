@@ -40,6 +40,7 @@ namespace Orleans.Serialization.UnitTests
         protected override void Configure(ISerializerBuilder builder)
         {
             builder.AddNewtonsoftJsonSerializer(isSupported: type => type.GetCustomAttribute<MyNewtonsoftJsonSerializableAttribute>(inherit: false) is not null);
+            builder.Configure(options => options.AddAllowedType(typeof(MyNewtonsoftJsonClass)));
         }
 
         protected override MyNewtonsoftJsonClass CreateValue() => new MyNewtonsoftJsonClass { IntProperty = 30, SubTypeProperty = "hello" };
@@ -133,6 +134,7 @@ namespace Orleans.Serialization.UnitTests
         protected override void Configure(ISerializerBuilder builder)
         {
             builder.AddNewtonsoftJsonSerializer(isSupported: type => type.GetCustomAttribute<MyNewtonsoftJsonSerializableAttribute>(inherit: false) is not null);
+            builder.Configure(options => options.AddAllowedType(typeof(MyNewtonsoftJsonClass)));
         }
 
         protected override IDeepCopier<MyNewtonsoftJsonClass> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<MyNewtonsoftJsonClass>();

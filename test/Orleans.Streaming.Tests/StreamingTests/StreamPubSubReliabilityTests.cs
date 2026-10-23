@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Hosting;
+using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -38,6 +39,8 @@ namespace UnitTests.StreamingTests
                     .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
                     .ConfigureServices(services =>
                     {
+                        services.AddSerializer(builder => builder.Configure(options =>
+                            options.AddAllowedType(typeof(ErrorInjectionStorageProvider))));
                         services.AddSingleton<ErrorInjectionStorageProvider>();
                         services.AddGrainStorage(PubSubStoreProviderName, (sp, name) => sp.GetRequiredService<ErrorInjectionStorageProvider>());
                         services.AddKeyedSingleton<IControllable>(PubSubStoreProviderName, (sp, key) => sp.GetRequiredService<ErrorInjectionStorageProvider>());
@@ -49,6 +52,8 @@ namespace UnitTests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME);
+                clientBuilder.Services.AddSerializer(builder => builder.Configure(options =>
+                    options.AddAllowedType(typeof(ErrorInjectionStorageProvider))));
             }
         }
 

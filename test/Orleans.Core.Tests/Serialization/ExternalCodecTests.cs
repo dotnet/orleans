@@ -33,6 +33,7 @@ namespace UnitTests.Serialization
                         services.AddSerializer(serializerBuilder =>
                         {
                             serializerBuilder.AddNewtonsoftJsonSerializer(type => type.GetCustomAttribute<JsonTypeAttribute>() is not null);
+                            serializerBuilder.Configure(options => options.AddAllowedType(typeof(JsonPoco)));
                         })));
         }
 
@@ -55,6 +56,7 @@ namespace UnitTests.Serialization
                         services.AddSerializer(serializerBuilder =>
                         {
                             serializerBuilder.AddNewtonsoftJsonSerializer(type => type.GetCustomAttribute<JsonTypeAttribute>() is not null);
+                            serializerBuilder.Configure(options => options.AddAllowedType(typeof(JsonPoco)));
                         }));
                 })
                 .Build();

@@ -52,6 +52,19 @@ public class CompoundTypeAliasTree
         return false;
     }
 
+    internal IEnumerable<Type> GetTypes()
+    {
+        if (Key is Type key) yield return key;
+        if (Value is { } value) yield return value;
+        if (_children is { } children)
+        {
+            foreach (var child in children.Values)
+            {
+                foreach (var type in child.GetTypes()) yield return type;
+            }
+        }
+    }
+
     /// <summary>
     /// Adds a node to the tree.
     /// </summary>

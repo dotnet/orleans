@@ -86,7 +86,11 @@ public static class SerializationHostingExtensions
             services.AddFromExisting<IGeneralizedCodec, MessagePackCodec>();
             services.AddFromExisting<IGeneralizedCopier, MessagePackCodec>();
             services.AddFromExisting<ITypeFilter, MessagePackCodec>();
-            serializerBuilder.Configure(options => options.WellKnownTypeAliases[MessagePackCodec.WellKnownAlias] = typeof(MessagePackCodec));
+            serializerBuilder.Configure(options =>
+            {
+                options.WellKnownTypeAliases[MessagePackCodec.WellKnownAlias] = typeof(MessagePackCodec);
+                options.AddAllowedType(typeof(MessagePackCodec));
+            });
         }
 
         return serializerBuilder;

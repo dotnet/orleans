@@ -125,7 +125,32 @@ namespace Orleans.Serialization.Codecs
         /// <returns>The referenced value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [return: MaybeNull]
-        public static T ReadReference<T, TInput>(ref Reader<TInput> reader, Field field) => (T)ReadReference(ref reader, field.FieldType ?? typeof(T))!;
+        public static T ReadReference<T, TInput>(ref Reader<TInput> reader, Field field)
+        {
+            if (typeof(T) != typeof(string) && typeof(T) != typeof(Type))
+            {
+                return (T)ReadReference(ref reader, field.FieldType ?? typeof(T))!;
+            }
+
+            MarkValueField(reader.Session);
+            var reference = reader.ReadVarUInt32();
+            if (reference == 0) return default!;
+            var value = reader.Session.ReferencedObjects.TryGetReferencedObject(reference);
+            if (value is null) throw new ReferenceNotFoundException(typeof(T), reference);
+            if (value is UnknownFieldMarker marker)
+            {
+                var expectedWireType = typeof(T) == typeof(string) ? WireType.LengthPrefixed : WireType.TagDelimited;
+                if (marker.Field.WireType != expectedWireType
+                    || marker.Field.FieldType is { } actualType && actualType != typeof(T))
+                {
+                    throw new InvalidCastException($"Reference {reference} is not a serialized {typeof(T)} value.");
+                }
+
+                value = DeserializeFromMarker(ref reader, typeof(T), marker, reference);
+            }
+
+            return (T)value!;
+        }
 
         /// <summary>
         /// Reads the reference.

@@ -175,16 +175,35 @@ namespace Orleans.Serialization.Codecs
             {
                 case SchemaType.WellKnown:
                     var typeId = reader.ReadVarUInt32();
-                    return reader.Session.WellKnownTypes.GetWellKnownType(typeId);
+                    var known = reader.Session.WellKnownTypes.GetWellKnownType(typeId);
+                    reader.Session.TypeCodec.ValidateType(known);
+                    return known;
                 case SchemaType.Encoded:
                     var encoded = reader.Session.TypeCodec.TryRead(ref reader);
                     reader.Session.ReferencedTypes.RecordReferencedType(encoded);
                     return encoded;
                 case SchemaType.Referenced:
                     var reference = reader.ReadVarUInt32();
-                    return reader.Session.ReferencedTypes.GetReferencedType(reference);
+                    var referenced = reader.Session.ReferencedTypes.GetReferencedType(reference);
+                    reader.Session.TypeCodec.ValidateType(referenced);
+                    return referenced;
                 default:
                     return ExceptionHelper.ThrowArgumentOutOfRange<Type>(nameof(SchemaType));
+            }
+        }
+
+        internal static Field ReadRequiredFieldHeader<TInput>(this ref Reader<TInput> reader)
+        {
+            var field = reader.ReadFieldHeader();
+            EnsureRequiredType(field);
+            return field;
+        }
+
+        internal static void EnsureRequiredType(Field field)
+        {
+            if (field.FieldType is null && field.Tag.SchemaType != SchemaType.Expected)
+            {
+                throw new TypeMissingException();
             }
         }
 

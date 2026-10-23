@@ -46,6 +46,7 @@ public class ProtobufSerializerTests : FieldCodecTester<MyProtobufClass?, IField
     protected override void Configure(ISerializerBuilder builder)
     {
         builder.AddProtobufSerializer();
+        builder.Configure(options => options.AddAllowedType(typeof(MyProtobufClass)));
     }
 
     protected override MyProtobufClass? CreateValue() => new() { IntProperty = 30, StringProperty = "hello", SubClass = new MyProtobufClass.Types.SubClass { Id = Guid.NewGuid().ToByteString() } };
@@ -115,6 +116,7 @@ public class ProtobufCodecCopierTests : CopierTester<MyProtobufClass?, IDeepCopi
     protected override void Configure(ISerializerBuilder builder)
     {
         builder.AddProtobufSerializer();
+        builder.Configure(options => options.AddAllowedType(typeof(MyProtobufClass)));
     }
     protected override IDeepCopier<MyProtobufClass?> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<MyProtobufClass?>();
 
