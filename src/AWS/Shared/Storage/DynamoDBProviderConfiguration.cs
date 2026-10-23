@@ -79,9 +79,15 @@ namespace Orleans.Reminders.DynamoDB
             SetIfPresent(value => options.AccessKey = value, GetValue(nameof(options.AccessKey)));
             SetIfPresent(value => options.SecretKey = value, GetValue(nameof(options.SecretKey)));
             SetIfPresent(value => options.Token = value, GetValue(nameof(options.Token), "SessionToken"));
-            var profileName = GetValue(nameof(options.ProfileName), "Profile")
-                ?? GetNonEmpty(_configuration["AWS:Profile"])
-                ?? GetNonEmpty(_configuration["AWS_PROFILE"]);
+            var profileName = GetValue(nameof(options.ProfileName), "Profile");
+            if (profileName is null
+                && string.IsNullOrEmpty(options.AccessKey)
+                && string.IsNullOrEmpty(options.SecretKey))
+            {
+                profileName = GetNonEmpty(_configuration["AWS:Profile"])
+                    ?? GetNonEmpty(_configuration["AWS_PROFILE"]);
+            }
+
             SetIfPresent(value => options.ProfileName = value, profileName);
 
             var service = GetValue(nameof(options.Service), "ServiceURL", "Endpoint", "Region")

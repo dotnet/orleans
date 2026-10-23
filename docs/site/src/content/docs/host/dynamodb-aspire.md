@@ -63,6 +63,8 @@ Use stable cluster and service identifiers whenever local data persists across A
 
 Direct provider configuration can set `AccessKey`, `SecretKey`, and `Token` for environments that supply explicit session credentials. `AccessKey`, `SecretKey`, and `Token` are redacted from formatted options. Configure `AccessKey` and `SecretKey` together, configure `Token` only with that pair, and choose either explicit credentials or `ProfileName`.
 
+Provider-supplied keys take precedence over the host-wide `AWS:Profile` and `AWS_PROFILE` defaults. A provider-level `ProfileName` or `Profile` selects the alternative profile credential mode; combining it with explicit keys produces a configuration error.
+
 ## Consume CloudFormation outputs
 
 AWS Aspire CDK table references emit the table name under `AWS:Resources:{resource-name}:TableName`. A CloudFormation reference can instead target the provider section directly, such as `Orleans:Clustering`, `Orleans:GrainStorage:Default`, or `Orleans:Reminders`, when the stack exposes an output named `TableName`.

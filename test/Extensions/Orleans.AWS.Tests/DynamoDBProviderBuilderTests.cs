@@ -57,6 +57,88 @@ public sealed class DynamoDBProviderConfigurationTests
         Assert.Equal("alias-profile", provider.GetValue("ProfileName", "Profile"));
     }
 
+    [Theory]
+    [InlineData("Provider:", "AWS:Profile")]
+    [InlineData("Provider:", "AWS_PROFILE")]
+    [InlineData("Provider:ConnectionProperties:", "AWS:Profile")]
+    [InlineData("Provider:ConnectionProperties:", "AWS_PROFILE")]
+    [InlineData("Provider:Resource:", "AWS:Profile")]
+    [InlineData("Provider:Resource:", "AWS_PROFILE")]
+    [InlineData("Provider:AWS:", "AWS:Profile")]
+    [InlineData("Provider:AWS:", "AWS_PROFILE")]
+    [InlineData("AWS:Resources:orders-table:", "AWS:Profile")]
+    [InlineData("AWS:Resources:orders-table:", "AWS_PROFILE")]
+    [InlineData("ORDERS_TABLE_", "AWS:Profile")]
+    [InlineData("ORDERS_TABLE_", "AWS_PROFILE")]
+    public void Create_ExplicitCredentialsOverrideAmbientProfile(string credentialPrefix, string profileKey)
+    {
+        var (_, _, options) = Bind(new()
+        {
+            ["Provider:ServiceKey"] = "orders-table",
+            ["Provider:Service"] = "us-west-2",
+            [$"{credentialPrefix}AccessKey"] = "explicit-access",
+            [$"{credentialPrefix}SecretKey"] = "explicit-secret",
+            [$"{credentialPrefix}SessionToken"] = "explicit-token",
+            [profileKey] = "ambient-profile",
+        });
+
+        Assert.Equal("explicit-access", options.AccessKey);
+        Assert.Equal("explicit-secret", options.SecretKey);
+        Assert.Equal("explicit-token", options.Token);
+        Assert.Null(options.ProfileName);
+        ClusteringProviderConfiguration.ValidateClientOptions(options, "orders");
+    }
+
+    [Theory]
+    [InlineData(null, "section-profile", "environment-profile", "section-profile")]
+    [InlineData(null, null, "environment-profile", "environment-profile")]
+    [InlineData("provider-profile", "section-profile", "environment-profile", "provider-profile")]
+    public void Create_ProfileOnly_UsesConfiguredProfilePrecedence(
+        string? providerProfile,
+        string? sectionProfile,
+        string? environmentProfile,
+        string expectedProfile)
+    {
+        var (_, _, options) = Bind(new()
+        {
+            ["Provider:Service"] = "us-west-2",
+            ["Provider:ProfileName"] = providerProfile,
+            ["AWS:Profile"] = sectionProfile,
+            ["AWS_PROFILE"] = environmentProfile,
+        });
+
+        Assert.Equal(expectedProfile, options.ProfileName);
+        Assert.Null(options.AccessKey);
+        Assert.Null(options.SecretKey);
+        Assert.Null(options.Token);
+        ClusteringProviderConfiguration.ValidateClientOptions(options, "orders");
+    }
+
+    [Theory]
+    [InlineData("Provider:ProfileName")]
+    [InlineData("Provider:Profile")]
+    [InlineData("AWS:Resources:orders-table:ProfileName")]
+    [InlineData("ORDERS_TABLE_PROFILE")]
+    public void Create_ExplicitCredentialsAndProviderProfile_RejectsConflict(string profileKey)
+    {
+        var (_, _, options) = Bind(new()
+        {
+            ["Provider:ServiceKey"] = "orders-table",
+            ["Provider:Service"] = "us-west-2",
+            ["Provider:AccessKey"] = "explicit-access",
+            ["Provider:SecretKey"] = "explicit-secret",
+            [profileKey] = "provider-profile",
+            ["AWS_PROFILE"] = "ambient-profile",
+        });
+
+        Assert.Equal("provider-profile", options.ProfileName);
+        var exception = Assert.Throws<OrleansConfigurationException>(
+            () => ClusteringProviderConfiguration.ValidateClientOptions(options, "orders"));
+        Assert.Contains("Explicit credentials", exception.Message);
+        Assert.Contains(nameof(options.ProfileName), exception.Message);
+        Assert.DoesNotContain("explicit-secret", exception.Message);
+    }
+
     [Fact]
     public void Create_DirectValuesOverrideStructuredAndConnectionStringValues()
     {
@@ -227,6 +309,7 @@ public sealed class DynamoDBProviderConfigurationTests
             ["AWS:Resources:orders:ServiceId"] = "resource-service-id",
             ["ORDERS_SERVICE"] = "encoded-region",
             ["ConnectionStrings:orders"] = "Service=named-region",
+            ["AWS_PROFILE"] = "ambient-profile",
         });
 
         Assert.Equal("https://explicit.example", options.Service);
@@ -235,6 +318,8 @@ public sealed class DynamoDBProviderConfigurationTests
         Assert.Equal("explicit-token", options.Token);
         Assert.Equal("explicit-table", provider.GetValue("TableName"));
         Assert.Equal("resource-service-id", provider.GetValue("ServiceId"));
+        Assert.Null(options.ProfileName);
+        ClusteringProviderConfiguration.ValidateClientOptions(options, "orders");
     }
 
     [Fact]
@@ -494,6 +579,65 @@ public sealed class DynamoDBProviderConfigurationTests
         Assert.Equal("OrleansGrainState", storage.TableName);
         Assert.Equal(serviceUrl, reminders.Service);
         Assert.Equal("OrleansReminders", reminders.TableName);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("explicit-token")]
+    public void ProviderBuilders_ExplicitCredentialsOverrideAmbientProfile(string? token)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["AWS:Region"] = "us-west-2",
+            ["AWS:Profile"] = "ambient-profile",
+            ["AWS_PROFILE"] = "environment-profile",
+        };
+        foreach (var prefix in new[] { "Clustering", "GrainStorage:Default", "Reminders" })
+        {
+            values[$"Orleans:{prefix}:ProviderType"] = "DynamoDB";
+            values[$"Orleans:{prefix}:AccessKey"] = "explicit-access";
+            values[$"Orleans:{prefix}:SecretKey"] = "explicit-secret";
+            values[$"Orleans:{prefix}:Token"] = token;
+        }
+
+        using var siloHost = BuildSiloProviderHost(values, (_, _) => { });
+        var clientValues = values.Where(pair =>
+            pair.Key.StartsWith("AWS", StringComparison.Ordinal)
+            || pair.Key.StartsWith("Orleans:Clustering:", StringComparison.Ordinal))
+            .ToDictionary();
+        using var clientHost = BuildClientProviderHost(clientValues, (_, _) => { });
+        var clustering = siloHost.Services.GetRequiredService<IOptions<DynamoDBClusteringOptions>>().Value;
+        var storage = siloHost.Services.GetRequiredService<IOptionsMonitor<DynamoDBStorageOptions>>().Get("Default");
+        var reminders = siloHost.Services.GetRequiredService<IOptions<DynamoDBReminderStorageOptions>>().Value;
+        var gateway = clientHost.Services.GetRequiredService<IOptions<DynamoDBGatewayOptions>>().Value;
+
+        Assert.All(new[]
+        {
+            (clustering.AccessKey, clustering.SecretKey, clustering.Token, clustering.ProfileName),
+            (storage.AccessKey, storage.SecretKey, storage.Token, storage.ProfileName),
+            (reminders.AccessKey, reminders.SecretKey, reminders.Token, reminders.ProfileName),
+            (gateway.AccessKey, gateway.SecretKey, gateway.Token, gateway.ProfileName),
+        }, credentials =>
+        {
+            Assert.Equal("explicit-access", credentials.AccessKey);
+            Assert.Equal("explicit-secret", credentials.SecretKey);
+            Assert.Equal(token, credentials.Token);
+            Assert.Null(credentials.ProfileName);
+        });
+
+        var siloValidators = siloHost.Services.GetServices<IConfigurationValidator>()
+            .Where(validator => validator.GetType().Name.StartsWith("DynamoDB", StringComparison.Ordinal))
+            .ToArray();
+        Assert.Equal(3, siloValidators.Length);
+        foreach (var validator in siloValidators)
+        {
+            validator.ValidateConfiguration();
+        }
+
+        Assert.Single(
+            clientHost.Services.GetServices<IConfigurationValidator>(),
+            validator => validator.GetType().Name.StartsWith("DynamoDB", StringComparison.Ordinal))
+            .ValidateConfiguration();
     }
 
     private static void AssertProviderLocalShape(string shape)
