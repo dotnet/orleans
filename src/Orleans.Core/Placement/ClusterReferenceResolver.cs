@@ -192,6 +192,12 @@ public sealed class ClusterReferenceResolver
         CancellationToken cancellationToken)
     {
         var topology = await _topologyProvider.GetTopology(cancellationToken);
+        if (!string.Equals(topology.ServiceId, _clusterOptions.ServiceId, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Topology service '{topology.ServiceId}' does not match local service '{_clusterOptions.ServiceId}'.");
+        }
+
         if (topology.Epoch == cached.TopologyEpoch
             && topology.Clusters.TryGetValue(cached.Cluster.ClusterId, out var cluster)
             && cluster.State == MetaclusterClusterState.Active)

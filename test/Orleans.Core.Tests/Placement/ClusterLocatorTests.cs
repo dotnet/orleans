@@ -723,6 +723,35 @@ public sealed class ClusterLocatorTests
     }
 
     [Fact]
+    public async Task ClusterReferenceResolver_CacheHit_RejectsDifferentTopologyServiceAtSameEpoch()
+    {
+        var locator = new SequenceClusterLocator(new ClusterLocation("west", 1, 1, false));
+        var topology = new Phase4MutableTopologyProvider(
+            Phase4Topology("service", 1, ("west", MetaclusterClusterState.Active)));
+        var fixture = CreatePhase4ResolverFixture(
+            topologyProvider: topology,
+            locators: [("selected", locator)]);
+        var reference = VirtualReference("service", "cached-service-boundary");
+        var expected = new ClusterIdentity("service", "west");
+
+        Assert.Equal(expected, await fixture.ReferenceResolver.Resolve(
+            reference, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(expected, await fixture.ReferenceResolver.Resolve(
+            reference, cancellationToken: TestContext.Current.CancellationToken));
+        topology.Current = Phase4Topology("foreign-service", 1, ("west", MetaclusterClusterState.Active));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.ReferenceResolver.Resolve(
+            reference, cancellationToken: TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal("Topology service 'foreign-service' does not match local service 'service'.", exception.Message);
+        Assert.Equal(1, locator.CallCount);
+        topology.Current = Phase4Topology("service", 1, ("west", MetaclusterClusterState.Active));
+        Assert.Equal(expected, await fixture.ReferenceResolver.Resolve(
+            reference, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(1, locator.CallCount);
+    }
+
+    [Fact]
     public async Task ClusterReferenceResolver_TopologyChange_InvalidatesStaleCacheEntry()
     {
         var locator = new SequenceClusterLocator(

@@ -159,6 +159,14 @@ internal sealed class PartitionTransitionCoordinator
             transition.FailCore(exception);
         }
     }
+
+    internal void MarkFenced(PartitionTransition transition, ClusterServiceFence fence)
+    {
+        lock (_lock)
+        {
+            transition.MarkFencedCore(fence);
+        }
+    }
 }
 
 internal sealed class PartitionTransition
@@ -218,8 +226,7 @@ internal sealed class PartitionTransition
     public void MarkFenced(ClusterServiceFence fence)
     {
         EnsureDirection(PartitionTransitionDirection.Inbound);
-        Transition(PartitionTransitionStage.StateInstalled, PartitionTransitionStage.Fenced);
-        Fence = fence;
+        _owner.MarkFenced(this, fence);
     }
 
     public void Complete()
@@ -277,6 +284,20 @@ internal sealed class PartitionTransition
         Failure = exception;
         Volatile.Write(ref _stage, (int)PartitionTransitionStage.Failed);
         _completion.TrySetException(exception);
+    }
+
+    internal void MarkFencedCore(ClusterServiceFence fence)
+    {
+        var stage = Stage;
+        if (stage != PartitionTransitionStage.StateInstalled)
+        {
+            throw new InvalidOperationException(
+                $"Transition stage '{stage}' cannot advance to '{PartitionTransitionStage.Fenced}'.");
+        }
+
+        // The owner lock serializes fence writers with failure/abort; publish the token before the stage.
+        Fence = fence;
+        Volatile.Write(ref _stage, (int)PartitionTransitionStage.Fenced);
     }
 
     private void EnsureDirection(PartitionTransitionDirection expected)

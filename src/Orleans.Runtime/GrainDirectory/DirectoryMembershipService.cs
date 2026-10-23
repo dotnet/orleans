@@ -85,6 +85,8 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
                     {
                         _viewUpdates.TryPublish(new(update, _grainFactory));
                     }
+
+                    break;
                 }
                 catch (Exception exception)
                 {

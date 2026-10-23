@@ -39,6 +39,107 @@ public sealed class PartitionTransitionCoordinatorTests
     }
 
     [Fact]
+    public async Task FencedStage_PublishesMatchingTokenAndRejectsSecondWriter()
+    {
+        var coordinator = new PartitionTransitionCoordinator();
+        var transition = coordinator.BeginInbound(Range, View1, View2);
+        transition.MarkStateInstalled();
+        var expected = new ClusterServiceFence(ClusterServiceFencingMode.External, 42);
+        var publish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var published = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var writer = Task.Run(async () =>
+        {
+            await publish.Task;
+            transition.MarkFenced(expected);
+            published.SetResult();
+        }, TestContext.Current.CancellationToken);
+        var observer = Task.Run(async () =>
+        {
+            await published.Task;
+            Assert.Equal(PartitionTransitionStage.Fenced, transition.Stage);
+            Assert.Equal(expected, transition.Fence);
+            Assert.Throws<InvalidOperationException>(
+                () => transition.MarkFenced(new(ClusterServiceFencingMode.MembershipView, 99)));
+            Assert.Equal(expected, transition.Fence);
+            Assert.Equal(PartitionTransitionStage.Fenced, transition.Stage);
+        }, TestContext.Current.CancellationToken);
+
+        publish.SetResult();
+        await Task.WhenAll(writer, observer);
+        transition.Complete();
+        await transition.Completion;
+        Assert.Equal(expected, transition.Fence);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task FencingAndTerminalTransition_PreserveWinningStateAndToken(bool abort, bool fenceFirst)
+    {
+        var coordinator = new PartitionTransitionCoordinator();
+        var transition = coordinator.BeginInbound(Range, View1, View2);
+        transition.MarkStateInstalled();
+        var expected = new ClusterServiceFence(ClusterServiceFencingMode.External, 42);
+        var failure = new InvalidOperationException("terminal failure");
+        var firstFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var first = Task.Run(() =>
+        {
+            if (fenceFirst)
+            {
+                transition.MarkFenced(expected);
+            }
+            else
+            {
+                Finish();
+            }
+
+            firstFinished.SetResult();
+        }, TestContext.Current.CancellationToken);
+        var second = Task.Run(async () =>
+        {
+            await firstFinished.Task;
+            if (fenceFirst)
+            {
+                Finish();
+            }
+            else
+            {
+                Assert.Throws<InvalidOperationException>(() => transition.MarkFenced(expected));
+            }
+        }, TestContext.Current.CancellationToken);
+
+        await Task.WhenAll(first, second);
+
+        Assert.Equal(abort ? PartitionTransitionStage.Aborted : PartitionTransitionStage.Failed, transition.Stage);
+        Assert.Equal(fenceFirst ? expected : (ClusterServiceFence?)null, transition.Fence);
+        Assert.False(coordinator.IsBlocked(Range, View2.MembershipVersion));
+        if (abort)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => transition.Completion);
+            Assert.Null(transition.Failure);
+        }
+        else
+        {
+            Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => transition.Completion));
+            Assert.Same(failure, transition.Failure);
+        }
+
+        void Finish()
+        {
+            if (abort)
+            {
+                transition.Abort();
+            }
+            else
+            {
+                transition.Fail(failure);
+            }
+        }
+    }
+
+    [Fact]
     public async Task OutboundTransition_DrainsBeforeRetainingStateAndOpeningGate()
     {
         var coordinator = new PartitionTransitionCoordinator();

@@ -72,6 +72,41 @@ public sealed class ClusterServiceMembershipTests
     }
 
     [Fact]
+    public async Task DirectoryMembershipService_NormalCompletionClosesReadersAndStopsProjection()
+    {
+        var service = new TestClusterMembershipService(CreateSnapshot(1, CreateSilo(1)));
+        await using var membership = new DirectoryMembershipService(
+            service,
+            grainFactory: null!,
+            NullLogger<DirectoryMembershipService>.Instance,
+            partitionsPerSilo: 2,
+            GetBoundaries);
+        await service.EnumeratorStarted;
+        await using var first = membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        await using var second = membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await first.MoveNextAsync());
+        Assert.True(await second.MoveNextAsync());
+        var firstUpdate = first.MoveNextAsync().AsTask();
+        var secondUpdate = second.MoveNextAsync().AsTask();
+        var snapshot = CreateSnapshot(2, CreateSilo(2));
+        service.Publish(snapshot);
+        Assert.True(await firstUpdate);
+        Assert.True(await secondUpdate);
+        var lastView = first.Current;
+        var firstCompletion = first.MoveNextAsync().AsTask();
+        var secondCompletion = second.MoveNextAsync().AsTask();
+
+        service.Complete();
+
+        Assert.False(await firstCompletion.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.False(await secondCompletion);
+        Assert.Same(lastView, membership.CurrentView);
+        Assert.Same(snapshot, membership.CurrentView.ClusterMembershipSnapshot);
+        await using var late = membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.False(await late.MoveNextAsync());
+    }
+
+    [Fact]
     public async Task DirectoryMembershipService_SuppressesDuplicateVersionWithDifferentTopology()
     {
         var service = new TestClusterMembershipService(ClusterMembershipSnapshot.Default);
