@@ -18,6 +18,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\..\..\..\src\AWS\Orleans.Streaming.SQS\Orleans.Streaming.SQS.csproj" />
   </ItemGroup>
 
 </Project>
