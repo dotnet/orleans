@@ -12,7 +12,9 @@ using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization.Buffers;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
@@ -823,6 +825,53 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         AssertCounts(services, metrics, baseline, shared, 0, 0, 0);
         AssertActivationEvents(metrics, shared, created: 1, destroyed: 1, failed: 0, instances: [1, -1]);
         AssertDeactivationMetrics(metrics, shared, "deactivateOnIdle");
+        await parent.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Runtime_StatelessWorkerReleasesMessageWhenReplacementIsUnavailable()
+    {
+        await using var fixture = new MetricsFixture("non-existent");
+        await fixture.InitializeAsync();
+        var services = fixture.PrimaryServices;
+        using var metrics = new RuntimeMetrics(services);
+        var grain = fixture.GrainFactory.GetGrain<IStatelessWorkerActivationCollectorTestGrain1>(Guid.NewGuid());
+        await grain.Nop().WaitAsync(Timeout, TestCancellation);
+        var grainId = ((GrainReference)grain).GrainId;
+        var directory = services.GetRequiredService<ActivationDirectory>();
+        var parent = Assert.IsType<StatelessWorkerGrainContext>(directory.FindTarget(grainId));
+        var removed = metrics.WaitForCount(InstrumentNames.CATALOG_ACTIVATION_DESTROYED, grainId.Type.ToString(), 1);
+        var deactivated = parent.Deactivated;
+        parent.Deactivate(new(DeactivationReasonCode.RuntimeRequested, "Test terminated context"), TestCancellation);
+        await deactivated.WaitAsync(Timeout, TestCancellation);
+        await removed;
+        Assert.Null(directory.FindTarget(grainId));
+
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(new byte[20_000]);
+        var body = services.GetRequiredService<MessageHandlerShared>().GetReceiveMessageHandler();
+        body.Initialize(default, buffer.ConsumeSlice(buffer.Length));
+        using var request = new Message
+        {
+            Direction = Message.Directions.Request,
+            TargetGrain = grainId,
+            SendingGrain = GrainId.Create("test", "caller"),
+            SendingSilo = fixture.HostedCluster.Primary!.SiloAddress,
+            Id = new(1),
+        };
+        request.SetMessageReadRequest(body);
+        var page = body.Body.First!;
+        var version = page.Version;
+        using (services.GetRequiredService<CatalogAvailability>().RejectNewActivations())
+        {
+            parent.ReceiveMessage(request);
+            // This work item follows the message on the parent's queue.
+            await parent.Deactivated.WaitAsync(Timeout, TestCancellation);
+            Assert.Null(request._bodyObject);
+            Assert.NotEqual(version, page.Version);
+            Assert.Null(directory.FindTarget(grainId));
+        }
+
         await parent.DisposeAsync();
     }
 

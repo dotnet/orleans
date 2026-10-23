@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="CsCheck" />
     <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="NSubstitute" />
   </ItemGroup>
 

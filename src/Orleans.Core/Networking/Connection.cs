@@ -360,12 +360,7 @@ namespace Orleans.Runtime.Messaging
                     else if (!_connection._transport.EnqueueWrite(writeRequest))
                     {
                         _connection.StartClosing(new ConnectionClosedException());
-                        for (var i = 0; i < writeRequest.MessageCount; i++)
-                        {
-                            _connection.RerouteMessage(writeRequest.GetMessage(i));
-                        }
-
-                        writeRequest.Reset();
+                        writeRequest.RerouteMessages(error: null);
                     }
                 }
                 finally
@@ -440,7 +435,7 @@ namespace Orleans.Runtime.Messaging
             "Reliability",
             "CA2000:Dispose objects before losing scope",
             Justification = "Ownership of the response message is transferred to the local message dispatcher.")]
-        private void OnMessageSerializationFailure(Message message, Exception exception)
+        internal void OnMessageSerializationFailure(Message message, Exception exception)
         {
             LogErrorExceptionSerializingMessage(Log, exception, message, this);
 

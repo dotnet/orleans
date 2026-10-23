@@ -28,7 +28,7 @@ namespace Orleans.Configuration
 
         public int ReadCapacityUnits { get { throw null; } set { } }
 
-        public string ServiceId { get { throw null; } set { } }
+        public string? ServiceId { get { throw null; } set { } }
 
         public string TableName { get { throw null; } set { } }
 

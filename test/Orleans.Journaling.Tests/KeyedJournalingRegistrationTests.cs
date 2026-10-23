@@ -46,9 +46,9 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
             options.MaxBytesBeforeSnapshot = long.MaxValue;
         });
         await using var services = builder.Services.BuildServiceProvider();
-        var defaults = services.GetRequiredService<IJournalStorageProvider>().CreateStorage(new("threshold"));
-        var named = services.GetRequiredKeyedService<IJournalStorageProvider>("small-bytes").CreateStorage(new("threshold"));
-        var large = services.GetRequiredKeyedService<IJournalStorageProvider>("large").CreateStorage(new("threshold"));
+        var defaults = await services.GetRequiredService<IJournalStorageProvider>().CreateStorage(new("threshold")).ReadForWriteAsync();
+        var named = await services.GetRequiredKeyedService<IJournalStorageProvider>("small-bytes").CreateStorage(new("threshold")).ReadForWriteAsync();
+        var large = await services.GetRequiredKeyedService<IJournalStorageProvider>("large").CreateStorage(new("threshold")).ReadForWriteAsync();
         var token = TestContext.Current.CancellationToken;
         await defaults.AppendAsync(new ReadOnlySequence<byte>([1]), token);
         await named.AppendAsync(new ReadOnlySequence<byte>([1, 2]), token);
@@ -117,7 +117,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         Assert.Equal(4, configured.MaxAppendsBeforeSnapshot);
         Assert.Equal(long.MaxValue, configured.MaxBytesBeforeSnapshot);
         var provider = services.GetRequiredKeyedService<IJournalStorageProvider>(name);
-        var storage = provider.CreateStorage(new("options-pipeline"));
+        var storage = await provider.CreateStorage(new("options-pipeline")).ReadForWriteAsync();
         if (name == ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
         {
             Assert.Same(provider, services.GetRequiredService<IJournalStorageProvider>());
@@ -133,7 +133,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([2]), token);
         Assert.True(storage.IsCompactionRequested);
-        var second = provider.CreateStorage(new("options-pipeline"));
+        var second = await provider.CreateStorage(new("options-pipeline")).ReadForWriteAsync();
         Assert.True(second.IsCompactionRequested);
         await second.ReplaceAsync(new ReadOnlySequence<byte>([3]), token);
         Assert.False(storage.IsCompactionRequested);
@@ -365,7 +365,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
             catalogA.Add(entry.Id);
         }
         Assert.Equal(new[] { id }, catalogA);
-        await storageA.CreateStorage(id).DeleteAsync(token);
+        await (await storageA.CreateStorage(id).ReadForWriteAsync()).DeleteAsync(token);
         Assert.Null(await storageA.CreateStorage(id).GetMetadataAsync(token));
         Assert.NotNull(await storageB.CreateStorage(id).GetMetadataAsync(token));
     }

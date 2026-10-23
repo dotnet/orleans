@@ -124,6 +124,13 @@ public struct ArcBufferReaderInput(in ArcBuffer slice)
     private int _position;
 
     internal readonly ArcBufferPage? First => _slice.First;
+    // The offset is relative to the span most recently returned by GetNext.
+    internal readonly ArcBuffer Slice(int offset, int length)
+    {
+        Debug.Assert(_page is not null);
+        var pageOffset = _page == First ? Offset : 0;
+        return new ArcBuffer(_page, pageOffset + offset, length).Slice(0, length);
+    }
     internal readonly int Position => _position;
     internal readonly int Offset => _slice.Offset;
     internal readonly int Length => _slice.Length;
@@ -141,13 +148,17 @@ public struct ArcBufferReaderInput(in ArcBuffer slice)
         _slice.CheckValidity();
         Debug.Assert(_position <= Length);
         if (Length == 0) return default;
-        while (_page is not null && _position < Length)
+        var page = _position == 0 ? _page : _page?.Next;
+        while (page is not null && _position < Length)
         {
-            var page = _page;
             var offset = page == First ? Offset : 0;
             var length = Math.Min(Length - _position, page.Length - offset);
-            _page = page.Next;
-            if (length == 0) continue;
+            _page = page;
+            if (length == 0)
+            {
+                page = page.Next;
+                continue;
+            }
 
             _position += length;
             return page.AsSpan(offset, length);

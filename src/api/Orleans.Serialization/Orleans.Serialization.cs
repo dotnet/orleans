@@ -1060,6 +1060,8 @@ namespace Orleans.Serialization.Buffers
 
         public long ReadInt64() { throw null; }
 
+        public ArcBuffer ReadOwnedBuffer(int length) { throw null; }
+
         public uint ReadUInt32() { throw null; }
 
         public ulong ReadUInt64() { throw null; }
@@ -1424,6 +1426,21 @@ namespace Orleans.Serialization.Cloning
 
 namespace Orleans.Serialization.Codecs
 {
+    [RegisterSerializer]
+    public sealed partial class ArcBufferCodec : IFieldCodec<Buffers.ArcBuffer>, IFieldCodec
+    {
+        public Buffers.ArcBuffer ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type? expectedType, Buffers.ArcBuffer value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [RegisterCopier]
+    public sealed partial class ArcBufferCopier : Cloning.IDeepCopier<Buffers.ArcBuffer>, Cloning.IDeepCopier
+    {
+        public Buffers.ArcBuffer DeepCopy(Buffers.ArcBuffer input, Cloning.CopyContext context) { throw null; }
+    }
+
     [RegisterSerializer]
     public sealed partial class ArrayCodec<T> : IFieldCodec<T[]>, IFieldCodec
     {

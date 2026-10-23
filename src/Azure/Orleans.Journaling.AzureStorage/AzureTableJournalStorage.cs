@@ -66,10 +66,11 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
     private readonly JournalId _journalId;
     private readonly string _partitionKey;
     private TableClient? _tableClient;
-    private ETag _headerETag;
+    // Null until read or creation, default(ETag) for an absent journal.
+    private ETag? _headerETag;
     private HeaderProviderState _headerProviderState;
 
-    private bool HeaderExists => _headerETag != default;
+    private bool HeaderExists => _headerETag is { } eTag && eTag != default;
 
     public bool IsCompactionRequested
         => _headerProviderState.AppendRowCount >= _shared.Options.CompactionRowCountThreshold
@@ -102,11 +103,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         try
         {
             var created = await CreateHeaderAsync(callerMetadata, cancellationToken).ConfigureAwait(false);
-            if (created.ETag != default)
-            {
-                SetHeader(created.ETag, created.ProviderState);
-            }
-
+            SetHeader(created.ETag, created.ProviderState);
             succeeded = true;
             return true;
         }
@@ -188,7 +185,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                 var metadata = headerState.CallerMetadata;
                 if (!ApplyCallerMetadataUpdate(metadata, setValues, removeValues))
                 {
-                    SetHeader(headerState.ETag, headerState.ProviderState);
+                    RefreshHeaderETag(headerState.ETag, headerState.ProviderState);
                     succeeded = true;
                     return CreateJournalMetadata(entity.ETag, entity);
                 }
@@ -208,7 +205,8 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                         expectedETag is null ? entity.ETag : ToAzureETag(expectedETag),
                         TableUpdateMode.Merge,
                         cancellationToken).ConfigureAwait(false);
-                    var updatedETag = SetHeaderFromResponse(response, headerState.ProviderState);
+                    var updatedETag = GetResponseETag(response);
+                    RefreshHeaderETag(updatedETag, headerState.ProviderState);
                     succeeded = true;
                     return new JournalMetadata(
                         headerState.ProviderState.Format,
@@ -240,6 +238,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
 
     public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
+        ArgumentOutOfRangeException.ThrowIfZero(value.Length, nameof(value));
         // Appends are written as one entity group transaction, so validate its limits before touching storage.
         ThrowIfBatchTooLarge(value.Length);
         var startTimestamp = Stopwatch.GetTimestamp();
@@ -249,13 +248,9 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         {
             for (var attempt = 0; ; attempt++)
             {
-                // Ensure local state has the current header ETag and manifest before making a conditional write.
-                if (!HeaderExists)
-                {
-                    await EnsureHeaderAsync(cancellationToken).ConfigureAwait(false);
-                }
+                await EnsureHeaderAsync(nameof(AppendAsync), cancellationToken).ConfigureAwait(false);
 
-                var expectedETag = _headerETag;
+                var expectedETag = _headerETag!.Value;
                 var expectedProviderState = _headerProviderState;
                 var generation = expectedProviderState.Generation
                     ?? throw new InvalidOperationException("Azure Table journal header state does not include a generation.");
@@ -324,23 +319,34 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         var succeeded = false;
         try
         {
-            var expectedETag = _headerETag;
-            var expectedProviderState = _headerProviderState;
-
-            // Load the header so deletion is guarded by the current manifest even on fresh instances.
-            var headerState = await TryLoadHeaderStateForMutationAsync(expectedETag, expectedProviderState, cancellationToken).ConfigureAwait(false);
-            if (headerState is null)
+            if (_headerETag is null)
             {
-                if (expectedETag != default)
+                throw new InvalidOperationException($"{nameof(DeleteAsync)} requires reading or creating the journal first.");
+            }
+
+            var expectedETag = _headerETag.Value;
+            var expectedProviderState = _headerProviderState;
+            if (!HeaderExists)
+            {
+                // An instance which observed the journal absent deletes nothing, unless another writer has since created it.
+                if (await GetHeaderEntityAsync(cancellationToken).ConfigureAwait(false) is not null)
                 {
                     throw CreateInconsistentHeaderStateException(
-                        "Azure Table journal header changed while deleting the journal; recovery is required.",
+                        "Azure Table journal header was created by another writer after this instance observed it absent; recovery is required.",
                         expectedETag);
                 }
 
-                SetHeader(eTag: default, providerState: default);
                 succeeded = true;
                 return;
+            }
+
+            // Load the header so deletion is guarded by the manifest this instance holds.
+            var headerState = await TryLoadHeaderStateForMutationAsync(expectedETag, expectedProviderState, cancellationToken).ConfigureAwait(false);
+            if (headerState is null)
+            {
+                throw CreateInconsistentHeaderStateException(
+                    "Azure Table journal header changed while deleting the journal; recovery is required.",
+                    expectedETag);
             }
 
             // Capture the row keys before deleting the header so cleanup can never touch rows written
@@ -404,17 +410,28 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             var entity = await GetHeaderEntityAsync(cancellationToken).ConfigureAwait(false);
             if (entity is null)
             {
-                // A missing header is an empty journal; clear cached state before reporting completion.
-                SetHeader(eTag: default, providerState: default);
+                if (HeaderExists)
+                {
+                    throw CreateInconsistentHeaderStateException(
+                        "Azure Table journal changed while reading; recovery through a fresh storage instance is required.",
+                        _headerETag!.Value);
+                }
+
                 consumer.Complete(metadata: null);
+                SetHeader(eTag: default, providerState: default);
                 succeeded = true;
                 return;
             }
 
             var headerState = CreateHeaderState(entity);
 
-            // Recovery refreshes the cached ETag and compaction counters from the header manifest.
-            SetHeader(headerState.ETag, headerState.ProviderState);
+            if (_headerETag is { } expectedETag
+                && (!HeaderExists || headerState.ProviderState != _headerProviderState))
+            {
+                throw CreateInconsistentHeaderStateException(
+                    "Azure Table journal changed while reading; recovery through a fresh storage instance is required.",
+                    expectedETag);
+            }
 
             var rowCount = 0L;
             var metadata = new JournalMetadata(headerState.ProviderState.Format, eTag: null, headerState.CallerMetadata);
@@ -455,6 +472,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             }
 
             LogRead(_shared.Logger, bytes, Table.Name, _partitionKey);
+            SetHeader(headerState.ETag, headerState.ProviderState);
             succeeded = true;
         }
         finally
@@ -474,9 +492,9 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         try
         {
             // Compaction publishes through the header, so first recover or create the header whose ETag will be checked.
-            await EnsureHeaderAsync(cancellationToken).ConfigureAwait(false);
+            await EnsureHeaderAsync(nameof(ReplaceAsync), cancellationToken).ConfigureAwait(false);
 
-            var expectedETag = _headerETag;
+            var expectedETag = _headerETag!.Value;
             var expectedProviderState = _headerProviderState;
             var headerState = await TryLoadHeaderStateForMutationAsync(expectedETag, expectedProviderState, cancellationToken).ConfigureAwait(false);
             if (headerState is null)
@@ -491,7 +509,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             // The new generation is invisible to recovery until the header flip below publishes it, so its
             // rows may span multiple transactions.
             var newGeneration = Guid.NewGuid().ToString("N");
-            var published = false;
+            var publicationAttempted = false;
             try
             {
                 var rowCount = await SubmitDataEntitiesAsync(value, newGeneration, cancellationToken).ConfigureAwait(false);
@@ -502,12 +520,12 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                     try
                     {
                         // Flip the header under its ETag to publish the new generation only if the journal is unchanged.
+                        publicationAttempted = true;
                         var response = await Table.UpdateEntityAsync(
                             CreateHeaderFlipPatch(newGeneration, rowCount, value.Length),
                             publishState.ETag,
                             TableUpdateMode.Merge,
                             cancellationToken).ConfigureAwait(false);
-                        published = true;
                         SetHeaderFromResponse(
                             response,
                             new HeaderProviderState(
@@ -540,7 +558,8 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             }
             catch
             {
-                if (!published)
+                // Once sent, a publication may still commit after the client fails. Keep its rows available.
+                if (!publicationAttempted)
                 {
                     await TryDeleteUnpublishedGenerationAsync(newGeneration).ConfigureAwait(false);
                 }
@@ -581,32 +600,30 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             "Reduce the operation size or compact more aggressively.");
     }
 
-    private async ValueTask EnsureHeaderAsync(CancellationToken cancellationToken)
+    private async ValueTask EnsureHeaderAsync(string operation, CancellationToken cancellationToken)
     {
-        // Either create the initial header or load the header created by a racing instance, then loop until state is cached.
-        while (!HeaderExists)
+        if (_headerETag is null)
         {
-            try
-            {
-                var created = await CreateHeaderAsync(callerMetadata: null, cancellationToken).ConfigureAwait(false);
-                if (created.ETag != default)
-                {
-                    SetHeader(created.ETag, created.ProviderState);
-                    return;
-                }
+            throw new InvalidOperationException($"{operation} requires reading or creating the journal first.");
+        }
 
-                await TryLoadHeaderStateAsync(cancellationToken).ConfigureAwait(false);
-            }
-            catch (RequestFailedException exception) when (IsEntityAlreadyExists(exception))
-            {
-                // Another instance created the header first; load only the manifest needed before writing.
-                await TryLoadHeaderStateAsync(cancellationToken).ConfigureAwait(false);
-            }
+        if (HeaderExists)
+        {
+            return;
+        }
 
-            if (!HeaderExists)
-            {
-                _shared.Instruments.OnRetry("create_race");
-            }
+        try
+        {
+            // This instance observed the journal absent, so it creates the header only while the header is still absent.
+            var created = await CreateHeaderAsync(callerMetadata: null, cancellationToken).ConfigureAwait(false);
+            SetHeader(created.ETag, created.ProviderState);
+        }
+        catch (RequestFailedException exception) when (IsEntityAlreadyExists(exception))
+        {
+            throw CreateInconsistentHeaderStateException(
+                "Azure Table journal header was created by another writer after this instance observed it absent; recovery is required.",
+                _headerETag.Value,
+                exception);
         }
     }
 
@@ -629,7 +646,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
 
         var response = await Table.AddEntityAsync(entity, cancellationToken).ConfigureAwait(false);
         return (
-            response.Headers.ETag ?? default,
+            GetResponseETag(response),
             new HeaderProviderState(
                 NormalizeFormat(_shared.JournalFormatKey),
                 generation,
@@ -639,30 +656,11 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                 AppendLength: 0));
     }
 
-    private async ValueTask<HeaderState?> TryLoadHeaderStateAsync(CancellationToken cancellationToken, bool updateCache = true)
+    private async ValueTask<HeaderState?> TryLoadHeaderStateAsync(CancellationToken cancellationToken)
     {
-        // Read only the header; no journal bytes are needed to cache mutation state.
+        // Read only the header; no journal bytes are needed for the mutation state.
         var entity = await GetHeaderEntityAsync(cancellationToken).ConfigureAwait(false);
-        if (entity is null)
-        {
-            // A missing header means there is no durable state to delete or mutate.
-            if (updateCache)
-            {
-                SetHeader(eTag: default, providerState: default);
-            }
-
-            return null;
-        }
-
-        var headerState = CreateHeaderState(entity);
-
-        // Cache the mutation precondition and compaction signal without replaying journal bytes.
-        if (updateCache)
-        {
-            SetHeader(headerState.ETag, headerState.ProviderState);
-        }
-
-        return headerState;
+        return entity is null ? null : CreateHeaderState(entity);
     }
 
     private async ValueTask<HeaderState?> TryLoadHeaderStateForMutationAsync(
@@ -670,19 +668,16 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         HeaderProviderState expectedProviderState,
         CancellationToken cancellationToken)
     {
-        var headerState = await TryLoadHeaderStateAsync(cancellationToken, updateCache: false).ConfigureAwait(false);
+        var headerState = await TryLoadHeaderStateAsync(cancellationToken).ConfigureAwait(false);
         if (headerState is null)
         {
             return null;
         }
 
-        if (expectedETag != default && headerState.Value.ETag != expectedETag)
+        // Accept a new ETag in place only when the change was metadata-only; content changes require recovery.
+        if (headerState.Value.ETag != expectedETag && headerState.Value.ProviderState != expectedProviderState)
         {
-            // Accept the new ETag in place only when the change was metadata-only; content changes require recovery.
-            if (headerState.Value.ProviderState != expectedProviderState)
-            {
-                return null;
-            }
+            return null;
         }
 
         SetHeader(headerState.Value.ETag, headerState.Value.ProviderState);
@@ -723,7 +718,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             return null;
         }
 
-        var headerState = await TryLoadHeaderStateAsync(cancellationToken, updateCache: false).ConfigureAwait(false);
+        var headerState = await TryLoadHeaderStateAsync(cancellationToken).ConfigureAwait(false);
         if (headerState is null || headerState.Value.ProviderState != expectedProviderState)
         {
             return null;
@@ -786,13 +781,6 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
     {
         try
         {
-            var header = await GetHeaderEntityAsync(CancellationToken.None).ConfigureAwait(false);
-            if (header is not null
-                && string.Equals(header.GetString(GenerationPropertyName), generation, StringComparison.Ordinal))
-            {
-                return;
-            }
-
             var rowKeys = await TryCollectRowKeysAsync(
                 CreateGenerationRangeFilter(generation),
                 CancellationToken.None).ConfigureAwait(false);
@@ -983,18 +971,22 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         _headerProviderState = providerState;
     }
 
-    private ETag SetHeaderFromResponse(Response response, HeaderProviderState providerState)
+    // Metadata operations never establish or move the content precondition: they refresh only the ETag of the header version
+    // this instance holds.
+    private void RefreshHeaderETag(ETag eTag, HeaderProviderState providerState)
     {
-        // Force a reload before the next mutation if the service did not return the new header ETag.
-        if (response.Headers.ETag is { } eTag)
+        if (HeaderExists && providerState == _headerProviderState)
         {
             SetHeader(eTag, providerState);
-            return eTag;
         }
-
-        SetHeader(eTag: default, providerState: default);
-        return default;
     }
+
+    private void SetHeaderFromResponse(Response response, HeaderProviderState providerState)
+        => SetHeader(GetResponseETag(response), providerState);
+
+    // Azure Table returns the new ETag of every entity it writes.
+    private static ETag GetResponseETag(Response response)
+        => response.Headers.ETag ?? throw new InvalidOperationException("Azure Table did not return the ETag of the written journal header.");
 
     private TableClient GetTableClient()
     {
