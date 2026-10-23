@@ -96,6 +96,12 @@ namespace UnitTests.StorageTests.Relational
             CommonStorageUtilities.AssertRelationalInconsistentExceptionMessage(exception.Message);
         }
 
+        internal Task Relational_VersionWrapsAfterMaximum() => GrainStorageVersionWrapTests.VersionWrapsAfterMaximum(
+            PersistenceStorageTests.Storage,
+            Fixture.Storage!.Storage,
+            _deleteStateOnClear,
+            TestContext.Current.CancellationToken);
+
         internal Task Relational_Json_WriteRead(string grainType, GrainId grainId, GrainState<TestStateGeneric1<string>> grainState)
         {
             ((AdoNetGrainStorage)PersistenceStorageTests.Storage).Serializer = GetJsonGrainStorageSerializer();

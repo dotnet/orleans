@@ -43,6 +43,11 @@
 --
 -- 7. In the storage operations queries the columns need to be in the exact same order
 -- since the storage table operations support optionally streaming.
+--
+-- 8. The next Version wraps from 2147483647 back to 1 so a frequently written grain never overflows
+-- the 32-bit Version. Orleans compares versions only for equality, so the version must change on
+-- every write but does not need to increase forever. A stale version can only match again after
+-- 2147483647 further writes to the same grain.
 CREATE TABLE OrleansStorage
 (
     -- These are for the book keeping. Orleans calculates
@@ -104,7 +109,7 @@ BEGIN
     UPDATE OrleansStorage
     SET
         PayloadBinary = NULL,
-        Version = Version + 1
+        Version = Version % 2147483647 + 1
     WHERE
         GrainIdHash = _GrainIdHash AND _GrainIdHash IS NOT NULL
         AND GrainTypeHash = _GrainTypeHash AND _GrainTypeHash IS NOT NULL
@@ -118,7 +123,7 @@ BEGIN
 
     IF ROW_COUNT() > 0
     THEN
-        SET _newGrainStateVersion = _GrainStateVersion + 1;
+        SET _newGrainStateVersion = _GrainStateVersion % 2147483647 + 1;
     END IF;
 
     SELECT _newGrainStateVersion AS NewGrainStateVersion;
@@ -160,7 +165,7 @@ BEGIN
 
     IF ROW_COUNT() > 0
     THEN
-        SET _newGrainStateVersion = _GrainStateVersion + 1;
+        SET _newGrainStateVersion = _GrainStateVersion % 2147483647 + 1;
     END IF;
 
     SELECT _newGrainStateVersion AS NewGrainStateVersion;
@@ -216,7 +221,7 @@ BEGIN
         SET
             PayloadBinary = _PayloadBinary,
             ModifiedOn = UTC_TIMESTAMP(),
-            Version = Version + 1
+            Version = Version % 2147483647 + 1
         WHERE
             GrainIdHash = _GrainIdHash AND _GrainIdHash IS NOT NULL
             AND GrainTypeHash = _GrainTypeHash AND _GrainTypeHash IS NOT NULL
@@ -230,7 +235,7 @@ BEGIN
 
         IF ROW_COUNT() > 0
         THEN
-            SET _newGrainStateVersion = _GrainStateVersion + 1;
+            SET _newGrainStateVersion = _GrainStateVersion % 2147483647 + 1;
             SET _GrainStateVersion = _newGrainStateVersion;
         END IF;
     END IF;

@@ -29,6 +29,13 @@ namespace UnitTests.StorageTests.Relational
 
         [Fact]
         [TestCategory("Functional")]
+        public async Task VersionWrapsAfterMaximum()
+        {
+            await Relational_VersionWrapsAfterMaximum();
+        }
+
+        [Fact]
+        [TestCategory("Functional")]
         public async Task WriteReadCyrillic()
         {
             await PersistenceStorageTests.PersistenceStorage_Relational_WriteReadIdCyrillic();

@@ -43,6 +43,11 @@
 --
 -- 7. In the storage operations queries the columns need to be in the exact same order
 -- since the storage table operations support optionally streaming.
+--
+-- 8. The next Version wraps from 2147483647 back to 1 so a frequently written grain never overflows
+-- the 32-bit Version. Orleans compares versions only for equality, so the version must change on
+-- every write but does not need to increase forever. A stale version can only match again after
+-- 2147483647 further writes to the same grain.
 CREATE TABLE IF NOT EXISTS OrleansStorage
 (
     -- These are for the book keeping. Orleans calculates
@@ -80,7 +85,7 @@ CREATE INDEX IF NOT EXISTS IX_OrleansStorage ON OrleansStorage(GrainIdHash, Grai
 INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES 
 ('WriteToStorageKey', '
     -- TEMP objects survive pooled connection reuse. Bump the suffix on both object names whenever the trigger body changes.
-    CREATE TEMP TABLE IF NOT EXISTS OrleansStorageWriteRequest_10_4
+    CREATE TEMP TABLE IF NOT EXISTS OrleansStorageWriteRequest_10_5
     (
         GrainIdHash INT NOT NULL,
         GrainIdN0 BIGINT NOT NULL,
@@ -94,14 +99,14 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
         Applied INT NOT NULL DEFAULT 0
     );
 
-    CREATE TEMP TRIGGER IF NOT EXISTS OrleansStorageWriteApply_10_4
-    AFTER INSERT ON OrleansStorageWriteRequest_10_4
+    CREATE TEMP TRIGGER IF NOT EXISTS OrleansStorageWriteApply_10_5
+    AFTER INSERT ON OrleansStorageWriteRequest_10_5
     BEGIN
         UPDATE OrleansStorage
         SET
             PayloadBinary = NEW.PayloadBinary,
             ModifiedOn = datetime(''now''),
-            Version = Version + 1
+            Version = Version % 2147483647 + 1
         WHERE
             GrainIdHash = NEW.GrainIdHash AND GrainTypeHash = NEW.GrainTypeHash
             AND GrainIdN0 = NEW.GrainIdN0 AND GrainIdN1 = NEW.GrainIdN1
@@ -110,7 +115,7 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
             AND ServiceId = NEW.ServiceId
             AND Version = NEW.GrainStateVersion;
 
-        UPDATE OrleansStorageWriteRequest_10_4 SET Applied = changes() WHERE rowid = NEW.rowid;
+        UPDATE OrleansStorageWriteRequest_10_5 SET Applied = changes() WHERE rowid = NEW.rowid;
 
         INSERT INTO OrleansStorage (GrainIdHash, GrainIdN0, GrainIdN1, GrainTypeHash, GrainTypeString, GrainIdExtensionString, ServiceId, PayloadBinary, ModifiedOn, Version)
         SELECT NEW.GrainIdHash, NEW.GrainIdN0, NEW.GrainIdN1, NEW.GrainTypeHash, NEW.GrainTypeString, NEW.GrainIdExtensionString, NEW.ServiceId, NEW.PayloadBinary, datetime(''now''), 1
@@ -124,20 +129,20 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
             AND ServiceId = NEW.ServiceId
         );
 
-        UPDATE OrleansStorageWriteRequest_10_4 SET Applied = Applied + changes(), PayloadBinary = NULL WHERE rowid = NEW.rowid;
+        UPDATE OrleansStorageWriteRequest_10_5 SET Applied = Applied + changes(), PayloadBinary = NULL WHERE rowid = NEW.rowid;
     END;
 
-    DELETE FROM OrleansStorageWriteRequest_10_4;
+    DELETE FROM OrleansStorageWriteRequest_10_5;
 
-    INSERT INTO OrleansStorageWriteRequest_10_4 (GrainIdHash, GrainIdN0, GrainIdN1, GrainTypeHash, GrainTypeString, GrainIdExtensionString, ServiceId, PayloadBinary, GrainStateVersion)
+    INSERT INTO OrleansStorageWriteRequest_10_5 (GrainIdHash, GrainIdN0, GrainIdN1, GrainTypeHash, GrainTypeString, GrainIdExtensionString, ServiceId, PayloadBinary, GrainStateVersion)
     VALUES (@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @PayloadBinary, @GrainStateVersion);
 
-    SELECT CASE WHEN @GrainStateVersion IS NULL THEN 1 ELSE @GrainStateVersion + 1 END AS NewGrainStateVersion
-    FROM OrleansStorageWriteRequest_10_4
+    SELECT CASE WHEN @GrainStateVersion IS NULL THEN 1 ELSE @GrainStateVersion % 2147483647 + 1 END AS NewGrainStateVersion
+    FROM OrleansStorageWriteRequest_10_5
     WHERE Applied > 0;
 
     SELECT @GrainStateVersion AS NewGrainStateVersion
-    FROM OrleansStorageWriteRequest_10_4
+    FROM OrleansStorageWriteRequest_10_5
     WHERE Applied = 0
         AND @GrainStateVersion IS NOT NULL;
 ')
@@ -168,7 +173,7 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
     SET
         PayloadBinary = NULL,
         ModifiedOn = datetime(''now''),
-        Version = Version + 1
+        Version = Version % 2147483647 + 1
     WHERE
         GrainIdHash = @GrainIdHash AND GrainTypeHash = @GrainTypeHash
         AND GrainIdN0 = @GrainIdN0 AND GrainIdN1 = @GrainIdN1
@@ -177,7 +182,7 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
         AND ServiceId = @ServiceId
         AND Version = @GrainStateVersion;
 
-    SELECT @GrainStateVersion + 1 AS NewGrainStateVersion
+    SELECT @GrainStateVersion % 2147483647 + 1 AS NewGrainStateVersion
     WHERE changes() > 0;
 
     SELECT @GrainStateVersion AS NewGrainStateVersion
@@ -185,3 +190,9 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
         AND @GrainStateVersion IS NOT NULL;
 ')
 ON CONFLICT(QueryKey) DO UPDATE SET QueryText = excluded.QueryText;
+
+-- Releases before 10.5.0 could commit a version past 2147483647 before failing to read it back.
+-- Reapplying this script moves such versions onto the same cycle used by the wrapping writes.
+UPDATE OrleansStorage
+SET Version = (Version - 1) % 2147483647 + 1
+WHERE Version > 2147483647;
