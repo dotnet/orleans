@@ -30,7 +30,7 @@ public static partial class OrleansSqsStreamingExtensions
     /// <exception cref="InvalidOperationException">
     /// A stream provider name conflicts case-insensitively, a physical queue is already owned in the
     /// same AppHost and region, a generated resource name is already registered, or the service
-    /// identifier conflicts with the Orleans service.
+    /// identifier conflicts with the Orleans service, or SQS providers on the service select different AWS profiles.
     /// </exception>
     public static OrleansService WithSqsStreaming(
         this OrleansService orleansService,
@@ -54,7 +54,7 @@ public static partial class OrleansSqsStreamingExtensions
     /// <exception cref="InvalidOperationException">
     /// A stream provider name conflicts case-insensitively, a physical queue is already owned in the
     /// same AppHost and region, a generated resource name is already registered, or the service
-    /// identifier conflicts with the Orleans service.
+    /// identifier conflicts with the Orleans service, or SQS providers on the service select different AWS profiles.
     /// </exception>
     public static SqsStreamingResource AddSqsStreaming(
         this OrleansService orleansService,
@@ -81,7 +81,7 @@ public static partial class OrleansSqsStreamingExtensions
             awsSdkConfig.SDKValidationEnabled);
         var validatedOptions = ValidateAndCopy(name, options);
         var queueNames = GetPhysicalQueueNames(name, validatedOptions);
-        ValidateIdentities(orleansService, name, region.SystemName, queueNames);
+        ValidateIdentities(orleansService, name, region.SystemName, awsSdkSnapshot.Profile, queueNames);
         ValidateServiceId(orleansService, validatedOptions.ServiceId, allowUnset: true);
 
         var resourceName = CreateResourceName($"{orleansService.Name}-{name}-sqs");
@@ -136,15 +136,26 @@ public static partial class OrleansSqsStreamingExtensions
         OrleansService orleansService,
         string name,
         string region,
+        string? profile,
         IReadOnlyList<string> queueNames)
     {
-        foreach (var existingName in orleansService.Streaming.Keys)
+        foreach (var (existingName, existingProvider) in orleansService.Streaming)
         {
             if (string.Equals(existingName, name, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
                     $"SQS stream provider '{name}' conflicts with existing stream provider '{existingName}'. "
                     + "Stream provider names must be unique ignoring case within an Orleans service.");
+            }
+
+            // Aspire emits AWS_PROFILE process-wide; only null and empty both leave profile selection to the SDK.
+            if (existingProvider is SqsStreamingResource sqsProvider
+                && !string.Equals(sqsProvider.AwsSdkConfig.Profile ?? string.Empty, profile ?? string.Empty, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"SQS stream providers '{name}' and '{existingName}' on Orleans service '{orleansService.Name}' "
+                    + "must use the same AWS profile because AWS_PROFILE is process-wide. "
+                    + "Use separate Orleans services and host processes for different profiles.");
             }
         }
 

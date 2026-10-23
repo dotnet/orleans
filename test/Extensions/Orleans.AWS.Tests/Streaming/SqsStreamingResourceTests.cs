@@ -622,6 +622,144 @@ public sealed class SqsStreamingResourceTests
     }
 
     [Theory]
+    [InlineData("integration-profile", "integration-profile", false)]
+    [InlineData("integration-profile", "integration-profile", true)]
+    [InlineData(null, null, false)]
+    [InlineData(null, "", true)]
+    [InlineData("", null, true)]
+    public async Task AddSqsStreaming_MatchingAwsProfiles_PreservesProviderRegions(
+        string? firstProfile,
+        string? secondProfile,
+        bool differentRegions)
+    {
+        var builder = CreateBuilder();
+        var firstAws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1).WithSdkValidation(false);
+        firstAws.Profile = firstProfile;
+        var secondAws = builder.AddAWSSDKConfig()
+            .WithRegion(differentRegions ? RegionEndpoint.USWest2 : RegionEndpoint.USEast1)
+            .WithSdkValidation(false);
+        secondAws.Profile = secondProfile;
+        var orleans = builder.AddOrleans("cluster").WithDevelopmentClustering();
+        var options = new SqsStreamingOptions { ServiceId = ServiceId, PartitionCount = 1 };
+        var first = orleans.AddSqsStreaming("Orders", firstAws, options);
+        var second = orleans.AddSqsStreaming("Billing", secondAws, options);
+        var silo = builder.AddContainer("silo", "unused").WithReference(orleans);
+        var client = builder.AddContainer("client", "unused").WithReference(orleans.AsClient());
+        await using var application = builder.Build();
+        var expectedSecondRegion = differentRegions ? "us-west-2" : "us-east-1";
+
+        foreach (var resource in new[] { silo.Resource, client.Resource })
+        {
+            var environment = await GetEnvironmentAsync(application.Services, resource);
+            if (string.IsNullOrEmpty(firstProfile))
+            {
+                Assert.DoesNotContain("AWS_PROFILE", environment.Keys);
+            }
+            else
+            {
+                Assert.Equal(firstProfile, environment["AWS_PROFILE"]);
+            }
+
+            Assert.Equal("us-east-1", environment["Orleans__Streaming__Orders__Region"]);
+            Assert.Equal(expectedSecondRegion, environment["Orleans__Streaming__Billing__Region"]);
+            using var scope = new EnvironmentVariableScope(environment);
+            using var host = resource == silo.Resource
+                ? Host.CreateApplicationBuilder().UseOrleans().Build()
+                : Host.CreateApplicationBuilder().UseOrleansClient().Build();
+            var monitor = host.Services.GetRequiredService<IOptionsMonitor<SqsOptions>>();
+            Assert.Equal("Service=us-east-1", monitor.Get("Orders").ConnectionString);
+            Assert.Equal($"Service={expectedSecondRegion}", monitor.Get("Billing").ConnectionString);
+        }
+
+        Assert.Equal("us-east-1", first.Stack.Resource.AWSSDKConfig?.Region?.SystemName);
+        Assert.Equal(expectedSecondRegion, second.Stack.Resource.AWSSDKConfig?.Region?.SystemName);
+        Assert.Equal("orders-service-orders-0", Assert.Single(GetQueues(first)).QueueName);
+        Assert.Equal("orders-service-billing-0", Assert.Single(GetQueues(second)).QueueName);
+    }
+
+    [Theory]
+    [InlineData("first-profile", "second-profile", false)]
+    [InlineData("first-profile", "second-profile", true)]
+    [InlineData("profile", "Profile", false)]
+    [InlineData(null, "profile", false)]
+    [InlineData("profile", null, false)]
+    [InlineData("", "profile", false)]
+    [InlineData(null, "default", false)]
+    public async Task AddSqsStreaming_ConflictingAwsProfiles_PreservesResourcesAndConfiguration(
+        string? firstProfile,
+        string? secondProfile,
+        bool differentRegions)
+    {
+        var builder = CreateBuilder();
+        var firstAws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1).WithSdkValidation(false);
+        firstAws.Profile = firstProfile;
+        var secondAws = builder.AddAWSSDKConfig()
+            .WithRegion(differentRegions ? RegionEndpoint.USWest2 : RegionEndpoint.USEast1)
+            .WithSdkValidation(false);
+        secondAws.Profile = secondProfile;
+        var orleans = builder.AddOrleans("cluster").WithDevelopmentClustering();
+        var options = new SqsStreamingOptions { ServiceId = ServiceId, PartitionCount = 1 };
+        var existing = orleans.AddSqsStreaming("Orders", firstAws, options);
+        var silo = builder.AddContainer("silo", "unused").WithReference(orleans);
+        var client = builder.AddContainer("client", "unused").WithReference(orleans.AsClient());
+        using var services = builder.Services.BuildServiceProvider();
+        var siloEnvironment = await GetEnvironmentAsync(services, silo.Resource);
+        var clientEnvironment = await GetEnvironmentAsync(services, client.Resource);
+        var resources = builder.Resources.ToArray();
+        var constructs = existing.Stack.Resource.Stack.Node.FindAll().ToArray();
+        var annotations = resources.Select(resource => resource.Annotations.ToArray()).ToArray();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => orleans.AddSqsStreaming("Billing", secondAws, options));
+
+        Assert.Contains("same AWS profile", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Orders", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Billing", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(resources, builder.Resources);
+        Assert.Equal(constructs, existing.Stack.Resource.Stack.Node.FindAll());
+        for (var index = 0; index < resources.Length; index++)
+        {
+            Assert.Equal(annotations[index], resources[index].Annotations);
+        }
+
+        Assert.Same(existing, Assert.Single(orleans.Streaming).Value);
+        Assert.Equal(
+            siloEnvironment.OrderBy(pair => pair.Key),
+            (await GetEnvironmentAsync(services, silo.Resource)).OrderBy(pair => pair.Key));
+        Assert.Equal(
+            clientEnvironment.OrderBy(pair => pair.Key),
+            (await GetEnvironmentAsync(services, client.Resource)).OrderBy(pair => pair.Key));
+    }
+
+    [Theory]
+    [InlineData("first-profile", "second-profile")]
+    [InlineData(null, "profile")]
+    public async Task AddSqsStreaming_DifferentServices_PreserveIndependentAwsProfiles(
+        string? firstProfile,
+        string? secondProfile)
+    {
+        var builder = CreateBuilder();
+        var firstAws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1).WithSdkValidation(false);
+        firstAws.Profile = firstProfile;
+        var secondAws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USWest2).WithSdkValidation(false);
+        secondAws.Profile = secondProfile;
+        var first = builder.AddOrleans("first").WithDevelopmentClustering();
+        first.AddSqsStreaming("Orders", firstAws, new SqsStreamingOptions { ServiceId = "first", PartitionCount = 1 });
+        var second = builder.AddOrleans("second").WithDevelopmentClustering();
+        second.AddSqsStreaming("Orders", secondAws, new SqsStreamingOptions { ServiceId = "second", PartitionCount = 1 });
+        var firstSilo = builder.AddContainer("first-silo", "unused").WithReference(first);
+        var secondSilo = builder.AddContainer("second-silo", "unused").WithReference(second);
+        await using var application = builder.Build();
+        var firstEnvironment = await GetEnvironmentAsync(application.Services, firstSilo.Resource);
+        var secondEnvironment = await GetEnvironmentAsync(application.Services, secondSilo.Resource);
+
+        Assert.Equal(firstProfile, firstEnvironment.GetValueOrDefault("AWS_PROFILE"));
+        Assert.Equal(secondProfile, secondEnvironment.GetValueOrDefault("AWS_PROFILE"));
+        Assert.Equal("us-east-1", firstEnvironment["Orleans__Streaming__Orders__Region"]);
+        Assert.Equal("us-west-2", secondEnvironment["Orleans__Streaming__Orders__Region"]);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]
