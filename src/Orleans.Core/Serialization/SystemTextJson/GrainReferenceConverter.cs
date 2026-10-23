@@ -47,7 +47,7 @@ namespace Orleans.Serialization
                 var interfaceType = string.IsNullOrEmpty(encodedInterface)
                     ? default
                     : GrainInterfaceType.Create(encodedInterface);
-                if (!reader.Read() || reader.TokenType != JsonTokenType.EndArray)
+                if (!reader.Read() || reader.TokenType != JsonTokenType.EndArray || grainId.IsDefault)
                 {
                     throw new JsonException($"Could not deserialize {nameof(IAddressable)}.");
                 }

@@ -441,6 +441,34 @@ public sealed class ClusterOwnershipLeaseMonitorTests
     }
 
     [Fact]
+    public async Task Monitor_UntrackDuringInitialValidation_PreventsResurrectionAndRenewal()
+    {
+        await using var harness = new TestHarness();
+        var context = harness.CreateContext("untrack-during-validation");
+        var ownership = harness.CreateEntry(context.GrainId, version: 2, epoch: 3, fence: 5);
+        var validation = new TaskCompletionSource<ClusterDirectoryEntry>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Validator.Enqueue((_, _) => new ValueTask<ClusterDirectoryEntry>(validation.Task));
+        var shared = harness.CreateSharedContext(TestHarness.DirectoryGrainType);
+        shared.OnCreateActivation(context);
+        var activation = context.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        await harness.Validator.WaitForCallCountAsync(1);
+        await harness.StartMonitorAsync();
+        await harness.AdvanceAndTickAsync(1);
+        await harness.Timer.WaitForScheduleAsync(2);
+
+        Assert.Equal(1, harness.Validator.CallCount);
+        Assert.Null(context.Ownership);
+        shared.OnDestroyActivation(context);
+        validation.SetResult(ownership);
+        await activation;
+        await harness.AdvanceAndTickAsync(2);
+        await harness.Timer.WaitForScheduleAsync(3);
+
+        Assert.Equal(1, harness.Validator.CallCount);
+        Assert.Equal(0, context.DeactivationCount);
+    }
+
+    [Fact]
     public async Task Monitor_Stop_CancelsAllSchedulesAndAwaitsWorkers()
     {
         await using var harness = new TestHarness();

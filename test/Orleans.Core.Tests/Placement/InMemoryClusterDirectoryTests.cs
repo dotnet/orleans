@@ -117,6 +117,61 @@ public sealed class InMemoryClusterDirectoryTests
     }
 
     [Fact]
+    public async Task Create_ContendedReplacement_RefreshesLeaseAfterRetry()
+    {
+        var clock = new ContentionTimeProvider();
+        var directory = new InMemoryClusterDirectory(clock);
+        var original = await directory.GetOrCreate(GrainId, "original", 1, Lease, TestContext.Current.CancellationToken);
+        clock.Clock.Advance(Lease);
+        ClusterDirectoryEntry? contender = null;
+        clock.OnNextRead = () =>
+        {
+            contender = directory.GetOrCreate(GrainId, "contender", 2, Lease).GetAwaiter().GetResult();
+            clock.Clock.Advance(Lease);
+        };
+
+        var acquired = await directory.GetOrCreate(GrainId, "winner", 3, Lease, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(contender);
+        Assert.Equal("winner", acquired.ClusterId);
+        Assert.Equal(3, acquired.TopologyEpoch);
+        Assert.Equal(Start + Lease + Lease + Lease, acquired.LeaseExpiration);
+        Assert.True(acquired.Version > contender.Version);
+        Assert.True(contender.Version > original.Version);
+        Assert.True(acquired.FencingToken > contender.FencingToken);
+        Assert.Equal(acquired, await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Renew_ContendedReplacement_RejectsLeaseExpiredDuringRetry()
+    {
+        var clock = new ContentionTimeProvider();
+        var directory = new InMemoryClusterDirectory(clock);
+        var original = await directory.GetOrCreate(GrainId, "owner", 1, Lease, TestContext.Current.CancellationToken);
+        clock.Clock.Advance(TimeSpan.FromMinutes(1));
+        ClusterDirectoryEntry? contender = null;
+        clock.OnNextRead = () =>
+        {
+            contender = directory.TryRenew(GrainId, original.Version, original.ClusterId, Lease).GetAwaiter().GetResult();
+            clock.Clock.Advance(Lease);
+        };
+
+        var renewed = await directory.TryRenew(
+            GrainId,
+            original.Version,
+            original.ClusterId,
+            Lease,
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(contender);
+        Assert.Equal(original.Version, contender.Version);
+        Assert.Equal(original.FencingToken, contender.FencingToken);
+        Assert.Equal(Start + TimeSpan.FromMinutes(1) + Lease, contender.LeaseExpiration);
+        Assert.Null(renewed);
+        Assert.Null(await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Renew_CurrentOwner_ExtendsLeaseWithoutChangingFence()
     {
         var (clock, directory) = CreateDirectory();
@@ -631,6 +686,23 @@ public sealed class InMemoryClusterDirectoryTests
     {
         var clock = new FakeTimeProvider(Start);
         return (clock, new InMemoryClusterDirectory(clock));
+    }
+
+    private sealed class ContentionTimeProvider : TimeProvider
+    {
+        public FakeTimeProvider Clock { get; } = new(Start);
+
+        public Action? OnNextRead { get; set; }
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            // Mutate the captured directory entry and advance time before its CAS can complete.
+            var now = Clock.GetUtcNow();
+            var onRead = OnNextRead;
+            OnNextRead = null;
+            onRead?.Invoke();
+            return now;
+        }
     }
 
     private static bool IsSameOwnership(ClusterDirectoryEntry expected, ClusterDirectoryEntry? actual)

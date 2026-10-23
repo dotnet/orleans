@@ -52,13 +52,14 @@ public sealed class InMemoryClusterDirectory : IClusterDirectory
     {
         cancellationToken.ThrowIfCancellationRequested();
         ValidateLeaseArguments(grainId, leaseDuration);
-        var now = _timeProvider.GetUtcNow();
         ArgumentException.ThrowIfNullOrWhiteSpace(proposedClusterId);
         while (true)
         {
-            if (!_entries.TryGetValue(grainId, out var current))
+            _entries.TryGetValue(grainId, out var current);
+            var now = _timeProvider.GetUtcNow();
+            if (current is null)
             {
-                var created = CreateEntry(grainId);
+                var created = CreateEntry(grainId, now);
                 if (_entries.TryAdd(grainId, created))
                 {
                     return new ValueTask<ClusterDirectoryEntry>(created);
@@ -78,14 +79,14 @@ public sealed class InMemoryClusterDirectory : IClusterDirectory
                     $"Topology epoch '{topologyEpoch}' cannot replace ownership from newer epoch '{current.TopologyEpoch}'.");
             }
 
-            var replacement = CreateEntry(grainId);
+            var replacement = CreateEntry(grainId, now);
             if (_entries.TryUpdate(grainId, replacement, current))
             {
                 return new ValueTask<ClusterDirectoryEntry>(replacement);
             }
         }
 
-        ClusterDirectoryEntry CreateEntry(GrainId id)
+        ClusterDirectoryEntry CreateEntry(GrainId id, DateTimeOffset now)
         {
             var version = Interlocked.Increment(ref _nextVersion);
             return new ClusterDirectoryEntry(
@@ -109,9 +110,9 @@ public sealed class InMemoryClusterDirectory : IClusterDirectory
         cancellationToken.ThrowIfCancellationRequested();
         ValidateLeaseArguments(grainId, leaseDuration);
         ArgumentException.ThrowIfNullOrWhiteSpace(ownerClusterId);
-        var now = _timeProvider.GetUtcNow();
         while (_entries.TryGetValue(grainId, out var current))
         {
+            var now = _timeProvider.GetUtcNow();
             if (current.Version != expectedVersion
                 || !string.Equals(current.ClusterId, ownerClusterId, StringComparison.Ordinal)
                 || current.LeaseExpiration <= now)
@@ -146,10 +147,10 @@ public sealed class InMemoryClusterDirectory : IClusterDirectory
     {
         cancellationToken.ThrowIfCancellationRequested();
         ValidateLeaseArguments(grainId, leaseDuration);
-        var now = _timeProvider.GetUtcNow();
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationClusterId);
         while (_entries.TryGetValue(grainId, out var current))
         {
+            var now = _timeProvider.GetUtcNow();
             if (current.Version != expectedVersion)
             {
                 return new ValueTask<ClusterDirectoryEntry?>((ClusterDirectoryEntry?)null);

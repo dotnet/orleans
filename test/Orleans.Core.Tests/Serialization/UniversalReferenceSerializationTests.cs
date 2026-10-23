@@ -409,6 +409,22 @@ public sealed class UniversalReferenceSerializationTests(TestEnvironmentFixture 
     }
 
     [Theory]
+    [InlineData("""["/",""]""")]
+    [InlineData("""["/","test.interface"]""")]
+    [InlineData("""[null,""]""")]
+    public void SystemTextJsonReader_DefaultLegacyGrainId_ThrowsJsonException(string json)
+    {
+        Assert.Throws<System.Text.Json.JsonException>(
+            () => SystemTextJson.Deserialize<IAddressable>(json, SystemTextJsonOptions));
+    }
+
+    [Fact]
+    public void SystemTextJsonReader_NullReference_ReturnsNull()
+    {
+        Assert.Null(SystemTextJson.Deserialize<IAddressable>("null", SystemTextJsonOptions));
+    }
+
+    [Theory]
     [InlineData("[]")]
     [InlineData("""["test.grain/1"]""")]
     [InlineData("""["test.grain/1","test.interface","extra"]""")]

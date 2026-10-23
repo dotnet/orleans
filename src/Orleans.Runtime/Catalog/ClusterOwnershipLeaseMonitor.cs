@@ -15,7 +15,7 @@ namespace Orleans.Runtime;
 
 internal sealed class ClusterOwnershipLeaseMonitor : ILifecycleParticipant<ISiloLifecycle>
 {
-    private readonly ConcurrentDictionary<ActivationId, IGrainContext> _activations = new();
+    private readonly ConcurrentDictionary<ActivationId, IGrainContext?> _activations = new();
     private readonly ConcurrentDictionary<ActivationId, TaskCompletionSource> _renewingActivations = new();
     private readonly ClusterLocatorResolver _locatorResolver;
     private readonly UniversalReferenceBindingResolver _bindingResolver;
@@ -52,6 +52,8 @@ internal sealed class ClusterOwnershipLeaseMonitor : ILifecycleParticipant<ISilo
             return;
         }
 
+        // A null entry reserves tracking while initial validation is pending, so Untrack can remove it.
+        _activations[context.ActivationId] = null;
         context.ObservableLifecycle.Subscribe<ClusterOwnershipLeaseMonitor>(
             GrainLifecycleStage.First,
             cancellationToken => ValidateAndTrack(context, cancellationToken));
@@ -61,17 +63,28 @@ internal sealed class ClusterOwnershipLeaseMonitor : ILifecycleParticipant<ISilo
 
     private async Task ValidateAndTrack(IGrainContext context, CancellationToken cancellationToken)
     {
-        if (_locatorResolver.Resolve(context.GrainId.Type) is not IClusterOwnershipValidator validator)
+        var tracked = false;
+        try
         {
-            return;
-        }
+            if (_locatorResolver.Resolve(context.GrainId.Type) is not IClusterOwnershipValidator validator)
+            {
+                return;
+            }
 
-        var ownership = await validator.ValidateLocalOwnership(
-            context.GrainId,
-            _bindingResolver.ClusterId,
-            cancellationToken);
-        context.SetComponent(ownership);
-        _activations[context.ActivationId] = context;
+            var ownership = await validator.ValidateLocalOwnership(
+                context.GrainId,
+                _bindingResolver.ClusterId,
+                cancellationToken);
+            context.SetComponent(ownership);
+            tracked = _activations.TryUpdate(context.ActivationId, context, comparisonValue: null);
+        }
+        finally
+        {
+            if (!tracked)
+            {
+                Untrack(context);
+            }
+        }
     }
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
@@ -118,6 +131,11 @@ internal sealed class ClusterOwnershipLeaseMonitor : ILifecycleParticipant<ISilo
         {
             foreach (var context in _activations.Values)
             {
+                if (context is null)
+                {
+                    continue;
+                }
+
                 var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 if (_renewingActivations.TryAdd(context.ActivationId, completion))
                 {
