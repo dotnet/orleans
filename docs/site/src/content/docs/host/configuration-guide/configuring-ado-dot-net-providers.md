@@ -51,25 +51,40 @@ application startup path.
 | `MySqlDatabaseResource` | `MySql.Data.MySqlClient` | Clustering, grain storage, reminders, grain directory, streaming |
 | `OracleDatabaseResource` | `Oracle.DataAccess.Client` | Clustering, grain storage, reminders |
 
-The SQL Server AppHost can create the database and apply the Orleans scripts through a creation script:
+The ADO.NET AppHost examples keep the silo at explicit start while you prepare its schema. The SQL Server example starts a database resource:
 
 :::code language="csharp" source="../snippets/aspire/AppHost/AppHostExamples.cs" id="adonet_apphost":::
 
-The `schema/sqlserver.sql` file creates `orleans-db`, selects it, and then contains the SQL Server main script followed by the scripts for each configured capability. Aspire runs this script when the SQL Server resource becomes ready.
-
-PostgreSQL and MySQL/MariaDB container initialization directories can provision the database and schema before the Orleans project starts:
+PostgreSQL and MySQL/MariaDB use the same schema-preparation sequence:
 
 :::code language="csharp" source="../snippets/aspire/AppHost/AppHostExamples.cs" id="adonet_postgresql_apphost":::
 
 :::code language="csharp" source="../snippets/aspire/AppHost/AppHostExamples.cs" id="adonet_mysql_apphost":::
 
-Place ordered initialization files in the referenced directory. Start with a file that creates `orleans-db`, then apply the main script and each configured capability script. MariaDB uses the MySQL scripts and provider mapping.
-
-Oracle supports clustering, grain storage, and reminders:
+Oracle supports clustering, grain storage, and reminders. Its example references a prepared database through the AppHost's `ConnectionStrings:orleans-db` secret or configuration entry:
 
 :::code language="csharp" source="../snippets/aspire/AppHost/AppHostExamples.cs" id="adonet_oracle_apphost":::
 
-The Oracle initialization directory creates the database user or service and applies the Oracle main, clustering, persistence, and reminder scripts. The Oracle container image terms and startup requirements apply to local orchestration.
+From the repository root, select an example with:
+
+```powershell
+dotnet run --project docs\site\src\content\docs\host\snippets\aspire\AppHost -- --example adonet-sqlserver
+```
+
+The other selectors are `adonet-postgresql`, `adonet-mysql`, and `adonet-oracle`. The AppHost project copies the canonical scripts from `src/AdoNet` into `schema` beside the built executable (`AppHost/bin/Debug/net10.0/schema`). Their paths are independent of the process working directory.
+
+For SQL Server, PostgreSQL, and MySQL, wait for the AppHost's `orleans-db` resource to become ready. For Oracle, prepare the database service and application user and configure its connection string before running the AppHost. Use the database's native SQL client to connect to the target database with a schema-owner identity and apply these files in order:
+
+| Example | Ordered files in `schema` |
+|---|---|
+| SQL Server | `SQLServer-Main.sql`, `SQLServer-Clustering.sql`, `SQLServer-Persistence.sql`, `SQLServer-Reminders.sql`, `SQLServer-Streaming.sql`, `SQLServer-GrainDirectory.sql` |
+| PostgreSQL | `PostgreSQL-Main.sql`, `PostgreSQL-Clustering.sql`, `PostgreSQL-Persistence.sql`, `PostgreSQL-Reminders.sql`, `PostgreSQL-Streaming.sql`, `PostgreSQL-GrainDirectory.sql` |
+| MySQL/MariaDB | `MySQL-Main.sql`, `MySQL-Clustering.sql`, `MySQL-Persistence.sql`, `MySQL-Reminders.sql`, `MySQL-Streaming.sql`, `MySQL-GrainDirectory.sql` |
+| Oracle | `Oracle-Main.sql`, `Oracle-Clustering.sql`, `Oracle-Persistence.sql`, `Oracle-Reminders.sql` |
+
+Use a client which handles the scripts' native batch syntax: `sqlcmd` for SQL Server, `psql` for PostgreSQL, `mysql` for MySQL/MariaDB, and SQL*Plus or SQLcl for Oracle. For Oracle, grant the application user the required schema-creation permissions and execute the scripts as that user; the referenced connection string uses that same user and database service.
+
+Once schema preparation succeeds, start `silo` from the Aspire dashboard. `WaitFor(database)` checks database availability; the explicit start keeps schema preparation ahead of Orleans provider startup. Use this sequence for a new development database and apply [the migration procedure](adonet-configuration.md#apply-and-upgrade-schemas) when retaining an existing database.
 
 ### Configure a custom database resource
 

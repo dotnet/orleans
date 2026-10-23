@@ -668,8 +668,7 @@ public static class AppHostExamples
         var builder = DistributedApplication.CreateBuilder(args);
 
         var database = builder.AddSqlServer("sql")
-            .AddDatabase("orleans-db")
-            .WithCreationScript(File.ReadAllText("schema/sqlserver.sql"));
+            .AddDatabase("orleans-db");
 
         var orleans = builder.AddOrleans("cluster")
             .WithClustering(database)
@@ -680,7 +679,8 @@ public static class AppHostExamples
 
         builder.AddProject<Projects.Silo>("silo")
             .WithReference(orleans)
-            .WaitFor(database);
+            .WaitFor(database)
+            .WithExplicitStart();
 
         builder.Build().Run();
     }
@@ -691,8 +691,7 @@ public static class AppHostExamples
     {
         var builder = DistributedApplication.CreateBuilder(args);
 
-        var postgres = builder.AddPostgres("postgres")
-            .WithInitFiles("schema/postgresql");
+        var postgres = builder.AddPostgres("postgres");
         var database = postgres.AddDatabase("orleans-db");
 
         var orleans = builder.AddOrleans("cluster")
@@ -704,7 +703,8 @@ public static class AppHostExamples
 
         builder.AddProject<Projects.Silo>("silo")
             .WithReference(orleans)
-            .WaitFor(database);
+            .WaitFor(database)
+            .WithExplicitStart();
 
         builder.Build().Run();
     }
@@ -715,8 +715,7 @@ public static class AppHostExamples
     {
         var builder = DistributedApplication.CreateBuilder(args);
 
-        var mysql = builder.AddMySql("mysql")
-            .WithInitFiles("schema/mysql");
+        var mysql = builder.AddMySql("mysql");
         var database = mysql.AddDatabase("orleans-db");
 
         var orleans = builder.AddOrleans("cluster")
@@ -728,7 +727,8 @@ public static class AppHostExamples
 
         builder.AddProject<Projects.Silo>("silo")
             .WithReference(orleans)
-            .WaitFor(database);
+            .WaitFor(database)
+            .WithExplicitStart();
 
         builder.Build().Run();
     }
@@ -739,18 +739,17 @@ public static class AppHostExamples
     {
         var builder = DistributedApplication.CreateBuilder(args);
 
-        var oracle = builder.AddOracle("oracle")
-            .WithInitFiles("schema/oracle");
-        var database = oracle.AddDatabase("orleans-db");
+        var database = builder.AddConnectionString("orleans-db");
+        var provider = new ExplicitAdoNetProviderConfiguration(database, "Oracle.DataAccess.Client");
 
         var orleans = builder.AddOrleans("cluster")
-            .WithClustering(database)
-            .WithGrainStorage("Default", database)
-            .WithReminders(database);
+            .WithClustering(provider)
+            .WithGrainStorage("Default", provider)
+            .WithReminders(provider);
 
         builder.AddProject<Projects.Silo>("silo")
             .WithReference(orleans)
-            .WaitFor(database);
+            .WithExplicitStart();
 
         builder.Build().Run();
     }

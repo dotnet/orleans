@@ -6,6 +6,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <IsAspireHost>true</IsAspireHost>
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\..\..\'))</RepositoryRoot>
   </PropertyGroup>
 
   <!-- <apphost_packages> -->
@@ -34,6 +35,21 @@
   <ItemGroup>
     <ProjectReference Include="..\Client\Client.csproj" />
     <ProjectReference Include="..\Silo\Silo.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="$(RepositoryRoot)src\AdoNet\Shared\*-Main.sql"
+             Exclude="$(RepositoryRoot)src\AdoNet\Shared\Sqlite-Main.sql" />
+    <Content Include="$(RepositoryRoot)src\AdoNet\Orleans.Clustering.AdoNet\*.sql" />
+    <Content Include="$(RepositoryRoot)src\AdoNet\Orleans.Persistence.AdoNet\*.sql"
+             Exclude="$(RepositoryRoot)src\AdoNet\Orleans.Persistence.AdoNet\Sqlite-Persistence.sql" />
+    <Content Include="$(RepositoryRoot)src\AdoNet\Orleans.Reminders.AdoNet\*.sql" />
+    <Content Include="$(RepositoryRoot)src\AdoNet\Orleans.Streaming.AdoNet\*.sql" />
+    <Content Include="$(RepositoryRoot)src\AdoNet\Orleans.GrainDirectory.AdoNet\*.sql" />
+    <Content Update="$(RepositoryRoot)src\AdoNet\**\*.sql">
+      <Link>schema\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
