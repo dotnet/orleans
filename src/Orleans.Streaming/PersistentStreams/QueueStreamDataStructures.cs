@@ -47,6 +47,9 @@ namespace Orleans.Streams
         public StreamSequenceToken? LastProcessedToken;
 
         [NonSerialized]
+        public StreamSequenceToken? LastSafePartitionToken;
+
+        [NonSerialized]
         public int PendingHandshakes;
         [NonSerialized]
         public long HandshakeGeneration;
