@@ -136,17 +136,19 @@ public sealed class SqsStreamingResourceTests
     }
 
     [Theory]
-    [InlineData("", 1, null, null, "ServiceId")]
-    [InlineData("service", 0, null, null, "PartitionCount")]
-    [InlineData("service", 1, -1, null, "ReceiveWaitTimeSeconds")]
-    [InlineData("service", 1, 21, null, "ReceiveWaitTimeSeconds")]
-    [InlineData("service", 1, null, 43_201, "VisibilityTimeoutSeconds")]
+    [InlineData("", 1, null, null, "ServiceId", "options.ServiceId")]
+    [InlineData("service", 0, null, null, "PartitionCount must be greater than zero.", "options")]
+    [InlineData("service", -1, null, null, "PartitionCount must be greater than zero.", "options")]
+    [InlineData("service", 1, -1, null, "ReceiveWaitTimeSeconds", "ReceiveWaitTimeSeconds")]
+    [InlineData("service", 1, 21, null, "ReceiveWaitTimeSeconds", "ReceiveWaitTimeSeconds")]
+    [InlineData("service", 1, null, 43_201, "VisibilityTimeoutSeconds", "VisibilityTimeoutSeconds")]
     public void AddSqsStreaming_InvalidOptions_ThrowsActionableError(
         string serviceId,
         int partitionCount,
         int? receiveWaitTimeSeconds,
         int? visibilityTimeoutSeconds,
-        string expectedMessage)
+        string expectedMessage,
+        string expectedParameterName)
     {
         var builder = CreateBuilder();
         var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
@@ -158,11 +160,15 @@ public sealed class SqsStreamingResourceTests
             ReceiveWaitTimeSeconds = receiveWaitTimeSeconds,
             VisibilityTimeoutSeconds = visibilityTimeoutSeconds,
         };
+        var resources = builder.Resources.ToArray();
 
         var exception = Assert.ThrowsAny<ArgumentException>(
             () => orleans.AddSqsStreaming(ProviderName, aws, options));
 
         Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
+        Assert.Equal(expectedParameterName, exception.ParamName);
+        Assert.Equal(resources, builder.Resources);
+        Assert.Empty(orleans.Streaming);
     }
 
     [Fact]
@@ -207,12 +213,15 @@ public sealed class SqsStreamingResourceTests
                 () => orleans.AddSqsStreaming(" ", aws, options)).ParamName);
     }
 
-    [Fact]
-    public void AddSqsStreaming_InvalidCacheSize_ThrowsActionableError()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void AddSqsStreaming_InvalidCacheSize_ThrowsActionableError(int cacheSize)
     {
         var builder = CreateBuilder();
         var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
         var orleans = builder.AddOrleans("cluster").WithDevelopmentClustering();
+        var resources = builder.Resources.ToArray();
 
         var exception = Assert.Throws<ArgumentOutOfRangeException>(
             () => orleans.AddSqsStreaming(
@@ -221,10 +230,13 @@ public sealed class SqsStreamingResourceTests
                 new SqsStreamingOptions
                 {
                     ServiceId = ServiceId,
-                    CacheSize = 0,
+                    CacheSize = cacheSize,
                 }));
 
-        Assert.Contains("CacheSize", exception.Message, StringComparison.Ordinal);
+        Assert.StartsWith("CacheSize must be greater than zero.", exception.Message, StringComparison.Ordinal);
+        Assert.Equal("options", exception.ParamName);
+        Assert.Equal(resources, builder.Resources);
+        Assert.Empty(orleans.Streaming);
     }
 
     [Fact]
@@ -233,6 +245,7 @@ public sealed class SqsStreamingResourceTests
         var builder = CreateBuilder();
         var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
         var orleans = builder.AddOrleans("cluster").WithDevelopmentClustering();
+        var resources = builder.Resources.ToArray();
 
         var exception = Assert.Throws<ArgumentException>(
             () => orleans.AddSqsStreaming(
@@ -244,7 +257,10 @@ public sealed class SqsStreamingResourceTests
                     DataAdapterKey = ProviderName,
                 }));
 
-        Assert.Contains("must differ", exception.Message, StringComparison.Ordinal);
+        Assert.StartsWith("DataAdapterKey must differ from the stream provider name.", exception.Message, StringComparison.Ordinal);
+        Assert.Equal("options", exception.ParamName);
+        Assert.Equal(resources, builder.Resources);
+        Assert.Empty(orleans.Streaming);
     }
 
     [Theory]

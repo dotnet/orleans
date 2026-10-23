@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -33,11 +34,14 @@ namespace OrleansAWSUtils.Streams
         /// <param name="clusterId">The service ID used to prefix the provider's physical queue names.</param>
         /// <param name="storageConnectionString">The SQS connection string.</param>
         /// <param name="loggerFactory">The logger factory.</param>
-        /// <param name="partitionCount">The provider's configured total queue count.</param>
+        /// <param name="partitionCount">The provider's configured total queue count, which must be positive.</param>
         /// <param name="fifoQueue">Whether the provider uses FIFO queues.</param>
         /// <returns>A task which completes when the configured queues have been deleted.</returns>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="partitionCount"/> is zero or negative.</exception>
         public static async Task DeleteAllUsedQueues(string providerName, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory, int partitionCount, bool fifoQueue)
         {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(partitionCount);
+
             if (clusterId != null)
             {
                 var queueMapper = new HashRingBasedStreamQueueMapper(

@@ -18,7 +18,31 @@ namespace AWSUtils.Tests.Streaming;
 public sealed class SQSStreamProviderUtilsTests
 {
     [Theory]
+    [InlineData(0, "cleanup-service")]
+    [InlineData(-1, "cleanup-service")]
+    [InlineData(int.MinValue, "cleanup-service")]
+    [InlineData(0, null)]
+    [InlineData(-1, null)]
+    public async Task DeleteAllUsedQueues_InvalidPartitionCount_ThrowsBeforeAccessingStorage(
+        int partitionCount,
+        string? serviceId)
+    {
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => SQSStreamProviderUtils.DeleteAllUsedQueues(
+                "Topology",
+                serviceId!,
+                "invalid-connection-string",
+                NullLoggerFactory.Instance,
+                partitionCount,
+                fifoQueue: false));
+
+        Assert.Equal("partitionCount", exception.ParamName);
+        Assert.Equal(partitionCount, exception.ActualValue);
+    }
+
+    [Theory]
     [InlineData(1, false)]
+    [InlineData(1, true)]
     [InlineData(4, false)]
     [InlineData(4, true)]
     [InlineData(12, true)]
