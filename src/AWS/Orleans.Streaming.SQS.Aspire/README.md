@@ -50,6 +50,8 @@ Provider names are unique ignoring case within an Orleans service, including pro
 
 Physical queue names preserve the service ID and lowercase the provider name: `orders-service-orders_primary-0`. Hyphens and underscores remain distinct in physical names; the CDK resource identifiers distinguish names such as `orders-primary` and `orders_primary`.
 
+Generated stack and queue resource names follow Aspire's 64-character naming limit, including the collision suffix and partition index. Registration validates every generated name before adding resources. Choose shorter Orleans service or provider names when the combined identifiers exceed the limit.
+
 ## Documentation
 
 See [Stream with Amazon SQS](https://dotnet.github.io/orleans/docs/streaming/sqs-streaming/) for runtime behavior, permissions, delivery semantics, and operations.

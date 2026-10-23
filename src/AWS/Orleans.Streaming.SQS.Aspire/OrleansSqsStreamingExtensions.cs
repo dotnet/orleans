@@ -26,6 +26,7 @@ public static partial class OrleansSqsStreamingExtensions
     /// <param name="awsSdkConfig">The AWS SDK configuration to snapshot for this provider.</param>
     /// <param name="options">The SQS topology and runtime options.</param>
     /// <returns>The Orleans service.</returns>
+    /// <exception cref="ArgumentException">A generated stack or queue resource name violates Aspire's naming rules.</exception>
     /// <exception cref="InvalidOperationException">
     /// A stream provider name conflicts case-insensitively, a physical queue is already owned in the
     /// same AppHost and region, a generated resource name is already registered, or the service
@@ -49,6 +50,7 @@ public static partial class OrleansSqsStreamingExtensions
     /// <param name="awsSdkConfig">The AWS SDK configuration to snapshot for this provider.</param>
     /// <param name="options">The SQS topology and runtime options.</param>
     /// <returns>The SQS stream provider resource.</returns>
+    /// <exception cref="ArgumentException">A generated stack or queue resource name violates Aspire's naming rules.</exception>
     /// <exception cref="InvalidOperationException">
     /// A stream provider name conflicts case-insensitively, a physical queue is already owned in the
     /// same AppHost and region, a generated resource name is already registered, or the service
@@ -181,6 +183,17 @@ public static partial class OrleansSqsStreamingExtensions
         IReadOnlyList<string> queueResourceNames)
     {
         var names = new HashSet<string>(queueResourceNames, StringComparer.OrdinalIgnoreCase) { stackName };
+        // Aspire's 64-character model-name limit also keeps stack names within CloudFormation's 128-character limit.
+        foreach (var name in names)
+        {
+            if (name.Length > 64 || !AspireResourceNamePattern().IsMatch(name))
+            {
+                throw new ArgumentException(
+                    $"The generated SQS streaming resource name '{name}' must be at most 64 characters, "
+                    + "start with an ASCII letter, and contain only ASCII letters, digits, and single hyphens.");
+            }
+        }
+
         foreach (var resource in builder.Resources)
         {
             if (names.Contains(resource.Name))
@@ -375,4 +388,7 @@ public static partial class OrleansSqsStreamingExtensions
 
     [GeneratedRegex(@"^[A-Za-z0-9_-]+(?:\.fifo)?$", RegexOptions.CultureInvariant)]
     private static partial Regex SqsQueueNamePattern();
+
+    [GeneratedRegex(@"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$", RegexOptions.CultureInvariant)]
+    private static partial Regex AspireResourceNamePattern();
 }

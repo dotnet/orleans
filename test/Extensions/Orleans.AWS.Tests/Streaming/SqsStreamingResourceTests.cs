@@ -391,6 +391,111 @@ public sealed class SqsStreamingResourceTests
     }
 
     [Theory]
+    [InlineData(51, false, "Orders", 1)]
+    [InlineData(50, false, "Orders", 11)]
+    [InlineData(34, false, "orders_primary", 1)]
+    [InlineData(42, true, "Orders", 1)]
+    public async Task AddSqsStreaming_MaximumResourceName_PreservesQueueIdentity(
+        int serviceNameLength,
+        bool namespaced,
+        string providerName,
+        int partitionCount)
+    {
+        var builder = CreateBuilder();
+        var serviceName = namespaced
+            ? $"namespace.{new string('s', serviceNameLength - 10)}"
+            : new string('s', serviceNameLength);
+        var serviceId = new string('s', 60);
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var orleans = builder.AddOrleans(serviceName).WithDevelopmentClustering().WithClusterId("cluster");
+        var streaming = orleans.AddSqsStreaming(
+            providerName,
+            aws,
+            new SqsStreamingOptions { ServiceId = serviceId, PartitionCount = partitionCount });
+        var silo = builder.AddContainer("silo", "unused").WithReference(orleans);
+        await using var application = builder.Build();
+
+        Assert.Equal(64, streaming.Queues.Max(queue => queue.Resource.Name.Length));
+        Assert.All(
+            streaming.Queues.Select(queue => queue.Resource.Name).Append(streaming.Stack.Resource.Name),
+            name => Assert.Matches("^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$", name));
+        Assert.Equal(streaming.Stack.Resource.Name, streaming.Stack.Resource.StackName);
+        Assert.Equal(
+            Enumerable.Range(0, partitionCount)
+                .Select(index => $"{serviceId}-{providerName.ToLowerInvariant()}-{index}").Order(),
+            GetQueues(streaming).Select(queue => queue.QueueName).Order());
+        var environment = await GetEnvironmentAsync(application.Services, silo.Resource);
+        Assert.Equal(serviceId, environment["Orleans__ServiceId"]);
+        Assert.Equal(partitionCount.ToString(), environment[$"Orleans__Streaming__{providerName}__PartitionCount"]);
+    }
+
+    [Theory]
+    [InlineData(52, false, "Orders", 1)]
+    [InlineData(51, false, "Orders", 11)]
+    [InlineData(35, false, "orders_primary", 1)]
+    [InlineData(43, true, "Orders", 1)]
+    [InlineData(118, false, "Orders", 1)]
+    public async Task AddSqsStreaming_OverlongResourceName_PreservesResourcesAndConfiguration(
+        int serviceNameLength,
+        bool namespaced,
+        string providerName,
+        int partitionCount)
+    {
+        var builder = CreateBuilder();
+        var serviceName = namespaced
+            ? $"namespace.{new string('s', serviceNameLength - 10)}"
+            : new string('s', serviceNameLength);
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var orleans = builder.AddOrleans(serviceName)
+            .WithDevelopmentClustering()
+            .WithClusterId("cluster")
+            .WithServiceId(ServiceId);
+        var silo = builder.AddContainer("silo", "unused").WithReference(orleans);
+        using var services = builder.Services.BuildServiceProvider();
+        var environment = await GetEnvironmentAsync(services, silo.Resource);
+        var resources = builder.Resources.ToArray();
+        var annotations = resources.Select(resource => resource.Annotations.ToArray()).ToArray();
+
+        var exception = Assert.Throws<ArgumentException>(() => orleans.AddSqsStreaming(
+            providerName,
+            aws,
+            new SqsStreamingOptions { ServiceId = ServiceId, PartitionCount = partitionCount }));
+
+        Assert.Contains("64", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("resource name", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(resources, builder.Resources);
+        for (var index = 0; index < resources.Length; index++)
+        {
+            Assert.Equal(annotations[index], resources[index].Annotations);
+        }
+
+        Assert.Empty(orleans.Streaming);
+        Assert.Equal(
+            environment.OrderBy(pair => pair.Key),
+            (await GetEnvironmentAsync(services, silo.Resource)).OrderBy(pair => pair.Key));
+    }
+
+    [Theory]
+    [InlineData("123")]
+    [InlineData("\u00e9quipe")]
+    public void AddSqsStreaming_InvalidResourceCharacters_PreservesResourcesAndConfiguration(string serviceName)
+    {
+        var builder = CreateBuilder();
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var orleans = builder.AddOrleans(serviceName).WithDevelopmentClustering();
+        var resources = builder.Resources.ToArray();
+
+        var exception = Assert.Throws<ArgumentException>(() => orleans.AddSqsStreaming(
+            ProviderName,
+            aws,
+            new SqsStreamingOptions { ServiceId = ServiceId, PartitionCount = 1 }));
+
+        Assert.Contains("ASCII letter", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(resources, builder.Resources);
+        Assert.Empty(orleans.Streaming);
+    }
+
+    [Theory]
     [InlineData("Orders", "Orders", false)]
     [InlineData("Orders", "orders", false)]
     [InlineData("orders_primary", "Orders_primary", false)]
