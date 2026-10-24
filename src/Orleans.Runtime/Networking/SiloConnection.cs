@@ -309,6 +309,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 if (msg.Direction == Message.Directions.Response
+                    && msg.Result != Message.ResponseTypes.Status
                     && msg.TargetGrain.IsClient()
                     && msg.TargetSilo is { } unavailableGateway)
                 {

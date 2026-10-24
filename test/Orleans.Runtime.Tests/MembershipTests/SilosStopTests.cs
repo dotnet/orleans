@@ -4,6 +4,7 @@ using System.Net;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Connections;
 using Orleans.Connections.Transport;
 using Orleans.Configuration;
@@ -318,6 +319,122 @@ namespace UnitTests.MembershipTests
                 }
 
                 client.RecordConnection(connection);
+            }
+        }
+
+        [Theory, TestCategory("Liveness")]
+        [InlineData((int)Message.ResponseTypes.Status)]
+        [InlineData((int)Message.ResponseTypes.Success)]
+        [InlineData((int)Message.ResponseTypes.Error)]
+        [InlineData((int)Message.ResponseTypes.Rejection)]
+        public async Task SiloConnectionFailureDropsStatusAndQueuesBufferedTerminalResponse(int responseType)
+        {
+            var services = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
+            var messageCenter = services.GetRequiredService<MessageCenter>();
+            var gateway = messageCenter.Gateway!;
+            var transport = Assert.IsType<SiloConnection>(
+                await services.GetRequiredService<ConnectionManager>()
+                    .GetConnection(HostedCluster.SecondarySilos[0].SiloAddress));
+            var clientId = ClientGrainId.Create();
+            var clients = (ConcurrentDictionary<ClientGrainId, Gateway.ClientState>)typeof(Gateway)
+                .GetField("clients", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(gateway)!;
+            var unavailableGateway = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 0), 1);
+            var request = new Message
+            {
+                Id = new CorrelationId(-5),
+                Direction = Message.Directions.Request,
+                SendingSilo = HostedCluster.Primary.SiloAddress,
+                SendingGrain = clientId.GrainId,
+                TargetSilo = HostedCluster.SecondarySilos[0].SiloAddress,
+                TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
+            };
+            using var shared = ActivatorUtilities.CreateInstance<MessageHandlerShared>(services);
+            using var response = services.GetRequiredService<MessageFactory>().CreateResponseMessage(request);
+            response.Result = (Message.ResponseTypes)responseType;
+            response.TargetSilo = unavailableGateway;
+            response.GatewayRequestAttempt = -42;
+            // Exhaust the routing budget so terminal fallback queues synchronously without a directory lookup.
+            var history = Enumerable.Repeat(
+                HostedCluster.Primary.SiloAddress,
+                services.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.MaxForwardCount).ToArray();
+            response.GatewayResponseRoutingHistory = history;
+            using var buffer = new ArcBufferWriter();
+            buffer.Write([1, 2, 3]);
+            var readRequest = shared.GetReceiveMessageHandler();
+            readRequest.Body = buffer.ConsumeSlice(3);
+            typeof(MessageReadRequest).GetField("_bodyLength", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(readRequest, 3);
+            response.SetMessageReadRequest(readRequest);
+            // This state has never had a connection, so its consumer cannot hold a stale live-connection snapshot.
+            var client = new Gateway.ClientState(gateway, clientId);
+            ConcurrentQueue<Message>? pendingResponses = null;
+            try
+            {
+                pendingResponses = (ConcurrentQueue<Message>)typeof(Gateway.ClientState)
+                    .GetField("_pendingToSend", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(client)!;
+                Assert.True(clients.TryAdd(clientId, client));
+                Assert.True(gateway.TryGetClientState(request, out var knownClient));
+                Assert.Same(client, knownClient);
+                Assert.Null(client.Connection);
+                Assert.Empty(pendingResponses);
+                Assert.False(MessageCenter.IsForwardedClientRequestUpdate(response));
+
+                transport.FailMessage(response, "Gateway transport failed after all retries.");
+
+                Assert.Equal((Message.ResponseTypes)responseType, response.Result);
+                Assert.Equal(clientId.GrainId, response.TargetGrain);
+                Assert.Null(client.Connection);
+                Assert.Null(response.GatewayForwardingSource);
+                Assert.Equal(0, gateway.TrackedRequestClientCount);
+                if (response.Result == Message.ResponseTypes.Status)
+                {
+                    Assert.Empty(pendingResponses);
+                    Assert.Equal(unavailableGateway, response.TargetSilo);
+                    Assert.Equal(-42, response.GatewayRequestAttempt);
+                    Assert.Same(history, response.GatewayResponseRoutingHistory);
+                    Assert.Null(response._bodyObject);
+                    Assert.Equal(0, readRequest.BodyLength);
+                    Assert.Equal(0, readRequest.Body.Length);
+                }
+                else
+                {
+                    Assert.Same(response, Assert.Single(pendingResponses));
+                    Assert.Null(response.TargetSilo);
+                    Assert.Equal(0, response.GatewayRequestAttempt);
+                    Assert.Null(response.GatewayResponseRoutingHistory);
+                    Assert.Same(readRequest, response._bodyObject);
+                    Assert.Equal(3, readRequest.BodyLength);
+                    Assert.Equal([1, 2, 3], readRequest.Body.ToArray());
+                    Assert.True(pendingResponses.TryDequeue(out var queued));
+                    Assert.Same(response, queued);
+                    response.Dispose();
+                }
+
+                var first = shared.GetReceiveMessageHandler();
+                var second = shared.GetReceiveMessageHandler();
+                try
+                {
+                    Assert.Same(readRequest, first);
+                    Assert.NotSame(first, second);
+                }
+                finally
+                {
+                    first.Reset();
+                    second.Reset();
+                }
+            }
+            finally
+            {
+                clients.TryRemove(clientId, out _);
+                if (pendingResponses is not null)
+                {
+                    while (pendingResponses.TryDequeue(out var queued))
+                    {
+                        queued.Dispose();
+                    }
+                }
+
+                client.Drop();
             }
         }
 
@@ -808,7 +925,8 @@ namespace UnitTests.MembershipTests
         public async Task ForwardingUpdateToDeadSiloReplacesStaleDestinationTracking()
         {
             var primaryServices = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
-            var gateway = primaryServices.GetRequiredService<MessageCenter>().Gateway!;
+            var messageCenter = primaryServices.GetRequiredService<MessageCenter>();
+            var gateway = messageCenter.Gateway!;
             var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
             var deadSilo = HostedCluster.SecondarySilos[0];
             var destination = new RecordingConnection(primaryServices.GetRequiredService<ConnectionCommon>());
@@ -847,6 +965,8 @@ namespace UnitTests.MembershipTests
             Assert.True(gateway.TryGetClientState(original, out var client));
             client.SendRequest(original, destination);
             Assert.Same(original, Assert.Single(destination.Messages));
+            Assert.True(original.GatewayRequestAttempt > 0);
+            forwardingUpdate.GatewayRequestAttempt = original.GatewayRequestAttempt;
             Assert.Equal(1, gateway.TrackedRequestClientCount);
 
             await HostedCluster.KillSiloAsync(deadSilo, TestContext.Current.CancellationToken);
@@ -862,11 +982,18 @@ namespace UnitTests.MembershipTests
                 TimeSpan.FromSeconds(30),
                 TestContext.Current.CancellationToken);
 
-            client.SendResponse(forwardingUpdate);
+            messageCenter.ReceiveMessage(forwardingUpdate);
 
             var rejected = Assert.IsType<GatewayEvents.DeadSiloRequestRejected>((await rejectionTask).Payload);
+            Assert.Null(forwardingUpdate._bodyObject);
+            Assert.Equal(forwarded.Id, rejected.Rejection.Id);
+            Assert.Equal(Message.Directions.Response, rejected.Rejection.Direction);
+            Assert.Equal(Message.ResponseTypes.Rejection, rejected.Rejection.Result);
             Assert.Equal(deadSilo.SiloAddress, rejected.Rejection.SendingSilo);
             Assert.Equal(clientId, rejected.Rejection.TargetGrain);
+            Assert.Null(rejected.Rejection.TargetSilo);
+            Assert.Equal(0, rejected.Rejection.GatewayRequestAttempt);
+            Assert.Null(rejected.Rejection.GatewayForwardingSource);
             Assert.Equal(0, gateway.TrackedRequestClientCount);
         }
 

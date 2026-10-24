@@ -1287,6 +1287,8 @@ public class GatewayInFlightRequestTrackerTests
         Assert.True(MessageCenter.CanDeliverToProxyLocally(response, Silo2, targetSiloIsDead: true));
         Assert.True(MessageCenter.ShouldReaddressResponse(response, targetSiloIsDead: true));
         Assert.False(MessageCenter.ShouldReaddressResponse(response, targetSiloIsDead: false));
+        response.Result = Message.ResponseTypes.Status;
+        Assert.False(MessageCenter.ShouldReaddressResponse(response, targetSiloIsDead: true));
     }
 
     [Fact]

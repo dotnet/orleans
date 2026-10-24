@@ -471,6 +471,7 @@ namespace Orleans.Runtime.Messaging
 
         internal static bool ShouldReaddressResponse(Message message, bool targetSiloIsDead) =>
             message.Direction == Message.Directions.Response
+            && message.Result != Message.ResponseTypes.Status
             && targetSiloIsDead
             && message.TargetGrain.IsClient();
 

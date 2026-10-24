@@ -395,6 +395,11 @@ namespace Orleans.Runtime.Messaging
             gatewayForwardingSource = null;
             gatewayResponseRoutingHistory = null;
             var size = (int)reader.ReadVarUInt32();
+            if (size == 0)
+            {
+                return null;
+            }
+
             var result = new Dictionary<string, object>(GetRequestContextInitialCapacity(size));
             for (var i = 0; i < size; i++)
             {
