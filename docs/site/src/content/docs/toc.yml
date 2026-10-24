@@ -102,6 +102,8 @@ items:
             href: grains/journaling/durable-jobs-migration.md
           - name: Use durable state
             href: grains/journaling/durable-state.md
+          - name: Observe state and stream drafts
+            href: grains/journaling/observe-state.md
           - name: Runtime behavior and consistency
             href: grains/journaling/runtime-behavior.md
           - name: Configuration and formats

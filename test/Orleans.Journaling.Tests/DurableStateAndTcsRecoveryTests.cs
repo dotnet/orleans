@@ -98,6 +98,48 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         Assert.True(tcs.TrySetResult(18));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NullPersistentState_ReadingInitializesItAndTheNextWriteRecordsIt(bool recover)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var storage = new VolatileJournalStorage();
+        var (manager, state, other) = await CreateAsync();
+        state.State = null!;
+        await manager.WriteStateAsync(cancellationToken);
+        if (recover)
+        {
+            (manager, state, other) = await CreateAsync();
+        }
+
+        // Reading null state initializes it, and the next journal write records the initialized value.
+        var initialized = state.State;
+        Assert.Empty(initialized);
+        Assert.Same(initialized, state.State);
+        initialized.Add(1);
+        other.Value = 1;
+        await manager.WriteStateAsync(cancellationToken);
+
+        var (_, recoveredState, recoveredOther) = await CreateAsync();
+        Assert.Equal(1, recoveredOther.Value);
+        Assert.True(recoveredState.RecordExists);
+        Assert.Equal([1], recoveredState.State);
+
+        async Task<(IJournaledStateManager Manager, IPersistentState<List<int>> State, DurableValue<int> Other)> CreateAsync()
+        {
+            var sut = CreateTestSystem(storage: storage);
+            var persistentState = new JournaledPersistentState<List<int>>(
+                "state",
+                sut.Manager,
+                new OrleansBinaryPersistentStateCommandCodec<List<int>>(ValueCodec<List<int>>(), SessionPool),
+                CodecProvider.GetActivator<List<int>>());
+            var otherValue = new DurableValue<int>("other", sut.Manager, new OrleansBinaryDurableValueCommandCodec<int>(ValueCodec<int>(), SessionPool));
+            await sut.Lifecycle.OnStart(cancellationToken);
+            return (sut.Manager, persistentState, otherValue);
+        }
+    }
+
     private IFieldCodec<T> ValueCodec<T>() => CodecProvider.GetCodec<T>();
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
