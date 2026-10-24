@@ -18,6 +18,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 #endif
     private readonly Dictionary<string, IStateMachine> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, IStateMachine> _statesMap = [];
+
+    // Whether a registered state journals changes which StagedChangeCount can't observe.
+    private bool _hasUnreportedChanges;
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
     private readonly IGrainContext? _grainContext;
@@ -147,6 +150,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             }
 
             _states.Add(name, stateMachine);
+            if (stateMachine is not IReportsStagedChanges) _hasUnreportedChanges = true;
             _workQueue.Enqueue(new RegisterStateWorkItem(name));
         }
 
@@ -282,6 +286,31 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                 "The journaled state operation was queued before deletion reset its state.");
                         }
 
+                        if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem)
+                        {
+                            try
+                            {
+                                for (var prepared = false; !prepared;)
+                                {
+                                    await PrepareStates(ref prepared, _shutdownCancellation.Token).ConfigureAwait(true);
+                                }
+
+                                _shutdownCancellation.Token.ThrowIfCancellationRequested();
+                            }
+                            catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+                            {
+                                workItem.TrySetCanceled(_shutdownCancellation.Token);
+                                return;
+                            }
+                            catch (Exception exception)
+                            {
+                                LogStatePreparationFailed(_shared.Logger, exception);
+                                storageActivity?.SetStatus(ActivityStatusCode.Error, "Journal state preparation failed.");
+                                workItem.SetException(new JournaledStatePreCommitException(exception));
+                                continue;
+                            }
+                        }
+
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
                         // We are ok sacrificing some code organization for performance in the inner loop.
                         switch (workItem)
@@ -317,6 +346,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
                                     lock (_lock)
                                     {
+                                        // Capture journals changes which states already staged, so it doesn't count as staging.
+                                        var stagedChangeCount = _journalWriter.StagedChangeCount;
                                         if (isSnapshot)
                                         {
                                             using var snapshotWriter = _shared.JournalFormat.CreateWriter();
@@ -402,6 +433,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                                 hasBufferToConsume = true;
                                             }
                                         }
+
+                                        _journalWriter.StagedChangeCount = stagedChangeCount;
                                     }
 
                                     _shared.Instruments.OnGather(
@@ -597,6 +630,28 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                 return;
             }
         }
+    }
+
+    // Completes when every state is synchronously ready; otherwise returns the first incomplete preparation.
+    private ValueTask PrepareStates(ref bool prepared, CancellationToken cancellationToken)
+    {
+        prepared = true;
+        lock (_lock)
+        {
+            foreach (var state in _states.Values)
+            {
+                var preparation = state.PrepareWriteAsync(cancellationToken);
+                if (!preparation.IsCompletedSuccessfully)
+                {
+                    prepared = false;
+                    return preparation;
+                }
+
+                preparation.GetAwaiter().GetResult();
+            }
+        }
+
+        return ValueTask.CompletedTask;
     }
 
     private void Fence(Exception exception)
@@ -1057,6 +1112,18 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public long PendingWriteByteCount => _journalWriter.CommittedLength;
 
+    /// <summary>
+    /// Gets a count which advances whenever a registered state stages a change and never decreases, or a negative value
+    /// when a registered state doesn't report its changes.
+    /// </summary>
+    /// <remarks>
+    /// Every state which implements <see cref="IReportsStagedChanges"/> advances it when it is modified. A write captures
+    /// changes without advancing it. Comparing two readings taken on the activation's scheduler shows whether any state
+    /// staged a change between them. Orleans.Messaging uses it to tell whether a failed handler attempt staged changes,
+    /// and treats a negative value as staged.
+    /// </remarks>
+    internal long StagedChangeCount => _hasUnreportedChanges ? -1 : _journalWriter.StagedChangeCount;
+
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer)
         => observer.Subscribe(GrainLifecycleStage.SetupState, this);
 
@@ -1327,7 +1394,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     /// This keeps buffering entries and dumps them back into the journal upon compaction.
     /// </summary>
     [DebuggerDisplay("RetiredStateMachine Id = {StreamId.Value}")]
-    private sealed class RetiredStateMachine(JournalStreamId streamId) : IStateMachine
+    private sealed class RetiredStateMachine(JournalStreamId streamId) : IStateMachine, IReportsStagedChanges
     {
         private readonly List<IPreservedJournalEntry> _preservedEntries = [];
 
@@ -1354,6 +1421,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journal state preparation failed; pending changes remain staged.")]
+    private static partial void LogStatePreparationFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Information,
