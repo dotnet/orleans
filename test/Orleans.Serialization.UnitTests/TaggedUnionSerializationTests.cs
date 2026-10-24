@@ -183,16 +183,22 @@ public class TaggedUnionSerializationTests : IDisposable
         Assert.Equal(new Contact { Open = true }, result);
     }
 
-    [Fact]
-    public void ClosedHierarchyReadsPayloadsWithEncodedRuntimeType()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClosedHierarchyReadsLegacyPayloadAndWritesTaggedFormat(bool empty)
     {
-        // Payloads written before a closed type declared case identifiers encode the runtime type in the field header.
-        var value = new Humidity(55) { Location = "attic" };
-        var bytes = _serializer.SerializeToArray<object>(value);
+        // The legacy format uses a runtime-type header for a value and a null reference for null.
+        var value = empty ? null : new Humidity(55) { Location = "attic" };
+        var legacyBytes = _serializer.SerializeToArray<object?>(value);
 
-        var result = _serializer.Deserialize<Sensor>(bytes);
+        var result = _serializer.Deserialize<Sensor?>(legacyBytes);
+        var taggedBytes = _serializer.SerializeToArray<Sensor?>(result);
 
         Assert.Equal(value, result);
+        Assert.Equal(_serializer.SerializeToArray<Sensor?>(value), taggedBytes);
+        Assert.NotEqual(legacyBytes, taggedBytes);
+        Assert.Equal(value, _serializer.Deserialize<Sensor?>(taggedBytes));
     }
 
     [Fact]
