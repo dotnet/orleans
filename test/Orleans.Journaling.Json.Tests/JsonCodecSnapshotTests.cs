@@ -493,6 +493,64 @@ public sealed class JsonCodecSnapshotTests
             (codec, writer) => codec.WriteCanceled(writer),
             ["canceled"]);
 
+    // --- Log -----------------------------------------------------------------------------------
+
+    private static readonly LogDraftId SnapshotDraftId = new(Guid.Parse("0f8fad5b-d9cb-469f-a165-70867728950e"), 3);
+
+    [Fact]
+    public Task Log_Epoch() =>
+        SnapshotLogOperation<string>(
+            (codec, writer) => codec.WriteEpoch(0x1234_5678_9ABC, writer),
+            [$"epoch:{0x1234_5678_9ABC}"]);
+
+    [Fact]
+    public Task Log_Append_Primitives() =>
+        SnapshotLogOperation<string>(
+            (codec, writer) => codec.WriteAppend(["alpha", "beta"], writer),
+            ["append:alpha", "append:beta"]);
+
+    [Fact]
+    public Task Log_DraftCommit_Primitives() =>
+        SnapshotLogOperation<string>(
+            (codec, writer) => codec.WriteDraftCommit(SnapshotDraftId, 5, ["alpha"], writer),
+            ["append:alpha", $"commitDraft:{SnapshotDraftId}:5:1"]);
+
+    [Fact]
+    public Task Log_DraftCommitEmpty_Primitives() =>
+        SnapshotLogOperation<string>(
+            (codec, writer) => codec.WriteDraftCommit(SnapshotDraftId, 5, [], writer),
+            [$"commitDraft:{SnapshotDraftId}:5:0"]);
+
+    [Fact]
+    public Task Log_TrimBefore() =>
+        SnapshotLogOperation<string>(
+            (codec, writer) => codec.WriteTrimBefore(300, writer),
+            ["trimBefore:300"]);
+
+    [Fact]
+    public Task Log_Clear() =>
+        SnapshotLogOperation<string>(
+            (codec, writer) => codec.WriteClear(writer),
+            ["clear"]);
+
+    [Fact]
+    public Task Log_Seal() =>
+        SnapshotLogOperation<string>(
+            (codec, writer) => codec.WriteSeal(writer),
+            ["seal"]);
+
+    [Fact]
+    public Task Log_Snapshot_Primitives() =>
+        SnapshotLogOperation<string>(
+            (codec, writer) => codec.WriteSnapshot(9, 4, 2, isSealed: true, ["alpha", "beta"], [new(SnapshotDraftId, 5, 1)], writer),
+            ["snapshot:9:4:2:2", "append:alpha", "append:beta", $"commitDraft:{SnapshotDraftId}:5:1", "seal"]);
+
+    [Fact]
+    public Task Log_SnapshotEmpty_Primitives() =>
+        SnapshotLogOperation<string>(
+            (codec, writer) => codec.WriteSnapshot(0, 0, 0, isSealed: false, [], [], writer),
+            ["snapshot:0:0:0:0"]);
+
     // --- Cross-cutting -------------------------------------------------------------------------
 
     [Fact]
@@ -608,6 +666,19 @@ public sealed class JsonCodecSnapshotTests
     {
         var codec = new JsonDurableTaskCompletionSourceCommandCodec<T>(Options);
         var state = new RecordingTcsState<T>(codec);
+        return SnapshotSingleOp(
+            codec,
+            state,
+            writer => write(codec, writer),
+            () => Assert.Equal(expectedCommands, state.Commands));
+    }
+
+    private Task SnapshotLogOperation<T>(
+        Action<JsonDurableLogCommandCodec<T>, JournalStreamWriter> write,
+        string[] expectedCommands)
+    {
+        var codec = new JsonDurableLogCommandCodec<T>(Options);
+        var state = new RecordingLogState<T>(codec);
         return SnapshotSingleOp(
             codec,
             state,
