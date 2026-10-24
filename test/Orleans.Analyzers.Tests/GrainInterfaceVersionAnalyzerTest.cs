@@ -1714,6 +1714,28 @@ public interface IMyGrain : IGrain
     }
 
     [Theory]
+    [InlineData("counter[Version(0)]", @"[GrainInterfaceType(""counter[Version(0)]"")]")]
+    [InlineData("counter\"[Version(0)]", @"[GrainInterfaceType(""counter\""[Version(0)]"", Escaped = true)]")]
+    public async Task CodeFix_UpdateVersion_PreservesVersionTextInIdentityAndClrComment(string identity, string recordedIdentity)
+    {
+        var source = $"[GrainInterfaceType({SymbolDisplay.FormatLiteral(identity, quote: true)})] [Version(2)] public interface IMyGrain : IGrain {{ }}";
+        const string clrComment = " # CLR: Previous[Version(3)]";
+        var contractsFile = $"interface {recordedIdentity} IMyGrain [Version(1)]{clrComment}";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+        Assert.Equal(GrainInterfaceVersionAnalyzer.RuleId0017, Assert.Single(diagnostics).Id);
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0017);
+
+        Assert.Contains($"interface {recordedIdentity} IMyGrain [Version(2)]", content);
+        Assert.Contains("# Previous[Version(3)]", content);
+        Assert.Empty(await GetDiagnosticsAsync(source, content));
+    }
+
+    [Theory]
     [InlineData("counter\"v2", @"[GrainInterfaceType(""counter\""v2"", Escaped = true)]")]
     [InlineData("counter # CLR: v2", @"[GrainInterfaceType(""counter \# CLR: v2"", Escaped = true)]")]
     [InlineData("counter\nv2", @"[GrainInterfaceType(""counter\nv2"", Escaped = true)]")]
