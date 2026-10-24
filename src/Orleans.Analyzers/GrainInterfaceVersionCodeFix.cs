@@ -1421,7 +1421,8 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             if (IsMatchingInterface(trimmedLine, interfaceName, grainInterfaceType, legacyGrainInterfaceTypes))
             {
                 // Replace the version number
-                var versionStart = trimmedLine.IndexOf("[Version(", StringComparison.Ordinal);
+                var declaration = GrainInterfaceFileParser.StripClrComment(trimmedLine);
+                var versionStart = declaration.LastIndexOf("[Version(", StringComparison.Ordinal);
                 var versionEnd = trimmedLine.IndexOf(")]", versionStart, StringComparison.Ordinal);
 
                 if (versionStart >= 0 && versionEnd > versionStart)
