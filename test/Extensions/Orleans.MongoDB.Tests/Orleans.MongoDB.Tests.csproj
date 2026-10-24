@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NSubstitute" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Aspire.MongoDB.Driver" />
+    <PackageReference Include="Aspire.Hosting.MongoDB" />
+    <PackageReference Include="Aspire.Hosting.Orleans" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\MongoDB\Orleans.Clustering.MongoDB\Orleans.Clustering.MongoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\MongoDB\Orleans.Persistence.MongoDB\Orleans.Persistence.MongoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\MongoDB\Orleans.Reminders.MongoDB\Orleans.Reminders.MongoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" PrivateAssets="all" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Persistence.TestKit\Orleans.Persistence.TestKit.csproj" PrivateAssets="all" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders.TestKit\Orleans.Reminders.TestKit.csproj" PrivateAssets="all" />
+    <ProjectReference Include="$(SourceRoot)test\Orleans.Testing.Reminders\Orleans.Testing.Reminders.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+</Project>
