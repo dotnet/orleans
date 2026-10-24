@@ -461,6 +461,10 @@ items:
         href: resources/frequently-asked-questions.md
       - name: Symptom and signal catalog
         href: host/monitoring/troubleshooting-symptom-catalog.md
+  - name: Upgrade to Orleans 11
+    items:
+      - name: Grain directory migration
+        href: migration/grain-directory.md
   - name: Upgrade to Orleans 10
     items:
       - name: Migration overview

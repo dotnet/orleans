@@ -427,9 +427,7 @@ public class GrainDirectoryLeaseTests
     {
         var timeProvider = new FakeTimeProvider(InitialTime);
         var builder = new InProcessTestClusterBuilder(siloCount);
-#pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
-#pragma warning restore ORLEANSEXP003
         builder.ConfigureSilo((_, siloBuilder) =>
         {
             siloBuilder.Services.AddSingleton<MembershipTableManager>();

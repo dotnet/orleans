@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.GrainDirectory;
 using Orleans.Hosting;
 
@@ -39,15 +40,52 @@ namespace Orleans.Runtime.Hosting
         public static IServiceCollection AddGrainDirectory<T>(this IServiceCollection collection, string name, Func<IServiceProvider, string, T> implementationFactory)
             where T : class, IGrainDirectory
         {
-            // Register the grain directory name so that directories can be enumerated by name.
-            collection.AddSingleton(sp => new NamedService<IGrainDirectory>(name));
+            if (name == GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY)
+            {
+                collection.RemoveDefaultGrainDirectory();
+            }
 
-            // Register the grain directory implementation.
-            collection.AddKeyedSingleton<IGrainDirectory>(name, (sp, key) => implementationFactory(sp, name));
-            collection.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(s =>
+            var registration = collection.AddGrainDirectoryAlias(name, implementationFactory);
+            registration.LifecycleParticipant = ServiceDescriptor.Singleton<ILifecycleParticipant<ISiloLifecycle>>(s =>
                 s.GetKeyedService<IGrainDirectory>(name) as ILifecycleParticipant<ISiloLifecycle> ?? NoOpLifecycleParticipant.Instance);
+            collection.Add(registration.LifecycleParticipant);
 
             return collection;
+        }
+
+        internal static NamedService<IGrainDirectory> AddGrainDirectoryAlias<T>(
+            this IServiceCollection collection,
+            string name,
+            Func<IServiceProvider, string, T> implementationFactory)
+            where T : class, IGrainDirectory
+        {
+            // Register the grain directory name so that directories can be enumerated by name.
+            var registration = new NamedService<IGrainDirectory>(name, typeof(T));
+            collection.AddSingleton(registration);
+
+            // Register the grain directory implementation.
+            collection.AddKeyedSingleton<IGrainDirectory>(name, (sp, _) => implementationFactory(sp, name));
+            return registration;
+        }
+
+        internal static void RemoveDefaultGrainDirectory(this IServiceCollection collection)
+        {
+            for (var index = collection.Count - 1; index >= 0; index--)
+            {
+                if (!collection[index].IsKeyedService
+                    && collection[index].ImplementationInstance is NamedService<IGrainDirectory> registration
+                    && registration.Name == GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY)
+                {
+                    collection.RemoveAt(index);
+                    if (registration.LifecycleParticipant is { } lifecycleParticipant)
+                    {
+                        collection.Remove(lifecycleParticipant);
+                    }
+                }
+            }
+
+            collection.RemoveAllKeyed<IGrainDirectory>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY);
+            CoreHostingExtensions.RemoveUnusedDistributedGrainDirectory(collection);
         }
 
         internal static IEnumerable<NamedService<IGrainDirectory>> GetGrainDirectories(this IServiceProvider serviceProvider)
