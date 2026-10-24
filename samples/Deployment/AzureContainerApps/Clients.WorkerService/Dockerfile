@@ -4,7 +4,7 @@ EXPOSE 8080
 ENV ASPNETCORE_HTTP_PORTS=8080
 USER $APP_UID
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0.100-rc.2 AS build
 WORKDIR /src
 COPY . .
 RUN dotnet restore "samples/Deployment/AzureContainerApps/Clients.WorkerService/Clients.WorkerService.csproj" --configfile samples/NuGet.config
