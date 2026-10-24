@@ -314,6 +314,22 @@ internal static class SerializableTypeModelExtractor
             return ExtractSerializableTypeModel(fsharpDescription, SymbolSourceLocationExtractor.GetSourceLocation(typeSymbol));
         }
 
+        List<UnionCaseDescription>? unionCases;
+        try
+        {
+            unionCases = UnionCaseResolver.GetUnionTypeCases(typeSymbol, compilation, libraryTypes);
+        }
+        catch (OrleansGeneratorDiagnosticAnalysisException) when (!throwOnFailure)
+        {
+            return null;
+        }
+
+        if (unionCases is not null)
+        {
+            var unionDescription = new SerializableTypeDescription(compilation, typeSymbol, supportsPrimaryConstructorParameters: false, [], libraryTypes) { UnionCases = unionCases };
+            return ExtractSerializableTypeModel(unionDescription, SymbolSourceLocationExtractor.GetSourceLocation(typeSymbol));
+        }
+
         var includePrimaryCtorParams = GetIncludePrimaryConstructorParameters(typeSymbol, libraryTypes);
         var ctorParams = ResolveConstructorParameters(typeSymbol, includePrimaryCtorParams, libraryTypes);
         var implicitFieldIdStrategy = (options.GenerateFieldIds, GetFieldIdsOptionFromType(typeSymbol, libraryTypes)) switch

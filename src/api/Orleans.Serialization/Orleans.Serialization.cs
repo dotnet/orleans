@@ -514,6 +514,12 @@ namespace Orleans.Serialization
     }
 
     [GenerateSerializer]
+    public sealed partial class UnknownUnionCaseException : SerializerException
+    {
+        public UnknownUnionCaseException(System.Type unionType, uint caseId) { }
+    }
+
+    [GenerateSerializer]
     public sealed partial class UnknownWellKnownTypeException : SerializerException
     {
         public UnknownWellKnownTypeException(uint id) { }
@@ -3517,10 +3523,21 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
         public static object InvokableThrowArgumentOutOfRange(int index, int maxArgs) { throw null; }
 
+        public static void ReadStartUnion<TInput>(this ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { }
+
         public static void SerializeUnexpectedType<TBufferWriter>(this ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
+        [System.Diagnostics.CodeAnalysis.DoesNotReturn]
+        public static TField ThrowUnknownUnionCase<TField>(uint caseId) { throw null; }
+
+        [System.Diagnostics.CodeAnalysis.DoesNotReturn]
+        public static void ThrowUnsupportedUnionValue<TField>(object value) { }
+
         public static TService UnwrapService<TService>(object caller, TService service) { throw null; }
+
+        public static void WriteStartUnion<TBufferWriter>(this ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type? expectedType, System.Type unionType)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public abstract partial class ExceptionCopier<T, B> : Cloning.IDeepCopier<T>, Cloning.IDeepCopier, Cloning.IBaseCopier<T>, Cloning.IBaseCopier where T : B where B : System.Exception
         {
@@ -4696,6 +4713,24 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_UnknownUnionCaseException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.UnknownUnionCaseException>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_UnknownUnionCaseException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.UnknownUnionCaseException> _activator) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.UnknownUnionCaseException instance) { }
+
+        public global::Orleans.Serialization.UnknownUnionCaseException ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Serialization.UnknownUnionCaseException instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Serialization.UnknownUnionCaseException value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_UnknownWellKnownTypeException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.UnknownWellKnownTypeException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_UnknownWellKnownTypeException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.UnknownWellKnownTypeException> _activator) { }
@@ -4847,6 +4882,14 @@ namespace OrleansCodeGen.Orleans.Serialization
         public Copier_UnknownReferencedTypeException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
 
         public override void DeepCopy(global::Orleans.Serialization.UnknownReferencedTypeException input, global::Orleans.Serialization.UnknownReferencedTypeException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_UnknownUnionCaseException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.UnknownUnionCaseException, global::Orleans.Serialization.SerializerException>
+    {
+        public Copier_UnknownUnionCaseException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
