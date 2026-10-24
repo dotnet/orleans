@@ -748,6 +748,23 @@ public sealed class SerializerConstructionReviewTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MalformedActivatorRegistrationsThrowInBothSelectionModes(bool materialize)
+    {
+        var options = new TypeManifestOptions();
+        options.AddActivator(typeof(UnboundActivator<,>), typeof(ReferenceModel<int>));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var codecs = new CodecProvider(services, Options.Create(options));
+        var selector = typeof(CodecProvider).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Single(method => method.Name == "TrySelectImplementation" && method.GetParameters().Length == 7);
+
+        var exception = Assert.Throws<TargetInvocationException>(() => selector.Invoke(codecs,
+            [typeof(IActivator<>), typeof(ReferenceModel<int>), typeof(ReferenceModel<>), materialize, null, null, null]));
+        Assert.Contains("different generic arity", Assert.IsType<ArgumentException>(exception.InnerException).Message);
+    }
+
+    [Theory]
     [InlineData("activator", typeof(ArgumentException))]
     [InlineData("value serializer", typeof(KeyNotFoundException))]
     [InlineData("base copier", typeof(KeyNotFoundException))]

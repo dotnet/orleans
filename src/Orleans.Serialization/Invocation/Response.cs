@@ -31,12 +31,7 @@ namespace Orleans.Serialization.Invocation
         /// <typeparam name="TResult">The underlying result type.</typeparam>
         /// <param name="value">The value.</param>
         /// <returns>A new response.</returns>
-        public static Response FromResult<TResult>(TResult value)
-        {
-            var result = ResponsePool.Get<TResult>();
-            result.TypedResult = value;
-            return result;
-        }
+        public static Response FromResult<TResult>(TResult value) => new Response<TResult> { TypedResult = value };
 
         /// <summary>
         /// Gets a completed response.
@@ -196,11 +191,7 @@ namespace Orleans.Serialization.Invocation
         }
 
         /// <inheritdoc/>
-        public override void Dispose()
-        {
-            _result = default;
-            ResponsePool.Return(this);
-        }
+        public override void Dispose() => _result = default;
 
         /// <inheritdoc/>
         public override string ToString() => _result?.ToString() ?? "[null]";
@@ -230,15 +221,41 @@ namespace Orleans.Serialization.Invocation
     }
 
     [RegisterSerializer]
-    internal sealed class PooledResponseCodec<TResult> : ResponseCodec, IFieldCodec<Response<TResult>>
+    internal sealed class ResponseCodec<TResult> : ResponseCodec<TResult, IFieldCodec<TResult>>
+    {
+        public ResponseCodec(ICodecProvider codecProvider)
+            : base(caller => OrleansGeneratedCodeHelper.GetService<IFieldCodec<TResult>>(caller, codecProvider))
+        {
+        }
+    }
+
+    /// <summary>
+    /// Serializes invocation responses using a statically specified result codec.
+    /// </summary>
+    /// <typeparam name="TResult">The invocation result type.</typeparam>
+    /// <typeparam name="TResultCodec">The concrete codec for invocation results.</typeparam>
+    public class ResponseCodec<TResult, TResultCodec> : ResponseCodec, IFieldCodec<Response<TResult>>
+        where TResultCodec : class, IFieldCodec<TResult>
     {
         private readonly Type _codecFieldType = typeof(Response<TResult>);
         private readonly Type _resultType = typeof(TResult);
-        private readonly IFieldCodec<TResult> _codec;
+        private readonly TResultCodec _codec;
 
-        public PooledResponseCodec(ICodecProvider codecProvider)
-            => _codec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<TResult>>(this, codecProvider);
+        /// <summary>
+        /// Initializes a response codec with its result codec.
+        /// </summary>
+        /// <param name="codec">The codec for invocation results.</param>
+        public ResponseCodec(TResultCodec codec)
+            => _codec = codec ?? throw new ArgumentNullException(nameof(codec));
 
+        /// <summary>
+        /// Initializes a response codec using a caller-aware factory for a recursive result codec graph.
+        /// </summary>
+        /// <param name="codecFactory">The concrete result codec factory, receiving this response codec as its construction caller.</param>
+        public ResponseCodec(Func<object, TResultCodec> codecFactory)
+            => _codec = (codecFactory ?? throw new ArgumentNullException(nameof(codecFactory)))(this);
+
+        /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] Response<TResult> value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value is null)
@@ -254,6 +271,7 @@ namespace Orleans.Serialization.Invocation
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public Response<TResult> ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
@@ -262,7 +280,7 @@ namespace Orleans.Serialization.Invocation
 
             field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
-            var result = ResponsePool.Get<TResult>();
+            var result = new Response<TResult>();
             reader.ReadFieldHeader(ref field);
             if (!field.IsEndBaseOrEndObject)
             {
@@ -273,6 +291,7 @@ namespace Orleans.Serialization.Invocation
             return result;
         }
 
+        /// <inheritdoc/>
         public override void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, object value)
         {
             writer.WriteStartObject(0, null!, _resultType);
@@ -282,10 +301,11 @@ namespace Orleans.Serialization.Invocation
             writer.WriteEndObject();
         }
 
+        /// <inheritdoc/>
         public override object ReadRaw<TInput>(ref Reader<TInput> reader, scoped ref Field field)
         {
             field.EnsureWireTypeTagDelimited();
-            var result = ResponsePool.Get<TResult>();
+            var result = new Response<TResult>();
             reader.ReadFieldHeader(ref field);
             if (!field.IsEndBaseOrEndObject)
             {
@@ -298,29 +318,68 @@ namespace Orleans.Serialization.Invocation
     }
 
     [RegisterCopier]
-    internal sealed class PooledResponseCopier<TResult> : IDeepCopier<Response<TResult>>
+    internal sealed class ResponseCopier<TResult> : ResponseCopier<TResult, IDeepCopier<TResult>>
     {
-        private readonly IDeepCopier<TResult> _copier;
+        public ResponseCopier(ICodecProvider codecProvider)
+            : base(caller => OrleansGeneratedCodeHelper.GetService<IDeepCopier<TResult>>(caller, codecProvider))
+        {
+        }
+    }
 
-        public PooledResponseCopier(ICodecProvider codecProvider)
-            => _copier = OrleansGeneratedCodeHelper.GetService<IDeepCopier<TResult>>(this, codecProvider);
+    /// <summary>
+    /// Copies invocation responses using a statically specified result copier.
+    /// </summary>
+    /// <typeparam name="TResult">The invocation result type.</typeparam>
+    /// <typeparam name="TResultCopier">The concrete copier for invocation results.</typeparam>
+    public class ResponseCopier<TResult, TResultCopier> : IDeepCopier<Response<TResult>>
+        where TResultCopier : class, IDeepCopier<TResult>
+    {
+        private readonly TResultCopier _copier;
 
+        /// <summary>
+        /// Initializes a response copier with its result copier.
+        /// </summary>
+        /// <param name="copier">The copier for invocation results.</param>
+        public ResponseCopier(TResultCopier copier)
+            => _copier = copier ?? throw new ArgumentNullException(nameof(copier));
+
+        /// <summary>
+        /// Initializes a response copier using a caller-aware factory for a recursive result copier graph.
+        /// </summary>
+        /// <param name="copierFactory">The concrete result copier factory, receiving this response copier as its construction caller.</param>
+        public ResponseCopier(Func<object, TResultCopier> copierFactory)
+            => _copier = (copierFactory ?? throw new ArgumentNullException(nameof(copierFactory)))(this);
+
+        /// <inheritdoc/>
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
         public Response<TResult>? DeepCopy(Response<TResult>? input, CopyContext context)
         {
-            if (input is null)
-                return null;
-
-            var result = ResponsePool.Get<TResult>();
-            result.TypedResult = _copier.DeepCopy(input.TypedResult!, context);
-            return result;
+            return input is null ? null : new Response<TResult> { TypedResult = _copier.DeepCopy(input.TypedResult!, context) };
         }
     }
 
     [RegisterActivator]
-    internal sealed class PooledResponseActivator<TResult> : IActivator<Response<TResult>>
+    internal sealed class ResponseActivator<TResult> : IActivator<Response<TResult>>
     {
-        public Response<TResult> Create() => ResponsePool.Get<TResult>();
+        public Response<TResult> Create() => new Response<TResult>();
+    }
+
+    /// <summary>
+    /// Serializes a <see cref="Response"/> field using the codec for its runtime type.
+    /// </summary>
+    internal sealed class ResponseFieldCodec : AbstractTypeSerializer<Response>
+    {
+    }
+
+    /// <summary>
+    /// Copies a <see cref="Response"/> using the copier for its runtime type.
+    /// </summary>
+    /// <remarks><see cref="CompletedResponse"/> and <see cref="ExceptionResponse"/> are immutable and keep their identity.</remarks>
+    internal sealed class ResponseFieldCopier : IDeepCopier<Response>
+    {
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Response? DeepCopy(Response? input, CopyContext context)
+            => input is null or CompletedResponse or ExceptionResponse ? input : (Response)ObjectCopier.DeepCopy(input, context)!;
     }
 
     /// <summary>

@@ -39,6 +39,10 @@ public class GeneratorMemoryRetentionTests
                 [Id(0)]
                 public Payload? Next { get; set; }
             }
+            public interface IResponses : IGrainWithIntegerKey
+            {
+                System.Threading.Tasks.Task<Payload> Get();
+            }
             """);
         var compilation = CSharpCompilation.Create(
             $"RetentionTest{index}",

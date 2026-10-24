@@ -430,6 +430,8 @@ internal static class Metadata
         options = new TypeManifestOptions();
         options.AddSerializationContract(typeof(MetadataConstraintFallbackCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
         options.AddSerializationContract(typeof(MetadataConstructorConstrainedCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+        options.AddGenericArgumentMetadata(typeof(MetadataPrivateConstructorTarget));
+        options.AddGenericArgumentMetadata(typeof(MetadataPublicConstructorTarget));
         provider = new CodecProvider(services, Options.Create(options));
         if (provider.GetDeepCopier<MetadataPrivateConstructorTarget>().GetType() != typeof(MetadataConstraintFallbackCopier<MetadataPrivateConstructorTarget>)
             || provider.GetDeepCopier<MetadataPublicConstructorTarget>().GetType() != typeof(MetadataConstructorConstrainedCopier<MetadataPublicConstructorTarget>))
