@@ -42,6 +42,11 @@ public sealed class TaggedUnionDiagnosticTests
             [GenerateSerializer] public closed record Shape<T>;
             [GenerateSerializer, Case(0)] public sealed record Circle<T>([property: Id(0)] T Radius) : Shape<T>;
             [GenerateSerializer, Case(1)] public sealed record Square<X>([property: Id(0)] X Side) : Shape<X>;
+            public static class Outer
+            {
+                [GenerateSerializer] public closed record NestedBase<T>;
+            }
+            [GenerateSerializer, Case(0)] public sealed record Item<T>([property: Id(0)] T Value) : Outer.NestedBase<T>;
             """);
 
         Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
@@ -122,6 +127,24 @@ public sealed class TaggedUnionDiagnosticTests
         }
         """,
         "Case 'Outer<T>.Box' must pass its own type parameters as the type arguments of 'Base'")]
+    [InlineData(
+        """
+        public static class Outer<T>
+        {
+            [GenerateSerializer] public closed record Base<U>;
+        }
+        [GenerateSerializer, Case(0)] public sealed record Item<U>([property: Id(0)] U Value) : Outer<int>.Base<U>;
+        """,
+        "Case 'Item<U>' must pass its own type parameters as the type arguments of 'Outer<T>.Base<U>'")]
+    [InlineData(
+        """
+        public static class Outer<T>
+        {
+            [GenerateSerializer] public closed record Base;
+        }
+        [GenerateSerializer, Case(0)] public sealed record Item([property: Id(0)] int Value) : Outer<int>.Base;
+        """,
+        "Case 'Item' must pass its own type parameters as the type arguments of 'Outer<T>.Base'")]
     [InlineData(
         """
         [GenerateSerializer] public closed record Shape<T>;

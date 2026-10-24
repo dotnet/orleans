@@ -119,6 +119,7 @@ internal static class UnionCaseResolver
     /// <remarks>
     /// A case of a generic closed type must be a case of every instantiation of that type, so each type argument of its base type must be a distinct
     /// type parameter of the case, as in 'Circle&lt;T&gt; : Shape&lt;T&gt;'. A subtype of one instantiation, such as 'IntSquare : Shape&lt;int&gt;', is rejected.
+    /// The mapping supports closed types and cases declared outside generic containing types.
     /// </remarks>
     private static INamedTypeSymbol GetClosedCaseType(INamedTypeSymbol subtype, INamedTypeSymbol closedType, Compilation compilation)
     {
@@ -129,7 +130,9 @@ internal static class UnionCaseResolver
 
         var baseTypeArguments = subtype.BaseType!.TypeArguments;
         var subtypeArguments = new ITypeSymbol[subtype.TypeParameters.Length];
-        var isFullyMapped = subtype.ContainingType is not { IsGenericType: true } && baseTypeArguments.Length == subtypeArguments.Length;
+        var isFullyMapped = closedType.ContainingType is not { IsGenericType: true }
+            && subtype.ContainingType is not { IsGenericType: true }
+            && baseTypeArguments.Length == subtypeArguments.Length;
         for (var i = 0; isFullyMapped && i < baseTypeArguments.Length; i++)
         {
             if (baseTypeArguments[i] is ITypeParameterSymbol parameter
