@@ -34,11 +34,18 @@ public static class InaccessibleCompoundTypeAliasDiagnostic
 
     private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true, description: Description);
 
-    internal static Diagnostic CreateDiagnostic(INamedTypeSymbol target, AttributeData attribute, ITypeSymbol inaccessibleType)
+    internal static Diagnostic CreateDiagnostic(INamedTypeSymbol target, AttributeData attribute, ITypeSymbol inaccessibleType, Compilation compilation)
     {
         var location = attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
             ?? target.Locations.FirstOrDefault()
             ?? Location.None;
+
+        // Referenced compilations retain source trees which the consumer's diagnostic output cannot accept.
+        if (location.SourceTree is { } tree && !compilation.ContainsSyntaxTree(tree))
+        {
+            var lineSpan = location.GetLineSpan();
+            location = Location.Create(lineSpan.Path, location.SourceSpan, lineSpan.Span);
+        }
 
         return Diagnostic.Create(
             Rule,

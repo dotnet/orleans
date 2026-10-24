@@ -113,9 +113,9 @@ internal static class ReferenceAssemblyModelExtractor
 
                     // The metadata provider is emitted outside the aliased type, so every type it names must be accessible from generated code.
                     // The diagnostic concerns generated metadata, so it is reported only when implementation outputs are emitted.
-                    if (FindInaccessibleCompoundAliasType(symbol, compoundAlias, compilation) is { } inaccessibleType)
+                    if (FindInaccessibleCompoundAliasType(symbol, compoundAlias) is { } inaccessibleType)
                     {
-                        implementationDiagnosticBuilder.Add(InaccessibleCompoundTypeAliasDiagnostic.CreateDiagnostic(symbol, compoundAlias, inaccessibleType));
+                        implementationDiagnosticBuilder.Add(InaccessibleCompoundTypeAliasDiagnostic.CreateDiagnostic(symbol, compoundAlias, inaccessibleType, compilation));
                         continue;
                     }
 
@@ -260,7 +260,7 @@ internal static class ReferenceAssemblyModelExtractor
                     || arguments[2].Value is not string target
                     || arguments[3].Value is not INamedTypeSymbol type
                     || !compilation.IsSymbolAccessibleWithin(type, compilation.Assembly)
-                    || !CanReferenceProviderType(type))
+                    || !CanReferenceType(type))
                 {
                     hasUnrepresentableProviderRegistration = true;
                     continue;
@@ -276,15 +276,15 @@ internal static class ReferenceAssemblyModelExtractor
             }
         }
 
-        bool CanReferenceProviderType(ITypeSymbol type)
+        bool CanReferenceType(ITypeSymbol type)
         {
             return type switch
             {
                 INamedTypeSymbol namedType => CanReferenceNamedType(namedType)
-                    && (namedType.ContainingType is null || CanReferenceProviderType(namedType.ContainingType))
-                    && namedType.TypeArguments.All(CanReferenceProviderType),
-                IArrayTypeSymbol arrayType => CanReferenceProviderType(arrayType.ElementType),
-                IPointerTypeSymbol pointerType => CanReferenceProviderType(pointerType.PointedAtType),
+                    && (namedType.ContainingType is null || CanReferenceType(namedType.ContainingType))
+                    && namedType.TypeArguments.All(CanReferenceType),
+                IArrayTypeSymbol arrayType => CanReferenceType(arrayType.ElementType),
+                IPointerTypeSymbol pointerType => CanReferenceType(pointerType.PointedAtType),
                 _ => true,
             };
         }
@@ -300,6 +300,27 @@ internal static class ReferenceAssemblyModelExtractor
             var metadataName = TypeMetadataIdentity.Create(originalDefinition).MetadataName;
             return compilation.GetTypeByMetadataName(metadataName) is { } resolvedType
                 && SymbolEqualityComparer.Default.Equals(resolvedType, originalDefinition);
+        }
+
+        ITypeSymbol? FindInaccessibleCompoundAliasType(INamedTypeSymbol target, AttributeData attribute)
+        {
+            // Assembly accessibility includes file-local types, whose names cannot be used in the generated file.
+            if (!compilation.IsSymbolAccessibleWithin(target, compilation.Assembly) || !CanReferenceType(target))
+            {
+                return target;
+            }
+
+            // TryExtractCompoundTypeAlias has already validated the shape of the arguments.
+            foreach (var argument in attribute.ConstructorArguments[0].Values)
+            {
+                if (argument.Value is ITypeSymbol type
+                    && (!compilation.IsSymbolAccessibleWithin(type, compilation.Assembly) || !CanReferenceType(type)))
+                {
+                    return type;
+                }
+            }
+
+            return null;
         }
     }
 
@@ -389,28 +410,6 @@ internal static class ReferenceAssemblyModelExtractor
 
         components = result.MoveToImmutable();
         return true;
-    }
-
-    private static ITypeSymbol? FindInaccessibleCompoundAliasType(
-        INamedTypeSymbol target,
-        AttributeData attribute,
-        Compilation compilation)
-    {
-        if (!compilation.IsSymbolAccessibleWithin(target, compilation.Assembly))
-        {
-            return target;
-        }
-
-        // TryExtractCompoundTypeAlias has already validated the shape of the arguments.
-        foreach (var argument in attribute.ConstructorArguments[0].Values)
-        {
-            if (argument.Value is ITypeSymbol type && !compilation.IsSymbolAccessibleWithin(type, compilation.Assembly))
-            {
-                return type;
-            }
-        }
-
-        return null;
     }
 
     internal static string GetCompoundTypeAliasOrderKey(CompoundTypeAliasModel entry)
