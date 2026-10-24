@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFrameworks>net10.0</TargetFrameworks>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <!-- Solution-wide test runs for other frameworks skip this net10.0-only project. -->
+  <PropertyGroup Condition="'$(TargetFramework)' != '' and '$(TargetFramework)' != 'net10.0'">
+    <IsTestProject>false</IsTestProject>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Traces exported from specs/garnet-range-migration; regenerate with generate-traces.sh. -->
+    <None Include="Conformance\traces\*.itf.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Garnet\Orleans.Journaling.Garnet\Orleans.Journaling.Garnet.csproj" />
+    <!-- Providers the comparison benchmark measures against. -->
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Journaling.AzureStorage\Orleans.Journaling.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.Journaling.Redis\Orleans.Journaling.Redis.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Orleans.Journaling.Tests\Orleans.Journaling.Tests.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\Orleans.Journaling.Garnet.CrashHost\Orleans.Journaling.Garnet.CrashHost.csproj" />
+  </ItemGroup>
+
+</Project>
