@@ -243,10 +243,10 @@ namespace Orleans.Streaming.EventHubs
         {
             purgedItems = null;
 
-            //if not under pressure, signal the cache to do a time based purge
-            //if under pressure, which means consuming speed is less than producing speed, then shouldn't purge, and don't read more message into the cache
-            if (!this.IsUnderPressure())
+            if (!this.IsUnderPressure() || this.cache is EventHubQueueCache { IsUnderMemoryPressure: true })
+            {
                 this.cache!.SignalPurge();
+            }
 
             return false;
         }
@@ -268,13 +268,20 @@ namespace Orleans.Streaming.EventHubs
             StreamId streamId,
             StreamSubscriptionStartPosition startPosition)
         {
-            return WrapCursorResult(this.cache!.TryGetCursorAtPosition(streamId, startPosition));
+            var result = this.cache!.TryGetCursorAtPosition(streamId, startPosition);
+            var latestStartToken = startPosition == StreamSubscriptionStartPosition.Latest
+                && this.cache is EventHubQueueCache eventHubCache
+                ? eventHubCache.GetNewestSequenceToken()
+                : null;
+            return WrapCursorResult(result, latestStartToken);
         }
 
-        private QueueCacheCursorResult<IQueueCacheCursor> WrapCursorResult(QueueCacheCursorResult<object> result)
+        private QueueCacheCursorResult<IQueueCacheCursor> WrapCursorResult(
+            QueueCacheCursorResult<object> result,
+            StreamSequenceToken? latestStartToken = null)
             => result.Kind switch
             {
-                QueueCacheCursorResultKind.Success => QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(new Cursor(this.cache!, result.Cursor!)),
+                QueueCacheCursorResultKind.Success => QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(new Cursor(this.cache!, result.Cursor!, latestStartToken)),
                 QueueCacheCursorResultKind.CacheMiss => QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(result.CacheMiss!.Value),
                 QueueCacheCursorResultKind.NotSupported => QueueCacheCursorResult<IQueueCacheCursor>.NotSupported,
                 _ => throw new InvalidOperationException("The cursor result is not initialized."),
@@ -285,6 +292,14 @@ namespace Orleans.Streaming.EventHubs
             return this.GetMaxAddCount() <= 0;
         }
 
+        public void UpdatePurgeProtection(bool hasActiveSubscriptions)
+        {
+            if (this.cache is EventHubQueueCache eventHubQueueCache)
+            {
+                eventHubQueueCache.UpdatePurgeProtection(hasActiveSubscriptions);
+            }
+        }
+
         public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
         {
             return Task.CompletedTask;
@@ -292,6 +307,11 @@ namespace Orleans.Streaming.EventHubs
 
         public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
         {
+            if (this.cache is EventHubQueueCache eventHubQueueCache)
+            {
+                eventHubQueueCache.UpdateDeliveryProgress(earliestSubscriptionToken, utcNow);
+            }
+
             if (earliestSubscriptionToken is IEventHubPartitionLocation location
                 && long.TryParse(location.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
             {
@@ -433,10 +453,11 @@ namespace Orleans.Streaming.EventHubs
             public bool ImportRequestContext() { throw new NotSupportedException(); }
         }
 
-        private class Cursor : IQueueCacheCursor
+        private class Cursor : IQueueCacheCursor, IQueueCacheCursorStartPosition
         {
             private readonly IEventHubQueueCache cache;
             private readonly object cursor;
+            private readonly StreamSequenceToken? latestStartToken;
             private IBatchContainer? current;
 
             public Cursor(IEventHubQueueCache cache, StreamId streamId, StreamSequenceToken? token)
@@ -447,11 +468,15 @@ namespace Orleans.Streaming.EventHubs
 #pragma warning restore CS0618
             }
 
-            public Cursor(IEventHubQueueCache cache, object cursor)
+            public Cursor(IEventHubQueueCache cache, object cursor, StreamSequenceToken? latestStartToken)
             {
                 this.cache = cache;
                 this.cursor = cursor;
+                this.latestStartToken = latestStartToken;
             }
+
+            public StreamSequenceToken? LatestStartToken
+                => cache is EventHubQueueCache { IsUnderMemoryPressure: true } ? latestStartToken : null;
 
             public void Dispose()
             {

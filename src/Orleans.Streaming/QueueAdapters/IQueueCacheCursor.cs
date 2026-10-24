@@ -3,6 +3,14 @@ using System;
 namespace Orleans.Streams
 {
     /// <summary>
+    /// Provides the immutable boundary skipped by a Latest acquisition for memory-pressure reclamation.
+    /// </summary>
+    internal interface IQueueCacheCursorStartPosition
+    {
+        StreamSequenceToken? LatestStartToken { get; }
+    }
+
+    /// <summary>
     /// Enumerates the messages in a stream.
     /// </summary>
     public interface IQueueCacheCursor : IDisposable
