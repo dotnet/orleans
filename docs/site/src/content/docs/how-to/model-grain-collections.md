@@ -9,7 +9,7 @@ ms.topic: how-to
 
 Orleans virtualizes individually addressed grains. Applications define collection membership explicitly and choose the storage and consistency model which matches each collection's access patterns.
 
-A grain key identifies a logical grain, and <xref:Orleans.IGrainFactory.GetGrain*> can create a reference for any valid key. Therefore, a domain catalog or query store determines which keys currently represent application members. Callers select a logical member or shard key; Orleans places activations and routes calls to their current locations. Persisted application catalogs retain membership across deactivation and cluster restarts.
+A grain's logical identity combines its grain type and key. <xref:Orleans.IGrainFactory.GetGrain*> can create a typed reference for any valid key. Therefore, a domain catalog or query store determines which keys currently represent application members. Callers select a logical member or shard key; Orleans places activations and routes calls to their current locations. Persisted application catalogs retain membership across deactivation and cluster restarts.
 
 ## Choose a collection shape
 
@@ -76,7 +76,7 @@ For asynchronous indexes, retain enough information to replay updates and reconc
 
 Use a database or search service as the query authority when the workload needs ad hoc predicates, sorting, aggregation, or reporting. Query for grain keys and the fields needed to order the result, then resolve grain references for commands or current domain behavior. The [grain persistence](../grains/grain-persistence/index.md) abstraction reads and writes records by grain identity; a grain or application service can access a query-oriented database model directly.
 
-Use continuation tokens for resumable paging. A token can carry the routing version, shard or partition, last ordering value, and last grain key. Treat tokens as opaque application contracts and version their encoded form.
+Use continuation tokens for resumable paging. A token can carry the routing version, shard or partition, last ordering value, and last grain key. Bind each token to the query's filters, ordering, data set, tenant, and authorization scope, and reject reuse when those inputs differ. Treat tokens as opaque application contracts and version their encoded form.
 
 Define whether paging observes a query snapshot or a live data set. For snapshot paging, include the query store's snapshot identifier or read timestamp in the token. For live paging, concurrent updates can produce repeated or omitted items; define that behavior and make page processing idempotent. Validate each client-supplied token's structure and integrity, and authorize its routing and ordering values before use.
 
@@ -84,6 +84,6 @@ Define whether paging observes a query snapshot or a live data set. For snapshot
 
 ## Examples
 
-- The [Journaled Todo List registry grain](https://github.com/dotnet/orleans/blob/main/samples/JournaledTodoList/JournaledTodoList.WebApp/Grains/TodoListRegistryGrain.cs) maintains a bounded catalog of list identities and display names.
+- The [Journaled Todo List registry grain](https://github.com/dotnet/orleans/blob/main/samples/JournaledTodoList/JournaledTodoList.WebApp/Grains/TodoListRegistryGrain.cs) maintains a single-owner catalog of list identities and display names and returns the complete array. Apply an application-enforced operational bound when adapting this pattern.
 - The [Shopping Cart inventory grains](https://github.com/dotnet/orleans/blob/main/samples/ShoppingCart/Grains/InventoryGrain.cs) partition product membership by category, and the [inventory service](https://github.com/dotnet/orleans/blob/main/samples/ShoppingCart/Silo/Services/InventoryService.cs) merges the known partitions.
 - The [Azure App Service inventory grain](https://github.com/dotnet/orleans/blob/main/samples/Deployment/AzureAppService/Grains/InventoryGrain.cs) returns inventory incrementally using response streaming.
