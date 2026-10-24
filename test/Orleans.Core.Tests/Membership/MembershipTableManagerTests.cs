@@ -605,9 +605,53 @@ namespace NonSilo.Tests.Membership
             await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(125)), cancellationToken);
             await manager.UpdateStatus(SiloStatus.Joining, cancellationToken);
             Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
-            Assert.DoesNotContain(this.localSilo, manager.MembershipTableSnapshot.Entries.Keys);
+            Assert.Equal(SiloStatus.Created, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
 
             await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(126)), cancellationToken);
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+
+            await this.lifecycle.OnStop(cancellationToken);
+        }
+
+        /// <summary>
+        /// A silo which starts against an empty table keeps its initial view. If another silo inserts itself before
+        /// this silo writes its own entry, the next view lacks the local silo. That absence must not be reported to
+        /// local silo status listeners as the local silo becoming <see cref="SiloStatus.Dead"/>.
+        /// </summary>
+        [Fact]
+        public async Task MembershipTableManager_NewCluster_OtherSiloJoinsFirst_DoesNotReportLocalSiloDead()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var membershipTable = new InMemoryMembershipTable();
+            var manager = this.CreateMembershipTableManager(membershipTable);
+            var listenerManager = new SiloStatusListenerManager(
+                manager,
+                this.loggerFactory.CreateLogger<SiloStatusListenerManager>(),
+                this.fatalErrorHandler);
+            var listener = new RecordingSiloStatusListener();
+            Assert.True(listenerManager.Subscribe(listener));
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)listenerManager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart(cancellationToken);
+
+            // The empty table does not supersede the initial view.
+            Assert.Equal((this.localSilo, SiloStatus.Created), await listener.Notifications.ReadAsync(cancellationToken));
+            Assert.Equal(MembershipVersion.MinValue, manager.MembershipTableSnapshot.Version);
+
+            var otherSilo = Silo("127.0.0.1:200@100");
+            Assert.True(await membershipTable.InsertRowAsync(
+                Entry(otherSilo, SiloStatus.Joining, DateTimeOffset.UtcNow),
+                membershipTable.Version.Next(),
+                cancellationToken));
+            await manager.Refresh(cancellationToken: cancellationToken);
+            await listenerManager.TestOnlyWaitForCurrentMembershipVersion(cancellationToken);
+
+            Assert.True(listener.Notifications.TryRead(out var notification));
+            Assert.Equal((otherSilo, SiloStatus.Joining), notification);
+            Assert.False(listener.Notifications.TryRead(out notification), $"Unexpected notification: {notification}");
+            Assert.Equal(new MembershipVersion(1), manager.MembershipTableSnapshot.Version);
+            Assert.Equal(SiloStatus.Created, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
+            Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
             await this.lifecycle.OnStop(cancellationToken);
@@ -1486,7 +1530,7 @@ namespace NonSilo.Tests.Membership
             Assert.True(gossipToken.IsCancellationRequested);
             Assert.False(write.Task.IsCompleted);
             Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
-            Assert.DoesNotContain(this.localSilo, manager.MembershipTableSnapshot.Entries.Keys);
+            Assert.Equal(SiloStatus.Created, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
             cleanup.Cancel();
             write.SetException(new InvalidOperationException("Late terminal status write failure"));
         }
@@ -1915,6 +1959,17 @@ namespace NonSilo.Tests.Membership
                 timerFactory: timerFactory ?? new AsyncTimerFactory(this.loggerFactory),
                 siloLifecycle: lifecycle ?? this.lifecycle,
                 timeProvider: timeProvider ?? TimeProvider.System);
+        }
+
+        private sealed class RecordingSiloStatusListener : ISiloStatusListener
+        {
+            private readonly Channel<(SiloAddress Silo, SiloStatus Status)> notifications =
+                Channel.CreateUnbounded<(SiloAddress Silo, SiloStatus Status)>();
+
+            public ChannelReader<(SiloAddress Silo, SiloStatus Status)> Notifications => this.notifications.Reader;
+
+            public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status) =>
+                this.notifications.Writer.TryWrite((updatedSilo, status));
         }
 
         private sealed class DelegatingMembershipTable(IMembershipTable inner) : IMembershipTable

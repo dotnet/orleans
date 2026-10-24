@@ -568,8 +568,7 @@ namespace Orleans.Runtime.MembershipService
                 return previous;
             }
 
-            if (!previous.Entries.TryGetValue(this.myAddress, out var previousLocalSiloEntry)
-                || previousLocalSiloEntry.Status == SiloStatus.Created)
+            if (!previous.Entries.TryGetValue(this.myAddress, out var previousLocalSiloEntry))
             {
                 return updated;
             }
@@ -580,6 +579,14 @@ namespace Orleans.Runtime.MembershipService
                     previousLocalSiloEntry.Status != SiloStatus.Dead || localSiloEntry.Status == SiloStatus.Dead,
                     "The local silo cannot transition from Dead to another status.");
                 return updated;
+            }
+
+            if (previousLocalSiloEntry.Status == SiloStatus.Created)
+            {
+                // The local silo has not written its entry yet, so its absence from the table says nothing about its
+                // status. Preserve the local Created entry: observers which diff consecutive views report a removed
+                // entry as Dead, and the local silo must not be reported Dead before it has joined.
+                return new MembershipTableSnapshot(updated.Version, updated.Entries.SetItem(this.myAddress, previousLocalSiloEntry));
             }
 
             // The local silo was present in the previous view but is missing now. Preserve its entry so
