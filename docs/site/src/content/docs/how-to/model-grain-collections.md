@@ -68,7 +68,7 @@ Collection membership and member state often occupy different records. Choose th
 | One external database owns member data and indexes | A database transaction commits the data and queryable index together |
 | Grain state is authoritative and a separate read model is updated asynchronously | A durable event or outbox drives an idempotent projector; queries expose the documented projection lag |
 
-For uniqueness, route every candidate value to one deterministic index shard. That shard durably reserves the value for one member key before the operation reports success. Include an operation identifier so retries reach the same outcome.
+For uniqueness, route every candidate value to one deterministic index shard that reserves it for one member key. When member creation or updates accompany a reservation, use Orleans transactional state for both the index and member, and commit both changes in one transaction before reporting success. Record the operation identifier and result in that transaction so retries can return the committed outcome. An abort discards both changes. Handle timeouts and in-doubt outcomes using the [transaction recovery guidance](../grains/transactions.md#commit-and-abort-semantics).
 
 For asynchronous indexes, retain enough information to replay updates and reconcile the index against its authority. Metrics should report projection lag, failed updates, and reconciliation differences.
 
@@ -78,7 +78,7 @@ Use a database or search service as the query authority when the workload needs 
 
 Use continuation tokens for resumable paging. A token can carry the routing version, shard or partition, last ordering value, and last grain key. Bind each token to the query's filters, ordering, data set, tenant, and authorization scope, and reject reuse when those inputs differ. Treat tokens as opaque application contracts and version their encoded form.
 
-Define whether paging observes a query snapshot or a live data set. For snapshot paging, include the query store's snapshot identifier or read timestamp in the token. For live paging, concurrent updates can produce repeated or omitted items; define that behavior and make page processing idempotent. Validate each client-supplied token's structure and integrity, and authorize its routing and ordering values before use.
+Define whether paging observes a query snapshot or a live data set. For snapshot paging, use a query store that can reproduce the same snapshot for the token's entire validity period, using retained snapshots, supported as-of reads, or materialized results. Include the store's snapshot identifier or supported read timestamp and an expiry within its retention window in the token. Require a new query when the token expires or the snapshot becomes unavailable. For live paging, concurrent updates can produce repeated or omitted items; define that behavior and make page processing idempotent. Validate each client-supplied token's structure and integrity, and authorize its routing and ordering values before use.
 
 [Response streaming](../grains/response-streaming.md) progressively delivers one live query result with pull-based flow control. A page with a continuation token provides an explicit resume boundary which a caller can persist before cancellation, timeout, grain deactivation, or process failure.
 
