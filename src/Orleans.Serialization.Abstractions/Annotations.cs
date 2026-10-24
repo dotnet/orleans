@@ -302,6 +302,11 @@ namespace Orleans
     /// Identifiers 0 through 6 are encoded without additional bytes.
     /// </para>
     /// <para>
+    /// Adding case identifiers changes writers to the tagged-union format. Adopt them on an existing hierarchy using a coordinated deployment
+    /// of the updated hierarchy to all processes which exchange these values. Readers generated for the updated hierarchy accept both
+    /// the runtime-type format and the tagged-union format.
+    /// </para>
+    /// <para>
     /// A closed type and a union type have the same serialized representation when the union's cases are the closed type's direct subtypes with the same
     /// case identifiers (see <see cref="CaseIdsAttribute"/>). A <see langword="null"/> closed-type value is represented as an empty union value.
     /// A closed type hierarchy can therefore be replaced by an equivalent union type without changing serialized data.
