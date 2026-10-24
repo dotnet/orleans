@@ -367,7 +367,7 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
     [Fact]
     public void RequiredPrivateArgumentAliasesProduceClearGeneratorErrors()
     {
-        var (_, result) = Generate("""
+        var (compilation, result) = Generate("""
             public interface ITag<T> { }
             [Orleans.GenerateSerializer]
             public sealed class Payload : ITag<Payload.Hidden>
@@ -379,9 +379,95 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
             [Orleans.GenerateSerializerContext<Payload>]
             public partial class DemoContext : Orleans.Serialization.SerializerContext { }
             """);
+        Assert.DoesNotContain(compilation.GetDiagnostics(TestContext.Current.CancellationToken),
+            static diagnostic => diagnostic.Id == "CS0122");
         var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0115");
         Assert.Contains("inaccessible", diagnostic.GetMessage(), StringComparison.Ordinal);
         Assert.Contains("Hidden", diagnostic.GetMessage(), StringComparison.Ordinal);
+        var aliasDiagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        Assert.Equal(DiagnosticSeverity.Error, aliasDiagnostic.Severity);
+        Assert.Contains("Hidden", aliasDiagnostic.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("public sealed class Outer { [Orleans.CompoundTypeAlias(\"hidden-alias\")] private sealed class Hidden { } }", "Outer.Hidden")]
+    [InlineData("public class Outer { [Orleans.CompoundTypeAlias(\"hidden-alias\")] protected sealed class Hidden { } }", "Outer.Hidden")]
+    [InlineData("public sealed class Outer { private sealed class Wrapper { [Orleans.CompoundTypeAlias(\"hidden-alias\")] public sealed class Hidden { } } }", "Outer.Wrapper.Hidden")]
+    [InlineData("public sealed class Outer { private sealed class Key { } [Orleans.CompoundTypeAlias(\"hidden-alias\", typeof(Key))] public sealed class Target { } }", "Outer.Key")]
+    [InlineData("[Orleans.CompoundTypeAlias(\"hidden-alias\")] file sealed class Hidden { }", "Hidden")]
+    [InlineData("file sealed class Outer { [Orleans.CompoundTypeAlias(\"hidden-alias\")] public sealed class Hidden { } }", "Outer.Hidden")]
+    [InlineData("file sealed class Key { } [Orleans.CompoundTypeAlias(\"hidden-alias\", typeof(Key))] public sealed class Target { }", "Key")]
+    [InlineData("file sealed class Key { } [Orleans.CompoundTypeAlias(\"hidden-alias\", typeof(Key[]))] public sealed class Target { }", "Key[]")]
+    [InlineData("file sealed class Key { } [Orleans.CompoundTypeAlias(\"hidden-alias\", typeof(System.Collections.Generic.List<Key>))] public sealed class Target { }", "Key")]
+    public void InaccessibleCompoundAliasesAreDiagnosedAndOmittedFromMetadata(string source, string inaccessibleType)
+    {
+        var (compilation, result) = Generate(source);
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.DoesNotContain(
+            result.Results.SelectMany(static result => result.GeneratedSources),
+            static source => source.SourceText.ToString().Contains("hidden-alias", StringComparison.Ordinal));
+        var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains(inaccessibleType, diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.NotNull(diagnostic.Location.SourceTree);
+        Assert.StartsWith("Orleans.CompoundTypeAlias(", diagnostic.Location.SourceTree.GetText(TestContext.Current.CancellationToken)
+            .ToString(diagnostic.Location.SourceSpan), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReferencedInaccessibleCompoundAliasesProduceConsumerDiagnostics()
+    {
+        var library = CreateCompilation("""
+            namespace Producer;
+            public sealed class Marker
+            {
+                [Orleans.CompoundTypeAlias("hidden-alias")]
+                private sealed class Hidden { }
+            }
+            """).WithAssemblyName("Producer");
+        var consumer = CreateCompilation("""
+            [assembly: Orleans.GenerateCodeForDeclaringAssembly(typeof(Producer.Marker))]
+            """).AddReferences(library.ToMetadataReference());
+        var (compilation, result) = Generate(consumer);
+
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("ORLEANS0116", diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("Producer.Marker.Hidden", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Equal(LocationKind.ExternalFile, diagnostic.Location.Kind);
+        Assert.DoesNotContain(
+            result.Results.SelectMany(static result => result.GeneratedSources),
+            static source => source.SourceText.ToString().Contains("hidden-alias", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AccessibleCompoundAliasTargetsRemainRegisteredInMetadata()
+    {
+        var (compilation, result) = Generate("""
+            [Orleans.CompoundTypeAlias("public-alias")]
+            public sealed class PublicTarget { }
+            [Orleans.CompoundTypeAlias("internal-alias")]
+            internal sealed class InternalTarget { }
+            [Orleans.CompoundTypeAlias("generic-alias", typeof(InternalTarget[]), typeof(System.Collections.Generic.List<InternalTarget>))]
+            public sealed class GenericTarget<T> { }
+            public sealed class Outer
+            {
+                [Orleans.CompoundTypeAlias("nested-internal-alias")]
+                internal sealed class Nested { }
+            }
+            """);
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var generated = string.Concat(result.Results.SelectMany(static result => result.GeneratedSources)
+            .Select(static source => source.SourceText.ToString()));
+        foreach (var alias in new[] { "public-alias", "internal-alias", "generic-alias", "nested-internal-alias" })
+        {
+            Assert.Contains($"\"{alias}\"", generated, StringComparison.Ordinal);
+        }
     }
 
     [Theory]
