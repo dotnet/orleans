@@ -6,3 +6,5 @@ Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
 ORLEANS0026 | Usage | Error | Invalid invokable base type mapping
 ORLEANS0014 | Usage | Warning | ConfigureAwaitAnalyzer, Grain code should not use ConfigureAwait(false) or ConfigureAwait without ContinueOnCapturedContext
+ORLEANS0028 | Usage | Warning | GrainContractSerializationAnalyzer, Grain contract data types must have serialization support
+ORLEANS0029 | Usage | Warning | GrainContractSerializationAnalyzer, Grain state data types must have serialization support
