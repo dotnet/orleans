@@ -1,4 +1,6 @@
 {
   "description": "Generated API assemblies which are not currently published as standalone NuGet packages.",
-  "packages": {}
+  "packages": {
+    "Microsoft.Orleans.Journaling.Garnet": "Experimental spike of journal storage on embedded Garnet partitions; not published."
+  }
 }
