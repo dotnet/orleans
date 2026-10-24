@@ -66,6 +66,33 @@ public sealed class TaggedUnionDiagnosticTests
     }
 
     [Theory]
+    [InlineData("Constraints<T>.INested", "Constraints<X>.INested")]
+    [InlineData("Constraints<T>.INested<int>", "Constraints<X>.INested<int>")]
+    [InlineData("Constraints<int>.INested<T>", "Constraints<int>.INested<X>")]
+    [InlineData("Constraints<int>.INested<string>", "Constraints<int>.INested<string>")]
+    [InlineData("Constraints<T>.Middle.INested<T>", "Constraints<X>.Middle.INested<X>")]
+    public void MatchingNestedGenericConstraintsGenerateCompilableCodec(string baseConstraint, string caseConstraint)
+    {
+        var (output, result) = Generate($$"""
+            public class Constraints<T>
+            {
+                public interface INested { }
+                public interface INested<U> { }
+                public class Middle
+                {
+                    public interface INested<U> { }
+                }
+            }
+            [GenerateSerializer] public closed record Base<T> where T : {{baseConstraint}};
+            [GenerateSerializer, Case(0)] public sealed record Item<X>([property: Id(0)] X Value) : Base<X> where X : {{caseConstraint}};
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        AssertGeneratesTaggedUnionCodec(result);
+        AssertNoErrors(output);
+    }
+
+    [Theory]
     [InlineData(
         """
         [GenerateSerializer] public closed record Base;
@@ -113,6 +140,14 @@ public sealed class TaggedUnionDiagnosticTests
         [GenerateSerializer, Case(0)] public sealed record RefShape<T>([property: Id(0)] T Item) : Shape<T> where T : class;
         """,
         "Case 'RefShape<T>' has type parameter constraints which closed type 'Shape<T>' does not declare")]
+    [InlineData(
+        """
+        public class Constraints<T> { public interface INested { } }
+        [GenerateSerializer] public closed record Base<T> where T : Constraints<int>.INested;
+        [GenerateSerializer, Case(0)] public sealed record Item<T>([property: Id(0)] T Value) : Base<T>
+            where T : Constraints<int>.INested, Constraints<string>.INested;
+        """,
+        "Case 'Item<T>' has type parameter constraints which closed type 'Base<T>' does not declare")]
     [InlineData(
         """
         public static class Outer

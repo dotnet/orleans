@@ -195,10 +195,20 @@ internal static class UnionCaseResolver
     {
         ITypeParameterSymbol parameter when SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, subtype) => subtypeArguments[parameter.Ordinal],
         IArrayTypeSymbol array => compilation.CreateArrayTypeSymbol(Substitute(array.ElementType, subtype, subtypeArguments, compilation), array.Rank),
-        INamedTypeSymbol { IsGenericType: true } named => named.OriginalDefinition.Construct(
-            [.. named.TypeArguments.Select(argument => Substitute(argument, subtype, subtypeArguments, compilation))]),
+        INamedTypeSymbol { IsGenericType: true } named => SubstituteNamedType(named, subtype, subtypeArguments, compilation),
         _ => type,
     };
+
+    private static INamedTypeSymbol SubstituteNamedType(INamedTypeSymbol type, INamedTypeSymbol subtype, ITypeSymbol[] subtypeArguments, Compilation compilation)
+    {
+        // A nested type's own type arguments exclude its containing type's arguments, so substitute the containing type before constructing the nested type.
+        var definition = type.ContainingType is { } containing
+            ? ((INamedTypeSymbol)Substitute(containing, subtype, subtypeArguments, compilation)).GetTypeMembers(type.Name, type.Arity).Single()
+            : type.OriginalDefinition;
+        return type.Arity == 0
+            ? definition
+            : definition.Construct([.. type.TypeArguments.Select(argument => Substitute(argument, subtype, subtypeArguments, compilation))]);
+    }
 
     private static void EnsureUniqueIds(INamedTypeSymbol unionType, ISymbol? location, List<UnionCaseDescription> cases)
     {
