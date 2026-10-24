@@ -51,6 +51,7 @@ describe('native API Markdown companions', () => {
   });
 
   test('omits NuGet links only for explicitly unpublished API assemblies', () => {
+    expect(nugetHref('Microsoft.Orleans.DurableTasks.Testing')).toBeUndefined();
     const unpublishedPackage = 'Microsoft.Orleans.UnpublishedFixture';
 
     expect(
