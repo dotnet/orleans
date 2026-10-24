@@ -22,6 +22,8 @@ internal sealed class SerializationSupport
         var registerSerializer = compilation.GetTypeByMetadataName("Orleans.RegisterSerializerAttribute");
         var registerConverter = compilation.GetTypeByMetadataName("Orleans.RegisterConverterAttribute");
         var fieldCodec = compilation.GetTypeByMetadataName("Orleans.Serialization.Codecs.IFieldCodec`1");
+        var baseCodec = compilation.GetTypeByMetadataName("Orleans.Serialization.Serializers.IBaseCodec`1");
+        var valueSerializer = compilation.GetTypeByMetadataName("Orleans.Serialization.Serializers.IValueSerializer`1");
         var converter = compilation.GetTypeByMetadataName("Orleans.IConverter`2");
         foreach (var assembly in compilation.SourceModule.ReferencedAssemblySymbols.Prepend(compilation.Assembly))
         {
@@ -39,13 +41,17 @@ internal sealed class SerializationSupport
                 cancellationToken.ThrowIfCancellationRequested();
                 var current = pending.Pop();
                 foreach (var member in current.GetMembers().OfType<INamespaceOrTypeSymbol>()) pending.Push(member);
-                if (current is not INamedTypeSymbol type || type.IsAbstract) continue;
+                if (current is not INamedTypeSymbol type || type.IsAbstract
+                    || type.DeclaredAccessibility is not (Accessibility.Public or Accessibility.Internal)) continue;
                 var serializer = HasAttribute(type, registerSerializer);
                 var surrogateConverter = HasAttribute(type, registerConverter);
                 if (!serializer && !surrogateConverter) continue;
                 foreach (var implemented in type.AllInterfaces)
                 {
-                    var isCodec = serializer && SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, fieldCodec);
+                    // CodecProvider wraps base codecs and value serializers in field codecs.
+                    var isCodec = serializer && (SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, fieldCodec)
+                        || SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, baseCodec)
+                        || SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, valueSerializer));
                     var isConverter = surrogateConverter && SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, converter);
                     if ((isCodec || isConverter) && implemented.TypeArguments[0] is INamedTypeSymbol target)
                     {

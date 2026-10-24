@@ -354,6 +354,101 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
         public interface IContract : IGrain { Task Send(Request<int> request); }
         """);
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task RegisteredBaseCodecAndValueSerializer_AreAcceptedInSourceAndMetadata(bool valueType, bool referenced)
+    {
+        var model = GetSerializerSource(valueType, registered: true);
+        const string contract = """
+            public interface IContract : Orleans.IGrain
+            {
+                System.Threading.Tasks.Task<Request<int>> Echo(Request<int> request);
+            }
+            public class Implementation : Orleans.Grain<Request<int>> { }
+            """;
+        var diagnostics = referenced
+            ? await AnalyzeWithReference(contract, await CompileReference(model))
+            : (await GetDiagnosticsFullSourceAsync(model + contract)).ToImmutableArray();
+        Assert.Empty(diagnostics);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UnregisteredBaseCodecAndValueSerializer_DoNotDeclareSupport(bool valueType)
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync(GetSerializerSource(valueType, registered: false) + """
+            public interface IContract : IGrain { Task Send(Request<int> request); }
+            """);
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(GrainContractSerializationAnalyzer.ContractRuleId, diagnostic.Id);
+        Assert.Contains("'Request<int>'", diagnostic.GetMessage());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ClosedBaseCodecAndValueSerializer_DoNotExemptOtherConstructions(bool valueType)
+    {
+        var model = GetSerializerSource(valueType, registered: true)
+            .Replace("class RequestSerializer<T>", "class RequestSerializer")
+            .Replace("<Request<T>>", "<Request<int>>")
+            .Replace("Request<T> value", "Request<int> value");
+        var (diagnostics, _) = await GetDiagnosticsAsync(model + """
+            public interface IContract : IGrain { Task Send(Request<string> request); }
+            """);
+        Assert.Contains("'Request<string>'", Assert.Single(diagnostics).GetMessage());
+    }
+
+    [Theory]
+    [InlineData("public", true)]
+    [InlineData("internal", true)]
+    [InlineData("private", false)]
+    [InlineData("protected", false)]
+    [InlineData("protected internal", false)]
+    [InlineData("private protected", false)]
+    public async Task NestedRegistrations_UseManifestAccessibility(string accessibility, bool supported)
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync(CodecSource + $$"""
+            public class Request { }
+            public class Container
+            {
+                [RegisterSerializer] {{accessibility}} class RequestCodec : Codec<Request> { }
+            }
+            public interface IContract : IGrain { Task Send(Request request); }
+            """);
+        if (supported)
+        {
+            Assert.Empty(diagnostics);
+        }
+        else
+        {
+            Assert.Contains("'Request'", Assert.Single(diagnostics).GetMessage());
+        }
+    }
+
+    [Fact]
+    public async Task PrivateConverter_DoesNotDeclareSupport()
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync("""
+            public class Request { }
+            [GenerateSerializer] public struct Surrogate { }
+            public class Container
+            {
+                [RegisterConverter] private class Converter : IConverter<Request, Surrogate>
+                {
+                    public Request ConvertFromSurrogate(in Surrogate value) => new Request();
+                    public Surrogate ConvertToSurrogate(in Request value) => default;
+                }
+            }
+            public interface IContract : IGrain { Task Send(Request request); }
+            """);
+        Assert.Contains("'Request'", Assert.Single(diagnostics).GetMessage());
+    }
+
     [Fact]
     public async Task ClosedCodec_DoesNotExemptOtherConstructions()
     {
@@ -895,6 +990,20 @@ public class GrainContractSerializationAnalyzerTests : DiagnosticAnalyzerTestBas
             public void WriteField<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer,
                 uint fieldIdDelta, System.Type expectedType, T value) where TBufferWriter : System.Buffers.IBufferWriter<byte>
                 => throw new System.NotImplementedException();
+        }
+
+        """;
+
+    private static string GetSerializerSource(bool valueType, bool registered) => $$"""
+        public {{(valueType ? "struct" : "class")}} Request<T> { }
+        {{(registered ? "[Orleans.RegisterSerializer]" : "")}}
+        public class RequestSerializer<T> : Orleans.Serialization.Serializers.{{(valueType ? "IValueSerializer" : "IBaseCodec")}}<Request<T>>
+        {
+            public void Serialize<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer,
+                {{(valueType ? "scoped ref " : "")}}Request<T> value) where TBufferWriter : System.Buffers.IBufferWriter<byte>
+                => throw new System.NotImplementedException();
+            public void Deserialize<TInput>(ref Orleans.Serialization.Buffers.Reader<TInput> reader,
+                {{(valueType ? "scoped ref " : "")}}Request<T> value) => throw new System.NotImplementedException();
         }
 
         """;

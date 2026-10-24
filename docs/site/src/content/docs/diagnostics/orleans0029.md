@@ -21,7 +21,7 @@ For applications whose grain storage uses Orleans serialization or whose state p
 dotnet_diagnostic.ORLEANS0029.severity = warning
 ```
 
-Enable this rule independently of the [RPC contract check](orleans0028.md). Storage providers can use JSON or another serializer, so Orleans serializer annotations are not a universal storage requirement. Live activation migration transfers the in-memory state of `Grain<TState>` and `IPersistentState<TState>` through Orleans serialization, independently of the storage format. That path requires an Orleans serializer even when storage uses JSON. See [Activation lifecycle and migration](../grains/grain-lifecycle.md#grain-migration).
+Enable this rule independently of the [RPC contract check](orleans0028.md). Storage providers select their own serializer, including JSON. Live activation migration transfers the in-memory state of <xref:Orleans.Grain`1> and <xref:Orleans.Runtime.IPersistentState`1> through Orleans serialization, independently of the storage format. That path requires an Orleans serializer even when storage uses JSON. See [Activation lifecycle and migration](../grains/grain-lifecycle.md#grain-migration).
 
 ## Cause
 
@@ -41,4 +41,4 @@ The traversal and [static-analysis limits](orleans0028.md#static-analysis-bounda
 
 ## Suppress the diagnostic
 
-Leave this diagnostic disabled when neither storage nor live activation migration uses Orleans serialization for the state. Verify storage round trips and, when enabled, migration before suppressing individual reports. The attribute itself is one way to provide serialization support; a registered codec or surrogate converter is also valid.
+Enable this diagnostic for state which uses Orleans serialization through storage or live activation migration. Verify storage round trips and, when enabled, migration before suppressing individual reports.
