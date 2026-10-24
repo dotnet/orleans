@@ -1466,10 +1466,12 @@ public sealed class RetirementHandoffTests
 
         static CallbackData GetCallback(InsideRuntimeClient runtimeClient, GrainId sendingGrain, CorrelationId id)
         {
-            var callbacks = (ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>)typeof(InsideRuntimeClient)
+            var callbacks = (CallbackRegistry)typeof(InsideRuntimeClient)
                 .GetField("callbacks", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
                 .GetValue(runtimeClient)!;
-            return callbacks[(sendingGrain, id)];
+            Assert.True(callbacks.TryGetCallback(id, out var callback));
+            Assert.Equal(sendingGrain, callback.Message.SendingGrain);
+            return callback;
         }
     }
 
@@ -2685,10 +2687,12 @@ public sealed class RetirementHandoffTests
 
     private static CallbackData FindPendingCallback(InProcessSiloHandle silo, GrainId target, string? methodName = null)
     {
-        var callbacks = (ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>)typeof(InsideRuntimeClient)
+        var callbacks = (CallbackRegistry)typeof(InsideRuntimeClient)
             .GetField("callbacks", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
             .GetValue(silo.ServiceProvider.GetRequiredService<InsideRuntimeClient>())!;
-        return Assert.Single(callbacks.Values, callback => callback.Message.TargetGrain == target
+        var pending = new List<CallbackData>();
+        callbacks.ForEach(pending, static (callback, pending) => pending.Add(callback));
+        return Assert.Single(pending, callback => callback.Message.TargetGrain == target
             && (methodName is null || callback.Message.BodyObject is Orleans.Serialization.Invocation.IInvokable request && request.GetMethodName() == methodName));
     }
 
