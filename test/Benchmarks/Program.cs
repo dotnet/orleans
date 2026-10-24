@@ -7,6 +7,7 @@ using Benchmarks.Ping;
 using Benchmarks.Placement;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
+using Benchmarks.Messaging;
 
 namespace Benchmarks;
 
@@ -354,8 +355,27 @@ internal class Program
         {
             _ = BenchmarkSwitcher.FromTypes([
                 typeof(DurableListJournalBenchmarks),
-                typeof(DurableCommandReaderBenchmarks)
+                typeof(DurableCommandReaderBenchmarks),
+                typeof(JournaledStateContextBenchmarks),
+                typeof(AccessRecordingBenchmarks),
+                typeof(JournalTransactionBenchmarks)
             ]).Run(args);
+        },
+        ["Journaling.AccessBytes"] = _ =>
+        {
+            AccessRecordingBytes.Run();
+        },
+        ["Journaling.TransactionBytes"] = _ =>
+        {
+            JournalTransactionBenchmarks.ReportBytes();
+        },
+        ["Journaling.TransactionCost"] = args =>
+        {
+            JournalTransactionCost.Run(args);
+        },
+        ["Journaling.PositionResolution"] = args =>
+        {
+            PositionResolutionCost.Run(args);
         },
         ["Journaling.Azure"] = args =>
         {
@@ -364,6 +384,14 @@ internal class Program
         ["Journaling.Azure.Bdn"] = args =>
         {
             var summaries = BenchmarkSwitcher.FromTypes([typeof(AzureJournalBenchmarks)]).Run(args).ToArray();
+            if (summaries.Length == 0 || summaries.Any(summary => summary.HasCriticalValidationErrors || summary.Reports.Any(report => !report.Success)))
+            {
+                Environment.ExitCode = 1;
+            }
+        },
+        ["Messaging.Sequential"] = args =>
+        {
+            var summaries = BenchmarkSwitcher.FromTypes([typeof(SequentialMessagingBenchmark)]).Run(args).ToArray();
             if (summaries.Length == 0 || summaries.Any(summary => summary.HasCriticalValidationErrors || summary.Reports.Any(report => !report.Success)))
             {
                 Environment.ExitCode = 1;
@@ -378,6 +406,11 @@ internal class Program
     // requires benchmark name or 'All' word as first parameter
     public static void Main(string[] args)
     {
+        if (args is ["--ignore-exit-code", "8", var command, ..]
+            && (_benchmarks.ContainsKey(command) || command.Equals("all", StringComparison.OrdinalIgnoreCase)))
+        {
+            args = args[2..];
+        }
         if (args.Length == 0 || (!args[0].Equals("all", StringComparison.OrdinalIgnoreCase) && !_benchmarks.ContainsKey(args[0])))
         {
             Environment.ExitCode = (args.Any(arg => arg is "-automated" or "@@")
