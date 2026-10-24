@@ -51,7 +51,7 @@ Partitioned registry grains distribute collection state and request load. Select
 - **Hash partitioning** spreads point lookups and unordered membership evenly.
 - **Range partitioning** supports ordered traversal and range queries.
 
-Each membership entry has one owning shard. Keep the shard count and hash algorithm stable, or include a routing version in the shard identity. A resharding workflow can write new-version entries, switch readers, and then retire old-version entries after reconciliation.
+Each membership entry has one owning shard. Keep the shard count and hash algorithm stable, or include a routing version in the shard identity. For resharding, use one application migration owner and an authoritative active routing version at an application write-admission boundary covering all shards. Pause write admission and drain accepted operations, then copy and reconcile the stable source into new-version shards. While writes remain paused, durably publish the new active version for readers and writers. Resume writes through that boundary using the new version, rejecting requests for older versions. Retire old-version shards once all readers and continuation tokens using them have completed or expired.
 
 For a query spanning known shards, use a coordinator service or grain to issue calls with bounded concurrency and merge the results. Apply limits for shard fan-out, returned items, elapsed time, and per-call concurrency so every query has a bounded execution budget.
 
