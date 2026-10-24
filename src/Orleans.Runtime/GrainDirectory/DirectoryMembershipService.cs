@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
+using Orleans.Runtime.ClusterServices;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Utilities;
 
@@ -19,9 +20,10 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     private readonly CancellationTokenSource _shutdownCts = new();
     private readonly Task _runTask;
     private readonly AsyncEnumerable<DirectoryMembershipSnapshot> _viewUpdates;
-    private readonly int _partitionsPerSilo;
-    private readonly Func<SiloAddress, int, ImmutableArray<uint>> _getRingBoundaries;
+    private readonly MembershipBasedClusterServiceViewProvider _membership;
+    private readonly bool _ownsViewProvider;
     private DirectoryMembershipSnapshot _currentView = DirectoryMembershipSnapshot.Default;
+    private Task? _disposeTask;
 
     public DirectoryMembershipSnapshot CurrentView
     {
@@ -32,46 +34,71 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
                 _runTask.GetAwaiter().GetResult();
             }
 
-            return _currentView;
+            return Volatile.Read(ref _currentView);
         }
     }
 
-    public int PartitionsPerSilo => _partitionsPerSilo;
+    public int PartitionsPerSilo => _membership.CurrentView.Topology.PartitionCount;
 
-    public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => GetViewUpdates();
+    public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => ReadUpdates();
 
-    public IClusterMembershipService ClusterMembershipService { get; }
-
-    public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version, CancellationToken cancellationToken)
-    {
-        if (CurrentView.Version < version || version == default)
-        {
-            await ClusterMembershipService.Refresh(version, cancellationToken);
-        }
-
-        if (CurrentView.Version < version)
-        {
-            await foreach (var view in ViewUpdates.WithCancellation(cancellationToken))
-            {
-                if (view.Version >= version)
-                {
-                    break;
-                }
-            }
-        }
-
-        return CurrentView;
-    }
-
-    private async IAsyncEnumerable<DirectoryMembershipSnapshot> GetViewUpdates([EnumeratorCancellation] CancellationToken cancellationToken = default)
+    private async IAsyncEnumerable<DirectoryMembershipSnapshot> ReadUpdates(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await foreach (var view in _viewUpdates.WithCancellation(cancellationToken))
         {
             yield return view;
         }
 
-        // Propagate the processor's failure to current and future subscribers.
         await _runTask;
+    }
+
+    public IClusterMembershipService ClusterMembershipService => _membership.ClusterMembershipService;
+
+    public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_shutdownCts.IsCancellationRequested)
+        {
+            await _runTask;
+            _shutdownCts.Token.ThrowIfCancellationRequested();
+        }
+
+        if (version != default && CurrentView.Version >= version)
+        {
+            return CurrentView;
+        }
+
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdownCts.Token);
+        try
+        {
+            var refreshed = version == default
+                ? await _membership.RefreshAsync(linkedCts.Token)
+                : await _membership.RefreshAtLeastAsync(DirectoryMembershipSnapshot.GetViewId(version), linkedCts.Token);
+            var requiredVersion = refreshed.ClusterMembershipSnapshot.Version;
+            if (CurrentView.Version < requiredVersion)
+            {
+                await foreach (var view in _viewUpdates.WithCancellation(linkedCts.Token))
+                {
+                    if (view.Version >= requiredVersion)
+                    {
+                        return view;
+                    }
+                }
+
+                throw new OperationCanceledException(
+                    "Directory membership updates completed before the requested view was published.",
+                    linkedCts.Token);
+            }
+
+            linkedCts.Token.ThrowIfCancellationRequested();
+            return CurrentView;
+        }
+        catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+        {
+            await _runTask;
+            throw;
+        }
     }
 
     public DirectoryMembershipService(
@@ -80,16 +107,44 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         ILogger<DirectoryMembershipService> logger,
         int partitionsPerSilo,
         Func<SiloAddress, int, ImmutableArray<uint>> getRingBoundaries)
+        : this(
+            new MembershipBasedClusterServiceViewProvider(
+                clusterMembershipService,
+                DirectoryMembershipSnapshot.CreateConfiguration(partitionsPerSilo),
+                getRingBoundaries,
+                logger,
+                ClusterMembershipSnapshot.Default),
+            grainFactory,
+            logger,
+            ownsViewProvider: true)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(partitionsPerSilo, 1);
-        ArgumentNullException.ThrowIfNull(getRingBoundaries);
-        _partitionsPerSilo = partitionsPerSilo;
-        _getRingBoundaries = getRingBoundaries;
+    }
+
+    public DirectoryMembershipService(
+        IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView> viewProvider,
+        IInternalGrainFactory grainFactory,
+        ILogger<DirectoryMembershipService> logger)
+        : this(viewProvider, grainFactory, logger, ownsViewProvider: false)
+    {
+    }
+
+    private DirectoryMembershipService(
+        IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView> viewProvider,
+        IInternalGrainFactory grainFactory,
+        ILogger<DirectoryMembershipService> logger,
+        bool ownsViewProvider)
+    {
+        ArgumentNullException.ThrowIfNull(viewProvider);
+        _membership = viewProvider as MembershipBasedClusterServiceViewProvider
+            ?? throw new ArgumentException(
+                "The distributed directory requires a membership-derived view provider for its membership-version wire contract.",
+                nameof(viewProvider));
+        _ownsViewProvider = ownsViewProvider;
+        _currentView = new(_membership.CurrentView, grainFactory);
         _viewUpdates = new(
-            DirectoryMembershipSnapshot.Default,
-            (previous, proposed) => proposed.Version >= previous.Version,
-            update => _currentView = update);
-        ClusterMembershipService = clusterMembershipService;
+            _currentView,
+            (previous, proposed) => proposed.Version > previous.Version,
+            update => Volatile.Write(ref _currentView, update));
         _grainFactory = grainFactory;
         _logger = logger;
         using var _ = new ExecutionContextSuppressor();
@@ -100,55 +155,49 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     {
         try
         {
-            while (!_shutdownCts.IsCancellationRequested)
+            await foreach (var update in _membership.ViewUpdates.WithCancellation(_shutdownCts.Token))
             {
+                DirectoryMembershipSnapshot view;
                 try
                 {
-                    await foreach (var update in ClusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
-                    {
-                        DirectoryMembershipSnapshot view;
-                        try
-                        {
-                            view = new DirectoryMembershipSnapshot(update, _grainFactory, _partitionsPerSilo, _getRingBoundaries);
-                        }
-                        catch (Exception exception)
-                        {
-                            throw new OrleansConfigurationException(
-                                $"Failed to construct grain directory membership version '{update.Version}'.",
-                                exception);
-                        }
-
-                        _viewUpdates.Publish(view);
-                    }
+                    view = new(update, _grainFactory);
                 }
-                catch (Exception exception) when (exception is not OrleansConfigurationException)
+                catch (Exception exception)
                 {
-                    if (!_shutdownCts.IsCancellationRequested)
-                    {
-                        LogErrorProcessingMembershipUpdates(exception);
-                    }
+                    LogErrorProcessingMembershipUpdates(exception);
+                    throw;
                 }
+
+                _viewUpdates.TryPublish(view);
             }
         }
-        catch (OrleansConfigurationException exception)
+        catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
         {
-            if (!_shutdownCts.IsCancellationRequested)
-            {
-                LogErrorProcessingMembershipUpdates(exception);
-            }
-
-            throw;
         }
         finally
         {
+            _shutdownCts.Cancel();
             _viewUpdates.Dispose();
         }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
+    {
+        lock (_shutdownCts)
+        {
+            return new(_disposeTask ??= DisposeCoreAsync());
+        }
+    }
+
+    private async Task DisposeCoreAsync()
     {
         _shutdownCts.Cancel();
         await _runTask.SuppressThrowing();
+        if (_ownsViewProvider)
+        {
+            await _membership.DisposeAsync();
+        }
+        _shutdownCts.Dispose();
     }
 
     [LoggerMessage(

@@ -21,6 +21,7 @@ These rules apply recursively to documentation, snippets, and samples under
 
 ## Links
 
+- Refer to external papers and articles by their titles or recognizable short names, rather than author names. Link every mention, including repeated references after the first citation.
 - Orleans documentation links should be relative so they work under `https://dotnet.github.io/orleans`.
 - Use fully qualified, locale-neutral canonical external links, such as `https://learn.microsoft.com/azure/...`.
 - Don't carry migrated repository `.md` suffixes into published links.
@@ -62,6 +63,9 @@ Place updates in the appropriate category and cross-link rather than mix purpose
 ## Content
 
 - Keep ordinary conceptual and how-to documentation timeless. Name Orleans releases only in migration or upgrade guidance where the release boundary matters.
+- Use direct, conversational technical prose and assume an engaged reader. Name models and mechanisms plainly, keep the article's central idea in focus, and give supporting implementation choices proportionate space. Tie qualifications to concrete assumptions or behavior.
+- Prefer good pedagogy over minimum word count. Keep motivation, worked examples, and useful reinforcement when they help readers build the mental model; trim repetition that adds no explanatory value.
+- Architecture and implementation-detail pages should cite primary papers and other authoritative technical sources for the underlying protocols. Explain which mechanisms Orleans adopts and the assumptions supplied by each runtime layer, and preserve useful research links from source comments.
 - Describe implemented behavior and verified constraints: relevant triggers,
   runtime actions, outcomes, and operator responses. Attribute responsibilities to
   the mechanism that performs them.
