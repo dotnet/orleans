@@ -368,6 +368,11 @@ internal sealed class LibraryTypes
                 return _shallowCopyableTypes[type] = true;
             }
 
+            if (!type.HasAttribute(GenerateSerializerAttribute))
+            {
+                return _shallowCopyableTypes[type] = false;
+            }
+
             visiting ??= new(SymbolEqualityComparer.Default);
             if (!visiting.Add(unionType.OriginalDefinition))
             {
