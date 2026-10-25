@@ -421,19 +421,51 @@ public class TaggedUnionSerializationTests : IDisposable
         Assert.Equal(43, result.Value);
     }
 
+    public static TheoryData<IntOrString> ShallowUnionCases() => [(IntOrString)42, (IntOrString)"text", default(IntOrString)];
+
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ImmutableUnionInContainerRunsCopyCallbacks(bool empty)
+    [MemberData(nameof(ShallowUnionCases))]
+    public void UnionCopyClassificationComposesThroughContainers(IntOrString shallow)
     {
-        CallbackNumber value = empty ? default(CallbackNumber) : 42;
-        var holder = new CallbackNumberHolder { Direct = value, Box = new CallbackNumberBox { Value = value } };
+        var empty = shallow.Value is null;
+        Pet deep = empty ? default(Pet) : new Cat("copy");
+        CallbackNumber callback = empty ? default(CallbackNumber) : 42;
+        ImmutablePet immutable = empty ? default(ImmutablePet) : new OpaqueCase("shared");
+        var holder = new UnionCopyHolder
+        {
+            Shallow = shallow,
+            Deep = deep,
+            Callback = callback,
+            Immutable = immutable,
+            Box = new UnionCopyBox { Shallow = shallow, Deep = deep, Callback = callback, Immutable = immutable },
+        };
 
         var result = Copy(holder);
 
         Assert.NotSame(holder, result);
-        Assert.Equal(43, result.Direct.Value);
-        Assert.Equal(43, result.Box.Value.Value);
+        Assert.Equal(shallow.Value, result.Shallow.Value);
+        Assert.Equal(shallow.Value, result.Box.Shallow.Value);
+        Assert.Equal(deep.Value, result.Deep.Value);
+        Assert.Same(result.Deep.Value, result.Box.Deep.Value);
+        if (!empty)
+        {
+            Assert.NotSame(deep.Value, result.Deep.Value);
+        }
+
+        Assert.Equal(43, result.Callback.Value);
+        Assert.Equal(43, result.Box.Callback.Value);
+        Assert.Same(immutable.Value, result.Immutable.Value);
+        Assert.Same(immutable.Value, result.Box.Immutable.Value);
+    }
+
+    [Fact]
+    public void RecursiveUnionCaseGraphCopiesThroughStructWrapper()
+    {
+        RecursiveUnion value = new RecursiveUnionBox { Value = 42 };
+
+        var result = Copy(value);
+
+        Assert.Equal(42, Assert.IsType<RecursiveUnionBox>(result.Value).Value.Value);
     }
 
     [Theory]
@@ -603,20 +635,48 @@ public sealed class NumberCallbacks
 }
 
 [GenerateSerializer]
-public sealed class CallbackNumberHolder
+public sealed class UnionCopyHolder
 {
     [Id(0)]
-    public CallbackNumber Direct { get; set; }
+    public IntOrString Shallow { get; set; }
 
     [Id(1)]
-    public CallbackNumberBox Box { get; set; }
+    public Pet Deep { get; set; }
+
+    [Id(2)]
+    public CallbackNumber Callback { get; set; }
+
+    [Id(3)]
+    public ImmutablePet Immutable { get; set; }
+
+    [Id(4)]
+    public UnionCopyBox Box { get; set; }
 }
 
 [GenerateSerializer]
-public struct CallbackNumberBox
+public struct UnionCopyBox
 {
     [Id(0)]
-    public CallbackNumber Value { get; set; }
+    public IntOrString Shallow { get; set; }
+
+    [Id(1)]
+    public Pet Deep { get; set; }
+
+    [Id(2)]
+    public CallbackNumber Callback { get; set; }
+
+    [Id(3)]
+    public ImmutablePet Immutable { get; set; }
+}
+
+[GenerateSerializer]
+public union RecursiveUnion(RecursiveUnionBox, int);
+
+[GenerateSerializer]
+public struct RecursiveUnionBox
+{
+    [Id(0)]
+    public RecursiveUnion Value { get; set; }
 }
 
 [GenerateSerializer, SerializationCallbacks(typeof(CaseOrderCallbacks))]

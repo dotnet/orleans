@@ -197,9 +197,7 @@ internal class SerializableTypeDescription : ISerializableTypeDescription
 
     public List<INamedTypeSymbol> SerializationHooks { get; }
 
-    public bool IsShallowCopyable => UnionCases is { } unionCases
-        ? SerializationHooks.Count == 0 && (IsImmutable || unionCases.All(unionCase => _libraryTypes.IsShallowCopyable(unionCase.CaseType)))
-        : IsEnumType || !Type.HasBaseType(_libraryTypes.Exception) && _libraryTypes.IsShallowCopyable(Type);
+    public bool IsShallowCopyable => IsEnumType || !Type.HasBaseType(_libraryTypes.Exception) && _libraryTypes.IsShallowCopyable(Type);
 
     /// <summary>
     /// Gets the cases of this union type, or <see langword="null"/> if this is not a union type.

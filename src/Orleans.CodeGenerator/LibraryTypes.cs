@@ -326,7 +326,9 @@ internal sealed class LibraryTypes
 
     public LanguageVersion? LanguageVersion { get; private set; }
 
-    public bool IsShallowCopyable(ITypeSymbol type)
+    public bool IsShallowCopyable(ITypeSymbol type) => IsShallowCopyable(type, visiting: null);
+
+    private bool IsShallowCopyable(ITypeSymbol type, HashSet<ITypeSymbol>? visiting)
     {
         switch (type.SpecialType)
         {
@@ -353,10 +355,30 @@ internal sealed class LibraryTypes
             return result;
         }
 
-        // Union copy callbacks can replace the value, including when the union is explicitly immutable.
-        if (type.HasAttribute(SerializationCallbacksAttribute) && LanguageFeatureSymbols.IsUnion(type))
+        if (type is INamedTypeSymbol unionType && LanguageFeatureSymbols.IsUnion(type))
         {
-            return _shallowCopyableTypes[type] = false;
+            // Copy callbacks can replace even immutable union values, so callers must use their copier.
+            if (type.HasAttribute(SerializationCallbacksAttribute))
+            {
+                return _shallowCopyableTypes[type] = false;
+            }
+
+            if (type.HasAttribute(ImmutableAttribute))
+            {
+                return _shallowCopyableTypes[type] = true;
+            }
+
+            visiting ??= new(SymbolEqualityComparer.Default);
+            if (!visiting.Add(unionType.OriginalDefinition))
+            {
+                // Recursive case graphs require deep copying rather than sharing their boxed values.
+                return false;
+            }
+
+            var cases = UnionCaseResolver.GetUnionTypeCases(unionType, Compilation, this)!;
+            result = cases.All(unionCase => IsShallowCopyable(unionCase.CaseType, visiting));
+            visiting.Remove(unionType.OriginalDefinition);
+            return _shallowCopyableTypes[type] = result;
         }
 
         foreach (var shallowCopyable in RegularShallowCopyableType)
@@ -384,7 +406,7 @@ internal sealed class LibraryTypes
 
         if (namedType.IsTupleType)
         {
-            return _shallowCopyableTypes[type] = AreShallowCopyable(namedType.TupleElements);
+            return _shallowCopyableTypes[type] = AreShallowCopyable(namedType.TupleElements, visiting);
         }
         else if (namedType.IsGenericType)
         {
@@ -392,7 +414,7 @@ internal sealed class LibraryTypes
             foreach (var t in _immutableContainerTypes)
             {
                 if (SymbolEqualityComparer.Default.Equals(t, def))
-                    return _shallowCopyableTypes[type] = AreShallowCopyable(namedType.TypeArguments);
+                    return _shallowCopyableTypes[type] = AreShallowCopyable(namedType.TypeArguments, visiting);
             }
         }
         else
@@ -404,14 +426,14 @@ internal sealed class LibraryTypes
 
             if (type.TypeKind == TypeKind.Struct && !namedType.IsUnboundGenericType)
             {
-                return _shallowCopyableTypes[type] = IsValueTypeFieldsShallowCopyable(type);
+                return _shallowCopyableTypes[type] = IsValueTypeFieldsShallowCopyable(type, visiting);
             }
         }
 
         return _shallowCopyableTypes[type] = false;
     }
 
-    private bool IsValueTypeFieldsShallowCopyable(ITypeSymbol type)
+    private bool IsValueTypeFieldsShallowCopyable(ITypeSymbol type, HashSet<ITypeSymbol>? visiting)
     {
         foreach (var field in type.GetDeclaredInstanceMembers<IFieldSymbol>())
         {
@@ -425,7 +447,7 @@ internal sealed class LibraryTypes
                 return false;
             }
 
-            if (!IsShallowCopyable(fieldType))
+            if (!IsShallowCopyable(fieldType, visiting))
             {
                 return false;
             }
@@ -434,19 +456,19 @@ internal sealed class LibraryTypes
         return true;
     }
 
-    private bool AreShallowCopyable(ImmutableArray<ITypeSymbol> types)
+    private bool AreShallowCopyable(ImmutableArray<ITypeSymbol> types, HashSet<ITypeSymbol>? visiting)
     {
         foreach (var t in types)
-            if (!IsShallowCopyable(t))
+            if (!IsShallowCopyable(t, visiting))
                 return false;
 
         return true;
     }
 
-    private bool AreShallowCopyable(ImmutableArray<IFieldSymbol> fields)
+    private bool AreShallowCopyable(ImmutableArray<IFieldSymbol> fields, HashSet<ITypeSymbol>? visiting)
     {
         foreach (var f in fields)
-            if (!IsShallowCopyable(f.Type))
+            if (!IsShallowCopyable(f.Type, visiting))
                 return false;
 
         return true;
