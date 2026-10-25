@@ -353,6 +353,12 @@ internal sealed class LibraryTypes
             return result;
         }
 
+        // Union copy callbacks can replace the value, including when the union is explicitly immutable.
+        if (type.HasAttribute(SerializationCallbacksAttribute) && LanguageFeatureSymbols.IsUnion(type))
+        {
+            return _shallowCopyableTypes[type] = false;
+        }
+
         foreach (var shallowCopyable in RegularShallowCopyableType)
         {
             if (SymbolEqualityComparer.Default.Equals(shallowCopyable, type))
