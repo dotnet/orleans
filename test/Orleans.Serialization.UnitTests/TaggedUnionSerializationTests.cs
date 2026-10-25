@@ -424,6 +424,21 @@ public class TaggedUnionSerializationTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void ImmutableUnionInContainerRunsCopyCallbacks(bool empty)
+    {
+        CallbackNumber value = empty ? default(CallbackNumber) : 42;
+        var holder = new CallbackNumberHolder { Direct = value, Box = new CallbackNumberBox { Value = value } };
+
+        var result = Copy(holder);
+
+        Assert.NotSame(holder, result);
+        Assert.Equal(43, result.Direct.Value);
+        Assert.Equal(43, result.Box.Value.Value);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void UnionDeserializationCallbacksSurroundCaseCallbacks(bool legacy)
     {
         var value = new CallbackCase("ordered");
@@ -585,6 +600,23 @@ public union CallbackNumber(int, string);
 public sealed class NumberCallbacks
 {
     public void OnCopied(CallbackNumber original, ref CallbackNumber result) => result = 43;
+}
+
+[GenerateSerializer]
+public sealed class CallbackNumberHolder
+{
+    [Id(0)]
+    public CallbackNumber Direct { get; set; }
+
+    [Id(1)]
+    public CallbackNumberBox Box { get; set; }
+}
+
+[GenerateSerializer]
+public struct CallbackNumberBox
+{
+    [Id(0)]
+    public CallbackNumber Value { get; set; }
 }
 
 [GenerateSerializer, SerializationCallbacks(typeof(CaseOrderCallbacks))]
