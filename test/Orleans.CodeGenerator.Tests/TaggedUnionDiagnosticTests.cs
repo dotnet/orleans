@@ -71,6 +71,33 @@ public sealed class TaggedUnionDiagnosticTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnionMembersWithoutGeneratedSerializerRespectCopyPolicy(bool immutable)
+    {
+        var (output, result) = Generate($$"""
+            {{(immutable ? "[Immutable]" : "")}}
+            public union CustomUnion(int, string);
+            [GenerateSerializer] public sealed class Holder
+            {
+                [Id(0)] public CustomUnion Value { get; set; }
+            }
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        AssertNoErrors(output);
+        var copier = GetCodec(result, "Copier_Holder").NormalizeWhitespace().ToFullString();
+        if (immutable)
+        {
+            Assert.DoesNotContain("IDeepCopier<global::CustomUnion>", copier, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Contains("IDeepCopier<global::CustomUnion>", copier, StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
     [InlineData("Constraints<T>.INested", "Constraints<X>.INested")]
     [InlineData("Constraints<T>.INested<int>", "Constraints<X>.INested<int>")]
     [InlineData("Constraints<int>.INested<T>", "Constraints<int>.INested<X>")]

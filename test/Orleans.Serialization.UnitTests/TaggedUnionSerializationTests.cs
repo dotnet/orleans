@@ -421,13 +421,13 @@ public class TaggedUnionSerializationTests : IDisposable
         Assert.Equal(43, result.Value);
     }
 
-    public static TheoryData<IntOrString> ShallowUnionCases() => [(IntOrString)42, (IntOrString)"text", default(IntOrString)];
+    public static TheoryData<string, IntOrString> ShallowUnionCases() => [("int", (IntOrString)42), ("string", (IntOrString)"text"), ("empty", default(IntOrString))];
 
     [Theory]
     [MemberData(nameof(ShallowUnionCases))]
-    public void UnionCopyClassificationComposesThroughContainers(IntOrString shallow)
+    public void UnionCopyClassificationComposesThroughContainers(string caseName, IntOrString shallow)
     {
-        var empty = shallow.Value is null;
+        var empty = caseName == "empty";
         Pet deep = empty ? default(Pet) : new Cat("copy");
         CallbackNumber callback = empty ? default(CallbackNumber) : 42;
         ImmutablePet immutable = empty ? default(ImmutablePet) : new OpaqueCase("shared");
