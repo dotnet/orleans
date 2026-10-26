@@ -1281,9 +1281,8 @@ internal static class GrainInterfaceFileParser
     // Interface line: interface [GrainInterfaceType("x")] Namespace.IInterface<T> [Version(N)]
     // Or with retired: *RETIRED* interface [GrainInterfaceType("x")] Namespace.IInterface<T> [Version(N)]
     // The name can include generic type parameters like IMyGrain<T> or IMyGrain<TKey, TValue>
-    // Identities are verbatim unless marked Escaped = true; see FormatGrainInterfaceTypeAttribute.
     private static readonly Regex InterfacePattern = new(
-        @"^(?<retired>\*RETIRED\*\s*)?(?:interface\s+)?(\[GrainInterfaceType\((?:""(?<grainInterfaceType>[^""]+)""|""(?<escapedGrainInterfaceType>(?:[^""\\]|\\.)+)"",\s*Escaped\s*=\s*true)\)\]\s*)?(\[Alias\(""(?<alias>[^""]+)""\)\]\s*)?(?<name>[\w]+(?:<[\w,\s]+>)?(?:\.[\w]+(?:<[\w,\s]+>)?)*)\s*\[Version\((?<version>\d+)\)\]$",
+        @"^(?<retired>\*RETIRED\*\s*)?(?:interface\s+)?(\[GrainInterfaceType\(""(?<grainInterfaceType>[^""]+)""\)\]\s*)?(\[Alias\(""(?<alias>[^""]+)""\)\]\s*)?(?<name>[\w]+(?:<[\w,\s]+>)?(?:\.[\w]+(?:<[\w,\s]+>)?)*)\s*\[Version\((?<version>\d+)\)\]$",
         RegexOptions.Compiled);
 
     // Grain class line: class [GrainType("x")] Namespace.GrainClass
@@ -1332,23 +1331,8 @@ internal static class GrainInterfaceFileParser
             return match.Groups["grainInterfaceType"].Value;
         }
 
-        if (match.Groups["escapedGrainInterfaceType"].Success)
-        {
-            return UnescapeWireIdentity(match.Groups["escapedGrainInterfaceType"].Value);
-        }
-
         return match.Groups["alias"].Success ? match.Groups["alias"].Value : null;
     }
-
-    /// <summary>
-    /// Formats the <c>[GrainInterfaceType]</c> attribute of an interface declaration. Identities are written verbatim,
-    /// as earlier manifests record them, unless they cannot be read back verbatim; those are backslash-escaped and
-    /// marked <c>Escaped = true</c> so that existing verbatim backslashes keep their meaning.
-    /// </summary>
-    internal static string FormatGrainInterfaceTypeAttribute(string value)
-        => RequiresEscaping(value)
-            ? $"[GrainInterfaceType(\"{EscapeIdentity(value)}\", Escaped = true)]"
-            : $"[GrainInterfaceType(\"{value}\")]";
 
     /// <summary>
     /// Formats an active interface declaration as retired, recording a legacy declaration's resolved identity.
@@ -1382,7 +1366,7 @@ internal static class GrainInterfaceFileParser
                 StringComparison.Ordinal))
             {
                 recordedDeclaration = (match.Groups["retired"].Success ? $"{GrainInterfaceVersionAnalyzer.RetiredPrefix} " : string.Empty)
-                    + $"interface {FormatGrainInterfaceTypeAttribute(grainInterfaceType)} {name} "
+                    + $"interface [GrainInterfaceType(\"{grainInterfaceType}\")] {name} "
                     + $"[Version({match.Groups["version"].Value})]{GetClrComment(declaration)}";
                 return true;
             }
@@ -1390,46 +1374,6 @@ internal static class GrainInterfaceFileParser
 
         recordedDeclaration = declaration;
         return false;
-    }
-
-    private static bool RequiresEscaping(string value)
-    {
-        if (value.IndexOf('"') >= 0 || value.IndexOf(ClrCommentPrefix, StringComparison.Ordinal) >= 0)
-        {
-            return true;
-        }
-
-        foreach (var character in value)
-        {
-            if (char.IsControl(character) || char.IsWhiteSpace(character) && character != ' ')
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static string EscapeIdentity(string value)
-    {
-        var result = new StringBuilder(value.Length);
-        foreach (var character in value)
-        {
-            result.Append(character switch
-            {
-                '\\' => @"\\",
-                '"' => @"\""",
-                '#' => @"\#",
-                '\r' => @"\r",
-                '\n' => @"\n",
-                '\t' => @"\t",
-                _ when char.IsControl(character) || char.IsWhiteSpace(character) && character != ' '
-                    => $"\\u{((int)character).ToString("X4", CultureInfo.InvariantCulture)}",
-                _ => character.ToString()
-            });
-        }
-
-        return result.ToString();
     }
 
     internal static bool TryGetGrainClassName(string line, out string name)

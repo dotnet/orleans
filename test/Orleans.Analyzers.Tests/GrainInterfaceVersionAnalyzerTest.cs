@@ -496,13 +496,13 @@ interface IMyGrain [Version(1)]
 [Version(1)]
 public interface IMyGrain : IGrain
 {
-    [Alias("" # CLR: stable:ping\\v2\u0085next "")]
+    [Alias(""stable:ping\\v2"")]
     Task Ping();
 }
 ";
         const string contractsFile = @"
 interface IMyGrain [Version(1)]
-  \s\#\sCLR\:\sstable\:ping\\v2\u0085next\s: Ping() -> Task
+  stable\:ping\\v2: Ping() -> Task
 ";
 
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
@@ -1715,7 +1715,6 @@ public interface IMyGrain : IGrain
 
     [Theory]
     [InlineData("counter[Version(0)]", @"[GrainInterfaceType(""counter[Version(0)]"")]")]
-    [InlineData("counter\"[Version(0)]", @"[GrainInterfaceType(""counter\""[Version(0)]"", Escaped = true)]")]
     public async Task CodeFix_UpdateVersion_PreservesVersionTextInIdentityAndClrComment(string identity, string recordedIdentity)
     {
         var source = $"[GrainInterfaceType({SymbolDisplay.FormatLiteral(identity, quote: true)})] [Version(2)] public interface IMyGrain : IGrain {{ }}";
@@ -1735,23 +1734,17 @@ public interface IMyGrain : IGrain
         Assert.Empty(await GetDiagnosticsAsync(source, content));
     }
 
-    [Theory]
-    [InlineData("counter\"v2", @"[GrainInterfaceType(""counter\""v2"", Escaped = true)]")]
-    [InlineData("counter # CLR: v2", @"[GrainInterfaceType(""counter \# CLR: v2"", Escaped = true)]")]
-    [InlineData("counter\nv2", @"[GrainInterfaceType(""counter\nv2"", Escaped = true)]")]
-    [InlineData("counter\u2028v2", @"[GrainInterfaceType(""counter\u2028v2"", Escaped = true)]")]
-    [InlineData("counter\"v2\\x", @"[GrainInterfaceType(""counter\""v2\\x"", Escaped = true)]")]
-    [InlineData("counter\\v2", @"[GrainInterfaceType(""counter\v2"")]")]
-    public async Task CodeFix_AddInterface_EscapedAliasRoundTrips(string alias, string expectedAttribute)
+    [Fact]
+    public async Task CodeFix_AddInterface_PreservesLiteralBackslashInAlias()
     {
-        var source = $"[Alias({SymbolDisplay.FormatLiteral(alias, quote: true)})] public interface ICounterGrain : IGrain {{ }}";
+        const string source = @"[Alias(@""counter\v2"")] public interface ICounterGrain : IGrain { }";
 
         var content = await ApplyCodeFixAndGetContractsAsync(
             source,
             string.Empty,
             GrainInterfaceVersionAnalyzer.RuleId0016);
 
-        Assert.Contains($"interface {expectedAttribute} ICounterGrain [Version(0)]", content);
+        Assert.Contains(@"interface [GrainInterfaceType(""counter\v2"")] ICounterGrain [Version(0)]", content);
         Assert.Empty(await GetDiagnosticsAsync(source, content));
     }
 

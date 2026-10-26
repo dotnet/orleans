@@ -124,7 +124,7 @@ class [GrainType("cart")] Contoso.Grains.CartGrain
 
 The value before the colon is the effective runtime identity. A source `[Id(42)]`, source `[Alias("42")]`, and generated method ID `42` describe the same wire identity. The manifest records that result as `42:` and keeps source provenance in source code. Syntax-sensitive characters in aliases are backslash-escaped.
 
-Grain interface identities are recorded verbatim. An identity which contains a quote, a line break, or ` # CLR: ` is backslash-escaped instead and marked as such: `[GrainInterfaceType("counter\"v2", Escaped = true)]`.
+Grain interface identities are recorded verbatim. Source <xref:Orleans.Runtime.GrainInterfaceTypeAttribute>, <xref:Orleans.GrainTypeAttribute>, and <xref:Orleans.AliasAttribute> values must be non-empty and contain no quotes, whitespace, or control characters. [`ORLEANS0028`](../../diagnostics/orleans0028.md) reports invalid values during compilation, and attribute construction and configured type-alias registration validate the same contract at runtime.
 
 `*RETIRED*` marks an intentionally removed contract:
 
