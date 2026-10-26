@@ -9,7 +9,7 @@ internal static class IdentityNameValidator
 {
     public static bool IsValid(string? value)
     {
-        if (string.IsNullOrEmpty(value))
+        if (value is null || value.Length == 0)
         {
             return false;
         }
