@@ -80,9 +80,7 @@ namespace Orleans.Runtime.MembershipService
             this.siloLifecycle = siloLifecycle;
             var initialSnapshot = new MembershipTableSnapshot(
                 MembershipVersion.MinValue,
-                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.SetItem(
-                    this.myAddress,
-                    this.CreateLocalSiloEntry(SiloStatus.Created)));
+                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
             _state = new MembershipState(initialSnapshot, SiloStatus.Created);
             this.updates = new AsyncEnumerable<MembershipTableSnapshot>(
                 initialValue: initialSnapshot,
@@ -546,70 +544,46 @@ namespace Orleans.Runtime.MembershipService
             TState state,
             string caller)
         {
-            if (!this.updates.TryPublish(
+            var published = this.updates.TryPublish(
                 static (previous, update) => update.Manager.ProcessMembershipUpdate(
                     previous,
                     update.UpdateFunc(previous, update.State)),
-                (Manager: this, UpdateFunc: updateFunc, State: state)))
-            {
-                return false;
-            }
+                (Manager: this, UpdateFunc: updateFunc, State: state));
 
             this.CheckIfLocalSiloIsDead(caller);
-            return true;
+            return published;
         }
 
         private MembershipTableSnapshot ProcessMembershipUpdate(
             MembershipTableSnapshot previous,
             MembershipTableSnapshot updated)
         {
-            if (updated.Version < previous.Version)
+            if (updated.Version <= previous.Version
+                && updated.Entries.TryGetValue(this.myAddress, out var localEntry)
+                && !previous.Entries.ContainsKey(this.myAddress))
             {
-                return previous;
-            }
-
-            if (!previous.Entries.TryGetValue(this.myAddress, out var previousLocalSiloEntry))
-            {
-                return updated;
-            }
-
-            if (updated.Entries.TryGetValue(this.myAddress, out var localSiloEntry))
-            {
+                // A delayed successful write or older full view can prove registration after the current
+                // view has already pruned the local row. Reconcile under the publication lock.
                 Debug.Assert(
-                    previousLocalSiloEntry.Status != SiloStatus.Dead || localSiloEntry.Status == SiloStatus.Dead,
-                    "The local silo cannot transition from Dead to another status.");
-                return updated;
+                    updated.Version < previous.Version || localEntry.Status == SiloStatus.Dead,
+                    "Only Dead rows can be pruned without advancing the membership version.");
+                var current = Volatile.Read(ref _state);
+                if (current.LocalSiloStatus != SiloStatus.Dead)
+                {
+                    Interlocked.Exchange(ref _state, new MembershipState(previous, SiloStatus.Dead));
+                }
             }
 
-            if (previousLocalSiloEntry.Status == SiloStatus.Created)
-            {
-                // The local silo has not written its entry yet, so its absence from the table says nothing about its
-                // status. Preserve the local Created entry: observers which diff consecutive views report a removed
-                // entry as Dead, and the local silo must not be reported Dead before it has joined.
-                return new MembershipTableSnapshot(updated.Version, updated.Entries.SetItem(this.myAddress, previousLocalSiloEntry));
-            }
-
-            // The local silo was present in the previous view but is missing now. Preserve its entry so
-            // that non-newer views cannot erase it; a newer view means that it is dead, so publish an
-            // artificial Dead entry for downstream observers before self-terminating.
-            return new MembershipTableSnapshot(
-                updated.Version,
-                updated.Entries.SetItem(
-                    this.myAddress,
-                    previousLocalSiloEntry.Status == SiloStatus.Dead || updated.Version > previous.Version
-                        ? previousLocalSiloEntry.WithStatus(SiloStatus.Dead)
-                        : previousLocalSiloEntry));
+            return updated.Version < previous.Version ? previous : updated;
         }
 
         private void CheckIfLocalSiloIsDead(string caller)
         {
-            var current = this.MembershipTableSnapshot;
-            if (!this.IsStopping
-                && current.Entries.TryGetValue(this.myAddress, out var localSiloEntry)
-                && localSiloEntry.Status == SiloStatus.Dead)
+            var current = Volatile.Read(ref _state);
+            if (!this.IsStopping && current.LocalSiloStatus == SiloStatus.Dead)
             {
-                LogWarningFoundMyselfDeadInMembershipUpdate(this.log, caller, localSiloEntry.ToFullString());
-                this.KillMyselfLocally($"I should be Dead according to the membership table (in {caller}). Local entry: {localSiloEntry.ToFullString()}.");
+                LogWarningFoundMyselfDeadInMembershipUpdate(this.log, caller, current.Snapshot);
+                this.KillMyselfLocally($"I should be Dead according to the membership table (in {caller}). Membership: {current.Snapshot}.");
             }
         }
 
@@ -720,7 +694,7 @@ namespace Orleans.Runtime.MembershipService
             var previous = Volatile.Read(ref _state);
             var localSiloStatus = snapshot.Entries.TryGetValue(this.myAddress, out var localEntry)
                 ? localEntry.Status
-                : previous.LocalSiloStatus;
+                : previous.Snapshot.Entries.ContainsKey(this.myAddress) ? SiloStatus.Dead : previous.LocalSiloStatus;
             Debug.Assert(localSiloStatus >= previous.LocalSiloStatus, "The local silo status cannot transition backwards.");
 
             Interlocked.Exchange(ref _state, new MembershipState(snapshot, localSiloStatus));
@@ -1160,9 +1134,9 @@ namespace Orleans.Runtime.MembershipService
         [LoggerMessage(
             EventId = (int)ErrorCode.MembershipFoundMyselfDead1,
             Level = LogLevel.Warning,
-            Message = "I should be Dead according to the membership table (in {Caller}). Local entry: {Entry}."
+            Message = "I should be Dead according to the membership table (in {Caller}). Membership: {Snapshot}."
         )]
-        private static partial void LogWarningFoundMyselfDeadInMembershipUpdate(ILogger logger, string caller, string entry);
+        private static partial void LogWarningFoundMyselfDeadInMembershipUpdate(ILogger logger, string caller, MembershipTableSnapshot snapshot);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
