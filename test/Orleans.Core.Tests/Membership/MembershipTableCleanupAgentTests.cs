@@ -121,9 +121,9 @@ namespace NonSilo.Tests.Membership
             var retainedDefunctSilo = Silo("127.0.0.1:700@100");
             var options = new ClusterMembershipOptions { DefunctSiloCleanupPeriod = null, MaxDefunctSiloEntries = 1 };
             var membershipManager = new TestMembershipManager();
-            var oldestDefunctEntry = Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now.AddMinutes(-3));
-            var removedDefunctEntry = Entry(Silo("127.0.0.1:600@100"), SiloStatus.Dead, now.AddMinutes(-2));
-            var retainedDefunctEntry = Entry(retainedDefunctSilo, SiloStatus.Dead, now.AddMinutes(-1));
+            var oldestDefunctEntry = Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now.AddHours(-4));
+            var removedDefunctEntry = Entry(Silo("127.0.0.1:600@100"), SiloStatus.Dead, now.AddHours(-3));
+            var retainedDefunctEntry = Entry(retainedDefunctSilo, SiloStatus.Dead, now.AddHours(-2));
             var table = new InMemoryMembershipTable(
                 new TableVersion(123, "123"),
                 oldestDefunctEntry,
@@ -159,13 +159,13 @@ namespace NonSilo.Tests.Membership
             var membershipManager = new TestMembershipManager();
 
             // This entry reported itself alive most recently, but was not suspected recently.
-            var newerAliveEntry = Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now.AddMinutes(-2));
+            var newerAliveEntry = Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now.AddHours(-3));
 
             // This entry last reported itself alive long ago, but was declared dead (suspected) very recently.
             // It is therefore the most-recently-updated defunct entry and should be retained even though its
             // IAmAliveTime is the oldest.
-            var recentlySuspectedEntry = Entry(recentlySuspectedSilo, SiloStatus.Dead, now.AddMinutes(-10));
-            recentlySuspectedEntry.AddSuspector(this.localSilo, now.AddMinutes(-1).UtcDateTime);
+            var recentlySuspectedEntry = Entry(recentlySuspectedSilo, SiloStatus.Dead, now.AddHours(-10));
+            recentlySuspectedEntry.AddSuspector(this.localSilo, now.AddHours(-2).UtcDateTime);
 
             var table = new InMemoryMembershipTable(
                 new TableVersion(123, "123"),
@@ -185,6 +185,105 @@ namespace NonSilo.Tests.Membership
             var updatedTable = await table.ReadAllAsync(cancellationToken);
             Assert.Single(updatedTable.Members, member => member.Item1.Status == SiloStatus.Dead);
             Assert.Contains(updatedTable.Members, member => member.Item1.SiloAddress.Equals(recentlySuspectedSilo));
+
+            await lifecycle.OnStop(cancellationToken);
+        }
+
+        [Fact]
+        public async Task MembershipTableCleanupAgent_ThresholdCleanup_RetainsEntriesWithinMinimumRetention()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var now = this.timeProvider.GetUtcNow();
+            var options = new ClusterMembershipOptions { DefunctSiloCleanupPeriod = null, MaxDefunctSiloEntries = 0 };
+            var membershipManager = new TestMembershipManager();
+            var expiredEntry = Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now - options.DefunctSiloMinimumRetention - TimeSpan.FromTicks(1));
+            var recentEntry = Entry(Silo("127.0.0.1:600@100"), SiloStatus.Dead, now - options.DefunctSiloMinimumRetention);
+
+            // A silo which joined long ago but was declared dead recently is retained.
+            var recentlyDeclaredDeadEntry = Entry(Silo("127.0.0.1:700@100"), SiloStatus.Dead, now.AddDays(-1));
+            recentlyDeclaredDeadEntry.AddSuspector(this.localSilo, now.AddMinutes(-1).UtcDateTime);
+            var table = new InMemoryMembershipTable(
+                new TableVersion(123, "123"),
+                expiredEntry,
+                recentEntry,
+                recentlyDeclaredDeadEntry);
+            using var cleanupAgent = this.CreateCleanupAgent(options, table, membershipManager);
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
+
+            await lifecycle.OnStart(cancellationToken);
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(
+                Entry(this.localSilo, SiloStatus.Active, now),
+                expiredEntry,
+                recentEntry,
+                recentlyDeclaredDeadEntry), cancellationToken);
+
+            var call = Assert.Single(table.Calls, call => call.Method == nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync));
+            Assert.Equal(now - options.DefunctSiloMinimumRetention, call.Arguments);
+            var updatedTable = await table.ReadAllAsync(cancellationToken);
+            Assert.Equal(
+                [recentEntry.SiloAddress, recentlyDeclaredDeadEntry.SiloAddress],
+                updatedTable.Members.Select(member => member.Item1.SiloAddress).Order());
+
+            await lifecycle.OnStop(cancellationToken);
+        }
+
+        [Fact]
+        public async Task MembershipTableCleanupAgent_ThresholdCleanup_SkipsWhenAllExcessEntriesAreWithinMinimumRetention()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var now = this.timeProvider.GetUtcNow();
+            var options = new ClusterMembershipOptions { DefunctSiloCleanupPeriod = null, MaxDefunctSiloEntries = 0 };
+            var membershipManager = new TestMembershipManager();
+            var recentEntry = Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now.AddMinutes(-30));
+            var table = new InMemoryMembershipTable(new TableVersion(123, "123"), recentEntry);
+            using var cleanupAgent = this.CreateCleanupAgent(options, table, membershipManager);
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
+
+            await lifecycle.OnStart(cancellationToken);
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(
+                Entry(this.localSilo, SiloStatus.Active, now),
+                recentEntry), cancellationToken);
+
+            Assert.Equal(0, CleanupCallCount(table));
+            Assert.Contains((await table.ReadAllAsync(cancellationToken)).Members, member => member.Item1.SiloAddress.Equals(recentEntry.SiloAddress));
+
+            await lifecycle.OnStop(cancellationToken);
+        }
+
+        [Fact]
+        public async Task MembershipTableCleanupAgent_ExpirationCleanup_UsesMinimumRetentionWhenExpirationIsShorter()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var options = new ClusterMembershipOptions
+            {
+                DefunctSiloCleanupPeriod = TimeSpan.FromMinutes(90),
+                DefunctSiloExpiration = TimeSpan.FromMinutes(10),
+                MaxDefunctSiloEntries = null
+            };
+            var membershipManager = new TestMembershipManager();
+            var table = new InMemoryMembershipTable();
+            using var cleanupAgent = this.CreateCleanupAgent(options, table, membershipManager);
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
+
+            await lifecycle.OnStart(cancellationToken);
+            var now = this.timeProvider.GetUtcNow();
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)), cancellationToken);
+            table.ClearCalls();
+
+            // An entry past DefunctSiloExpiration but within the minimum retention period does not trigger cleanup.
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(
+                Entry(this.localSilo, SiloStatus.Active, now),
+                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead, now.AddMinutes(-30))), cancellationToken);
+            Assert.Equal(0, CleanupCallCount(table));
+
+            this.timeProvider.Advance(options.DefunctSiloCleanupPeriod.Value);
+            var later = this.timeProvider.GetUtcNow();
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(Entry(this.localSilo, SiloStatus.Active, later)), cancellationToken);
+            var call = Assert.Single(table.Calls, call => call.Method == nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync));
+            Assert.Equal(later - options.DefunctSiloMinimumRetention, call.Arguments);
 
             await lifecycle.OnStop(cancellationToken);
         }
