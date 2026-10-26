@@ -1,4 +1,5 @@
 #nullable enable
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,18 +8,22 @@ using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Serialization;
 using Orleans.Storage;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.StorageTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public sealed class SystemTextJsonStorageSerializerConfigurationTests
     {
         private sealed record Money(decimal Amount);
 
         private sealed class MoneyConverter : JsonConverter<Money>
         {
-            public override Money Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => new(decimal.Parse(reader.GetString()!.TrimStart('$')));
-            public override void Write(Utf8JsonWriter writer, Money value, JsonSerializerOptions options) => writer.WriteStringValue($"${value.Amount}");
+            public override Money Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => new(decimal.Parse(reader.GetString()!.TrimStart('$'), CultureInfo.InvariantCulture));
+            public override void Write(Utf8JsonWriter writer, Money value, JsonSerializerOptions options) => writer.WriteStringValue(string.Create(CultureInfo.InvariantCulture, $"${value.Amount}"));
         }
 
         private static IServiceProvider BuildServices(Action<ISiloBuilder> configureSilo)
