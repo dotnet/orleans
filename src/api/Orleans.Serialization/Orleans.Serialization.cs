@@ -3508,6 +3508,8 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 {
     public static partial class OrleansGeneratedCodeHelper
     {
+        public static void BeginUnionRead<TInput>(this ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { }
+
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field) { }
 
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader) { }
@@ -3522,8 +3524,6 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         public static TService GetService<TService>(object caller, Serializers.ICodecProvider codecProvider) { throw null; }
 
         public static object InvokableThrowArgumentOutOfRange(int index, int maxArgs) { throw null; }
-
-        public static void ReadStartUnion<TInput>(this ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { }
 
         public static void SerializeUnexpectedType<TBufferWriter>(this ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, object value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }

@@ -308,13 +308,17 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         }
 
         /// <summary>
-        /// Validates the header of a tagged-union field written by <see cref="WriteStartUnion{TBufferWriter}(ref Writer{TBufferWriter}, uint, Type?, Type)"/>.
+        /// Begins deserializing a tagged-union field by validating its already-read header and accounting for the envelope's reference identifier.
         /// </summary>
+        /// <remarks>
+        /// The envelope uses the ordinary tag-delimited wire format and occupies one reference identifier, like a value-type field.
+        /// The case codec deserializes and tracks the case value independently.
+        /// </remarks>
         /// <typeparam name="TInput">The reader input type.</typeparam>
         /// <param name="reader">The reader.</param>
         /// <param name="field">The union field header.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadStartUnion<TInput>(this ref Reader<TInput> reader, Field field)
+        public static void BeginUnionRead<TInput>(this ref Reader<TInput> reader, Field field)
         {
             field.EnsureWireTypeTagDelimited();
             ReferenceCodec.MarkValueField(reader.Session);
