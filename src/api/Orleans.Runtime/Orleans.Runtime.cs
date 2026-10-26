@@ -509,6 +509,8 @@ namespace Orleans.Hosting
     {
         public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder) { throw null; }
 
+        public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Serialization.SystemTextJsonGrainStorageSerializerOptions>> configureOptions) { throw null; }
+
         public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder, System.Action<Serialization.SystemTextJsonGrainStorageSerializerOptions> configureOptions) { throw null; }
     }
 }

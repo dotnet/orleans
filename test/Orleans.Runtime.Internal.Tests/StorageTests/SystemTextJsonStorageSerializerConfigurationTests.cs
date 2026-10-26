@@ -75,9 +75,31 @@ namespace UnitTests.StorageTests
         }
 
         [Fact]
+        public void ConfigureOptionsBuilderDelegateCanUseServices()
+        {
+            var converter = new MoneyConverter();
+            var services = BuildServices(siloBuilder =>
+            {
+                siloBuilder.Services.AddSingleton(converter);
+                siloBuilder.UseSystemTextJsonGrainStorageSerializer(optionsBuilder =>
+                    optionsBuilder.Configure<MoneyConverter>((options, moneyConverter) => options.JsonSerializerOptions.Converters.Add(moneyConverter)));
+            });
+
+            var serializer = Assert.IsType<SystemTextJsonGrainStorageSerializer>(services.GetRequiredService<IGrainStorageSerializer>());
+            var converters = services.GetRequiredService<IOptions<SystemTextJsonGrainStorageSerializerOptions>>().Value.JsonSerializerOptions.Converters;
+
+            Assert.Contains(converter, converters);
+            Assert.Contains(converters, c => c is GrainReferenceConverter);
+            Assert.Equal("\"$12.5\"", serializer.Serialize(new Money(12.5m)).ToString());
+        }
+
+        [Fact]
         public void ConfigureOptionsDelegateMustNotBeNull()
         {
-            Assert.Throws<ArgumentNullException>(() => BuildServices(siloBuilder => siloBuilder.UseSystemTextJsonGrainStorageSerializer(null!)));
+            Assert.Throws<ArgumentNullException>(() => BuildServices(siloBuilder =>
+                siloBuilder.UseSystemTextJsonGrainStorageSerializer((Action<SystemTextJsonGrainStorageSerializerOptions>)null!)));
+            Assert.Throws<ArgumentNullException>(() => BuildServices(siloBuilder =>
+                siloBuilder.UseSystemTextJsonGrainStorageSerializer((Action<OptionsBuilder<SystemTextJsonGrainStorageSerializerOptions>>)null!)));
         }
     }
 }
