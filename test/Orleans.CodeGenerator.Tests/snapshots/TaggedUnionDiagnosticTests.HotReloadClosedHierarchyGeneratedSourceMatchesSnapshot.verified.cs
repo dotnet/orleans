@@ -73,7 +73,8 @@ namespace OrleansCodeGen
             // Values written before the type used case identifiers encode their runtime type in the field header.
             if (field.FieldType is { } fieldType && fieldType != _codecFieldType)
                 return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.DeserializeUnexpectedType<TReaderInput, global::Base>(ref reader, ref field);
-            global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.BeginUnionRead(ref reader, field);
+            field.EnsureWireTypeTagDelimited();
+            global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(reader.Session);
             var header = global::Orleans.Serialization.Codecs.FieldHeaderCodec.ReadFieldHeader(ref reader);
             if (header.IsEndBaseOrEndObject)
                 return null;

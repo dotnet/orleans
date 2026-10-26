@@ -3508,8 +3508,6 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 {
     public static partial class OrleansGeneratedCodeHelper
     {
-        public static void BeginUnionRead<TInput>(this ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { }
-
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field) { }
 
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader) { }
