@@ -110,14 +110,7 @@ namespace OrleansCodeGen.Orleans.Serialization.UnitTests.TaggedUnions
         [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::Orleans.Serialization.UnitTests.TaggedUnions.CallbackNumber DeepCopy(global::Orleans.Serialization.UnitTests.TaggedUnions.CallbackNumber original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            global::Orleans.Serialization.UnitTests.TaggedUnions.CallbackNumber result = default;
-            switch (original)
-            {
-                default:
-                    result = original;
-                    break;
-            }
-
+            global::Orleans.Serialization.UnitTests.TaggedUnions.CallbackNumber result = original;
             _hook0.OnCopied(original, ref result);
             return result;
         }

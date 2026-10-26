@@ -519,7 +519,7 @@ public class TaggedUnionSerializationTests : IDisposable
         var result = Copy(value);
 
         Assert.Same(value.Value, result.Value);
-        Assert.Equal(new[] { "copying", "copied" }, callbacks.Events);
+        Assert.Equal(new[] { ("copying", (object?)null), ("copied", value.Value) }, callbacks.Events);
     }
 }
 
@@ -712,10 +712,10 @@ public union ImmutableCallbackPet(OpaqueCase, Value<List<int>>);
 
 public sealed class ImmutablePetCallbacks
 {
-    public List<string> Events { get; } = [];
+    public List<(string Event, object? Value)> Events { get; } = [];
 
-    public void OnCopying(ImmutableCallbackPet original, ref ImmutableCallbackPet result) => Events.Add("copying");
-    public void OnCopied(ImmutableCallbackPet original, ref ImmutableCallbackPet result) => Events.Add("copied");
+    public void OnCopying(ImmutableCallbackPet original, ref ImmutableCallbackPet result) => Events.Add(("copying", result.Value));
+    public void OnCopied(ImmutableCallbackPet original, ref ImmutableCallbackPet result) => Events.Add(("copied", result.Value));
 }
 
 [GenerateSerializer]
