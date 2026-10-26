@@ -88,10 +88,10 @@ namespace Orleans
         /// Initializes a new instance of the <see cref="GrainTypeAttribute"/> class.
         /// </summary>
         /// <param name="grainType">
-        /// A non-empty grain type name containing no quotes, whitespace, or control characters.
+        /// A non-empty grain type name containing no quotes, whitespace, control characters, or reserved type-name delimiters (<c>[](),*&amp;</c>).
         /// </param>
         /// <exception cref="ArgumentNullException"><paramref name="grainType"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentException"><paramref name="grainType"/> is empty or contains a quote, whitespace, or a control character.</exception>
+        /// <exception cref="ArgumentException"><paramref name="grainType"/> is empty or contains a quote, whitespace, a control character, or a reserved type-name delimiter.</exception>
         public GrainTypeAttribute(string grainType)
         {
             IdentityNameValidator.Validate(grainType, nameof(grainType));

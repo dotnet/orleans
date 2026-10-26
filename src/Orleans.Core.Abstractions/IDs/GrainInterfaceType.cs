@@ -174,9 +174,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a <see cref="GrainInterfaceTypeAttribute"/> instance.
         /// </summary>
-        /// <param name="value">A non-empty identity containing no quotes, whitespace, or control characters.</param>
+        /// <param name="value">A non-empty identity containing no quotes, whitespace, control characters, or reserved type-name delimiters (<c>[](),*&amp;</c>).</param>
         /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentException"><paramref name="value"/> is empty or contains a quote, whitespace, or a control character.</exception>
+        /// <exception cref="ArgumentException"><paramref name="value"/> is empty or contains a quote, whitespace, a control character, or a reserved type-name delimiter.</exception>
         public GrainInterfaceTypeAttribute(string value)
         {
             IdentityNameValidator.Validate(value, nameof(value));

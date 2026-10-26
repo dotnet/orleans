@@ -65,7 +65,7 @@ public class TypeConverter
     /// <param name="typeFilters">The type filters.</param>
     /// <param name="options">The options.</param>
     /// <param name="typeResolver">The type resolver.</param>
-    /// <exception cref="ArgumentException">A configured type alias is empty or contains a quote, whitespace, or a control character.</exception>
+    /// <exception cref="ArgumentException">A configured type alias is empty or contains a quote, whitespace, a control character, or a reserved type-name delimiter.</exception>
     public TypeConverter(
         IEnumerable<ITypeConverter> formatters,
         IEnumerable<ITypeNameFilter> typeNameFilters,

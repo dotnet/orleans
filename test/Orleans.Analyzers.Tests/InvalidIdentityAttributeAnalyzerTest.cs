@@ -25,6 +25,13 @@ public class InvalidIdentityAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<I
     [InlineData(0x0020)]
     [InlineData(0x0022)]
     [InlineData(0x0027)]
+    [InlineData(0x0026)]
+    [InlineData(0x0028)]
+    [InlineData(0x0029)]
+    [InlineData(0x002A)]
+    [InlineData(0x002C)]
+    [InlineData(0x005B)]
+    [InlineData(0x005D)]
     [InlineData(0x007F)]
     [InlineData(0x0085)]
     [InlineData(0x00A0)]
@@ -113,6 +120,8 @@ public class InvalidIdentityAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<I
             [Alias(Identity)]
             public class Model
             {
+                public interface INested : IGrain { }
+
                 [Alias(Identity)]
                 public void Method() { }
             }

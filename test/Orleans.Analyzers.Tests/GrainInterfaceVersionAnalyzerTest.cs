@@ -1713,11 +1713,11 @@ public interface IMyGrain : IGrain
         Assert.Empty(await GetDiagnosticsAsync(source, content));
     }
 
-    [Theory]
-    [InlineData("counter[Version(0)]", @"[GrainInterfaceType(""counter[Version(0)]"")]")]
-    public async Task CodeFix_UpdateVersion_PreservesVersionTextInIdentityAndClrComment(string identity, string recordedIdentity)
+    [Fact]
+    public async Task CodeFix_UpdateVersion_PreservesVersionTextInClrComment()
     {
-        var source = $"[GrainInterfaceType({SymbolDisplay.FormatLiteral(identity, quote: true)})] [Version(2)] public interface IMyGrain : IGrain {{ }}";
+        const string source = @"[GrainInterfaceType(""counter-v2"")] [Version(2)] public interface IMyGrain : IGrain { }";
+        const string recordedIdentity = @"[GrainInterfaceType(""counter-v2"")]";
         const string clrComment = " # CLR: Previous[Version(3)]";
         var contractsFile = $"interface {recordedIdentity} IMyGrain [Version(1)]{clrComment}";
 

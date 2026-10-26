@@ -16,7 +16,9 @@ internal static class IdentityNameValidator
 
         foreach (var character in value)
         {
-            if (character is '"' or '\'' || char.IsWhiteSpace(character) || char.IsControl(character))
+            if (character is '"' or '\'' or '[' or ']' or '(' or ')' or ',' or '*' or '&'
+                || char.IsWhiteSpace(character)
+                || char.IsControl(character))
             {
                 return false;
             }
@@ -34,7 +36,7 @@ internal static class IdentityNameValidator
 
         if (!IsValid(value))
         {
-            throw new ArgumentException("An Orleans identity must be non-empty and contain no quotes, whitespace, or control characters.", parameterName);
+            throw new ArgumentException("An Orleans identity must be non-empty and contain no quotes, whitespace, control characters, or reserved type-name delimiters ([](),*&).", parameterName);
         }
     }
 }
