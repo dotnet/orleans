@@ -279,13 +279,24 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine(MethodImpl);
         source.AppendLine($"    public {typeName} DeepCopy({typeName} original, global::Orleans.Serialization.Cloning.CopyContext context)");
         source.AppendLine("    {");
-        source.AppendLine($"        {typeName} result = default;");
-        AppendCopyCallbacks(source, type, "OnCopying");
-        source.AppendLine("        switch (original)");
-        source.AppendLine("        {");
-        source.Append(copyCases);
-        source.AppendLine("            default: result = original; break;");
-        source.AppendLine("        }");
+        var copyingCallbacks = new StringBuilder();
+        AppendCopyCallbacks(copyingCallbacks, type, "OnCopying");
+        var initialValue = copyCases.Length == 0 && copyingCallbacks.Length == 0 ? "original" : "default";
+        source.AppendLine($"        {typeName} result = {initialValue};");
+        source.Append(copyingCallbacks);
+        if (copyCases.Length > 0)
+        {
+            source.AppendLine("        switch (original)");
+            source.AppendLine("        {");
+            source.Append(copyCases);
+            source.AppendLine("            default: result = original; break;");
+            source.AppendLine("        }");
+        }
+        else if (copyingCallbacks.Length > 0)
+        {
+            source.AppendLine("        result = original;");
+        }
+
         AppendCopyCallbacks(source, type, "OnCopied");
         source.AppendLine("        return result;");
         source.AppendLine("    }");

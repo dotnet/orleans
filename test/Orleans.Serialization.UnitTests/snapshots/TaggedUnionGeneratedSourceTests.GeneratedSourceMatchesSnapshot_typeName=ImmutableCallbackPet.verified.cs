@@ -116,13 +116,7 @@ namespace OrleansCodeGen.Orleans.Serialization.UnitTests.TaggedUnions
         {
             global::Orleans.Serialization.UnitTests.TaggedUnions.ImmutableCallbackPet result = default;
             _hook0.OnCopying(original, ref result);
-            switch (original)
-            {
-                default:
-                    result = original;
-                    break;
-            }
-
+            result = original;
             _hook0.OnCopied(original, ref result);
             return result;
         }
