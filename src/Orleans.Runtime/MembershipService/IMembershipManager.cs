@@ -19,29 +19,20 @@ namespace Orleans.Runtime.MembershipService;
 internal interface IMembershipManager : ILifecycleParticipant<ISiloLifecycle>, IHealthCheckParticipant
 {
     /// <summary>
-    /// Gets the current canonical membership snapshot.
+    /// Gets the current membership snapshot.
     /// </summary>
-    /// <remarks>
-    /// The initial snapshot is empty at <see cref="MembershipVersion.MinValue"/>.
-    /// Membership entries reflect authoritative cluster state; local lifecycle status is exposed by
-    /// <see cref="LocalSiloStatus"/>.
-    /// </remarks>
     MembershipTableSnapshot CurrentSnapshot { get; }
 
     /// <summary>
-    /// Gets a stream of canonical membership updates.
+    /// Gets a stream of membership updates.
     /// Updates are published whenever the membership view changes.
     /// Consumers should process updates in order.
     /// </summary>
     IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates { get; }
 
     /// <summary>
-    /// Gets the local silo's current status, initially <see cref="SiloStatus.Created"/>.
+    /// Gets the local silo's current status.
     /// </summary>
-    /// <remarks>
-    /// Status advances from authoritative membership evidence, including successful local writes.
-    /// Removal of a previously registered local silo establishes its terminal <see cref="SiloStatus.Dead"/> status.
-    /// </remarks>
     SiloStatus LocalSiloStatus { get; }
 
     /// <summary>
