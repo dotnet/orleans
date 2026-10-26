@@ -152,7 +152,8 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine($"        if (field.FieldType is {{ }} fieldType && fieldType != {CodecFieldTypeFieldName})");
         source.AppendLine("            return ReadCaseValue(ref reader, ref field);");
         source.AppendLine();
-        source.AppendLine($"        {Helper}.BeginUnionRead(ref reader, field);");
+        source.AppendLine("        field.EnsureWireTypeTagDelimited();");
+        source.AppendLine("        global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(reader.Session);");
         source.AppendLine($"        {typeName} result = default;");
         source.AppendLine("        Deserialize(ref reader, ref result);");
         source.AppendLine("        return result;");
@@ -221,7 +222,8 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine($"        if (field.FieldType is {{ }} fieldType && fieldType != {CodecFieldTypeFieldName})");
         source.AppendLine($"            return {Helper}.DeserializeUnexpectedType<TReaderInput, {typeName}>(ref reader, ref field);");
         source.AppendLine();
-        source.AppendLine($"        {Helper}.BeginUnionRead(ref reader, field);");
+        source.AppendLine("        field.EnsureWireTypeTagDelimited();");
+        source.AppendLine("        global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(reader.Session);");
         source.AppendLine($"        var header = {FieldHeaderCodec}.ReadFieldHeader(ref reader);");
         source.AppendLine("        if (header.IsEndBaseOrEndObject)");
         source.AppendLine("            return null;");

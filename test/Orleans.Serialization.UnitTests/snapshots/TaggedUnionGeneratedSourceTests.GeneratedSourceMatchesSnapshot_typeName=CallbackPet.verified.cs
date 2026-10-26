@@ -73,7 +73,8 @@ namespace OrleansCodeGen.Orleans.Serialization.UnitTests.TaggedUnions
                 return ReadCaseValue(ref reader, ref field);
             if (field.FieldType is { } fieldType && fieldType != _codecFieldType)
                 return ReadCaseValue(ref reader, ref field);
-            global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.BeginUnionRead(ref reader, field);
+            field.EnsureWireTypeTagDelimited();
+            global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(reader.Session);
             global::Orleans.Serialization.UnitTests.TaggedUnions.CallbackPet result = default;
             Deserialize(ref reader, ref result);
             return result;

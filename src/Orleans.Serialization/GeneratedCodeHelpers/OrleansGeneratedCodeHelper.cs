@@ -308,23 +308,6 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         }
 
         /// <summary>
-        /// Begins deserializing a tagged-union field by validating its already-read header and accounting for the envelope's reference identifier.
-        /// </summary>
-        /// <remarks>
-        /// The envelope uses the ordinary tag-delimited wire format and occupies one reference identifier, like a value-type field.
-        /// The case codec deserializes and tracks the case value independently.
-        /// </remarks>
-        /// <typeparam name="TInput">The reader input type.</typeparam>
-        /// <param name="reader">The reader.</param>
-        /// <param name="field">The union field header.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void BeginUnionRead<TInput>(this ref Reader<TInput> reader, Field field)
-        {
-            field.EnsureWireTypeTagDelimited();
-            ReferenceCodec.MarkValueField(reader.Session);
-        }
-
-        /// <summary>
         /// Throws an exception indicating that a serialized tagged-union value has an unknown case identifier.
         /// </summary>
         /// <typeparam name="TField">The union type or closed base type.</typeparam>
