@@ -550,6 +550,7 @@ namespace Orleans.Runtime.MembershipService
                     update.UpdateFunc(previous, update.State)),
                 (Manager: this, UpdateFunc: updateFunc, State: state));
 
+            // Even a rejected snapshot can establish local death from previously unseen registration evidence.
             this.CheckIfLocalSiloIsDead(caller);
             return published;
         }
@@ -558,12 +559,18 @@ namespace Orleans.Runtime.MembershipService
             MembershipTableSnapshot previous,
             MembershipTableSnapshot updated)
         {
+            // This runs under the publication lock. "previous" is the current published view; "updated"
+            // is an incoming read or successful write result, which can arrive out of version order.
+            //
+            // For example, our Joining write can commit at V, then a peer declares us Dead and prunes
+            // our row at V+1. If we observe V+1 before the write completes, local status is still Created.
+            // The delayed result proves we were registered and subsequently removed, so it establishes
+            // local death even though the canonical view must remain at V+1.
             if (updated.Version <= previous.Version
                 && updated.Entries.TryGetValue(this.myAddress, out var localEntry)
                 && !previous.Entries.ContainsKey(this.myAddress))
             {
-                // A delayed successful write or older full view can prove registration after the current
-                // view has already pruned the local row. Reconcile under the publication lock.
+                // Equal versions cover a Dead row whose pruning did not advance the table version.
                 Debug.Assert(
                     updated.Version < previous.Version || localEntry.Status == SiloStatus.Dead,
                     "Only Dead rows can be pruned without advancing the membership version.");
@@ -574,6 +581,8 @@ namespace Orleans.Runtime.MembershipService
                 }
             }
 
+            // Successor validation decides whether equal/newer candidates advance the view, including
+            // rejecting an equal-version candidate which would reintroduce a pruned row.
             return updated.Version < previous.Version ? previous : updated;
         }
 
