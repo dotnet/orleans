@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using static VerifyXunit.Verifier;
 
 namespace Orleans.CodeGenerator.Tests;
 
@@ -250,6 +251,21 @@ public sealed class TaggedUnionDiagnosticTests
             fields["_caseCodec9"].ToString());
         Assert.DoesNotContain(fields["_caseCodec1"].Modifiers, static modifier => modifier.IsKind(SyntaxKind.ReadOnlyKeyword));
         Assert.Contains("(_caseCodec1 ??= OrleansGeneratedCodeHelper.GetService<", afterCodec.NormalizeWhitespace().ToFullString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public Task HotReloadClosedHierarchyGeneratedSourceMatchesSnapshot()
+    {
+        var (output, result) = Generate("""
+            [GenerateSerializer] public closed record Base;
+            [GenerateSerializer, Case(9)] public sealed record Existing([property: Id(0)] string Value) : Base;
+            [GenerateSerializer, Case(1)] public sealed record Added([property: Id(0)] string Value) : Base;
+            """, hotReload: true);
+        AssertNoErrors(output);
+        var source = Assert.Single(result.Results.SelectMany(static generator => generator.GeneratedSources),
+            static generated => generated.SourceText.ToString().Contains("class Codec_Base :", StringComparison.Ordinal));
+
+        return Verify(source.SourceText.ToString(), extension: "cs").UseDirectory("snapshots");
     }
 
     [Fact]
