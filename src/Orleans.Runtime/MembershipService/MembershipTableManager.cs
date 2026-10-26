@@ -544,46 +544,46 @@ namespace Orleans.Runtime.MembershipService
             TState state,
             string caller)
         {
-            var published = this.updates.TryPublish(
-                static (previous, update) => update.Manager.ProcessMembershipUpdate(
-                    previous,
-                    update.UpdateFunc(previous, update.State)),
+            var wasPublished = this.updates.TryPublish(
+                static (published, update) => update.Manager.ProcessMembershipUpdate(
+                    published,
+                    update.UpdateFunc(published, update.State)),
                 (Manager: this, UpdateFunc: updateFunc, State: state));
 
             // Even a rejected snapshot can establish local death from previously unseen registration evidence.
             this.CheckIfLocalSiloIsDead(caller);
-            return published;
+            return wasPublished;
         }
 
         private MembershipTableSnapshot ProcessMembershipUpdate(
-            MembershipTableSnapshot previous,
-            MembershipTableSnapshot updated)
+            MembershipTableSnapshot published,
+            MembershipTableSnapshot candidate)
         {
-            // This runs under the publication lock. "previous" is the current published view; "updated"
-            // is an incoming read or successful write result, which can arrive out of version order.
+            // This runs under the publication lock. The candidate comes from an incoming read or
+            // successful write result, which can arrive out of version order.
             //
             // For example, our Joining write can commit at V, then a peer declares us Dead and prunes
             // our row at V+1. If we observe V+1 before the write completes, local status is still Created.
             // The delayed result proves we were registered and subsequently removed, so it establishes
             // local death even though the canonical view must remain at V+1.
-            if (updated.Version <= previous.Version
-                && updated.Entries.TryGetValue(this.myAddress, out var localEntry)
-                && !previous.Entries.ContainsKey(this.myAddress))
+            if (candidate.Version <= published.Version
+                && candidate.Entries.TryGetValue(this.myAddress, out var localEntry)
+                && !published.Entries.ContainsKey(this.myAddress))
             {
                 // Equal versions cover a Dead row whose pruning did not advance the table version.
                 Debug.Assert(
-                    updated.Version < previous.Version || localEntry.Status == SiloStatus.Dead,
+                    candidate.Version < published.Version || localEntry.Status == SiloStatus.Dead,
                     "Only Dead rows can be pruned without advancing the membership version.");
                 var current = Volatile.Read(ref _state);
                 if (current.LocalSiloStatus != SiloStatus.Dead)
                 {
-                    Interlocked.Exchange(ref _state, new MembershipState(previous, SiloStatus.Dead));
+                    Interlocked.Exchange(ref _state, new MembershipState(published, SiloStatus.Dead));
                 }
             }
 
             // Successor validation decides whether equal/newer candidates advance the view, including
             // rejecting an equal-version candidate which would reintroduce a pruned row.
-            return updated.Version < previous.Version ? previous : updated;
+            return candidate.Version < published.Version ? published : candidate;
         }
 
         private void CheckIfLocalSiloIsDead(string caller)
