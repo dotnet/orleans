@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Analyzers;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.TypeSystem;
 using Xunit;
