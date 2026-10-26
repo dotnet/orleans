@@ -114,7 +114,7 @@ namespace NonSilo.Tests.Membership
 
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                clusterMembershipOptions: Options.Create(CreateMembershipOptions()),
                 membershipTable: membershipTable,
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
@@ -237,7 +237,7 @@ namespace NonSilo.Tests.Membership
 
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                clusterMembershipOptions: Options.Create(CreateMembershipOptions()),
                 membershipTable: membershipTable,
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
@@ -331,7 +331,7 @@ namespace NonSilo.Tests.Membership
 
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                clusterMembershipOptions: Options.Create(CreateMembershipOptions()),
                 membershipTable: membershipTable,
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
@@ -375,7 +375,7 @@ namespace NonSilo.Tests.Membership
 
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                clusterMembershipOptions: Options.Create(CreateMembershipOptions()),
                 membershipTable: membershipTable,
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
@@ -415,7 +415,7 @@ namespace NonSilo.Tests.Membership
 
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                clusterMembershipOptions: Options.Create(CreateMembershipOptions()),
                 membershipTable: membershipTable,
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
@@ -648,10 +648,15 @@ namespace NonSilo.Tests.Membership
             completeWrite.SetResult();
             await joining.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
 
-            Assert.Same(latest, manager.MembershipTableSnapshot);
+            var reconciled = manager.MembershipTableSnapshot;
+            Assert.Equal(latest.Version, reconciled.Version);
+            Assert.Equal(latest.Entries, reconciled.Entries);
+            Assert.Empty(latest.RecentlyDeadSilos);
             Assert.Equal(pruneLocalEntry ? SiloStatus.Dead : SiloStatus.Active, manager.CurrentStatus);
             if (pruneLocalEntry)
             {
+                Assert.Equal(this.localSilo, Assert.Single(reconciled.RecentlyDeadSilos));
+                Assert.Equal(SiloStatus.Dead, reconciled.GetSiloStatus(this.localSilo));
                 await manager.UpdateStatus(SiloStatus.Active, cancellationToken);
                 Assert.Empty((await table.ReadAllAsync(cancellationToken)).Members);
                 Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
@@ -659,6 +664,7 @@ namespace NonSilo.Tests.Membership
             }
             else
             {
+                Assert.Empty(reconciled.RecentlyDeadSilos);
                 Assert.Equal(SiloStatus.Active, Assert.Single(latest.Entries).Value.Status);
                 this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
             }
@@ -694,7 +700,12 @@ namespace NonSilo.Tests.Membership
             completeWrite.SetResult();
             await terminating.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
 
-            Assert.Same(pruned, manager.MembershipTableSnapshot);
+            var reconciled = manager.MembershipTableSnapshot;
+            Assert.Equal(pruned.Version, reconciled.Version);
+            Assert.Empty(reconciled.Entries);
+            Assert.Equal(this.localSilo, Assert.Single(reconciled.RecentlyDeadSilos));
+            Assert.Empty(pruned.RecentlyDeadSilos);
+            Assert.Equal(SiloStatus.Dead, reconciled.GetSiloStatus(this.localSilo));
             Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
             this.fatalErrorHandler.Received(1).OnFatalException(manager, Arg.Any<string>(), null);
         }
@@ -714,7 +725,12 @@ namespace NonSilo.Tests.Membership
             await manager.RefreshFromSnapshot(Snapshot(
                 new MembershipVersion(1), Entry(this.localSilo, oldStatus, DateTimeOffset.UnixEpoch)), cancellationToken);
 
-            Assert.Same(current, manager.MembershipTableSnapshot);
+            var reconciled = manager.MembershipTableSnapshot;
+            Assert.Equal(current.Version, reconciled.Version);
+            Assert.Empty(reconciled.Entries);
+            Assert.Equal(this.localSilo, Assert.Single(reconciled.RecentlyDeadSilos));
+            Assert.Empty(current.RecentlyDeadSilos);
+            Assert.Equal(SiloStatus.Dead, reconciled.GetSiloStatus(this.localSilo));
             Assert.Empty(current.Entries);
             Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
 
@@ -763,7 +779,7 @@ namespace NonSilo.Tests.Membership
             peerDetails.SiloAddress.Returns(peer);
             using var peerManager = new MembershipTableManager(
                 peerDetails,
-                Options.Create(new ClusterMembershipOptions()),
+                Options.Create(CreateMembershipOptions()),
                 table,
                 this.fatalErrorHandler,
                 Substitute.For<IMembershipGossiper>(),
@@ -927,7 +943,7 @@ namespace NonSilo.Tests.Membership
 
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                clusterMembershipOptions: Options.Create(CreateMembershipOptions()),
                 membershipTable: membershipTable,
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
@@ -974,7 +990,7 @@ namespace NonSilo.Tests.Membership
 
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                clusterMembershipOptions: Options.Create(CreateMembershipOptions()),
                 membershipTable: membershipTable,
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
@@ -1011,7 +1027,7 @@ namespace NonSilo.Tests.Membership
 
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                clusterMembershipOptions: Options.Create(CreateMembershipOptions()),
                 membershipTable: membershipTable,
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
@@ -1054,7 +1070,7 @@ namespace NonSilo.Tests.Membership
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
-            var clusterMembershipOptions = new ClusterMembershipOptions();
+            var clusterMembershipOptions = CreateMembershipOptions();
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(clusterMembershipOptions),
@@ -1135,7 +1151,7 @@ namespace NonSilo.Tests.Membership
 
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                clusterMembershipOptions: Options.Create(CreateMembershipOptions()),
                 membershipTable: membershipTable,
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
@@ -1234,7 +1250,7 @@ namespace NonSilo.Tests.Membership
 
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                clusterMembershipOptions: Options.Create(CreateMembershipOptions()),
                 membershipTable: membershipTable,
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
@@ -2166,6 +2182,10 @@ namespace NonSilo.Tests.Membership
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
+        // These fixtures use synthetic generation 100 rather than clock-derived identities.
+        // Retirement publication is exercised separately with a controlled clock in MembershipRetirementTests.
+        private static ClusterMembershipOptions CreateMembershipOptions() => new() { SiloGenerationRetirementAge = null };
+
         private MembershipTableManager CreateMembershipTableManager(
             IMembershipTable membershipTable,
             TimeProvider? timeProvider = null,
@@ -2174,7 +2194,7 @@ namespace NonSilo.Tests.Membership
         {
             return this.membershipTableManager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                clusterMembershipOptions: Options.Create(CreateMembershipOptions()),
                 membershipTable: membershipTable,
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
