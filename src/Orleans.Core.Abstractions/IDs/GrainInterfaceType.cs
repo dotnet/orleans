@@ -1,4 +1,5 @@
 using System;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -178,7 +179,7 @@ namespace Orleans.Runtime
         /// <exception cref="ArgumentException"><paramref name="value"/> is empty or contains a quote, whitespace, or a control character.</exception>
         public GrainInterfaceTypeAttribute(string value)
         {
-            Serialization.IdentityNameValidator.Validate(value, nameof(value));
+            IdentityNameValidator.Validate(value, nameof(value));
             _value = GrainInterfaceType.Create(value);
         }
 

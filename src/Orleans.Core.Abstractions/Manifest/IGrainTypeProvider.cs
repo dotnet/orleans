@@ -1,6 +1,7 @@
 using System;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.Metadata
 {
@@ -93,7 +94,7 @@ namespace Orleans
         /// <exception cref="ArgumentException"><paramref name="grainType"/> is empty or contains a quote, whitespace, or a control character.</exception>
         public GrainTypeAttribute(string grainType)
         {
-            Serialization.IdentityNameValidator.Validate(grainType, nameof(grainType));
+            IdentityNameValidator.Validate(grainType, nameof(grainType));
             this._grainType = GrainType.Create(grainType);
         }
 
