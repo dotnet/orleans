@@ -1,0 +1,32 @@
+using System.Threading;
+using System.Threading.Tasks;
+using Orleans.DurableTasks;
+using Orleans.DurableTasks.Protocol;
+
+namespace Orleans.DurableTasks.Runtime;
+
+internal sealed partial class DurableTaskGrainRuntime
+{
+    private sealed class CompletedTaskHandle(TaskId taskId, DurableTaskResponse response) : IScheduledTaskHandle
+    {
+        public TaskId TaskId => taskId;
+
+        public DurableTaskResponse Response => response;
+
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask AbortAsync(string reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(response);
+        }
+
+        public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(response);
+        }
+    }
+}
