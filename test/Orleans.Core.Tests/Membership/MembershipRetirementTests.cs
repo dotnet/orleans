@@ -28,6 +28,162 @@ public class MembershipRetirementTests
         _localDetails.Name.Returns("local");
     }
 
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(0, TimeSpan.TicksPerSecond)]
+    [InlineData(3600, TimeSpan.TicksPerSecond)]
+    public async Task Refresh_AgeAloneDoesNotPreventFirstRegistration(int retirementAgeSeconds, long elapsedTicks)
+    {
+        var clock = new FakeTimeProvider(Epoch.AddSeconds(_localDetails.SiloAddress.Generation + retirementAgeSeconds).AddTicks(elapsedTicks));
+        var table = new InMemoryMembershipTable();
+        using var manager = CreateManager(clock, table, new ClusterMembershipOptions
+        {
+            SiloGenerationRetirementAge = TimeSpan.FromSeconds(retirementAgeSeconds)
+        });
+
+        await manager.Refresh(cancellationToken: _cancellationToken);
+
+        Assert.Equal(_localDetails.SiloAddress.Generation + 1, manager.MembershipTableSnapshot.MinimumSiloGeneration);
+        Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(_localDetails.SiloAddress));
+        Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
+        Assert.Empty(manager.MembershipTableSnapshot.Entries);
+        await manager.UpdateStatus(SiloStatus.Joining, _cancellationToken);
+        Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
+        Assert.Equal(SiloStatus.Joining, Assert.Single((await table.ReadAllAsync(_cancellationToken)).Members).Item1.Status);
+        await manager.UpdateStatus(SiloStatus.Active, _cancellationToken);
+        Assert.Equal(SiloStatus.Active, manager.CurrentStatus);
+        Assert.Equal(SiloStatus.Active, manager.MembershipTableSnapshot.GetSiloStatus(_localDetails.SiloAddress));
+        var registered = Assert.Single((await table.ReadAllAsync(_cancellationToken)).Members).Item1;
+        Assert.Equal(_localDetails.SiloAddress, registered.SiloAddress);
+        Assert.Equal(SiloStatus.Active, registered.Status);
+        _fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+    }
+
+    [Theory]
+    [InlineData("dead-row", false)]
+    [InlineData("dead-row", true)]
+    [InlineData("history", false)]
+    [InlineData("history", true)]
+    [InlineData("successor", false)]
+    [InlineData("successor", true)]
+    [InlineData("successor-history", false)]
+    [InlineData("successor-history", true)]
+    public async Task Gossip_ExplicitDeathEvidenceTerminatesUnregisteredLocalSilo(string evidence, bool advanceFloor)
+    {
+        var self = _localDetails.SiloAddress;
+        using var manager = CreateManager(
+            new FakeTimeProvider(advanceFloor ? Epoch.AddSeconds(self.Generation + 2) : Epoch),
+            options: new ClusterMembershipOptions { SiloGenerationRetirementAge = TimeSpan.Zero });
+        await manager.RefreshFromSnapshot(
+            new MembershipTableSnapshot(new MembershipVersion(6), ImmutableDictionary<SiloAddress, MembershipEntry>.Empty), _cancellationToken);
+        Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
+        var entries = ImmutableDictionary<SiloAddress, MembershipEntry>.Empty;
+        var history = ImmutableHashSet<SiloAddress>.Empty;
+        if (evidence is "history" or "successor-history")
+        {
+            history = history.Add(evidence == "history" ? self : Silo(self.Endpoint.Port, self.Generation + 1));
+        }
+        else
+        {
+            var entry = evidence == "dead-row"
+                ? Entry(self, SiloStatus.Dead)
+                : Entry(Silo(self.Endpoint.Port, self.Generation + 1), SiloStatus.Active);
+            entries = entries.Add(entry.SiloAddress, entry);
+        }
+
+        await manager.RefreshFromSnapshot(new MembershipTableSnapshot(new MembershipVersion(7), entries, 0, history), _cancellationToken);
+
+        Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+        Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(self));
+        _fatalErrorHandler.Received(1).OnFatalException(manager, Arg.Any<string>(), null);
+    }
+
+    [Theory]
+    [InlineData(SiloStatus.Joining)]
+    [InlineData(SiloStatus.Active)]
+    [InlineData(SiloStatus.Dead)]
+    public async Task Gossip_DelayedRegistrationBelowAdvancedFloorStillTerminatesCreatedSilo(SiloStatus oldStatus)
+    {
+        var self = _localDetails.SiloAddress;
+        var clock = new FakeTimeProvider(Epoch.AddSeconds(self.Generation));
+        var table = new InMemoryMembershipTable(new TableVersion(2, "2"));
+        using var manager = CreateManager(clock, table, new ClusterMembershipOptions { SiloGenerationRetirementAge = TimeSpan.Zero });
+        await manager.Refresh(cancellationToken: _cancellationToken);
+        Assert.Equal(self.Generation, manager.MembershipTableSnapshot.MinimumSiloGeneration);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await manager.Refresh(cancellationToken: _cancellationToken);
+        var previous = manager.MembershipTableSnapshot;
+        Assert.Equal(self.Generation + 1, previous.MinimumSiloGeneration);
+        Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
+        _fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+
+        await manager.RefreshFromSnapshot(new MembershipTableSnapshot(new MembershipVersion(1),
+            ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(self, Entry(self, oldStatus))), _cancellationToken);
+
+        Assert.Equal(previous.Version, manager.MembershipTableSnapshot.Version);
+        Assert.Equal(previous.MinimumSiloGeneration, manager.MembershipTableSnapshot.MinimumSiloGeneration);
+        Assert.Empty(manager.MembershipTableSnapshot.Entries);
+        Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+        await manager.UpdateStatus(SiloStatus.Active, _cancellationToken);
+        Assert.Empty((await table.ReadAllAsync(_cancellationToken)).Members);
+        Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+        _fatalErrorHandler.Received(1).OnFatalException(manager, Arg.Any<string>(), null);
+    }
+
+    [Theory]
+    [InlineData(SiloStatus.Joining)]
+    [InlineData(SiloStatus.Active)]
+    [InlineData(SiloStatus.Dead)]
+    public async Task UpdateStatus_DelayedCompletionBelowAdvancedFloorStillTerminatesCreatedSilo(SiloStatus status)
+    {
+        var self = _localDetails.SiloAddress;
+        var clock = new FakeTimeProvider(Epoch.AddSeconds(self.Generation));
+        var table = new InMemoryMembershipTable();
+        var membershipTable = Substitute.For<IMembershipTable>();
+        membershipTable.ReadAllAsync(Arg.Any<CancellationToken>())
+            .Returns(call => table.ReadAllAsync(call.Arg<CancellationToken>()));
+        var committed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completeWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        membershipTable.InsertRowAsync(Arg.Any<MembershipEntry>(), Arg.Any<TableVersion>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                var token = call.Arg<CancellationToken>();
+                Assert.True(await table.InsertRowAsync(call.Arg<MembershipEntry>(), call.Arg<TableVersion>(), token));
+                committed.SetResult();
+                await completeWrite.Task.WaitAsync(token);
+                return true;
+            });
+        using var manager = CreateManager(clock, membershipTable,
+            new ClusterMembershipOptions { SiloGenerationRetirementAge = TimeSpan.Zero });
+        var updating = manager.UpdateStatus(status, _cancellationToken);
+        try
+        {
+            await committed.Task.WaitAsync(TimeSpan.FromSeconds(10), _cancellationToken);
+            Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
+            var written = await table.ReadAllAsync(_cancellationToken);
+            var row = Assert.Single(written.Members);
+            Assert.True(await table.UpdateRowAsync(row.Item1.WithStatus(SiloStatus.Dead), row.Item2, written.Version.Next(), _cancellationToken));
+            await table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, _cancellationToken);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            await manager.Refresh(cancellationToken: _cancellationToken);
+            Assert.Equal(self.Generation + 1, manager.MembershipTableSnapshot.MinimumSiloGeneration);
+            Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
+            Assert.Empty(manager.MembershipTableSnapshot.Entries);
+            _fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+        }
+        finally
+        {
+            completeWrite.TrySetResult();
+        }
+
+        await updating.WaitAsync(TimeSpan.FromSeconds(10), _cancellationToken);
+
+        Assert.Equal(new MembershipVersion(2), manager.MembershipTableSnapshot.Version);
+        Assert.Empty(manager.MembershipTableSnapshot.Entries);
+        Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+        _fatalErrorHandler.Received(1).OnFatalException(manager, Arg.Any<string>(), null);
+    }
+
     [Fact]
     public async Task Refresh_SameVersionFloorAdvancePublishesAndKeepsOldLiveRows()
     {

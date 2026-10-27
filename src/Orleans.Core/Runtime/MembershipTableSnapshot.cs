@@ -205,11 +205,13 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="silo">The silo address.</param>
         /// <returns>The silo status.</returns>
-        public SiloStatus GetSiloStatus(SiloAddress silo)
+        public SiloStatus GetSiloStatus(SiloAddress silo) => GetSiloStatus(silo, includeRetirement: true);
+
+        internal SiloStatus GetSiloStatus(SiloAddress silo, bool includeRetirement)
         {
             return this.Entries.TryGetValue(silo, out var entry)
                 ? entry.Status
-                : GetMissingSiloStatus(silo, MinimumSiloGeneration, RecentlyDeadSilos, Entries.Keys);
+                : GetMissingSiloStatus(silo, includeRetirement ? MinimumSiloGeneration : 0, RecentlyDeadSilos, Entries.Keys);
         }
 
         internal static SiloStatus GetMissingSiloStatus(
@@ -224,6 +226,14 @@ namespace Orleans.Runtime
             }
 
             foreach (var member in members)
+            {
+                if (member.IsSuccessorOf(silo))
+                {
+                    return SiloStatus.Dead;
+                }
+            }
+
+            foreach (var member in recentlyDeadSilos)
             {
                 if (member.IsSuccessorOf(silo))
                 {

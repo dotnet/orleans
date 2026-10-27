@@ -15,6 +15,48 @@ namespace UnitTests;
 public class ClusterMembershipSnapshotTests
 {
     [Theory]
+    [InlineData(0)]
+    [InlineData(10)]
+    public void MembershipTableSnapshot_PrunedSuccessorKeepsPredecessorDeadInEveryLookup(int floor)
+    {
+        var predecessor = CreateSiloAddress(10);
+        var successor = CreateSiloAddress(11);
+        var entry = new MembershipEntry { SiloAddress = successor, SiloName = "successor", Status = SiloStatus.Dead };
+        var table = new MembershipTableSnapshot(new MembershipVersion(7),
+            ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(successor, entry), floor);
+        var pruned = MembershipTableSnapshot.Update(table,
+            new MembershipTableSnapshot(table.Version, ImmutableDictionary<SiloAddress, MembershipEntry>.Empty));
+        var compacted = pruned.RetireGenerations(new DateTime(2022, 1, 1, 0, 0, 12, DateTimeKind.Utc), TimeSpan.Zero);
+
+        foreach (var view in new[] { table, pruned, compacted })
+        {
+            var snapshot = view.CreateClusterMembershipSnapshot();
+            Assert.Equal(view.MinimumSiloGeneration, snapshot.MinimumSiloGeneration);
+            Assert.Same(view.RecentlyDeadSilos, snapshot.RecentlyDeadSilos);
+            Assert.Equal(SiloStatus.Dead, snapshot.GetSiloStatus(predecessor));
+            foreach (var version in new[] { 6, 7, 8 })
+            {
+                Assert.Equal(SiloStatus.Dead, snapshot.GetSiloStatus(predecessor, new MembershipVersion(version)));
+            }
+
+            foreach (var unknown in new[] { CreateSiloAddress(12), CreateSiloAddress(12, port: 11112) })
+            {
+                Assert.Equal(SiloStatus.None, snapshot.GetSiloStatus(unknown));
+                Assert.Equal(SiloStatus.None, snapshot.GetSiloStatus(unknown, snapshot.Version));
+                Assert.Equal(SiloStatus.None, snapshot.GetSiloStatus(unknown, new MembershipVersion(8)));
+            }
+        }
+
+        Assert.Equal(successor, Assert.Single(pruned.RecentlyDeadSilos));
+        Assert.Empty(compacted.RecentlyDeadSilos);
+        var present = new ClusterMembershipSnapshot(
+            ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(predecessor, new ClusterMember(predecessor, SiloStatus.Active, "present")),
+            pruned.Version, 12, pruned.RecentlyDeadSilos);
+        Assert.Equal(SiloStatus.Active, present.GetSiloStatus(predecessor));
+        Assert.Equal(SiloStatus.Active, present.GetSiloStatus(predecessor, new MembershipVersion(6)));
+    }
+
+    [Theory]
     [InlineData(0, 1, SiloStatus.None)]
     [InlineData(10, -1, SiloStatus.None)]
     [InlineData(10, 0, SiloStatus.None)]

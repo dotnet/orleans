@@ -268,6 +268,47 @@ namespace NonSilo.Tests.Membership
             new(new MembershipVersion(7), entries.ToImmutableDictionary(entry => entry.SiloAddress), floor);
 
         [Theory]
+        [InlineData(0, false)]
+        [InlineData(0, true)]
+        [InlineData(10, false)]
+        [InlineData(10, true)]
+        public void Update_PruningSuccessorPreservesPredecessorDeath(int floor, bool fromPeer)
+        {
+            var predecessor = Silo("127.0.0.1:100@10");
+            var successor = Entry(Silo("127.0.0.1:100@11"), SiloStatus.Active);
+            var previous = RetirementSnapshot(floor, successor);
+            Assert.Equal(SiloStatus.Dead, previous.GetSiloStatus(predecessor));
+            var dead = successor.WithStatus(SiloStatus.Dead);
+            var deadView = fromPeer
+                ? MembershipTableSnapshot.Update(previous, new MembershipTableSnapshot(new MembershipVersion(8),
+                    ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(dead.SiloAddress, dead)))
+                : MembershipTableSnapshot.Update(previous, new MembershipTableData(Tuple.Create(dead, "dead"), new TableVersion(8, "8")));
+            var pruned = fromPeer
+                ? MembershipTableSnapshot.Update(deadView, new MembershipTableSnapshot(deadView.Version, ImmutableDictionary<SiloAddress, MembershipEntry>.Empty))
+                : MembershipTableSnapshot.Update(deadView, new MembershipTableData(new TableVersion(8, "8")));
+
+            Assert.Equal(SiloStatus.Dead, deadView.GetSiloStatus(predecessor));
+            Assert.Empty(pruned.Entries);
+            Assert.Equal(dead.SiloAddress, Assert.Single(pruned.RecentlyDeadSilos));
+            Assert.Equal(SiloStatus.Dead, pruned.GetSiloStatus(predecessor));
+            Assert.Equal(SiloStatus.Dead, pruned.GetSiloStatus(dead.SiloAddress));
+            Assert.Equal(SiloStatus.None, pruned.GetSiloStatus(Silo("127.0.0.1:200@10")));
+            Assert.Equal(SiloStatus.None, pruned.GetSiloStatus(Silo("127.0.0.1:100@12")));
+            var compacted = pruned.RetireGenerations(new DateTime(2022, 1, 1, 0, 0, 12, DateTimeKind.Utc), TimeSpan.Zero);
+            Assert.Equal(12, compacted.MinimumSiloGeneration);
+            Assert.Empty(compacted.RecentlyDeadSilos);
+            Assert.Equal(SiloStatus.Dead, compacted.GetSiloStatus(predecessor));
+            Assert.Equal(SiloStatus.Dead, compacted.GetSiloStatus(dead.SiloAddress));
+            Assert.Equal(SiloStatus.None, compacted.GetSiloStatus(Silo("127.0.0.1:100@12")));
+            Assert.Equal(floor, pruned.MinimumSiloGeneration);
+            Assert.Equal(dead.SiloAddress, Assert.Single(pruned.RecentlyDeadSilos));
+            var present = new MembershipTableSnapshot(pruned.Version,
+                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(predecessor, Entry(predecessor, SiloStatus.Active)),
+                12, pruned.RecentlyDeadSilos);
+            Assert.Equal(SiloStatus.Active, present.GetSiloStatus(predecessor));
+        }
+
+        [Theory]
         [InlineData("status")]
         [InlineData("proxy-port")]
         [InlineData("host")]
