@@ -39,6 +39,11 @@ namespace Orleans.Runtime.MembershipService
 
         public SiloStatus GetApproximateSiloStatus(SiloAddress silo)
         {
+            if (silo.Equals(this.SiloAddress))
+            {
+                return this.CurrentStatus;
+            }
+
             var status = this.membershipManager.CurrentSnapshot.GetSiloStatus(silo);
 
             if (status == SiloStatus.None)
