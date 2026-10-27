@@ -67,29 +67,28 @@ public class OrleansJsonSerializationBinderTests
         var exception = Assert.Throws<JsonSerializationException>(() =>
             binder.BindToType(typeof(DisallowedState).Assembly.GetName().Name, typeof(DisallowedState).FullName!));
 
-        Assert.Contains(nameof(OrleansJsonSerializerOptions.AllowAllTypes), exception.Message);
+        Assert.Contains(nameof(Orleans.Serialization.Configuration.TypeManifestOptions.AddAllowedType), exception.Message);
     }
 
     [Fact]
-    public void BindToType_NotAllowed_WithAllowAllTypes_ResolvesType()
+    public void BindToType_UnknownIdentity_WithAllowAllTypes_Throws()
     {
         using var services = BuildServiceProvider(typeof(AllowedState));
         var binder = CreateStrictBinder(services, allowAllTypes: true);
 
-        var type = binder.BindToType(typeof(DisallowedState).Assembly.GetName().Name, typeof(DisallowedState).FullName!);
-
-        Assert.Equal(typeof(DisallowedState), type);
+        Assert.Throws<JsonSerializationException>(() =>
+            binder.BindToType(typeof(DisallowedState).Assembly.GetName().Name, typeof(DisallowedState).FullName!));
     }
 
     [Fact]
-    public void BindToType_LegacyConstructor_ResolvesAnyType()
+    public void BindToType_LegacyConstructor_ReportsRequiredStrictConfiguration()
     {
         using var services = BuildServiceProvider(typeof(AllowedState));
         var binder = new OrleansJsonSerializationBinder(services.GetRequiredService<TypeResolver>());
 
-        var type = binder.BindToType(typeof(DisallowedState).Assembly.GetName().Name, typeof(DisallowedState).FullName!);
-
-        Assert.Equal(typeof(DisallowedState), type);
+        var error = Assert.Throws<JsonSerializationException>(() =>
+            binder.BindToType(typeof(DisallowedState).Assembly.GetName().Name, typeof(DisallowedState).FullName!));
+        Assert.Contains(nameof(TypeConverter), error.Message);
     }
 
     [Fact]
@@ -130,16 +129,25 @@ public class OrleansJsonSerializationBinderTests
     }
 
     [Fact]
-    public void Deserialize_DisallowedType_WithAllowAllTypes_Succeeds()
+    public void Deserialize_UnknownIdentity_WithAllowAllTypes_Throws()
     {
         using var services = BuildServiceProvider(typeof(AllowedState));
         var settings = CreateSettings(CreateStrictBinder(services, allowAllTypes: true));
         var json = CreateDisallowedPayload();
 
-        var result = JsonConvert.DeserializeObject(json, typeof(object), settings);
+        Assert.Throws<JsonSerializationException>(() => JsonConvert.DeserializeObject(json, typeof(object), settings));
+    }
 
-        var state = Assert.IsType<DisallowedState>(result);
-        Assert.Equal("gadget", state.Name);
+    [Fact]
+    public void BindToType_KnownAliasTarget_WithAllowAllTypes_ResolvesRegisteredIdentity()
+    {
+        var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+            options.WellKnownTypeAliases["known_state"] = typeof(DisallowedState)));
+        using var provider = services.BuildServiceProvider();
+        var binder = CreateStrictBinder(provider, allowAllTypes: true);
+
+        Assert.Same(typeof(DisallowedState),
+            binder.BindToType(typeof(DisallowedState).Assembly.GetName().Name, typeof(DisallowedState).FullName!));
     }
 
     private static string CreateDisallowedPayload()

@@ -28,6 +28,7 @@ namespace Orleans.Serialization.Codecs
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public static object? ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
+            FieldHeaderCodec.EnsureRequiredType(field);
             if (field.IsReference)
             {
                 return ReferenceCodec.ReadReference(ref reader, field.FieldType ?? typeof(object));

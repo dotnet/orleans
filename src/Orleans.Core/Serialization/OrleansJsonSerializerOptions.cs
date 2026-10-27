@@ -19,7 +19,7 @@ namespace Orleans.Serialization
         public JsonSerializerSettings JsonSerializerSettings { get; set; }
 
         /// <summary>
-        /// Gets or sets a value indicating whether any resolvable type may be constructed during
+        /// Gets or sets a value indicating whether any host-registered type may be constructed during
         /// deserialization, including types named in the serialized payload via
         /// <see cref="Newtonsoft.Json.TypeNameHandling"/>.
         /// </summary>
@@ -34,9 +34,9 @@ namespace Orleans.Serialization
         /// persisted or streamed state.
         /// </para>
         /// <para>
-        /// Setting this to <see langword="true"/> restores the previous behavior of allowing any loadable
-        /// type to be constructed during deserialization. This is <b>insecure</b> and is not recommended;
-        /// prefer allow-listing individual types instead.
+        /// Setting this to <see langword="true"/> bypasses authorization for host-established identities.
+        /// Register concrete polymorphic types with <see cref="Configuration.TypeManifestOptions.AddAllowedType"/>.
+        /// Prefer individual type grants for less-trusted input.
         /// </para>
         /// </remarks>
         public bool AllowAllTypes { get; set; }

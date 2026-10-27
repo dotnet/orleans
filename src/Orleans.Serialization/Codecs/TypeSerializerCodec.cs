@@ -142,6 +142,7 @@ namespace Orleans.Serialization.Codecs
             }
 
             if (result is null) ThrowMissingType();
+            reader.Session.TypeCodec.ValidateType(result);
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }

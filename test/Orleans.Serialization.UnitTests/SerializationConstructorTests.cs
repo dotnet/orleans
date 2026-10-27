@@ -241,6 +241,7 @@ public sealed class SerializationConstructorTests
     {
         using var services = new ServiceCollection()
             .AddSerializer()
+            .Configure<Configuration.TypeManifestOptions>(options => options.AddAllowedType(typeof(CallbackValue)))
             .AddSingleton<Serializers.IGeneralizedCodec, DotNetSerializableCodec>()
             .BuildServiceProvider();
         var serializer = services.GetRequiredService<Serializer<object>>();

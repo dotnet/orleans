@@ -4,6 +4,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Persistence.TestKit;
 using Orleans.Serialization;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using Xunit;
@@ -30,6 +31,8 @@ public sealed class FileGrainStorageTestFixture : GrainStorageTestFixture, IAsyn
 
     protected override void ConfigureSilo(ISiloBuilder siloBuilder)
     {
+        siloBuilder.Services.Configure<TypeManifestOptions>(
+            options => options.AddAllowedType(typeof(FileStorageTestState)));
         siloBuilder.AddFileGrainStorage(
             StorageProviderName,
             options => options.RootDirectory = _temporaryDirectory.RootDirectory);

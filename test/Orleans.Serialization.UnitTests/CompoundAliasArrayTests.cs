@@ -14,7 +14,9 @@ namespace Orleans.Serialization.UnitTests;
 [TestArea("Serialization")]
 public sealed class CompoundAliasArrayTests : IDisposable
 {
-    private readonly ServiceProvider _services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+    private readonly ServiceProvider _services = new ServiceCollection()
+        .AddSerializer(builder => builder.Configure(options => options.AddAllowedType(typeof(MyTypeAliasClass))))
+        .BuildServiceProvider();
 
     [Theory]
     [InlineData("(\"marker\")[]", "Resolved.Marker[],New.Assembly")]
