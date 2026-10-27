@@ -71,6 +71,63 @@ public sealed class TaggedUnionDiagnosticTests
         AssertNoErrors(output);
     }
 
+    [Fact]
+    public void PermutedCaseParametersAndConstraintsGenerateCompilableCodec()
+    {
+        var (output, result) = Generate("""
+            [GenerateSerializer] public closed record Pair<T, U> where T : class where U : struct;
+            [GenerateSerializer, Case(7)] internal sealed record Item<X, Y>([property: Id(0)] X First, [property: Id(1)] Y Second)
+                : Pair<Y, X> where X : struct where Y : class;
+            [GenerateSerializer] public closed record Related<T, U> where T : U;
+            [GenerateSerializer, Case(0)] public sealed record RelatedItem<X, Y>([property: Id(0)] Y Value)
+                : Related<Y, X> where Y : X;
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        AssertNoErrors(output);
+        Assert.Contains("global::Item<U, T>", GetCodec(result, "Codec_Pair").NormalizeWhitespace().ToFullString(), StringComparison.Ordinal);
+        Assert.Contains("global::RelatedItem<U, T>", GetCodec(result, "Codec_Related").NormalizeWhitespace().ToFullString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("class", "class")]
+    [InlineData("struct", "struct")]
+    [InlineData("unmanaged", "unmanaged")]
+    [InlineData("new()", "new()")]
+    [InlineData("System.IComparable<T>", "System.IComparable<X>")]
+    [InlineData("System.Collections.Generic.IEnumerable<T[]>", "System.Collections.Generic.IEnumerable<X[]>")]
+    [InlineData("System.Collections.Generic.IEnumerable<T[,]>", "System.Collections.Generic.IEnumerable<X[,]>")]
+    public void MatchingCaseConstraintsGenerateCompilableCodec(string baseConstraint, string caseConstraint)
+    {
+        var (output, result) = Generate($$"""
+            [GenerateSerializer] public closed record Base<T> where T : {{baseConstraint}};
+            [GenerateSerializer, Case(0)] public sealed record Item<X>([property: Id(0)] X Value) : Base<X> where X : {{caseConstraint}};
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        AssertGeneratesTaggedUnionCodec(result);
+        AssertNoErrors(output);
+    }
+
+    [Theory]
+    [InlineData("class")]
+    [InlineData("struct")]
+    [InlineData("unmanaged")]
+    [InlineData("new()")]
+    [InlineData("System.IComparable<X>")]
+    [InlineData("System.Collections.Generic.IEnumerable<X[]>")]
+    public void StrongerCaseConstraintsProduceGeneratorErrors(string constraint)
+    {
+        var (_, result) = Generate($$"""
+            [GenerateSerializer] public closed record Base<T>;
+            [GenerateSerializer, Case(0)] public sealed record Item<X>([property: Id(0)] X Value) : Base<X> where X : {{constraint}};
+            """);
+
+        var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("has type parameter constraints which closed type 'Base<T>' does not declare", diagnostic.GetMessage(), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -208,6 +265,24 @@ public sealed class TaggedUnionDiagnosticTests
         }
         """,
         "Case type 'Outer.Hidden' of 'Outer.Base' is not accessible to generated code")]
+    [InlineData(
+        """
+        [GenerateSerializer] public closed record Base<T, U>;
+        [GenerateSerializer, Case(0)] public sealed record Item<X, Y>([property: Id(0)] X Value) : Base<X, X>;
+        """,
+        "Case 'Item<X, Y>' must pass its own type parameters as the type arguments of 'Base<T, U>'")]
+    [InlineData(
+        """
+        [GenerateSerializer] public closed record Base<T> where T : struct;
+        [GenerateSerializer, Case(0)] public sealed record Item<X>([property: Id(0)] X Value) : Base<X> where X : unmanaged;
+        """,
+        "Case 'Item<X>' has type parameter constraints which closed type 'Base<T>' does not declare")]
+    [InlineData(
+        """
+        [GenerateSerializer] public closed record Base<T, U>;
+        [GenerateSerializer, Case(0)] public sealed record Item<X, Y>([property: Id(0)] X Value) : Base<X, Y> where X : Y;
+        """,
+        "Case 'Item<X, Y>' has type parameter constraints which closed type 'Base<T, U>' does not declare")]
     [InlineData(
         """
         public sealed record Cat;
