@@ -522,11 +522,51 @@ public sealed class DurableStateManagerTests
         Assert.Equal(2, storage.AppendCount);
     }
 
+    [Fact]
+    public async Task PersistentState_WithoutRecord_CreatesStateWithSerializerActivator()
+    {
+        var grainId = GrainId.Create("registry-test", "persistent-default");
+        var storage = new ControlledStorage();
+        var builder = CreateBuilder();
+        builder.AddJournaling();
+        builder.Services.AddSingleton<IJournalStorageProvider>(new SingleJournalProvider(JournalId.FromGrainId(grainId), storage));
+        await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
+        await using var scope = CreateActivationScope(services, grainId);
+        var owner = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        var manager = scope.ServiceProvider.GetRequiredService<IDurableStateManager>();
+
+        var constructed = manager.GetOrAddPersistentState<ConstructedState>("constructed");
+        var positional = manager.GetOrAddPersistentState<TestDurableGrainState>("positional");
+        var nullable = manager.GetOrAddPersistentState<int?>("nullable");
+        await owner.InitializeAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(constructed.RecordExists);
+        Assert.Equal(ConstructedState.InitialValue, constructed.State.Value);
+        Assert.Same(constructed.State, constructed.State);
+        Assert.Equal(new TestDurableGrainState(null!, 0), positional.State);
+        Assert.False(nullable.RecordExists);
+        Assert.Null(nullable.State);
+
+        nullable.State = 7;
+        await nullable.WriteStateAsync(TestContext.Current.CancellationToken);
+        await scope.DisposeAsync();
+
+        await using var recoveredScope = CreateActivationScope(services, grainId);
+        var recoveredOwner = recoveredScope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        var recovered = recoveredScope.ServiceProvider.GetRequiredService<IDurableStateManager>()
+            .GetOrAddPersistentState<int?>("nullable");
+        await recoveredOwner.InitializeAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(recovered.RecordExists);
+        Assert.Equal(7, recovered.State);
+    }
+
     private static TestSiloBuilder CreateBuilder(bool withGrainContext = true)
     {
         var builder = new TestSiloBuilder();
         builder.Services.AddSerializer();
         builder.Services.AddLogging();
+        builder.Services.AddSingleton(JournalingTestBase.CreateGrainPropertiesResolver());
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, TimeProvider.System);
         builder.Services.Configure<JournaledStateManagerOptions>(
             options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
@@ -825,5 +865,14 @@ public sealed class DurableStateManagerTests
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken)
             => _inner.DeleteAsync(cancellationToken);
+    }
+
+    [GenerateSerializer]
+    public sealed class ConstructedState
+    {
+        public const string InitialValue = "initial";
+
+        [Id(0)]
+        public string Value { get; set; } = InitialValue;
     }
 }

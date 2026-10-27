@@ -14,6 +14,7 @@ internal static class SqsSnippets
             .AddDynamoDBGrainStorage("PubSubStore", options =>
             {
                 options.Service = "us-east-1";
+                options.ServiceId = "orders";
                 options.TableName = "OrdersPubSub";
             })
             .AddSqsStreams("Orders", options =>

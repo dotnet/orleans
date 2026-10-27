@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -218,6 +219,10 @@ namespace Orleans.GrainReferences
                 _mapping[id] = type;
             }
 
+            [UnconditionalSuppressMessage(
+                "Trimming",
+                "IL2070",
+                Justification = "TypeManifestOptions.AddInterfaceProxy preserves registered proxy interfaces before the types enter the manifest collection.")]
             static Type GetMainInterface(Type t)
             {
                 var all = t.GetInterfaces();
@@ -319,6 +324,10 @@ namespace Orleans.GrainReferences
         }
 
         /// <inheritdoc />
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2067",
+            Justification = "Generated proxies are registered using TypeManifestOptions.AddInterfaceProxy, which preserves their public constructors before they enter RpcProvider's mapping.")]
         public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, [NotNullWhen(true)] out IGrainReferenceActivator? activator)
         {
             if (!_rpcProvider.TryGet(interfaceType, out var proxyType))
@@ -365,12 +374,25 @@ namespace Orleans.GrainReferences
             /// </summary>
             /// <param name="referenceType">The generated proxy object type.</param>
             /// <param name="shared">The functionality shared between all grain references for a specified grain type and grain interface type.</param>
-            public GrainReferenceActivator(Type referenceType, GrainReferenceShared shared)
+            [UnconditionalSuppressMessage(
+                "Trimming",
+                "IL2070",
+                Justification = "Generated proxy public constructors are preserved by AddInterfaceProxy. Non-public constructors remain supported for explicitly preserved custom proxies.")]
+            public GrainReferenceActivator(
+                [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type referenceType,
+                GrainReferenceShared shared)
             {
                 _shared = shared;
 
                 var ctor = referenceType.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, new[] { typeof(GrainReferenceShared), typeof(IdSpan) })
                     ?? throw new SerializerException("Invalid proxy type: " + referenceType);
+
+                if (!RuntimeFeature.IsDynamicCodeSupported)
+                {
+                    var invoker = ConstructorInvoker.Create(ctor);
+                    _create = (shared, key) => (GrainReference)invoker.Invoke(shared, key);
+                    return;
+                }
 
                 var method = new DynamicMethod(referenceType.Name, typeof(GrainReference), new[] { typeof(object), typeof(GrainReferenceShared), typeof(IdSpan) });
                 var il = method.GetILGenerator();

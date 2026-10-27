@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Text;
+using System.Text.Unicode;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -178,8 +179,8 @@ internal sealed partial class NatsConnectionManager
             throw new InvalidOperationException("Unable to enqueue message because the NATS context is not initialized.");
         }
 
-        var ns = message.StreamId.Namespace.IsEmpty ? "null" : Encoding.UTF8.GetString(message.StreamId.Namespace.Span);
-        var id = Encoding.UTF8.GetString(message.StreamId.Key.Span);
+        var ns = GetSubjectToken(message.StreamId.Namespace.Span, isNamespace: true);
+        var id = GetSubjectToken(message.StreamId.Key.Span);
 
         var subject = $"{this._providerName}.{ns}.{id}";
 
@@ -217,6 +218,36 @@ internal sealed partial class NatsConnectionManager
 
     internal static int GetProducerIndex(int hashCode, int producerCount)
         => (int)((uint)hashCode % (uint)producerCount);
+
+    internal static string GetSubjectToken(ReadOnlySpan<byte> value, bool isNamespace = false)
+    {
+        if (isNamespace && value.IsEmpty)
+        {
+            return "null";
+        }
+
+        if (!value.IsEmpty && value[0] != (byte)'~' && Utf8.IsValid(value))
+        {
+            var token = Encoding.UTF8.GetString(value);
+            var valid = !isNamespace || token != "null";
+            foreach (var character in token)
+            {
+                if (character is '.' or '*' or '>' || char.IsWhiteSpace(character) || char.IsControl(character))
+                {
+                    valid = false;
+                    break;
+                }
+            }
+
+            if (valid)
+            {
+                return token;
+            }
+        }
+
+        // Reserve '~' so encoded bytes and literal tokens have distinct identities.
+        return $"~{Convert.ToHexString(value)}";
+    }
 
     /// <summary>
     /// Acknowledge messages on a subject in a NATS JetStream stream

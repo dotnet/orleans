@@ -369,8 +369,13 @@ internal sealed class MembershipModelExecutionContext
                     break;
                 case MembershipOperationKind.ReadPresentRow:
                 case MembershipOperationKind.ReadAbsentRow:
+                    // Retain generated operation identities while selecting from one full snapshot.
+                    var snapshot = await writer.ReadAllAsync(_ct);
+                    var selected = snapshot.TryGet(input.SiloAddress);
                     MembershipTableTestRunner.Equal(before.Select(input.SiloAddress),
-                        ClusteringMembershipSnapshot.Capture(await writer.ReadRowAsync(input.SiloAddress, _ct)));
+                        ClusteringMembershipSnapshot.Capture(selected is null
+                            ? new MembershipTableData(snapshot.Version)
+                            : new MembershipTableData(selected, snapshot.Version)));
                     break;
                 case MembershipOperationKind.InsertNew:
                 case MembershipOperationKind.StartSuccessor:

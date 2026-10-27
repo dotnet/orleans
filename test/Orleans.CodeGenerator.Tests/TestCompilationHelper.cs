@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 
@@ -20,6 +21,29 @@ internal static class TestCompilationHelper
         ? StringComparer.OrdinalIgnoreCase
         : StringComparer.Ordinal;
     private static readonly ImmutableArray<MetadataReference> FrameworkReferences = CreateFrameworkReferences();
+
+    public static AnalyzerConfigOptionsProvider CreateOptionsProvider(IReadOnlyDictionary<string, string>? globalOptions = null)
+    {
+        var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["build_property.TargetFrameworkIdentifier"] = ".NETCoreApp",
+#if NET8_0
+            ["build_property.TargetFrameworkVersion"] = "v8.0",
+#else
+            ["build_property.TargetFrameworkVersion"] = "v10.0",
+#endif
+        };
+
+        if (globalOptions is not null)
+        {
+            foreach (var (key, value) in globalOptions)
+            {
+                options[key] = value;
+            }
+        }
+
+        return new TestOptionsProvider(options);
+    }
 
     /// <summary>
     /// Creates a <see cref="CSharpCompilation"/> with the .NET framework and Orleans assembly references.
@@ -100,5 +124,18 @@ internal static class TestCompilationHelper
             .Where(path => !runtimeAssemblies.ContainsKey(Path.GetFileName(path)!))
             .Concat(runtimeAssemblies.Values)
             .ToImmutableArray();
+    }
+
+    private sealed class TestOptionsProvider(IReadOnlyDictionary<string, string> options) : AnalyzerConfigOptionsProvider
+    {
+        private static readonly AnalyzerConfigOptions EmptyOptions = new TestOptions(new Dictionary<string, string>());
+        public override AnalyzerConfigOptions GlobalOptions { get; } = new TestOptions(options);
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => EmptyOptions;
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => EmptyOptions;
+    }
+
+    private sealed class TestOptions(IReadOnlyDictionary<string, string> options) : AnalyzerConfigOptions
+    {
+        public override bool TryGetValue(string key, out string value) => options.TryGetValue(key, out value!);
     }
 }

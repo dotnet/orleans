@@ -1,13 +1,13 @@
 ---
 title: Configure Orleans Journaling
 description: Select an experimental Orleans Journaling storage provider and journal format.
-ms.date: 08/21/2026
+ms.date: 10/19/2026
 ms.topic: how-to
 ---
 
 # Configure Orleans Journaling
 
-Configure a default journal storage provider on every silo that hosts grains or activation-scoped features using <xref:Orleans.Journaling.IDurableStateManager>. Additional named providers give journal consumers independent storage namespaces alongside default grain journaling. Provider registration also adds the core Journaling services, durable-state factories and keyed services, activation lifecycle integration, JSON format, and Orleans binary reader.
+Configure the journal storage providers selected by grains or activation-scoped features using <xref:Orleans.Journaling.IDurableStateManager> on every silo that hosts those grain types. Named providers give grain types and standalone journal consumers independent storage namespaces. Grain types without an explicit selection use `Default`. Provider registration also adds the core Journaling services, durable-state factories and keyed services, activation lifecycle integration, JSON format, and Orleans binary reader.
 
 The Journaling packages are pre-release alpha packages and their APIs carry diagnostic `ORLEANSEXP005`.
 
@@ -25,13 +25,14 @@ See [Use durable state](durable-state.md) for source-backed constructor injectio
 
 ## Choose a storage provider
 
-| Provider | Package | Storage model | Compaction trigger |
-| --- | --- | --- | --- |
-| [Azure Blob Storage](azure-storage.md#azure-blob-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | Append blob plus immutable checkpoint blobs | Append-blob block budget |
-| [Azure Table Storage](azure-storage.md#azure-table-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | One partition per journal with header and ordered data rows | Row count or journal bytes |
-| [Redis](redis-journal-storage.md) | `Microsoft.Orleans.Journaling.Redis` | String journal plus hash metadata | Journal bytes |
+| Provider | Package | Storage model | Compaction trigger | Largest append |
+| --- | --- | --- | --- | --- |
+| [Azure Blob Storage](azure-storage.md#azure-blob-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | Append blob plus immutable checkpoint blobs | Append-blob block budget | 100 MiB |
+| [Azure Table Storage](azure-storage.md#azure-table-storage) | `Microsoft.Orleans.Journaling.AzureStorage` | One partition per journal with header and ordered data rows | Row count or journal bytes | 2 MiB |
+| [Redis](redis-journal-storage.md) | `Microsoft.Orleans.Journaling.Redis` | String journal plus hash metadata | Journal bytes | Whole journal within the server's string limit (512 MB by default) |
+| Amazon S3 | `Microsoft.Orleans.Journaling.S3` | WAL object plus immutable checkpoint objects | Append part budget | 5 GB |
 
-Select a provider based on atomic-write limits, replay latency, durability configuration, backup tooling, maximum hot-grain size, and operational familiarity.
+Every provider writes each append and replacement all-or-nothing and fails a write which exceeds its limits as a whole; see [Journal storage contract](runtime-behavior.md#journal-storage-contract). Select a provider based on atomic-write limits, replay latency, durability configuration, backup tooling, maximum hot-grain size, and operational familiarity.
 
 ## Select named providers
 
@@ -63,8 +64,8 @@ it contains work.
 Configure each journal storage binding under `Orleans:Journaling:{name}`.
 `ProviderType` selects its storage provider, and `ServiceKey` selects its Azure
 or Redis client from dependency injection. Orleans passes each entry's name and
-configuration section to the registered provider builder. Use `Default` as the
-name for grain journaling; other names configure additional storage bindings.
+configuration section to the registered provider builder. Use `Default` for grain
+types with the default selection, and additional names for selected storage bindings.
 
 For example, these entries configure the default journal and an archive with
 separate registered Redis clients and key prefixes:
@@ -90,6 +91,38 @@ separate registered Redis clients and key prefixes:
 
 The equivalent environment-variable key for the archive client is
 `Orleans__Journaling__archive__ServiceKey`.
+
+### Select storage per grain type
+
+Apply <xref:Orleans.Journaling.JournalStorageProviderAttribute> to a grain class to
+select its registered, ordinal, case-sensitive provider name. Orleans publishes
+the selection in grain-type metadata and resolves it when creating the activation's
+shared state manager. An inherited attribute supplies the base class's selection;
+an attribute on a derived grain class supplies that type's selection.
+
+Register the same names and physical namespaces on every silo hosting the grain
+types. For example, two named Azure Blob providers can use separate containers
+alongside the default container:
+
+:::code language="csharp" source="./snippets/journaling/GrainJournalProviders.cs" id="configure_grain_providers":::
+
+Both <xref:Orleans.Journaling.DurableGrain> helpers and constructor injection use
+the selected provider:
+
+:::code language="csharp" source="./snippets/journaling/GrainJournalProviders.cs" id="select_grain_providers":::
+
+All injected durable values, collections, and journaling-backed
+<xref:Orleans.Runtime.IPersistentState`1> share that activation's manager and write
+boundary. The provider stays fixed for the activation's lifetime. Invalid or
+unregistered selections fail with a configuration error identifying the grain type
+and provider before journal data is accessed.
+
+Recovery reads the selected physical namespace using the grain's existing journal
+identity. Changing a grain type's selection directs new activations to the new
+namespace. For grain types with existing journals, plan a deliberate data migration
+or cutover: stop writes to the old namespace, transfer and verify journals with
+their metadata, and deploy the new selection consistently across silos. Include
+the provider selection and namespace in the rollback plan.
 
 For Durable Jobs, <xref:Orleans.Hosting.DurableJobsExtensions.UseJournaledDurableJobs*>
 selects the journaled implementation.
@@ -145,5 +178,26 @@ The default minimum is seven days. Removal is persisted by a compaction after th
 ## Development storage
 
 <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournaling*> registers the core services, formats, durable-state factories, and lifecycle integration. Register storage through a provider-specific method or the generic <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournalStorage*> method. Runtime tests and disposable development hosts can use <xref:Orleans.Journaling.JournalingHostingExtensions.AddVolatileJournalStorage*> with a provider name. Its contents live in process memory, so use persistent emulator storage to validate restart recovery and provider migration.
+
+<xref:Orleans.Journaling.VolatileJournalStorageOptions> controls the retained append
+history. The defaults request a snapshot after **100 successful appends or 1 MiB
+(1,048,576 bytes)** of appended data, whichever limit is reached first:
+
+:::code language="csharp" source="./snippets/journaling/JournalingConfiguration.cs" id="volatile_journal_thresholds":::
+
+The state manager observes that request before its next write. That write replaces
+the history with a snapshot of current state; successful replacement resets both
+counters. Snapshot bytes are excluded from the appended-byte count. Deletion and
+recreation begin with empty history. Each limit must be positive; a single append
+can exceed the byte threshold.
+
+Use the overload accepting a provider name and options delegate to configure
+independent named thresholds. Providers capture the configured limits when
+constructed. Counters belong to each journal and are shared by
+handles for the same journal within one provider. Larger limits amortize
+full-state snapshot copies over more updates; smaller limits reduce retained
+append history and replay work. Size both limits alongside the current snapshot.
+Retained memory includes the latest snapshot, appended encoded bytes up to and
+including the crossing append, and the storage provider's bookkeeping.
 
 Use the same durable provider category in staging that production uses so recovery, compaction, concurrency, and backup procedures receive realistic validation.

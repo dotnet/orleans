@@ -19,10 +19,45 @@ namespace Tester.Cosmos.Clustering;
 public class CosmosMembershipTableCancellationTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RetiredRowReadsRejectWithoutInitializationOrStorage(bool initialized)
+    {
+        using var storage = new CosmosMembershipTestStorage();
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var factoryCalls = 0;
+        var options = new CosmosClusteringOptions();
+        options.ConfigureCosmosClient(_ =>
+        {
+            factoryCalls++;
+            throw new InvalidOperationException("Unexpected initialization.");
+        });
+        var table = initialized ? storage.Table : CreateTable(services, options);
+        const string guidance = "Use ReadAllAsync and MembershipTableData.TryGet instead.";
+#pragma warning disable CS0618 // Verify the retired compatibility entry points.
+        var legacy = table.ReadRow(null!);
+        var asynchronous = table.ReadRowAsync(null!, Token);
+        var token = new CancellationToken(canceled: true);
+        var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => table.ReadRowAsync(null!, token));
+#pragma warning restore CS0618
+        Assert.True(legacy.IsFaulted);
+        Assert.True(asynchronous.IsFaulted);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => legacy)).Message);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => asynchronous)).Message);
+        Assert.Equal(token, canceled.CancellationToken);
+        Assert.Equal(0, factoryCalls);
+        Assert.Empty(storage.Container.ReceivedCalls());
+        foreach (var name in new[] { "ReadRow", "ReadRowAsync" })
+        {
+            Assert.Equal(guidance, Assert.IsType<ObsoleteAttribute>(
+                Attribute.GetCustomAttribute(table.GetType().GetMethod(name)!, typeof(ObsoleteAttribute))).Message);
+        }
+    }
+
+    [Theory]
     [InlineData("Initialize")]
     [InlineData("Delete")]
     [InlineData("Cleanup")]
-    [InlineData("ReadRow")]
     [InlineData("ReadAll")]
     [InlineData("Insert")]
     [InlineData("Update")]
@@ -43,7 +78,6 @@ public class CosmosMembershipTableCancellationTests
             "Initialize" => table.InitializeMembershipTableAsync(true, token),
             "Delete" => table.DeleteMembershipTableEntriesAsync("cluster", token),
             "Cleanup" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, token),
-            "ReadRow" => table.ReadRowAsync(silo, token),
             "ReadAll" => table.ReadAllAsync(token),
             "Insert" => table.InsertRowAsync(entry, version, token),
             "Update" => table.UpdateRowAsync(entry, "etag", version, token),
@@ -164,7 +198,6 @@ public class CosmosMembershipTableCancellationTests
 
     [Theory]
     [InlineData("Initialize", 1, 0)]
-    [InlineData("ReadRow", 3, 0)]
     [InlineData("ReadAll", 2, 1)]
     [InlineData("Cleanup", 0, 1)]
     [InlineData("Delete", 2, 1)]
@@ -186,7 +219,6 @@ public class CosmosMembershipTableCancellationTests
         await (operation switch
         {
             "Initialize" => CreateTable(services, options).InitializeMembershipTableAsync(true, Token),
-            "ReadRow" => storage.Table.ReadRowAsync(Entry().SiloAddress, Token),
             "ReadAll" => storage.Table.ReadAllAsync(Token),
             "Cleanup" => storage.Table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.UnixEpoch.AddDays(1), Token),
             "Delete" => storage.Table.DeleteMembershipTableEntriesAsync("cluster", Token),
@@ -226,10 +258,8 @@ public class CosmosMembershipTableCancellationTests
         Assert.Single(storage.Container.ReceivedCalls());
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task MembershipReadsRetryChangedVersion(bool pointRead)
+    [Fact]
+    public async Task MembershipReadsRetryChangedVersion()
     {
         using var storage = new CosmosMembershipTestStorage();
         var oldSilo = Silo();
@@ -237,28 +267,16 @@ public class CosmosMembershipTableCancellationTests
         storage.Container.ReadItemAsync<ClusterVersionEntity>(
             "", default, null, Token)
             .ReturnsForAnyArgs(Version(7, "v7", "0:7"), Version(8, "v8", "0:9"), Version(8, "v8", "0:9"), Version(8, "v8", "0:10"));
-        storage.Container.ReadItemAsync<SiloEntity>(
-            "", default, null, Token)
-            .ReturnsForAnyArgs(Item(oldSilo, "0:8"), Item(currentSilo, "0:10"));
         storage.SetPages(Page("0:8", null, oldSilo), Page("0:10", null, currentSilo));
 
-        var result = pointRead
-            ? await storage.Table.ReadRowAsync(Entry().SiloAddress, Token)
-            : await storage.Table.ReadAllAsync(Token);
+        var result = await storage.Table.ReadAllAsync(Token);
 
-        Assert.Equal(SiloStatus.Dead, Assert.Single(result.Members).Item1.Status);
+        Assert.Equal(SiloStatus.Dead, result.TryGet(Entry().SiloAddress)!.Item1.Status);
         Assert.Equal(8, result.Version.Version);
         Assert.Equal("v8", result.Version.VersionEtag);
         Assert.Equal("v8", Assert.Single(result.Members).Item2);
         storage.AssertVersionReads(4);
-        if (pointRead)
-        {
-            var reads = storage.Container.ReceivedCalls().Where(call =>
-                call.GetMethodInfo().Name == "ReadItemAsync"
-                && call.GetMethodInfo().GetGenericArguments().Contains(typeof(SiloEntity))).ToArray();
-            Assert.Equal(2, reads.Length);
-            Assert.All(reads, call => Assert.Null(call.GetArguments()[2]));
-        }
+        Assert.Equal(2, storage.PageReadCount);
     }
 
     [Fact]
@@ -308,13 +326,12 @@ public class CosmosMembershipTableCancellationTests
     {
         using var storage = new CosmosMembershipTestStorage();
         storage.SetVersion();
-        storage.Container.ReadItemAsync<SiloEntity>(
-            "", default, null, Token)
-            .ReturnsForAnyArgs(Task.FromException<ItemResponse<SiloEntity>>(Failure(HttpStatusCode.NotFound)));
+        storage.SetPages(Page("0:8", null, Silo(2)));
 
-        var result = await storage.Table.ReadRowAsync(Entry().SiloAddress, Token);
+        var result = await storage.Table.ReadAllAsync(Token);
 
-        Assert.Empty(result.Members);
+        Assert.Null(result.TryGet(Entry().SiloAddress));
+        Assert.Equal(Entry(2).SiloAddress, Assert.Single(result.Members).Item1.SiloAddress);
         Assert.Equal(7, result.Version.Version);
         Assert.Equal("v7", result.Version.VersionEtag);
         storage.AssertVersionReads(2);
@@ -378,20 +395,15 @@ public class CosmosMembershipTableCancellationTests
         Assert.False(result);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task HeartbeatPreservesCanonicalTokensForMembershipUpdate(bool pointRead)
+    [Fact]
+    public async Task HeartbeatPreservesCanonicalTokensForMembershipUpdate()
     {
         using var storage = new CosmosMembershipTestStorage();
         var silo = Silo();
         storage.SetVersion();
-        storage.SetSilo(silo);
         storage.SetPages(Page("0:8", null, Clone(silo)));
-        var before = pointRead
-            ? await storage.Table.ReadRowAsync(Entry().SiloAddress, Token)
-            : await storage.Table.ReadAllAsync(Token);
-        var (entry, rowToken) = Assert.Single(before.Members);
+        var before = await storage.Table.ReadAllAsync(Token);
+        var (entry, rowToken) = Assert.IsType<Tuple<MembershipEntry, string>>(before.TryGet(Entry().SiloAddress));
         Assert.Equal(before.Version.VersionEtag, rowToken);
         Assert.NotEqual(silo.ETag, rowToken);
 
@@ -804,8 +816,7 @@ public class CosmosMembershipTableCancellationTests
     }
 
     [Theory]
-    [InlineData("ReadRow", HttpStatusCode.NotFound, 0)]
-    [InlineData("ReadRow", HttpStatusCode.NotFound, 1002)]
+    [InlineData("ReadAll", HttpStatusCode.NotFound, 1002)]
     [InlineData("ReadAll", HttpStatusCode.NotFound, 0)]
     [InlineData("Cleanup", HttpStatusCode.NotFound, 0)]
     [InlineData("Cleanup", HttpStatusCode.Forbidden, 0)]
@@ -826,7 +837,6 @@ public class CosmosMembershipTableCancellationTests
 
         var exception = await Assert.ThrowsAsync<WrappedException>(() => operation switch
         {
-            "ReadRow" => storage.Table.ReadRowAsync(Entry().SiloAddress, Token),
             "ReadAll" => storage.Table.ReadAllAsync(Token),
             "Cleanup" => storage.Table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.UnixEpoch.AddDays(1), Token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
@@ -874,23 +884,18 @@ public class CosmosMembershipTableCancellationTests
         Assert.DoesNotContain(storage.Container.ReceivedCalls(), call => call.GetMethodInfo().Name == "DeleteItemAsync");
     }
 
-    [Theory]
-    [InlineData("ReadRow")]
-    public async Task SessionUnavailableRemainsVisibleWithSurvivingVersion(string operation)
+    [Fact]
+    public async Task SessionUnavailableRemainsVisibleWithSurvivingVersion()
     {
         using var storage = new CosmosMembershipTestStorage();
         storage.SetVersion();
-        storage.Container.ReadItemAsync<SiloEntity>("", default, null, Token)
-            .ReturnsForAnyArgs(Task.FromException<ItemResponse<SiloEntity>>(Failure(HttpStatusCode.NotFound, 1002)));
+        storage.SetPageFailure(Failure(HttpStatusCode.NotFound, 1002));
 
-        var exception = await Assert.ThrowsAsync<WrappedException>(() => operation switch
-        {
-            "ReadRow" => storage.Table.ReadRowAsync(Entry().SiloAddress, Token),
-            _ => throw new ArgumentOutOfRangeException(nameof(operation))
-        });
+        var exception = await Assert.ThrowsAsync<WrappedException>(() => storage.Table.ReadAllAsync(Token));
 
         Assert.Contains("storage failure", exception.Message);
-        Assert.Equal(operation == "ReadRow" ? 2 : 1, storage.Container.ReceivedCalls().Count());
+        Assert.Equal(2, storage.Container.ReceivedCalls().Count());
+        Assert.Equal(1, storage.PageReadCount);
     }
 
     [Fact]

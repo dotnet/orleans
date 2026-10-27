@@ -120,8 +120,12 @@ build transitively and aren't direct `Docs.slnx` entries.
 Fix `LINK001` using the canonical URL in its remediation. Rendered-link failures
 name the source file/line when the authored link can be mapped, otherwise the
 rendered route. `src/data/external-link-allowlist.json` accepts exact URLs only;
-each entry needs a narrow reason and remains actively probed, so reachable or
-unreferenced entries fail as stale. A generated API package awaiting its first
+each entry records a narrow probe-reliability reason and remains actively probed.
+The audit reports each response status with its reason, including successful
+responses from intermittently accessible targets. Remove an entry after reviewing
+evidence that the target reliably accepts the bounded automated probe.
+Unreferenced entries fail as stale, and destination safety checks apply to every
+entry and redirect. A generated API package awaiting its first
 NuGet publication also needs a temporary entry in
 `src/data/unpublished-api-packages.json`; remove both entries after publication.
 

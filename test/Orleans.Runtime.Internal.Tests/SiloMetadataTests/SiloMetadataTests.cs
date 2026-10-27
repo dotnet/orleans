@@ -1,7 +1,10 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Diagnostics;
 using Xunit;
 
 namespace UnitTests.SiloMetadataTests;
@@ -15,6 +18,8 @@ namespace UnitTests.SiloMetadataTests;
 [TestCategory("SiloMetadata")]
 public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixture<SiloMetadataTests.Fixture>
 {
+    private static readonly TimeSpan MetadataConvergenceTimeout = TimeSpan.FromSeconds(30);
+
     private static readonly List<KeyValuePair<string, string?>> Metadata =
         [
             new("Orleans:Metadata:first", "1"),
@@ -24,12 +29,20 @@ public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixtur
 
     public class Fixture : IAsyncLifetime
     {
+        public DiagnosticEventCollector MetadataEvents { get; } = new(SiloMetadataEvents.ListenerName);
         public InProcessTestCluster Cluster { get; private set; } = null!;
         public async ValueTask DisposeAsync()
         {
-            if (Cluster is { } cluster)
+            try
             {
-                await cluster.DisposeAsync();
+                if (Cluster is { } cluster)
+                {
+                    await cluster.DisposeAsync();
+                }
+            }
+            finally
+            {
+                MetadataEvents.Dispose();
             }
         }
 
@@ -59,14 +72,23 @@ public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixtur
     }
 
     [Fact, TestCategory("Functional")]
-    public void SiloMetadata_FromConfiguration_CanBeSetAndRead()
+    public async Task SiloMetadata_FromConfiguration_CanBeSetAndRead()
     {
-        fixture.Cluster.AssertAllSiloMetadataMatchesOnAllSilos(Metadata.Select(kv => kv.Key.Split(':').Last()).ToArray());
+        await fixture.Cluster.AssertAllSiloMetadataMatchesOnAllSilos(
+            fixture.MetadataEvents,
+            Metadata.Select(kv => kv.Key.Split(':').Last()).ToArray(),
+            MetadataConvergenceTimeout,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("Functional")]
-    public void SiloMetadata_HasConfiguredValues()
+    public async Task SiloMetadata_HasConfiguredValues()
     {
+        await fixture.Cluster.WaitForSiloMetadataConvergenceAsync(
+            fixture.MetadataEvents,
+            Metadata.Select(kv => kv.Key.Split(':').Last()).ToArray(),
+            MetadataConvergenceTimeout,
+            TestContext.Current.CancellationToken);
         var first = fixture.Cluster.Silos.First();
         var firstSp = fixture.Cluster.GetSiloServiceProvider(first.SiloAddress);
         var firstSiloMetadataCache = firstSp.GetRequiredService<ISiloMetadataCache>();
@@ -81,9 +103,13 @@ public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixtur
     }
 
     [Fact, TestCategory("Functional")]
-    public void SiloMetadata_CanBeSetAndRead()
+    public async Task SiloMetadata_CanBeSetAndRead()
     {
-        fixture.Cluster.AssertAllSiloMetadataMatchesOnAllSilos(["host.id"]);
+        await fixture.Cluster.AssertAllSiloMetadataMatchesOnAllSilos(
+            fixture.MetadataEvents,
+            ["host.id"],
+            MetadataConvergenceTimeout,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("Functional")]
@@ -92,13 +118,22 @@ public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixtur
         await fixture.Cluster.StartAdditionalSiloAsync();
         await fixture.Cluster.WaitForLivenessToStabilizeAsync();
         await fixture.Cluster.WaitForClusterManifestToStabilizeAsync();
-        fixture.Cluster.AssertAllSiloMetadataMatchesOnAllSilos(["host.id"]);
+        await fixture.Cluster.AssertAllSiloMetadataMatchesOnAllSilos(
+            fixture.MetadataEvents,
+            ["host.id"],
+            MetadataConvergenceTimeout,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("Functional")]
     public async Task SiloMetadata_RemovedSiloHasNoMetadata()
     {
-        fixture.Cluster.AssertAllSiloMetadataMatchesOnAllSilos(["host.id"]);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await fixture.Cluster.AssertAllSiloMetadataMatchesOnAllSilos(
+            fixture.MetadataEvents,
+            ["host.id"],
+            MetadataConvergenceTimeout,
+            cancellationToken);
         var first = fixture.Cluster.Silos.First();
         var firstSp = fixture.Cluster.GetSiloServiceProvider(first.SiloAddress);
         var firstSiloMetadataCache = firstSp.GetRequiredService<ISiloMetadataCache>();
@@ -108,7 +143,13 @@ public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixtur
         Assert.NotNull(metadata);
         Assert.NotEmpty(metadata.Metadata);
 
-        await fixture.Cluster.StopSiloAsync(second, TestContext.Current.CancellationToken);
+        var metadataRemoval = fixture.Cluster.WaitForSiloMetadataRemovalAsync(
+            fixture.MetadataEvents,
+            second.SiloAddress,
+            MetadataConvergenceTimeout,
+            cancellationToken);
+        await fixture.Cluster.StopSiloAsync(second, cancellationToken);
+        await metadataRemoval;
         metadata = firstSiloMetadataCache.GetSiloMetadata(second.SiloAddress);
         Assert.NotNull(metadata);
         Assert.Empty(metadata.Metadata);
@@ -128,8 +169,15 @@ public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixtur
 
 public static class SiloMetadataTestExtensions
 {
-    public static void AssertAllSiloMetadataMatchesOnAllSilos(this InProcessTestCluster hostedCluster, string[] expectedKeys)
+    public static async Task AssertAllSiloMetadataMatchesOnAllSilos(
+        this InProcessTestCluster hostedCluster,
+        DiagnosticEventCollector events,
+        string[] expectedKeys,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
     {
+        await hostedCluster.WaitForSiloMetadataConvergenceAsync(events, expectedKeys, timeout, cancellationToken);
+
         var exampleSiloMetadata = new Dictionary<SiloAddress, SiloMetadata>();
         var first = hostedCluster.Silos.First();
         var firstSp = hostedCluster.GetSiloServiceProvider(first.SiloAddress);
@@ -141,7 +189,9 @@ public static class SiloMetadataTestExtensions
             Assert.NotNull(metadata.Metadata);
             foreach (var expectedKey in expectedKeys)
             {
-                Assert.True(metadata.Metadata.ContainsKey(expectedKey));
+                Assert.True(
+                    metadata.Metadata.ContainsKey(expectedKey),
+                    $"Metadata cache on '{first.SiloAddress}' is missing key '{expectedKey}' for silo '{otherSilo.SiloAddress}'.");
             }
             exampleSiloMetadata.Add(otherSilo.SiloAddress, metadata);
         }
@@ -158,7 +208,9 @@ public static class SiloMetadataTestExtensions
                 Assert.NotNull(metadata.Metadata);
                 foreach (var expectedKey in expectedKeys)
                 {
-                    Assert.True(metadata.Metadata.ContainsKey(expectedKey));
+                    Assert.True(
+                        metadata.Metadata.ContainsKey(expectedKey),
+                        $"Metadata cache on '{hostedClusterSilo.SiloAddress}' is missing key '{expectedKey}' for silo '{otherSilo.SiloAddress}'.");
                 }
                 remoteMetadata.Add(otherSilo.SiloAddress, metadata);
             }
@@ -175,6 +227,116 @@ public static class SiloMetadataTestExtensions
                     Assert.Equal(kvp2.Value, value);
                 }
             }
+        }
+    }
+
+    public static Task WaitForSiloMetadataConvergenceAsync(
+        this InProcessTestCluster hostedCluster,
+        DiagnosticEventCollector events,
+        string[] expectedKeys,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var siloAddresses = hostedCluster.Silos.Select(static silo => silo.SiloAddress).ToArray();
+        var convergenceTasks = siloAddresses.Select(observerSiloAddress =>
+        {
+            var serviceProvider = hostedCluster.GetSiloServiceProvider(observerSiloAddress);
+            var cache = serviceProvider.GetRequiredService<ISiloMetadataCache>();
+            return WaitForCacheStateAsync(
+                events,
+                observerSiloAddress,
+                () => siloAddresses.All(siloAddress =>
+                {
+                    var metadata = cache.GetSiloMetadata(siloAddress);
+                    return expectedKeys.All(metadata.Metadata.ContainsKey);
+                }),
+                $"contain keys [{string.Join(", ", expectedKeys)}] for silos [{string.Join(", ", siloAddresses.Select(static address => address.ToString()))}]",
+                timeout,
+                cancellationToken);
+        });
+        return Task.WhenAll(convergenceTasks);
+    }
+
+    public static Task WaitForSiloMetadataRemovalAsync(
+        this InProcessTestCluster hostedCluster,
+        DiagnosticEventCollector events,
+        SiloAddress removedSiloAddress,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var observers = hostedCluster.Silos
+            .Select(static silo => silo.SiloAddress)
+            .Where(siloAddress => !siloAddress.Equals(removedSiloAddress))
+            .ToArray();
+        var removalTasks = observers.Select(observerSiloAddress =>
+        {
+            var serviceProvider = hostedCluster.GetSiloServiceProvider(observerSiloAddress);
+            var cache = serviceProvider.GetRequiredService<ISiloMetadataCache>();
+            return WaitForCacheStateAsync(
+                events,
+                observerSiloAddress,
+                () => cache.GetSiloMetadata(removedSiloAddress).Metadata.Count == 0,
+                $"remove metadata for '{removedSiloAddress}'",
+                timeout,
+                cancellationToken);
+        });
+        return Task.WhenAll(removalTasks);
+    }
+
+    private static async Task WaitForCacheStateAsync(
+        DiagnosticEventCollector events,
+        SiloAddress observerSiloAddress,
+        Func<bool> predicate,
+        string expectedState,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var lastSequence = events
+            .GetEvents(nameof(SiloMetadataEvents.CacheUpdated))
+            .Select(static diagnosticEvent => diagnosticEvent.Payload)
+            .OfType<SiloMetadataEvents.CacheUpdated>()
+            .Where(updated => updated.ObserverSiloAddress.Equals(observerSiloAddress))
+            .Select(static updated => updated.Sequence)
+            .DefaultIfEmpty()
+            .Max();
+        var stopwatch = Stopwatch.StartNew();
+
+        while (!predicate())
+        {
+            var remaining = timeout - stopwatch.Elapsed;
+            if (remaining <= TimeSpan.Zero)
+            {
+                throw CreateTimeoutException();
+            }
+
+            try
+            {
+                var diagnosticEvent = await events.WaitForEventAsync(
+                    nameof(SiloMetadataEvents.CacheUpdated),
+                    diagnosticEvent => diagnosticEvent.Payload is SiloMetadataEvents.CacheUpdated updated
+                        && updated.ObserverSiloAddress.Equals(observerSiloAddress)
+                        && updated.Sequence > lastSequence,
+                    remaining,
+                    cancellationToken);
+                lastSequence = ((SiloMetadataEvents.CacheUpdated)diagnosticEvent.Payload!).Sequence;
+            }
+            catch (TimeoutException)
+            {
+                throw CreateTimeoutException();
+            }
+        }
+
+        TimeoutException CreateTimeoutException()
+        {
+            var observedStates = events
+                .GetEvents(nameof(SiloMetadataEvents.CacheUpdated))
+                .Select(static diagnosticEvent => diagnosticEvent.Payload)
+                .OfType<SiloMetadataEvents.CacheUpdated>()
+                .Where(updated => updated.ObserverSiloAddress.Equals(observerSiloAddress))
+                .Select(updated => $"sequence {updated.Sequence}, version {updated.MembershipVersion}: [{string.Join(", ", updated.CachedSilos)}]");
+            return new TimeoutException(
+                $"Timed out waiting for metadata cache on '{observerSiloAddress}' to {expectedState}. "
+                + $"Observed states: {string.Join("; ", observedStates)}");
         }
     }
 }

@@ -47,16 +47,15 @@ public sealed class AzureQueueStreamProviderBuilder : IProviderBuilder<ISiloBuil
         {
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
-                var queueNames = configurationSection.GetSection("QueueNames")?.Get<List<string>>();
+                var queueNames = configurationSection.GetSection("QueueNames").Get<List<string>>();
                 if (queueNames != null)
                 {
                     options.QueueNames = queueNames;
                 }
 
-                var visibilityTimeout = configurationSection["MessageVisibilityTimeout"];
-                if (TimeSpan.TryParse(visibilityTimeout, out var visibilityTimeoutTimeSpan))
+                if (configurationSection.GetValue<TimeSpan?>(nameof(options.MessageVisibilityTimeout)) is { } visibilityTimeout)
                 {
-                    options.MessageVisibilityTimeout = visibilityTimeoutTimeSpan;
+                    options.MessageVisibilityTimeout = visibilityTimeout;
                 }
 
                 var serviceKey = configurationSection["ServiceKey"];

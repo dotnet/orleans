@@ -1,0 +1,7 @@
+{
+  "scenario": "Fields",
+  "diagnostics": "legacy-visible",
+  "rejectDiagnostics": [
+    "OrleansCodeGen|FieldAccessor|UnsafeAccessor"
+  ]
+}

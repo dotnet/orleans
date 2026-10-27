@@ -41,4 +41,8 @@ public class CodeGeneratorOptions
     /// Gets or sets a value indicating whether generated serializers and copiers support adding members using .NET Hot Reload.
     /// </summary>
     public bool HotReloadSafe { get; set; }
+
+    internal bool SupportsUnsafeAccessors { get; set; }
+    internal bool SupportsGenericUnsafeAccessors { get; set; }
+    internal bool SupportsVolatileUnsafeAccessors { get; set; }
 }

@@ -19,8 +19,8 @@ public partial class InMemoryMembershipTableTests
 
         Assert.True(table.Insert(entry, before.Next()));
 
-        var after = table.Read(entry.SiloAddress);
-        var stored = Assert.Single(after.Members);
+        var after = table.ReadAll();
+        var stored = Assert.IsType<Tuple<MembershipEntry, string>>(after.TryGet(entry.SiloAddress));
         Assert.Equal(before.Version + 1, after.Version.Version);
         Assert.NotEqual(before.VersionEtag, after.Version.VersionEtag);
         Assert.NotEmpty(stored.Item2);
@@ -33,7 +33,7 @@ public partial class InMemoryMembershipTableTests
     {
         var entry = CreateConformanceEntry(1);
         Assert.True(table.Insert(entry, table.ReadTableVersion().Next()));
-        var before = table.Read(entry.SiloAddress);
+        var before = table.ReadAll();
         var heartbeat = entry.Copy();
         heartbeat.IAmAliveTime = entry.IAmAliveTime.AddMinutes(2);
         table.UpdateIAmAlive(heartbeat);
@@ -43,8 +43,8 @@ public partial class InMemoryMembershipTableTests
 
         Assert.True(table.Update(entry, Assert.Single(before.Members).Item2, before.Version.Next()));
 
-        var after = table.Read(entry.SiloAddress);
-        var row = Assert.Single(after.Members);
+        var after = table.ReadAll();
+        var row = Assert.IsType<Tuple<MembershipEntry, string>>(after.TryGet(entry.SiloAddress));
         AssertCanonicalFields(entry, row.Item1);
         Assert.Equal(inputHeartbeat, entry.IAmAliveTime);
         Assert.Equal(before.Version.Version + 1, after.Version.Version);
@@ -58,7 +58,7 @@ public partial class InMemoryMembershipTableTests
         var entry = CreateConformanceEntry(1);
         var initial = table.ReadTableVersion();
         Assert.True(table.Insert(entry, initial.Next()));
-        var first = table.Read(entry.SiloAddress);
+        var first = table.ReadAll();
         var staleRowToken = Assert.Single(first.Members).Item2;
         entry.Status = SiloStatus.Active;
         Assert.True(table.Update(entry, staleRowToken, first.Version.Next()));
@@ -75,18 +75,18 @@ public partial class InMemoryMembershipTableTests
         Assert.Equal(before.Version, after.Version);
         Assert.Equal(currentRow.Item2, stored.Item2);
         AssertConformanceEntry(currentRow.Item1, stored.Item1);
-        Assert.Empty(table.Read(CreateConformanceEntry(2).SiloAddress).Members);
+        Assert.Null(after.TryGet(CreateConformanceEntry(2).SiloAddress));
     }
 
     [Fact]
-    public void ReadAndReadAll_ReturnDetachedEquivalentEntries()
+    public void ReadAll_ReturnsDetachedEquivalentEntries()
     {
         var entry = CreateConformanceEntry(1);
         Assert.True(table.Insert(entry, table.ReadTableVersion().Next()));
-        var point = table.Read(entry.SiloAddress);
+        var point = table.ReadAll();
         var all = table.ReadAll();
-        var pointRow = Assert.Single(point.Members);
-        var allRow = Assert.Single(all.Members);
+        var pointRow = Assert.IsType<Tuple<MembershipEntry, string>>(point.TryGet(entry.SiloAddress));
+        var allRow = Assert.IsType<Tuple<MembershipEntry, string>>(all.TryGet(entry.SiloAddress));
         Assert.Equal(point.Version, all.Version);
         Assert.Equal(pointRow.Item2, allRow.Item2);
         Assert.NotSame(pointRow.Item1, allRow.Item1);
@@ -99,13 +99,11 @@ public partial class InMemoryMembershipTableTests
         allRow.Item1.IAmAliveTime = entry.IAmAliveTime.AddDays(1);
         allRow.Item1.SuspectTimes!.Clear();
 
-        var after = table.Read(entry.SiloAddress);
+        var after = table.ReadAll();
         Assert.Equal(point.Version, after.Version);
         Assert.Equal(pointRow.Item2, Assert.Single(after.Members).Item2);
         AssertConformanceEntry(entry, Assert.Single(after.Members).Item1);
-        var absent = table.Read(CreateConformanceEntry(2).SiloAddress);
-        Assert.Empty(absent.Members);
-        Assert.Equal(point.Version, absent.Version);
+        Assert.Null(after.TryGet(CreateConformanceEntry(2).SiloAddress));
     }
 
     [Theory]
@@ -116,7 +114,7 @@ public partial class InMemoryMembershipTableTests
     {
         var entry = CreateConformanceEntry(1);
         Assert.True(table.Insert(entry, table.ReadTableVersion().Next()));
-        var before = table.Read(entry.SiloAddress);
+        var before = table.ReadAll();
         // The owning silo can report the same time or a clock adjustment.
         var heartbeat = new MembershipEntry
         {
@@ -126,7 +124,7 @@ public partial class InMemoryMembershipTableTests
 
         table.UpdateIAmAlive(heartbeat);
 
-        var after = table.Read(entry.SiloAddress);
+        var after = table.ReadAll();
         var expected = entry.Copy();
         expected.IAmAliveTime = heartbeat.IAmAliveTime;
         Assert.Equal(before.Version, after.Version);
@@ -160,7 +158,7 @@ public partial class InMemoryMembershipTableTests
         var after = table.ReadAll();
         Assert.Equal(before.Version, after.Version);
         Assert.Equal(4, after.Members.Count);
-        Assert.Empty(table.Read(entries[0].SiloAddress).Members);
+        Assert.Null(after.TryGet(entries[0].SiloAddress));
         foreach (var expected in entries.Skip(1))
         {
             var actual = Assert.Single(after.Members, row => row.Item1.SiloAddress.Equals(expected.SiloAddress));
@@ -178,13 +176,13 @@ public partial class InMemoryMembershipTableTests
         Assert.True(table.Insert(input, table.ReadTableVersion().Next()));
         if (update)
         {
-            var current = table.Read(input.SiloAddress);
+            var current = table.ReadAll();
             input.Status = SiloStatus.Active;
             Assert.True(table.Update(input, Assert.Single(current.Members).Item2, current.Version.Next()));
         }
 
         var expected = input.Copy();
-        var before = table.Read(input.SiloAddress);
+        var before = table.ReadAll();
         var rowToken = Assert.Single(before.Members).Item2;
         input.Status = SiloStatus.Dead;
         input.HostName = "caller-mutated";
@@ -192,7 +190,7 @@ public partial class InMemoryMembershipTableTests
         input.SuspectTimes!.Clear();
         input.SuspectTimes = [Tuple.Create(CreateConformanceEntry(2).SiloAddress, input.IAmAliveTime)];
 
-        var after = table.Read(input.SiloAddress);
+        var after = table.ReadAll();
         Assert.Equal(before.Version, after.Version);
         var stored = Assert.Single(after.Members);
         Assert.Equal(rowToken, stored.Item2);
@@ -206,22 +204,22 @@ public partial class InMemoryMembershipTableTests
         var entry = CreateConformanceEntry(1);
         entry.Status = SiloStatus.Active;
         Assert.True(table.Insert(entry, table.ReadTableVersion().Next()));
-        var current = table.Read(entry.SiloAddress);
+        var current = table.ReadAll();
         var deathTime = entry.IAmAliveTime.AddMinutes(10);
         entry.Status = SiloStatus.Dead;
         entry.SuspectTimes![0] = Tuple.Create(entry.SuspectTimes[0].Item1, deathTime);
         Assert.True(table.Update(entry, Assert.Single(current.Members).Item2, current.Version.Next()));
-        var before = table.Read(entry.SiloAddress);
+        var before = table.ReadAll();
 
         table.CleanupDefunctSiloEntries(new DateTimeOffset(deathTime));
 
-        var retained = table.Read(entry.SiloAddress);
+        var retained = table.ReadAll();
         Assert.Equal(before.Version, retained.Version);
         Assert.Equal(Assert.Single(before.Members).Item2, Assert.Single(retained.Members).Item2);
         AssertConformanceEntry(entry, Assert.Single(retained.Members).Item1);
 
         table.CleanupDefunctSiloEntries(new DateTimeOffset(deathTime.AddSeconds(1)));
-        var removed = table.Read(entry.SiloAddress);
+        var removed = table.ReadAll();
         Assert.Equal(before.Version, removed.Version);
         Assert.Empty(removed.Members);
     }
@@ -295,4 +293,5 @@ public partial class InMemoryMembershipTableTests
         Assert.Equal(expected.StartTime, actual.StartTime);
         Assert.Equal(expected.SuspectTimes, actual.SuspectTimes);
     }
+
 }

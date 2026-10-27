@@ -12,7 +12,7 @@ namespace Tester.DurableJobs;
 public partial class JournaledJobShardManagerTests
 {
     [Fact]
-    public async Task Discovery_UsesProjectedMetadataAndReadsOnlyEntriesWithoutMetadata()
+    public async Task Discovery_UsesProjectedMetadataAndVerifiesOpenedShardOwnership()
     {
         await using var fixture = new DiscoveryFixture();
         var projected = await fixture.AddShardAsync("projected", fixture.Now.AddYears(-1));
@@ -24,7 +24,7 @@ public partial class JournaledJobShardManagerTests
         fixture.Storage.MetadataReads.Clear();
 
         AssertAssignedIds([projected, missing], await fixture.DiscoverAsync(maxNewClaims: 2));
-        Assert.Equal(new[] { missing }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { projected, projected, missing, missing, missing }, fixture.Storage.MetadataReads);
         Assert.Equal(3, fixture.Catalog.YieldedIds);
         Assert.Equal(1, fixture.Catalog.ListCalls);
     }
@@ -43,7 +43,7 @@ public partial class JournaledJobShardManagerTests
         fixture.Storage.MetadataReads.Clear();
 
         AssertAssignedIds([id], await fixture.DiscoverAsync(maxNewClaims: 1));
-        Assert.Equal(new[] { id }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { id, id, id }, fixture.Storage.MetadataReads);
         Assert.Equal((id, snapshot.ETag), Assert.Single(fixture.Storage.MetadataUpdates));
         var claimed = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(claimed);
@@ -150,8 +150,8 @@ public partial class JournaledJobShardManagerTests
         fixture.Storage.MetadataUpdates.Clear();
 
         Assert.Empty(await fixture.DiscoverAsync(maxNewClaims: 0));
-        Assert.Equal(new[] { id, id }, fixture.Storage.MetadataReads);
-        Assert.Equal(deleteEmptyShard ? 0 : 1, fixture.Storage.MetadataUpdates.Count);
+        Assert.Equal(new[] { id, id, id }, fixture.Storage.MetadataReads);
+        Assert.Equal(deleteEmptyShard ? 1 : 2, fixture.Storage.MetadataUpdates.Count);
         var current = await storage.GetMetadataAsync(cancellationToken);
         if (deleteEmptyShard)
         {
@@ -169,7 +169,7 @@ public partial class JournaledJobShardManagerTests
             Assert.NotSame(shard, recovered);
             Assert.True(recovered.IsAddingCompleted);
             Assert.Equal(1, await recovered.GetJobCountAsync());
-            Assert.Equal(new[] { id }, fixture.Storage.MetadataReads);
+            Assert.Equal(new[] { id, id, id }, fixture.Storage.MetadataReads);
             Assert.Equal((id, current.ETag), Assert.Single(fixture.Storage.MetadataUpdates));
             Assert.Same(recovered, Assert.Single(await fixture.DiscoverAsync(maxNewClaims: 0)));
         }
@@ -227,7 +227,7 @@ public partial class JournaledJobShardManagerTests
 
         var shard = Assert.Single(await fixture.DiscoverAsync(maxNewClaims: 0));
         AssertAssignedIds([id], [shard]);
-        Assert.Equal(new[] { id }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { id, id, id }, fixture.Storage.MetadataReads);
         Assert.Empty(fixture.Storage.MetadataUpdates);
 
         fixture.Storage.MetadataReads.Clear();
@@ -246,12 +246,12 @@ public partial class JournaledJobShardManagerTests
         fixture.Catalog.Ids.AddRange([youngest, oldest, middle]);
 
         AssertAssignedIds([oldest, middle], await fixture.DiscoverAsync(maxNewClaims: 2));
-        Assert.Equal(new[] { oldest, middle, youngest }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { oldest, oldest, oldest, middle, middle, middle, youngest }, fixture.Storage.MetadataReads);
         Assert.Equal(1, fixture.Catalog.ListCalls);
         Assert.Equal(1, fixture.Catalog.DisposeCalls);
 
         AssertAssignedIds([oldest, middle, youngest], await fixture.DiscoverAsync(maxNewClaims: 1));
-        Assert.Equal(new[] { oldest, middle, youngest, oldest, middle, youngest }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { oldest, oldest, oldest, middle, middle, middle, youngest, oldest, middle, youngest, youngest, youngest }, fixture.Storage.MetadataReads);
         Assert.Equal(2, fixture.Catalog.ListCalls);
         Assert.Equal(2, fixture.Catalog.DisposeCalls);
     }
@@ -278,7 +278,7 @@ public partial class JournaledJobShardManagerTests
         };
 
         AssertAssignedIds([previous, boundaryA, boundaryZ], await fixture.DiscoverAsync(horizon: horizon));
-        Assert.Equal(new[] { previous, boundaryA, boundaryZ }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { previous, previous, previous, boundaryA, boundaryA, boundaryA, boundaryZ, boundaryZ, boundaryZ }, fixture.Storage.MetadataReads);
         Assert.Equal(3, fixture.Catalog.YieldedIds);
         Assert.Equal(4, fixture.Catalog.MoveNextCalls);
         var request = Assert.Single(fixture.Catalog.Requests);
@@ -304,11 +304,11 @@ public partial class JournaledJobShardManagerTests
         var inserted = await fixture.AddShardAsync("inserted", fixture.Now.AddYears(-3));
         fixture.Catalog.Ids.Add(inserted);
         AssertAssignedIds([inserted, current], await fixture.DiscoverAsync(maxNewClaims: 1));
-        Assert.Equal(new[] { current, inserted, current }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { current, current, current, inserted, inserted, inserted, current }, fixture.Storage.MetadataReads);
 
         var laterHorizon = fixture.Horizon.AddTicks(1);
         AssertAssignedIds([inserted, current, future], await fixture.DiscoverAsync(horizon: laterHorizon));
-        Assert.Equal(new[] { current, inserted, current, inserted, current, future }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { current, current, current, inserted, inserted, inserted, current, inserted, current, future, future, future }, fixture.Storage.MetadataReads);
         Assert.Equal(4, fixture.Catalog.ListCalls);
         Assert.Equal(4, fixture.Catalog.DisposeCalls);
         Assert.Equal(
@@ -333,11 +333,11 @@ public partial class JournaledJobShardManagerTests
         fixture.Catalog.Ids.AddRange([lastLocal, youngerOrphan, olderOrphan, firstLocal]);
 
         AssertAssignedIds([firstLocal, lastLocal], await fixture.DiscoverAsync(maxNewClaims: 0));
-        Assert.Equal(new[] { firstLocal, olderOrphan, youngerOrphan, lastLocal }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { firstLocal, firstLocal, firstLocal, olderOrphan, youngerOrphan, lastLocal, lastLocal, lastLocal }, fixture.Storage.MetadataReads);
 
         AssertAssignedIds([firstLocal, olderOrphan, lastLocal], await fixture.DiscoverAsync(maxNewClaims: 1));
         Assert.Equal(
-            new[] { firstLocal, olderOrphan, youngerOrphan, lastLocal, firstLocal, olderOrphan, youngerOrphan, lastLocal },
+            new[] { firstLocal, firstLocal, firstLocal, olderOrphan, youngerOrphan, lastLocal, lastLocal, lastLocal, firstLocal, olderOrphan, olderOrphan, olderOrphan, youngerOrphan, lastLocal },
             fixture.Storage.MetadataReads);
         Assert.Equal(2, fixture.Catalog.ListCalls);
         Assert.Equal(2, fixture.Catalog.DisposeCalls);
@@ -363,18 +363,18 @@ public partial class JournaledJobShardManagerTests
             Assert.True(await discovery.MoveNextAsync());
             retained = discovery.Current;
             AssertAssignedIds([first], [retained]);
-            Assert.Equal(new[] { first }, fixture.Storage.MetadataReads);
+            Assert.Equal(new[] { first, first, first }, fixture.Storage.MetadataReads);
             Assert.Equal(1, fixture.Catalog.DisposeCalls);
             Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => discovery.MoveNextAsync().AsTask()));
         }
 
-        Assert.Equal(new[] { first, failing }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { first, first, first, failing }, fixture.Storage.MetadataReads);
         Assert.Equal(0, await retained.GetJobCountAsync());
         fixture.Storage.BeforeMetadataRead = null;
         var retry = await fixture.DiscoverAsync(maxNewClaims: 2);
         AssertAssignedIds([first, failing, tail], retry);
         Assert.Same(retained, retry[0]);
-        Assert.Equal(new[] { first, failing, first, failing, tail }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { first, first, first, failing, first, failing, failing, failing, tail, tail, tail }, fixture.Storage.MetadataReads);
         Assert.Equal(2, fixture.Catalog.ListCalls);
         Assert.Equal(2, fixture.Catalog.DisposeCalls);
     }
@@ -433,10 +433,10 @@ public partial class JournaledJobShardManagerTests
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => discovery.MoveNextAsync().AsTask());
         }
 
-        Assert.Equal(new[] { first }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { first, first, first }, fixture.Storage.MetadataReads);
         Assert.Equal(1, fixture.Catalog.DisposeCalls);
         AssertAssignedIds([first, next], await fixture.DiscoverAsync(maxNewClaims: 1));
-        Assert.Equal(new[] { first, first, next }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { first, first, first, first, next, next, next }, fixture.Storage.MetadataReads);
         Assert.Equal(2, fixture.Catalog.ListCalls);
         Assert.Equal(2, fixture.Catalog.DisposeCalls);
     }
@@ -455,11 +455,11 @@ public partial class JournaledJobShardManagerTests
             Assert.Equal(1, fixture.Catalog.DisposeCalls);
         }
 
-        Assert.Equal(new[] { first }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { first, first, first }, fixture.Storage.MetadataReads);
         var inserted = await fixture.AddShardAsync("inserted", fixture.Now.AddYears(-1));
         fixture.Catalog.Ids.Add(inserted);
         AssertAssignedIds([inserted, first], await fixture.DiscoverAsync(maxNewClaims: 1));
-        Assert.Equal(new[] { first, inserted, first, tail }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { first, first, first, inserted, inserted, inserted, first, tail }, fixture.Storage.MetadataReads);
         Assert.Equal(2, fixture.Catalog.ListCalls);
         Assert.Equal(2, fixture.Catalog.DisposeCalls);
     }
@@ -492,7 +492,7 @@ public partial class JournaledJobShardManagerTests
         }
 
         AssertAssignedIds([due], await discovery);
-        Assert.Equal(new[] { due }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { due, due, due }, fixture.Storage.MetadataReads);
         Assert.Equal(1, fixture.Catalog.DisposeCalls);
     }
 
@@ -515,7 +515,7 @@ public partial class JournaledJobShardManagerTests
         fixture.Catalog.Ids.Add(inserted);
         fixture.Catalog.BeforeMoveNext = null;
         AssertAssignedIds([inserted, first, tail], await fixture.DiscoverAsync());
-        Assert.Equal(new[] { inserted, first, tail }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { inserted, inserted, inserted, first, first, first, tail, tail, tail }, fixture.Storage.MetadataReads);
         Assert.Equal(2, fixture.Catalog.ListCalls);
         Assert.Equal(2, fixture.Catalog.DisposeCalls);
     }
@@ -536,12 +536,12 @@ public partial class JournaledJobShardManagerTests
         };
 
         AssertAssignedIds([first], await fixture.DiscoverAsync());
-        Assert.Equal(new[] { first, second }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { first, first, first, second }, fixture.Storage.MetadataReads);
 
         fixture.Storage.BeforeMetadataRead = null;
         fixture.Membership.SetSiloStatus(owner, SiloStatus.Dead);
         AssertAssignedIds([first, second], await fixture.DiscoverAsync(maxNewClaims: 1));
-        Assert.Equal(new[] { first, second, first, second }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { first, first, first, second, first, second, second, second }, fixture.Storage.MetadataReads);
         Assert.Equal(2, fixture.Catalog.ListCalls);
         var metadata = await fixture.Storage.CreateStorage(second).GetMetadataAsync(TestContext.Current.CancellationToken);
         Assert.Equal(fixture.Silo.ToParsableString(), metadata!.Properties["DurableJobsOwner"]);
@@ -556,14 +556,14 @@ public partial class JournaledJobShardManagerTests
         fixture.Catalog.Ids.AddRange([due, due, due]);
 
         AssertAssignedIds([due], await fixture.DiscoverAsync(maxNewClaims: 1));
-        Assert.Equal(new[] { due }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { due, due, due }, fixture.Storage.MetadataReads);
         Assert.Equal(3, fixture.Catalog.YieldedIds);
         Assert.Equal(1, fixture.Catalog.ListCalls);
         Assert.Equal(1, fixture.Catalog.DisposeCalls);
     }
 
     [Fact]
-    public async Task Discovery_ConcurrentUnregisterDisposesDuplicateClaimAndPreservesCachedShard()
+    public async Task Discovery_DefersClaimWhileUnregisterOwnsCachedShard()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var storage = new CountingJournalStorageProvider(delayAppends: false);
@@ -597,10 +597,9 @@ public partial class JournaledJobShardManagerTests
 
             discovered = await manager.AssignJobShardsAsync(start.AddHours(1), 1, cancellationToken);
             Assert.Empty(discovered);
-            Assert.Equal(2, factory.Managers.Count);
+            Assert.Single(factory.Managers);
             Assert.Equal(0, factory.Managers[0].DisposeCalls);
-            Assert.Equal(1, factory.Managers[1].DisposeCalls);
-            Assert.Same(shard, Assert.Single(await manager.AssignJobShardsAsync(start.AddHours(1), 0, cancellationToken)));
+            Assert.Empty(await manager.AssignJobShardsAsync(start.AddHours(1), 0, cancellationToken));
         }
         finally
         {
@@ -614,9 +613,9 @@ public partial class JournaledJobShardManagerTests
 
         Assert.Equal(1, factory.Managers[0].DisposeCalls);
         storage.AfterMetadataUpdate = null;
-        await using var recovered = Assert.Single(await manager.AssignJobShardsAsync(start.AddHours(1), 0, cancellationToken));
+        await using var recovered = Assert.Single(await manager.AssignJobShardsAsync(start.AddHours(1), 1, cancellationToken));
         Assert.NotSame(shard, recovered);
-        Assert.Equal(3, factory.Managers.Count);
+        Assert.Equal(2, factory.Managers.Count);
         Assert.Equal(1, await recovered.GetJobCountAsync());
         await DrainAndUnregisterAsync(manager, recovered, cancellationToken);
         Assert.All(factory.Managers, stateManager => Assert.Equal(1, stateManager.DisposeCalls));
@@ -630,7 +629,7 @@ public partial class JournaledJobShardManagerTests
         await fixture.AddShardAsync("future", fixture.Horizon.AddTicks(1));
 
         AssertAssignedIds([due], await fixture.DiscoverAsync(maxNewClaims: 1));
-        Assert.Empty(fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { due, due }, fixture.Storage.MetadataReads);
     }
 
     [Fact]
@@ -650,7 +649,7 @@ public partial class JournaledJobShardManagerTests
         AssertAssignedIds([inserted, first, second], next);
         Assert.Same(initial[0], next[1]);
         Assert.Same(initial[1], next[2]);
-        Assert.Equal(new[] { first, second, inserted, first, second }, fixture.Storage.MetadataReads);
+        Assert.Equal(new[] { first, first, first, second, second, second, inserted, inserted, inserted, first, second }, fixture.Storage.MetadataReads);
         Assert.Equal(2, fixture.Catalog.ListCalls);
         Assert.Equal(2, fixture.Catalog.DisposeCalls);
         Assert.All(fixture.Catalog.Requests, request => Assert.Equal(JobShardId.GetMaxJournalId(fixture.Horizon), request.MaxId));
@@ -689,8 +688,8 @@ public partial class JournaledJobShardManagerTests
         stopwatch.Stop();
 
         AssertAssignedIds(dueIds.Take(maxNewClaims), assigned);
-        Assert.Equal(dueIds, fixture.Storage.MetadataReads);
-        Assert.Equal(PredecessorCount, fixture.Storage.MetadataReads.Count);
+        Assert.Equal(dueIds.SelectMany((id, index) => Enumerable.Repeat(id, index < maxNewClaims ? 3 : 1)), fixture.Storage.MetadataReads);
+        Assert.Equal(PredecessorCount + 2 * maxNewClaims, fixture.Storage.MetadataReads.Count);
         Assert.Equal(PredecessorCount, fixture.Catalog.YieldedIds);
         Assert.Equal(PredecessorCount + 1, fixture.Catalog.MoveNextCalls);
         Assert.Equal(1, fixture.Catalog.ListCalls);

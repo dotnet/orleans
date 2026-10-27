@@ -8,7 +8,10 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator;
 
-internal class MetadataGenerator(MetadataAggregateModel metadataModel, string assemblyName, bool supportsModuleInitializers)
+internal class MetadataGenerator(
+    MetadataAggregateModel metadataModel,
+    string assemblyName,
+    bool supportsModuleInitializers)
 {
     private static readonly TypeSyntax TypeManifestOptionsType = ParseTypeName("global::Orleans.Serialization.Configuration.TypeManifestOptions");
     private static readonly TypeSyntax TypeManifestProviderBaseType = ParseTypeName("global::Orleans.Serialization.Configuration.TypeManifestProviderBase");
@@ -45,12 +48,20 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         var addSerializerMethod = configParam.Member("AddSerializer");
         foreach (var registration in serializableRegistrations)
         {
-            AddRegistration(body, addSerializerMethod, registration.SerializerTypeSyntax);
+            AddRegistration(body, addSerializerMethod, registration.SerializerTypeSyntax, GetOpenTypeSyntax(registration.SourceType));
+            if (registration.BaseCodec)
+            {
+                AddRegistration(body, configParam.Member("AddBaseCodec"), registration.SerializerTypeSyntax, GetOpenTypeSyntax(registration.SourceType));
+            }
+            if (registration.ValueSerializer)
+            {
+                AddRegistration(body, configParam.Member("AddValueSerializer"), registration.SerializerTypeSyntax, GetOpenTypeSyntax(registration.SourceType));
+            }
         }
 
         foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Serializer))
         {
-            AddRegistration(body, addSerializerMethod, GetOpenTypeSyntax(type.Type));
+            AddContracts(body, configParam, type, addSerializerMethod);
         }
 
         var addCopierMethod = configParam.Member("AddCopier");
@@ -58,19 +69,23 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         {
             if (registration.CopierTypeSyntax is not null)
             {
-                AddRegistration(body, addCopierMethod, registration.CopierTypeSyntax);
+                AddRegistration(body, addCopierMethod, registration.CopierTypeSyntax, GetOpenTypeSyntax(registration.SourceType));
+                if (registration.BaseCopier)
+                {
+                    AddRegistration(body, configParam.Member("AddBaseCopier"), registration.CopierTypeSyntax, GetOpenTypeSyntax(registration.SourceType));
+                }
             }
         }
 
         foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Copier))
         {
-            AddRegistration(body, addCopierMethod, GetOpenTypeSyntax(type.Type));
+            AddContracts(body, configParam, type, addCopierMethod);
         }
 
         var addConverterMethod = configParam.Member("AddConverter");
         foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Converter))
         {
-            AddRegistration(body, addConverterMethod, GetOpenTypeSyntax(type.Type));
+            AddContracts(body, configParam, type, addConverterMethod);
         }
 
         var addProxyMethod = configParam.Member("AddInterfaceProxy");
@@ -95,35 +110,27 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         {
             if (registration.ActivatorTypeSyntax is not null)
             {
-                AddRegistration(body, addActivatorMethod, registration.ActivatorTypeSyntax);
+                AddRegistration(body, addActivatorMethod, registration.ActivatorTypeSyntax, GetOpenTypeSyntax(registration.SourceType));
             }
         }
 
         foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Activator))
         {
-            AddRegistration(body, addActivatorMethod, GetOpenTypeSyntax(type.Type));
+            AddContracts(body, configParam, type, addActivatorMethod);
         }
 
-        var addWellKnownTypeIdMethod = configParam.Member("WellKnownTypeIds").Member("Add");
         foreach (var type in model.ReferenceAssemblyData.WellKnownTypeIds)
         {
-            body.Add(ExpressionStatement(InvocationExpression(addWellKnownTypeIdMethod,
-                ArgumentList(SeparatedList(
-                [
-                    Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Id))),
-                    Argument(CreateTypeOfExpression(type.Type)),
-                ])))));
+            body.Add(CreateTypeMetadataRegistration(configParam.Member("WellKnownTypeIds"),
+                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Id)),
+                CreateTypeOfExpression(type.Type)));
         }
 
-        var addTypeAliasMethod = configParam.Member("WellKnownTypeAliases").Member("Add");
         foreach (var type in model.ReferenceAssemblyData.TypeAliases)
         {
-            body.Add(ExpressionStatement(InvocationExpression(addTypeAliasMethod,
-                ArgumentList(SeparatedList(
-                [
-                    Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias))),
-                    Argument(CreateTypeOfExpression(type.Type)),
-                ])))));
+            body.Add(CreateTypeMetadataRegistration(configParam.Member("WellKnownTypeAliases"),
+                LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias)),
+                CreateTypeOfExpression(type.Type)));
         }
 
         foreach (var provider in model.ReferenceAssemblyData.RegisteredProviders)
@@ -250,12 +257,12 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
                 body.Add(LocalDeclarationStatement(VariableDeclaration(
                     ParseTypeName("var"),
                     SingletonSeparatedList(VariableDeclarator(nodeName.Identifier).WithInitializer(EqualsValueClause(InvocationExpression(
-                        tree.Member("Add"),
+                        tree.Member(aliases.HasValue ? "Add" : "GetOrAdd"),
                         ArgumentList(SeparatedList(addArguments)))))))));
             }
             else
             {
-                body.Add(ExpressionStatement(InvocationExpression(tree.Member("Add"), ArgumentList(SeparatedList(addArguments)))));
+                body.Add(ExpressionStatement(InvocationExpression(tree.Member(aliases.HasValue ? "Add" : "GetOrAdd"), ArgumentList(SeparatedList(addArguments)))));
             }
         }
 
@@ -357,13 +364,17 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
                 serializerTypeSyntax: GetCodecTypeName(type.GeneratedNamespace, type.Name, type.TypeParameters.Length),
                 copierTypeSyntax: copierType,
                 activatorTypeSyntax: activatorType,
-                sourceLocation: type.SourceLocation));
+                sourceLocation: type.SourceLocation,
+                baseCodec: !type.IsValueType && !type.IsSealedType,
+                valueSerializer: type.IsValueType && !type.IsEnumType,
+                baseCopier: !type.IsShallowCopyable && (!type.IsSealedType
+                    || type.IsExceptionType && type.SerializationHooks.IsEmpty)));
         }
 
         foreach (var type in generatedInvokables)
         {
             registrations.Add(new SerializableMetadataRegistration(
-                sourceType: type.SourceType,
+                sourceType: new TypeRef(type.TypeSyntax.ToString()),
                 sortKey: type.TypeSyntax.ToString(),
                 serializerTypeSyntax: type.CodecTypeSyntax,
                 copierTypeSyntax: type.CopierTypeSyntax,
@@ -620,6 +631,124 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             ArgumentList(SingletonSeparatedList(Argument(TypeOfExpression(typeSyntax)))))));
     }
 
+    private static void AddRegistration(List<StatementSyntax> body, ExpressionSyntax addMethod, TypeSyntax typeSyntax, TypeSyntax targetSyntax)
+        => body.Add(ExpressionStatement(InvocationExpression(addMethod, ArgumentList(SeparatedList(
+        [
+            Argument(TypeOfExpression(typeSyntax)),
+            Argument(TypeOfExpression(targetSyntax))
+        ])))));
+
+    private static void AddContracts(
+        List<StatementSyntax> body,
+        IdentifierNameSyntax config,
+        RegisteredCodecModel implementation,
+        ExpressionSyntax legacyMethod)
+    {
+        if (implementation.Contracts.IsEmpty)
+        {
+            AddRegistration(body, legacyMethod, GetOpenTypeSyntax(implementation.Type));
+            return;
+        }
+
+        foreach (var contract in implementation.Contracts)
+        {
+            if (contract.TargetDescription is { } targetDescription)
+            {
+                var contractType = contract.RegistrationMethod switch
+                {
+                    "AddSerializer" => "Orleans.Serialization.Codecs.IFieldCodec<>",
+                    "AddBaseCodec" => "Orleans.Serialization.Serializers.IBaseCodec<>",
+                    "AddValueSerializer" => "Orleans.Serialization.Serializers.IValueSerializer<>",
+                    "AddCopier" => "Orleans.Serialization.Cloning.IDeepCopier<>",
+                    "AddBaseCopier" => "Orleans.Serialization.Cloning.IBaseCopier<>",
+                    "AddActivator" => "Orleans.Serialization.Activators.IActivator<>",
+                    _ => "Orleans.IConverter<,>"
+                };
+                var describedArguments = new List<ArgumentSyntax>
+                {
+                    Argument(TypeOfExpression(GetOpenTypeSyntax(implementation.Type))),
+                    Argument(TypeOfExpression(ParseTypeName("global::" + contractType))),
+                    Argument(GetSerializationTypeExpression(targetDescription))
+                };
+                if (contract.SurrogateDescription is { } describedSurrogate)
+                {
+                    describedArguments.Add(Argument(GetSerializationTypeExpression(describedSurrogate)));
+                }
+                else if (contract.Surrogate is { } concreteSurrogate)
+                {
+                    describedArguments.Add(Argument(InvocationExpression(
+                        ParseExpression("global::Orleans.Serialization.Configuration.SerializationType.Create"),
+                        ArgumentList(SingletonSeparatedList(Argument(GetTargetExpression(concreteSurrogate)))))));
+                }
+
+                body.Add(ExpressionStatement(InvocationExpression(config.Member("AddSerializationContract"),
+                    ArgumentList(SeparatedList(describedArguments)))));
+                continue;
+            }
+
+            var arguments = new List<ArgumentSyntax>
+            {
+                Argument(TypeOfExpression(GetOpenTypeSyntax(implementation.Type))),
+                Argument(GetTargetExpression(contract.Target))
+            };
+            if (contract.SurrogateDescription is { } description)
+            {
+                arguments.Add(Argument(GetSerializationTypeExpression(description)));
+            }
+            else if (contract.Surrogate is { } surrogate)
+            {
+                arguments.Add(Argument(GetTargetExpression(surrogate)));
+            }
+
+            body.Add(ExpressionStatement(InvocationExpression(config.Member(contract.RegistrationMethod), ArgumentList(SeparatedList(arguments)))));
+        }
+    }
+
+    private static ExpressionSyntax GetTargetExpression(ContractTargetModel target)
+        => target.IsAccessible
+            ? TypeOfExpression(target.Type.ToTypeSyntax())
+            : PostfixUnaryExpression(SyntaxKind.SuppressNullableWarningExpression,
+                InvocationExpression(ParseExpression("global::System.Type.GetType"), ArgumentList(SeparatedList(
+                [
+                    Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(target.RuntimeTypeName))),
+                    Argument(LiteralExpression(SyntaxKind.TrueLiteralExpression))
+                ]))));
+
+    private static ExpressionSyntax GetSerializationTypeExpression(SerializationTypeModel description)
+    {
+        var type = ParseExpression("global::Orleans.Serialization.Configuration.SerializationType");
+        if (description.ParameterIndex >= 0)
+        {
+            return InvocationExpression(type.Member("Parameter"), ArgumentList(SingletonSeparatedList(
+                Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(description.ParameterIndex))))));
+        }
+
+        if (description.ArrayRank > 0)
+        {
+            return InvocationExpression(type.Member("Array"), ArgumentList(SeparatedList(
+            [
+                Argument(GetSerializationTypeExpression(description.Arguments[0])),
+                Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(description.ArrayRank)))
+            ])));
+        }
+
+        var arguments = new List<ArgumentSyntax> { Argument(GetTargetExpression(description.Type!.Value)) };
+        arguments.AddRange(description.Arguments.Select(argument => Argument(GetSerializationTypeExpression(argument))));
+        return InvocationExpression(type.Member("Create"), ArgumentList(SeparatedList(arguments)));
+    }
+    internal static StatementSyntax CreateTypeMetadataRegistration(
+        ExpressionSyntax dictionary, ExpressionSyntax key, ExpressionSyntax type)
+        => ParseStatement($$"""
+            {
+                var registeredType = {{type}};
+                if ({{dictionary}}.TryGetValue({{key}}, out var existingType) && existingType != registeredType)
+                {
+                    throw new global::System.InvalidOperationException("Conflicting type metadata registration for " + {{key}} + ".");
+                }
+                {{dictionary}}[{{key}}] = registeredType;
+            }
+            """);
+
     private static bool ShouldGenerateActivator(SerializableTypeModel type)
         => !type.IsAbstractType
             && !type.IsEnumType
@@ -757,7 +886,10 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         TypeSyntax serializerTypeSyntax,
         TypeSyntax? copierTypeSyntax,
         TypeSyntax? activatorTypeSyntax,
-        SourceLocationModel sourceLocation)
+        SourceLocationModel sourceLocation,
+        bool baseCodec = false,
+        bool valueSerializer = false,
+        bool baseCopier = false)
     {
         public TypeRef SourceType { get; } = sourceType;
         public string SortKey { get; } = sortKey;
@@ -765,5 +897,8 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         public TypeSyntax? CopierTypeSyntax { get; } = copierTypeSyntax;
         public TypeSyntax? ActivatorTypeSyntax { get; } = activatorTypeSyntax;
         public SourceLocationModel SourceLocation { get; } = sourceLocation;
+        public bool BaseCodec { get; } = baseCodec;
+        public bool ValueSerializer { get; } = valueSerializer;
+        public bool BaseCopier { get; } = baseCopier;
     }
 }

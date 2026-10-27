@@ -86,30 +86,67 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 LogDebugStartingToProcessMembershipUpdates(log);
-                await foreach (var tableSnapshot in this.membershipManager.MembershipUpdates.WithCancellation(this.shutdownCancellation.Token))
+                using var processingCancellation = CancellationTokenSource.CreateLinkedTokenSource(this.shutdownCancellation.Token);
+                var cancellationToken = processingCancellation.Token;
+                await using var updates = this.membershipManager.MembershipUpdates.GetAsyncEnumerator(cancellationToken);
+                var reevaluationPeriod = this.clusterMembershipOptions.CurrentValue.TableRefreshTimeout;
+                var membershipUpdate = updates.MoveNextAsync().AsTask();
+                var reevaluation = this.timeProvider.DelayAsync(reevaluationPeriod, cancellationToken);
+                var tableSnapshot = this.membershipManager.CurrentSnapshot;
+                try
                 {
-                    var utcNow = this.timeProvider.GetUtcNow().UtcDateTime;
-
-                    var newMonitoredSilos = this.UpdateMonitoredSilos(tableSnapshot, this.monitoredSilos, utcNow);
-
-                    if (this.clusterMembershipOptions.CurrentValue.EvictWhenMaxJoinAttemptTimeExceeded)
+                    while (true)
                     {
-                        await this.EvictStaleStateSilos(tableSnapshot, utcNow);
-                    }
-
-                    foreach (var pair in this.monitoredSilos)
-                    {
-                        if (!newMonitoredSilos.ContainsKey(pair.Key))
+                        cancellationToken.ThrowIfCancellationRequested();
+                        await Task.WhenAny(membershipUpdate, reevaluation);
+                        var isMembershipUpdate = membershipUpdate.IsCompleted;
+                        if (reevaluation.IsCompleted)
                         {
-                            using var cancellation = new CancellationTokenSource(
-                                this.clusterMembershipOptions.CurrentValue.MaxProbeTimeout,
-                                this.timeProvider);
-                            await pair.Value.StopAsync(cancellation.Token);
+                            await reevaluation;
+                            reevaluation = this.timeProvider.DelayAsync(reevaluationPeriod, cancellationToken);
+                        }
+
+                        if (isMembershipUpdate)
+                        {
+                            if (!await membershipUpdate)
+                            {
+                                break;
+                            }
+
+                            tableSnapshot = updates.Current;
+                        }
+
+                        var utcNow = this.timeProvider.GetUtcNow().UtcDateTime;
+                        var newMonitoredSilos = this.UpdateMonitoredSilos(tableSnapshot, this.monitoredSilos, utcNow);
+
+                        if (isMembershipUpdate && this.clusterMembershipOptions.CurrentValue.EvictWhenMaxJoinAttemptTimeExceeded)
+                        {
+                            await this.EvictStaleStateSilos(tableSnapshot, utcNow);
+                        }
+
+                        foreach (var pair in this.monitoredSilos)
+                        {
+                            if (!newMonitoredSilos.ContainsKey(pair.Key))
+                            {
+                                using var cancellation = new CancellationTokenSource(
+                                    this.clusterMembershipOptions.CurrentValue.MaxProbeTimeout,
+                                    this.timeProvider);
+                                await pair.Value.StopAsync(cancellation.Token);
+                            }
+                        }
+
+                        this.monitoredSilos = newMonitoredSilos;
+                        this.observedMembershipVersion = tableSnapshot.Version;
+                        if (isMembershipUpdate)
+                        {
+                            membershipUpdate = updates.MoveNextAsync().AsTask();
                         }
                     }
-
-                    this.monitoredSilos = newMonitoredSilos;
-                    this.observedMembershipVersion = tableSnapshot.Version;
+                }
+                finally
+                {
+                    processingCancellation.Cancel();
+                    await Task.WhenAll(membershipUpdate, reevaluation).SuppressThrowing();
                 }
             }
             catch (OperationCanceledException) when (shutdownCancellation.IsCancellationRequested)

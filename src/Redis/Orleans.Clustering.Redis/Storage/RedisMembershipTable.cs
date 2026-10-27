@@ -12,6 +12,9 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Clustering.Redis
 {
+    /// <summary>
+    /// Reads membership snapshots and executes membership write scripts on the Redis primary.
+    /// </summary>
     internal class RedisMembershipTable : IMembershipTable, IDisposable, IAsyncDisposable
     {
         private const string TableVersionKey = "Version";
@@ -222,7 +225,7 @@ namespace Orleans.Clustering.Redis
                 script,
                 [_clusterKey],
                 [entry.SiloAddress.ToString(), tableVersion.VersionEtag, SerializeVersion(tableVersion), Serialize(entry), allowInsertOnly ? 0 : 1],
-                CommandFlags.NoScriptCache), cancellationToken);
+                CommandFlags.DemandMaster | CommandFlags.NoScriptCache), cancellationToken);
             return (int)result == 1;
         }
 
@@ -232,7 +235,7 @@ namespace Orleans.Clustering.Redis
         public async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var all = await AwaitAsync(_db.HashGetAllAsync(_clusterKey), cancellationToken);
+            var all = await AwaitAsync(_db.HashGetAllAsync(_clusterKey, CommandFlags.DemandMaster), cancellationToken);
             var tableVersionRow = all.SingleOrDefault(h => TableVersionKey.Equals(h.Name, StringComparison.Ordinal));
             TableVersion tableVersion = GetTableVersionFromRow(tableVersionRow.Value);
 
@@ -264,30 +267,14 @@ namespace Orleans.Clustering.Redis
             return false;
         }
 
-        [Obsolete("Use ReadRowAsync instead.")]
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-        public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
-        {
-            var rows = await ReadEntryAsync(key.ToString(), cancellationToken);
-            var tableVersion = GetTableVersionFromRow(rows[0]);
-            var entryRow = rows[1];
-            if (TryGetValueString(entryRow, out var entryValueString))
-            {
-                var entry = Deserialize(entryValueString);
-                return new MembershipTableData(Tuple.Create(entry, tableVersion.VersionEtag), tableVersion);
-            }
-            else
-            {
-                return new MembershipTableData(tableVersion);
-            }
-        }
-
-        private async Task<RedisValue[]> ReadEntryAsync(string key, CancellationToken cancellationToken)
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            // HMGET reads the version and row from the same Redis command.
-            return await AwaitAsync(_db.HashGetAsync(_clusterKey, [TableVersionKey, key]), cancellationToken);
+            return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
         }
 
         [Obsolete("Use UpdateIAmAliveAsync instead.")]
@@ -309,7 +296,7 @@ namespace Orleans.Clustering.Redis
                 script,
                 [_clusterKey],
                 [entry.SiloAddress.ToString(), timestamp],
-                CommandFlags.NoScriptCache), cancellationToken);
+                CommandFlags.DemandMaster | CommandFlags.NoScriptCache), cancellationToken);
         }
 
         [Obsolete("Use UpdateRowAsync instead.")]
@@ -329,7 +316,7 @@ namespace Orleans.Clustering.Redis
         public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var rows = await AwaitAsync(_db.HashGetAllAsync(_clusterKey), cancellationToken);
+            var rows = await AwaitAsync(_db.HashGetAllAsync(_clusterKey, CommandFlags.DemandMaster), cancellationToken);
             _ = GetTableVersionFromRow(rows.SingleOrDefault(row => row.Name == TableVersionKey).Value);
             foreach (var row in rows)
             {
@@ -352,7 +339,7 @@ namespace Orleans.Clustering.Redis
                         return 0
                         """;
                     await AwaitAsync(_db.ScriptEvaluateAsync(
-                        script, [_clusterKey], [row.Name, row.Value], CommandFlags.NoScriptCache), cancellationToken);
+                        script, [_clusterKey], [row.Name, row.Value], CommandFlags.DemandMaster | CommandFlags.NoScriptCache), cancellationToken);
                 }
             }
         }

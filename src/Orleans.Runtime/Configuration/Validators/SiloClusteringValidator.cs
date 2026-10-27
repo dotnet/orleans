@@ -52,6 +52,11 @@ namespace Orleans.Runtime.Configuration
                 throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.MaxDefunctSiloEntries)} ({clusterMembershipOptions.MaxDefunctSiloEntries}) must be greater than or equal to 0, or null.");
             }
 
+            if (clusterMembershipOptions.DefunctSiloMinimumRetention < TimeSpan.Zero)
+            {
+                throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.DefunctSiloMinimumRetention)} ({clusterMembershipOptions.DefunctSiloMinimumRetention}) must be greater than or equal to 0.");
+            }
+
             if (clusterMembershipOptions.ProbeTimeout <= TimeSpan.Zero)
             {
                 throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.ProbeTimeout)} ({clusterMembershipOptions.ProbeTimeout}) must be greater than 0.");
@@ -95,9 +100,13 @@ namespace Orleans.Runtime.Configuration
                 failureDetectionTimeoutTicks = maxProbeCycleTime.Ticks * clusterMembershipOptions.NumMissedProbesLimit;
             }
 
+            if (clusterMembershipOptions.TableRefreshTimeout <= TimeSpan.Zero)
+            {
+                throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.TableRefreshTimeout)} ({clusterMembershipOptions.TableRefreshTimeout}) must be greater than 0.");
+            }
+
             var tableRefreshTimeoutTicks = clusterMembershipOptions.TableRefreshTimeout.Ticks;
-            if (tableRefreshTimeoutTicks > 0
-                && tableRefreshTimeoutTicks > (TimeSpan.MaxValue.Ticks - failureDetectionTimeoutTicks) / 2)
+            if (tableRefreshTimeoutTicks > (TimeSpan.MaxValue.Ticks - failureDetectionTimeoutTicks) / 2)
             {
                 throw new OrleansConfigurationException($"The failure detection timeout plus twice {nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.TableRefreshTimeout)} ({clusterMembershipOptions.TableRefreshTimeout}) must not exceed {TimeSpan.MaxValue}.");
             }

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.Diagnostics;
 
 namespace Orleans.Runtime.MembershipService.SiloMetadata;
 
@@ -14,6 +15,7 @@ internal partial class SiloMetadataCache(
     ISiloMetadataClient siloMetadataClient,
     IMembershipManager membershipManager,
     IOptions<ClusterMembershipOptions> clusterMembershipOptions,
+    ILocalSiloDetails localSiloDetails,
     ILogger<SiloMetadataCache> logger)
     : ISiloMetadataCache, ILifecycleParticipant<ISiloLifecycle>, IDisposable
 {
@@ -21,6 +23,7 @@ internal partial class SiloMetadataCache(
     private readonly Dictionary<SiloAddress, DateTime> _negativeCache = new();
     private readonly CancellationTokenSource _cts = new();
     private TimeSpan negativeCachePeriod;
+    private long _updateSequence;
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
     {
@@ -105,6 +108,11 @@ internal partial class SiloMetadataCache(
                         _metadata.TryRemove(silo, out _);
                         _negativeCache.Remove(silo, out _);
                     }
+                }
+
+                if (SiloMetadataEvents.IsCacheUpdatedEnabled)
+                {
+                    SiloMetadataEvents.EmitCacheUpdated(localSiloDetails.SiloAddress, ++_updateSequence, update.Version, _metadata.Keys);
                 }
             }
         }

@@ -120,40 +120,14 @@ internal partial class FirestoreMembershipTable : IMembershipTable
         }
     }
 
-    [Obsolete("Use ReadRowAsync instead.")]
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
     public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-    public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+    public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        try
-        {
-            var collection = this._storage.GetCollection();
-            // One BatchGet stream is a strongly consistent snapshot; the SDK restores request order.
-            var snapshots = await FirestoreDataManager.ExecuteWithCancellation(
-                collection.Database.GetAllSnapshotsAsync(
-                    [collection.Document(this._partitionId), collection.Document(key.ToParsableString())],
-                    cancellationToken),
-                cancellationToken);
-            var versionSnapshot = snapshots[0];
-            var siloSnapshot = snapshots[1];
-            if (!versionSnapshot.Exists)
-                throw new KeyNotFoundException($"Could not find cluster version entry for {this._partitionId}");
-
-            var silos = siloSnapshot.Exists
-                ? new[] { siloSnapshot.ConvertTo<SiloInstanceEntity>() }
-                : Array.Empty<SiloInstanceEntity>();
-            var table = Convert((silos, versionSnapshot.ConvertTo<ClusterVersionEntity>()));
-
-            LogReadEntry(key, table);
-
-            return table;
-        }
-        catch (Exception exc) when (exc is not OperationCanceledException)
-        {
-            LogReadEntryError(exc, key);
-            throw;
-        }
+        return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
     }
 
     [Obsolete("Use ReadAllAsync instead.")]

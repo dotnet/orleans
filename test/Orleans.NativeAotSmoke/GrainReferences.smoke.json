@@ -1,0 +1,7 @@
+{
+  "scenario": "GrainReferences",
+  "diagnostics": "legacy-visible",
+  "rejectDiagnostics": [
+    "(?:warning|error) IL[0-9]+: Orleans\\.GrainReferences\\.(?:GrainReferenceActivatorProvider|RpcProvider\\.<\\.ctor>)"
+  ]
+}

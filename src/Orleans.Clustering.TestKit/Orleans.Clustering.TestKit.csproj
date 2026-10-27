@@ -11,9 +11,6 @@
     <IsPackable>true</IsPackable>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
-    <!-- First release: there is no prior package to compare against. Keep within-package validation enabled. -->
-    <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
-    <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Accordant" />

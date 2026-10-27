@@ -12,6 +12,48 @@ namespace Orleans.CodeGenerator.Tests;
 public class IncrementalCachingTests
 {
     [Fact]
+    public async Task GenericContext_UnrelatedChange_PreservesOneCachedGraph()
+    {
+        const string source = """
+            [Orleans.GenerateSerializerContext<System.Collections.Generic.List<int>>]
+            [Orleans.GenerateSerializerContext<int?>]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GenerateSerializerContext<System.Collections.Generic.List<int>>]
+            public partial class DemoContext { }
+            """;
+        var compilation = await CreateCompilation(source);
+        var updated = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(
+            "public class Unrelated { }", cancellationToken: TestContext.Current.CancellationToken));
+        var (first, second) = await RunTwice(compilation, updated);
+        Assert.Empty(first.Diagnostics);
+        Assert.Empty(second.Diagnostics);
+        Assert.Single(first.GeneratedSources, static source => source.HintName.Contains(".context.", StringComparison.Ordinal));
+        Assert.Single(second.GeneratedSources, static source => source.HintName.Contains(".context.", StringComparison.Ordinal));
+        AssertTrackedStepsCachedOrUnchanged(second, OrleansSerializationSourceGenerator.SerializerContextOutputsTrackingName);
+        AssertGeneratedSourcesIdentical(first, second);
+    }
+
+    [Fact]
+    public async Task GenericContext_ChangedRoot_InvalidatesGraph()
+    {
+        const string source = """
+            [Orleans.GenerateSerializerContext<System.Collections.Generic.List<int>>]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """;
+        var compilation = await CreateCompilation(source);
+        var updated = ReplaceSource(compilation, source.Replace("List<int>", "List<long>", StringComparison.Ordinal));
+        var (first, second) = await RunTwice(compilation, updated);
+        Assert.Empty(first.Diagnostics);
+        Assert.Empty(second.Diagnostics);
+        AssertTrackedStepModifiedOrNew(second, OrleansSerializationSourceGenerator.SerializerContextOutputsTrackingName);
+        AssertSourcesChanged(first, second, static hint => hint.Contains(".context.", StringComparison.Ordinal));
+        var context = Assert.Single(second.GeneratedSources,
+            static source => source.HintName.Contains(".context.", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("AddSerializer<long>", context, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddSerializer<int>", context, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task UnchangedSource_ProducesCachedOutput()
     {
         const string code = """

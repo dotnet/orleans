@@ -18,6 +18,30 @@ namespace Tester.Cassandra.Clustering;
 [TestCategory("BVT")]
 public sealed class CassandraMembershipTableInitializationTests
 {
+    [Fact]
+    public async Task PointReads_Uninitialized_DoNotCreateSession()
+    {
+        var backend = new InitializationBackend();
+        using var table = backend.CreateTable(false);
+        backend.Session.ClearReceivedCalls();
+        var address = SiloAddress.New(System.Net.IPAddress.Loopback, 11111, 1);
+#pragma warning disable CS0618 // Verify retirement before initialization and cancellation precedence.
+        var legacy = ((IMembershipTable)table).ReadRow(address);
+        var current = table.ReadRowAsync(address, TestContext.Current.CancellationToken);
+        Assert.True(legacy.IsFaulted);
+        Assert.True(current.IsFaulted);
+        const string guidance = "Use ReadAllAsync and MembershipTableData.TryGet instead.";
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => legacy)).Message);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => current)).Message);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => table.ReadRowAsync(address, cancellation.Token));
+#pragma warning restore CS0618
+        Assert.Equal(cancellation.Token, canceled.CancellationToken);
+        Assert.Equal(0, backend.FactoryCalls);
+        Assert.Empty(backend.Session.ReceivedCalls());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

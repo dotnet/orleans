@@ -1,4 +1,5 @@
 using System.Reflection;
+using Azure.Core;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -84,6 +85,96 @@ public sealed class AzureTableStorageJournalingProviderBuilderTests
         Assert.Equal(7, options.MaxMetadataOnlyConflictRetries);
         Assert.Equal(TimeSpan.FromMilliseconds(25), options.MetadataOnlyConflictInitialBackoff);
         Assert.Equal(TimeSpan.FromMilliseconds(500), options.MetadataOnlyConflictMaxBackoff);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Configure_ClientOptions_AppliesToClientCreatedByConfiguredFactory(bool preconfigured)
+    {
+        var builder = CreateBuilder(
+            ("Provider:ClientOptions:EnableTenantDiscovery", "true"),
+            ("Provider:ClientOptions:Retry:MaxRetries", "7"),
+            ("Provider:ClientOptions:Retry:Delay", "00:00:02"),
+            ("Provider:ClientOptions:Retry:Mode", "Fixed"),
+            ("Provider:ClientOptions:Diagnostics:IsLoggingEnabled", "false"),
+            ("Provider:ClientOptions:Diagnostics:LoggedHeaderNames:0", "x-custom"));
+        var preconfiguredOptions = new TableClientOptions();
+        TableClientOptions? capturedOptions = null;
+        builder.Services.AddOptions<AzureTableJournalStorageOptions>(ProviderName).Configure(options =>
+        {
+            if (preconfigured)
+            {
+                options.ClientOptions = preconfiguredOptions;
+            }
+
+            options.ConfigureTableServiceClient(_ =>
+            {
+                capturedOptions = options.ClientOptions;
+                return Task.FromResult(new TableServiceClient(
+                    new Uri("https://factory.table.example/"),
+                    new TableSharedKeyCredential("factory", Convert.ToBase64String(new byte[32]))));
+            });
+        });
+
+        Configure(builder, "Provider");
+
+        using var services = builder.Services.BuildServiceProvider();
+        await GetStorageOptions(services).CreateClient!(CancellationToken.None);
+        Assert.NotNull(capturedOptions);
+        if (preconfigured)
+        {
+            Assert.Same(preconfiguredOptions, capturedOptions);
+        }
+
+        Assert.True(capturedOptions.EnableTenantDiscovery);
+        Assert.Equal(7, capturedOptions.Retry.MaxRetries);
+        Assert.Equal(TimeSpan.FromSeconds(2), capturedOptions.Retry.Delay);
+        Assert.Equal(RetryMode.Fixed, capturedOptions.Retry.Mode);
+        Assert.False(capturedOptions.Diagnostics.IsLoggingEnabled);
+        Assert.Contains("x-custom", capturedOptions.Diagnostics.LoggedHeaderNames);
+    }
+
+    [Fact]
+    public void Configure_WithoutClientOptionsSection_LeavesClientOptionsUnset()
+    {
+        var builder = CreateBuilder(("Provider:TableName", "custom"));
+
+        Configure(builder, "Provider");
+
+        using var services = builder.Services.BuildServiceProvider();
+        Assert.Null(GetStorageOptions(services).ClientOptions);
+    }
+
+    [Fact]
+    public void Configure_InvalidClientRetryOption_ThrowsWhenOptionsAreResolved()
+    {
+        var builder = CreateBuilder(("Provider:ClientOptions:Retry:MaxRetries", "lots"));
+
+        Configure(builder, "Provider");
+
+        using var services = builder.Services.BuildServiceProvider();
+        var exception = Assert.Throws<InvalidOperationException>(() => GetStorageOptions(services));
+        Assert.Contains("'Provider:ClientOptions:Retry:MaxRetries'", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("DeleteOldGenerations", "maybe", typeof(bool))]
+    [InlineData("CompactionRowCountThreshold", "many", typeof(long))]
+    [InlineData("CompactionSizeThreshold", "1.5", typeof(long))]
+    [InlineData("MaxMetadataOnlyConflictRetries", "lots", typeof(int))]
+    [InlineData("MetadataOnlyConflictInitialBackoff", "soon", typeof(TimeSpan))]
+    [InlineData("MetadataOnlyConflictMaxBackoff", "later", typeof(TimeSpan))]
+    public void Configure_InvalidOperationalOption_ThrowsWhenOptionsAreResolved(string key, string value, Type valueType)
+    {
+        var builder = CreateBuilder(($"Provider:{key}", value));
+
+        Configure(builder, "Provider");
+
+        using var services = builder.Services.BuildServiceProvider();
+        var exception = Assert.Throws<InvalidOperationException>(() => GetStorageOptions(services));
+        Assert.Contains($"'Provider:{key}'", exception.Message);
+        Assert.Contains($"'{valueType}'", exception.Message);
     }
 
     [Fact]

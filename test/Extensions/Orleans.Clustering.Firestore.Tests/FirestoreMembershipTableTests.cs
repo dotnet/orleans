@@ -109,7 +109,7 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
     public Task InsertRow() => MembershipTable_InsertRow();
 
     [Fact]
-    public Task ReadRow_Insert_Read() => MembershipTable_ReadRow_Insert_Read();
+    public Task ReadAll_Insert_TryGet() => MembershipTable_ReadRow_Insert_Read();
 
     [Fact]
     public Task ReadAll_Insert_ReadAll() => MembershipTable_ReadAll_Insert_ReadAll();
@@ -171,11 +171,13 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
 
             var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var writer = WriteUpdates();
-            var readAll = ReadSnapshots(() => table.ReadAllAsync(TestContext.Current.CancellationToken));
-            var readRow = ReadSnapshots(() => table.ReadRowAsync(address, TestContext.Current.CancellationToken));
+            var readAll = ReadSnapshots(nameof(FirestoreMembershipTable.ReadAllAsync),
+                () => table.ReadAllAsync(TestContext.Current.CancellationToken));
+            var secondReader = ReadSnapshots("ReadAllAsync second handle",
+                () => table.ReadAllAsync(TestContext.Current.CancellationToken));
             start.SetResult();
 
-            await Task.WhenAll(writer, readAll, readRow).WaitAsync(
+            await Task.WhenAll(writer, readAll, secondReader).WaitAsync(
                 TimeSpan.FromMinutes(2),
                 TestContext.Current.CancellationToken);
 
@@ -188,9 +190,9 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
                     while (!updated)
                     {
                         var snapshot = await ReadWithRetries(
-                            () => table.ReadRowAsync(address, TestContext.Current.CancellationToken),
+                            () => table.ReadAllAsync(TestContext.Current.CancellationToken),
                             TestContext.Current.CancellationToken);
-                        var row = Assert.Single(snapshot.Members);
+                        var row = Assert.IsType<Tuple<MembershipEntry, string>>(snapshot.TryGet(address));
                         var nextVersion = snapshot.Version.Next();
                         row.Item1.ProxyPort = nextVersion.Version;
                         updated = await table.UpdateRowAsync(row.Item1, row.Item2, nextVersion, TestContext.Current.CancellationToken);
@@ -199,7 +201,7 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
 
             }
 
-            async Task ReadSnapshots(Func<Task<MembershipTableData>> read)
+            async Task ReadSnapshots(string operation, Func<Task<MembershipTableData>> read)
             {
                 await start.Task.WaitAsync(TestContext.Current.CancellationToken);
                 var previousVersion = -1;
@@ -208,11 +210,13 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
                     var snapshot = await ReadWithRetries(
                         read,
                         TestContext.Current.CancellationToken);
-                    Assert.True(snapshot.Version.Version >= previousVersion);
-                    var row = Assert.Single(
-                        snapshot.Members,
-                        member => member.Item1.SiloAddress.Equals(address));
-                    Assert.Equal(snapshot.Version.Version, row.Item1.ProxyPort);
+                    Assert.True(
+                        snapshot.Version.Version >= previousVersion,
+                        $"{operation} read {i} returned version {snapshot.Version.Version} after version {previousVersion}.");
+                    var row = Assert.IsType<Tuple<MembershipEntry, string>>(snapshot.TryGet(address));
+                    Assert.True(
+                        snapshot.Version.Version == row.Item1.ProxyPort,
+                        $"{operation} read {i} returned table version {snapshot.Version.Version} with row version {row.Item1.ProxyPort}.");
                     previousVersion = snapshot.Version.Version;
                 }
             }

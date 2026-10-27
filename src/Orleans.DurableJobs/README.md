@@ -202,7 +202,9 @@ Each silo discovers shards whose start time is within `DurableJobsOptions.ShardL
 of its current Durable Jobs time-provider clock. The default lookahead is ten minutes.
 A discovered shard starts processing once its start time enters `ShardActivationBufferPeriod`.
 `DurableJobsOptions.ShardCheckInterval` controls periodic discovery and writable-shard cleanup
-checks, with a default of five minutes. Membership changes also trigger checks.
+checks, with a default of five minutes. A silo joining or leaving the active set also triggers
+a check, as does a silo being declared dead, so the dead silo's shards are adopted as soon as
+membership declares it dead.
 The lookahead accepts non-negative durations; zero selects shards whose start time is at or
 before the current time. The discovery horizon is capped at `DateTimeOffset.MaxValue`.
 The check interval accepts durations from 1 to 4294967294 milliseconds.
@@ -230,6 +232,20 @@ metadata ETags and enforce conditional updates; a missing ETag surfaces as a dis
 Assigned shards are delivered as they are opened, allowing execution to proceed while later
 candidates are evaluated. The claim budget limits new claims;
 locally owned shards remain eligible after that budget is exhausted.
+
+Recovering a shard replays its jobs, verifies local ownership, and durably appends a
+bounded owner record in a separate journal stream before publishing the instance.
+Its size depends on the silo address, so recovery works for shards larger than a
+provider's single-append limit. This content commit establishes the
+new writer's storage concurrency boundary: earlier owners' pending writes fail
+against the changed journal, and the new owner progresses from the recovered
+state. Ownership is verified again after the commit to detect a superseding
+claim during opening. Concurrent local opens share one recovery and use the
+same canonical instance. Newly created journals start with their first writer.
+Each caller's cancellation ends its own wait. An active joiner retries a shared
+open canceled by its initiating caller after that attempt finishes cleanup.
+Persistent journal providers enforce conditional content mutations; ordinary metadata annotations and
+same-owner closure retain their metadata-only retry behavior.
 
 Catalog providers apply raw-prefix and range constraints using their storage capabilities.
 The timestamp representation also supports narrower day/hour prefixes and inclusive `MinId`

@@ -157,7 +157,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
 
         await using (var writerProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, blobName, cts.Token))
         {
-            var storage = writerProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
+            var storage = await writerProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId)).ReadForWriteAsync();
             await storage.ReplaceAsync(new ReadOnlySequence<byte>(checkpointBytes), cts.Token);
             await storage.AppendAsync(new ReadOnlySequence<byte>(walBytes), cts.Token);
         }
@@ -185,7 +185,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
             new DurableQueue<string>("queue", manager, new OrleansBinaryDurableQueueCommandCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableSet<string>("set", manager, new OrleansBinaryDurableSetCommandCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableValue<int>("value", manager, new OrleansBinaryDurableValueCommandCodec<int>(ValueCodec<int>(), SessionPool)),
-            new JournaledPersistentState<string>("state", manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool)),
+            new JournaledPersistentState<string>("state", manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool), CodecProvider.GetActivator<string>()),
             new DurableTaskCompletionSource<int>(
                 "tcs",
                 manager,

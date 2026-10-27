@@ -136,7 +136,7 @@ public sealed class RedisJournalingProviderBuilderTests
     }
 
     [Fact]
-    public void Configure_BlankAndInvalidValues_PreserveDefaults()
+    public void Configure_BlankValues_PreserveDefaults()
     {
         var expected = new RedisJournalStorageOptions();
         var expectedManagerOptions = new JournaledStateManagerOptions();
@@ -145,9 +145,6 @@ public sealed class RedisJournalingProviderBuilderTests
             ("ConnectionName", ""),
             ("ConnectionString", ""),
             (nameof(RedisJournalStorageOptions.KeyPrefix), " "),
-            (nameof(RedisJournalStorageOptions.CompactionThresholdBytes), "not-a-long"),
-            (nameof(RedisJournalStorageOptions.ReadChunkSize), "not-an-int"),
-            (nameof(RedisJournalStorageOptions.InitStage), "not-an-int"),
             (nameof(JournaledStateManagerOptions.JournalFormatKey), " "));
 
         using var services = builder.Services.BuildServiceProvider();
@@ -161,6 +158,82 @@ public sealed class RedisJournalingProviderBuilderTests
         Assert.Equal(expected.ReadChunkSize, options.ReadChunkSize);
         Assert.Equal(expected.InitStage, options.InitStage);
         Assert.Equal(expectedManagerOptions.JournalFormatKey, managerOptions.JournalFormatKey);
+    }
+
+    [Theory]
+    [InlineData(nameof(RedisJournalStorageOptions.CompactionThresholdBytes), "not-a-long", typeof(long))]
+    [InlineData(nameof(RedisJournalStorageOptions.ReadChunkSize), "not-an-int", typeof(int))]
+    [InlineData(nameof(RedisJournalStorageOptions.InitStage), "not-an-int", typeof(int))]
+    public void Configure_InvalidTypedValue_Throws(string key, string invalidValue, Type expectedType)
+    {
+        var builder = ConfigureBuilder((key, invalidValue));
+
+        using var services = builder.Services.BuildServiceProvider();
+        var exception = Assert.Throws<InvalidOperationException>(() => GetStorageOptions(services));
+
+        Assert.Contains($"at '{ConfigurationSectionName}:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
+    }
+
+    // The configuration binding source generator treats an empty value as absent on .NET 10 and rejects it on .NET 8.
+#if NET10_0_OR_GREATER
+    private static readonly bool EmptyValueIsAbsent = true;
+#else
+    private static readonly bool EmptyValueIsAbsent = false;
+#endif
+
+    [Theory]
+    [InlineData(nameof(RedisJournalStorageOptions.CompactionThresholdBytes), typeof(long))]
+    [InlineData(nameof(RedisJournalStorageOptions.ReadChunkSize), typeof(int))]
+    public void Configure_EmptyTypedValue_FollowsBinderContract(string key, Type expectedType)
+    {
+        var builder = ConfigureBuilder(PreconfigureNonDefaultValues, [(key, "")], []);
+        using var services = builder.Services.BuildServiceProvider();
+
+        if (EmptyValueIsAbsent)
+        {
+            AssertPreconfiguredValues(GetStorageOptions(services));
+            return;
+        }
+
+        var exception = Assert.Throws<InvalidOperationException>(() => GetStorageOptions(services));
+        Assert.Contains($"at '{ConfigurationSectionName}:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
+    }
+
+    [Theory]
+    [InlineData(nameof(RedisJournalStorageOptions.CompactionThresholdBytes), typeof(long))]
+    [InlineData(nameof(RedisJournalStorageOptions.ReadChunkSize), typeof(int))]
+    public void Configure_WhitespaceTypedValue_Throws(string key, Type expectedType)
+    {
+        var builder = ConfigureBuilder(PreconfigureNonDefaultValues, [(key, "   ")], []);
+        using var services = builder.Services.BuildServiceProvider();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => GetStorageOptions(services));
+
+        Assert.Contains($"at '{ConfigurationSectionName}:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
+    }
+
+    [Fact]
+    public void Configure_AbsentTypedValues_PreservePreconfiguredValues()
+    {
+        var builder = ConfigureBuilder(PreconfigureNonDefaultValues, [], []);
+        using var services = builder.Services.BuildServiceProvider();
+
+        AssertPreconfiguredValues(GetStorageOptions(services));
+    }
+
+    private static void PreconfigureNonDefaultValues(RedisJournalStorageOptions options)
+    {
+        options.CompactionThresholdBytes = 4242;
+        options.ReadChunkSize = 4343;
+    }
+
+    private static void AssertPreconfiguredValues(RedisJournalStorageOptions options)
+    {
+        Assert.Equal(4242, options.CompactionThresholdBytes);
+        Assert.Equal(4343, options.ReadChunkSize);
     }
 
     [Fact]
@@ -186,6 +259,12 @@ public sealed class RedisJournalingProviderBuilderTests
     private static TestSiloBuilder ConfigureBuilder(
         (string Key, string? Value)[] settings,
         (string Key, string? Value)[] rootSettings)
+        => ConfigureBuilder(_ => { }, settings, rootSettings);
+
+    private static TestSiloBuilder ConfigureBuilder(
+        Action<RedisJournalStorageOptions> preconfigure,
+        (string Key, string? Value)[] settings,
+        (string Key, string? Value)[] rootSettings)
     {
         var values = rootSettings
             .Concat(settings.Select(setting => ($"{ConfigurationSectionName}:{setting.Key}", setting.Value)))
@@ -195,6 +274,7 @@ public sealed class RedisJournalingProviderBuilderTests
             .Build();
         var builder = new TestSiloBuilder(configuration);
         builder.Services.AddSingleton<IConfiguration>(configuration);
+        builder.Services.Configure(ProviderName, preconfigure);
 
         new RedisJournalingProviderBuilder().Configure(
             builder,

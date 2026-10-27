@@ -30,7 +30,7 @@ Orleans.Dashboard.App/
 
 ### Prerequisites
 
-- Node.js (v18 or later)
+- Node.js (v24 or later)
 - npm
 
 ### Setup
@@ -59,6 +59,15 @@ npm run build
 ```
 
 This builds the application to `../Orleans.Dashboard/wwwroot/` which is then embedded as resources in the Orleans.Dashboard C# project.
+
+### Navigation Tests
+
+The browser tests exercise the production bundle's counter refresh, slow requests, route changes, narrow-screen navigation, keyboard dismissal, and desktop breakpoint:
+
+```bash
+npx playwright install chromium
+npm run test:ui
+```
 
 ### Preview Production Build
 

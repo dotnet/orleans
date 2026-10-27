@@ -1,0 +1,7 @@
+<Project>
+  <!-- <serializer_context_native_publish> -->
+  <PropertyGroup>
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+  <!-- </serializer_context_native_publish> -->
+</Project>

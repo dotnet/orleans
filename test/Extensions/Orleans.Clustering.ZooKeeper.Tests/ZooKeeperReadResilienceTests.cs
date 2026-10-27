@@ -60,8 +60,9 @@ public sealed class ZooKeeperReadResilienceTests : IAsyncLifetime
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task MembershipTable_ZooKeeper_RepeatedSnapshotReadCompatibility(bool pointRead)
+    public async Task MembershipTable_ZooKeeper_RepeatedSnapshotReadCompatibility(bool selectFromSnapshot)
     {
+        var mode = selectFromSnapshot ? "ReadAll + TryGet" : "ReadAll";
         for (var iteration = 0; iteration < 3; iteration++)
         {
             var started = Stopwatch.GetTimestamp();
@@ -71,25 +72,31 @@ public sealed class ZooKeeperReadResilienceTests : IAsyncLifetime
                 await CapturePrimaryScenarioFailureAsync(async () =>
                 {
                     var runner = new MembershipTableTestRunner(fixture, seed: 17, concurrencyRowCount: 128);
-                    if (pointRead)
-                    {
-                        await runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(cancellationToken);
-                    }
-                    else
-                    {
-                        await runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(cancellationToken);
-                    }
+                    await runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(cancellationToken);
 
                     phase = "stable ReadAll";
                     var readStarted = Stopwatch.GetTimestamp();
                     var snapshot = await fixture.First.ReadAllAsync(cancellationToken);
+                    if (selectFromSnapshot)
+                    {
+                        phase = "stable snapshot lookup";
+                        Assert.NotEmpty(snapshot.Members);
+                        var present = snapshot.Members[0];
+                        var address = present.Item1.SiloAddress;
+                        var absent = SiloAddress.New(address.Endpoint.Address, address.Endpoint.Port, checked(address.Generation + 1));
+                        Assert.Same(present, snapshot.TryGet(address));
+                        Assert.Null(snapshot.TryGet(absent));
+                        TestContext.Current.TestOutputHelper?.WriteLine(
+                            $"Snapshot lookup present={address}; absent={absent}; version={snapshot.Version}");
+                    }
+
                     TestContext.Current.TestOutputHelper?.WriteLine(
-                        $"Stable snapshot rows={snapshot.Members.Count}; elapsed={Stopwatch.GetElapsedTime(readStarted)}");
+                        $"Stable snapshot mode={mode}; rows={snapshot.Members.Count}; elapsed={Stopwatch.GetElapsedTime(readStarted)}");
                 }, failure => RecordPrimaryFailure(
-                    $"Primary snapshot failure; pointRead={pointRead}; repetition={iteration + 1}/3; phase={phase}", failure));
+                    $"Primary snapshot failure; mode={mode}; repetition={iteration + 1}/3; phase={phase}", failure));
             }, TestContext.Current.CancellationToken);
             TestContext.Current.TestOutputHelper?.WriteLine(
-                $"Snapshot compatibility pass {iteration + 1}/3; pointRead={pointRead}; elapsed={Stopwatch.GetElapsedTime(started)}");
+                $"Snapshot compatibility pass {iteration + 1}/3; mode={mode}; elapsed={Stopwatch.GetElapsedTime(started)}");
         }
     }
 

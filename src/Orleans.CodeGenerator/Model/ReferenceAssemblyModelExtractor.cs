@@ -101,9 +101,11 @@ internal static class ReferenceAssemblyModelExtractor
                     typeAliases.Add(new TypeAliasModel(typeRef, alias));
                 }
 
-                if (TryExtractCompoundTypeAlias(symbol, libraryTypes.CompoundTypeAliasAttribute, out var components))
+                foreach (var compoundAlias in symbol.GetAttributes().Where(attribute =>
+                    SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, libraryTypes.CompoundTypeAliasAttribute)))
                 {
-                    compoundTypeAliases.Add(new CompoundTypeAliasModel(components, typeRef));
+                    if (TryExtractCompoundTypeAlias(compoundAlias, out var components))
+                        compoundTypeAliases.Add(new CompoundTypeAliasModel(components, typeRef));
                 }
 
                 if ((symbol.TypeKind == TypeKind.Class || symbol.TypeKind == TypeKind.Struct)
@@ -112,22 +114,22 @@ internal static class ReferenceAssemblyModelExtractor
                 {
                     if (symbol.HasAttribute(libraryTypes.RegisterSerializerAttribute))
                     {
-                        registeredCodecs.Add(new RegisteredCodecModel(typeRef, RegisteredCodecKind.Serializer));
+                        registeredCodecs.Add(ExtractRegisteredCodec(symbol, RegisteredCodecKind.Serializer, compilation));
                     }
 
                     if (symbol.HasAttribute(libraryTypes.RegisterCopierAttribute))
                     {
-                        registeredCodecs.Add(new RegisteredCodecModel(typeRef, RegisteredCodecKind.Copier));
+                        registeredCodecs.Add(ExtractRegisteredCodec(symbol, RegisteredCodecKind.Copier, compilation));
                     }
 
                     if (symbol.HasAttribute(libraryTypes.RegisterActivatorAttribute))
                     {
-                        registeredCodecs.Add(new RegisteredCodecModel(typeRef, RegisteredCodecKind.Activator));
+                        registeredCodecs.Add(ExtractRegisteredCodec(symbol, RegisteredCodecKind.Activator, compilation));
                     }
 
                     if (symbol.HasAttribute(libraryTypes.RegisterConverterAttribute))
                     {
-                        registeredCodecs.Add(new RegisteredCodecModel(typeRef, RegisteredCodecKind.Converter));
+                        registeredCodecs.Add(ExtractRegisteredCodec(symbol, RegisteredCodecKind.Converter, compilation));
                     }
 
                     foreach (var iface in symbol.AllInterfaces)
@@ -335,11 +337,9 @@ internal static class ReferenceAssemblyModelExtractor
     }
 
     private static bool TryExtractCompoundTypeAlias(
-        INamedTypeSymbol symbol,
-        INamedTypeSymbol compoundTypeAliasAttribute,
+        AttributeData attr,
         out ImmutableArray<CompoundAliasComponentModel> components)
     {
-        var attr = symbol.GetAttribute(compoundTypeAliasAttribute);
         if (attr is null)
         {
             components = [];
@@ -395,10 +395,11 @@ internal static class ReferenceAssemblyModelExtractor
     /// <summary>
     /// Extracts a <see cref="RegisteredCodecModel"/> from a symbol with one of the Register* attributes.
     /// </summary>
-    internal static RegisteredCodecModel ExtractRegisteredCodec(INamedTypeSymbol symbol, RegisteredCodecKind kind)
+    internal static RegisteredCodecModel ExtractRegisteredCodec(INamedTypeSymbol symbol, RegisteredCodecKind kind, Compilation compilation)
     {
         return new RegisteredCodecModel(
             new TypeRef(symbol.ToOpenTypeSyntax().ToString()),
-            kind);
+            kind,
+            SerializationContractModelExtractor.Extract(symbol, kind, compilation));
     }
 }

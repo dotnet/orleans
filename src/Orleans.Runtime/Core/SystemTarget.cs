@@ -370,9 +370,14 @@ namespace Orleans.Runtime
 
                 default:
                     LogInvalidMessage(_logger, msg);
+                    msg.Dispose();
                     break;
             }
         }
+
+        /// <inheritdoc/>
+        void IGrainContext.ReceiveLocalRequest(ILocalRequest request, LocalRequestOptions options)
+            => ReceiveMessage(RuntimeClient.CreateLocalRequest(this, request, options));
 
         /// <inheritdoc/>
         public object? GetTarget() => this;

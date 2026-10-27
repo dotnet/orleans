@@ -26,11 +26,14 @@ using Orleans.Hosting;
 using Orleans.Runtime.TestHooks;
 using Orleans.Configuration.Internal;
 using Orleans.TestingHost.Logging;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Metadata;
+using Orleans.Metadata;
 
 namespace Orleans.TestingHost;
 
 /// <summary>
-/// A host class for local testing with Orleans using in-process silos. 
+/// A host class for local testing with Orleans using in-process silos.
 /// </summary>
 public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 {
@@ -62,7 +65,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// Options used to configure the test cluster.
     /// </summary>
-    /// <remarks>This is the options you configured your test cluster with, or the default one. 
+    /// <remarks>This is the options you configured your test cluster with, or the default one.
     /// If the cluster is being configured via ClusterConfiguration, then this object may not reflect the true settings.
     /// </remarks>
     public InProcessTestClusterOptions Options { get; }
@@ -200,7 +203,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     {
         if (TryGetGrainContext(grainId, out var grainContext))
         {
-            grainContext.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationRequested, $"{nameof(DeactivateAsync)} was called."));
+            grainContext!.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationRequested, $"{nameof(DeactivateAsync)} was called."));
             await grainContext.Deactivated;
         }
     }
@@ -379,7 +382,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
     public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
     {
-        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value; // Stabilization requires a deployed client.
+        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
         TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
         var activeSilos = GetActiveSilos().ToArray();
         var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
@@ -405,12 +408,11 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// Wait for active silos to observe cluster manifest updates for all active silos.
+    /// Waits for active silos to observe cluster manifest updates for all active silos.
     /// </summary>
-    /// <param name="didKill">Whether recent membership changes were done by graceful Stop.</param>
     public async Task WaitForClusterManifestToStabilizeAsync(bool didKill = false)
     {
-        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value; // Stabilization requires a deployed client.
+        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
         var stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
         var activeSilos = GetActiveSilos().ToArray();
         var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
@@ -442,7 +444,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             .Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>())
             .ToArray();
         var manifestProviders = activeSilos
-            .Select(static silo => silo.ServiceProvider.GetRequiredService<IClusterManifestProvider>())
+            .Select(static silo => silo.ServiceProvider.GetRequiredService<ClusterManifestProvider>())
             .ToArray();
         var gatewayManager = Client.ServiceProvider.GetRequiredService<GatewayManager>();
         if (!GrainDirectoryObserver.CanObserve(activeSilos))
@@ -470,12 +472,55 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             .WaitAsync(cancellationToken);
         if (!manifestConverged)
         {
-            var observedManifests = activeSilos.Select((silo, index) =>
-                $"{silo.SiloAddress}=[{string.Join(", ", manifestProviders[index].Current.Silos.Keys.Order())}]");
+            var expectedSiloSet = activeSilos.Select(static silo => silo.SiloAddress).ToHashSet();
+
+            var snapshots = activeSilos.Select((silo, index) =>
+            {
+                var (manifest, diagnostics) = manifestProviders[index].GetManifestAndDiagnosticsSnapshot();
+                var observerTime = silo.ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime;
+                return (Silo: silo, Manifest: manifest, Diagnostics: diagnostics, ObserverTime: observerTime);
+            }).ToArray();
+
+            var observedManifests = snapshots.Select(entry =>
+                $"{entry.Silo.SiloAddress}=[{string.Join(", ", entry.Manifest.Silos.Keys.Order())}]");
+            var pendingFetchDiagnostics = snapshots
+                .Where(entry => !expectedSiloSet.SetEquals(entry.Manifest.Silos.Keys))
+                .Select(entry => DescribePendingFetch(entry.Silo.SiloAddress, entry.Manifest, entry.Diagnostics, entry.ObserverTime));
             throw new TimeoutException(
                 $"Cluster manifests did not converge within {manifestTimeout}. Expected active silos: {expectedSilos}. "
-                + $"Observed manifests: {string.Join("; ", observedManifests)}.");
+                + $"Observed manifests: {string.Join("; ", observedManifests)}. "
+                + $"Pending fetch diagnostics: {string.Join("; ", pendingFetchDiagnostics)}.");
         }
+    }
+
+    /// <summary>
+    /// Describes a silo's most recent manifest-update attempt: the membership version it is reconciling
+    /// against, the peers it is still waiting on, how long the attempt has been outstanding, and the most
+    /// recent fetch failure, if any. Used to diagnose a cluster-manifest convergence timeout.
+    /// </summary>
+    /// <remarks><see langword="internal"/> (rather than <see langword="private"/>) solely so its exact output
+    /// format can be unit-tested directly from <c>Orleans.Core.Tests</c> without requiring a full in-process
+    /// cluster convergence timeout.</remarks>
+    internal static string DescribePendingFetch(
+        SiloAddress observer,
+        ClusterManifest manifest,
+        ManifestUpdateAttemptDiagnostics? diagnostics,
+        DateTime observerUtcNow)
+    {
+        if (diagnostics is null)
+        {
+            return $"{observer}: no manifest-update attempt recorded (published version {manifest.Version})";
+        }
+
+        // Use the observer silo's own clock, which may be virtualized in tests, so elapsed time is measured
+        // consistently with AttemptStartedAt (stamped via the same silo's TimeProvider).
+        var elapsed = observerUtcNow - diagnostics.AttemptStartedAt;
+        var pending = string.Join(", ", diagnostics.PendingSilos);
+        var failure = diagnostics.LastFailedSilo is { } failedSilo
+            ? $", last fetch failure for {failedSilo} at {diagnostics.LastFailureAt:O}: {diagnostics.LastFailureMessage}"
+            : string.Empty;
+        return $"{observer}: membership v{diagnostics.MembershipVersion}, published v{manifest.Version}, "
+            + $"pending=[{pending}], attempt started {elapsed.TotalSeconds.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)}s ago{failure}";
     }
 
     /// <summary>
@@ -565,14 +610,8 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="silosToStart">Number of silos to start.</param>
     /// <param name="cancellationToken">The token used to cancel silo startup.</param>
     /// <returns>List of silo handles for the newly started silos.</returns>
-    public Task<List<InProcessSiloHandle>> StartSilosAsync(
+    public async Task<List<InProcessSiloHandle>> StartSilosAsync(
         int silosToStart,
-        CancellationToken cancellationToken)
-        => StartSilosAsync(silosToStart, configureSilo: null, cancellationToken);
-
-    internal async Task<List<InProcessSiloHandle>> StartSilosAsync(
-        int silosToStart,
-        Action<int, InProcessTestSiloSpecificOptions>? configureSilo,
         CancellationToken cancellationToken)
     {
         var instances = new List<InProcessSiloHandle>();
@@ -587,7 +626,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                     () => StartSiloAsync(
                         (short)instanceNumber,
                         Options,
-                        configureSilo,
                         cancellationToken),
                     cancellationToken))
                 .ToArray();
@@ -871,7 +909,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 clientBuilder.Services.AddSingleton<IGatewayListProvider>(_membershipTable);
             }
 
-            clientBuilder.UseInMemoryConnectionTransport(_transportHub);
+            clientBuilder.UseInMemoryTransport(_transportHub);
         });
 
         TryConfigureFileLogging(Options, hostBuilder.Services, "TestClusterClient");
@@ -1000,7 +1038,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                         new ConfigureDistributedGrainDirectory().Configure(siloBuilder);
                     }
 
-                    siloBuilder.UseInMemoryConnectionTransport(_transportHub);
+                    siloBuilder.UseInMemoryTransport(_transportHub);
 
                     services.AddSingleton<TestHooksEnvironmentStatisticsProvider>();
                     services.AddSingleton<TestHooksSystemTarget>();
@@ -1011,22 +1049,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 });
 
                 var host = appBuilder.Build();
-                if (siloOptions.RingHashCode is { } ringHashCode)
-                {
-                    // Apply the override before any startup service can cache the address's natural ring hashes.
-                    var siloAddress = host.Services.GetRequiredService<ILocalSiloDetails>().SiloAddress;
-                    siloAddress.InternalSetConsistentHashCode(unchecked((int)ringHashCode));
-                    var ringOptions = host.Services.GetRequiredService<IOptions<ConsistentRingOptions>>().Value;
-                    if (ringOptions.UseVirtualBucketsConsistentRing)
-                    {
-                        var uniformHashCodes = siloAddress
-                            .GetUniformHashCodes(ringOptions.NumVirtualBucketsConsistentRing)
-                            .ToArray();
-                        uniformHashCodes[0] = ringHashCode;
-                        siloAddress.InternalSetUniformHashCodes(uniformHashCodes);
-                    }
-                }
-
                 TestClusterFatalErrorHandler.Attach(host);
                 InitializeTestHooksSystemTarget(host);
                 try
@@ -1112,20 +1134,8 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         int instanceNumber,
         InProcessTestClusterOptions clusterOptions,
         CancellationToken cancellationToken)
-        => await StartSiloAsync(
-            instanceNumber,
-            clusterOptions,
-            configureSilo: null,
-            cancellationToken);
-
-    private async Task<InProcessSiloHandle> StartSiloAsync(
-        int instanceNumber,
-        InProcessTestClusterOptions clusterOptions,
-        Action<int, InProcessTestSiloSpecificOptions>? configureSilo,
-        CancellationToken cancellationToken)
     {
         var siloOptions = InProcessTestSiloSpecificOptions.Create(this, clusterOptions, instanceNumber, assignNewPort: true);
-        configureSilo?.Invoke(instanceNumber, siloOptions);
         var handle = await CreateSiloAsync(siloOptions, cancellationToken);
         handle.InstanceNumber = (short)instanceNumber;
         Interlocked.Increment(ref _startedInstances);

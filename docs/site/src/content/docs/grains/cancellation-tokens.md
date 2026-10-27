@@ -58,7 +58,7 @@ Cancellation callbacks registered from grain code execute in the grain's schedul
 
 Orleans treats <xref:System.Threading.CancellationToken> specially in generated request contracts. Adding or removing a token parameter is wire-compatible with callers compiled against the other form: a missing token is represented as <xref:System.Threading.CancellationToken.None?displayProperty=nameWithType>, and an extra token from an older caller can be ignored. Making a newly added parameter optional also preserves C# source compatibility for common call sites.
 
-The older <xref:Orleans.GrainCancellationToken> API isn't needed for new applications. Use the standard .NET token.
+The older <xref:Orleans.GrainCancellationToken> API is obsolete. Use <xref:System.Threading.CancellationToken> and <xref:System.Threading.CancellationTokenSource> instead.
 
 ## Related .NET guidance
 

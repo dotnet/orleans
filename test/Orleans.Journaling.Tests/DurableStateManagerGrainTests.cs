@@ -24,6 +24,7 @@ public sealed class DurableStateManagerGrainTests(DurableStateManagerIntegration
         var builder = new LifecycleTestSiloBuilder();
         builder.Services.AddSerializer();
         builder.Services.AddLogging();
+        builder.Services.AddSingleton(JournalingTestBase.CreateGrainPropertiesResolver());
         builder.Services.AddKeyedSingleton<TimeProvider>(JournalingTimeProviderNames.Journaling, TimeProvider.System);
         builder.Services.Configure<JsonJournalOptions>(
             options => options.AddTypeInfoResolver(JournalingTestsJsonContext.Default));

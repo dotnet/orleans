@@ -1,7 +1,7 @@
 ---
 title: Journaling runtime behavior and consistency
 description: Understand Orleans Journaling activation, write, recovery, compaction, concurrency, and failure semantics.
-ms.date: 08/21/2026
+ms.date: 10/19/2026
 ms.topic: conceptual
 ---
 
@@ -72,9 +72,37 @@ staged mutations from other calls.
 
 Orleans grain placement normally supplies a single active writer for a grain identity. Journal storage providers also use optimistic concurrency to protect the journal when a stale or competing writer reaches storage.
 
+Each storage instance establishes its write precondition with its first successful read or creation, then advances it through its own writes. That precondition includes an absent journal: a writer which recovered an empty journal can create it, and fails if another writer created it first.
+
 An append, replacement, or delete with stale storage metadata throws <xref:Orleans.Storage.InconsistentStateException>. The state manager permanently fences further operations, faults queued work, and requests grain deactivation. The failed operation reports its original exception. A new activation replays the stored journal to determine the durable outcome.
 
 Design commands to tolerate retries at the application boundary. Use operation identifiers when a caller can repeat a command after an uncertain network outcome.
+
+## Journal storage contract
+
+The journal is the source of truth for durable state, so every <xref:Orleans.Journaling.IJournalStorage> provider guarantees the following, and the provider conformance suite in the Orleans repository verifies each guarantee for every provider:
+
+- **All-or-nothing writes.** An append makes its whole segment visible after every earlier segment, or none of it. A replacement makes its whole value the journal's only segment, or the journal keeps its earlier content. This holds across process and storage crashes, timeouts, conflicts, and retries inside the provider.
+- **Whole-call limit failures.** A segment which exceeds a provider limit fails the call with an exception, and nothing of it becomes visible.
+- **Failure outcomes.** A definitively rejected write leaves the earlier content in place. A write with an indeterminate outcome, such as a timeout after the request was sent, applied its whole segment or none of it. A retry can report a precondition conflict after the original request committed; recovery determines the outcome.
+- **Whole, ordered reads.** A successful read returns one version of the journal: every segment written up to that version, whole and in write order. Callers discard data from a failed read and recover from the beginning.
+- **Write preconditions.** A storage instance writes after it reads or creates the journal, and a write through an instance which has done neither throws <xref:System.InvalidOperationException>. Writes and subsequent reads succeed only if the journal still matches that precondition; after an observed absence, the journal must still be absent. Metadata operations preserve the content precondition.
+
+Direct storage callers await each operation before starting another through the same instance. Separate instances coordinate through storage preconditions.
+
+Subsequent reads provide history for an active writer while validating its precondition. A content change by another writer produces <xref:Orleans.Storage.InconsistentStateException>. Recovery after a conflict uses a fresh storage instance.
+
+Appends contain at least one byte. An empty append throws <xref:System.ArgumentOutOfRangeException> before touching storage. A replacement accepts an empty value to publish an empty journal.
+
+Each provider documents its limits:
+
+| Provider | Largest append | Largest replacement |
+| --- | --- | --- |
+| Azure Blob Storage | 100 MiB (one append block) | Azure block blob limits |
+| Azure Table Storage | 2 MiB (one entity group transaction) | Partition capacity; rows publish through one header update |
+| Redis | The whole journal string, including the append, fits the server's string limit (512 MB by default) | The server's string limit |
+| Amazon S3 | 5 GB per request; conditional-rewrite appends keep the whole WAL within 5 GB | 5 GB |
+| Volatile (development) | Process memory | Process memory |
 
 ## Storage failures
 
@@ -135,6 +163,26 @@ complete their own operation waiters and resource cleanup through their operatio
 Standalone callers own that cleanup explicitly. A previously captured write retains its actual storage
 outcome and acknowledgement bookkeeping. Owner-canceled initial recovery and idle shutdown complete
 through normal shutdown; admitted write/delete storage cancellation remains terminal.
+
+### Durable Jobs shard retirement
+
+When a shard runner terminates, including after an unexpected executor failure, the local Durable Jobs
+manager withdraws its writable and cached references and retains responsibility for cleanup until
+disposal finishes. Journaled shard retirement closes mutation admission and waits for previously
+accepted operations at a queued completion barrier. Ownership cleanup then samples the drained job
+count, releases populated shards for discovery, and deletes empty shard journals.
+
+Scheduling calls which retained a retiring instance retry against a writable replacement. Queued jobs
+acknowledged before retirement remain in the journal and recover through a fresh canonical
+instance on discovery. Discovery retains distinct replacement instances while an old runner finishes
+cleanup. Canonical lookups skip retiring instances, and local publication and activation check the
+instance lifetime again when delayed creation or discovery results arrive. A later sweep opens a fresh
+instance after eviction. Cleanup removes tracking entries by instance identity.
+
+Cleanup failures are logged, and an unexpected executor failure remains the runner's failure. A prior
+journal I/O failure fences deletion, preserving the persisted journal for recovery in a fresh instance.
+Failed closure or ownership cleanup also evicts and disposes the retired local instance. Investigate
+the logged storage or metadata failure and allow a fresh discovery sweep to recover persisted work.
 
 ## Compaction
 

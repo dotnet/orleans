@@ -9,18 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="logo.png" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="logo.png" />
+    <None Remove="logo.markup.gz" />
+    <EmbeddedResource Include="logo.markup.gz" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Client" />
-    <PackageReference Include="SixLabors.ImageSharp" />
     <PackageReference Include="Spectre.Console" />
-    <PackageReference Include="Spectre.Console.ImageSharp" />
   </ItemGroup>
 
   <ItemGroup>

@@ -24,6 +24,7 @@
   <ItemGroup>
     <Content Include="*.xml" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\MembershipTests\MembershipTableConformanceTestsBase.cs" Link="Membership\MembershipTableConformanceTestsBase.cs" />
+    <Compile Include="$(SourceRoot)docs\site\src\content\docs\snippets\compiled\Deployment\DirectoryPartitioningSnippet.cs" Link="Directory\DirectoryPartitioningSnippet.cs" />
   </ItemGroup>
 
   <ItemGroup>

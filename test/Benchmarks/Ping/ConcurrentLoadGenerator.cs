@@ -26,6 +26,7 @@ public sealed class ConcurrentLoadGenerator<TState>
     private readonly int _numWorkers;
     private readonly int _blocksPerWorker;
     private readonly int _requestsPerBlock;
+    private readonly int _warmupBlocksPerWorker;
 
     public ConcurrentLoadGenerator(
         int maxConcurrency,
@@ -33,7 +34,8 @@ public sealed class ConcurrentLoadGenerator<TState>
         int requestsPerBlock,
         Func<TState, ValueTask> issueRequest,
         Func<int, TState> getStateForWorker,
-        bool logIntermediateResults = false)
+        bool logIntermediateResults = false,
+        int warmupBlocksPerWorker = 3)
     {
         this._numWorkers = maxConcurrency;
         this._blocksPerWorker = blocksPerWorker;
@@ -41,6 +43,7 @@ public sealed class ConcurrentLoadGenerator<TState>
         this._issueRequest = issueRequest;
         this._getStateForWorker = getStateForWorker;
         this._logIntermediateResults = logIntermediateResults;
+        this._warmupBlocksPerWorker = warmupBlocksPerWorker;
         this._tasks = new Task[maxConcurrency];
         this._states = new TState[maxConcurrency];
     }
@@ -53,7 +56,7 @@ public sealed class ConcurrentLoadGenerator<TState>
         for (var ree = 0; ree < this._numWorkers; ree++)
         {
             this._states[ree] = _getStateForWorker(ree);
-            this._tasks[ree] = this.RunWorker(this._states[ree], this._requestsPerBlock, 3);
+            this._tasks[ree] = this.RunWorker(this._states[ree], this._requestsPerBlock, this._warmupBlocksPerWorker);
         }
 
         // Wait for warmup to complete.

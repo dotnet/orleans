@@ -1,13 +1,15 @@
 ---
 title: Configure Consul clustering
 description: Configure Orleans silos and clients to use Consul for cluster membership and gateway discovery.
-ms.date: 08/08/2026
+ms.date: 10/03/2026
 ms.topic: how-to
 ---
 
 # Configure Consul clustering
 
 Use the [`Microsoft.Orleans.Clustering.Consul`](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.Consul) package to store Orleans membership records in the [Consul key/value store](https://developer.hashicorp.com/consul/docs/dynamic-app-config/kv).
+
+Use Consul 1.22 or later. Orleans silo-address keys contain `:` and `@`, which Consul 1.21.5 rejects with its default key filter. When upgrading an existing Consul 1.21.5 deployment, temporarily enable [`disable_http_unprintable_char_filter`](https://developer.hashicorp.com/consul/docs/v1.21.x/reference/agent/configuration-file/general#disable_http_unprintable_char_filter) until the deployment reaches Consul 1.22 or later.
 
 Every silo and client in a cluster must use:
 

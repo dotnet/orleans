@@ -228,11 +228,15 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_MyServiceConsumer));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_RootType));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_MyServiceConsumer));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_RootType));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_RootType));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_MyServiceConsumer), typeof(global::TestProject.MyServiceConsumer));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_MyServiceConsumer), typeof(global::TestProject.MyServiceConsumer));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_RootType), typeof(global::TestProject.RootType));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_RootType), typeof(global::TestProject.RootType));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_MyServiceConsumer), typeof(global::TestProject.MyServiceConsumer));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_MyServiceConsumer), typeof(global::TestProject.MyServiceConsumer));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_RootType), typeof(global::TestProject.RootType));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_RootType), typeof(global::TestProject.RootType));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_RootType), typeof(global::TestProject.RootType));
         }
     }
 }

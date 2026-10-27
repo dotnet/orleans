@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -33,21 +34,58 @@ namespace Orleans.Serialization
         /// <returns>The service collection.</returns>
         public static IServiceCollection AddSerializer(this IServiceCollection services, Action<ISerializerBuilder>? configure = null)
         {
+            var context = GetOrCreateConfigurationContext(services, static builder =>
+            {
+                foreach (var asm in ReferencedAssemblyProvider.GetRelevantAssemblies())
+                {
+                    builder.AddAssembly(asm);
+                }
+
+                builder.Services.AddSingleton<IGeneralizedCodec, WellKnownStringComparerCodec>();
+                builder.Services.AddSingleton<IGeneralizedCodec, InterfaceCollectionCodecResolver>();
+                builder.Services.AddSingleton<ExceptionCodec>();
+                builder.Services.AddSingleton<IGeneralizedCodec>(sp => sp.GetRequiredService<ExceptionCodec>());
+                builder.Services.AddSingleton<IGeneralizedBaseCodec>(sp => sp.GetRequiredService<ExceptionCodec>());
+            });
+            configure?.Invoke(context.Builder);
+            return services;
+        }
+
+        /// <summary>
+        /// Adds the Orleans serializer and deep copier using an explicit, compile-time type graph.
+        /// </summary>
+        /// <param name="services">The service collection.</param>
+        /// <param name="context">The generated serializer context.</param>
+        /// <returns>The service collection.</returns>
+        /// <remarks>Repeated calls combine the registered contexts. Closed factories take priority over metadata-based resolution.</remarks>
+        public static IServiceCollection AddSerializerContext(this IServiceCollection services, SerializerContext context)
+        {
+            if (services is null) throw new ArgumentNullException(nameof(services));
+            if (context is null) throw new ArgumentNullException(nameof(context));
+            GetOrCreateConfigurationContext(services, initialize: null).Builder.AddSerializerContext(context);
+            return services;
+        }
+
+        private static ConfigurationContext GetOrCreateConfigurationContext(
+            IServiceCollection services, Action<ISerializerBuilder>? initialize)
+        {
             // Only add the services once.
             var context = GetFromServices<ConfigurationContext>(services);
             if (context is null)
             {
                 context = new ConfigurationContext(services);
-                foreach (var asm in ReferencedAssemblyProvider.GetRelevantAssemblies())
-                {
-                    context.Builder.AddAssembly(asm);
-                }
+                initialize?.Invoke(context.Builder);
+                context.AutomaticInitialized = initialize is not null;
 
                 services.Add(context.CreateServiceDescriptor());
                 services.AddOptions();
                 services.AddSingleton<IConfigureOptions<TypeManifestOptions>, DefaultTypeManifestProvider>();
                 services.AddSingleton<IPostConfigureOptions<TypeManifestOptions>, DefaultTypeManifestProvider>();
-                services.AddSingleton<TypeResolver, CachedTypeResolver>();
+                services.AddSingleton<TypeResolver>(sp =>
+                {
+                    var options = sp.GetRequiredService<IOptions<TypeManifestOptions>>();
+                    return new CachedTypeResolver(options.Value.ContextTypes);
+                });
                 services.AddSingleton<TypeConverter>();
                 services.TryAddSingleton<CodecProvider>();
                 services.TryAddSingleton<ICodecProvider>(sp => sp.GetRequiredService<CodecProvider>());
@@ -72,13 +110,6 @@ namespace Orleans.Serialization
                 services.TryAddSingleton<SerializerSessionPool>();
                 services.TryAddSingleton<CopyContextPool>();
 
-                services.AddSingleton<IGeneralizedCodec, WellKnownStringComparerCodec>();
-                services.AddSingleton<IGeneralizedCodec, InterfaceCollectionCodecResolver>();
-
-                services.AddSingleton<ExceptionCodec>();
-                services.AddSingleton<IGeneralizedCodec>(sp => sp.GetRequiredService<ExceptionCodec>());
-                services.AddSingleton<IGeneralizedBaseCodec>(sp => sp.GetRequiredService<ExceptionCodec>());
-
                 // Serializer
                 services.TryAddSingleton<ObjectSerializer>();
                 services.TryAddSingleton<Serializer>();
@@ -87,10 +118,13 @@ namespace Orleans.Serialization
                 services.TryAddSingleton<DeepCopier>();
                 services.TryAddSingleton(typeof(DeepCopier<>));
             }
+            else if (initialize is not null && !context.AutomaticInitialized)
+            {
+                initialize(context.Builder);
+                context.AutomaticInitialized = true;
+            }
 
-            configure?.Invoke(context.Builder);
-
-            return services;
+            return context;
         }
 
         private static T? GetFromServices<T>(IServiceCollection services) where T : class
@@ -109,6 +143,7 @@ namespace Orleans.Serialization
         private sealed class ConfigurationContext
         {
             public ConfigurationContext(IServiceCollection services) => Builder = new SerializerBuilder(services);
+            public bool AutomaticInitialized { get; set; }
 
             public ServiceDescriptor CreateServiceDescriptor() => new ServiceDescriptor(typeof(ConfigurationContext), this);
 
@@ -122,6 +157,19 @@ namespace Orleans.Serialization
             public IServiceCollection Services { get; }
         }
 
+        internal static Type? GetServiceHolderType(Type serviceType)
+        {
+            if (!serviceType.IsConstructedGenericType) return null;
+            var definition = serviceType.GetGenericTypeDefinition();
+            if (definition == typeof(IFieldCodec<>)) return typeof(FieldCodecHolder<>);
+            if (definition == typeof(IBaseCodec<>)) return typeof(BaseCodecHolder<>);
+            if (definition == typeof(IValueSerializer<>)) return typeof(ValueSerializerHolder<>);
+            if (definition == typeof(IActivator<>)) return typeof(ActivatorHolder<>);
+            if (definition == typeof(IDeepCopier<>)) return typeof(CopierHolder<>);
+            if (definition == typeof(IBaseCopier<>)) return typeof(BaseCopierHolder<>);
+            return null;
+        }
+
         private sealed class ActivatorHolder<T> : IActivator<T>, IServiceHolder<IActivator<T>>
         {
             private readonly IActivatorProvider _activatorProvider;
@@ -132,12 +180,13 @@ namespace Orleans.Serialization
                 _activatorProvider = codecProvider;
             }
 
-            public IActivator<T> Value => _activator ??= _activatorProvider.GetActivator<T>();
+            public IActivator<T> Value => _activator ?? CacheCompleted(_activatorProvider, _activatorProvider.GetActivator<T>(), ref _activator);
+            public object Provider => _activatorProvider;
 
             public T Create() => Value.Create();
         }
 
-        private sealed class FieldCodecHolder<TField> : IFieldCodec<TField>, IServiceHolder<IFieldCodec<TField>>
+        internal sealed class FieldCodecHolder<TField> : IFieldCodec<TField>, IServiceHolder<IFieldCodec<TField>>
         {
             private readonly IFieldCodecProvider _codecProvider;
             private IFieldCodec<TField>? _codec;
@@ -152,7 +201,8 @@ namespace Orleans.Serialization
             [return: System.Diagnostics.CodeAnalysis.MaybeNull]
             public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field) => Value.ReadValue(ref reader, field);
 
-            public IFieldCodec<TField> Value => _codec ??= _codecProvider.GetCodec<TField>();
+            public IFieldCodec<TField> Value => _codec ?? CacheCompleted(_codecProvider, _codecProvider.GetCodec<TField>(), ref _codec);
+            public object Provider => _codecProvider;
         }
 
         private sealed class BaseCodecHolder<TField> : IBaseCodec<TField>, IServiceHolder<IBaseCodec<TField>> where TField : class
@@ -169,7 +219,8 @@ namespace Orleans.Serialization
 
             public void Deserialize<TInput>(ref Reader<TInput> reader, TField value) => Value.Deserialize(ref reader, value);
 
-            public IBaseCodec<TField> Value => _baseCodec ??= _provider.GetBaseCodec<TField>();
+            public IBaseCodec<TField> Value => _baseCodec ?? CacheCompleted(_provider, _provider.GetBaseCodec<TField>(), ref _baseCodec);
+            public object Provider => _provider;
         }
 
         private sealed class ValueSerializerHolder<TField> : IValueSerializer<TField>, IServiceHolder<IValueSerializer<TField>> where TField : struct
@@ -186,10 +237,11 @@ namespace Orleans.Serialization
 
             public void Deserialize<TInput>(ref Reader<TInput> reader, scoped ref TField value) => Value.Deserialize(ref reader, ref value);
 
-            public IValueSerializer<TField> Value => _serializer ??= _provider.GetValueSerializer<TField>();
+            public IValueSerializer<TField> Value => _serializer ?? CacheCompleted(_provider, _provider.GetValueSerializer<TField>(), ref _serializer);
+            public object Provider => _provider;
         }
 
-        private sealed class CopierHolder<T> : IDeepCopier<T>, IServiceHolder<IDeepCopier<T>>, IOptionalDeepCopier
+        internal sealed class CopierHolder<T> : IDeepCopier<T>, IServiceHolder<IDeepCopier<T>>, IOptionalDeepCopier
         {
             private readonly IDeepCopierProvider _codecProvider;
             private IDeepCopier<T>? _copier;
@@ -207,7 +259,8 @@ namespace Orleans.Serialization
 
             public bool IsShallowCopyable() => (Value as IOptionalDeepCopier)?.IsShallowCopyable() ?? false;
 
-            public IDeepCopier<T> Value => _copier ??= _codecProvider.GetDeepCopier<T>();
+            public IDeepCopier<T> Value => _copier ?? CacheCompleted(_codecProvider, _codecProvider.GetDeepCopier<T>(), ref _copier);
+            public object Provider => _codecProvider;
         }
 
         private sealed class BaseCopierHolder<T> : IBaseCopier<T>, IServiceHolder<IBaseCopier<T>> where T : class
@@ -222,7 +275,14 @@ namespace Orleans.Serialization
 
             public void DeepCopy(T original, T copy, CopyContext context) => Value.DeepCopy(original, copy, context);
 
-            public IBaseCopier<T> Value => _copier ??= _codecProvider.GetBaseCopier<T>();
+            public IBaseCopier<T> Value => _copier ?? CacheCompleted(_codecProvider, _codecProvider.GetBaseCopier<T>(), ref _copier);
+            public object Provider => _codecProvider;
+        }
+
+        private static TService CacheCompleted<TService>(object provider, TService value, ref TService? slot) where TService : class
+        {
+            if (provider is not CodecProvider codecs || !codecs.IsConstructionPending) slot = value;
+            return value;
         }
     }
 
@@ -230,12 +290,17 @@ namespace Orleans.Serialization
     /// Holds a reference to a service.
     /// </summary>
     /// <typeparam name="T">The service type.</typeparam>
-    internal interface IServiceHolder<T>
+    internal interface IServiceHolder<out T>
     {
         /// <summary>
         /// Gets the service.
         /// </summary>
         /// <value>The service.</value>
         T Value { get; }
+
+        /// <summary>
+        /// Gets the provider which resolves the held service.
+        /// </summary>
+        object Provider { get; }
     }
 }

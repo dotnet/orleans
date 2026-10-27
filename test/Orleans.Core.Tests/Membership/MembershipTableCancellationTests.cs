@@ -55,7 +55,16 @@ public class MembershipTableCancellationTests
             methodName[..^"Async".Length],
             method.GetParameters().SkipLast(1).Select(parameter => parameter.ParameterType).ToArray());
         Assert.NotNull(legacyMethod);
-        Assert.Contains(methodName, Assert.IsType<ObsoleteAttribute>(legacyMethod.GetCustomAttribute<ObsoleteAttribute>()).Message, StringComparison.Ordinal);
+        var guidance = methodName == nameof(IMembershipTable.ReadRowAsync)
+            ? "Use ReadAllAsync and MembershipTableData.TryGet instead."
+            : $"Use {methodName} instead.";
+        Assert.Equal(guidance, Assert.IsType<ObsoleteAttribute>(legacyMethod.GetCustomAttribute<ObsoleteAttribute>()).Message);
+        if (methodName == nameof(IMembershipTable.ReadRowAsync))
+        {
+            var obsolete = Assert.IsType<ObsoleteAttribute>(method.GetCustomAttribute<ObsoleteAttribute>());
+            Assert.Equal(guidance, obsolete.Message);
+            Assert.False(obsolete.IsError);
+        }
         Assert.Equal(legacyId, Assert.Single(method.GetCustomAttributes<AliasAttribute>()).Alias);
         var invokableType = Assert.Single(typeof(IMembershipTable).Assembly.GetTypes(),
             type => typeof(IInvokable).IsAssignableFrom(type)
@@ -239,7 +248,9 @@ public class MembershipTableCancellationTests
                 await table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.UnixEpoch, cancellationToken);
                 break;
             case nameof(IMembershipTable.ReadRowAsync):
+#pragma warning disable CS0618 // Intentional compatibility dispatch to a custom legacy provider.
                 return await table.ReadRowAsync(provider.Entry.SiloAddress, cancellationToken);
+#pragma warning restore CS0618
             case nameof(IMembershipTable.ReadAllAsync):
                 return await table.ReadAllAsync(cancellationToken);
             case nameof(IMembershipTable.InsertRowAsync):

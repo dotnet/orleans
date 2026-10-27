@@ -1,3 +1,81 @@
+# Implementation principles
+
+Apply these principles during design, implementation, and validation, alongside
+correctness, security, compatibility, concurrency, and reliability.
+
+## Priorities
+
+- Rank goals as correctness (including safety) > simplicity > performance >
+  convenience; seek a design that serves all of them before trading one away.
+- Safety (no corruption, data loss, broken invariants, or security violations)
+  precedes liveness.
+- Ask the maintainer (in reviews, raise a question) before relying on an invariant
+  that is not yet established, changing a surface that may have shipped or been
+  persisted, or adding a dependency.
+
+## Approach
+
+- **Essence over accident.** The hard part is the spec and the conceptual model;
+  code is its representation. Spend effort there.
+- **KISS.** Simplicity is the hardest revision, not the first draft. Iterate until
+  the design is obviously right.
+- **YAGNI.** Build for today's requirements. "If in doubt, leave it out."
+- **Grow, don't build.** Keep a running end-to-end skeleton; add function
+  incrementally.
+- **Zero debt in what ships.** Fewer features, each solid. Fix showstoppers when
+  found.
+- **Always say why.** Every non-obvious decision carries its rationale (comment,
+  commit message, PR).
+
+## Layering, contracts, and invariants
+
+- Establish each layer's required and provided guarantees. Keep responsibilities
+  and invariant enforcement in their owning layer; preserve contracts across
+  callers, overrides, concurrency, failures, and lifecycle transitions.
+- Document non-obvious or changed contracts near the code in comments or XML API
+  docs; use architecture documentation for broader design context.
+- Use side-effect-free assertions at API boundaries for caller preconditions and
+  internal invariants. Prefer debug-time assertions (`Debug.Assert`) for product
+  programming errors where contracts are established or maintained. Exercise
+  assertion-enabled code in CI and surface assertion failures as test failures.
+  Preserve required behavior and external-input validation when assertions are compiled out.
+- Within established contracts, rely on proven guarantees rather than adding
+  redundant assertions or checks. Avoid unnecessary fallback state, retries, or catches.
+  Validate external inputs and handle realistic failures with explicit error reporting.
+- Seek additional invariants that simplify code. Establish their feasibility,
+  owning layer, and enforcement cost, then enforce and document them before use.
+
+## Clean, minimal implementations
+
+- Make the smallest complete change; reuse patterns and helpers. Keep unrelated
+  refactoring and formatting out of scope.
+- Add abstractions, inheritance, virtual dispatch, options, fields, properties,
+  caches, and states only for concrete requirements or boundaries. Derive values
+  from existing state when correctness and efficiency permit.
+
+## Runtime performance
+
+- Assess CPU, throughput, latency, and scalability under relevant workloads,
+  including algorithmic complexity, repeated work, I/O, contention, and scheduling.
+- Prioritize low allocation and retained-memory costs. Minimize copies, object sizes
+  (including alignment), and retained graphs, especially per grain, activation, or
+  message. Account for count and lifetime; justify optimizations by net benefit,
+  ownership safety, and complexity. Support quantitative claims with evidence.
+
+## Testing and documentation
+
+- Assert observable outcomes and contracts across relevant boundaries, failures,
+  and transitions. Use Accordant model-based tests, CsCheck property-based tests,
+  Verify for xUnit snapshots (`Verify.XunitV3`), or unit/integration tests as
+  appropriate. Reuse test infrastructure; follow `test/AGENTS.md` under `test/`.
+- Aim for greater than 80% CI code coverage. Consult the automated PR coverage
+  comment for affected-code gaps and regressions; state when results are unavailable.
+  Use behavioral assertions to establish guarantees.
+- Match documentation to affected behavior, audience, and document type. Update
+  READMEs only for highly relevant end-user setup, usage, or public behavior.
+  Describe affirmative behavior and outcomes.
+- For reviews, use `.github/skills/code-review/SKILL.md`.
+
 # Repository workflow
 
 - **New pull requests:** branch from `dotnet/orleans`'s `main`, push to the authenticated user's fork, and open the PR against `dotnet/orleans`.
@@ -6,7 +84,6 @@
 - Never push a feature branch to a remote whose URL points to `github.com/dotnet/orleans`, over HTTPS or SSH. Delete it immediately if this happens accidentally.
 - After rebasing a PR branch, use `--force-with-lease`, never `--force`.
 - Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for commits and PR titles. Update nonconforming PR titles during review.
-- When reviewing changes, check whether corresponding documentation or sample updates are needed in the `/docs` and `/samples` directories.
 - Keep PR descriptions focused on the problem, solution, and rationale; omit test-command sections.
 
 # Package compatibility

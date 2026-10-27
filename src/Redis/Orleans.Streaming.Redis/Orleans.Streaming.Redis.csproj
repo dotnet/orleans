@@ -6,6 +6,7 @@
     <Description>Microsoft Orleans streaming implementation that uses Redis</Description>
     <PackageTags>$(PackageTags) Redis Streaming</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>

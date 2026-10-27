@@ -154,7 +154,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
         var queue = new DurableQueue<string>("queue", sut.Manager, new JsonDurableQueueCommandCodec<string>(jsonOptions));
         var set = new DurableSet<string>("set", sut.Manager, new JsonDurableSetCommandCodec<string>(jsonOptions));
-        var state = new JournaledPersistentState<string>("state", sut.Manager, new JsonPersistentStateCommandCodec<string>(jsonOptions));
+        var state = new JournaledPersistentState<string>("state", sut.Manager, new JsonPersistentStateCommandCodec<string>(jsonOptions), CodecProvider.GetActivator<string>());
         var tcs = new DurableTaskCompletionSource<int>(
             "tcs",
             sut.Manager,
@@ -174,7 +174,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
         var queue2 = new DurableQueue<string>("queue", sut2.Manager, new JsonDurableQueueCommandCodec<string>(jsonOptions));
         var set2 = new DurableSet<string>("set", sut2.Manager, new JsonDurableSetCommandCodec<string>(jsonOptions));
-        var state2 = new JournaledPersistentState<string>("state", sut2.Manager, new JsonPersistentStateCommandCodec<string>(jsonOptions));
+        var state2 = new JournaledPersistentState<string>("state", sut2.Manager, new JsonPersistentStateCommandCodec<string>(jsonOptions), CodecProvider.GetActivator<string>());
         var tcs2 = new DurableTaskCompletionSource<int>(
             "tcs",
             sut2.Manager,
@@ -440,6 +440,7 @@ public class CodecRecoveryTests : JournalingTestBase
         CancellationToken cancellationToken)
     {
         var storage = CreateJsonStorage();
+        await storage.ReadForWriteAsync();
         await storage.AppendAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(jsonLines)), cancellationToken);
         return storage;
     }
@@ -480,10 +481,12 @@ public class CodecRecoveryTests : JournalingTestBase
         public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             => inner.ReplaceAsync(value, cancellationToken);
 
-        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
 
+            // The inner storage reads too, which establishes its write precondition.
+            await inner.ReadForWriteAsync();
             var metadata = storedJournalFormatKey is null
                 ? JournalMetadata.Empty
                 : new JournalMetadata(storedJournalFormatKey);
@@ -495,8 +498,6 @@ public class CodecRecoveryTests : JournalingTestBase
             {
                 consumer.Read(ReadSegments(cancellationToken), metadata, complete: true);
             }
-
-            return default;
         }
 
         private IEnumerable<ReadOnlyMemory<byte>> ReadSegments(CancellationToken cancellationToken)

@@ -492,6 +492,10 @@ namespace Orleans.Journaling
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddStateMachine<TState, TImplementation>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services)
             where TState : class where TImplementation : class, TState, IStateMachine { throw null; }
 
+        public static Hosting.ISiloBuilder AddVolatileJournalStorage(this Hosting.ISiloBuilder builder, System.Action<VolatileJournalStorageOptions> configureOptions) { throw null; }
+
+        public static Hosting.ISiloBuilder AddVolatileJournalStorage(this Hosting.ISiloBuilder builder, string name, System.Action<VolatileJournalStorageOptions>? configureOptions) { throw null; }
+
         public static Hosting.ISiloBuilder AddVolatileJournalStorage(this Hosting.ISiloBuilder builder, string name) { throw null; }
 
         public static Hosting.ISiloBuilder AddVolatileJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
@@ -543,6 +547,16 @@ namespace Orleans.Journaling
         public static System.Threading.Tasks.ValueTask<long> ReadAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalMetadata? metadata, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Class)]
+    public sealed partial class JournalStorageProviderAttribute : System.Attribute, Metadata.IGrainPropertiesProviderAttribute
+    {
+        public JournalStorageProviderAttribute(string providerName) { }
+
+        public string ProviderName { get { throw null; } }
+
+        public void Populate(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) { }
+    }
+
     public readonly partial struct JournalStreamId : System.IEquatable<JournalStreamId>
     {
         private readonly int _dummyPrimitive;
@@ -583,6 +597,8 @@ namespace Orleans.Journaling
     {
         public VolatileJournalStorage() { }
 
+        public VolatileJournalStorage(string? journalFormatKey, VolatileJournalStorageOptions options) { }
+
         public VolatileJournalStorage(string? journalFormatKey) { }
 
         public bool IsCompactionRequested { get { throw null; } }
@@ -602,9 +618,18 @@ namespace Orleans.Journaling
         public System.Threading.Tasks.ValueTask<IJournalMetadata?> UpdateMetadataAsync(System.Collections.Generic.IReadOnlyDictionary<string, string>? set = null, System.Collections.Generic.IEnumerable<string>? remove = null, string? expectedETag = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
+    public sealed partial class VolatileJournalStorageOptions
+    {
+        public int MaxAppendsBeforeSnapshot { get { throw null; } set { } }
+
+        public long MaxBytesBeforeSnapshot { get { throw null; } set { } }
+    }
+
     public sealed partial class VolatileJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
     {
         public VolatileJournalStorageProvider() { }
+
+        public VolatileJournalStorageProvider(Microsoft.Extensions.Options.IOptions<JournaledStateManagerOptions> options, Microsoft.Extensions.Options.IOptions<VolatileJournalStorageOptions> storageOptions, Runtime.OrleansInstruments? instruments) { }
 
         public VolatileJournalStorageProvider(Microsoft.Extensions.Options.IOptions<JournaledStateManagerOptions> options, Runtime.OrleansInstruments instruments) { }
 

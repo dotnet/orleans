@@ -56,7 +56,7 @@ public sealed partial class CassandraClusteringTableTests : MembershipTableFullC
         foreach (var membershipEntry in membershipEntries)
         {
             Assert.True(await membershipTable.InsertRowAsync(membershipEntry, version.Next(), TestContext.Current.CancellationToken));
-            version = (await membershipTable.ReadRowAsync(membershipEntry.SiloAddress, TestContext.Current.CancellationToken)).Version;
+            version = (await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken)).Version;
         }
 
         var gateways = await gatewayListProvider.GetGateways();
@@ -115,7 +115,7 @@ public sealed partial class CassandraClusteringTableTests : MembershipTableFullC
             entry.Status = SiloStatus.Dead;
             entry.StartTime = entry.IAmAliveTime = GetUtcNowWithSecondsResolution().AddDays(-10);
             Assert.True(await table.InsertRowAsync(entry, data.Version.Next(), token));
-            data = await table.ReadRowAsync(entry.SiloAddress, token);
+            data = await table.ReadAllAsync(token);
         }
 
         var canonicalVersion = data.Version;
@@ -130,14 +130,14 @@ public sealed partial class CassandraClusteringTableTests : MembershipTableFullC
         Assert.All(statements, statement => Assert.Equal(ConsistencyLevel.Serial, statement.ConsistencyLevel));
 
         statements.Clear();
-        var single = await table.ReadRowAsync(entries[0].SiloAddress, token);
+        var single = await table.ReadAllAsync(token);
         Assert.Equal(canonicalVersion, single.Version);
-        Assert.Equal(entries[0].ToFullString(), Assert.Single(single.Members).Item1.ToFullString());
-        Assert.Single(statements);
+        Assert.Equal(entries[0].ToFullString(), Assert.IsType<Tuple<MembershipEntry, string>>(single.TryGet(entries[0].SiloAddress)).Item1.ToFullString());
+        Assert.Equal(2, statements.Count);
 
         statements.Clear();
         await table.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(GetUtcNowWithSecondsResolution()), token);
-        Assert.Equal(2, pagedScans);
+        Assert.Equal(3, pagedScans);
         Assert.Equal(4, statements.Count);
         Assert.Equal(ConsistencyLevel.Quorum, statements[0].ConsistencyLevel);
         Assert.All(statements.Skip(1), statement =>
@@ -228,7 +228,7 @@ public sealed partial class CassandraClusteringTableTests : MembershipTableFullC
         data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         Assert.Single(data.Members);
 
-        data = await membershipTable.ReadRowAsync(newEntry.SiloAddress, TestContext.Current.CancellationToken);
+        data = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
         Assert.Equal(newTableVersion.Version, data.Version.Version);
 
         _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
@@ -239,9 +239,10 @@ public sealed partial class CassandraClusteringTableTests : MembershipTableFullC
         Assert.NotEqual(newTableVersion.VersionEtag, data.Version.VersionEtag);
         Assert.Equal(newTableVersion.Version, data.Version.Version);
 
-        var membershipEntry = data.Members[0].Item1;
-        string eTag = data.Members[0].Item2;
-        _testOutputHelper.WriteLine("Membership.ReadRow returned MembershipEntry ETag={0} Entry={1}", eTag, membershipEntry);
+        var selectedRow = Assert.IsType<Tuple<MembershipEntry, string>>(data.TryGet(newEntry.SiloAddress));
+        var membershipEntry = selectedRow.Item1;
+        string eTag = selectedRow.Item2;
+        _testOutputHelper.WriteLine("Membership.ReadAll selected MembershipEntry ETag={0} Entry={1}", eTag, membershipEntry);
 
         Assert.NotNull(eTag);
         Assert.NotNull(membershipEntry);
@@ -591,8 +592,8 @@ public sealed partial class CassandraClusteringTableTests : MembershipTableFullC
 
         Assert.Equal(live.ToFullString(), Assert.Single(data.Members).Item1.ToFullString());
         Assert.Equal(before.Version, data.Version);
-        var retired = await table.ReadRowAsync(dead.SiloAddress, token);
-        Assert.Empty(retired.Members);
+        var retired = await table.ReadAllAsync(token);
+        Assert.Null(retired.TryGet(dead.SiloAddress));
         Assert.Equal(before.Version, retired.Version);
         if (lateHeartbeat)
         {
@@ -620,8 +621,8 @@ public sealed partial class CassandraClusteringTableTests : MembershipTableFullC
         entry.Status = SiloStatus.Active;
         var initial = await table.ReadAllAsync(token);
         Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), token));
-        var before = await table.ReadRowAsync(entry.SiloAddress, token);
-        var update = Assert.Single(before.Members);
+        var before = await table.ReadAllAsync(token);
+        var update = Assert.IsType<Tuple<MembershipEntry, string>>(before.TryGet(entry.SiloAddress));
         update.Item1.HostName += "-updated";
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var heartbeats = PublishHeartbeatsAsync();
@@ -630,8 +631,8 @@ public sealed partial class CassandraClusteringTableTests : MembershipTableFullC
 
         await Task.WhenAll(heartbeats, fullRowWrite);
         Assert.True(await fullRowWrite);
-        var after = await table.ReadRowAsync(entry.SiloAddress, token);
-        var result = Assert.Single(after.Members).Item1;
+        var after = await table.ReadAllAsync(token);
+        var result = Assert.IsType<Tuple<MembershipEntry, string>>(after.TryGet(entry.SiloAddress)).Item1;
         Assert.Equal(update.Item1.HostName, result.HostName);
         Assert.Equal(entry.StartTime, result.StartTime);
         Assert.Equal(SiloStatus.Active, result.Status);
@@ -667,29 +668,31 @@ public sealed partial class CassandraClusteringTableTests : MembershipTableFullC
         var entry = CreateMembershipEntryForTest();
         var initial = await table.ReadAllAsync(token);
         Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), token));
-        var before = await table.ReadRowAsync(entry.SiloAddress, token);
-        var stale = Assert.Single(before.Members);
+        var before = await table.ReadAllAsync(token);
+        var stale = Assert.IsType<Tuple<MembershipEntry, string>>(before.TryGet(entry.SiloAddress));
         var heartbeat = entry.IAmAliveTime.AddMinutes(1);
         await table.UpdateIAmAliveAsync(new MembershipEntry
         {
             SiloAddress = entry.SiloAddress,
             IAmAliveTime = heartbeat
         }, token);
-        var afterHeartbeat = await table.ReadRowAsync(entry.SiloAddress, token);
+        var afterHeartbeat = await table.ReadAllAsync(token);
         Assert.Equal(before.Version, afterHeartbeat.Version);
-        Assert.Equal(stale.Item2, Assert.Single(afterHeartbeat.Members).Item2);
-        Assert.Equal(heartbeat, afterHeartbeat.Members[0].Item1.IAmAliveTime);
+        var heartbeatRow = Assert.IsType<Tuple<MembershipEntry, string>>(afterHeartbeat.TryGet(entry.SiloAddress));
+        Assert.Equal(stale.Item2, heartbeatRow.Item2);
+        Assert.Equal(heartbeat, heartbeatRow.Item1.IAmAliveTime);
         stale.Item1.Status = SiloStatus.Dead;
         Assert.True(await table.UpdateRowAsync(stale.Item1, stale.Item2, before.Version.Next(), token));
-        var after = await table.ReadRowAsync(entry.SiloAddress, token);
-        Assert.Equal(SiloStatus.Dead, Assert.Single(after.Members).Item1.Status);
+        var after = await table.ReadAllAsync(token);
+        var updatedRow = Assert.IsType<Tuple<MembershipEntry, string>>(after.TryGet(entry.SiloAddress));
+        Assert.Equal(SiloStatus.Dead, updatedRow.Item1.Status);
         Assert.Equal(before.Version.Version + 1, after.Version.Version);
-        Assert.NotEqual(stale.Item2, after.Members[0].Item2);
+        Assert.NotEqual(stale.Item2, updatedRow.Item2);
         stale.Item1.Status = SiloStatus.Active;
         Assert.False(await table.UpdateRowAsync(stale.Item1, stale.Item2, before.Version.Next(), token));
-        var unchanged = await table.ReadRowAsync(entry.SiloAddress, token);
+        var unchanged = await table.ReadAllAsync(token);
         Assert.Equal(after.Version, unchanged.Version);
-        Assert.Equal(SiloStatus.Dead, Assert.Single(unchanged.Members).Item1.Status);
+        Assert.Equal(SiloStatus.Dead, Assert.IsType<Tuple<MembershipEntry, string>>(unchanged.TryGet(entry.SiloAddress)).Item1.Status);
     }
 
     [Theory]
@@ -726,9 +729,10 @@ public sealed partial class CassandraClusteringTableTests : MembershipTableFullC
         entry.SuspectTimes = [];
         var initial = await table.ReadAllAsync(token);
         Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), token));
-        var captured = Assert.Single((await table.ReadRowAsync(entry.SiloAddress, token)).Members).Item1;
-        var current = await table.ReadRowAsync(entry.SiloAddress, token);
-        var updated = Assert.Single(current.Members);
+        var capture = await table.ReadAllAsync(token);
+        var captured = Assert.IsType<Tuple<MembershipEntry, string>>(capture.TryGet(entry.SiloAddress)).Item1;
+        var current = await table.ReadAllAsync(token);
+        var updated = Assert.IsType<Tuple<MembershipEntry, string>>(current.TryGet(entry.SiloAddress));
         switch (field)
         {
             case "status":
@@ -763,25 +767,26 @@ public sealed partial class CassandraClusteringTableTests : MembershipTableFullC
             Assert.True(await table.UpdateRowAsync(updated.Item1, updated.Item2, current.Version.Next(), token));
         }
 
-        var beforeCleanup = await table.ReadRowAsync(entry.SiloAddress, token);
+        var beforeCleanup = await table.ReadAllAsync(token);
         var queries = await OrleansQueries.CreateInstance(await CreateSession(token));
         var result = await queries.ExecuteAsync(
             await queries.DeleteMembershipEntry($"{serviceId}-{clusterId}", captured, token), token);
         Assert.False((bool)result.First()["[applied]"]);
-        var afterCleanup = await table.ReadRowAsync(entry.SiloAddress, token);
+        var afterCleanup = await table.ReadAllAsync(token);
+        var survivingRow = Assert.IsType<Tuple<MembershipEntry, string>>(afterCleanup.TryGet(entry.SiloAddress));
         Assert.Equal(beforeCleanup.Version, afterCleanup.Version);
-        Assert.Equal(updated.Item1.ToFullString(), Assert.Single(afterCleanup.Members).Item1.ToFullString());
-        Assert.Equal(updated.Item1.SiloName, afterCleanup.Members[0].Item1.SiloName);
-        Assert.Equal(updated.Item1.HostName, afterCleanup.Members[0].Item1.HostName);
-        Assert.Equal(updated.Item1.ProxyPort, afterCleanup.Members[0].Item1.ProxyPort);
+        Assert.Equal(updated.Item1.ToFullString(), survivingRow.Item1.ToFullString());
+        Assert.Equal(updated.Item1.SiloName, survivingRow.Item1.SiloName);
+        Assert.Equal(updated.Item1.HostName, survivingRow.Item1.HostName);
+        Assert.Equal(updated.Item1.ProxyPort, survivingRow.Item1.ProxyPort);
 
         if (updated.Item1.Status == SiloStatus.Dead)
         {
             result = await queries.ExecuteAsync(
-                await queries.DeleteMembershipEntry($"{serviceId}-{clusterId}", afterCleanup.Members[0].Item1, token), token);
+                await queries.DeleteMembershipEntry($"{serviceId}-{clusterId}", survivingRow.Item1, token), token);
             Assert.True((bool)result.First()["[applied]"]);
-            var retired = await table.ReadRowAsync(entry.SiloAddress, token);
-            Assert.Empty(retired.Members);
+            var retired = await table.ReadAllAsync(token);
+            Assert.Null(retired.TryGet(entry.SiloAddress));
             Assert.Equal(afterCleanup.Version, retired.Version);
         }
     }
@@ -1070,11 +1075,9 @@ public sealed partial class CassandraClusteringTableTests : MembershipTableFullC
             _testOutputHelper.WriteLine(gateway.ToString());
         }
 
-        var queriedEntry = await membershipTable.ReadRowAsync(membershipEntry.SiloAddress, TestContext.Current.CancellationToken);
-        foreach (var queriedEntryMember in queriedEntry.Members)
-        {
-            _testOutputHelper.WriteLine(queriedEntryMember.Item1.SiloAddress.ToParsableString());
-        }
+        var queriedEntry = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
+        var queriedRow = Assert.IsType<Tuple<MembershipEntry, string>>(queriedEntry.TryGet(membershipEntry.SiloAddress));
+        _testOutputHelper.WriteLine(queriedRow.Item1.SiloAddress.ToParsableString());
 
     }
 

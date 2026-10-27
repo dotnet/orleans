@@ -75,7 +75,7 @@ public partial class StateManagerTests : JournalingTestBase
     [Fact]
     public async Task StateManager_Initialize_ThrowsWhenCompletedReadLeavesData()
     {
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         using (var data = CreateBuffer([1, 2, 3]))
         {
             await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
@@ -141,7 +141,7 @@ public partial class StateManagerTests : JournalingTestBase
     [Fact]
     public async Task StateManager_Recovery_PreservesUnknownStateEntry()
     {
-        var storage = new VolatileJournalStorage();
+        var storage = await new VolatileJournalStorage().ReadForWriteAsync();
         using var segment = new OrleansBinaryJournalBufferWriter();
         using (var entry = segment.CreateJournalStreamWriter(new JournalStreamId(99)).BeginEntry())
         {
@@ -400,6 +400,72 @@ public partial class StateManagerTests : JournalingTestBase
 
         Assert.Single(recoveredDictionary);
         Assert.Equal(2, recoveredDictionary["after"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StateManager_DeleteState_DiscardsPendingEntriesBeforeNextAppend(bool persistBeforeDelete)
+    {
+        var storage = new CapturingStorage();
+        await using var manager = CreateTestSystem(storage).Manager;
+        var listCodec = new OrleansBinaryDurableListCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
+        var list = new DurableList<string>("b", manager, listCodec);
+        var value = new DurableValue<string>("a", manager, CreateValueCodec<string>());
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        if (persistBeforeDelete)
+        {
+            list.Add("persisted-item");
+            await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        }
+
+        list.Add("deleted-item");
+        value.Value = "before";
+        await manager.DeleteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(list);
+        Assert.Null(value.Value);
+        Assert.Empty(storage.RecoverableBytes);
+
+        value.Value = "after";
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        // Recovery can mask stale entries when a later directory entry resets their state.
+        var entries = ReadBinaryEntries(storage.RecoverableBytes);
+        Assert.Single(entries, entry => entry.StreamId.Value >= 8);
+        var replay = ReplayValueCommands(storage.RecoverableBytes);
+        Assert.Equal(["after"], replay.AppliedValues);
+
+        await using var recovered = CreateTestSystem(storage).Manager;
+        var recoveredList = new DurableList<string>("b", recovered, listCodec);
+        var recoveredValue = new DurableValue<string>("a", recovered, CreateValueCodec<string>());
+        await recovered.InitializeAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(recoveredList);
+        Assert.Equal("after", recoveredValue.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_DeleteFailure_PreservesPendingEntriesAndFencesManager()
+    {
+        var expected = new IOException("Expected deletion failure.");
+        var storage = new CapturingStorage { NextDeleteException = expected };
+        await using var manager = CreateTestSystem(storage).Manager;
+        var dictionary = new DurableDictionary<string, int>("dict", manager, CreateDictionaryCodec<string, int>());
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        dictionary.Add("pending", 42);
+        var pendingBytes = manager.PendingWriteByteCount;
+        Assert.True(pendingBytes > 0);
+
+        var exception = await Assert.ThrowsAsync<IOException>(
+            () => manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Same(expected, exception);
+        Assert.Equal(pendingBytes, manager.PendingWriteByteCount);
+        Assert.Equal(42, Assert.Single(dictionary).Value);
+        var fenced = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.Same(expected, fenced.InnerException);
     }
 
     [Fact]
@@ -1367,7 +1433,10 @@ public partial class StateManagerTests : JournalingTestBase
 
         var period = ManagerOptions.RetirementGracePeriod;
         var timeProvider = new FakeTimeProvider(DateTime.UtcNow);
-        var storage = CreateStorage();
+        var storage = new VolatileJournalStorage(null, new()
+        {
+            MaxAppendsBeforeSnapshot = 10
+        });
 
         // -------------- STEP 1 --------------
 

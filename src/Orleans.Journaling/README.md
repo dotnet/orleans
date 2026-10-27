@@ -9,6 +9,24 @@ Application code uses `IDurableStateManager` to manage the grain's durable state
 `IStateMachine` defines the low-level replay and snapshot protocol for state implementations.
 `IJournaledStateManager` is an independent contract for journal ownership and lifetime operations.
 
+## Volatile storage snapshot thresholds
+
+`AddVolatileJournalStorage(options => ...)` configures
+`VolatileJournalStorageOptions.MaxAppendsBeforeSnapshot` (default 100) and
+`MaxBytesBeforeSnapshot` (default 1,048,576 bytes). The named-provider overload
+configures each provider independently. Both values must be positive.
+Providers capture the configured limits when constructed.
+
+Reaching either threshold requests a snapshot before the next journal write.
+Successful replacement resets both counters; the snapshot itself is excluded
+from append history. Deletion and recreation reset the history too. A single
+append can exceed the byte threshold. Larger limits amortize snapshot copies
+over more updates; smaller limits reduce retained history and replay work.
+Counters belong to each journal and are shared by handles for the same journal
+within one provider.
+Retained memory includes the latest snapshot, appended encoded bytes up to and
+including the crossing append, and provider bookkeeping.
+
 ## Getting Started
 To use this package, install it via NuGet:
 
@@ -62,6 +80,17 @@ Provider registration calls `JournalingHostingExtensions.AddJournaling` to regis
 formats, state factories, and activation lifecycle integration. Use `AddJournalStorage<TProvider>`
 for an application-supplied storage provider. `AddJournaling` is core setup; a provider registration
 supplies the backing storage.
+
+Apply `[JournalStorageProvider("orders")]` to a grain class to select a named
+provider registered using, for example, `AddAzureBlobJournalStorage("orders", options => ...)`.
+Grain types without an explicit selection use `Default`. `DurableGrain` helpers,
+injected durable values and collections, and journaling-backed persistent state all
+share the activation's manager and selected storage. Register the same names and
+physical namespaces on every silo hosting the grain type.
+
+Recovery reads the selected provider's physical namespace using the existing
+journal identity. Changing the selection for a grain type with existing journals
+requires a deliberate data migration or cutover strategy, including rollback.
 
 JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers expose the stored journal format key through `IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey`. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. If a non-empty journal has no stored format metadata, Orleans treats it as legacy OrleansBinary data for compatibility.
 
@@ -270,6 +299,24 @@ State registration stays closed after initialization first begins.
 
 Cancelling a caller's wait leaves an already queued write running. Observe durability through write
 acknowledgement or a fresh activation before deciding whether to retry an application command.
+
+## Storage provider contract
+
+The journal is the source of truth for durable state. Every `IJournalStorage` implementation provides these guarantees:
+
+- `AppendAsync` makes its whole segment visible after every earlier segment, or none of it, and `ReplaceAsync` makes its whole value the journal's only segment, or the journal keeps its earlier content. A segment stored across several records or requests becomes visible through one atomic publication step, so successful reads observe whole segments after a crash, timeout, conflict, or retry inside the provider.
+- A segment which exceeds a provider limit fails the whole call with an exception, and nothing of it becomes visible.
+- A definitively rejected write leaves the earlier content in place. A write with an indeterminate outcome, such as a timeout after the request was sent, applied its whole segment or none of it. A retry can report a precondition conflict after the original request committed; recovery determines the outcome.
+- A successful `ReadAsync` returns one version of the journal: every segment written up to that version, whole and in write order. Callers discard data from a failed read and recover from the beginning.
+- Each storage instance holds a write precondition established by its first successful read or creation, including an observed absence, and advanced by its own writes. `AppendAsync`, `ReplaceAsync`, and `DeleteAsync` succeed only at that version and otherwise throw `InconsistentStateException`. An instance writes after it reads the journal or creates it with `CreateIfNotExistsAsync`; a write through an instance which has done neither throws `InvalidOperationException`. Metadata operations never establish or move the precondition.
+
+Callers await each operation before starting another through the same storage instance. Separate instances coordinate through storage preconditions. Direct storage callers initialize their precondition with `ReadAsync` or a successful `CreateIfNotExistsAsync` before writing.
+
+Subsequent `ReadAsync` calls validate the established precondition and throw `InconsistentStateException` if another writer changed the content. This provides history reads through the same interface while preserving the active writer's precondition. Recovery after a conflict uses a fresh storage instance.
+
+Appends contain at least one byte. An empty append throws `ArgumentOutOfRangeException` before touching storage; `ReplaceAsync` accepts an empty value to publish an empty journal.
+
+The provider conformance suite (`JournalStorageConformanceTests` in `test/Orleans.Journaling.Tests/Conformance`) verifies these guarantees with limit, concurrency, fault-injection, and model-based tests. Each provider in this repository runs it.
 
 ## Storage format
 

@@ -33,7 +33,6 @@ namespace Orleans
 
         private readonly MessagingTrace messagingTrace;
         private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
-        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private IGrainCallCancellationManager? _cancellationManager;
         private IClusterConnectionStatusObserver[]? _statusObservers;
 
@@ -82,7 +81,6 @@ namespace Orleans
         {
             TimeProvider = timeProvider;
             _interfaceToImplementationMapping = interfaceToImplementationMapping;
-            _applicationRequestInstruments = new(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             _localClientDetails = localClientDetails;
             this.loggerFactory = loggerFactory;
@@ -103,7 +101,8 @@ namespace Orleans
                 this.clientMessagingOptions.ResponseTimeout,
                 this.clientMessagingOptions.CancelRequestOnTimeout,
                 this.clientMessagingOptions.WaitForCancellationAcknowledgement,
-                null);
+                null,
+                new ApplicationRequestInstruments(orleansInstruments));
         }
 
         internal void ConsumeServices()
@@ -258,10 +257,15 @@ namespace Orleans
                     }
                 default:
                     LogMessageNotSupported(logger, message);
+                    message.Dispose();
                     break;
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of the response message is transferred to the message center.")]
         public void SendResponse(Message request, Response response)
         {
             ThrowIfDisposed();
@@ -272,6 +276,10 @@ namespace Orleans
             MessageCenter!.SendMessage(message);
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of the request message is transferred to callback tracking or the message center.")]
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource? context, InvokeMethodOptions options)
         {
             ThrowIfDisposed();
@@ -302,7 +310,7 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context!, message, _applicationRequestInstruments);
+                var callbackData = new CallbackData(this.sharedCallbackData, context!, message);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
@@ -339,6 +347,7 @@ namespace Orleans
 
             if (response.Result is Message.ResponseTypes.Status)
             {
+                using var statusMessage = response;
                 var status = (StatusResponse)response.BodyObject!;
                 callbacks.TryGetValue(response.Id, out var callback);
                 var request = callback?.Message;
@@ -384,6 +393,7 @@ namespace Orleans
             else
             {
                 LogDebugNoCallbackForResponseMessage(logger, response);
+                response.Dispose();
             }
         }
 
@@ -473,7 +483,7 @@ namespace Orleans
             {
                 if (deadSilo.Equals(callback.Value.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callback.Value.OnTargetSiloFail(deadSilo);
                 }
             }
         }

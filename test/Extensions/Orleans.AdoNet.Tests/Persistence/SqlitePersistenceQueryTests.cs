@@ -12,9 +12,147 @@ public sealed class SqlitePersistenceQueryTests : IDisposable
     public SqlitePersistenceQueryTests()
     {
         _connection.Open();
+        InitializeDatabase(_connection);
+    }
+
+    [Fact]
+    public void FailedWriteDoesNotPoisonPooledConnection()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"orleans-sqlite-write-failure-{Guid.NewGuid():N}.db");
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = databasePath,
+            DefaultTimeout = 1,
+            Pooling = true
+        }.ToString();
+        var independentConnectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = databasePath,
+            DefaultTimeout = 1,
+            Pooling = false
+        }.ToString();
+
+        try
+        {
+            using (var connection = new SqliteConnection(connectionString))
+            {
+                connection.Open();
+                InitializeDatabase(connection);
+                Assert.Equal([1], ExecuteQuery(connection, "WriteToStorageKey", null));
+            }
+
+            using (var blocker = new SqliteConnection(independentConnectionString))
+            {
+                blocker.Open();
+                using (var command = blocker.CreateCommand())
+                {
+                    command.CommandText = "BEGIN IMMEDIATE;";
+                    command.ExecuteNonQuery();
+                }
+
+                using (var connection = new SqliteConnection(connectionString))
+                {
+                    connection.Open();
+                    var exception = Assert.Throws<SqliteException>(() => ExecuteQuery(connection, "WriteToStorageKey", 1));
+                    Assert.Equal(5, exception.SqliteErrorCode);
+                    using var begin = connection.CreateCommand();
+                    begin.CommandText = "BEGIN; ROLLBACK;";
+                    begin.ExecuteNonQuery();
+                }
+
+                using var rollback = blocker.CreateCommand();
+                rollback.CommandText = "ROLLBACK;";
+                rollback.ExecuteNonQuery();
+            }
+
+            using (var connection = new SqliteConnection(connectionString))
+            {
+                connection.Open();
+                using (var begin = connection.CreateCommand())
+                {
+                    begin.CommandText = "BEGIN; ROLLBACK;";
+                    begin.ExecuteNonQuery();
+                }
+
+                Assert.Equal([2], ExecuteQuery(connection, "ClearStorageKey", 1));
+            }
+
+            AssertStoredState(independentConnectionString, 2, null);
+
+            using (var connection = new SqliteConnection(connectionString))
+            {
+                connection.Open();
+                Assert.Equal([3], ExecuteQuery(connection, "WriteToStorageKey", 2));
+            }
+
+            AssertStoredState(independentConnectionString, 3, "updated");
+        }
+        finally
+        {
+            using var connection = new SqliteConnection(connectionString);
+            SqliteConnection.ClearPool(connection);
+            File.Delete(databasePath);
+        }
+    }
+
+    [Fact]
+    public void ConflictAfterSuccessfulWritePreservesVersionProgression()
+    {
+        Assert.Equal([1], ExecuteQuery("WriteToStorageKey", null));
+        Assert.Equal([2], ExecuteQuery("WriteToStorageKey", 1));
+        Assert.Equal([99], ExecuteQuery("WriteToStorageKey", 99));
+        Assert.Equal([3], ExecuteQuery("WriteToStorageKey", 2));
+        Assert.Equal([99], ExecuteQuery("WriteToStorageKey", 99));
+        Assert.Equal([(3, "updated")], ReadRows());
+    }
+
+    [Fact]
+    public void ReapplyingScriptsInstallsCurrentQueriesAndPreservesState()
+    {
+        var expected = new Dictionary<string, string>
+        {
+            ["WriteToStorageKey"] = GetQuery("WriteToStorageKey"),
+            ["ReadFromStorageKey"] = GetQuery("ReadFromStorageKey"),
+            ["ClearStorageKey"] = GetQuery("ClearStorageKey")
+        };
+        InsertRow(7);
+
+        using (var command = _connection.CreateCommand())
+        {
+            command.CommandText = """
+                UPDATE OrleansQuery
+                SET QueryText = 'outdated'
+                WHERE QueryKey IN ('WriteToStorageKey', 'ReadFromStorageKey', 'ClearStorageKey');
+                """;
+            Assert.Equal(3, command.ExecuteNonQuery());
+        }
+
+        InitializeDatabase(_connection);
+
+        Assert.Equal(expected["WriteToStorageKey"], GetQuery("WriteToStorageKey"));
+        Assert.Equal(expected["ReadFromStorageKey"], GetQuery("ReadFromStorageKey"));
+        Assert.Equal(expected["ClearStorageKey"], GetQuery("ClearStorageKey"));
+        Assert.Equal([(7, "original")], ReadRows());
+    }
+
+    private static void AssertStoredState(string connectionString, int version, string? payload)
+    {
+        using var connection = new SqliteConnection(connectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Version, CAST(PayloadBinary AS TEXT) FROM OrleansStorage";
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal(version, reader.GetInt32(0));
+        Assert.Equal(payload, reader.IsDBNull(1) ? null : reader.GetString(1));
+        Assert.False(reader.Read());
+    }
+
+    private static void InitializeDatabase(SqliteConnection connection)
+    {
         foreach (var script in new[] { "Sqlite-Main.sql", "Sqlite-Persistence.sql" })
         {
-            using var command = _connection.CreateCommand();
+            using var command = connection.CreateCommand();
             command.CommandText = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, script));
             command.ExecuteNonQuery();
         }
@@ -142,13 +280,12 @@ public sealed class SqlitePersistenceQueryTests : IDisposable
     }
 
     private List<int> ExecuteQuery(string queryKey, int? version, string? extension = null)
-    {
-        using var lookup = _connection.CreateCommand();
-        lookup.CommandText = "SELECT QueryText FROM OrleansQuery WHERE QueryKey = @QueryKey";
-        lookup.Parameters.AddWithValue("QueryKey", queryKey);
+        => ExecuteQuery(_connection, queryKey, version, extension);
 
-        using var command = _connection.CreateCommand();
-        command.CommandText = Assert.IsType<string>(lookup.ExecuteScalar());
+    private static List<int> ExecuteQuery(SqliteConnection connection, string queryKey, int? version, string? extension = null)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = GetQuery(connection, queryKey);
         AddParameters(command, version, extension);
 
         using var reader = command.ExecuteReader();
@@ -165,6 +302,16 @@ public sealed class SqlitePersistenceQueryTests : IDisposable
         while (reader.NextResult());
 
         return versions;
+    }
+
+    private string GetQuery(string queryKey) => GetQuery(_connection, queryKey);
+
+    private static string GetQuery(SqliteConnection connection, string queryKey)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT QueryText FROM OrleansQuery WHERE QueryKey = @QueryKey";
+        command.Parameters.AddWithValue("QueryKey", queryKey);
+        return Assert.IsType<string>(command.ExecuteScalar());
     }
 
     private void InsertRow(int? version, string? extension = null, string? differentIdentityColumn = null)

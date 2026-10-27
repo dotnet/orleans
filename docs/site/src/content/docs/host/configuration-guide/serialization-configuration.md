@@ -45,7 +45,7 @@ If every type in an application assembly is trusted, allow the assembly instead:
 
 :::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="allow_assembly":::
 
-Assembly trust applies component by component. Allowing a generic type definition's assembly doesn't implicitly trust generic arguments from other assemblies.
+Assembly trust applies component by component. Constructed generic types require an authorized generic definition and approved arguments. Orleans uses manifest registrations, configured names, assembly trust, and filters to authorize the definition independently of its arguments. Assembly-qualified lookup resolves through the specified assembly, including CLR type forwarding.
 
 For policy-based trust, register <xref:Orleans.Serialization.ITypeNameFilter> to evaluate names before Orleans loads the corresponding type:
 
@@ -56,6 +56,8 @@ Register the filter with dependency injection:
 :::code language="csharp" source="snippets/serialization/TypeNameResolutionExamples.cs" id="register_type_name_filter":::
 
 A filter returns `true` to allow, `false` to deny, or `null` when it has no opinion. Types explicitly added to `AllowedTypes` are authoritative. For other names, a denial from any `ITypeNameFilter` takes precedence over other type-name filters and assembly trust. <xref:Orleans.Serialization.ITypeFilter> provides a resolved-`Type` fallback when name-based checks have no affirmative result; a denial wins within that fallback. Both formatting and parsing apply these checks, including to constructed generic components and array element types.
+
+An `ITypeFilter` can explicitly grant a particular closed generic type as a complete construction, including arguments for which filters have no opinion. Orleans still inspects every argument for denials, including arguments after an unknown argument.
 
 As a compatibility escape hatch, you can disable the boundary:
 

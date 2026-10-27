@@ -224,7 +224,9 @@ namespace UnitTests.MembershipTests
                 nameof(IMembershipTable.InitializeMembershipTableAsync) => () => sut.InitializeMembershipTableAsync(true, cancellationToken),
                 nameof(IMembershipTable.DeleteMembershipTableEntriesAsync) => () => sut.DeleteMembershipTableEntriesAsync("cluster-a", cancellationToken),
                 nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync) => () => sut.CleanupDefunctSiloEntriesAsync(DateTimeOffset.UnixEpoch, cancellationToken),
+#pragma warning disable CS0618 // Verify the retired API's cancellation precedence.
                 nameof(IMembershipTable.ReadRowAsync) => () => sut.ReadRowAsync(CreateSiloAddress(), cancellationToken),
+#pragma warning restore CS0618
                 nameof(IMembershipTable.ReadAllAsync) => () => sut.ReadAllAsync(cancellationToken),
                 nameof(IMembershipTable.InsertRowAsync) => () => sut.InsertRowAsync(CreateMembershipEntry(), CreateTableVersion(), cancellationToken),
                 nameof(IMembershipTable.UpdateRowAsync) => () => sut.UpdateRowAsync(CreateMembershipEntry(), "17", CreateTableVersion(), cancellationToken),
@@ -657,44 +659,49 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact]
-        public async Task ReadAll_PerpetualCanonicalChurn_StopsAfterMaximumAttempts()
+        public async Task ReadAll_PerpetualCanonicalChurn_StopsOnCancellation()
         {
             var (fake, entry) = await CreateNativeTable();
+            const int churnCount = 8;
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            var closingReads = 0;
             fake.BeforeRead = path =>
             {
                 if (path == "/")
                 {
                     var root = fake.Nodes["/"];
                     fake.Nodes["/"] = root with { Version = root.Version + 1 };
+                    if (++closingReads == churnCount)
+                    {
+                        cancellation.Cancel();
+                    }
                 }
 
                 return Task.CompletedTask;
             };
 
-            var failure = await Assert.ThrowsAsync<OrleansException>(() => Read(fake));
+            var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                ZooKeeperBasedMembershipTable.ReadCoreAsync(fake.Operations, null, cancellation.Token));
 
-            Assert.Equal(
-                $"Unable to read a consistent ZooKeeper membership snapshot after {ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS} attempts.",
-                failure.Message);
+            Assert.Equal(cancellation.Token, failure.CancellationToken);
             Assert.Equal(1, fake.Calls.Count(call => call == "sync /"));
-            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS,
-                fake.Calls.Count(call => call == "children /"));
-            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS,
+            Assert.Equal(churnCount, fake.Calls.Count(call => call == "children /"));
+            Assert.Equal(churnCount,
                 fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.RowPath(entry.SiloAddress)));
-            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS,
+            Assert.Equal(churnCount,
                 fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)));
-            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS,
-                fake.Calls.Count(call => call == "read /"));
+            Assert.Equal(churnCount, fake.Calls.Count(call => call == "read /"));
         }
 
         [Fact]
-        public async Task ReadAll_StabilizesOnFinalAllowedAttempt()
+        public async Task ReadAll_RetriesCanonicalChurnUntilStable()
         {
             var (fake, entry) = await CreateNativeTable();
+            const int churnCount = 8;
             var closingReads = 0;
             fake.BeforeRead = path =>
             {
-                if (path == "/" && ++closingReads < ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS)
+                if (path == "/" && ++closingReads <= churnCount)
                 {
                     var root = fake.Nodes["/"];
                     fake.Nodes["/"] = root with { Version = root.Version + 1 };
@@ -704,12 +711,11 @@ namespace UnitTests.MembershipTests
             };
 
             var result = await Read(fake);
-
             Assert.Single(result.Members);
             Assert.Equal(entry.SiloAddress, result.Members[0].Item1.SiloAddress);
-            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS, closingReads);
-            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS,
-                fake.Calls.Count(call => call == "children /"));
+            Assert.Equal(churnCount + 1, result.Version.Version);
+            Assert.Equal(churnCount + 1, closingReads);
+            Assert.Equal(churnCount + 1, fake.Calls.Count(call => call == "children /"));
         }
 
         [Fact]

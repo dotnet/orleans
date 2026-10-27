@@ -20,6 +20,34 @@ namespace UnitTests.MembershipTests;
 [TestSuite("BVT"), TestProvider("ZooKeeper"), TestArea("Membership")]
 public sealed class ZooKeeperReadRetryTests
 {
+    [Fact]
+    public async Task PointReads_AreUnsupportedWithoutSession()
+    {
+        var harness = await Harness.CreateAsync();
+        var address = harness.Entries[0].SiloAddress;
+        const string guidance = "Use ReadAllAsync and MembershipTableData.TryGet instead.";
+#pragma warning disable CS0618 // Verify both retired entrypoints and cancellation precedence.
+        var legacy = harness.Table.ReadRow(address);
+        var current = harness.Table.ReadRowAsync(address, TestContext.Current.CancellationToken);
+        Assert.True(legacy.IsFaulted);
+        Assert.True(current.IsFaulted);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => legacy)).Message);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => current)).Message);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => harness.Table.ReadRowAsync(address, cancellation.Token));
+#pragma warning restore CS0618
+        Assert.Equal(cancellation.Token, canceled.CancellationToken);
+        Assert.Empty(harness.Sessions);
+        Assert.Empty(harness.Calls);
+        Assert.Equal(0, harness.CloseCount);
+        foreach (var name in new[] { "ReadRow", "ReadRowAsync" })
+        {
+            var obsolete = Assert.Single(typeof(ZooKeeperBasedMembershipTable).GetMethod(name)!.GetCustomAttributes(typeof(ObsoleteAttribute), false));
+            Assert.Equal(guidance, Assert.IsType<ObsoleteAttribute>(obsolete).Message);
+        }
+    }
+
     [Theory]
     [InlineData("sync", false)]
     [InlineData("children", false)]
@@ -656,6 +684,7 @@ public sealed class ZooKeeperReadRetryTests
             : harness.Table.InsertRowAsync(entry, new TableVersion(2, "1"), TestContext.Current.CancellationToken));
 
         Assert.Same(failure, actual);
+        Assert.Same(failure, await Record.ExceptionAsync(() => Assert.Single(harness.Sessions).Completion));
         Assert.Equal("Multi", Assert.Single(harness.Calls));
         Assert.Single(harness.Fake.Transactions);
         Assert.Equal(2, harness.Fake.Nodes["/"].Version);
@@ -982,7 +1011,9 @@ public sealed class ZooKeeperReadRetryTests
         internal Task<MembershipTableData> Read(CancellationToken cancellationToken) => Read(false, cancellationToken);
 
         internal Task<MembershipTableData> Read(bool point, CancellationToken cancellationToken) =>
-            point ? Table.ReadRowAsync(Entries[0].SiloAddress, cancellationToken) : Table.ReadAllAsync(cancellationToken);
+            point
+                ? ZooKeeperBasedMembershipTable.ReadAsync(() => CreateSession(true), Pipeline, Entries[0].SiloAddress, cancellationToken)
+                : Table.ReadAllAsync(cancellationToken);
 
         internal IEnumerable<string> ExpectedReadCalls(bool point = false)
         {

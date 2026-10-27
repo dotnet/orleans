@@ -65,9 +65,9 @@ public sealed class AdoNetMembershipUpgradeTests
         var queries = await ReadQueriesAsync(storage, cancellationToken);
         Assert.Equal(enhanced, queries.ContainsKey("CleanupDefunctSiloEntryKey"));
         var connectionString = database.CurrentConnectionString;
-        if (enhanced && engine == "PostgreSQL")
+        if (engine == "PostgreSQL")
         {
-            // Enhanced rollback must not depend on the server's optional PL/pgSQL assertions.
+            // Fresh SQL must roll back without optional assertions; frozen original SQL retains its legacy behavior.
             connectionString = new NpgsqlConnectionStringBuilder(connectionString) { Options = "-c plpgsql.check_asserts=off" }.ConnectionString;
         }
 
@@ -107,8 +107,8 @@ public sealed class AdoNetMembershipUpgradeTests
         oldSuspect.SuspectTimes = [Tuple.Create(active.SiloAddress, cutoff.AddSeconds(-1))];
         foreach (var entry in new[] { suspected, oldSuspect })
         {
-            var row = await current.ReadRowAsync(entry.SiloAddress, cancellationToken);
-            Assert.True(await current.UpdateRowAsync(entry, Assert.Single(row.Members).Item2, row.Version.Next(), cancellationToken));
+            var row = await current.ReadAllAsync(cancellationToken);
+            Assert.True(await current.UpdateRowAsync(entry, Assert.IsType<Tuple<MembershipEntry, string>>(row.TryGet(entry.SiloAddress)).Item2, row.Version.Next(), cancellationToken));
         }
 
         // A populated original installation supports package upgrades without any catalog edits.
@@ -123,10 +123,10 @@ public sealed class AdoNetMembershipUpgradeTests
         AssertUnchanged(populated, await ReadSnapshotAsync(storage, cancellationToken));
         Assert.Equal(queries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(storage, cancellationToken)).OrderBy(pair => pair.Key));
 
-        var captured = await current.ReadRowAsync(active.SiloAddress, cancellationToken);
+        var captured = await current.ReadAllAsync(cancellationToken);
         Assert.Equal(populated.Version, captured.Version.Version);
         Assert.Equal(populated.Etag, captured.Version.VersionEtag);
-        var capturedRow = Assert.Single(captured.Members);
+        var capturedRow = Assert.IsType<Tuple<MembershipEntry, string>>(captured.TryGet(active.SiloAddress));
         Assert.Equal(StoredMember.FromEntry(active), StoredMember.FromEntry(capturedRow.Item1));
         var originalRowToken = capturedRow.Item2;
         Assert.Equal(populated.Etag, originalRowToken);
@@ -210,12 +210,14 @@ public sealed class AdoNetMembershipUpgradeTests
             Assert.Equal(observed.Version.Version.ToString(CultureInfo.InvariantCulture), observed.Version.VersionEtag);
             if (observed.Version.Version == afterCleanup.Version)
             {
-                Assert.Empty(observed.Members);
+                Assert.Null(observed.TryGet(overlappingEntry.SiloAddress));
+                AssertReadMatches(afterCleanup, observed);
             }
             else
             {
                 Assert.Equal(afterOverlap.Version, observed.Version.Version);
-                var row = Assert.Single(observed.Members);
+                AssertReadMatches(afterOverlap, observed);
+                var row = Assert.IsType<Tuple<MembershipEntry, string>>(observed.TryGet(overlappingEntry.SiloAddress));
                 Assert.Equal(afterOverlap.Etag, row.Item2);
                 Assert.Equal(StoredMember.FromEntry(overlappingEntry), StoredMember.FromEntry(row.Item1));
             }
@@ -229,8 +231,20 @@ public sealed class AdoNetMembershipUpgradeTests
             async Task<MembershipTableData> ReadAfterBarrierAsync()
             {
                 await start.Task.WaitAsync(cancellationToken);
-                return await current.ReadRowAsync(overlappingEntry.SiloAddress, cancellationToken);
+                return await current.ReadAllAsync(cancellationToken);
             }
+        }
+
+        if (!enhanced)
+        {
+            // Frozen original SQL can commit a version-only update on a missing row. Do not conceal it.
+            var beforeMissing = await ReadSnapshotAsync(storage, cancellationToken);
+            var missing = await current.UpdateRowAsync(
+                Entry(20, SiloStatus.Dead), beforeMissing.Etag, beforeMissing.NextVersion, cancellationToken);
+            Assert.False(missing);
+            var afterMissing = await ReadSnapshotAsync(storage, cancellationToken);
+            Assert.Equal(beforeMissing.Version + 1, afterMissing.Version);
+            Assert.Equal(beforeMissing.Members, afterMissing.Members);
         }
 
         Assert.Equal(queries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(storage, cancellationToken)).OrderBy(pair => pair.Key));
