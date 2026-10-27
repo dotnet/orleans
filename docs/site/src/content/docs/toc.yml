@@ -463,10 +463,12 @@ items:
         href: resources/frequently-asked-questions.md
       - name: Symptom and signal catalog
         href: host/monitoring/troubleshooting-symptom-catalog.md
-  - name: Upgrade to Orleans 10
+  - name: Upgrade and migration
     items:
       - name: Migration overview
         href: migration-guide.md
+      - name: Migrate contract identities
+        href: migration/contract-identities.md
       - name: Deployment and rollback
         href: migration/deployment-and-rollback.md
       - name: Upgrade from Orleans 9

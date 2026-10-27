@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Analyzers;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Configuration;
@@ -56,11 +57,33 @@ public class InvalidIdentityAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<I
     }
 
     [Theory]
+    [InlineData("counter`")]
+    [InlineData("counter`x")]
+    [InlineData("counter`-1")]
+    [InlineData("counter`\u0661")]
+    [InlineData("counter`1v2")]
+    [InlineData("counter`1.2")]
+    [InlineData("counter`1`2")]
+    [InlineData("counter`1+Nested`")]
+    [InlineData("counter`65")]
+    [InlineData("counter`2147483648")]
+    [InlineData("counter`32+Nested`33")]
+    public async Task InvalidGenericArity_IsRejectedAtDeclarationBoundaries(string identity)
+    {
+        await AssertInvalidDeclarations(identity);
+        AssertInvalidRuntimeDeclarations(identity);
+    }
+
+    [Theory]
     [InlineData("counter")]
     [InlineData("Contoso.Counter+INested`1")]
     [InlineData("counter-v2")]
     [InlineData(@"counter\v2")]
     [InlineData("\u8BA1\u6570\u5668")]
+    [InlineData("counter`0")]
+    [InlineData("counter`01")]
+    [InlineData("counter`64")]
+    [InlineData("counter`32+Nested`32")]
     public async Task ValidIdentity_IsPreservedAtDeclarationBoundaries(string identity)
     {
         var (diagnostics, _) = await GetDiagnosticsAsync(CreateSource(identity));
@@ -69,7 +92,11 @@ public class InvalidIdentityAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<I
         Assert.Equal(identity, new AliasAttribute(identity).Alias);
         Assert.Equal(identity, new GrainTypeAttribute(identity).GetGrainType(null!, typeof(object)).ToString());
         Assert.Equal(identity, new GrainInterfaceTypeAttribute(identity).GetGrainInterfaceType(null!, typeof(object)).ToString());
-        Assert.Equal(identity, CreateConverter(identity).Format(typeof(InvalidIdentityAttributeAnalyzerTest)));
+        var converter = CreateConverter(identity);
+        Assert.Equal(identity, converter.Format(typeof(IIdentityContract)));
+        Assert.Equal(typeof(IIdentityContract), converter.Parse(identity));
+        var resolver = new GrainInterfaceTypeResolver(Array.Empty<IGrainInterfaceTypeProvider>(), converter);
+        Assert.Equal(identity, resolver.GetGrainInterfaceType(typeof(IIdentityContract)).ToString());
     }
 
     [Fact]
@@ -134,12 +161,16 @@ public class InvalidIdentityAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<I
     private static TypeConverter CreateConverter(string identity)
     {
         var options = new TypeManifestOptions { AllowAllTypes = true };
-        options.WellKnownTypeAliases.Add(identity, typeof(InvalidIdentityAttributeAnalyzerTest));
+        options.WellKnownTypeAliases.Add(identity, typeof(IIdentityContract));
         return new TypeConverter(
             Array.Empty<ITypeConverter>(),
             Array.Empty<ITypeNameFilter>(),
             Array.Empty<ITypeFilter>(),
             Options.Create(options),
             new CachedTypeResolver());
+    }
+
+    public interface IIdentityContract : IGrain
+    {
     }
 }

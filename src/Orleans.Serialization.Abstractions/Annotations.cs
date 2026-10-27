@@ -328,9 +328,10 @@ namespace Orleans
         /// <remarks>
         /// In the case of a type, the alias must be globally unique. In the case of a method, the alias must be unique to the declaring type.
         /// Aliases must be non-empty and contain no quotes, whitespace, control characters, or reserved type-name delimiters (<c>[](),*&amp;</c>).
+        /// Generic arity suffixes must be decimal integers at the end of each nested type name, totaling at most 64.
         /// </remarks>
         /// <exception cref="ArgumentNullException"><paramref name="alias"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentException"><paramref name="alias"/> is empty or contains a quote, whitespace, a control character, or a reserved type-name delimiter.</exception>
+        /// <exception cref="ArgumentException"><paramref name="alias"/> is empty, contains a quote, whitespace, a control character, or a reserved type-name delimiter, or has an invalid generic arity suffix.</exception>
         public AliasAttribute(string alias)
         {
             Serialization.IdentityNameValidator.Validate(alias, nameof(alias));

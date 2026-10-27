@@ -1428,6 +1428,80 @@ namespace MyApp.Counters
         Assert.Empty(diagnostics);
     }
 
+    [Fact]
+    public async Task Version104Baseline_VerifiedAliasMigration_PreservesVersionAndMembers()
+    {
+        const string source = """
+            namespace Contoso
+            {
+                [Alias("counter")]
+                [Version(2)]
+                public interface ICounterGrain : IGrain
+                {
+                    [Alias("ping")]
+                    Task Ping();
+                }
+            }
+            """;
+        const string contractsFile = """
+            interface [GrainInterfaceType("Contoso.ICounterGrain")] Contoso.ICounterGrain [Version(2)]
+              ping: Ping() -> Task
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+        Assert.Equal(
+            new[] { GrainInterfaceVersionAnalyzer.RuleId0016, GrainInterfaceVersionAnalyzer.RuleId0019 },
+            diagnostics.Select(diagnostic => diagnostic.Id).OrderBy(id => id).ToArray());
+
+        var migratedFile = contractsFile.Replace(
+            "[GrainInterfaceType(\"Contoso.ICounterGrain\")]",
+            "[GrainInterfaceType(\"counter\")]");
+        Assert.Empty(await GetDiagnosticsAsync(source, migratedFile));
+        Assert.Equal(
+            GrainInterfaceVersionAnalyzer.RuleId0017,
+            Assert.Single(await GetDiagnosticsAsync(source.Replace("[Version(2)]", "[Version(3)]"), migratedFile)).Id);
+        diagnostics = await GetDiagnosticsAsync(source.Replace("[Alias(\"counter\")]", "[Alias(\"new-counter\")]"), migratedFile);
+        Assert.Equal(
+            new[] { GrainInterfaceVersionAnalyzer.RuleId0016, GrainInterfaceVersionAnalyzer.RuleId0019 },
+            diagnostics.Select(diagnostic => diagnostic.Id).OrderBy(id => id).ToArray());
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateProject_PreservesVersion104BaselineAsHistory()
+    {
+        const string source = """
+            namespace Contoso
+            {
+                [Alias("counter")]
+                [Version(2)]
+                public interface ICounterGrain : IGrain
+                {
+                    [Alias("ping")]
+                    Task Ping();
+                }
+            }
+            """;
+        const string contractsFile = """
+            interface [GrainInterfaceType("Contoso.ICounterGrain")] Contoso.ICounterGrain [Version(2)]
+              ping: Ping() -> Task
+            """;
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0016,
+            RegenerateCodeActionTitle);
+        var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+
+        Assert.Contains("interface [GrainInterfaceType(\"counter\")] Contoso.ICounterGrain [Version(2)]", content);
+        Assert.Contains(
+            "*RETIRED* interface [GrainInterfaceType(\"Contoso.ICounterGrain\")] Contoso.ICounterGrain [Version(2)]",
+            content);
+        Assert.Equal(2, content.Split('\n').Count(line => line.Trim() == "ping: Ping() -> Task"));
+        Assert.Empty(await GetDiagnosticsAsync(source, content));
+    }
+
     [Theory]
     [InlineData("[Alias(\"new-id\")]", "interface IMyGrain [Version(0)]")]
     [InlineData("", "[Alias(\"my-grain\")] IMyGrain [Version(0)]")]
