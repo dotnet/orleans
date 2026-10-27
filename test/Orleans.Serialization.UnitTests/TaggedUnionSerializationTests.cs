@@ -462,10 +462,22 @@ public class TaggedUnionSerializationTests : IDisposable
     public void RecursiveUnionCaseGraphCopiesThroughStructWrapper()
     {
         RecursiveUnion value = new RecursiveUnionBox { Value = 42 };
+        var shared = new List<int> { 7, 11 };
+        value = new RecursiveUnionBox { Value = value, Values = shared };
+        value = new RecursiveUnionBox { Value = value, Values = shared };
 
         var result = Copy(value);
+        var outer = Assert.IsType<RecursiveUnionBox>(result.Value);
+        var inner = Assert.IsType<RecursiveUnionBox>(outer.Value.Value);
 
-        Assert.Equal(42, Assert.IsType<RecursiveUnionBox>(result.Value).Value.Value);
+        Assert.NotSame(value.Value, result.Value);
+        Assert.NotSame(((RecursiveUnionBox)value.Value!).Value.Value, outer.Value.Value);
+        Assert.Equal(42, Assert.IsType<RecursiveUnionBox>(inner.Value.Value).Value.Value);
+        Assert.Equal(new[] { 7, 11 }, outer.Values);
+        Assert.NotSame(shared, outer.Values);
+        Assert.Same(outer.Values, inner.Values);
+        outer.Values![0] = 99;
+        Assert.Equal(new[] { 7, 11 }, shared);
     }
 
     [Theory]
@@ -677,6 +689,9 @@ public struct RecursiveUnionBox
 {
     [Id(0)]
     public RecursiveUnion Value { get; set; }
+
+    [Id(1)]
+    public List<int>? Values { get; set; }
 }
 
 [GenerateSerializer, SerializationCallbacks(typeof(CaseOrderCallbacks))]
