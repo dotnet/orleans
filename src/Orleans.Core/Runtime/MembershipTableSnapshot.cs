@@ -18,6 +18,9 @@ namespace Orleans.Runtime
     [GenerateSerializer, Immutable]
     internal sealed class MembershipTableSnapshot : ISpanFormattable
     {
+        [Id(3)]
+        private readonly IReadOnlySet<SiloAddress>? _recentlyDeadSilos;
+
         private static readonly MembershipTableSnapshot InitialValue = new(MembershipVersion.MinValue, ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
 
         /// <summary>
@@ -37,7 +40,7 @@ namespace Orleans.Runtime
             this.Entries = entries;
             this.MinimumSiloGeneration = minimumSiloGeneration;
             // Freeze caller-owned sets so published snapshots remain immutable.
-            this.RecentlyDeadSilos = recentlyDeadSilos?.ToFrozenSet() ?? FrozenSet<SiloAddress>.Empty;
+            _recentlyDeadSilos = recentlyDeadSilos?.ToFrozenSet() ?? FrozenSet<SiloAddress>.Empty;
         }
 
         /// <summary>
@@ -186,8 +189,8 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets known dead identities retained separately from the canonical membership rows.
         /// </summary>
-        [Id(3)]
-        public IReadOnlySet<SiloAddress> RecentlyDeadSilos { get; }
+        // Snapshots from older silos omit field 3 and carry no retained death history.
+        public IReadOnlySet<SiloAddress> RecentlyDeadSilos => _recentlyDeadSilos ?? FrozenSet<SiloAddress>.Empty;
 
         /// <summary>
         /// Gets the number of active silos in this snapshot.

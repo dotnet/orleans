@@ -12,6 +12,9 @@ namespace Orleans.Runtime
     [Serializable, GenerateSerializer, Immutable]
     public sealed class ClusterMembershipSnapshot : ISpanFormattable
     {
+        [Id(3)]
+        private readonly IReadOnlySet<SiloAddress>? _recentlyDeadSilos;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="ClusterMembershipSnapshot"/> class.
         /// </summary>
@@ -38,7 +41,7 @@ namespace Orleans.Runtime
             this.Members = members;
             this.Version = version;
             this.MinimumSiloGeneration = minimumSiloGeneration;
-            this.RecentlyDeadSilos = recentlyDeadSilos?.ToFrozenSet() ?? FrozenSet<SiloAddress>.Empty;
+            _recentlyDeadSilos = recentlyDeadSilos?.ToFrozenSet() ?? FrozenSet<SiloAddress>.Empty;
         }
 
         internal static ClusterMembershipSnapshot Default => new(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue);
@@ -64,8 +67,8 @@ namespace Orleans.Runtime
         [Id(2)]
         internal int MinimumSiloGeneration { get; }
 
-        [Id(3)]
-        internal IReadOnlySet<SiloAddress> RecentlyDeadSilos { get; }
+        // Snapshots from older silos omit field 3 and carry no retained death history.
+        internal IReadOnlySet<SiloAddress> RecentlyDeadSilos => _recentlyDeadSilos ?? FrozenSet<SiloAddress>.Empty;
 
         internal bool IsSuccessorTo(ClusterMembershipSnapshot previous)
         {
