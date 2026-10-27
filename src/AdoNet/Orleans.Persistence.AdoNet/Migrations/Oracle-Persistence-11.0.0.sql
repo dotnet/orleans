@@ -1,5 +1,6 @@
--- Run this migration for upgrading the Oracle persistence functions for deployments created before 10.5.0.
+-- Run this migration for upgrading the Oracle persistence functions for deployments created before 11.0.0.
 -- The next grain state version wraps from 2147483647 back to 1 so it stays within the 32-bit range Orleans reads.
+-- Stop all silos using this database before applying the migration, then restart them to reload the queries.
 
 CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAINIDN0 IN NUMBER, PARAM_GRAINIDN1 IN NUMBER, PARAM_GRAINTYPEHASH IN NUMBER, PARAM_GRAINTYPESTRING IN NVARCHAR2,
                                              PARAM_GRAINIDEXTENSIONSTRING IN NVARCHAR2, PARAM_SERVICEID IN VARCHAR2, PARAM_GRAINSTATEVERSION IN NUMBER, PARAM_PAYLOADBINARY IN BLOB)
@@ -160,7 +161,7 @@ CREATE OR REPLACE FUNCTION DeleteStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAI
   END;
 /
 
--- Releases before 10.5.0 could commit a version past 2147483647 before failing to read it back.
+-- Releases before 11.0.0 could commit a version past 2147483647 before failing to read it back.
 -- Move such versions onto the same cycle used by the wrapping writes.
 UPDATE ORLEANSSTORAGE
 SET VERSION = MOD(VERSION - 1, 2147483647) + 1

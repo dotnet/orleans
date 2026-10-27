@@ -26,21 +26,49 @@ namespace UnitTests.StorageTests.Relational
             var grainState = new GrainState<TestState1> { State = new TestState1 { A = "created" } };
             await storage.WriteStateAsync(grainType, grainId, grainState, cancellationToken);
 
-            await SetVersionToMaximumAsync(database, key, cancellationToken);
-            grainState.ETag = MaximumVersion;
+            await SetVersionAsync(database, key, int.MaxValue - 1, cancellationToken);
+            await storage.ReadStateAsync(grainType, grainId, grainState, cancellationToken);
+            Assert.Equal((int.MaxValue - 1).ToString(CultureInfo.InvariantCulture), grainState.ETag);
+
+            grainState.State = new TestState1 { A = "maximum" };
+            await storage.WriteStateAsync(grainType, grainId, grainState, cancellationToken);
+            Assert.Equal(MaximumVersion, grainState.ETag);
+
+            var stale = new GrainState<TestState1>
+            {
+                State = new TestState1 { A = "stale" },
+                ETag = (int.MaxValue - 1).ToString(CultureInfo.InvariantCulture),
+                RecordExists = true
+            };
+            await AssertStaleStateRejectedAsync(storage, grainType, grainId, stale, cancellationToken);
+            var maximum = new GrainState<TestState1>();
+            await storage.ReadStateAsync(grainType, grainId, maximum, cancellationToken);
+            Assert.Equal(MaximumVersion, maximum.ETag);
+            Assert.Equal(new TestState1 { A = "maximum" }, maximum.State);
+
             grainState.State = new TestState1 { A = "wrapped" };
             await storage.WriteStateAsync(grainType, grainId, grainState, cancellationToken);
+            stale.ETag = MaximumVersion;
+            await AssertStaleStateRejectedAsync(storage, grainType, grainId, stale, cancellationToken);
             var read = new GrainState<TestState1>();
             await storage.ReadStateAsync(grainType, grainId, read, cancellationToken);
 
             Assert.Equal("1", grainState.ETag);
             Assert.Equal("1", read.ETag);
             Assert.True(read.RecordExists);
-            Assert.Equal(grainState.State, read.State);
+            Assert.Equal(new TestState1 { A = "wrapped" }, read.State);
 
-            await SetVersionToMaximumAsync(database, key, cancellationToken);
+            grainState.State = new TestState1 { A = "after-wrap" };
+            await storage.WriteStateAsync(grainType, grainId, grainState, cancellationToken);
+            await storage.ReadStateAsync(grainType, grainId, read, cancellationToken);
+            Assert.Equal("2", grainState.ETag);
+            Assert.Equal("2", read.ETag);
+            Assert.Equal(new TestState1 { A = "after-wrap" }, read.State);
+
+            await SetVersionAsync(database, key, int.MaxValue, cancellationToken);
             grainState.ETag = MaximumVersion;
             await storage.ClearStateAsync(grainType, grainId, grainState, cancellationToken);
+            await AssertStaleStateRejectedAsync(storage, grainType, grainId, stale, cancellationToken);
             var cleared = new GrainState<TestState1>();
             await storage.ReadStateAsync(grainType, grainId, cleared, cancellationToken);
 
@@ -49,13 +77,36 @@ namespace UnitTests.StorageTests.Relational
             Assert.Equal(expectedClearedVersion, cleared.ETag);
             Assert.False(cleared.RecordExists);
             Assert.Equal(new TestState1(), cleared.State);
+
+            grainState.State = new TestState1 { A = "after-clear" };
+            await storage.WriteStateAsync(grainType, grainId, grainState, cancellationToken);
+            await storage.ReadStateAsync(grainType, grainId, read, cancellationToken);
+            var expectedWrittenVersion = deleteStateOnClear ? "1" : "2";
+            Assert.Equal(expectedWrittenVersion, grainState.ETag);
+            Assert.Equal(expectedWrittenVersion, read.ETag);
+            Assert.True(read.RecordExists);
+            Assert.Equal(new TestState1 { A = "after-clear" }, read.State);
         }
 
-        private static async Task SetVersionToMaximumAsync(IRelationalStorage database, string grainKey, CancellationToken cancellationToken)
+        private static async Task AssertStaleStateRejectedAsync(
+            IGrainStorage storage, string grainType, GrainId grainId, GrainState<TestState1> stale, CancellationToken cancellationToken)
+        {
+            var etag = stale.ETag;
+            await Assert.ThrowsAsync<InconsistentStateException>(() => storage.WriteStateAsync(grainType, grainId, stale, cancellationToken));
+            await Assert.ThrowsAsync<InconsistentStateException>(() => storage.ClearStateAsync(grainType, grainId, stale, cancellationToken));
+            Assert.Equal(etag, stale.ETag);
+            Assert.True(stale.RecordExists);
+        }
+
+        private static async Task SetVersionAsync(IRelationalStorage database, string grainKey, int version, CancellationToken cancellationToken)
         {
             var updated = await database.ExecuteAsync(
-                "UPDATE OrleansStorage SET Version = 2147483647 WHERE GrainIdExtensionString = @GrainKey",
-                command => command.AddParameter("GrainKey", grainKey),
+                "UPDATE OrleansStorage SET Version = @Version WHERE GrainIdExtensionString = @GrainKey",
+                command =>
+                {
+                    command.AddParameter("GrainKey", grainKey);
+                    command.AddParameter("Version", version);
+                },
                 cancellationToken: cancellationToken);
             Assert.Equal(1, updated);
         }

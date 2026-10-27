@@ -1,5 +1,6 @@
--- Run this migration for upgrading the MySQL persistence procedures for deployments created before 10.5.0.
+-- Run this migration for upgrading the MySQL persistence procedures for deployments created before 11.0.0.
 -- The next grain state version wraps from 2147483647 back to 1 instead of overflowing the INT Version column.
+-- Stop all silos using this database before applying the migration, then restart them to reload the queries.
 
 DROP PROCEDURE IF EXISTS ClearStorage;
 DROP PROCEDURE IF EXISTS DeleteStorage;

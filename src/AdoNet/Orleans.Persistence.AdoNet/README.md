@@ -98,10 +98,17 @@ Before using the ADO.NET provider, you need to set up the necessary database tab
 The SQLite scripts are idempotent: reapplying them refreshes the persistence
 queries while preserving grain state.
 
-To upgrade a database created by an earlier release, run the
+Grain state versions cycle through 1 to 2147483647. Each successful write or
+clear advances the version, and optimistic concurrency compares ETags for
+equality. An ETag repeats after 2147483647 mutations of the same row.
+
+To upgrade an existing database, stop all silos using it and run the
 [migration scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Migrations)
-for your database that are newer than that release, in version order. For example, the 10.5.0 migrations
-make grain state versions wrap from 2147483647 back to 1 instead of failing writes with an overflow.
+for your database newer than its installed schema version, in version order.
+For SQLite, reapply the current setup scripts.
+Restart the silos after applying the scripts so every provider loads the updated
+queries. The wrapping versions fit the integer ETags used by older silos, so
+binary rolling upgrades can proceed after this database update.
 
 ## Storage Key Format
 

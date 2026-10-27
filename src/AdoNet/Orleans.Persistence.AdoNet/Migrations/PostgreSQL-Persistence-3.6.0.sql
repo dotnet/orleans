@@ -52,7 +52,7 @@ AS $function$
         SET
             PayloadBinary = _PayloadBinary,
             ModifiedOn = now(),
-            Version = Version % 2147483647 + 1
+            Version = Version + 1
 
         WHERE
             GrainIdHash = _GrainIdHash AND _GrainIdHash IS NOT NULL
@@ -67,7 +67,7 @@ AS $function$
         GET DIAGNOSTICS RowCountVar = ROW_COUNT;
         IF RowCountVar > 0
         THEN
-            _newGrainStateVersion := _GrainStateVersion % 2147483647 + 1;
+            _newGrainStateVersion := _GrainStateVersion + 1;
         END IF;
     END IF;
 
