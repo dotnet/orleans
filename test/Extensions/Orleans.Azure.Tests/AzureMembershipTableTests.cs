@@ -192,7 +192,7 @@ namespace Tester.AzureUtils
             var result = await table.ReadAllAsync(cancellationToken);
 
             Assert.Equal(7, result.Version.Version);
-            Assert.NotEqual(legacyVersion.Value.ETag.ToString(), result.Version.VersionEtag);
+            Assert.Equal(legacyVersion.Value.ETag.ToString(), result.Version.VersionEtag);
             Assert.Equal(rowCount, result.Members.Count);
             for (var index = 0; index < rowCount; index++)
             {
@@ -207,10 +207,9 @@ namespace Tester.AzureUtils
 
             foreach (var rowKey in new[] { SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX })
             {
-                var boundary = await client.GetEntityAsync<SiloInstanceTableEntry>(
+                var boundary = await client.GetEntityIfExistsAsync<SiloInstanceTableEntry>(
                     clusterId, rowKey, cancellationToken: cancellationToken);
-                Assert.Equal("7", boundary.Value.MembershipVersion);
-                Assert.Null(boundary.Value.Status);
+                Assert.False(boundary.HasValue);
             }
 
             Assert.Equal(result.Version, (await table.ReadAllAsync(cancellationToken)).Version);
@@ -222,14 +221,21 @@ namespace Tester.AzureUtils
                 StartTime = startTime,
                 IAmAliveTime = startTime
             };
-            Assert.False(await table.InsertRowAsync(
-                joining, new TableVersion(8, legacyVersion.Value.ETag.ToString()), cancellationToken));
             Assert.True(await table.InsertRowAsync(joining, result.Version.Next(), cancellationToken));
             var joined = await table.ReadAllAsync(cancellationToken);
             Assert.Equal(8, joined.Version.Version);
             Assert.Equal(rowCount + 1, joined.Members.Count);
             var joinedRow = Assert.IsType<Tuple<MembershipEntry, string>>(joined.TryGet(joining.SiloAddress));
+            foreach (var rowKey in new[] { SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX })
+            {
+                var boundary = await client.GetEntityAsync<SiloInstanceTableEntry>(
+                    clusterId, rowKey, cancellationToken: cancellationToken);
+                Assert.Equal("8", boundary.Value.MembershipVersion);
+                Assert.Null(boundary.Value.Status);
+            }
+
             joining.Status = SiloStatus.Active;
+            Assert.False(await table.UpdateRowAsync(joining, joinedRow.Item2, result.Version.Next(), cancellationToken));
             Assert.True(await table.UpdateRowAsync(joining, joinedRow.Item2, joined.Version.Next(), cancellationToken));
             var active = await table.ReadAllAsync(cancellationToken);
             Assert.Equal(9, active.Version.Version);
