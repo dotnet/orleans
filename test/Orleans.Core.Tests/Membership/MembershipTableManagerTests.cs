@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Threading.Channels;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -10,6 +11,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Runtime;
+using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.MembershipService;
 using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
@@ -121,14 +123,10 @@ namespace NonSilo.Tests.Membership
                 this.lifecycle,
                 timeProvider: TimeProvider.System);
 
-            // Validate that the initial snapshot is valid and contains the local silo.
+            // Local startup status is separate from the uninitialized membership view.
             var initialSnapshot = manager.MembershipTableSnapshot;
-            Assert.NotNull(initialSnapshot);
-            Assert.NotNull(initialSnapshot.Entries);
-            var localSiloEntry = initialSnapshot.Entries[this.localSilo];
-            Assert.Equal(SiloStatus.Created, localSiloEntry.Status);
-            Assert.Equal(this.localSiloDetails.Name, localSiloEntry.SiloName);
-            Assert.Equal(this.localSiloDetails.DnsHostName, localSiloEntry.HostName);
+            Assert.Equal(MembershipVersion.MinValue, initialSnapshot.Version);
+            Assert.Empty(initialSnapshot.Entries);
             Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
 
             Assert.NotNull(manager.MembershipTableUpdates);
@@ -162,8 +160,10 @@ namespace NonSilo.Tests.Membership
             await manager.UpdateStatus(SiloStatus.Joining, cancellationToken);
             await this.membershipGossiper.ReceivedWithAnyArgs().GossipToRemoteSilos(default!, default!, default!, default, default);
             Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
-            localSiloEntry = manager.MembershipTableSnapshot.Entries[this.localSilo];
+            var localSiloEntry = manager.MembershipTableSnapshot.Entries[this.localSilo];
             Assert.Equal(SiloStatus.Joining, localSiloEntry.Status);
+            Assert.Equal(this.localSiloDetails.Name, localSiloEntry.SiloName);
+            Assert.Equal(this.localSiloDetails.DnsHostName, localSiloEntry.HostName);
 
             // An update should have been issued.
             currentEnumerator = changes.GetAsyncEnumerator(cancellationToken);
@@ -246,14 +246,10 @@ namespace NonSilo.Tests.Membership
                 this.lifecycle,
                 timeProvider: TimeProvider.System);
 
-            // Validate that the initial snapshot is valid and contains the local silo.
+            // Local startup status is separate from the uninitialized membership view.
             var snapshot = manager.MembershipTableSnapshot;
-            Assert.NotNull(snapshot);
-            Assert.NotNull(snapshot.Entries);
-            var localSiloEntry = snapshot.Entries[this.localSilo];
-            Assert.Equal(SiloStatus.Created, localSiloEntry.Status);
-            Assert.Equal(this.localSiloDetails.Name, localSiloEntry.SiloName);
-            Assert.Equal(this.localSiloDetails.DnsHostName, localSiloEntry.HostName);
+            Assert.Equal(MembershipVersion.MinValue, snapshot.Version);
+            Assert.Empty(snapshot.Entries);
             Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
 
             Assert.NotNull(manager.MembershipTableUpdates);
@@ -496,6 +492,12 @@ namespace NonSilo.Tests.Membership
                 new MembershipVersion(version.Value + 1),
                 Entry(this.localSilo, SiloStatus.Dead, DateTimeOffset.UtcNow)), cancellationToken);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+
+            await manager.RefreshFromSnapshot(Snapshot(
+                new MembershipVersion(version.Value + 2),
+                Entry(this.localSilo, SiloStatus.Joining, DateTimeOffset.UtcNow)), cancellationToken);
+            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+
             await this.lifecycle.OnStop(cancellationToken);
         }
 
@@ -571,11 +573,13 @@ namespace NonSilo.Tests.Membership
             await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Joining, cancellationToken);
             var currentVersion = manager.MembershipTableSnapshot.Version;
+            var joinedSnapshot = manager.MembershipTableSnapshot;
 
             await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(currentVersion.Value - 1)), cancellationToken);
             await manager.RefreshFromSnapshot(Snapshot(
                 currentVersion,
                 Entry(otherSilo, SiloStatus.Active, now.AddMinutes(1))), cancellationToken);
+            Assert.Same(joinedSnapshot, manager.MembershipTableSnapshot);
             Assert.Equal(SiloStatus.Joining, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
@@ -586,28 +590,289 @@ namespace NonSilo.Tests.Membership
                 new MembershipVersion(currentVersion.Value + 1),
                 Entry(otherSilo, SiloStatus.Active, now.AddMinutes(1))), cancellationToken);
             Assert.True(await membershipUpdates.MoveNextAsync());
-            Assert.Equal(SiloStatus.Dead, membershipUpdates.Current.Entries[this.localSilo].Status);
-            Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
+            Assert.DoesNotContain(this.localSilo, membershipUpdates.Current.Entries.Keys);
+            Assert.DoesNotContain(this.localSilo, manager.MembershipTableSnapshot.Entries.Keys);
+            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+            var change = Assert.Single(
+                membershipUpdates.Current.CreateClusterMembershipSnapshot()
+                    .CreateUpdate(joinedSnapshot.CreateClusterMembershipSnapshot()).Changes);
+            Assert.Equal(this.localSilo, change.SiloAddress);
+            Assert.Equal(SiloStatus.Dead, change.Status);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             await this.lifecycle.OnStop(cancellationToken);
         }
 
-        [Fact]
-        public async Task MembershipTableManager_MissingLocalEntry_WhenJoinSnapshotWasNotPublished_DoesNotTerminate()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task MembershipTableManager_DelayedJoinCompletion_ReconcilesCanonicalView(bool pruneLocalEntry)
         {
             var cancellationToken = TestContext.Current.CancellationToken;
-            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
-            var manager = this.CreateMembershipTableManager(membershipTable);
+            var table = new InMemoryMembershipTable();
+            var membershipTable = new DelegatingMembershipTable(table);
+            using var manager = this.CreateMembershipTableManager(membershipTable);
+            var committed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var completeWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            membershipTable.InsertRowOverride = async (entry, version, token) =>
+            {
+                Assert.True(await table.InsertRowAsync(entry, version, token));
+                committed.SetResult();
+                await completeWrite.Task.WaitAsync(token);
+                return true;
+            };
+
+            var joining = manager.UpdateStatus(SiloStatus.Joining, cancellationToken);
+            await committed.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
+            var committedTable = await table.ReadAllAsync(cancellationToken);
+            var row = Assert.Single(committedTable.Members);
+            if (pruneLocalEntry)
+            {
+                Assert.True(await table.UpdateRowAsync(
+                    row.Item1.WithStatus(SiloStatus.Dead), row.Item2, committedTable.Version.Next(), cancellationToken));
+                await table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, cancellationToken);
+            }
+            else
+            {
+                await manager.UpdateStatus(SiloStatus.Active, cancellationToken);
+            }
+
+            await manager.Refresh(cancellationToken: cancellationToken);
+            var latest = manager.MembershipTableSnapshot;
+            Assert.Equal(new MembershipVersion(2), latest.Version);
+            Assert.Equal(pruneLocalEntry ? 0 : 1, latest.Entries.Count);
+            Assert.Equal(pruneLocalEntry ? SiloStatus.Created : SiloStatus.Active, manager.CurrentStatus);
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+
+            completeWrite.SetResult();
+            await joining.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+            Assert.Same(latest, manager.MembershipTableSnapshot);
+            Assert.Equal(pruneLocalEntry ? SiloStatus.Dead : SiloStatus.Active, manager.CurrentStatus);
+            if (pruneLocalEntry)
+            {
+                await manager.UpdateStatus(SiloStatus.Active, cancellationToken);
+                Assert.Empty((await table.ReadAllAsync(cancellationToken)).Members);
+                Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+                this.fatalErrorHandler.Received(1).OnFatalException(manager, Arg.Any<string>(), null);
+            }
+            else
+            {
+                Assert.Equal(SiloStatus.Active, Assert.Single(latest.Entries).Value.Status);
+                this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            }
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_DelayedDeadCompletion_ReconcilesSameVersionPruning()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var table = new InMemoryMembershipTable();
+            var membershipTable = new DelegatingMembershipTable(table);
+            using var manager = this.CreateMembershipTableManager(membershipTable);
+            var committed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var completeWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            membershipTable.InsertRowOverride = async (entry, version, token) =>
+            {
+                Assert.True(await table.InsertRowAsync(entry, version, token));
+                committed.SetResult();
+                await completeWrite.Task.WaitAsync(token);
+                return true;
+            };
+
+            var terminating = manager.UpdateStatus(SiloStatus.Dead, cancellationToken);
+            await committed.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            await table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, cancellationToken);
+            await manager.Refresh(cancellationToken: cancellationToken);
+            var pruned = manager.MembershipTableSnapshot;
+            Assert.Equal(new MembershipVersion(1), pruned.Version);
+            Assert.Empty(pruned.Entries);
+            Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+
+            completeWrite.SetResult();
+            await terminating.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+            Assert.Same(pruned, manager.MembershipTableSnapshot);
+            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+            this.fatalErrorHandler.Received(1).OnFatalException(manager, Arg.Any<string>(), null);
+        }
+
+        [Theory]
+        [InlineData(SiloStatus.Joining)]
+        [InlineData(SiloStatus.Active)]
+        [InlineData(SiloStatus.Dead)]
+        public async Task MembershipTableManager_OlderRegistrationEvidence_TerminatesWithoutChangingView(SiloStatus oldStatus)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var table = new InMemoryMembershipTable(new TableVersion(2, "2"));
+            using var manager = this.CreateMembershipTableManager(table);
+            await manager.Refresh(cancellationToken: cancellationToken);
+            var current = manager.MembershipTableSnapshot;
+
+            await manager.RefreshFromSnapshot(Snapshot(
+                new MembershipVersion(1), Entry(this.localSilo, oldStatus, DateTimeOffset.UnixEpoch)), cancellationToken);
+
+            Assert.Same(current, manager.MembershipTableSnapshot);
+            Assert.Empty(current.Entries);
+            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+
+            var otherSilo = Silo("127.0.0.1:200@100");
+            Assert.True(await table.InsertRowAsync(
+                Entry(otherSilo, SiloStatus.Active, DateTimeOffset.UtcNow), table.Version.Next(), cancellationToken));
+            await manager.Refresh(cancellationToken: cancellationToken);
+            Assert.Equal(new MembershipVersion(3), manager.MembershipTableSnapshot.Version);
+            Assert.Equal(otherSilo, Assert.Single(manager.MembershipTableSnapshot.Entries).Key);
+            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+            this.fatalErrorHandler.Received(1).OnFatalException(manager, Arg.Any<string>(), null);
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_PreJoinCleanup_GossipsCanonicalViewAndAllowsHeartbeatRefresh()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var now = DateTimeOffset.UtcNow;
+            var predecessor = Silo("127.0.0.1:100@99");
+            var peer = Silo("127.0.0.1:200@100");
+            var table = new InMemoryMembershipTable(
+                new TableVersion(1, "1"),
+                Entry(predecessor, SiloStatus.Active, now),
+                Entry(peer, SiloStatus.Active, now));
+            using var manager = this.CreateMembershipTableManager(table);
+            var gossiped = new TaskCompletionSource<MembershipTableSnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+            this.membershipGossiper.GossipToRemoteSilos(
+                Arg.Any<List<SiloAddress>>(), Arg.Any<MembershipTableSnapshot>(), predecessor, SiloStatus.Dead, Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    Assert.Equal(peer, Assert.Single(call.ArgAt<List<SiloAddress>>(0)));
+                    gossiped.SetResult(call.ArgAt<MembershipTableSnapshot>(1));
+                    return Task.CompletedTask;
+                });
+
+            await manager.Refresh(cancellationToken: cancellationToken);
+            var snapshot = await gossiped.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            Assert.Equal(new MembershipVersion(2), snapshot.Version);
+            Assert.Equal(2, snapshot.Entries.Count);
+            Assert.Equal(SiloStatus.Dead, snapshot.Entries[predecessor].Status);
+            Assert.Equal(SiloStatus.Active, snapshot.Entries[peer].Status);
+            Assert.DoesNotContain(this.localSilo, snapshot.Entries.Keys);
+            Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
+
+            var peerDetails = Substitute.For<ILocalSiloDetails>();
+            peerDetails.SiloAddress.Returns(peer);
+            using var peerManager = new MembershipTableManager(
+                peerDetails,
+                Options.Create(new ClusterMembershipOptions()),
+                table,
+                this.fatalErrorHandler,
+                Substitute.For<IMembershipGossiper>(),
+                this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                new AsyncTimerFactory(this.loggerFactory),
+                new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>()),
+                TimeProvider.System);
+            await peerManager.RefreshFromSnapshot(snapshot, cancellationToken);
+            Assert.Equal(SiloStatus.Active, peerManager.CurrentStatus);
+
+            var heartbeat = now.AddMinutes(1);
+            await table.UpdateIAmAliveAsync(Entry(peer, SiloStatus.Active, heartbeat), cancellationToken);
+            await peerManager.Refresh(cancellationToken: cancellationToken);
+
+            var refreshed = peerManager.MembershipTableSnapshot;
+            Assert.Equal(snapshot.Version, refreshed.Version);
+            Assert.Equal(2, refreshed.Entries.Count);
+            Assert.Equal(SiloStatus.Dead, refreshed.Entries[predecessor].Status);
+            Assert.Equal(SiloStatus.Active, refreshed.Entries[peer].Status);
+            Assert.Equal(heartbeat.UtcDateTime, refreshed.Entries[peer].IAmAliveTime);
+            Assert.DoesNotContain(this.localSilo, refreshed.Entries.Keys);
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+        }
+
+        /// <summary>
+        /// Membership notifications track committed entries while local startup status remains Created until registration.
+        /// </summary>
+        [Fact]
+        public async Task MembershipTableManager_NewCluster_PublishesCanonicalViewsAndPreservesLocalRouting()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var membershipTable = new InMemoryMembershipTable();
+            using var manager = this.CreateMembershipTableManager(membershipTable);
+            using var clusterMembership = new ClusterMembershipService(
+                manager,
+                this.loggerFactory.CreateLogger<ClusterMembershipService>(),
+                this.fatalErrorHandler);
+            var listenerManager = new SiloStatusListenerManager(
+                manager,
+                this.loggerFactory.CreateLogger<SiloStatusListenerManager>(),
+                this.fatalErrorHandler);
+            var oracle = new SiloStatusOracle(
+                this.localSiloDetails, manager, this.loggerFactory.CreateLogger<SiloStatusOracle>(), listenerManager);
+            using var ring = new ConsistentRingProvider(this.localSilo, this.loggerFactory, oracle);
+            using var services = new ServiceCollection()
+                .AddMetrics()
+                .AddSingleton<OrleansInstruments>()
+                .AddSingleton<ConsistentRingInstruments>()
+                .BuildServiceProvider();
+            using var virtualRing = new VirtualBucketsRingProvider(
+                this.localSilo, this.loggerFactory, 30, oracle, services.GetRequiredService<ConsistentRingInstruments>());
+            var listener = new RecordingSiloStatusListener();
+            Assert.True(listenerManager.Subscribe(listener));
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)listenerManager).Participate(this.lifecycle);
             await this.lifecycle.OnStart(cancellationToken);
 
-            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(125)), cancellationToken);
-            await manager.UpdateStatus(SiloStatus.Joining, cancellationToken);
-            Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
-            Assert.DoesNotContain(this.localSilo, manager.MembershipTableSnapshot.Entries.Keys);
+            Assert.Equal(MembershipVersion.MinValue, manager.MembershipTableSnapshot.Version);
+            Assert.Empty(manager.MembershipTableSnapshot.Entries);
+            Assert.Empty(clusterMembership.CurrentSnapshot.Members);
+            Assert.Equal(SiloStatus.Created, oracle.CurrentStatus);
+            Assert.Empty(oracle.GetApproximateSiloStatuses());
+            Assert.False(listener.Notifications.TryRead(out _));
 
-            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(126)), cancellationToken);
+            var otherSilo = Silo("127.0.0.1:200@100");
+            Assert.True(await membershipTable.InsertRowAsync(
+                Entry(otherSilo, SiloStatus.Joining, DateTimeOffset.UtcNow),
+                membershipTable.Version.Next(),
+                cancellationToken));
+            await manager.Refresh(cancellationToken: cancellationToken);
+            await listenerManager.TestOnlyWaitForCurrentMembershipVersion(cancellationToken);
+
+            Assert.True(listener.Notifications.TryRead(out var notification));
+            Assert.Equal((otherSilo, SiloStatus.Joining), notification);
+            Assert.False(listener.Notifications.TryRead(out notification), $"Unexpected notification: {notification}");
+            Assert.Equal(new MembershipVersion(1), manager.MembershipTableSnapshot.Version);
+            Assert.Equal(otherSilo, Assert.Single(manager.MembershipTableSnapshot.Entries).Key);
+            var initialClusterView = clusterMembership.CurrentSnapshot;
+            Assert.Equal(otherSilo, Assert.Single(initialClusterView.Members).Key);
+            Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
+
+            await manager.UpdateStatus(SiloStatus.Joining, cancellationToken);
+            await manager.UpdateStatus(SiloStatus.Active, cancellationToken);
+            await listenerManager.TestOnlyWaitForCurrentMembershipVersion(cancellationToken);
+            Assert.True(listener.Notifications.TryRead(out notification));
+            Assert.Equal((this.localSilo, SiloStatus.Joining), notification);
+            Assert.True(listener.Notifications.TryRead(out notification));
+            Assert.Equal((this.localSilo, SiloStatus.Active), notification);
+            Assert.False(listener.Notifications.TryRead(out notification), $"Unexpected notification: {notification}");
+            Assert.Equal(SiloStatus.Active, manager.CurrentStatus);
+            var clusterView = clusterMembership.CurrentSnapshot;
+            Assert.Equal(new MembershipVersion(3), clusterView.Version);
+            Assert.Equal(2, clusterView.Members.Count);
+            var change = Assert.Single(clusterView.CreateUpdate(initialClusterView).Changes);
+            Assert.Equal(this.localSilo, change.SiloAddress);
+            Assert.Equal(SiloStatus.Active, change.Status);
+            Assert.Equal(this.localSilo, ring.GetPrimaryTargetSilo(unchecked((uint)this.localSilo.GetConsistentHashCode())));
+            Assert.Equal(this.localSilo, virtualRing.GetPrimaryTargetSilo(this.localSilo.GetUniformHashCodes(30)[0]));
+
+            var table = await membershipTable.ReadAllAsync(cancellationToken);
+            var otherRow = table.Members.Single(row => row.Item1.SiloAddress.Equals(otherSilo));
+            Assert.True(await membershipTable.UpdateRowAsync(
+                otherRow.Item1.WithStatus(SiloStatus.Active), otherRow.Item2, table.Version.Next(), cancellationToken));
+            await manager.Refresh(cancellationToken: cancellationToken);
+            await listenerManager.TestOnlyWaitForCurrentMembershipVersion(cancellationToken);
+            Assert.True(listener.Notifications.TryRead(out notification));
+            Assert.Equal((otherSilo, SiloStatus.Active), notification);
+            Assert.False(listener.Notifications.TryRead(out _));
+            Assert.Equal(this.localSilo, virtualRing.GetPrimaryTargetSilo(this.localSilo.GetUniformHashCodes(30)[0]));
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
             await this.lifecycle.OnStop(cancellationToken);
@@ -638,7 +903,9 @@ namespace NonSilo.Tests.Membership
             Assert.DoesNotContain(prunedTable.Members, row => row.Item1.SiloAddress.Equals(this.localSilo));
 
             await manager.Refresh(cancellationToken: cancellationToken);
-            Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
+            Assert.Empty(manager.MembershipTableSnapshot.Entries);
+            Assert.Equal(prunedTable.Version.Version, manager.MembershipTableSnapshot.Version.Value);
+            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             await this.lifecycle.OnStop(cancellationToken);
@@ -1917,9 +2184,21 @@ namespace NonSilo.Tests.Membership
                 timeProvider: timeProvider ?? TimeProvider.System);
         }
 
+        private sealed class RecordingSiloStatusListener : ISiloStatusListener
+        {
+            private readonly Channel<(SiloAddress Silo, SiloStatus Status)> notifications =
+                Channel.CreateUnbounded<(SiloAddress Silo, SiloStatus Status)>();
+
+            public ChannelReader<(SiloAddress Silo, SiloStatus Status)> Notifications => this.notifications.Reader;
+
+            public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status) =>
+                this.notifications.Writer.TryWrite((updatedSilo, status));
+        }
+
         private sealed class DelegatingMembershipTable(IMembershipTable inner) : IMembershipTable
         {
             public Func<CancellationToken, Task<MembershipTableData>>? ReadAllOverride { get; set; }
+            public Func<MembershipEntry, TableVersion, CancellationToken, Task<bool>>? InsertRowOverride { get; set; }
 
             public Task InitializeMembershipTable(bool tryInitTableVersion) =>
                 InitializeMembershipTableAsync(tryInitTableVersion);
@@ -1974,7 +2253,8 @@ namespace NonSilo.Tests.Membership
                 MembershipEntry entry,
                 TableVersion tableVersion,
                 CancellationToken cancellationToken = default) =>
-                inner.InsertRowAsync(entry, tableVersion, cancellationToken);
+                InsertRowOverride?.Invoke(entry, tableVersion, cancellationToken)
+                    ?? inner.InsertRowAsync(entry, tableVersion, cancellationToken);
 
             public Task<bool> UpdateRow(
                 MembershipEntry entry,
