@@ -8,7 +8,7 @@ using RelationalOrleansQueries = Orleans.Streaming.AdoNet.Storage.RelationalOrle
 namespace Tester.AdoNet.Streaming;
 
 /// <summary>
-/// Verifies that the streaming migrations upgrade databases created by earlier streaming scripts.
+/// Verifies that the streaming setup script creates and upgrades databases while preserving queued data.
 /// </summary>
 [TestSuite("Functional")]
 [TestArea("Streaming")]
@@ -19,12 +19,14 @@ public sealed class AdoNetStreamingMigrationTests
     private const string QueueId = "migration-queue";
     private const int RemovalTimeout = 600;
 
-    [Fact]
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     [TestProvider("MySql")]
-    public async Task MySql_Migration_10_4_1_UpgradesStreamProcedures()
+    public async Task MySql_Setup_CreatesAndUpgradesStreamProcedures(bool upgrade)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (database, queries) = await CreateMigratedDatabaseAsync(cancellationToken);
+        var (database, queries) = await CreateMigratedDatabaseAsync(upgrade, cancellationToken);
 
         var confirmed = await queries.QueueStreamMessageAsync(ServiceId, ProviderId, QueueId, [1], 600);
         var released = await queries.QueueStreamMessageAsync(ServiceId, ProviderId, QueueId, [2], 600);
@@ -62,14 +64,14 @@ public sealed class AdoNetStreamingMigrationTests
     /// </remarks>
     [Fact]
     [TestProvider("MySql")]
-    public async Task MySql_Migration_10_4_1_EvictsByRetryLimitAndBatchSize()
+    public async Task MySql_Setup_EvictsByRetryLimitAndBatchSize()
     {
         const int maxAttempts = 2;
         const int evictionBatchSize = 3;
         const string retryQueueId = "retry-queue";
         const string batchQueueId = "batch-queue";
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (database, queries) = await CreateMigratedDatabaseAsync(cancellationToken);
+        var (database, queries) = await CreateMigratedDatabaseAsync(upgrade: true, cancellationToken);
 
         // A negative visibility timeout makes each attempt visible again immediately.
         Task<IList<AdoNetStreamMessage>> DequeueAsync(string queueId) =>
@@ -102,8 +104,8 @@ public sealed class AdoNetStreamingMigrationTests
     }
 
     // src/AdoNet/Orleans.Streaming.AdoNet/MySQL-Streaming.sql from 845672b8d84813859aa54245efd0eebb8f0233e2,
-    // the last script before the 10.4.1 migration. The hash normalizes checkout line endings.
-    private static async Task<(RelationalStorageForTesting Database, RelationalOrleansQueries Queries)> CreateMigratedDatabaseAsync(CancellationToken cancellationToken)
+    // frozen before MySQL 8.4 support. The hash normalizes checkout line endings.
+    private static async Task<(RelationalStorageForTesting Database, RelationalOrleansQueries Queries)> CreateMigratedDatabaseAsync(bool upgrade, CancellationToken cancellationToken)
     {
         var fixturePath = Path.Combine(AppContext.BaseDirectory, "StreamingUpgradeFixtures", "MySQL-Streaming.sql");
         var original = await File.ReadAllTextAsync(fixturePath, cancellationToken);
@@ -111,18 +113,68 @@ public sealed class AdoNetStreamingMigrationTests
             "B349B59063190EC34AF69702EF32FFC76BF1FF396690572469B894D3F56A49A2",
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(original.Replace("\r\n", "\n")))));
 
+        var mainPath = Path.Combine(AppContext.BaseDirectory, "MySQL-Main.sql");
+        var script = await File.ReadAllTextAsync(mainPath, cancellationToken)
+            + await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "MySQL-Streaming.sql"), cancellationToken);
         var database = await RelationalStorageForTesting.SetupInstance(
             AdoNetInvariants.InvariantNameMySql,
             $"StreamingMigration_{Guid.NewGuid():N}",
             cancellationToken: cancellationToken,
-            setupSqlScriptFileNames: [Path.Combine(AppContext.BaseDirectory, "MySQL-Main.sql"), fixturePath]);
+            setupSqlScriptFileNames: upgrade ? [mainPath, fixturePath] : []);
+        if (!upgrade)
+        {
+            await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, script, cancellationToken);
+        }
 
-        // The migration runs twice, as users run it, to show that repeating it leaves an upgraded database working.
-        var migration = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "MySQL-Streaming-10.4.1.sql"), cancellationToken);
-        await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, migration, cancellationToken);
-        await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, migration, cancellationToken);
+        // Seed all persistent tables without invoking the legacy batch procedures rejected by MySQL 8.4.
+        await database.Storage.ExecuteAsync(
+            """
+            UPDATE OrleansStreamMessageSequence SET MessageId = 42;
+            INSERT INTO OrleansStreamMessage
+                (ServiceId, ProviderId, QueueId, MessageId, Dequeued, VisibleOn, ExpiresOn, CreatedOn, ModifiedOn, Payload)
+            VALUES ('preserved-service', 'preserved-provider', 'preserved-queue', 41, 2,
+                '2030-01-02 03:04:05', '2030-01-03 03:04:05', '2030-01-01 03:04:05', '2030-01-02 03:04:05', X'0102');
+            INSERT INTO OrleansStreamDeadLetter
+                (ServiceId, ProviderId, QueueId, MessageId, Dequeued, VisibleOn, ExpiresOn, CreatedOn, ModifiedOn, DeadOn, RemoveOn, Payload)
+            VALUES ('preserved-service', 'preserved-provider', 'preserved-queue', 42, 3,
+                '2030-01-02 03:04:05', '2030-01-03 03:04:05', '2030-01-01 03:04:05', '2030-01-02 03:04:05',
+                '2030-01-04 03:04:05', '2030-01-05 03:04:05', X'0304');
+            INSERT INTO OrleansStreamControl (ServiceId, ProviderId, QueueId, EvictOn)
+            VALUES ('preserved-service', 'preserved-provider', 'preserved-queue', '2030-01-06 03:04:05');
+            """,
+            cancellationToken);
+        var before = await ReadPreservedDataAsync();
+        Assert.Equal(4, before.Length);
+
+        await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, script, cancellationToken);
+        Assert.Equal(before, await ReadPreservedDataAsync());
+        await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, script, cancellationToken);
+        Assert.Equal(before, await ReadPreservedDataAsync());
+
+        // The sequence continues after both the queued message and dead letter across repeated upgrades.
         var queries = await RelationalOrleansQueries.CreateInstance(AdoNetInvariants.InvariantNameMySql, database.CurrentConnectionString);
+        var next = await queries.QueueStreamMessageAsync(ServiceId, ProviderId, "sequence-check", [5], 600);
+        Assert.Equal(43, next.MessageId);
+        await database.Storage.ExecuteAsync("DELETE FROM OrleansStreamMessage; DELETE FROM OrleansStreamDeadLetter;", cancellationToken);
         return (database, queries);
+
+        async Task<string[]> ReadPreservedDataAsync() =>
+            (await database.Storage.ReadAsync(
+                """
+                SELECT CONCAT_WS('|', ServiceId, ProviderId, QueueId, MessageId, Dequeued, VisibleOn, ExpiresOn,
+                    CreatedOn, ModifiedOn, HEX(Payload)) AS Value
+                FROM OrleansStreamMessage
+                UNION ALL
+                SELECT CONCAT_WS('|', ServiceId, ProviderId, QueueId, MessageId, Dequeued, VisibleOn, ExpiresOn,
+                    CreatedOn, ModifiedOn, DeadOn, RemoveOn, HEX(Payload))
+                FROM OrleansStreamDeadLetter
+                UNION ALL
+                SELECT CONCAT_WS('|', ServiceId, ProviderId, QueueId, EvictOn) FROM OrleansStreamControl
+                UNION ALL
+                SELECT CAST(MessageId AS CHAR) FROM OrleansStreamMessageSequence
+                ORDER BY Value
+                """,
+                record => record.GetString(0), null, cancellationToken)).ToArray();
     }
 
     private static Task<IList<AdoNetStreamMessage>> GetMessagesAsync(RelationalOrleansQueries queries) =>
