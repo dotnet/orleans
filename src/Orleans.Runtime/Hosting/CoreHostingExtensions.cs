@@ -10,6 +10,7 @@ using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
+using Orleans.Runtime.ClusterServices;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Hosting;
 using Orleans.Runtime.MembershipService;
@@ -164,16 +165,19 @@ namespace Orleans.Hosting
 
             // Distributed Grain Directory
             services.AddOptions<GrainDirectoryOptions>();
-            services.TryAddSingleton(static sp =>
-            {
-                var options = sp.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value;
-                return new DirectoryMembershipService(
+            services.TryAddKeyedSingleton<IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>>(
+                DirectoryMembershipSnapshot.ServiceId,
+                static (sp, _) => new MembershipBasedClusterServiceViewProvider(
                     sp.GetRequiredService<ClusterMembershipService>(),
-                    sp.GetRequiredService<IInternalGrainFactory>(),
-                    sp.GetRequiredService<ILogger<DirectoryMembershipService>>(),
-                    options.PartitionsPerSilo,
-                    options.GetPartitionBoundaries);
-            });
+                    DirectoryMembershipSnapshot.CreateConfiguration(
+                        sp.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value.PartitionsPerSilo),
+                    sp.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value.GetPartitionBoundaries,
+                    sp.GetRequiredService<ILogger<MembershipBasedClusterServiceViewProvider>>(),
+                    ClusterMembershipSnapshot.Default));
+            services.TryAddSingleton(static sp => new DirectoryMembershipService(
+                sp.GetRequiredKeyedService<IClusterServiceViewProvider<ClusterServiceViewId, MembershipBasedClusterServiceView>>(DirectoryMembershipSnapshot.ServiceId),
+                sp.GetRequiredService<IInternalGrainFactory>(),
+                sp.GetRequiredService<ILogger<DirectoryMembershipService>>()));
             if (!services.Contains(DirectoryDescriptor))
             {
                 services.Add(DirectoryDescriptor);
