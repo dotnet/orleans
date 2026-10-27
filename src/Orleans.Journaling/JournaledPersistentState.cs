@@ -46,16 +46,22 @@ internal sealed class JournaledPersistentState<T> : IPersistentState<T>, IStateM
     {
         get
         {
+            ThrowIfInTransaction();
             _hasState = true;
             return _value ??= _activator.Create();
         }
         set
         {
+            ThrowIfInTransaction();
             _value = value;
             _hasState = true;
             _clearRequested = false;
         }
     }
+
+    // Persistent state journals its whole value at every write, outside any transaction's segment, so a transaction's
+    // abort couldn't undo a change to it.
+    private void ThrowIfInTransaction() => (_manager as JournaledStateManager)?.ThrowIfInTransaction("Persistent state (IPersistentState)");
 
     string IStorage.Etag => $"{_version}";
     bool IStorage.RecordExists => _version > 0;
@@ -154,6 +160,7 @@ internal sealed class JournaledPersistentState<T> : IPersistentState<T>, IStateM
     Task IStorage.ClearStateAsync() => ((IStorage)this).ClearStateAsync(CancellationToken.None);
     async Task IStorage.ClearStateAsync(CancellationToken cancellationToken)
     {
+        ThrowIfInTransaction();
         _value = default;
         _hasState = false;
         _clearRequested = true;
