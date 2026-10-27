@@ -65,6 +65,7 @@ public class TypeConverter
     /// <param name="typeFilters">The type filters.</param>
     /// <param name="options">The options.</param>
     /// <param name="typeResolver">The type resolver.</param>
+    /// <exception cref="ArgumentException">A configured type alias is empty, contains a quote, whitespace, a control character, or a reserved type-name delimiter, or has an invalid generic arity suffix.</exception>
     public TypeConverter(
         IEnumerable<ITypeConverter> formatters,
         IEnumerable<ITypeNameFilter> typeNameFilters,
@@ -107,6 +108,7 @@ public class TypeConverter
         var aliases = options.Value.WellKnownTypeAliases;
         foreach (var item in aliases)
         {
+            IdentityNameValidator.Validate(item.Key, nameof(TypeManifestOptions.WellKnownTypeAliases));
             var alias = new QualifiedType(null, item.Key);
             var spec = RuntimeTypeNameParser.Parse(RuntimeTypeNameFormatter.Format(item.Value));
             string? asmName = null;
