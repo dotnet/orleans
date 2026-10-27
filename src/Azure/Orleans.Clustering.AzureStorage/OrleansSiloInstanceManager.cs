@@ -321,7 +321,7 @@ namespace Orleans.AzureUtils
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var query = await membershipTableReadStorage.ReadAllTableEntriesForPartitionAsync(DeploymentId, cancellationToken);
-                if (CanAcceptSnapshot(query.Entries))
+                if (await CanAcceptSnapshotAsync(query.Entries, cancellationToken))
                 {
                     return RemoveBoundaryVersionRows(query.Entries);
                 }
@@ -331,11 +331,23 @@ namespace Orleans.AzureUtils
                 $"Unable to read a consistent membership snapshot for cluster '{DeploymentId}' from table '{TableName}' after {MaxMembershipSnapshotAttempts} attempts.");
         }
 
-        private static bool CanAcceptSnapshot(List<(SiloInstanceTableEntry Entity, string ETag)> entries)
+        private async Task<bool> CanAcceptSnapshotAsync(
+            List<(SiloInstanceTableEntry Entity, string ETag)> entries,
+            CancellationToken cancellationToken)
         {
             var version = ValidateAllSiloEntries(entries);
-            if (entries[0].Entity.RowKey != SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN
-                || entries[^1].Entity.RowKey != SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX)
+            var opening = entries[0].Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN;
+            var closing = entries[^1].Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX;
+            // Both markers absent identifies the legacy format. Establish them under the canonical
+            // version etag, then reread through the fence. One absent marker is an inconsistent query.
+            if (!opening && !closing)
+            {
+                var versionEntry = entries.Single(entry => entry.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
+                await TryCreateBoundaryVersionRowsAsync(versionEntry, cancellationToken);
+                return false;
+            }
+
+            if (!opening || !closing)
             {
                 throw new KeyNotFoundException("The membership query must include both ordered boundary version rows.");
             }
@@ -348,6 +360,28 @@ namespace Orleans.AzureUtils
             // Every canonical write changes both ordered markers atomically with the membership data.
             return string.Equals(before, after, StringComparison.Ordinal)
                 && string.Equals(before, version, StringComparison.Ordinal);
+        }
+
+        private async Task TryCreateBoundaryVersionRowsAsync(
+            (SiloInstanceTableEntry Entity, string ETag) versionEntry,
+            CancellationToken cancellationToken)
+        {
+            var boundaries = CreateBoundaryVersionEntries(versionEntry.Entity);
+            try
+            {
+                // Add both markers and refresh the version etag atomically, fencing concurrent
+                // legacy writes and upgrades while preserving the membership version and silo rows.
+                await storage.Table.SubmitTransactionAsync(
+                [
+                    new(TableTransactionActionType.Add, boundaries.Min),
+                    new(TableTransactionActionType.Add, boundaries.Max),
+                    new(TableTransactionActionType.UpdateMerge, versionEntry.Entity, new ETag(versionEntry.ETag))
+                ], cancellationToken);
+            }
+            catch (RequestFailedException exception) when (exception.Status is 409 or 412)
+            {
+                LogTraceInsertSiloEntryConditionallyFailed((HttpStatusCode)exception.Status, exception.ErrorCode);
+            }
         }
 
         private static List<(SiloInstanceTableEntry Entity, string ETag)> RemoveBoundaryVersionRows(
