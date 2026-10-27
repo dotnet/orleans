@@ -95,6 +95,82 @@ namespace Tester.HeterogeneousSilosTests
             this.cluster!.GrainFactory!.GetGrain<ISimpleGrainWithAsyncMethods>(0);
         }
 
+        [Fact]
+        public async Task GetGrainAsyncWaitsForImplementation()
+        {
+            SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
+            using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+            var pending = this.cluster!.Client.GetGrainAsync<ITestGrain>(0, cancellationToken: cancellation.Token);
+            Assert.False(pending.IsCompleted);
+
+            await cluster.StartAdditionalSiloAsync();
+            await WaitForClusterStateToStabilizeAsync(restartClient: false);
+
+            var grain = await pending;
+            var resolvedType = await this.cluster.Client.WaitForGrainTypeAsync<ITestGrain>(cancellationToken: cancellation.Token);
+            Assert.Equal(resolvedType, grain.GetGrainId().Type);
+            Assert.Equal(0, await grain.GetKey());
+            Assert.Equal(this.cluster.GrainFactory!.GetGrain<ITestGrain>(0), grain);
+        }
+
+        [Fact]
+        public async Task SiloGrainFactoryGetGrainAsyncWaitsForImplementation()
+        {
+            SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
+            using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+            var grainFactory = this.cluster!.GetSiloServiceProvider().GetRequiredService<IGrainFactory>();
+            var pending = grainFactory.GetGrainAsync<ITestGrain>(0, cancellationToken: cancellation.Token);
+            Assert.False(pending.IsCompleted);
+
+            await cluster.StartAdditionalSiloAsync();
+            await WaitForClusterStateToStabilizeAsync(restartClient: false);
+
+            var grain = await pending;
+            Assert.Equal(0, await grain.GetKey());
+        }
+
+        [Fact]
+        public async Task CohostedClusterClientGetGrainAsyncWaitsForImplementation()
+        {
+            SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
+            using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+            var client = this.cluster!.GetSiloServiceProvider().GetRequiredService<IClusterClient>();
+            var pending = client.GetGrainAsync<ITestGrain>(0, cancellationToken: cancellation.Token);
+            Assert.False(pending.IsCompleted);
+
+            await cluster.StartAdditionalSiloAsync();
+            await WaitForClusterStateToStabilizeAsync(restartClient: false);
+
+            var grain = await pending;
+            Assert.Equal(0, await grain.GetKey());
+        }
+
+        [Fact]
+        public async Task GetGrainAsyncCanBeCanceled()
+        {
+            SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
+            using var cancellation = new CancellationTokenSource();
+            var pending = this.cluster!.Client.GetGrainAsync<ITestGrain>(0, cancellationToken: cancellation.Token);
+
+            cancellation.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await pending);
+        }
+
+        [Fact]
+        public async Task WaitForGrainTypeAsyncSupportsImplementationPrefixes()
+        {
+            SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
+            using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+            var pending = this.cluster!.Client.WaitForGrainTypeAsync<ITestGrain>(typeof(TestGrain).FullName, cancellation.Token);
+            Assert.False(pending.IsCompleted);
+
+            await cluster.StartAdditionalSiloAsync();
+            await WaitForClusterStateToStabilizeAsync(restartClient: false);
+
+            Assert.False((await pending).IsDefault);
+        }
+
 
         [Fact]
         public async Task MergeGrainResolverTests()
