@@ -467,6 +467,8 @@ namespace Orleans.Configuration
 
         public System.TimeSpan DefunctSiloExpiration { get { throw null; } set { } }
 
+        public System.TimeSpan DefunctSiloMinimumRetention { get { throw null; } set { } }
+
         public bool EnableConnectionLivenessCheck { get { throw null; } set { } }
 
         public bool EnableIndirectProbes { get { throw null; } set { } }

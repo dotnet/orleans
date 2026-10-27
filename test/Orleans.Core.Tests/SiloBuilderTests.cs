@@ -193,6 +193,16 @@ namespace NonSilo.Tests
                 {
                     siloBuilder
                         .UseLocalhostClustering()
+                        .Configure<ClusterMembershipOptions>(options => options.DefunctSiloMinimumRetention = TimeSpan.FromTicks(-1));
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
+            });
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
+            {
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
                         .Configure<ClusterMembershipOptions>(options => options.ProbeTimeout = TimeSpan.Zero);
                 }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
