@@ -35,6 +35,8 @@ namespace Orleans.Messaging
         private readonly ConnectionManager connectionManager;
         private readonly GatewayOptions gatewayOptions;
         private readonly PeriodicTimer gatewayRefreshTimer;
+        private readonly CancellationTokenSource shutdown = new();
+        private readonly CancellationToken shutdownToken;
         private List<SiloAddress> cachedLiveGateways = [];
         private HashSet<SiloAddress> cachedLiveGatewaysSet = [];
         private List<SiloAddress> knownGateways = [];
@@ -51,6 +53,8 @@ namespace Orleans.Messaging
             ConnectionManager connectionManager,
             [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider)
         {
+            // Refresh continuations can observe shutdown after the source has been disposed.
+            this.shutdownToken = this.shutdown.Token;
             this.gatewayOptions = gatewayOptions.Value;
             this.logger = loggerFactory.CreateLogger<GatewayManager>();
             this.connectionManager = connectionManager;
@@ -100,6 +104,11 @@ namespace Orleans.Messaging
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
+            if (!shutdownToken.IsCancellationRequested)
+            {
+                await shutdown.CancelAsync();
+            }
+
             gatewayRefreshTimer.Dispose();
             if (gatewayRefreshTimerTask is { } task)
             {
@@ -261,10 +270,15 @@ namespace Orleans.Messaging
                 }
 
                 // the listProvider.GetGateways() is not under lock.
-                var allGateways = await gatewayListProvider.GetGateways();
+                shutdownToken.ThrowIfCancellationRequested();
+                var allGateways = await gatewayListProvider.GetGateways().WaitAsync(shutdownToken);
                 var refreshedGateways = allGateways.Select(gw => gw.ToGatewayAddress()!).ToList();
 
                 await UpdateLiveGatewaysSnapshot(refreshedGateways, gatewayListProvider.MaxStaleness);
+            }
+            catch (OperationCanceledException) when (shutdownToken.IsCancellationRequested)
+            {
+                // The gateway provider owns its lookup; shutdown releases this manager's refresh wait.
             }
             catch (Exception exc)
             {
@@ -391,7 +405,13 @@ namespace Orleans.Messaging
 
         public void Dispose()
         {
+            if (!shutdownToken.IsCancellationRequested)
+            {
+                shutdown.Cancel();
+            }
+
             this.gatewayRefreshTimer.Dispose();
+            shutdown.Dispose();
         }
 
         [LoggerMessage(
