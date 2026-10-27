@@ -381,6 +381,48 @@ namespace DefaultCluster.Tests.General
             Assert.Throws<ArgumentException>(() => this.Client.CreateObjectReference<ISimpleGrainObserver>(reference));
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact, TestCategory("BVT")]
+        public async Task ObserverTest_CallDeletedObserver_ThrowsObserverNotReachableException()
+        {
+            TestInitialize();
+
+            var result = new AsyncResultHandle();
+            var cancellationToken = TestContext.Current.CancellationToken;
+            Exception? exception = null;
+
+            this.observer1 = new SimpleGrainObserver(null, null, this.Logger);
+
+            var observerRef = this.GrainFactory.CreateObjectReference<IPingableGrainObserver>(this.observer1);
+
+            await observerRef.Ping();
+
+            this.GrainFactory.DeleteObjectReference<IPingableGrainObserver>(observerRef);
+
+            _ = Task.Run(async () =>
+            {
+                while (!result.Done)
+                {
+                    try
+                    {
+                        // We keep sending ping requests until the observer is deregistered, this will trigger the exception.
+                        await observerRef.Ping();
+                        await Task.Delay(20, cancellationToken); // Give the delete message time to propagate
+                    }
+                    catch (Exception ex)
+                    {
+                        exception = ex;
+                        result.Done = true;
+                    }
+                }
+            }, cancellationToken);
+
+            Assert.True(await result.WaitForFinished(timeout), $"Should not timeout waiting {timeout} for the exception.");
+            Assert.NotNull(exception);
+            Assert.IsType<ObserverNotReachableException>(exception);
+        }
+
         public class DummyObserverGrain : Grain, ISimpleGrainObserver
         {
             public void StateChanged(int a, int b) { }
@@ -391,11 +433,10 @@ namespace DefaultCluster.Tests.General
             public void StateChanged(int a, int b) { }
         }
 
-        internal class SimpleGrainObserver : ISimpleGrainObserver
+        internal class SimpleGrainObserver : ISimpleGrainObserver, IPingableGrainObserver
         {
             private readonly Action<int, int, AsyncResultHandle>? action;
             private readonly AsyncResultHandle? result;
-
             private readonly ILogger logger;
 
             public SimpleGrainObserver(Action<int, int, AsyncResultHandle>? action, AsyncResultHandle? result, ILogger logger)
@@ -410,6 +451,8 @@ namespace DefaultCluster.Tests.General
                 this.logger.LogDebug("SimpleGrainObserver.StateChanged a={A} b={B}", a, b);
                 action?.Invoke(a, b, result!);
             }
+
+            public Task Ping() => Task.CompletedTask;
         }
     }
 }
