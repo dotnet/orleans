@@ -62,13 +62,14 @@ namespace Orleans.Messaging
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!gatewayListProviderInitialized)
             {
-                await this.gatewayListProvider.InitializeGatewayListProvider();
+                await this.gatewayListProvider.InitializeGatewayListProvider().WaitAsync(cancellationToken);
                 gatewayListProviderInitialized = true;
             }
 
-            var knownGateways = await this.gatewayListProvider.GetGateways();
+            var knownGateways = await this.gatewayListProvider.GetGateways().WaitAsync(cancellationToken);
             if (knownGateways == null || knownGateways.Count == 0)
             {
                 // this situation can occur if the client starts faster than the silos.

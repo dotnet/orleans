@@ -69,13 +69,14 @@ namespace Orleans.Runtime
         public GrainManifest LocalGrainManifest { get; }
 
         /// <summary>
-        /// Starts this service.
+        /// Starts this service and waits for the initial cluster manifest.
         /// </summary>
+        /// <param name="cancellationToken">The token used to cancel the initialization wait.</param>
         /// <returns>A <see cref="Task"/> which completes once the service has started.</returns>
-        public Task StartAsync()
+        public Task StartAsync(CancellationToken cancellationToken)
         {
-            _runTask = Task.Run(RunAsync);
-            return _initialized.Task;
+            _runTask = Task.Run(RunAsync, CancellationToken.None);
+            return _initialized.Task.WaitAsync(cancellationToken);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage(
