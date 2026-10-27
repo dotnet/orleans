@@ -238,7 +238,9 @@ internal static class SourceGeneratorDiagnosticComparer
             return false;
         }
 
-        return string.Equals(left.Id, right.Id, StringComparison.Ordinal)
+        // A source location retains its syntax tree, so diagnostics from different trees cannot be reused after an edit.
+        return left.Location.Equals(right.Location)
+            && string.Equals(left.Id, right.Id, StringComparison.Ordinal)
             && left.Severity == right.Severity
             && left.WarningLevel == right.WarningLevel
             && string.Equals(left.ToString(), right.ToString(), StringComparison.Ordinal);
@@ -256,6 +258,7 @@ internal static class SourceGeneratorDiagnosticComparer
             var hash = StringComparer.Ordinal.GetHashCode(diagnostic.Id ?? string.Empty);
             hash = hash * 31 + (int)diagnostic.Severity;
             hash = hash * 31 + diagnostic.WarningLevel;
+            hash = hash * 31 + diagnostic.Location.GetHashCode();
             hash = hash * 31 + StringComparer.Ordinal.GetHashCode(diagnostic.ToString() ?? string.Empty);
             return hash;
         }

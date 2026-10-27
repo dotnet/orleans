@@ -282,7 +282,7 @@ internal static class ReferenceAssemblyModelExtractor
             {
                 INamedTypeSymbol namedType => CanReferenceNamedType(namedType)
                     && (namedType.ContainingType is null || CanReferenceType(namedType.ContainingType))
-                    && namedType.TypeArguments.All(CanReferenceType),
+                    && (namedType.IsUnboundGenericType || namedType.TypeArguments.All(CanReferenceType)),
                 IArrayTypeSymbol arrayType => CanReferenceType(arrayType.ElementType),
                 IPointerTypeSymbol pointerType => CanReferenceType(pointerType.PointedAtType),
                 _ => true,
