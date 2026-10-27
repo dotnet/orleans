@@ -147,6 +147,17 @@ namespace Orleans.Configuration
         public int? MaxDefunctSiloEntries { get; set; } = 25;
 
         /// <summary>
+        /// Gets or sets the minimum period for which dead silo entries are retained in the membership table.
+        /// Cleanup removes only dead entries whose latest startup, liveness, or suspect-vote timestamp is older than this period,
+        /// regardless of <see cref="DefunctSiloExpiration"/> and <see cref="MaxDefunctSiloEntries"/>.
+        /// Retaining recent dead entries lets a silo whose membership operations are delayed or retried, such as a joining
+        /// silo within <see cref="MaxJoinAttemptTime"/>, observe that it was declared dead.
+        /// This period should comfortably exceed <see cref="MaxJoinAttemptTime"/> and expected clock skew between silos.
+        /// </summary>
+        /// <value>Dead silo entries are retained for at least one hour by default.</value>
+        public TimeSpan DefunctSiloMinimumRetention { get; set; } = TimeSpan.FromHours(1);
+
+        /// <summary>
         /// Gets the period after which a silo's membership entry is considered stale if it has not updated its heartbeat in the membership table.
         /// </summary>
         internal TimeSpan AllowedIAmAliveMissPeriod => IAmAliveTablePublishTimeout.Multiply(NumMissedTableIAmAliveLimit);
