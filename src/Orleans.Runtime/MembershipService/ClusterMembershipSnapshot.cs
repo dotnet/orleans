@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Frozen;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Text;
 
@@ -31,12 +33,12 @@ namespace Orleans.Runtime
             ImmutableDictionary<SiloAddress, ClusterMember> members,
             MembershipVersion version,
             int minimumSiloGeneration,
-            ImmutableHashSet<SiloAddress>? recentlyDeadSilos = null)
+            IReadOnlySet<SiloAddress>? recentlyDeadSilos = null)
         {
             this.Members = members;
             this.Version = version;
             this.MinimumSiloGeneration = minimumSiloGeneration;
-            this.RecentlyDeadSilos = recentlyDeadSilos ?? ImmutableHashSet<SiloAddress>.Empty;
+            this.RecentlyDeadSilos = recentlyDeadSilos?.ToFrozenSet() ?? FrozenSet<SiloAddress>.Empty;
         }
 
         internal static ClusterMembershipSnapshot Default => new(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue);
@@ -63,7 +65,7 @@ namespace Orleans.Runtime
         internal int MinimumSiloGeneration { get; }
 
         [Id(3)]
-        internal ImmutableHashSet<SiloAddress> RecentlyDeadSilos { get; }
+        internal IReadOnlySet<SiloAddress> RecentlyDeadSilos { get; }
 
         internal bool IsSuccessorTo(ClusterMembershipSnapshot previous)
         {

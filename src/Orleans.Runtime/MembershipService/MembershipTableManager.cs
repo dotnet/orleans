@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -534,7 +535,7 @@ namespace Orleans.Runtime.MembershipService
 
             var observedLocalStatus = table.TryGet(this.myAddress)?.Item1.Status
                 ?? MembershipTableSnapshot.GetMissingSiloStatus(
-                    this.myAddress, 0, ImmutableHashSet<SiloAddress>.Empty, table.Members.Select(entry => entry.Item1.SiloAddress));
+                    this.myAddress, 0, FrozenSet<SiloAddress>.Empty, table.Members.Select(entry => entry.Item1.SiloAddress));
             if (this.TryProcessMembershipUpdate(
                 MembershipTableSnapshot.Update, table, caller, observedLocalStatus, new MembershipVersion(table.Version.Version)))
             {

@@ -1,4 +1,5 @@
 using AwesomeAssertions.Common;
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
@@ -17,6 +18,51 @@ namespace NonSilo.Tests.Membership
     [TestArea("Runtime")]
     public class MembershipTableSnapshotTests
     {
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public void Constructor_FreezesHistoryAndRetainsFixedAnswers(bool frozen, bool empty)
+        {
+            var live = Entry(Silo("127.0.0.1:100@1"), SiloStatus.Active);
+            var removed = Silo("127.0.0.1:200@11");
+            var predecessor = Silo("127.0.0.1:200@10");
+            var unknown = Silo("127.0.0.1:300@11");
+            var source = empty ? new HashSet<SiloAddress>() : new HashSet<SiloAddress> { removed };
+            IReadOnlySet<SiloAddress> history = frozen ? source.ToFrozenSet() : source;
+            var snapshot = new MembershipTableSnapshot(new MembershipVersion(7),
+                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(live.SiloAddress, live), 10, history);
+
+            source.Clear();
+            source.Add(unknown);
+
+            Assert.IsAssignableFrom<FrozenSet<SiloAddress>>(snapshot.RecentlyDeadSilos);
+            if (frozen)
+            {
+                Assert.Same(history, snapshot.RecentlyDeadSilos);
+            }
+
+            Assert.True(snapshot.RecentlyDeadSilos.SetEquals(empty ? [] : new[] { removed }));
+            Assert.Equal(empty ? SiloStatus.None : SiloStatus.Dead, snapshot.GetSiloStatus(removed));
+            Assert.Equal(empty ? SiloStatus.None : SiloStatus.Dead, snapshot.GetSiloStatus(predecessor));
+            Assert.Equal(SiloStatus.None, snapshot.GetSiloStatus(unknown));
+            Assert.Equal(SiloStatus.Active, snapshot.GetSiloStatus(live.SiloAddress));
+            Assert.Equal(SiloStatus.Dead, snapshot.GetSiloStatus(Silo("127.0.0.1:400@9")));
+        }
+
+        [Fact]
+        public void Constructor_NullHistoryIsFrozenAndEmpty()
+        {
+            var snapshot = new MembershipTableSnapshot(new MembershipVersion(7),
+                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty, 10, recentlyDeadSilos: null);
+
+            Assert.IsAssignableFrom<FrozenSet<SiloAddress>>(snapshot.RecentlyDeadSilos);
+            Assert.Empty(snapshot.RecentlyDeadSilos);
+            Assert.Equal(SiloStatus.Dead, snapshot.GetSiloStatus(Silo("127.0.0.1:100@9")));
+            Assert.Equal(SiloStatus.None, snapshot.GetSiloStatus(Silo("127.0.0.1:100@10")));
+        }
+
         [Theory]
         [InlineData(0, 1, SiloStatus.None)]
         [InlineData(10, -1, SiloStatus.None)]
@@ -87,17 +133,21 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.None, previous.GetSiloStatus(missing));
         }
 
-        [Fact]
-        public void Serialization_GossipSnapshotPreservesRetirementFloorAndRows()
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(32)]
+        public void Serialization_GossipSnapshotPreservesRetirementFloorAndRows(int historyCount)
         {
             using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
             var serializer = services.GetRequiredService<Serializer>();
             var live = Entry(Silo("127.0.0.1:100@1"), SiloStatus.Active, DateTimeOffset.UnixEpoch);
             var dead = Entry(Silo("127.0.0.1:200@10"), SiloStatus.Dead, DateTimeOffset.UnixEpoch);
-            var removed = Silo("127.0.0.1:400@11");
+            var history = Enumerable.Range(0, historyCount)
+                .Select(index => SiloAddress.New(System.Net.IPAddress.Loopback, 400 + index, 11)).ToFrozenSet();
             var snapshot = new MembershipTableSnapshot(new MembershipVersion(7),
                 ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(live.SiloAddress, live).Add(dead.SiloAddress, dead),
-                10, ImmutableHashSet.Create(removed));
+                10, history);
 
             var actual = serializer.Deserialize<MembershipTableSnapshot>(serializer.SerializeToArray(snapshot));
 
@@ -110,8 +160,25 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(DateTime.UnixEpoch, actual.Entries[live.SiloAddress].IAmAliveTime);
             Assert.Equal(SiloStatus.Dead, actual.GetSiloStatus(Silo("127.0.0.1:300@9")));
             Assert.Equal(SiloStatus.None, actual.GetSiloStatus(Silo("127.0.0.1:300@10")));
-            Assert.Equal(removed, Assert.Single(actual.RecentlyDeadSilos));
-            Assert.Equal(SiloStatus.Dead, actual.GetSiloStatus(removed));
+            Assert.IsAssignableFrom<FrozenSet<SiloAddress>>(actual.RecentlyDeadSilos);
+            Assert.True(actual.RecentlyDeadSilos.SetEquals(history));
+            Assert.All(history, removed =>
+            {
+                Assert.Equal(SiloStatus.Dead, actual.GetSiloStatus(removed));
+                Assert.Equal(SiloStatus.Dead, actual.GetSiloStatus(
+                    SiloAddress.New(removed.Endpoint.Address, removed.Endpoint.Port, 10)));
+            });
+
+            var localDeath = Silo("127.0.0.1:500@12");
+            var previous = new MembershipTableSnapshot(snapshot.Version, snapshot.Entries, 10,
+                new HashSet<SiloAddress> { localDeath });
+            var merged = MembershipTableSnapshot.Update(previous, actual);
+            Assert.True(merged.RecentlyDeadSilos.SetEquals(history.Append(localDeath)));
+            Assert.Equal(SiloStatus.Active, merged.GetSiloStatus(live.SiloAddress));
+            Assert.Equal(SiloStatus.Dead, merged.GetSiloStatus(localDeath));
+            Assert.Equal(localDeath, Assert.Single(previous.RecentlyDeadSilos));
+            Assert.True(actual.RecentlyDeadSilos.SetEquals(history));
+            Assert.Same(merged.RecentlyDeadSilos, MembershipTableSnapshot.Update(merged, actual).RecentlyDeadSilos);
         }
 
         [Theory]
@@ -154,18 +221,24 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(remembered, actual.IsSuccessorTo(previous));
         }
 
-        [Fact]
-        public void Update_GossipHistoryUnionsAndDropsPresentOrCoveredIdentities()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Update_GossipHistoryUnionsAndDropsPresentOrCoveredIdentities(bool frozen)
         {
             var existing = Silo("127.0.0.1:100@10");
             var learned = Silo("127.0.0.1:200@11");
             var covered = Silo("127.0.0.1:300@9");
             var live = Entry(Silo("127.0.0.1:400@1"), SiloStatus.Active);
+            var previousSource = new HashSet<SiloAddress> { existing };
+            var peerSource = new HashSet<SiloAddress> { learned, covered, live.SiloAddress };
+            IReadOnlySet<SiloAddress> previousHistory = frozen ? previousSource.ToFrozenSet() : previousSource;
+            IReadOnlySet<SiloAddress> peerHistory = frozen ? peerSource.ToFrozenSet() : peerSource;
             var previous = new MembershipTableSnapshot(new MembershipVersion(7),
                 ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(live.SiloAddress, live),
-                10, ImmutableHashSet.Create(existing));
+                10, previousHistory);
             var peer = new MembershipTableSnapshot(previous.Version, previous.Entries, 100,
-                ImmutableHashSet.Create(learned, covered, live.SiloAddress));
+                peerHistory);
 
             var actual = MembershipTableSnapshot.Update(previous, peer);
 
@@ -177,6 +250,58 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.Dead, actual.GetSiloStatus(covered));
             Assert.True(actual.IsSuccessorTo(previous));
             Assert.Equal(existing, Assert.Single(previous.RecentlyDeadSilos));
+            Assert.NotSame(previous.RecentlyDeadSilos, actual.RecentlyDeadSilos);
+            Assert.True(peer.RecentlyDeadSilos.SetEquals([learned, covered, live.SiloAddress]));
+            Assert.True(previousSource.SetEquals([existing]));
+            Assert.True(peerSource.SetEquals([learned, covered, live.SiloAddress]));
+        }
+
+        [Theory]
+        [InlineData(false, 0)]
+        [InlineData(false, 1)]
+        [InlineData(false, 32)]
+        [InlineData(true, 0)]
+        [InlineData(true, 1)]
+        [InlineData(true, 32)]
+        public void Update_UnchangedHistoryReusesSetForHeartbeatAdvance(bool fromPeer, int historyCount)
+        {
+            var live = Entry(Silo("127.0.0.1:100@1"), SiloStatus.Active, DateTimeOffset.UnixEpoch);
+            var history = Enumerable.Range(0, historyCount)
+                .Select(index => SiloAddress.New(System.Net.IPAddress.Loopback, 400 + index, 11)).ToFrozenSet();
+            var previous = new MembershipTableSnapshot(new MembershipVersion(7),
+                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(live.SiloAddress, live), 10, history);
+            var heartbeat = live.WithIAmAliveTime(DateTime.UnixEpoch.AddMinutes(1));
+            var updated = fromPeer
+                ? MembershipTableSnapshot.Update(previous, new MembershipTableSnapshot(previous.Version,
+                    previous.Entries.SetItem(live.SiloAddress, heartbeat), 10, history))
+                : MembershipTableSnapshot.Update(previous,
+                    new MembershipTableData(Tuple.Create(heartbeat, "live"), new TableVersion(7, "table")));
+
+            Assert.Same(previous.RecentlyDeadSilos, updated.RecentlyDeadSilos);
+            Assert.True(updated.RecentlyDeadSilos.SetEquals(history));
+            Assert.Equal(DateTime.UnixEpoch.AddMinutes(1), updated.Entries[live.SiloAddress].IAmAliveTime);
+            Assert.Equal(DateTime.UnixEpoch, previous.Entries[live.SiloAddress].IAmAliveTime);
+            Assert.Equal(SiloStatus.Active, updated.GetSiloStatus(live.SiloAddress));
+            Assert.True(updated.IsSuccessorTo(previous));
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void RetireGenerations_UncoveredHistoryReusesSet(bool empty)
+        {
+            var source = empty ? new HashSet<SiloAddress>() : new HashSet<SiloAddress> { Silo("127.0.0.1:100@10") };
+            var previous = new MembershipTableSnapshot(new MembershipVersion(7),
+                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty, 0, source);
+
+            var actual = previous.RetireGenerations(new DateTime(2022, 1, 1, 0, 0, 10, DateTimeKind.Utc), TimeSpan.Zero);
+
+            Assert.NotSame(previous, actual);
+            Assert.Same(previous.RecentlyDeadSilos, actual.RecentlyDeadSilos);
+            Assert.True(actual.RecentlyDeadSilos.SetEquals(source));
+            Assert.Equal(10, actual.MinimumSiloGeneration);
+            Assert.Equal(0, previous.MinimumSiloGeneration);
+            Assert.Equal(empty ? SiloStatus.None : SiloStatus.Dead, actual.GetSiloStatus(Silo("127.0.0.1:100@10")));
         }
 
         [Theory]
@@ -233,17 +358,21 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(10, snapshot.RetireGenerations(epoch.AddSeconds(10), TimeSpan.Zero).MinimumSiloGeneration);
         }
 
-        [Fact]
-        public void RetireGenerations_CompactsHistoryWithoutChangingRowsOrFixedAnswers()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void RetireGenerations_CompactsHistoryWithoutChangingRowsOrFixedAnswers(bool frozen)
         {
             var epoch = new DateTime(2022, 1, 1, 0, 0, 0, DateTimeKind.Utc);
             var covered = Silo("127.0.0.1:100@9");
             var boundary = Silo("127.0.0.1:200@10");
             var unknown = Silo("127.0.0.1:300@9");
             var live = Entry(Silo("127.0.0.1:400@1"), SiloStatus.Active);
+            var source = new HashSet<SiloAddress> { covered, boundary };
+            IReadOnlySet<SiloAddress> history = frozen ? source.ToFrozenSet() : source;
             var previous = new MembershipTableSnapshot(new MembershipVersion(7),
                 ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(live.SiloAddress, live),
-                0, ImmutableHashSet.Create(covered, boundary));
+                0, history);
 
             var actual = previous.RetireGenerations(epoch.AddHours(1).AddSeconds(10), TimeSpan.FromHours(1));
 
@@ -257,6 +386,9 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.None, previous.GetSiloStatus(unknown));
             Assert.Equal(0, previous.MinimumSiloGeneration);
             Assert.Equal(2, previous.RecentlyDeadSilos.Count);
+            Assert.NotSame(previous.RecentlyDeadSilos, actual.RecentlyDeadSilos);
+            Assert.True(previous.RecentlyDeadSilos.SetEquals([covered, boundary]));
+            Assert.True(source.SetEquals([covered, boundary]));
             Assert.True(actual.IsSuccessorTo(previous));
             Assert.False(previous.IsSuccessorTo(actual));
             Assert.Same(actual, actual.RetireGenerations(epoch, TimeSpan.Zero));

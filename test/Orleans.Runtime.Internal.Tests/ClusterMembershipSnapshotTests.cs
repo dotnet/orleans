@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,60 @@ namespace UnitTests;
 [TestCategory("BVT"), TestCategory("Membership")]
 public class ClusterMembershipSnapshotTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Constructor_FreezesHistoryAndRetainsFixedAnswers(bool frozen, bool empty)
+    {
+        var live = CreateSiloAddress(1);
+        var removed = CreateSiloAddress(11, port: 11112);
+        var predecessor = CreateSiloAddress(10, port: 11112);
+        var unknown = CreateSiloAddress(11, port: 11113);
+        var source = empty ? new HashSet<SiloAddress>() : new HashSet<SiloAddress> { removed };
+        IReadOnlySet<SiloAddress> history = frozen ? source.ToFrozenSet() : source;
+        var snapshot = new ClusterMembershipSnapshot(
+            ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(live, new ClusterMember(live, SiloStatus.Active, "live")),
+            new MembershipVersion(7), 10, history);
+
+        source.Clear();
+        source.Add(unknown);
+
+        Assert.IsAssignableFrom<FrozenSet<SiloAddress>>(snapshot.RecentlyDeadSilos);
+        if (frozen)
+        {
+            Assert.Same(history, snapshot.RecentlyDeadSilos);
+        }
+
+        Assert.True(snapshot.RecentlyDeadSilos.SetEquals(empty ? [] : new[] { removed }));
+        foreach (var seenAt in new[] { snapshot.Version, new MembershipVersion(8) })
+        {
+            Assert.Equal(empty ? SiloStatus.None : SiloStatus.Dead, snapshot.GetSiloStatus(removed, seenAt));
+            Assert.Equal(empty ? SiloStatus.None : SiloStatus.Dead, snapshot.GetSiloStatus(predecessor, seenAt));
+            Assert.Equal(SiloStatus.None, snapshot.GetSiloStatus(unknown, seenAt));
+            Assert.Equal(SiloStatus.Active, snapshot.GetSiloStatus(live, seenAt));
+            Assert.Equal(SiloStatus.Dead, snapshot.GetSiloStatus(CreateSiloAddress(9, port: 11114), seenAt));
+        }
+
+        Assert.Equal(empty ? SiloStatus.None : SiloStatus.Dead, snapshot.GetSiloStatus(removed));
+        Assert.Equal(empty ? SiloStatus.None : SiloStatus.Dead, snapshot.GetSiloStatus(predecessor));
+        Assert.Equal(SiloStatus.None, snapshot.GetSiloStatus(unknown));
+        Assert.Equal(SiloStatus.Active, snapshot.GetSiloStatus(live));
+    }
+
+    [Fact]
+    public void Constructor_NullHistoryIsFrozenAndEmpty()
+    {
+        var snapshot = new ClusterMembershipSnapshot(
+            ImmutableDictionary<SiloAddress, ClusterMember>.Empty, new MembershipVersion(7), 10, recentlyDeadSilos: null);
+
+        Assert.IsAssignableFrom<FrozenSet<SiloAddress>>(snapshot.RecentlyDeadSilos);
+        Assert.Empty(snapshot.RecentlyDeadSilos);
+        Assert.Equal(SiloStatus.Dead, snapshot.GetSiloStatus(CreateSiloAddress(9)));
+        Assert.Equal(SiloStatus.None, snapshot.GetSiloStatus(CreateSiloAddress(10)));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(10)]
@@ -130,7 +185,8 @@ public class ClusterMembershipSnapshotTests
 
         Assert.Equal(new MembershipVersion(7), snapshot.Version);
         Assert.Equal(10, snapshot.MinimumSiloGeneration);
-        Assert.Same(history, snapshot.RecentlyDeadSilos);
+        Assert.Same(table.RecentlyDeadSilos, snapshot.RecentlyDeadSilos);
+        Assert.Equal(removed, Assert.Single(snapshot.RecentlyDeadSilos));
         Assert.Equal(2, snapshot.Members.Count);
         Assert.Equal(SiloStatus.Active, snapshot.GetSiloStatus(live));
         Assert.Equal(SiloStatus.Dead, snapshot.GetSiloStatus(dead));
@@ -169,27 +225,40 @@ public class ClusterMembershipSnapshotTests
         Assert.Equal(SiloStatus.Dead, current.GetSiloStatus(dead));
     }
 
-    [Fact]
-    public void Serialization_PreservesLocalFloorAndRecentDeathHistory()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(32)]
+    public void Serialization_PreservesLocalFloorAndRecentDeathHistory(int historyCount)
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var serializer = services.GetRequiredService<Serializer>();
         var live = CreateSiloAddress(1);
-        var removed = CreateSiloAddress(11, port: 11112);
+        var history = Enumerable.Range(0, historyCount)
+            .Select(index => CreateSiloAddress(11, port: 11120 + index)).ToFrozenSet();
         var snapshot = new ClusterMembershipSnapshot(
             ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(live, new ClusterMember(live, SiloStatus.Active, "live")),
-            new MembershipVersion(7), 10, ImmutableHashSet.Create(removed));
+            new MembershipVersion(7), 10, history);
 
         var actual = serializer.Deserialize<ClusterMembershipSnapshot>(serializer.SerializeToArray(snapshot));
 
         Assert.NotNull(actual);
         Assert.Equal(new MembershipVersion(7), actual.Version);
         Assert.Equal(10, actual.MinimumSiloGeneration);
-        Assert.Equal(removed, Assert.Single(actual.RecentlyDeadSilos));
+        Assert.IsAssignableFrom<FrozenSet<SiloAddress>>(actual.RecentlyDeadSilos);
+        Assert.True(actual.RecentlyDeadSilos.SetEquals(history));
         Assert.Equal(live, Assert.Single(actual.Members).Key);
+        Assert.Equal("live", actual.Members[live].Name);
         Assert.Equal(SiloStatus.Active, actual.GetSiloStatus(live));
-        Assert.Equal(SiloStatus.Dead, actual.GetSiloStatus(removed));
+        Assert.All(history, removed =>
+        {
+            Assert.Equal(SiloStatus.Dead, actual.GetSiloStatus(removed));
+            Assert.Equal(SiloStatus.Dead, actual.GetSiloStatus(CreateSiloAddress(10, removed.Endpoint.Port)));
+            Assert.Equal(SiloStatus.Dead, actual.GetSiloStatus(removed, new MembershipVersion(8)));
+        });
+        Assert.Equal(SiloStatus.Dead, actual.GetSiloStatus(CreateSiloAddress(9, port: 11113)));
         Assert.Equal(SiloStatus.None, actual.GetSiloStatus(CreateSiloAddress(11, port: 11113)));
+        Assert.True(snapshot.RecentlyDeadSilos.SetEquals(history));
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -30,12 +31,13 @@ namespace Orleans.Runtime
             MembershipVersion version,
             ImmutableDictionary<SiloAddress, MembershipEntry> entries,
             int minimumSiloGeneration = 0,
-            ImmutableHashSet<SiloAddress>? recentlyDeadSilos = null)
+            IReadOnlySet<SiloAddress>? recentlyDeadSilos = null)
         {
             this.Version = version;
             this.Entries = entries;
             this.MinimumSiloGeneration = minimumSiloGeneration;
-            this.RecentlyDeadSilos = recentlyDeadSilos ?? ImmutableHashSet<SiloAddress>.Empty;
+            // Freeze caller-owned sets so published snapshots remain immutable.
+            this.RecentlyDeadSilos = recentlyDeadSilos?.ToFrozenSet() ?? FrozenSet<SiloAddress>.Empty;
         }
 
         /// <summary>
@@ -58,7 +60,7 @@ namespace Orleans.Runtime
             var version = (table.Version.Version == 0 && table.Version.VersionEtag == "0")
               ? MembershipVersion.MinValue
               : new MembershipVersion(table.Version.Version);
-            return Update(previousSnapshot, version, table.Members.Select(t => t.Item1), ImmutableHashSet<SiloAddress>.Empty);
+            return Update(previousSnapshot, version, table.Members.Select(t => t.Item1), FrozenSet<SiloAddress>.Empty);
         }
 
         /// <summary>
@@ -78,10 +80,10 @@ namespace Orleans.Runtime
             MembershipTableSnapshot previousSnapshot,
             MembershipVersion version,
             IEnumerable<MembershipEntry> updatedEntries,
-            ImmutableHashSet<SiloAddress> recentlyDeadSilos)
+            IReadOnlySet<SiloAddress> recentlyDeadSilos)
         {
             var entries = ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>();
-            var dead = previousSnapshot.RecentlyDeadSilos.ToBuilder();
+            var dead = new HashSet<SiloAddress>(previousSnapshot.RecentlyDeadSilos);
             dead.UnionWith(recentlyDeadSilos);
             foreach (var item in updatedEntries)
             {
@@ -129,9 +131,11 @@ namespace Orleans.Runtime
                 }
             }
 
-            var retainedDeaths = dead.ToImmutable();
-            retainedDeaths = retainedDeaths.Except(retainedDeaths.Where(silo => canonicalEntries.ContainsKey(silo)
-                || IsGenerationRetired(silo, previousSnapshot.MinimumSiloGeneration)));
+            dead.RemoveWhere(silo => canonicalEntries.ContainsKey(silo)
+                || IsGenerationRetired(silo, previousSnapshot.MinimumSiloGeneration));
+            var retainedDeaths = dead.SetEquals(previousSnapshot.RecentlyDeadSilos)
+                ? previousSnapshot.RecentlyDeadSilos
+                : dead.ToFrozenSet();
             return new MembershipTableSnapshot(
                 incomingIsOlder ? previousSnapshot.Version : version,
                 canonicalEntries,
@@ -152,7 +156,12 @@ namespace Orleans.Runtime
                 return this;
             }
 
-            var dead = RecentlyDeadSilos.Except(RecentlyDeadSilos.Where(silo => IsGenerationRetired(silo, minimum)));
+            var dead = RecentlyDeadSilos;
+            if (dead.Any(silo => IsGenerationRetired(silo, minimum)))
+            {
+                dead = dead.Where(silo => !IsGenerationRetired(silo, minimum)).ToFrozenSet();
+            }
+
             return new(Version, Entries, minimum, dead);
         }
 
@@ -178,7 +187,7 @@ namespace Orleans.Runtime
         /// Gets known dead identities retained separately from the canonical membership rows.
         /// </summary>
         [Id(3)]
-        public ImmutableHashSet<SiloAddress> RecentlyDeadSilos { get; }
+        public IReadOnlySet<SiloAddress> RecentlyDeadSilos { get; }
 
         /// <summary>
         /// Gets the number of active silos in this snapshot.
@@ -217,7 +226,7 @@ namespace Orleans.Runtime
         internal static SiloStatus GetMissingSiloStatus(
             SiloAddress silo,
             int minimumSiloGeneration,
-            ImmutableHashSet<SiloAddress> recentlyDeadSilos,
+            IReadOnlySet<SiloAddress> recentlyDeadSilos,
             IEnumerable<SiloAddress> members)
         {
             if (IsGenerationRetired(silo, minimumSiloGeneration) || recentlyDeadSilos.Contains(silo))
