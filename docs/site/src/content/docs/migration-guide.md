@@ -49,14 +49,12 @@ See the [metrics catalog](host/monitoring/metrics-catalog.md#grain-type-identity
 
 The ADO.NET MySQL scripts support MySQL 8.4 and MariaDB. Streaming procedures lock message batches before dequeueing, confirming, or evicting them, and apply the configured retry limit, eviction batch size, and dead-letter retention. Membership insertion advances the membership version only when a new silo row is inserted.
 
-For an existing database, run the migration for each provider in use from the release's `src/AdoNet` directory:
+For a new or existing database, run `src/AdoNet/Shared/MySQL-Main.sql`, then the canonical script for each provider in use from the same release:
 
-- Clustering: `Orleans.Clustering.AdoNet/Migrations/MySQL-Clustering-11.0.0.sql`.
-- Streaming: `Orleans.Streaming.AdoNet/Migrations/MySQL-Streaming-11.0.0.sql`.
+- Clustering: `src/AdoNet/Orleans.Clustering.AdoNet/MySQL-Clustering.sql`.
+- Streaming: `src/AdoNet/Orleans.Streaming.AdoNet/MySQL-Streaming.sql`.
 
-Schedule a maintenance window and stop all silos using the affected databases. Run each complete script with a MySQL-compatible client that supports `DELIMITER`, then restart the silos after every required script succeeds. The scripts preserve membership data, queued messages, and dead letters, and support repeated execution. Each procedure replacement commits through separate DDL statements; if execution is interrupted, rerun the complete script before restarting the silos.
-
-New databases use the release's `MySQL-Main.sql` and the provider's full setup script.
+Schedule a maintenance window and stop all silos using the affected databases. Run each complete script with a MySQL-compatible client that supports `DELIMITER`, then restart the silos after every required script succeeds. The scripts create missing tables and refresh the provider's procedures and query catalog while preserving membership data, message sequence numbers, queued messages, and dead letters. Each procedure replacement commits through separate DDL statements; if execution is interrupted, rerun the complete script before restarting the silos.
 
 ## Package version policy
 

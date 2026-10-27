@@ -1,5 +1,10 @@
+-- Creates or upgrades MySQL/MariaDB clustering tables, procedures, and queries. Run MySQL-Main.sql first.
+-- Stop all silos using this membership database before running the complete script, then restart them.
+-- Procedure replacement commits through separate DDL statements. If interrupted, rerun the complete script
+-- before restarting silos. Existing membership rows and versions are preserved.
+
 -- For each deployment, there will be only one (active) membership version table version column which will be updated periodically.
-CREATE TABLE OrleansMembershipVersionTable
+CREATE TABLE IF NOT EXISTS OrleansMembershipVersionTable
 (
     DeploymentId NVARCHAR(150) NOT NULL,
     Timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -9,7 +14,7 @@ CREATE TABLE OrleansMembershipVersionTable
 );
 
 -- Every silo instance has a row in the membership table.
-CREATE TABLE OrleansMembershipTable
+CREATE TABLE IF NOT EXISTS OrleansMembershipTable
 (
     DeploymentId NVARCHAR(150) NOT NULL,
     Address VARCHAR(45) NOT NULL,
@@ -41,7 +46,8 @@ VALUES
         AND Address = @Address
         AND Port = @Port
         AND Generation = @Generation;
-');
+')
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -62,7 +68,8 @@ VALUES
     );
 
     SELECT ROW_COUNT();
-');
+')
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -70,7 +77,10 @@ VALUES
     'InsertMembershipKey','
     call InsertMembershipKey(@DeploymentId, @Address, @Port, @Generation,
     @Version, @SiloName, @HostName, @Status, @ProxyPort, @StartTime, @IAmAliveTime);'
-);
+)
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
+
+DROP PROCEDURE IF EXISTS InsertMembershipKey;
 
 DELIMITER $$
 
@@ -173,7 +183,8 @@ VALUES
         AND m.Generation = @Generation AND @Generation IS NOT NULL;
 
     SELECT ROW_COUNT() > 0;
-');
+')
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -189,7 +200,8 @@ VALUES
         DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
         AND Status = @Status AND @Status IS NOT NULL
         AND ProxyPort > 0;
-');
+')
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -217,7 +229,8 @@ VALUES
         AND Generation = @Generation AND @Generation IS NOT NULL
     WHERE
         v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-');
+')
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -241,7 +254,8 @@ VALUES
         ON v.DeploymentId = m.DeploymentId
     WHERE
         v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-');
+')
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -251,7 +265,8 @@ VALUES
     WHERE DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
     DELETE FROM OrleansMembershipVersionTable
     WHERE DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-');
+')
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -264,7 +279,8 @@ VALUES
         AND StartTime < @IAmAliveTime
         AND COALESCE(SuspectTimes, '''') = ''''
         AND Status = 6;
-');
+')
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -275,4 +291,5 @@ VALUES
         AND Address = @Address AND Port = @Port AND Generation = @Generation
         AND IAmAliveTime = @IAmAliveTime AND StartTime = @StartTime
         AND CAST(COALESCE(SuspectTimes, '''') AS BINARY) = CAST(COALESCE(@SuspectTimes, '''') AS BINARY);
-');
+')
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);

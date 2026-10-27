@@ -1,4 +1,9 @@
-CREATE TABLE OrleansStreamMessageSequence
+-- Creates or upgrades MySQL/MariaDB streaming tables, procedures, and queries. Run MySQL-Main.sql first.
+-- Stop all silos using this streaming database before running the complete script, then restart them.
+-- Procedure replacement commits through separate DDL statements. If interrupted, rerun the complete script
+-- before restarting silos. Existing queued messages, sequence numbers, and dead letters are preserved.
+
+CREATE TABLE IF NOT EXISTS OrleansStreamMessageSequence
 (
     MessageId BIGINT NOT NULL
 );
@@ -6,9 +11,7 @@ INSERT INTO OrleansStreamMessageSequence
 SELECT 0
 WHERE NOT EXISTS (SELECT * FROM OrleansStreamMessageSequence);
 
-DELIMITER $$
-
-CREATE TABLE OrleansStreamMessage
+CREATE TABLE IF NOT EXISTS OrleansStreamMessage
 (
 	/* Identifies the application */
 	ServiceId NVARCHAR(150) NOT NULL,
@@ -44,9 +47,7 @@ CREATE TABLE OrleansStreamMessage
 	PRIMARY KEY (ServiceId, ProviderId, QueueId, MessageId)
 );
 
-DELIMITER $$
-
-CREATE TABLE OrleansStreamDeadLetter
+CREATE TABLE IF NOT EXISTS OrleansStreamDeadLetter
 (
 	/* Identifies the application */
 	ServiceId NVARCHAR(150) NOT NULL,
@@ -88,9 +89,7 @@ CREATE TABLE OrleansStreamDeadLetter
 	PRIMARY KEY (ServiceId, ProviderId, QueueId, MessageId)
 );
 
-DELIMITER $$
-
-CREATE TABLE OrleansStreamControl
+CREATE TABLE IF NOT EXISTS OrleansStreamControl
 (
 	/* Identifies the application */
 	ServiceId NVARCHAR(150) NOT NULL,
@@ -107,6 +106,8 @@ CREATE TABLE OrleansStreamControl
     /* Each row represents a flat configuration object for an individual queue */
 	PRIMARY KEY (ServiceId, ProviderId, QueueId)
 );
+
+DROP PROCEDURE IF EXISTS QueueStreamMessage;
 
 DELIMITER $$
 
@@ -162,18 +163,23 @@ SELECT
     _QueueId AS QueueId,
     _MessageId AS MessageId;
 
-END;
+END$$
 
-DELIMITER $$
+DELIMITER ;
 
 INSERT INTO OrleansQuery
 (
 	QueryKey,
 	QueryText
 )
-SELECT
+VALUES
+(
 	'QueueStreamMessageKey',
 	'CALL QueueStreamMessage(@ServiceId, @ProviderId, @QueueId, @Payload, @ExpiryTimeout)'
+)
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
+
+DROP PROCEDURE IF EXISTS GetStreamMessages;
 
 DELIMITER $$
 
@@ -334,18 +340,23 @@ DROP TEMPORARY TABLE _Batch;
 
 COMMIT;
 
-END;
+END$$
 
-DELIMITER $$
+DELIMITER ;
 
 INSERT INTO OrleansQuery
 (
 	QueryKey,
 	QueryText
 )
-SELECT
+VALUES
+(
 	'GetStreamMessagesKey',
-	'CALL GetStreamMessages(@ServiceId, @ProviderId, @QueueId, @MaxCount, @MaxAttempts, @VisibilityTimeout, @RemovalTimeout, @EvictionInterval, @EvictionBatchSize)';
+	'CALL GetStreamMessages(@ServiceId, @ProviderId, @QueueId, @MaxCount, @MaxAttempts, @VisibilityTimeout, @RemovalTimeout, @EvictionInterval, @EvictionBatchSize)'
+)
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
+
+DROP PROCEDURE IF EXISTS ConfirmStreamMessages;
 
 DELIMITER $$
 
@@ -473,18 +484,23 @@ DROP TEMPORARY TABLE _Batch;
 DROP TEMPORARY TABLE _ItemsTable;
 
 COMMIT;
-END;
+END$$
 
-DELIMITER $$
+DELIMITER ;
 
 INSERT INTO OrleansQuery
 (
 	QueryKey,
 	QueryText
 )
-SELECT
+VALUES
+(
 	'ConfirmStreamMessagesKey',
-	'CALL ConfirmStreamMessages(@ServiceId, @ProviderId, @QueueId, @Items)';
+	'CALL ConfirmStreamMessages(@ServiceId, @ProviderId, @QueueId, @Items)'
+)
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
+
+DROP PROCEDURE IF EXISTS FailStreamMessage;
 
 DELIMITER $$
 
@@ -572,18 +588,23 @@ IF ROW_COUNT() = 0 THEN
 
 END IF;
 
-END;
+END$$
 
-DELIMITER $$
+DELIMITER ;
 
 INSERT INTO OrleansQuery
 (
 	QueryKey,
 	QueryText
 )
-SELECT
+VALUES
+(
 	'FailStreamMessageKey',
 	'CALL FailStreamMessage(@ServiceId, @ProviderId, @QueueId, @MessageId, @MaxAttempts, @RemovalTimeout)'
+)
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
+
+DROP PROCEDURE IF EXISTS EvictStreamMessages;
 
 DELIMITER $$
 
@@ -690,19 +711,23 @@ DROP TEMPORARY TABLE _Batch;
 
 COMMIT;
 
-END;
+END$$
 
-DELIMITER $$
+DELIMITER ;
 
 INSERT INTO OrleansQuery
 (
 	QueryKey,
 	QueryText
 )
-SELECT
+VALUES
+(
 	'EvictStreamMessagesKey',
 	'CALL EvictStreamMessages(@ServiceId, @ProviderId, @QueueId, @BatchSize, @MaxAttempts, @RemovalTimeout)'
-;
+)
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
+
+DROP PROCEDURE IF EXISTS EvictStreamDeadLetters;
 
 DELIMITER $$
 
@@ -758,18 +783,18 @@ INNER JOIN _Batch AS B
 
 DROP TEMPORARY TABLE _Batch;
 
-END;
+END$$
 
-DELIMITER $$
+DELIMITER ;
 
 INSERT INTO OrleansQuery
 (
 	QueryKey,
 	QueryText
 )
-SELECT
+VALUES
+(
 	'EvictStreamDeadLettersKey',
 	'CALL EvictStreamDeadLetters(@ServiceId, @ProviderId, @QueueId, @BatchSize)'
-;
-
-DELIMITER $$
+)
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
