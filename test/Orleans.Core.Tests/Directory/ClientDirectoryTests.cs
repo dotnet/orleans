@@ -117,6 +117,103 @@ namespace NonSilo.Tests.Directory
             return services.BuildServiceProvider().GetRequiredService<SchedulerInstruments>();
         }
 
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task SameVersionRetirement_RemovesCachedRoutesAndRejectsDelayedUpdates(bool useRecentDeathHistory, bool getRoutesFirst)
+        {
+            var retired = Silo("127.0.0.1:222@10");
+            var oldLive = Silo("127.0.0.1:333@1");
+            var retiredClient = Client("retired-route");
+            var liveClient = Client("old-live-route");
+            _clusterMembershipService.UpdateSiloStatus(retired, SiloStatus.Active, "retired");
+            _clusterMembershipService.UpdateSiloStatus(oldLive, SiloStatus.Active, "old-live");
+            var routes = ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty
+                .Add(retired, (ImmutableHashSet.Create(retiredClient), 1))
+                .Add(oldLive, (ImmutableHashSet.Create(liveClient), 1));
+            await _directory.OnUpdateClientRoutes(routes, TestContext.Current.CancellationToken);
+            Assert.True(_directory.TryLocalLookup(retiredClient, out _));
+            Assert.True(_directory.TryLocalLookup(liveClient, out _));
+            var previous = _clusterMembershipService.Target.CurrentSnapshot;
+            var pruned = new ClusterMembershipSnapshot(previous.Members.Remove(retired), new MembershipVersion(previous.Version.Value + 1));
+            _clusterMembershipService.PublishSnapshot(pruned);
+            // Unknown is not itself death evidence for a client route.
+            Assert.True(_directory.TryLocalLookup(retiredClient, out _));
+            var retiredView = new ClusterMembershipSnapshot(pruned.Members, pruned.Version,
+                useRecentDeathHistory ? 0 : 11,
+                useRecentDeathHistory ? ImmutableHashSet.Create(retired) : ImmutableHashSet<SiloAddress>.Empty);
+
+            _clusterMembershipService.PublishSnapshot(retiredView);
+
+            if (getRoutesFirst)
+            {
+                var refreshed = await _directory.GetClientRoutes(
+                    ImmutableDictionary<SiloAddress, long>.Empty, TestContext.Current.CancellationToken);
+                Assert.DoesNotContain(retired, refreshed.Keys);
+                Assert.Contains(oldLive, refreshed.Keys);
+            }
+
+            Assert.False(_directory.TryLocalLookup(retiredClient, out var removedRoutes));
+            Assert.Null(removedRoutes);
+            Assert.True(_directory.TryLocalLookup(liveClient, out var retainedRoutes));
+            Assert.Equal(Gateway.GetClientActivationAddress(liveClient, oldLive), Assert.Single(retainedRoutes!));
+            var delayed = routes.SetItem(retired, (ImmutableHashSet.Create(retiredClient), 2));
+            await _directory.OnUpdateClientRoutes(delayed, TestContext.Current.CancellationToken);
+            Assert.False(_directory.TryLocalLookup(retiredClient, out _));
+            var advertised = await _directory.GetClientRoutes(
+                ImmutableDictionary<SiloAddress, long>.Empty, TestContext.Current.CancellationToken);
+            Assert.DoesNotContain(retired, advertised.Keys);
+            Assert.Contains(oldLive, advertised.Keys);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(10)]
+        public async Task PrunedSuccessor_RejectsDelayedPredecessorRoutes(int floor)
+        {
+            var predecessor = Silo("127.0.0.1:222@10");
+            var successor = Silo("127.0.0.1:222@11");
+            var predecessorClient = Client("predecessor-route");
+            var unknown = Silo("127.0.0.1:333@12");
+            var unknownClient = Client("unknown-route");
+            _clusterMembershipService.UpdateSiloStatus(predecessor, SiloStatus.Active, "predecessor");
+            var routes = ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty
+                .Add(predecessor, (ImmutableHashSet.Create(predecessorClient), 1))
+                .Add(unknown, (ImmutableHashSet.Create(unknownClient), 1));
+            await _directory.OnUpdateClientRoutes(routes, TestContext.Current.CancellationToken);
+            Assert.True(_directory.TryLocalLookup(predecessorClient, out _));
+            Assert.True(_directory.TryLocalLookup(unknownClient, out _));
+            var previous = _clusterMembershipService.Target.CurrentSnapshot;
+            var members = previous.Members.Remove(predecessor)
+                .Add(successor, new ClusterMember(successor, SiloStatus.Active, "successor"));
+            var active = new ClusterMembershipSnapshot(members, new MembershipVersion(previous.Version.Value + 1), floor);
+            _clusterMembershipService.PublishSnapshot(active);
+            Assert.False(_directory.TryLocalLookup(predecessorClient, out _));
+            var dead = new ClusterMembershipSnapshot(
+                members.SetItem(successor, new ClusterMember(successor, SiloStatus.Dead, "successor")),
+                new MembershipVersion(active.Version.Value + 1), floor);
+            var history = new ClusterMembershipSnapshot(dead.Members.Remove(successor), dead.Version,
+                floor, ImmutableHashSet.Create(successor));
+            var compacted = new ClusterMembershipSnapshot(history.Members, history.Version, 12);
+
+            foreach (var snapshot in new[] { dead, history, compacted })
+            {
+                _clusterMembershipService.PublishSnapshot(snapshot);
+                Assert.Equal(SiloStatus.Dead, snapshot.GetSiloStatus(predecessor));
+                await _directory.OnUpdateClientRoutes(routes.SetItem(predecessor, (ImmutableHashSet.Create(predecessorClient), 2)),
+                    TestContext.Current.CancellationToken);
+                Assert.False(_directory.TryLocalLookup(predecessorClient, out var removedRoutes));
+                Assert.Null(removedRoutes);
+                Assert.True(_directory.TryLocalLookup(unknownClient, out var retainedRoutes));
+                Assert.Equal(Gateway.GetClientActivationAddress(unknownClient, unknown), Assert.Single(retainedRoutes!));
+                var advertised = await _directory.GetClientRoutes(ImmutableDictionary<SiloAddress, long>.Empty, TestContext.Current.CancellationToken);
+                Assert.DoesNotContain(predecessor, advertised.Keys);
+                Assert.Contains(unknown, advertised.Keys);
+            }
+        }
+
         private static CatalogInstruments CreateCatalogInstruments()
         {
             var services = new ServiceCollection();

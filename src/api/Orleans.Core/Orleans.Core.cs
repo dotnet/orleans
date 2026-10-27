@@ -455,6 +455,8 @@ namespace Orleans.Configuration
 
         public System.TimeSpan DefunctSiloExpiration { get { throw null; } set { } }
 
+        public System.TimeSpan DefunctSiloMinimumRetention { get { throw null; } set { } }
+
         public bool EnableConnectionLivenessCheck { get { throw null; } set { } }
 
         public bool EnableIndirectProbes { get { throw null; } set { } }
@@ -486,6 +488,8 @@ namespace Orleans.Configuration
         public int NumVotesForDeathDeclaration { get { throw null; } set { } }
 
         public System.TimeSpan ProbeTimeout { get { throw null; } set { } }
+
+        public System.TimeSpan? SiloGenerationRetirementAge { get { throw null; } set { } }
 
         public System.TimeSpan TableRefreshTimeout { get { throw null; } set { } }
 
