@@ -10,11 +10,11 @@
     Project="$(MSBuildThisFileDirectory)src/Orleans.Core/build/Microsoft.Orleans.Core.targets" />
 
   <ItemGroup>
-    <!-- Enable code generator -->
+    <!-- Preserve NuGet dependencies while keeping analyzer assemblies out of copy-local outputs. -->
     <ProjectReference
       Include="$(SourceRoot)src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj"
       OutputItemType="Analyzer"
-      ReferenceOutputAssembly="false"
+      Private="false"
       PrivateAssets="None"
       Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
     <ProjectReference
@@ -32,7 +32,7 @@
       UndefineProperties="TargetFramework"
       SkipGetTargetFrameworkProperties="true"
       OutputItemType="Analyzer"
-      ReferenceOutputAssembly="false"
+      Private="false"
       PrivateAssets="None"
       Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and '$(EnableOrleansContractsAnalyzer)' == 'true' "/>
   </ItemGroup>
