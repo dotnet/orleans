@@ -26,6 +26,9 @@
     <InternalsVisibleTo Include="Benchmarks" />
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
     <InternalsVisibleTo Include="LoadTestGrains" />
+    <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks" />
+    <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks.Tests" />
+    <InternalsVisibleTo Include="Microsoft.Orleans.DurableTasks.IntegrationTests" />
     <InternalsVisibleTo Include="Orleans.AdoNet.Tests" />
     <InternalsVisibleTo Include="Orleans.AWS.Tests" />
     <InternalsVisibleTo Include="Orleans.Azure.Tests" />
