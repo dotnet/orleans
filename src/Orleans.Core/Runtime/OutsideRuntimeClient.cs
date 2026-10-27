@@ -162,6 +162,11 @@ namespace Orleans
                 // The client lifecycle starts after this method, so cancellation here owns network cleanup.
                 await StopObserverInvocationsAsync().ConfigureAwait(false);
                 await ServiceProvider.GetRequiredService<ConnectionManager>().Close(CancellationToken.None).ConfigureAwait(false);
+                if (MessageCenter is null)
+                {
+                    await ServiceProvider.GetRequiredService<GatewayManager>().StopAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+
                 await StopAsync(CancellationToken.None).ConfigureAwait(false);
                 throw;
             }
@@ -193,10 +198,6 @@ namespace Orleans
             if (MessageCenter is { } messageCenter)
             {
                 await messageCenter.StopAsync(cancellationToken);
-            }
-            else
-            {
-                await ServiceProvider.GetRequiredService<GatewayManager>().StopAsync(cancellationToken);
             }
 
             if (_manifestProvider is { } provider)
