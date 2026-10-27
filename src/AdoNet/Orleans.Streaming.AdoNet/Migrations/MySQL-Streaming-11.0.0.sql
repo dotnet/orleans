@@ -1,4 +1,7 @@
--- Run this migration for upgrading the MySQL streaming procedures for deployments created before 10.5.0.
+-- Run this migration for upgrading the MySQL streaming procedures for deployments created before 11.0.0.
+-- Stop all silos using this streaming database before running the script, and restart them after it completes.
+-- Procedure replacement uses separate DDL statements which commit independently. If interrupted, rerun the
+-- complete script before restarting silos. Existing queued messages and dead letters are preserved.
 -- MySQL 8.4 rejects CREATE TEMPORARY TABLE ... SELECT ... FOR UPDATE, so these procedures now create their
 -- batch table first and fill it with a separate locking INSERT ... SELECT.
 -- GetStreamMessages also passes its eviction batch size, max attempts and removal timeout to EvictStreamMessages

@@ -1,4 +1,7 @@
--- Run this migration for upgrading the MySQL clustering procedures for deployments created before 10.5.0.
+-- Run this migration for upgrading the MySQL clustering procedures for deployments created before 11.0.0.
+-- Stop all silos using this membership database before running the script, and restart them after it completes.
+-- Procedure replacement uses separate DDL statements which commit independently. If interrupted, rerun the
+-- complete script before restarting silos. Existing membership rows and versions are preserved.
 -- MySQL 8.4 does not evaluate ROW_COUNT() in a WHERE clause as the count of the preceding statement, so
 -- InsertMembershipKey could report a duplicate silo insert as successful and advance the membership version.
 

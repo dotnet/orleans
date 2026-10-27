@@ -45,6 +45,19 @@ The shutdown counter retains its historical additional event for each nonempty c
 
 See the [metrics catalog](host/monitoring/metrics-catalog.md#grain-type-identity-and-aggregation) for units, lifecycle outcomes, population scopes, and aggregation.
 
+## MySQL provider scripts in Orleans 11.0.0-preview.1
+
+The ADO.NET MySQL scripts support MySQL 8.4 and MariaDB. Streaming procedures lock message batches before dequeueing, confirming, or evicting them, and apply the configured retry limit, eviction batch size, and dead-letter retention. Membership insertion advances the membership version only when a new silo row is inserted.
+
+For an existing database, run the migration for each provider in use from the release's `src/AdoNet` directory:
+
+- Clustering: `Orleans.Clustering.AdoNet/Migrations/MySQL-Clustering-11.0.0.sql`.
+- Streaming: `Orleans.Streaming.AdoNet/Migrations/MySQL-Streaming-11.0.0.sql`.
+
+Schedule a maintenance window and stop all silos using the affected databases. Run each complete script with a MySQL-compatible client that supports `DELIMITER`, then restart the silos after every required script succeeds. The scripts preserve membership data, queued messages, and dead letters, and support repeated execution. Each procedure replacement commits through separate DDL statements; if execution is interrupted, rerun the complete script before restarting the silos.
+
+New databases use the release's `MySQL-Main.sql` and the provider's full setup script.
+
 ## Package version policy
 
 Keep all `Microsoft.Orleans.*` packages on the same 10.x patch. For solutions that use NuGet Central Package Management, declare the versions in `Directory.Packages.props` and omit versions from project-level `PackageReference` items. Don't copy old provider dependency versions from migration examples; select a current version that is supported by your target runtime and provider.

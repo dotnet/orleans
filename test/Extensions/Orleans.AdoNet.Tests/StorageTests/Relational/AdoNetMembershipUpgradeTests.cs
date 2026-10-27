@@ -53,7 +53,7 @@ public sealed class AdoNetMembershipUpgradeTests
     // The migration runs twice, as users run it, to show that repeating it leaves an upgraded database working.
     [Fact]
     [TestProvider("MySql")]
-    public async Task MySql_Migration_10_5_0_RejectsDuplicateInsert()
+    public async Task MySql_Migration_11_0_0_RejectsDuplicateInsert()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var fixturePath = Path.Combine(AppContext.BaseDirectory, "MembershipUpgradeFixtures", "MySQL-Clustering.sql");
@@ -66,7 +66,7 @@ public sealed class AdoNetMembershipUpgradeTests
             $"MembershipMigration_{Guid.NewGuid():N}",
             cancellationToken: cancellationToken,
             setupSqlScriptFileNames: [Path.Combine(AppContext.BaseDirectory, "MySQL-Main.sql"), fixturePath]);
-        var migration = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "MySQL-Clustering-10.5.0.sql"), cancellationToken);
+        var migration = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "MySQL-Clustering-11.0.0.sql"), cancellationToken);
         await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, migration, cancellationToken);
         await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, migration, cancellationToken);
         using var services = new ServiceCollection().BuildServiceProvider();

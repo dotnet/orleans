@@ -21,7 +21,7 @@ public sealed class AdoNetStreamingMigrationTests
 
     [Fact]
     [TestProvider("MySql")]
-    public async Task MySql_Migration_10_5_0_UpgradesStreamProcedures()
+    public async Task MySql_Migration_11_0_0_UpgradesStreamProcedures()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var (database, queries) = await CreateMigratedDatabaseAsync(cancellationToken);
@@ -62,7 +62,7 @@ public sealed class AdoNetStreamingMigrationTests
     /// </remarks>
     [Fact]
     [TestProvider("MySql")]
-    public async Task MySql_Migration_10_5_0_EvictsByRetryLimitAndBatchSize()
+    public async Task MySql_Migration_11_0_0_EvictsByRetryLimitAndBatchSize()
     {
         const int maxAttempts = 2;
         const int evictionBatchSize = 3;
@@ -102,7 +102,7 @@ public sealed class AdoNetStreamingMigrationTests
     }
 
     // src/AdoNet/Orleans.Streaming.AdoNet/MySQL-Streaming.sql from 845672b8d84813859aa54245efd0eebb8f0233e2,
-    // the last script before the 10.5.0 migration. The hash normalizes checkout line endings.
+    // the last script before the 11.0.0 migration. The hash normalizes checkout line endings.
     private static async Task<(RelationalStorageForTesting Database, RelationalOrleansQueries Queries)> CreateMigratedDatabaseAsync(CancellationToken cancellationToken)
     {
         var fixturePath = Path.Combine(AppContext.BaseDirectory, "StreamingUpgradeFixtures", "MySQL-Streaming.sql");
@@ -118,7 +118,7 @@ public sealed class AdoNetStreamingMigrationTests
             setupSqlScriptFileNames: [Path.Combine(AppContext.BaseDirectory, "MySQL-Main.sql"), fixturePath]);
 
         // The migration runs twice, as users run it, to show that repeating it leaves an upgraded database working.
-        var migration = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "MySQL-Streaming-10.5.0.sql"), cancellationToken);
+        var migration = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "MySQL-Streaming-11.0.0.sql"), cancellationToken);
         await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, migration, cancellationToken);
         await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, migration, cancellationToken);
         var queries = await RelationalOrleansQueries.CreateInstance(AdoNetInvariants.InvariantNameMySql, database.CurrentConnectionString);
