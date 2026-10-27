@@ -535,7 +535,7 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
         Assert.Equal("ORLEANS0116", Assert.Single(first.Diagnostics).Id);
 
         var unrelatedChange = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(
-            "public sealed class Unrelated { }", parseOptions));
+            "public sealed class Unrelated { }", parseOptions, cancellationToken: TestContext.Current.CancellationToken));
         driver = driver.RunGenerators(unrelatedChange, TestContext.Current.CancellationToken);
         var second = Assert.Single(driver.GetRunResult().Results);
         Assert.Equal(first.Diagnostics.Select(static diagnostic => diagnostic.ToString()),
