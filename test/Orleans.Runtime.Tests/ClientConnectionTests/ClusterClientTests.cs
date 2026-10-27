@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
@@ -172,6 +173,67 @@ namespace Tester.ClientConnectionTests
         }
 
         [Fact]
+        public async Task StartAsync_CancellationDuringGatewayRefresh_CancelsStartupAndManifestFetch()
+        {
+            var gateways = await HostedCluster.Client!.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var clusterOptions = HostedCluster.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value;
+            var provider = new RefreshingGatewayListProvider(gateways);
+            var clock = new FakeTimeProvider();
+            var manifestRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var manifestRequestCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var cancellation = new CancellationTokenSource();
+            using var host = new HostBuilder()
+                .UseOrleansClient(builder => builder
+                    .UseLocalhostClustering(clusterId: clusterOptions.ClusterId, serviceId: clusterOptions.ServiceId)
+                    .Configure<GatewayOptions>(options => options.GatewayListRefreshPeriod = TimeSpan.FromSeconds(1))
+                    .ConfigureServices(services =>
+                    {
+                        services.AddSingleton<IGatewayListProvider>(provider);
+                        services.AddKeyedSingleton<TimeProvider>(TimeProviderNames.Messaging, clock);
+                    })
+                    .AddOutgoingGrainCallFilter(async context =>
+                    {
+                        if (context.InterfaceName.Contains(nameof(IClusterManifestSystemTarget), StringComparison.Ordinal))
+                        {
+                            manifestRequested.TrySetResult();
+                            try
+                            {
+                                await Task.Delay(Timeout.InfiniteTimeSpan, context.Request.GetCancellationToken());
+                            }
+                            finally
+                            {
+                                manifestRequestCompleted.TrySetResult();
+                            }
+                        }
+                        else
+                        {
+                            await context.Invoke();
+                        }
+                    }))
+                .Build();
+
+            var start = host.StartAsync(cancellation.Token);
+            try
+            {
+                await manifestRequested.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                clock.Advance(TimeSpan.FromSeconds(1));
+                await provider.RefreshEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                cancellation.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+                await manifestRequestCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.True(start.IsCanceled);
+                Assert.False(provider.Release.Task.IsCompleted);
+                AssertConnectionsClosed(host);
+                using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await host.StopAsync(shutdown.Token);
+            }
+            finally
+            {
+                provider.Release.TrySetResult();
+            }
+        }
+
+        [Fact]
         public async Task StartAsync_CancellationWhileWaitingForRetryFilter_CancelsStartup()
         {
             var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -269,6 +331,27 @@ namespace Tester.ClientConnectionTests
                 {
                     Completed.TrySetResult();
                 }
+            }
+        }
+
+        private sealed class RefreshingGatewayListProvider(IList<Uri> gateways) : IGatewayListProvider
+        {
+            private int _calls;
+            public TaskCompletionSource RefreshEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public TimeSpan MaxStaleness => TimeSpan.FromHours(1);
+            public bool IsUpdatable => true;
+            public Task InitializeGatewayListProvider() => Task.CompletedTask;
+
+            public async Task<IList<Uri>> GetGateways()
+            {
+                if (Interlocked.Increment(ref _calls) > 1)
+                {
+                    RefreshEntered.TrySetResult();
+                    await Release.Task;
+                }
+
+                return gateways;
             }
         }
 
