@@ -10,13 +10,15 @@
     Project="$(MSBuildThisFileDirectory)src/Orleans.Core/build/Microsoft.Orleans.Core.targets" />
 
   <ItemGroup>
-    <!-- Preserve NuGet dependencies while keeping analyzer assemblies out of copy-local outputs. -->
+    <!-- Packable projects retain analyzer dependencies while keeping their assemblies out of copy-local outputs. -->
     <ProjectReference
       Include="$(SourceRoot)src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj"
       OutputItemType="Analyzer"
-      Private="false"
       PrivateAssets="None"
-      Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
+      Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
+      <ReferenceOutputAssembly Condition="'$(IsPackable)' != 'true'">false</ReferenceOutputAssembly>
+      <Private Condition="'$(IsPackable)' == 'true'">false</Private>
+    </ProjectReference>
     <ProjectReference
       Include="$(SourceRoot)src/Orleans.Analyzers/Orleans.Analyzers.csproj"
       AssetTargetFallback="netstandard2.0"
@@ -32,9 +34,11 @@
       UndefineProperties="TargetFramework"
       SkipGetTargetFrameworkProperties="true"
       OutputItemType="Analyzer"
-      Private="false"
       PrivateAssets="None"
-      Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and '$(EnableOrleansContractsAnalyzer)' == 'true' "/>
+      Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and '$(EnableOrleansContractsAnalyzer)' == 'true' ">
+      <ReferenceOutputAssembly Condition="'$(IsPackable)' != 'true'">false</ReferenceOutputAssembly>
+      <Private Condition="'$(IsPackable)' == 'true'">false</Private>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup Condition="'$(IsTestingPlatformApplication)' == 'true'">
