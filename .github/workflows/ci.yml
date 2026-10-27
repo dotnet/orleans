@@ -92,6 +92,10 @@ jobs:
     - name: Pack and validate package compatibility
       if: matrix.os == 'ubuntu-latest'
       run: dotnet pack Orleans.slnx --configuration Debug --no-build --no-restore -bl:package_validation.binlog
+    - name: Test package consumers
+      if: matrix.os == 'ubuntu-latest'
+      shell: pwsh
+      run: ./.github/scripts/test-package-consumers.ps1 -Configuration Debug -SkipPack
     - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       continue-on-error: true
       with:
