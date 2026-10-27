@@ -18,6 +18,10 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets an enumerable collection of membership updates.
         /// </summary>
+        /// <remarks>
+        /// Versions advance with canonical membership changes. Updates at the same version can
+        /// prune dead rows or advance this observer's knowledge of absent silo identities.
+        /// </remarks>
         /// <value>The membership updates.</value>
         IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates { get; }
 

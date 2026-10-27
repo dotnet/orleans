@@ -1036,6 +1036,12 @@ public partial class JournaledJobShardManagerTests
             _version++;
         }
 
+        public void RemoveSilo(SiloAddress siloAddress)
+        {
+            _members = _members.Remove(siloAddress);
+            _version++;
+        }
+
         public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 
         public Task<bool> TryKill(SiloAddress siloAddress) => Task.FromResult(false);

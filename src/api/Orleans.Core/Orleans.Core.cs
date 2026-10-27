@@ -501,6 +501,8 @@ namespace Orleans.Configuration
 
         public System.TimeSpan ProbeTimeout { get { throw null; } set { } }
 
+        public System.TimeSpan? SiloGenerationRetirementAge { get { throw null; } set { } }
+
         public System.TimeSpan TableRefreshTimeout { get { throw null; } set { } }
 
         public bool UseLivenessGossip { get { throw null; } set { } }

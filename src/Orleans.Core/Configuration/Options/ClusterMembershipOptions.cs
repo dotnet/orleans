@@ -91,6 +91,18 @@ namespace Orleans.Configuration
         public TimeSpan MaxJoinAttemptTime { get; set; } = TimeSpan.FromMinutes(5);
 
         /// <summary>
+        /// Gets or sets the age at which absent positive silo generations are classified as dead.
+        /// </summary>
+        /// <remarks>
+        /// The cutoff is established when publishing membership views using the peer's local UTC clock.
+        /// Present members retain their recorded status. Set to <see langword="null"/> to disable generation retirement.
+        /// Observed death evidence is retained until covered by the cutoff, or for the observer's lifetime when retirement is disabled.
+        /// The value must be greater than or equal to <see cref="TimeSpan.Zero"/>.
+        /// </remarks>
+        /// <value>One hour by default.</value>
+        public TimeSpan? SiloGenerationRetirementAge { get; set; } = TimeSpan.FromHours(1);
+
+        /// <summary>
         /// Gets or sets a value indicating whether membership updates are disseminated between hosts using gossip.
         /// </summary>
         /// <value>Membership updates are disseminated using gossip by default.</value>
