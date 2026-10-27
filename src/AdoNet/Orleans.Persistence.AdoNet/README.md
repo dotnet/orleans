@@ -101,6 +101,8 @@ queries while preserving grain state.
 Grain state versions cycle through 1 to 2147483647. Each successful write or
 clear advances the version, and optimistic concurrency compares ETags for
 equality. An ETag repeats after 2147483647 mutations of the same row.
+A writer retaining an ETag across that full cycle can match the current version
+and overwrite newer state.
 
 To upgrade an existing database, stop all silos using it and run the
 [migration scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Migrations)
