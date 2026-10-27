@@ -4,12 +4,14 @@ param(
     [string] $PackageDirectory,
     [string] $PackageVersion,
     [string[]] $Frameworks = @('net8.0', 'net10.0'),
+    [string[]] $Consumers = @(),
     [switch] $SkipPack
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
+$env:MSBUILDDISABLENODEREUSE = '1'
 $repositoryRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) "orleans-package-tests-$([guid]::NewGuid())"
 $serializationProject = Join-Path $repositoryRoot 'src/Orleans.Serialization/Orleans.Serialization.csproj'
@@ -64,7 +66,7 @@ if (-not $SkipPack) {
         }
 
         Invoke-DotNet pack (Join-Path $repositoryRoot $relativePath) --configuration $Configuration `
-            "-p:PackageVersion=$PackageVersion" --output $PackageDirectory --verbosity quiet
+            "-p:PackageVersion=$PackageVersion" --output $PackageDirectory --verbosity quiet '-m:1' '-p:BuildInParallel=false'
     }
 }
 
@@ -121,6 +123,16 @@ public sealed class Greeting
 
     $cases = @($packages | ForEach-Object { @{ Name = $_; Packages = @($_) } })
     $cases += @{ Name = 'Combined'; Packages = @('Serialization', 'Sdk', 'Client', 'Server') }
+    if ($Consumers.Count -gt 0) {
+        foreach ($consumer in $Consumers) {
+            if ($consumer -notin $cases.Name) {
+                throw "Unknown package consumer '$consumer'."
+            }
+        }
+
+        $cases = @($cases | Where-Object { $_.Name -in $Consumers })
+    }
+
     $passed = 0
     foreach ($case in $cases) {
         $caseRoot = Join-Path $temporaryRoot $case.Name
@@ -162,7 +174,9 @@ $references
         Invoke-DotNet restore $project --packages (Join-Path $temporaryRoot 'nuget') --verbosity quiet
         foreach ($framework in $Frameworks) {
             Write-Host "Running package consumer $($case.Name) ($framework)"
-            Invoke-DotNet run --project $project --framework $framework --configuration Release --no-restore --verbosity quiet
+            Invoke-DotNet build $project --framework $framework --configuration Release --no-restore --verbosity quiet `
+                '-m:1' '-p:BuildInParallel=false'
+            Invoke-DotNet run --project $project --framework $framework --configuration Release --no-build --no-restore
             $passed++
         }
     }
