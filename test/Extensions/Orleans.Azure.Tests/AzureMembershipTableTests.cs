@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Net;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -6,6 +8,7 @@ using Orleans.Clustering.AzureStorage;
 using Orleans.Clustering.TestKit;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using TestExtensions;
 using UnitTests;
@@ -131,6 +134,113 @@ namespace Tester.AzureUtils
         public async Task MembershipTable_Azure_ReadAll_EmptyTable()
         {
             await MembershipTable_ReadAll_EmptyTable();
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(1001)]
+        public async Task MembershipTable_Azure_ReadAll_UpgradesLegacyBoundaryRows(int rowCount)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var client = AzureStorageOperationOptionsExtensions.GetTableServiceClient()
+                .GetTableClient(new AzureStorageClusteringOptions().TableName);
+            await client.CreateIfNotExistsAsync(cancellationToken);
+            var version = new SiloInstanceTableEntry
+            {
+                PartitionKey = clusterId,
+                RowKey = SiloInstanceTableEntry.TABLE_VERSION_ROW,
+                DeploymentId = clusterId,
+                MembershipVersion = "7"
+            };
+            await client.AddEntityAsync(version, cancellationToken);
+            var legacyVersion = await client.GetEntityAsync<SiloInstanceTableEntry>(
+                clusterId, version.RowKey, cancellationToken: cancellationToken);
+            var startTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            // Seed the 10.2.x format directly: VersionRow and silo rows, with neither boundary marker.
+            var rows = Enumerable.Range(0, rowCount).Select(index =>
+            {
+                var address = SiloAddress.New(IPAddress.Loopback, 12000 + index, 1);
+                return new SiloInstanceTableEntry
+                {
+                    PartitionKey = clusterId,
+                    RowKey = SiloInstanceTableEntry.ConstructRowKey(address),
+                    DeploymentId = clusterId,
+                    Address = address.Endpoint.Address.ToString(),
+                    Port = address.Endpoint.Port.ToString(CultureInfo.InvariantCulture),
+                    Generation = "1",
+                    HostName = $"legacy-{index}",
+                    Status = nameof(SiloStatus.Active),
+                    StartTime = LogFormatter.PrintDate(startTime),
+                    IAmAliveTime = LogFormatter.PrintDate(startTime)
+                };
+            }).ToArray();
+            foreach (var batch in rows.Chunk(100))
+            {
+                await client.SubmitTransactionAsync(
+                    batch.Select(row => new TableTransactionAction(TableTransactionActionType.Add, row)), cancellationToken);
+            }
+
+            var legacyEtags = new Dictionary<string, string>();
+            await foreach (var row in client.QueryAsync<SiloInstanceTableEntry>(
+                TableClient.CreateQueryFilter($"PartitionKey eq {clusterId}"), cancellationToken: cancellationToken))
+            {
+                legacyEtags.Add(row.RowKey, row.ETag.ToString());
+            }
+
+            var table = await GetLegacyMembershipTableAsync(cancellationToken);
+            var result = await table.ReadAllAsync(cancellationToken);
+
+            Assert.Equal(7, result.Version.Version);
+            Assert.Equal(legacyVersion.Value.ETag.ToString(), result.Version.VersionEtag);
+            Assert.Equal(rowCount, result.Members.Count);
+            for (var index = 0; index < rowCount; index++)
+            {
+                var row = Assert.IsType<Tuple<MembershipEntry, string>>(result.TryGet(
+                    SiloInstanceTableEntry.UnpackRowKey(rows[index].RowKey)));
+                Assert.Equal($"legacy-{index}", row.Item1.HostName);
+                Assert.Equal(SiloStatus.Active, row.Item1.Status);
+                Assert.Equal(startTime, row.Item1.StartTime);
+                Assert.Equal(startTime, row.Item1.IAmAliveTime);
+                Assert.Equal(legacyEtags[rows[index].RowKey], row.Item2);
+            }
+
+            foreach (var rowKey in new[] { SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX })
+            {
+                var boundary = await client.GetEntityIfExistsAsync<SiloInstanceTableEntry>(
+                    clusterId, rowKey, cancellationToken: cancellationToken);
+                Assert.False(boundary.HasValue);
+            }
+
+            Assert.Equal(result.Version, (await table.ReadAllAsync(cancellationToken)).Version);
+            var joining = new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(IPAddress.Loopback, 14000, 2),
+                HostName = "new-silo",
+                Status = SiloStatus.Joining,
+                StartTime = startTime,
+                IAmAliveTime = startTime
+            };
+            Assert.True(await table.InsertRowAsync(joining, result.Version.Next(), cancellationToken));
+            var joined = await table.ReadAllAsync(cancellationToken);
+            Assert.Equal(8, joined.Version.Version);
+            Assert.Equal(rowCount + 1, joined.Members.Count);
+            var joinedRow = Assert.IsType<Tuple<MembershipEntry, string>>(joined.TryGet(joining.SiloAddress));
+            foreach (var rowKey in new[] { SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX })
+            {
+                var boundary = await client.GetEntityAsync<SiloInstanceTableEntry>(
+                    clusterId, rowKey, cancellationToken: cancellationToken);
+                Assert.Equal("8", boundary.Value.MembershipVersion);
+                Assert.Null(boundary.Value.Status);
+            }
+
+            joining.Status = SiloStatus.Active;
+            Assert.False(await table.UpdateRowAsync(joining, joinedRow.Item2, result.Version.Next(), cancellationToken));
+            Assert.True(await table.UpdateRowAsync(joining, joinedRow.Item2, joined.Version.Next(), cancellationToken));
+            var active = await table.ReadAllAsync(cancellationToken);
+            Assert.Equal(9, active.Version.Version);
+            Assert.Equal(SiloStatus.Active,
+                Assert.IsType<Tuple<MembershipEntry, string>>(active.TryGet(joining.SiloAddress)).Item1.Status);
         }
 
         /// <summary>
