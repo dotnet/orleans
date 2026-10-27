@@ -1,0 +1,653 @@
+using System.Diagnostics.CodeAnalysis;
+using Microsoft.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Serialization.Invocation;
+
+namespace Orleans;
+
+internal partial class InvokableObjectManager
+{
+    public sealed partial class LocalObjectData : IGrainContext, IGrainCallCancellationExtension, IAsyncDisposable
+    {
+        private const int MaxPendingCancellations = 1_024;
+
+        private static readonly Func<object?, Task> HandleFunc = self => ((LocalObjectData)self!).LocalObjectMessagePumpAsync();
+        private readonly InvokableObjectManager _manager;
+        private readonly Dictionary<(GrainId SenderGrainId, CorrelationId MessageId), LinkedListNode<(GrainId, CorrelationId)>> _pendingCancellations = [];
+        private readonly LinkedList<(GrainId SenderGrainId, CorrelationId MessageId)> _pendingCancellationOrder = [];
+        private readonly Dictionary<Message, Task?> _runningRequests = [];
+
+        private Task? _disposeTask;
+        private Task? _messagePumpTask;
+
+#if NET10_0_OR_GREATER
+        private readonly Lock _asyncEnumerableExtensionLock = new();
+#else
+        private readonly object _asyncEnumerableExtensionLock = new();
+#endif
+        private AsyncEnumerableGrainObserverExtension? _asyncEnumerableExtension;
+
+        internal LocalObjectData(IAddressable obj, ObserverGrainId observerId, InvokableObjectManager manager)
+        {
+            this.LocalObject = new WeakReference(obj);
+            this.ObserverId = observerId;
+            this.Messages = new Queue<Message>();
+            this.Running = false;
+
+            _manager = manager;
+        }
+
+        internal WeakReference LocalObject { get; }
+        internal ObserverGrainId ObserverId { get; }
+        internal Queue<Message> Messages { get; }
+        internal bool Running { get; set; }
+
+        GrainId IGrainContext.GrainId => this.ObserverId.GrainId;
+
+        GrainReference IGrainContext.GrainReference =>
+            _manager.runtimeClient.InternalGrainFactory.GetGrain(ObserverId.GrainId).AsReference();
+
+        object? IGrainContext.GrainInstance => this.LocalObject.Target;
+
+        ActivationId IGrainContext.ActivationId => throw new NotImplementedException();
+
+        GrainAddress IGrainContext.Address => throw new NotImplementedException();
+
+        IServiceProvider IGrainContext.ActivationServices => throw new NotSupportedException();
+
+        IGrainLifecycle IGrainContext.ObservableLifecycle => throw new NotImplementedException();
+
+        public IWorkItemScheduler Scheduler => throw new NotImplementedException();
+
+        void IGrainContext.SetComponent<TComponent>(TComponent? value) where TComponent : class
+        {
+            if (this.LocalObject.Target is TComponent)
+            {
+                throw new ArgumentException("Cannot override a component which is implemented by this grain");
+            }
+
+            _manager.rootGrainContext.SetComponent(value);
+        }
+
+        public object? GetComponent(Type componentType)
+        {
+            if (componentType == typeof(IAsyncEnumerableGrainExtension))
+            {
+                lock (_asyncEnumerableExtensionLock)
+                {
+                    ObjectDisposedException.ThrowIf(_disposeTask is not null, typeof(LocalObjectData));
+
+                    if (_asyncEnumerableExtension is not null)
+                    {
+                        return _asyncEnumerableExtension;
+                    }
+
+                    _asyncEnumerableExtension = new AsyncEnumerableGrainObserverExtension(this,
+                        _manager.runtimeClient.ServiceProvider.GetRequiredService<TimeProvider>(),
+                        _manager.runtimeClient.ServiceProvider.GetRequiredService<IOptions<MessagingOptions>>(),
+                        _manager.runtimeClient.ServiceProvider.GetRequiredService<ILogger<AsyncEnumerableGrainObserverExtension>>());
+
+                    return _asyncEnumerableExtension;
+                }
+            }
+            else if (componentType.IsAssignableFrom(this.LocalObject.Target?.GetType()))
+            {
+                return LocalObject.Target;
+            }
+            else if (componentType.IsAssignableFrom(GetType()))
+            {
+                return this;
+            }
+
+            return _manager.rootGrainContext.GetComponent(componentType);
+        }
+
+        public object? GetTarget() => this.LocalObject.Target;
+
+        bool IEquatable<IGrainContext>.Equals(IGrainContext? other) => ReferenceEquals(this, other);
+
+        public void ReceiveMessage(object msg)
+        {
+            var message = (Message)msg;
+            var gate = _manager.GetAdmissionGate(message);
+            if (!gate.TryEnterUnscoped())
+            {
+                _manager.RejectMessage(message);
+                return;
+            }
+
+            var ownsAdmission = true;
+            try
+            {
+                // Queue publication transfers admission ownership to the pump or interleaved invocation.
+                ReceiveMessage(message, ref ownsAdmission);
+            }
+            finally
+            {
+                if (ownsAdmission)
+                {
+                    gate.Exit();
+                }
+            }
+        }
+
+        private void ReceiveMessage(Message message, ref bool ownsAdmission)
+        {
+            var obj = this.LocalObject.Target;
+            if (obj is null)
+            {
+                // Remove from the dictionary record for the garbage collected object? But now we won't be able to detect invalid dispatch IDs anymore.
+                LogObserverGarbageCollected(_manager.logger, this.ObserverId, message);
+                // Try to remove. If it's not there, we don't care.
+                _manager.TryDeregister(this.ObserverId);
+                message.Dispose();
+                return;
+            }
+
+            // Handle AlwaysInterleave messages (like cancellation requests) immediately without queueing.
+            // These messages need to be processed right away, even if another request is currently running.
+            if (message.IsAlwaysInterleave)
+            {
+                bool wasCancelled;
+                lock (Messages)
+                {
+                    wasCancelled = RemovePendingCancellation((message.SendingGrain, message.Id));
+                    if (!wasCancelled)
+                    {
+                        // Track the running request so it can be cancelled.
+                        var task = Task.Factory.StartNew(
+                            static state =>
+                            {
+                                var (self, msg) = ((LocalObjectData, Message))state!;
+                                return self.ProcessMessageAsync(msg);
+                            },
+                            (this, message),
+                            CancellationToken.None,
+                            TaskCreationOptions.DenyChildAttach,
+                            TaskScheduler.Default).Unwrap();
+                        ownsAdmission = false;
+                        _runningRequests.Add(message, task);
+                    }
+                }
+
+                if (wasCancelled)
+                {
+                    SendCanceledResponse(message);
+                }
+
+                return;
+            }
+
+            bool start;
+            bool wasWaitingCancellation;
+            lock (this.Messages)
+            {
+                wasWaitingCancellation = RemovePendingCancellation((message.SendingGrain, message.Id));
+                if (wasWaitingCancellation)
+                {
+                    start = false;
+                }
+                else
+                {
+                    this.Messages.Enqueue(message);
+                    ownsAdmission = false;
+                    start = !this.Running;
+                    this.Running = true;
+                }
+            }
+
+            if (wasWaitingCancellation)
+            {
+                SendCanceledResponse(message);
+                return;
+            }
+
+            LogInvokeLocalObjectAsync(_manager.logger, message, start);
+
+            if (start)
+            {
+                // we want to ensure that the message pump operates asynchronously
+                // with respect to the current thread. see
+                // http://channel9.msdn.com/Events/TechEd/Europe/2013/DEV-B317#fbid=aIWUq0ssW74
+                // at position 54:45.
+                //
+                // according to the information posted at:
+                // http://stackoverflow.com/questions/12245935/is-task-factory-startnew-guaranteed-to-use-another-thread-than-the-calling-thr
+                // this idiom is dependent upon the a TaskScheduler not implementing the
+                // override QueueTask as task inlining (as opposed to queueing). this seems
+                // implausible to the author, since none of the .NET schedulers do this and
+                // it is considered bad form (the OrleansTaskScheduler does not do this).
+                //
+                // if, for some reason this doesn't hold true, we can guarantee what we
+                // want by passing a placeholder continuation token into Task.StartNew()
+                // instead. i.e.:
+                //
+                // return Task.StartNew(() => ..., new CancellationToken());
+                // We pass these options to Task.Factory.StartNew as they make the call identical
+                // to Task.Run. See: https://blogs.msdn.microsoft.com/pfxteam/2011/10/24/task-run-vs-task-factory-startnew/
+                _messagePumpTask = Task.Factory.StartNew(
+                        HandleFunc,
+                        this,
+                        CancellationToken.None,
+                        TaskCreationOptions.DenyChildAttach,
+                        TaskScheduler.Default).Unwrap();
+            }
+        }
+
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Each dequeued message is transferred to ProcessMessageAsync, which completes or rejects the request.")]
+        private async Task LocalObjectMessagePumpAsync()
+        {
+            while (TryDequeueMessage(out var message))
+            {
+                await ProcessMessageAsync(message);
+            }
+
+            bool TryDequeueMessage([NotNullWhen(true)] out Message? message)
+            {
+                lock (Messages)
+                {
+                    var result = Messages.TryDequeue(out message);
+                    if (!result)
+                    {
+                        Running = false;
+                    }
+                    else
+                    {
+                        _runningRequests.Add(message!, _messagePumpTask);
+                    }
+
+                    return result;
+                }
+            }
+        }
+
+        private async Task ProcessMessageAsync(Message message)
+        {
+            try
+            {
+                if (message.IsExpired)
+                {
+                    _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
+                    message.Dispose();
+                    return;
+                }
+
+                if (message.RequestContextData is { Count: > 0 })
+                {
+                    RequestContextExtensions.Import(message.RequestContextData);
+                }
+
+                IInvokable? request;
+                try
+                {
+                    if (message.BodyObject is not IInvokable invokableBody)
+                    {
+                        _manager.runtimeClient.SendResponse(
+                            message,
+                            Response.FromException(new InvalidOperationException("Message body is not an invokable request")));
+                        return;
+                    }
+
+                    request = invokableBody;
+                }
+                catch (Exception deserializationException)
+                {
+                    LogErrorDeserializingMessageBody(_manager.logger, deserializationException, message);
+                    _manager.runtimeClient.SendResponse(message, Response.FromException(deserializationException));
+                    return;
+                }
+
+                try
+                {
+                    request.SetTarget(this);
+                    if (TryTakePendingCancellation(message))
+                    {
+                        TryCancelInvokable(request);
+                    }
+
+                    var filters = _manager.GrainCallFilters;
+                    Response response;
+                    if (filters is { Count: > 0 } || LocalObject.Target is IIncomingGrainCallFilter)
+                    {
+                        var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping, _manager._responseCopier);
+                        await invoker.Invoke();
+                        response = invoker.Response!;
+                    }
+                    else
+                    {
+                        response = await request.Invoke();
+                        // The copier preserves the null state of its input.
+                        response = _manager._responseCopier.Copy(response)!;
+                    }
+
+                    if (message.Direction != Message.Directions.OneWay)
+                    {
+                        this.SendResponseAsync(message, response);
+                    }
+                }
+                catch (Exception exc)
+                {
+                    this.ReportException(message, exc);
+                }
+            }
+            catch (Exception outerException)
+            {
+                // Ignore and keep looping.
+                LogErrorProcessingMessage(_manager.logger, outerException, message);
+            }
+            finally
+            {
+                lock (Messages)
+                {
+                    _runningRequests.Remove(message);
+                }
+
+                // Generated interface metadata is stable throughout the request's lifetime.
+                _manager.GetAdmissionGate(message).Exit();
+            }
+        }
+
+        private bool TryTakePendingCancellation(Message message)
+        {
+            lock (Messages)
+            {
+                return RemovePendingCancellation((message.SendingGrain, message.Id));
+            }
+        }
+
+        private bool TryCancelInvokable(IInvokable request)
+        {
+            try
+            {
+                return request.TryCancel();
+            }
+            catch (Exception exception)
+            {
+                LogErrorCancellationCallbackFailed(_manager.logger, exception);
+                return true;
+            }
+        }
+
+        private void SendCanceledResponse(Message message) =>
+            _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+
+        private void SendResponseAsync(Message message, Response resultObject)
+        {
+            if (message.IsExpired)
+            {
+                _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Respond);
+                return;
+            }
+
+            Response deepCopy;
+            try
+            {
+                // we're expected to notify the caller if the deep copy failed.
+                // The copier preserves the null state of its input.
+                deepCopy = _manager.deepCopier.Copy(resultObject)!;
+            }
+            catch (Exception exc2)
+            {
+                _manager.runtimeClient.SendResponse(message, Response.FromException(exc2));
+                LogErrorSendingResponse(_manager.logger, exc2);
+                return;
+            }
+
+            // the deep-copy succeeded.
+            _manager.runtimeClient.SendResponse(message, deepCopy);
+            return;
+        }
+
+        private void ReportException(Message message, Exception exception)
+        {
+            switch (message.Direction)
+            {
+                case Message.Directions.OneWay:
+                    LogErrorInvokingOneWayRequest(_manager.logger, exception, message.BodyObject?.ToString(), message.InterfaceType);
+                    break;
+
+                case Message.Directions.Request:
+                    Exception deepCopy;
+                    try
+                    {
+                        // we're expected to notify the caller if the deep copy failed.
+                        // The copier preserves the null state of its input.
+                        deepCopy = _manager.deepCopier.Copy(exception)!;
+                    }
+                    catch (Exception ex2)
+                    {
+                        _manager.runtimeClient.SendResponse(message, Response.FromException(ex2));
+                        LogErrorSendingExceptionResponse(_manager.logger, ex2);
+                        return;
+                    }
+
+                    // the deep-copy succeeded.
+                    var response = Response.FromException(deepCopy);
+                    _manager.runtimeClient.SendResponse(message, response);
+                    break;
+
+                default:
+                    throw new InvalidOperationException($"Unrecognized direction for message {message}, which resulted in exception: {exception}");
+            }
+        }
+
+        public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
+        public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
+
+        public void Rehydrate(IRehydrationContext context)
+        {
+            // Migration is not supported, but we need to dispose of the context if it's provided
+            (context as IDisposable)?.Dispose();
+        }
+
+        public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
+        {
+            // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
+        }
+
+        ValueTask IGrainCallCancellationExtension.CancelRequestAsync(
+            GrainId senderGrainId,
+            CorrelationId messageId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            TryCancelRequest();
+            return ValueTask.CompletedTask;
+
+            void TryCancelRequest()
+            {
+                Message? message = null;
+                var wasWaiting = false;
+                var key = (senderGrainId, messageId);
+                lock (Messages)
+                {
+                    // Check the running requests.
+                    foreach (var runningRequest in _runningRequests.Keys)
+                    {
+                        if (runningRequest.Id == messageId && runningRequest.SendingGrain == senderGrainId)
+                        {
+                            message = runningRequest;
+                            break;
+                        }
+                    }
+
+                    if (message is null)
+                    {
+                        // Check the waiting requests.
+                        foreach (var waitingRequest in Messages)
+                        {
+                            var waiting = waitingRequest;
+                            if (waiting.Id == messageId && waiting.SendingGrain == senderGrainId)
+                            {
+                                message = waiting;
+                                wasWaiting = true;
+
+                                // Remove the message, since it will be rejected immediately (outside the lock) without being executed.
+                                var initialCount = Messages.Count;
+                                for (var i = 0; i < initialCount; i++)
+                                {
+                                    var current = Messages.Dequeue();
+                                    if (!ReferenceEquals(current, message))
+                                    {
+                                        Messages.Enqueue(current);
+                                    }
+                                }
+
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!wasWaiting)
+                    {
+                        // Cancellation and invocation are delivered independently. Retain cancellation
+                        // until the matching invocation is admitted or has initialized its local token.
+                        RetainPendingCancellation(key);
+                    }
+                }
+
+                var didCancel = false;
+                if (message is not null)
+                {
+                    // The message never began executing, so send a canceled response immediately.
+                    // If the message did begin executing, wait for it to observe the cancellation token and respond itself.
+                    if (wasWaiting)
+                    {
+                        try
+                        {
+                            SendCanceledResponse(message);
+                        }
+                        finally
+                        {
+                            _manager.GetAdmissionGate(message).Exit();
+                        }
+
+                        didCancel = true;
+                    }
+                    else if (message.BodyObject is IInvokable invokableRequest)
+                    {
+                        didCancel = TryCancelInvokable(invokableRequest) || !invokableRequest.IsCancellable;
+                    }
+                    else
+                    {
+                        // Assume the request is not cancellable.
+                        didCancel = true;
+                    }
+                }
+
+                if (didCancel)
+                {
+                    lock (Messages)
+                    {
+                        RemovePendingCancellation(key);
+                    }
+                }
+            }
+        }
+
+        private void RetainPendingCancellation((GrainId SenderGrainId, CorrelationId MessageId) key)
+        {
+            if (_pendingCancellations.ContainsKey(key))
+            {
+                return;
+            }
+
+            if (_pendingCancellations.Count >= MaxPendingCancellations)
+            {
+                var oldest = _pendingCancellationOrder.First!;
+                _pendingCancellationOrder.RemoveFirst();
+                _pendingCancellations.Remove(oldest.Value);
+            }
+
+            _pendingCancellations.Add(key, _pendingCancellationOrder.AddLast(key));
+        }
+
+        private bool RemovePendingCancellation((GrainId SenderGrainId, CorrelationId MessageId) key)
+        {
+            if (!_pendingCancellations.Remove(key, out var node))
+            {
+                return false;
+            }
+
+            _pendingCancellationOrder.Remove(node);
+            return true;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TaskCompletionSource completion;
+            AsyncEnumerableGrainObserverExtension? extension;
+
+            lock (_asyncEnumerableExtensionLock)
+            {
+                if (_disposeTask is { } disposeTask)
+                {
+                    return new ValueTask(disposeTask);
+                }
+
+                extension = _asyncEnumerableExtension;
+
+                _asyncEnumerableExtension = null;
+
+                completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                _disposeTask = completion.Task;
+            }
+
+            lock (Messages)
+            {
+                _pendingCancellations.Clear();
+                _pendingCancellationOrder.Clear();
+            }
+
+            DisposeExtensionAsync(extension, completion).Ignore();
+
+            return new ValueTask(completion.Task);
+
+            async Task DisposeExtensionAsync(AsyncEnumerableGrainObserverExtension? extension, TaskCompletionSource completion)
+            {
+                try
+                {
+                    if (extension is not null)
+                    {
+                        try
+                        {
+                            await extension.DisposeAsync().ConfigureAwait(false);
+                        }
+                        catch (Exception exception)
+                        {
+                            LogErrorDisposingAsyncEnumerableExtension(_manager.logger, exception);
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    LogErrorDisposingAsyncEnumerableExtension(_manager.logger, exception);
+                }
+                finally
+                {
+                    completion.TrySetResult();
+                }
+            }
+        }
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Error disposing observer async enumerable extension.")]
+        private static partial void LogErrorDisposingAsyncEnumerableExtension(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "One or more cancellation callbacks failed."
+        )]
+        private static partial void LogErrorCancellationCallbackFailed(ILogger logger, Exception exception);
+
+        public Task Deactivated => Task.CompletedTask;
+    }
+}

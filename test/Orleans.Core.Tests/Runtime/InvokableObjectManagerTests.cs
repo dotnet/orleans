@@ -237,7 +237,7 @@ public class InvokableObjectManagerTests
 
         fixture.Manager.Dispatch(message);
 
-        fixture.AssertUnavailable(message);
+        fixture.AssertException<ObserverNotReachableException>(message);
         Assert.Equal(0, control.InvocationCount);
         Assert.Null(control.CancellationTarget);
         Assert.False(control.CancellationSent.Task.IsCompleted);
@@ -503,6 +503,47 @@ public class InvokableObjectManagerTests
         fixture.AssertNoResponse(message);
         fixture.AssertResponseCount(0);
         fixture.AssertOrder();
+    }
+
+    [Fact]
+    public async Task Dispatch_UnregisteredObserver_Request_SendsNotReachableException()
+    {
+        await using var fixture = new ManagerFixture(registerObserver: false);
+        var body = new TestInvokable("must not run");
+        var message = fixture.Request(11, body);
+
+        fixture.Manager.Dispatch(message);
+
+        var exception = fixture.AssertException<ObserverNotReachableException>(message);
+        Assert.Equal(0, body.InvocationCount);
+        fixture.AssertResponseCount(1);
+    }
+
+    [Fact]
+    public async Task Dispatch_UnregisteredObserver_OneWay_DoesNotSendResponse()
+    {
+        await using var fixture = new ManagerFixture(registerObserver: false);
+        var body = new TestInvokable("must not run");
+        var message = fixture.Request(11, body);
+
+        message.Direction = Message.Directions.OneWay;
+        fixture.Manager.Dispatch(message);
+
+        fixture.AssertNoResponse(message);
+        Assert.Equal(0, body.InvocationCount);
+        fixture.AssertResponseCount(0);
+    }
+
+    [Fact]
+    public async Task TryRegister_RejectsNewObserversDuringShutdown()
+    {
+        await using var fixture = new ManagerFixture();
+        await fixture.WaitAsync(fixture.StopAsync(), "manager drained");
+
+        var newObserver = new DrainObserver();
+        var newObserverId = ObserverGrainId.Create(ClientGrainId.Create("observer-new"), IdSpan.Create("new-observer"));
+
+        Assert.False(fixture.Manager.TryRegister(newObserver, newObserverId));
     }
 
     [Fact]
