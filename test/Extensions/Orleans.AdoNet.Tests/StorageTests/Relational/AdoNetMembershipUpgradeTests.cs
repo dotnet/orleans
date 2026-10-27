@@ -49,6 +49,43 @@ public sealed class AdoNetMembershipUpgradeTests
         VerifyInstallationAsync("MySQL", AdoNetInvariants.InvariantNameMySql, enhanced,
             "FD33B6AD41DDA95942F275857F27C7FD02A0DB433747DA4C3B92D677ACB6014E");
 
+    // On MySQL 8.4 the original InsertMembershipKey reported a duplicate silo insert as successful and advanced the version.
+    // The migration runs twice, as users run it, to show that repeating it leaves an upgraded database working.
+    [Fact]
+    [TestProvider("MySql")]
+    public async Task MySql_Migration_10_4_1_RejectsDuplicateInsert()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "MembershipUpgradeFixtures", "MySQL-Clustering.sql");
+        var fixture = await File.ReadAllTextAsync(fixturePath, cancellationToken);
+        Assert.Equal(
+            "FD33B6AD41DDA95942F275857F27C7FD02A0DB433747DA4C3B92D677ACB6014E",
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fixture.Replace("\r\n", "\n")))));
+        var database = await RelationalStorageForTesting.SetupInstance(
+            AdoNetInvariants.InvariantNameMySql,
+            $"MembershipMigration_{Guid.NewGuid():N}",
+            cancellationToken: cancellationToken,
+            setupSqlScriptFileNames: [Path.Combine(AppContext.BaseDirectory, "MySQL-Main.sql"), fixturePath]);
+        var migration = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "MySQL-Clustering-10.4.1.sql"), cancellationToken);
+        await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, migration, cancellationToken);
+        await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, migration, cancellationToken);
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var table = new AdoNetClusteringTable(
+            services,
+            Options.Create(new ClusterOptions { ClusterId = ClusterId }),
+            Options.Create(new AdoNetClusteringSiloOptions { Invariant = AdoNetInvariants.InvariantNameMySql, ConnectionString = database.CurrentConnectionString }),
+            NullLogger<AdoNetClusteringTable>.Instance);
+        await table.InitializeMembershipTableAsync(true, cancellationToken);
+        var entry = Entry(1, SiloStatus.Active);
+        Assert.True(await table.InsertRowAsync(entry, new TableVersion(1, "0"), cancellationToken));
+        var inserted = await ReadSnapshotAsync(database.Storage, cancellationToken);
+
+        Assert.False(await table.InsertRowAsync(entry, new TableVersion(2, "1"), cancellationToken));
+
+        AssertUnchanged(inserted, await ReadSnapshotAsync(database.Storage, cancellationToken));
+        Assert.Equal(1, (await table.ReadAllAsync(cancellationToken)).Version.Version);
+    }
+
     private static async Task VerifyInstallationAsync(string engine, string invariant, bool enhanced, string fixtureHash)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
