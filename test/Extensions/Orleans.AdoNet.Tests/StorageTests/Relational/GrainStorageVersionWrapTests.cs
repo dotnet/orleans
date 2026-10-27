@@ -18,8 +18,10 @@ namespace UnitTests.StorageTests.Relational
         /// <summary>
         /// Writing and clearing a state at the maximum version wraps the version to 1 instead of overflowing.
         /// </summary>
-        public static async Task VersionWrapsAfterMaximum(IGrainStorage storage, IRelationalStorage database, bool deleteStateOnClear, CancellationToken cancellationToken)
+        public static async Task VersionWrapsAfterMaximum(
+            IGrainStorage storage, IRelationalStorage database, bool deleteStateOnClear, CancellationToken cancellationToken, IGrainStorage? compatibilityReader = null)
         {
+            var readStorage = compatibilityReader ?? storage;
             var key = $"version-wrap-{Guid.NewGuid():N}";
             var grainId = GrainId.Create("version-wrap", key);
             const string grainType = "version-wrap-grain";
@@ -27,7 +29,7 @@ namespace UnitTests.StorageTests.Relational
             await storage.WriteStateAsync(grainType, grainId, grainState, cancellationToken);
 
             await SetVersionAsync(database, key, int.MaxValue - 1, cancellationToken);
-            await storage.ReadStateAsync(grainType, grainId, grainState, cancellationToken);
+            await readStorage.ReadStateAsync(grainType, grainId, grainState, cancellationToken);
             Assert.Equal((int.MaxValue - 1).ToString(CultureInfo.InvariantCulture), grainState.ETag);
 
             grainState.State = new TestState1 { A = "maximum" };
@@ -42,7 +44,7 @@ namespace UnitTests.StorageTests.Relational
             };
             await AssertStaleStateRejectedAsync(storage, grainType, grainId, stale, cancellationToken);
             var maximum = new GrainState<TestState1>();
-            await storage.ReadStateAsync(grainType, grainId, maximum, cancellationToken);
+            await readStorage.ReadStateAsync(grainType, grainId, maximum, cancellationToken);
             Assert.Equal(MaximumVersion, maximum.ETag);
             Assert.Equal(new TestState1 { A = "maximum" }, maximum.State);
 
@@ -51,7 +53,7 @@ namespace UnitTests.StorageTests.Relational
             stale.ETag = MaximumVersion;
             await AssertStaleStateRejectedAsync(storage, grainType, grainId, stale, cancellationToken);
             var read = new GrainState<TestState1>();
-            await storage.ReadStateAsync(grainType, grainId, read, cancellationToken);
+            await readStorage.ReadStateAsync(grainType, grainId, read, cancellationToken);
 
             Assert.Equal("1", grainState.ETag);
             Assert.Equal("1", read.ETag);
@@ -60,7 +62,7 @@ namespace UnitTests.StorageTests.Relational
 
             grainState.State = new TestState1 { A = "after-wrap" };
             await storage.WriteStateAsync(grainType, grainId, grainState, cancellationToken);
-            await storage.ReadStateAsync(grainType, grainId, read, cancellationToken);
+            await readStorage.ReadStateAsync(grainType, grainId, read, cancellationToken);
             Assert.Equal("2", grainState.ETag);
             Assert.Equal("2", read.ETag);
             Assert.Equal(new TestState1 { A = "after-wrap" }, read.State);
@@ -70,7 +72,7 @@ namespace UnitTests.StorageTests.Relational
             await storage.ClearStateAsync(grainType, grainId, grainState, cancellationToken);
             await AssertStaleStateRejectedAsync(storage, grainType, grainId, stale, cancellationToken);
             var cleared = new GrainState<TestState1>();
-            await storage.ReadStateAsync(grainType, grainId, cleared, cancellationToken);
+            await readStorage.ReadStateAsync(grainType, grainId, cleared, cancellationToken);
 
             var expectedClearedVersion = deleteStateOnClear ? null : "1";
             Assert.Equal(expectedClearedVersion, grainState.ETag);
@@ -80,7 +82,7 @@ namespace UnitTests.StorageTests.Relational
 
             grainState.State = new TestState1 { A = "after-clear" };
             await storage.WriteStateAsync(grainType, grainId, grainState, cancellationToken);
-            await storage.ReadStateAsync(grainType, grainId, read, cancellationToken);
+            await readStorage.ReadStateAsync(grainType, grainId, read, cancellationToken);
             var expectedWrittenVersion = deleteStateOnClear ? "1" : "2";
             Assert.Equal(expectedWrittenVersion, grainState.ETag);
             Assert.Equal(expectedWrittenVersion, read.ETag);

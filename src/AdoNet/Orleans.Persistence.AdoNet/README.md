@@ -95,8 +95,10 @@ Before using the ADO.NET provider, you need to set up the necessary database tab
 - [SQLite Main Script](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Shared/Sqlite-Main.sql)
 - [SQLite Persistence Script](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
 
-The SQLite scripts are idempotent: reapplying them refreshes the persistence
-queries while preserving grain state.
+The persistence scripts support both setup and repeatable upgrades: reapplying
+the current script refreshes persistence queries and routines while preserving
+grain state. For a new database, first run the shared Main script for your
+database to create the query catalog, then run its persistence script.
 
 Grain state versions cycle through 1 to 2147483647. Each successful write or
 clear advances the version, and optimistic concurrency compares ETags for
@@ -104,10 +106,10 @@ equality. An ETag repeats after 2147483647 mutations of the same row.
 A writer retaining an ETag across that full cycle can match the current version
 and overwrite newer state.
 
-To upgrade an existing database, stop all silos using it and run the
-[migration scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Migrations)
-for your database newer than its installed schema version, in version order.
-For SQLite, reapply the current setup scripts.
+To upgrade an existing database, stop all silos using it and reapply the current
+persistence script for your database. MySQL recreates its procedures, so reapply
+any routine-specific `EXECUTE` grants afterward. Oracle and SQLite also normalize
+versions above the integer maximum while preserving their payloads.
 Restart the silos after applying the scripts so every provider loads the updated
 queries. The wrapping versions fit the integer ETags used by older silos, so
 binary rolling upgrades can proceed after this database update.

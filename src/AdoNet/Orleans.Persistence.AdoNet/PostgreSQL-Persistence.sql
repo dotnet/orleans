@@ -1,4 +1,8 @@
-CREATE TABLE OrleansStorage
+-- Apply this script for setup and repeatable upgrades after the shared Main script creates OrleansQuery.
+-- Stop all silos using this database before applying it, then restart them to reload the queries.
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS OrleansStorage
 (
     grainidhash integer NOT NULL,
     grainidn0 bigint NOT NULL,
@@ -15,7 +19,7 @@ CREATE TABLE OrleansStorage
     version integer
 );
 
-CREATE INDEX ix_orleansstorage
+CREATE INDEX IF NOT EXISTS ix_orleansstorage
     ON orleansstorage USING btree
     (grainidhash, graintypehash);
 
@@ -142,7 +146,8 @@ VALUES
     'WriteToStorageKey','
 
         select * from WriteToStorage(@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @GrainStateVersion, @PayloadBinary);
-');
+')
+ON CONFLICT (QueryKey) DO UPDATE SET QueryText = EXCLUDED.QueryText;
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -162,7 +167,8 @@ VALUES
         AND GrainTypeString = @GrainTypeString AND GrainTypeString IS NOT NULL
         AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
         AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
-');
+')
+ON CONFLICT (QueryKey) DO UPDATE SET QueryText = EXCLUDED.QueryText;
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -182,7 +188,8 @@ VALUES
         AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND Version IS NOT NULL AND Version = @GrainStateVersion AND @GrainStateVersion IS NOT NULL
     Returning Version as NewGrainStateVersion
-');
+')
+ON CONFLICT (QueryKey) DO UPDATE SET QueryText = EXCLUDED.QueryText;
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -199,4 +206,7 @@ VALUES
         AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND Version IS NOT NULL AND Version = @GrainStateVersion AND @GrainStateVersion IS NOT NULL
     Returning Version % 2147483647 + 1 as NewGrainStateVersion
-');
+')
+ON CONFLICT (QueryKey) DO UPDATE SET QueryText = EXCLUDED.QueryText;
+
+COMMIT;

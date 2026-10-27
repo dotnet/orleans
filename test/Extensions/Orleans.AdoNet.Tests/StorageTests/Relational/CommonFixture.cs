@@ -175,6 +175,7 @@ namespace UnitTests.StorageTests.Relational
         public async Task<AdoNetGrainStorage> CreateStorageProviderAsync(
             string storageInvariant,
             string connectionString,
+            string serviceId,
             bool deleteStateOnClear,
             CancellationToken cancellationToken)
         {
@@ -189,7 +190,7 @@ namespace UnitTests.StorageTests.Relational
                 DefaultProviderRuntime.ServiceProvider.GetRequiredService<IActivatorProvider>(),
                 DefaultProviderRuntime.ServiceProvider.GetRequiredService<ILogger<AdoNetGrainStorage>>(),
                 Options.Create(options),
-                Options.Create(new ClusterOptions { ServiceId = Guid.NewGuid().ToString() }),
+                Options.Create(new ClusterOptions { ServiceId = serviceId }),
                 $"{storageInvariant}_Uncached_StorageProvider");
             ISiloLifecycleSubject siloLifeCycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
             storageProvider.Participate(siloLifeCycle);

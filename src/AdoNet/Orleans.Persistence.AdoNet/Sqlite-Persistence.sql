@@ -1,3 +1,6 @@
+-- Apply this script for setup and repeatable upgrades after the shared Main script creates OrleansQuery.
+-- Stop all silos using this database before applying it, then restart them to reload the queries.
+--
 -- The design criteria for this table are:
 --
 -- 1. It can contain arbitrary content serialized as binary, XML or JSON. These formats
@@ -191,9 +194,7 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
 ')
 ON CONFLICT(QueryKey) DO UPDATE SET QueryText = excluded.QueryText;
 
--- Stop all silos using this database before reapplying the script, then restart them to reload the queries.
--- Releases before 11.0.0 could commit a version past 2147483647 before failing to read it back.
--- Reapplying this script moves such versions onto the same cycle used by the wrapping writes.
+-- Normalize oversized versions while preserving their payloads.
 UPDATE OrleansStorage
 SET Version = (Version - 1) % 2147483647 + 1
 WHERE Version > 2147483647;

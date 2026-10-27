@@ -1,3 +1,7 @@
+-- Apply this script for setup and repeatable upgrades after the shared Main script creates OrleansQuery.
+-- Stop all silos using this database before applying it, then restart them to reload the queries.
+-- Reapply routine-specific EXECUTE grants after the procedures are recreated.
+--
 -- The design criteria for this table are:
 --
 -- 1. It can contain arbitrary content serialized as binary, XML or JSON. These formats
@@ -48,7 +52,7 @@
 -- the 32-bit Version. Orleans compares versions only for equality, so the version must change on
 -- every write but does not need to increase forever. A stale version can only match again after
 -- 2147483647 further writes to the same grain.
-CREATE TABLE OrleansStorage
+CREATE TABLE IF NOT EXISTS OrleansStorage
 (
     -- These are for the book keeping. Orleans calculates
     -- these hashes (see RelationalStorageProvide implementation),
@@ -74,14 +78,18 @@ CREATE TABLE OrleansStorage
     ModifiedOn DATETIME NOT NULL,
 
     -- The version of the stored payload.
-    Version INT NULL
+    Version INT NULL,
+    INDEX IX_OrleansStorage (GrainIdHash, GrainTypeHash)
 
     -- The following would in principle be the primary key, but it would be too thick
     -- to be indexed, so the values are hashed and only collisions will be solved
     -- by using the fields. That is, after the indexed queries have pinpointed the right
     -- rows down to [0, n] relevant ones, n being the number of collided value pairs.
 ) ROW_FORMAT = COMPRESSED KEY_BLOCK_SIZE = 16;
-ALTER TABLE OrleansStorage ADD INDEX IX_OrleansStorage (GrainIdHash, GrainTypeHash);
+
+DROP PROCEDURE IF EXISTS ClearStorage;
+DROP PROCEDURE IF EXISTS DeleteStorage;
+DROP PROCEDURE IF EXISTS WriteToStorage;
 
 DELIMITER $$
 
@@ -314,25 +322,29 @@ VALUES
         AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
         AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         LIMIT 1;'
-);
+)
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'WriteToStorageKey','
     call WriteToStorage(@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @GrainStateVersion, @PayloadBinary);'
-);
+)
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'ClearStorageKey','
     call ClearStorage(@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @GrainStateVersion);'
-);
+)
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'DeleteStorageKey','
     call DeleteStorage(@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @GrainStateVersion);'
-);
+)
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
