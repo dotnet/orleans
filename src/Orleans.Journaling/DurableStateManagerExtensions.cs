@@ -51,6 +51,17 @@ public static class DurableStateManagerExtensions
         return manager.GetOrAddState<IDurableSet<T>>(name);
     }
 
+    /// <summary>Gets or creates a named durable log.</summary>
+    /// <typeparam name="T">The entry type.</typeparam>
+    /// <param name="manager">The owning manager.</param>
+    /// <param name="name">The stable state name.</param>
+    /// <returns>The named log instance.</returns>
+    public static IDurableLog<T> GetOrAddLog<T>(this IDurableStateManager manager, string name)
+    {
+        ArgumentNullException.ThrowIfNull(manager);
+        return manager.GetOrAddState<IDurableLog<T>>(name);
+    }
+
     /// <summary>Gets or creates a named durable value.</summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="manager">The owning manager.</param>
