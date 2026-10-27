@@ -87,7 +87,7 @@ namespace Tester.ClientConnectionTests
                         options.ClusterId = clusterOptions.ClusterId;
                         options.ServiceId = clusterOptions.ServiceId;
                     })
-                    .UseStaticClustering(gateways)
+                    .UseStaticClustering(options => options.Gateways = [.. gateways])
                     .AddOutgoingGrainCallFilter(async context =>
                     {
                         if (context.InterfaceName.Contains(nameof(IClusterManifestSystemTarget), StringComparison.Ordinal))
@@ -127,7 +127,7 @@ namespace Tester.ClientConnectionTests
                     cancellation.Cancel();
                 }
 
-                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5)));
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
                 Assert.True(start.IsCanceled);
                 await manifestRequestCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
                 AssertConnectionsClosed(host);
@@ -159,7 +159,7 @@ namespace Tester.ClientConnectionTests
             {
                 await provider.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
                 cancellation.Cancel();
-                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5)));
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
                 Assert.True(start.IsCanceled);
                 AssertConnectionsClosed(host);
                 using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -191,7 +191,7 @@ namespace Tester.ClientConnectionTests
             {
                 await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
                 cancellation.Cancel();
-                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5)));
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
                 Assert.True(start.IsCanceled);
                 AssertConnectionsClosed(host);
                 using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -216,7 +216,7 @@ namespace Tester.ClientConnectionTests
             var start = host.StartAsync(cancellation.Token);
             await connector.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             cancellation.Cancel();
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5)));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
             Assert.True(start.IsCanceled);
             await connector.Completed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             AssertConnectionsClosed(host);
