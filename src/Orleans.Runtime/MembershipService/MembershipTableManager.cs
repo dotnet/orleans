@@ -701,9 +701,11 @@ namespace Orleans.Runtime.MembershipService
         private void PublishSnapshot(MembershipTableSnapshot snapshot)
         {
             var previous = Volatile.Read(ref _state);
-            var localSiloStatus = snapshot.Entries.TryGetValue(this.myAddress, out var localEntry)
-                ? localEntry.Status
-                : previous.Snapshot.Entries.ContainsKey(this.myAddress) ? SiloStatus.Dead : previous.LocalSiloStatus;
+            var localSiloStatus = previous.LocalSiloStatus == SiloStatus.Dead
+                ? SiloStatus.Dead
+                : snapshot.Entries.TryGetValue(this.myAddress, out var localEntry)
+                    ? localEntry.Status
+                    : previous.Snapshot.Entries.ContainsKey(this.myAddress) ? SiloStatus.Dead : previous.LocalSiloStatus;
             Debug.Assert(localSiloStatus >= previous.LocalSiloStatus, "The local silo status cannot transition backwards.");
 
             Interlocked.Exchange(ref _state, new MembershipState(snapshot, localSiloStatus));

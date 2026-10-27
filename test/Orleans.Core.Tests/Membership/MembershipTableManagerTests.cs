@@ -492,6 +492,12 @@ namespace NonSilo.Tests.Membership
                 new MembershipVersion(version.Value + 1),
                 Entry(this.localSilo, SiloStatus.Dead, DateTimeOffset.UtcNow)), cancellationToken);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+
+            await manager.RefreshFromSnapshot(Snapshot(
+                new MembershipVersion(version.Value + 2),
+                Entry(this.localSilo, SiloStatus.Joining, DateTimeOffset.UtcNow)), cancellationToken);
+            Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
+
             await this.lifecycle.OnStop(cancellationToken);
         }
 
