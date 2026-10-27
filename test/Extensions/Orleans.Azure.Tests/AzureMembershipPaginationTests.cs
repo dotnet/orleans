@@ -143,103 +143,19 @@ public class AzureMembershipPaginationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task LegacySnapshotEstablishesFencesAndRereads(bool paginated)
+    public async Task LegacySnapshotUsesOneQuery(bool paginated)
     {
         var storage = new ScriptedMembershipTableReadStorage();
-        storage.AddQuery(Query(paginated, Silo("silo-1", "stale"), Version(7, "legacy")));
-        storage.AddQuery(FencedQuery(7, Silo("silo-1", "current")));
+        storage.AddQuery(Query(paginated, Silo("silo-1", "s1"), Version(7, "legacy")));
         var client = CreateHeartbeatClient();
-        TableTransactionAction[]? transaction = null;
-        _ = client.SubmitTransactionAsync(Arg.Any<IEnumerable<TableTransactionAction>>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                Assert.Equal(TestContext.Current.CancellationToken, call.Arg<CancellationToken>());
-                transaction = call.Arg<IEnumerable<TableTransactionAction>>().ToArray();
-                return SuccessfulTransaction();
-            });
 
         var result = await CreateManager(storage, client).FindAllSiloEntries(TestContext.Current.CancellationToken);
 
-        Assert.Equal("current", result.Single(entry => entry.Entity.RowKey == "silo-1").ETag);
-        Assert.Equal(2, storage.QueryCount);
-        Assert.NotNull(transaction);
-        Assert.Equal(
-            [SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX, SiloInstanceTableEntry.TABLE_VERSION_ROW],
-            transaction.Select(action => action.Entity.RowKey));
-        Assert.Equal(
-            [TableTransactionActionType.Add, TableTransactionActionType.Add, TableTransactionActionType.UpdateMerge],
-            transaction.Select(action => action.ActionType));
-        Assert.All(transaction, action =>
-        {
-            Assert.Equal(ClusterId, action.Entity.PartitionKey);
-            Assert.Equal("7", Assert.IsType<SiloInstanceTableEntry>(action.Entity).MembershipVersion);
-        });
-        Assert.Equal("legacy", transaction[2].ETag.ToString());
-        Assert.Single(client.ReceivedCalls());
-    }
-
-    [Theory]
-    [InlineData(409)]
-    [InlineData(412)]
-    public async Task LegacyUpgradeContentionRereadsCurrentFences(int status)
-    {
-        var storage = new ScriptedMembershipTableReadStorage();
-        storage.AddQuery(Query(true, Silo("silo-1", "stale"), Version(7, "legacy")));
-        storage.AddQuery(FencedQuery(8, Silo("silo-1", "current")));
-        var client = CreateHeartbeatClient();
-        _ = client.SubmitTransactionAsync(Arg.Any<IEnumerable<TableTransactionAction>>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<Response<IReadOnlyList<Response>>>(new RequestFailedException(status, "Contention.")));
-
-        var result = await CreateManager(storage, client).FindAllSiloEntries(TestContext.Current.CancellationToken);
-
-        Assert.Equal("current", result.Single(entry => entry.Entity.RowKey == "silo-1").ETag);
-        Assert.Equal("8", result.Single(entry => entry.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW).Entity.MembershipVersion);
-        Assert.Equal(2, storage.QueryCount);
-        Assert.Single(client.ReceivedCalls());
-    }
-
-    [Theory]
-    [InlineData(403)]
-    [InlineData(404)]
-    [InlineData(503)]
-    public async Task LegacyUpgradeStorageFailurePropagates(int status)
-    {
-        var storage = new ScriptedMembershipTableReadStorage();
-        storage.AddQuery(Query(false, Version(7, "legacy")));
-        var client = CreateHeartbeatClient();
-        var failure = new RequestFailedException(status, "Storage failure.");
-        _ = client.SubmitTransactionAsync(Arg.Any<IEnumerable<TableTransactionAction>>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<Response<IReadOnlyList<Response>>>(failure));
-
-        var exception = await Assert.ThrowsAsync<RequestFailedException>(
-            () => CreateManager(storage, client).FindAllSiloEntries(TestContext.Current.CancellationToken));
-
-        Assert.Same(failure, exception);
+        Assert.Equal(["silo-1", SiloInstanceTableEntry.TABLE_VERSION_ROW], result.Select(entry => entry.Entity.RowKey));
+        Assert.Equal(["s1", "legacy"], result.Select(entry => entry.ETag));
+        Assert.Equal("7", result[1].Entity.MembershipVersion);
         Assert.Equal(1, storage.QueryCount);
-        Assert.Single(client.ReceivedCalls());
-    }
-
-    [Fact]
-    public async Task LegacyUpgradeCancellationStopsBeforeReread()
-    {
-        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var storage = new ScriptedMembershipTableReadStorage();
-        storage.AddQuery(Query(false, Version(7, "legacy")));
-        var client = CreateHeartbeatClient();
-        _ = client.SubmitTransactionAsync(Arg.Any<IEnumerable<TableTransactionAction>>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                Assert.Equal(cancellation.Token, call.Arg<CancellationToken>());
-                cancellation.Cancel();
-                return Task.FromCanceled<Response<IReadOnlyList<Response>>>(cancellation.Token);
-            });
-
-        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => CreateManager(storage, client).FindAllSiloEntries(cancellation.Token));
-
-        Assert.Equal(cancellation.Token, exception.CancellationToken);
-        Assert.Equal(1, storage.QueryCount);
-        Assert.Single(client.ReceivedCalls());
+        Assert.Empty(client.ReceivedCalls());
     }
 
     [Fact]
