@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -56,7 +57,7 @@ namespace Orleans.Hosting.Kubernetes
         private readonly ILocalSiloDetails _localSiloDetails;
         private readonly ILogger<KubernetesClusterAgent> _logger;
         private readonly CancellationTokenSource _shutdownToken;
-        private readonly SemaphoreSlim _pauseMonitoringSemaphore = new SemaphoreSlim(0);
+        private readonly SemaphoreSlim _pauseMonitoringSemaphore = new SemaphoreSlim(0, 1);
         private volatile bool _enableMonitoring;
         private Task _runTask = null!;
 
@@ -75,6 +76,17 @@ namespace Orleans.Hosting.Kubernetes
             IOptionsMonitor<KubernetesHostingOptions> options,
             IOptions<ClusterOptions> clusterOptions,
             ILocalSiloDetails localSiloDetails)
+            : this(clusterMembershipService, logger, options, clusterOptions, localSiloDetails, [])
+        {
+        }
+
+        internal KubernetesClusterAgent(
+            IClusterMembershipService clusterMembershipService,
+            ILogger<KubernetesClusterAgent> logger,
+            IOptionsMonitor<KubernetesHostingOptions> options,
+            IOptions<ClusterOptions> clusterOptions,
+            ILocalSiloDetails localSiloDetails,
+            DelegatingHandler[] httpMessageHandlers)
         {
             _localSiloDetails = localSiloDetails;
             _logger = logger;
@@ -83,7 +95,7 @@ namespace Orleans.Hosting.Kubernetes
             _clusterOptions = clusterOptions.Value;
             _clusterMembershipService = clusterMembershipService;
             _config = _options.CurrentValue.GetClientConfiguration?.Invoke() ?? throw new ArgumentException("A Kubernetes client configuration must be provided.", nameof(options));
-            _client = new k8s.Kubernetes(_config);
+            _client = new k8s.Kubernetes(_config, httpMessageHandlers);
             _podLabelSelector = $"{KubernetesHostingOptions.ServiceIdLabel}={_clusterOptions.ServiceId},{KubernetesHostingOptions.ClusterIdLabel}={_clusterOptions.ClusterId}";
             _podNamespace = _options.CurrentValue.Namespace!;
             _podName = _options.CurrentValue.PodName!;
@@ -216,7 +228,6 @@ namespace Orleans.Hosting.Kubernetes
         {
             _shutdownToken.Cancel();
             _enableMonitoring = false;
-            _pauseMonitoringSemaphore.Release();
 
             if (_runTask is not null)
             {
@@ -240,14 +251,15 @@ namespace Orleans.Hosting.Kubernetes
                             .Take(_options.CurrentValue.MaxAgents)
                             .ToList();
 
-                        if (!_enableMonitoring && chosenSilos.Exists(s => s.SiloAddress.Equals(_localSiloDetails.SiloAddress)))
+                        var shouldMonitor = chosenSilos.Exists(s => s.SiloAddress.Equals(_localSiloDetails.SiloAddress));
+                        if (_enableMonitoring != shouldMonitor)
                         {
-                            _enableMonitoring = true;
-                            _pauseMonitoringSemaphore.Release(1);
-                        }
-                        else if (_enableMonitoring)
-                        {
-                            _enableMonitoring = false;
+                            _enableMonitoring = shouldMonitor;
+                            // This loop is the sole signal producer. Re-election can precede consumption of the previous signal.
+                            if (shouldMonitor && _pauseMonitoringSemaphore.CurrentCount == 0)
+                            {
+                                _pauseMonitoringSemaphore.Release();
+                            }
                         }
 
                         if (_enableMonitoring && _options.CurrentValue.DeleteDefunctSiloPods)
@@ -308,7 +320,7 @@ namespace Orleans.Hosting.Kubernetes
                     if (!_enableMonitoring)
                     {
                         // Wait on the semaphore to avoid spinning in a tight loop.
-                        await _pauseMonitoringSemaphore.WaitAsync();
+                        await _pauseMonitoringSemaphore.WaitAsync(_shutdownToken.Token);
                         continue;
                     }
 
@@ -358,7 +370,10 @@ namespace Orleans.Hosting.Kubernetes
                         await Task.Delay(5000);
                     }
                 }
-                catch (Exception exception) when (!(_shutdownToken.IsCancellationRequested && exception is OperationCanceledException))
+                catch (OperationCanceledException) when (_shutdownToken.IsCancellationRequested)
+                {
+                }
+                catch (Exception exception)
                 {
                     LogErrorMonitoringPods(exception);
                     if (!_shutdownToken.IsCancellationRequested)
@@ -383,6 +398,14 @@ namespace Orleans.Hosting.Kubernetes
 
             server = default;
             return false;
+        }
+
+        internal readonly struct TestAccessor(KubernetesClusterAgent agent)
+        {
+            public bool IsMonitoringEnabled => agent._enableMonitoring;
+            public SemaphoreSlim PauseMonitoringSemaphore => agent._pauseMonitoringSemaphore;
+            public Task MonitorOrleansClustering() => agent.MonitorOrleansClustering();
+            public Task MonitorKubernetesPods() => agent.MonitorKubernetesPods();
         }
 
         [LoggerMessage(
