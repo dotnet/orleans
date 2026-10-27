@@ -338,7 +338,7 @@ namespace Orleans.AzureUtils
             var closing = entries[^1].Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX;
             // Both markers absent identifies the legacy format, which uses legacy read semantics.
             // The first membership write atomically establishes both markers with the new version.
-            // Once either marker is observed, both are required to validate the snapshot.
+            // A query overlapping that write can see a partial pair, so retry partial or mismatched pairs.
             if (!opening && !closing)
             {
                 return true;
@@ -346,7 +346,7 @@ namespace Orleans.AzureUtils
 
             if (!opening || !closing)
             {
-                throw new KeyNotFoundException("The membership query must include both ordered boundary version rows.");
+                return false;
             }
 
             var before = entries[0].Entity.MembershipVersion
