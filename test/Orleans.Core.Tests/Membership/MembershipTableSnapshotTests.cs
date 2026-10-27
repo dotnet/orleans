@@ -1,10 +1,16 @@
 using AwesomeAssertions.Common;
+using System.Buffers;
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.Session;
+using Orleans.Serialization.WireProtocol;
 using Xunit;
 
 namespace NonSilo.Tests.Membership
@@ -18,6 +24,143 @@ namespace NonSilo.Tests.Membership
     [TestArea("Runtime")]
     public class MembershipTableSnapshotTests
     {
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Serialization_LegacySnapshotDefaultsToEmptyDeathHistory(bool clusterSnapshot)
+        {
+            using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+            var serializer = services.GetRequiredService<Serializer>();
+            var codecs = services.GetRequiredService<CodecProvider>();
+            var live = Entry(Silo("127.0.0.1:100@1"), SiloStatus.Active);
+            var unknown = Silo("127.0.0.1:200@10");
+            var version = new MembershipVersion(7);
+            var buffer = new ArrayBufferWriter<byte>();
+            using (var session = services.GetRequiredService<SerializerSessionPool>().GetSession())
+            {
+                var writer = Writer.Create(buffer, session);
+                var snapshotType = clusterSnapshot ? typeof(ClusterMembershipSnapshot) : typeof(MembershipTableSnapshot);
+                ReferenceCodec.MarkValueField(session);
+                writer.WriteFieldHeader(0, typeof(object), snapshotType, WireType.TagDelimited);
+                // Orleans 10.4.0 snapshots contain only their original two fields.
+                if (clusterSnapshot)
+                {
+                    var members = ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(
+                        live.SiloAddress, new ClusterMember(live.SiloAddress, live.Status, live.SiloName));
+                    codecs.GetCodec<ImmutableDictionary<SiloAddress, ClusterMember>>().WriteField(ref writer, 0, typeof(ImmutableDictionary<SiloAddress, ClusterMember>), members);
+                    codecs.GetCodec<MembershipVersion>().WriteField(ref writer, 1, typeof(MembershipVersion), version);
+                }
+                else
+                {
+                    codecs.GetCodec<MembershipVersion>().WriteField(ref writer, 0, typeof(MembershipVersion), version);
+                    var entries = ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(live.SiloAddress, live);
+                    codecs.GetCodec<ImmutableDictionary<SiloAddress, MembershipEntry>>().WriteField(ref writer, 1, typeof(ImmutableDictionary<SiloAddress, MembershipEntry>), entries);
+                }
+
+                writer.WriteEndObject();
+                writer.Commit();
+            }
+
+            var decoded = serializer.Deserialize<object>(buffer.WrittenMemory);
+            if (clusterSnapshot)
+            {
+                var actual = Assert.IsType<ClusterMembershipSnapshot>(decoded);
+                Assert.Equal(version, actual.Version);
+                Assert.Equal(live.SiloAddress, Assert.Single(actual.Members).Key);
+                Assert.Equal(0, actual.MinimumSiloGeneration);
+                Assert.IsAssignableFrom<FrozenSet<SiloAddress>>(actual.RecentlyDeadSilos);
+                Assert.Empty(actual.RecentlyDeadSilos);
+                Assert.Equal(SiloStatus.Active, actual.GetSiloStatus(live.SiloAddress));
+                Assert.Equal(SiloStatus.None, actual.GetSiloStatus(unknown));
+            }
+            else
+            {
+                var actual = Assert.IsType<MembershipTableSnapshot>(decoded);
+                Assert.Equal(version, actual.Version);
+                Assert.Equal(live.SiloAddress, Assert.Single(actual.Entries).Key);
+                Assert.Equal(0, actual.MinimumSiloGeneration);
+                Assert.IsAssignableFrom<FrozenSet<SiloAddress>>(actual.RecentlyDeadSilos);
+                Assert.Empty(actual.RecentlyDeadSilos);
+                Assert.Equal(SiloStatus.Active, actual.GetSiloStatus(live.SiloAddress));
+                Assert.Equal(SiloStatus.None, actual.GetSiloStatus(unknown));
+                var initial = new MembershipTableSnapshot(MembershipVersion.MinValue, ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
+                var merged = MembershipTableSnapshot.Update(initial, actual);
+                Assert.Equal(version, merged.Version);
+                Assert.Equal(SiloStatus.Active, merged.GetSiloStatus(live.SiloAddress));
+                Assert.Equal(SiloStatus.None, merged.GetSiloStatus(unknown));
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Serialization_CurrentSnapshotPreservesLegacyVersionAndRows(bool clusterSnapshot)
+        {
+            using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+            var serializer = services.GetRequiredService<Serializer>();
+            var codecs = services.GetRequiredService<CodecProvider>();
+            var live = Entry(Silo("127.0.0.1:100@1"), SiloStatus.Active);
+            var removed = Silo("127.0.0.1:200@11");
+            var snapshot = new MembershipTableSnapshot(new MembershipVersion(7),
+                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(live.SiloAddress, live),
+                10, new HashSet<SiloAddress> { removed });
+            var bytes = clusterSnapshot
+                ? serializer.SerializeToArray(new ClusterMembershipSnapshot(
+                    ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(
+                        live.SiloAddress, new ClusterMember(live.SiloAddress, live.Status, live.SiloName)),
+                    snapshot.Version, snapshot.MinimumSiloGeneration, snapshot.RecentlyDeadSilos))
+                : serializer.SerializeToArray(snapshot);
+            using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+            var reader = Reader.Create(bytes.AsMemory(), session);
+            Assert.Equal(WireType.TagDelimited, reader.ReadFieldHeader().WireType);
+            ReferenceCodec.MarkValueField(session);
+            var version = MembershipVersion.MinValue;
+            ImmutableDictionary<SiloAddress, MembershipEntry>? entries = null;
+            ImmutableDictionary<SiloAddress, ClusterMember>? members = null;
+            uint fieldId = 0;
+            while (true)
+            {
+                var field = reader.ReadFieldHeader();
+                if (field.IsEndBaseOrEndObject)
+                {
+                    break;
+                }
+
+                fieldId += field.FieldIdDelta;
+                if (fieldId == (clusterSnapshot ? 1u : 0u))
+                {
+                    version = codecs.GetCodec<MembershipVersion>().ReadValue(ref reader, field);
+                }
+                else if (clusterSnapshot && fieldId == 0)
+                {
+                    members = codecs.GetCodec<ImmutableDictionary<SiloAddress, ClusterMember>>().ReadValue(ref reader, field);
+                }
+                else if (!clusterSnapshot && fieldId == 1)
+                {
+                    entries = codecs.GetCodec<ImmutableDictionary<SiloAddress, MembershipEntry>>().ReadValue(ref reader, field);
+                }
+                else
+                {
+                    reader.ConsumeUnknownField(field);
+                }
+            }
+
+            Assert.Equal(new MembershipVersion(7), version);
+            if (clusterSnapshot)
+            {
+                Assert.NotNull(members);
+                Assert.Equal(live.SiloAddress, Assert.Single(members).Key);
+                Assert.Equal(SiloStatus.Active, members[live.SiloAddress].Status);
+            }
+            else
+            {
+                Assert.NotNull(entries);
+                Assert.Equal(live.SiloAddress, Assert.Single(entries).Key);
+                Assert.Equal(SiloStatus.Active, entries[live.SiloAddress].Status);
+                Assert.Equal(live.IAmAliveTime, entries[live.SiloAddress].IAmAliveTime);
+            }
+        }
+
         [Theory]
         [InlineData(false, false)]
         [InlineData(false, true)]
