@@ -73,7 +73,7 @@ public sealed class ObservableGrainObserver : IObservableGrainObserver, IIncomin
     }
 
     public ValueTask OnNext(string data) => _updates.Writer.WriteAsync(data);
-    public ValueTask<List<(string InterfaceName, string MethodName)>> GetIncomingCalls() =>  new([.. _localCalls]);
+    public ValueTask<List<(string InterfaceName, string MethodName)>> GetIncomingCalls() => new([.. _localCalls]);
 
     public Task Invoke(IIncomingGrainCallContext context)
     {
