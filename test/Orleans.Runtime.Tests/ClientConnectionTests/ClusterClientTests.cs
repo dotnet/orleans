@@ -233,8 +233,10 @@ namespace Tester.ClientConnectionTests
             }
         }
 
-        [Fact]
-        public async Task StartAsync_CancellationWhileWaitingForRetryFilter_CancelsStartup()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task StartAsync_CancellationWhileWaitingForRetryFilter_CancelsStartup(bool faultAfterCancellation)
         {
             var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -256,6 +258,17 @@ namespace Tester.ClientConnectionTests
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
                 Assert.True(start.IsCanceled);
                 AssertConnectionsClosed(host);
+                Assert.False(release.Task.IsCompleted);
+                if (faultAfterCancellation)
+                {
+                    release.SetException(new InvalidOperationException("Retry filter failed after startup cancellation."));
+                    Assert.True(release.Task.IsFaulted);
+                }
+                else
+                {
+                    release.SetResult(false);
+                }
+
                 using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                 await host.StopAsync(shutdown.Token);
             }

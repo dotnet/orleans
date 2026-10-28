@@ -247,7 +247,9 @@ namespace Orleans
                     }
                     catch (Exception exception) when (retryFilter is not null && !cancellationToken.IsCancellationRequested)
                     {
-                        var shouldRetry = await retryFilter.ShouldRetryConnectionAttempt(exception, cancellationToken).WaitAsync(cancellationToken);
+                        var retry = retryFilter.ShouldRetryConnectionAttempt(exception, cancellationToken);
+                        retry.Ignore();
+                        var shouldRetry = await retry.WaitAsync(cancellationToken);
                         cancellationToken.ThrowIfCancellationRequested();
                         if (!shouldRetry)
                         {
