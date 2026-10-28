@@ -110,7 +110,7 @@ internal partial class InvokableObjectManager
                                 {
                                     // We must not allow a stuck/slow producer to result in us holding the lock for an unbounded time.
                                     // So just skip those that currently have an in-flight MoveNextAsync call.
-                                    continue; 
+                                    continue;
                                 }
 
                                 try
@@ -265,7 +265,7 @@ internal partial class InvokableObjectManager
             // Note: this method is deliberately kept as a single flat (but fat) body rather than split into helper
             // methods or local functions: it is the hot path for every MoveNext, and each nested
             // async function would introduce its own state machine allocation and continuation dispatch.
-            
+
             // First we wait to acquire exclusive access to this enumerator.
             // Cancellation here means the caller cancelled before we ever touched the producer.
 
@@ -282,7 +282,7 @@ internal partial class InvokableObjectManager
                 return (EnumerationResult.Canceled, default);
             }
 
-                        Task<bool>? moveNextTask = null;
+            Task<bool>? moveNextTask = null;
             (EnumerationResult Status, object? Value) result;
 
             try
