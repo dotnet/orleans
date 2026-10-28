@@ -19,6 +19,79 @@ namespace Tester.Cosmos.Clustering;
 public class CosmosMembershipTableCancellationTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Gateway_PreCanceled_DoesNotCreateClientOrAccessContainer(bool initialize)
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var factoryCalls = 0;
+        var options = new CosmosClusteringOptions();
+        options.ConfigureCosmosClient(_ =>
+        {
+            factoryCalls++;
+            throw new InvalidOperationException("No client should be created.");
+        });
+        var provider = CreateGatewayProvider(services, options);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => initialize
+            ? provider.InitializeGatewayListProviderAsync(cancellation.Token)
+            : provider.GetGatewaysAsync(cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(0, factoryCalls);
+    }
+
+    [Fact]
+    public async Task Gateway_CanceledInitialization_DoesNotUseOrDisposeLateSharedClient()
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var creation = new TaskCompletionSource<CosmosClient>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var client = new TrackingCosmosClient { Container = Substitute.For<Container>() };
+        var options = new CosmosClusteringOptions { DatabaseName = "database", ContainerName = "container" };
+        var factoryCalls = 0;
+        options.ConfigureCosmosClient(_ =>
+        {
+            factoryCalls++;
+            return new ValueTask<CosmosClient>(creation.Task);
+        });
+        var provider = CreateGatewayProvider(services, options);
+        using var cancellation = new CancellationTokenSource();
+        var initialization = provider.InitializeGatewayListProviderAsync(cancellation.Token);
+
+        Assert.Equal(1, factoryCalls);
+        Assert.False(initialization.IsCompleted);
+        cancellation.Cancel();
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => initialization.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.False(creation.Task.IsCompleted);
+        creation.SetResult(client);
+        // A retry is a deterministic fence after completion of the shared factory.
+        await provider.InitializeGatewayListProviderAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(2, factoryCalls);
+        Assert.Equal(1, client.ContainerCalls);
+        Assert.Equal(0, client.DisposeCalls);
+    }
+
+    [Fact]
+    public async Task Gateway_Initialization_PropagatesFactoryFailureUnchanged()
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var failure = new InvalidOperationException("Cosmos client creation failed.");
+        var options = new CosmosClusteringOptions();
+        options.ConfigureCosmosClient(_ => new ValueTask<CosmosClient>(Task.FromException<CosmosClient>(failure)));
+        var provider = CreateGatewayProvider(services, options);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => provider.InitializeGatewayListProviderAsync(TestContext.Current.CancellationToken));
+
+        Assert.Same(failure, exception);
+    }
+
+    [Theory]
     [InlineData("Initialize")]
     [InlineData("Delete")]
     [InlineData("Cleanup")]
@@ -941,6 +1014,10 @@ public class CosmosMembershipTableCancellationTests
             services,
             Options.Create(options),
             Options.Create(new ClusterOptions { ClusterId = "cluster" }));
+
+    private static CosmosGatewayListProvider CreateGatewayProvider(IServiceProvider services, CosmosClusteringOptions options) =>
+        new(NullLoggerFactory.Instance, services, Options.Create(options),
+            Options.Create(new ClusterOptions { ClusterId = "cluster" }), Options.Create(new GatewayOptions()));
 
     private sealed class TrackingCosmosClient : CosmosClient
     {

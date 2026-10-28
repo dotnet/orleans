@@ -903,7 +903,7 @@ public sealed class RelationalOrleansQueriesUnitTests
                     [30_003, 13, "10.2.3.5"]));
         var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
-        var result = await queries.ActiveGatewaysAsync("cluster-gateways");
+        var result = await queries.ActiveGatewaysAsync("cluster-gateways", TestContext.Current.CancellationToken);
 
         Assert.Equal(
             [new Uri("gwy.tcp://10.2.3.4:30002/12"), new Uri("gwy.tcp://10.2.3.5:30003/13")],

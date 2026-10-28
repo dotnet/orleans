@@ -1,10 +1,14 @@
 using System.Collections.ObjectModel;
+using System.Net;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
@@ -63,6 +67,305 @@ namespace Tester.ClientConnectionTests
             await host.StartAsync(TestContext.Current.CancellationToken);
             Assert.Single(exceptions);
             await host.StopAsync(TestContext.Current.CancellationToken);
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        public async Task StartAsync_CancellationWhileWaitingForManifest_CancelsStartup(bool stopApplication, bool pendingRequest)
+        {
+            var gateways = await HostedCluster.Client!.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var clusterOptions = HostedCluster.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value;
+            var manifestRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var manifestRequestCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var cancellation = new CancellationTokenSource();
+            using var host = new HostBuilder()
+                .UseOrleansClient(clientBuilder => clientBuilder
+                    .Configure<ClusterOptions>(options =>
+                    {
+                        options.ClusterId = clusterOptions.ClusterId;
+                        options.ServiceId = clusterOptions.ServiceId;
+                    })
+                    .UseStaticClustering(options => options.Gateways = [.. gateways])
+                    .AddOutgoingGrainCallFilter(async context =>
+                    {
+                        if (context.InterfaceName.Contains(nameof(IClusterManifestSystemTarget), StringComparison.Ordinal))
+                        {
+                            manifestRequested.TrySetResult();
+                            try
+                            {
+                                if (pendingRequest)
+                                {
+                                    await Task.Delay(Timeout.InfiniteTimeSpan, context.Request.GetCancellationToken());
+                                }
+
+                                throw new InvalidOperationException("Manifest retrieval is unavailable during client startup.");
+                            }
+                            finally
+                            {
+                                manifestRequestCompleted.TrySetResult();
+                            }
+                        }
+
+                        await context.Invoke();
+                    }))
+                .Build();
+
+            var start = host.StartAsync(cancellation.Token);
+            try
+            {
+                await manifestRequested.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                Assert.False(start.IsCompleted);
+
+                if (stopApplication)
+                {
+                    host.Services.GetRequiredService<IHostApplicationLifetime>().StopApplication();
+                }
+                else
+                {
+                    cancellation.Cancel();
+                }
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+                Assert.True(start.IsCanceled);
+                await manifestRequestCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                AssertConnectionsClosed(host);
+            }
+            finally
+            {
+                using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await host.StopAsync(shutdown.Token);
+                if (stopApplication)
+                {
+                    await ((IAsyncDisposable)host).DisposeAsync();
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task StartAsync_CancellationWhileWaitingForGateways_CancelsStartup(bool blockInitialization)
+        {
+            var provider = new BlockingGatewayListProvider(blockInitialization);
+            using var host = new HostBuilder()
+                .UseOrleansClient(builder => builder.UseLocalhostClustering()
+                    .ConfigureServices(services => services.AddSingleton<IGatewayListProvider>(provider)))
+                .Build();
+            using var cancellation = new CancellationTokenSource();
+            var start = host.StartAsync(cancellation.Token);
+            try
+            {
+                await provider.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                cancellation.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+                Assert.True(start.IsCanceled);
+                AssertConnectionsClosed(host);
+                using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await host.StopAsync(shutdown.Token);
+            }
+            finally
+            {
+                provider.Release.TrySetResult();
+            }
+        }
+
+        [Fact]
+        public async Task StartAsync_CancellationDuringGatewayRefresh_CancelsStartupAndManifestFetch()
+        {
+            var gateways = await HostedCluster.Client!.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var clusterOptions = HostedCluster.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value;
+            var provider = new RefreshingGatewayListProvider(gateways);
+            var clock = new FakeTimeProvider();
+            var manifestRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var manifestRequestCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var cancellation = new CancellationTokenSource();
+            using var host = new HostBuilder()
+                .UseOrleansClient(builder => builder
+                    .UseLocalhostClustering(clusterId: clusterOptions.ClusterId, serviceId: clusterOptions.ServiceId)
+                    .Configure<GatewayOptions>(options => options.GatewayListRefreshPeriod = TimeSpan.FromSeconds(1))
+                    .ConfigureServices(services =>
+                    {
+                        services.AddSingleton<IGatewayListProvider>(provider);
+                        services.AddKeyedSingleton<TimeProvider>(TimeProviderNames.Messaging, clock);
+                    })
+                    .AddOutgoingGrainCallFilter(async context =>
+                    {
+                        if (context.InterfaceName.Contains(nameof(IClusterManifestSystemTarget), StringComparison.Ordinal))
+                        {
+                            manifestRequested.TrySetResult();
+                            try
+                            {
+                                await Task.Delay(Timeout.InfiniteTimeSpan, context.Request.GetCancellationToken());
+                            }
+                            finally
+                            {
+                                manifestRequestCompleted.TrySetResult();
+                            }
+                        }
+                        else
+                        {
+                            await context.Invoke();
+                        }
+                    }))
+                .Build();
+
+            var start = host.StartAsync(cancellation.Token);
+            try
+            {
+                await manifestRequested.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                clock.Advance(TimeSpan.FromSeconds(1));
+                await provider.RefreshEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                cancellation.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+                await manifestRequestCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.True(start.IsCanceled);
+                Assert.False(provider.Release.Task.IsCompleted);
+                AssertConnectionsClosed(host);
+                using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await host.StopAsync(shutdown.Token);
+            }
+            finally
+            {
+                provider.Release.TrySetResult();
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task StartAsync_CancellationWhileWaitingForRetryFilter_CancelsStartup(bool faultAfterCancellation)
+        {
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var host = new HostBuilder()
+                .UseOrleansClient(builder => builder.UseLocalhostClustering()
+                    .ConfigureServices(services => services.AddSingleton<IGatewayListProvider>(new MockGatewayListProvider()))
+                    .UseConnectionRetryFilter((_, _) =>
+                    {
+                        entered.TrySetResult();
+                        return release.Task;
+                    }))
+                .Build();
+            using var cancellation = new CancellationTokenSource();
+            var start = host.StartAsync(cancellation.Token);
+            try
+            {
+                await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                cancellation.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+                Assert.True(start.IsCanceled);
+                AssertConnectionsClosed(host);
+                Assert.False(release.Task.IsCompleted);
+                if (faultAfterCancellation)
+                {
+                    release.SetException(new InvalidOperationException("Retry filter failed after startup cancellation."));
+                    Assert.True(release.Task.IsFaulted);
+                }
+                else
+                {
+                    release.SetResult(false);
+                }
+
+                using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await host.StopAsync(shutdown.Token);
+            }
+            finally
+            {
+                release.TrySetResult(false);
+            }
+        }
+
+        [Fact]
+        public async Task StartAsync_CancellationWhileConnecting_CancelsStartupAndConnectionAttempt()
+        {
+            var connector = new BlockingConnector();
+            using var host = new HostBuilder()
+                .UseOrleansClient(builder => builder.UseLocalhostClustering()
+                    .Configure<ConnectionOptions>(options => options.OpenConnectionTimeout = TimeSpan.FromMinutes(1))
+                    .ConfigureServices(services => services.AddKeyedSingleton<IConnectionFactory>(ClientOutboundConnectionFactory.ServicesKey, connector)))
+                .Build();
+            using var cancellation = new CancellationTokenSource();
+            var start = host.StartAsync(cancellation.Token);
+            await connector.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+            Assert.True(start.IsCanceled);
+            await connector.Completed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            AssertConnectionsClosed(host);
+            using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await host.StopAsync(shutdown.Token);
+        }
+
+        private static void AssertConnectionsClosed(IHost host)
+        {
+            var connections = host.Services.GetRequiredService<ConnectionManager>();
+            Assert.True(connections.Closed.IsCompletedSuccessfully);
+            Assert.Equal(0, connections.ConnectionCount);
+        }
+
+        private sealed class BlockingGatewayListProvider(bool blockInitialization) : IGatewayListProvider
+        {
+            public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public TimeSpan MaxStaleness => TimeSpan.FromHours(1);
+            public bool IsUpdatable => true;
+
+            public Task InitializeGatewayListProvider() => blockInitialization ? BlockAsync() : Task.CompletedTask;
+
+            public async Task<IList<Uri>> GetGateways()
+            {
+                await BlockAsync();
+                return [];
+            }
+
+            private Task BlockAsync()
+            {
+                Entered.TrySetResult();
+                return Release.Task;
+            }
+        }
+
+        private sealed class BlockingConnector : IConnectionFactory
+        {
+            public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public TaskCompletionSource Completed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public async ValueTask<ConnectionContext> ConnectAsync(EndPoint endpoint, CancellationToken cancellationToken = default)
+            {
+                Entered.TrySetResult();
+                try
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    throw new InvalidOperationException("The connection attempt must be canceled.");
+                }
+                finally
+                {
+                    Completed.TrySetResult();
+                }
+            }
+        }
+
+        private sealed class RefreshingGatewayListProvider(IList<Uri> gateways) : IGatewayListProvider
+        {
+            private int _calls;
+            public TaskCompletionSource RefreshEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public TimeSpan MaxStaleness => TimeSpan.FromHours(1);
+            public bool IsUpdatable => true;
+            public Task InitializeGatewayListProvider() => Task.CompletedTask;
+
+            public async Task<IList<Uri>> GetGateways()
+            {
+                if (Interlocked.Increment(ref _calls) > 1)
+                {
+                    RefreshEntered.TrySetResult();
+                    await Release.Task;
+                }
+
+                return gateways;
+            }
         }
 
         public class MockGatewayListProvider : IGatewayListProvider

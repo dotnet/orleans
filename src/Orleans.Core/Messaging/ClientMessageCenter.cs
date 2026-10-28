@@ -143,6 +143,10 @@ namespace Orleans.Messaging
                     }
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception exception)
             {
                 throw new ConnectionFailedException(
