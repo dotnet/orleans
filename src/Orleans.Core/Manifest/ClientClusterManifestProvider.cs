@@ -21,7 +21,6 @@ namespace Orleans.Runtime
     /// </summary>
     internal partial class ClientClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable
     {
-        private readonly TaskCompletionSource<bool> _initialized = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ILogger<ClientClusterManifestProvider> _logger;
         private readonly TypeManagementOptions _typeManagementOptions;
         private readonly IServiceProvider _services;
@@ -71,20 +70,25 @@ namespace Orleans.Runtime
         /// <summary>
         /// Starts this service and waits for the initial cluster manifest.
         /// </summary>
+        /// <remarks>
+        /// Callers serialize start attempts. After initialization succeeds, refreshes follow the service lifetime.
+        /// </remarks>
         /// <param name="cancellationToken">The token used to cancel initialization and stop its background work.</param>
         /// <returns>A <see cref="Task"/> which completes once the service has started.</returns>
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            Debug.Assert(_runTask is null || _runTask.IsCompleted);
             var shutdownToken = _shutdownCts.Token;
-            _runTask = Task.Run(RunAsync, CancellationToken.None);
+            var initialization = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var runTask = _runTask = Task.Run(() => RunAsync(initialization), CancellationToken.None);
             try
             {
-                var initialized = await _initialized.Task.WaitAsync(cancellationToken);
+                var initialized = await initialization.Task.WaitAsync(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!initialized)
                 {
-                    await _runTask;
+                    await runTask.WaitAsync(cancellationToken);
                     Debug.Assert(shutdownToken.IsCancellationRequested);
                     throw new OperationCanceledException(shutdownToken);
                 }
@@ -121,7 +125,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task RunAsync()
+        private async Task RunAsync(TaskCompletionSource<bool> initialization)
         {
             try
             {
@@ -195,7 +199,7 @@ namespace Orleans.Runtime
                         }
 
                         ManifestEvents.EmitClusterManifestUpdated(this, updatedManifest);
-                        _initialized.TrySetResult(true);
+                        initialization.TrySetResult(true);
 
                         LogRefreshedClusterManifest(_logger);
 
@@ -221,7 +225,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                _initialized.TrySetResult(false);
+                initialization.TrySetResult(false);
 
                 LogStoppedRefreshingClusterManifest(_logger);
             }

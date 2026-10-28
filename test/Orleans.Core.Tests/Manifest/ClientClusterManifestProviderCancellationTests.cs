@@ -26,6 +26,103 @@ namespace UnitTests.Manifest;
 public class ClientClusterManifestProviderCancellationTests
 {
     [Fact]
+    public async Task StartAsync_RetryAfterFailure_WaitsForFreshInitializationAndSucceeds()
+    {
+        var failure = new InvalidOperationException("First manifest run setup failed.");
+        await using var fixture = new Fixture(factoryFailure: failure);
+        await fixture.Gateways.StartAsync(TestContext.Current.CancellationToken);
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(
+            () => Await(fixture.Provider.StartAsync(TestContext.Current.CancellationToken))));
+        fixture.FactoryFailure = null;
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var refreshEntered = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var initial = new TaskCompletionSource<ClusterManifestUpdate?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var refresh = new TaskCompletionSource<ClusterManifestUpdate?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var requests = 0;
+        fixture.Remote.GetClusterManifestUpdate(Arg.Any<MajorMinorVersion>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                if (Interlocked.Increment(ref requests) == 1)
+                {
+                    entered.SetResult();
+                    return new ValueTask<ClusterManifestUpdate?>(initial.Task);
+                }
+
+                refreshEntered.TrySetResult(call.Arg<CancellationToken>());
+                return new ValueTask<ClusterManifestUpdate?>(refresh.Task);
+            });
+        var retry = fixture.Provider.StartAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            await Await(entered.Task);
+            Assert.False(retry.IsCompleted);
+            Assert.Equal(MajorMinorVersion.MinValue, fixture.Provider.Current.Version);
+
+            initial.SetResult(Update(1));
+            await Await(retry);
+
+            Assert.True(retry.IsCompletedSuccessfully);
+            Assert.Equal(new MajorMinorVersion(1, 1), fixture.Provider.Current.Version);
+            Assert.Equal(2, fixture.FactoryResolutions);
+            var lifetimeToken = await Await(refreshEntered.Task);
+            Assert.False(lifetimeToken.IsCancellationRequested);
+            Assert.Equal(1, fixture.Logger.StoppedCount); // Only the failed first run stopped.
+            await Await(fixture.Provider.StopAsync(TestContext.Current.CancellationToken));
+            Assert.True(lifetimeToken.IsCancellationRequested);
+            Assert.Equal(2, fixture.Logger.StoppedCount);
+            Assert.False(refresh.Task.IsCompleted);
+        }
+        finally
+        {
+            initial.TrySetException(new InvalidOperationException("Late initial request failure."));
+            refresh.TrySetException(new InvalidOperationException("Late refresh failure."));
+        }
+    }
+
+    [Fact]
+    public async Task StartAsync_RetryAfterFailure_CancellationStopsFreshRun()
+    {
+        var failure = new InvalidOperationException("First manifest run setup failed.");
+        await using var fixture = new Fixture(factoryFailure: failure);
+        await fixture.Gateways.StartAsync(TestContext.Current.CancellationToken);
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(
+            () => Await(fixture.Provider.StartAsync(TestContext.Current.CancellationToken))));
+        fixture.FactoryFailure = null;
+        var entered = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var rpc = new TaskCompletionSource<ClusterManifestUpdate?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.Remote.GetClusterManifestUpdate(Arg.Any<MajorMinorVersion>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                entered.TrySetResult(call.Arg<CancellationToken>());
+                return new ValueTask<ClusterManifestUpdate?>(rpc.Task);
+            });
+        using var cancellation = new CancellationTokenSource();
+        var retry = fixture.Provider.StartAsync(cancellation.Token);
+        try
+        {
+            var lifetimeToken = await Await(entered.Task);
+            Assert.False(retry.IsCompleted);
+
+            cancellation.Cancel();
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Await(retry));
+
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            Assert.True(retry.IsCanceled);
+            Assert.True(lifetimeToken.IsCancellationRequested);
+            Assert.Equal(2, fixture.FactoryResolutions);
+            Assert.Equal(2, fixture.Logger.StoppedCount);
+            Assert.Equal(MajorMinorVersion.MinValue, fixture.Provider.Current.Version);
+            Assert.False(rpc.Task.IsCompleted);
+            Assert.DoesNotContain(fixture.Remote.ReceivedCalls(),
+                call => call.GetMethodInfo().Name == nameof(IClusterManifestSystemTarget.GetClusterManifest));
+        }
+        finally
+        {
+            rpc.TrySetException(new InvalidOperationException("Late canceled retry failure."));
+        }
+    }
+
+    [Fact]
     public async Task StartAsync_IncompleteInitialization_StopPropagatesLifetimeCancellation()
     {
         await using var fixture = new Fixture();
@@ -345,6 +442,7 @@ public class ClientClusterManifestProviderCancellationTests
         private readonly ServiceProvider _services;
         private int _factoryResolutions;
         public int FactoryResolutions => Volatile.Read(ref _factoryResolutions);
+        public Exception? FactoryFailure { get; set; }
         public IInternalGrainFactory Factory { get; } = Substitute.For<IInternalGrainFactory>();
         public IClusterManifestSystemTarget Remote { get; } = Substitute.For<IClusterManifestSystemTarget>();
         public ShutdownLogger Logger { get; } = new();
@@ -355,15 +453,16 @@ public class ClientClusterManifestProviderCancellationTests
 
         public Fixture(bool emptyGateways = false, Exception? factoryFailure = null)
         {
+            FactoryFailure = factoryFailure;
             _services = new ServiceCollection()
                 .AddMetrics()
                 .AddSingleton<OrleansInstruments>()
                 .AddSingleton<IInternalGrainFactory>(_ =>
                 {
                     Interlocked.Increment(ref _factoryResolutions);
-                    if (factoryFailure is not null)
+                    if (FactoryFailure is { } failure)
                     {
-                        throw factoryFailure;
+                        throw failure;
                     }
 
                     return Factory;
