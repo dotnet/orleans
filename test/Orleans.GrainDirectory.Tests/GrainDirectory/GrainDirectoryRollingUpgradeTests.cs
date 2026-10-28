@@ -35,8 +35,8 @@ internal class RollingUpgradeTestGrain : Grain, IRollingUpgradeTestGrain
 }
 
 /// <summary>
-/// Tests rolling upgrade from <see cref="LocalGrainDirectory"/> to <see cref="DistributedGrainDirectory"/>.
-/// Starts a cluster with only LocalGrainDirectory, then adds silos with DistributedGrainDirectory
+/// Tests rolling upgrade from LegacyGrainDirectory to <see cref="DistributedGrainDirectory"/>.
+/// Starts a cluster using LegacyGrainDirectory, then adds silos with DistributedGrainDirectory
 /// while removing old silos, verifying grain calls succeed after each step.
 /// </summary>
 [TestSuite("Functional")]
@@ -47,26 +47,25 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
     private static readonly TimeSpan DirectoryConvergenceTimeout = TimeSpan.FromSeconds(30);
 
     [Fact]
-    public async Task RollingUpgrade_LocalToDistributed_NoErrors()
+    public async Task RollingUpgrade_LegacyToDistributed_NoErrors()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(3);
-        // Initial silos use LocalGrainDirectory only; later silos opt into DistributedGrainDirectory.
+        // Initial silos use LegacyGrainDirectory; later silos opt into DistributedGrainDirectory.
         builder.Options.UseTestClusterGrainDirectory = false;
         var initialSiloCount = builder.Options.InitialSilosCount;
         var clusterId = builder.Options.ClusterId;
-        var handoffPhase = new RollingUpgradePhase("local-to-distributed", output);
+        var handoffPhase = new RollingUpgradePhase("legacy-to-distributed", output);
         var handoffLogs = new PhaseAwareLogCapture(handoffPhase);
         builder.ConfigureSilo((siloOptions, siloBuilder) =>
         {
             if (!ShouldUseDistributedDirectory(siloOptions.SiloName, initialSiloCount))
             {
+                siloBuilder.UseLegacyGrainDirectory();
                 return;
             }
 
-#pragma warning disable ORLEANSEXP003
             siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003
         });
         builder.ConfigureSiloHost((_, hostBuilder) => ConfigureErrorLogCapture(hostBuilder, clusterId));
         builder.ConfigureSiloHost((_, hostBuilder) => ConfigureRollingUpgradeDiagnosticCapture(hostBuilder, clusterId));
@@ -82,7 +81,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         try
         {
             await cluster.DeployAsync(cancellationToken);
-            output.WriteLine($"Cluster deployed with {cluster.Silos.Count} silos (LocalGrainDirectory only).");
+            output.WriteLine($"Cluster deployed with {cluster.Silos.Count} silos (LegacyGrainDirectory only).");
 
             IGrainFactory client = cluster.Client!;
             var grainId = 0L;
@@ -90,8 +89,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
             try
             {
-                // Phase 1: Drive load on the LocalGrainDirectory cluster.
-                output.WriteLine("Phase 1: Driving load on LocalGrainDirectory cluster...");
+                // Phase 1: Drive load on the LegacyGrainDirectory cluster.
+                output.WriteLine("Phase 1: Driving load on LegacyGrainDirectory cluster...");
                 await DriveLoad(client, nextGrainId, count: 100, cancellationToken, id => failingGrainKey = id);
 
                 // Phase 2: Add DistributedGrainDirectory silos one at a time.
@@ -130,7 +129,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 client = cluster.Client!;
 
                 // Phase 3: Stop old silos one at a time, non-primary first.
-                output.WriteLine($"Phase 3: Removing {oldSilos.Count} old LocalGrainDirectory silos...");
+                output.WriteLine($"Phase 3: Removing {oldSilos.Count} LegacyGrainDirectory silos...");
                 var transitionIndex = 0;
                 foreach (var oldSilo in oldSilos.OrderBy(static s => s.InstanceNumber == 0 ? 1 : 0))
                 {
@@ -439,9 +438,11 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         var isMixedDirectoryCluster = distributedSiloCount > 0 && distributedSiloCount < cluster.Silos.Count;
         if (isMixedDirectoryCluster)
         {
+            // Mixed legacy/distributed-directory upgrades can temporarily have duplicate activations.
+            // Final all-distributed checkpoints require those duplicates to be resolved.
             output.WriteLine(
                 $"  Observed {activations.Count} activations across {distributedSiloCount} DistributedGrainDirectory "
-                + $"and {cluster.Silos.Count - distributedSiloCount} LocalGrainDirectory silos {stage}; "
+                + $"and {cluster.Silos.Count - distributedSiloCount} LegacyGrainDirectory silos {stage}; "
                 + "steady-state uniqueness and partition integrity are validated after the upgrade completes.");
             return;
         }
@@ -876,7 +877,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         var operationTimeout = TimeSpan.FromSeconds(45);
         var cleanupTimeout = TimeSpan.FromSeconds(30);
         var upgradedSiloNames = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
-        var phase = new RollingUpgradePhase("deploy-local", output);
+        var phase = new RollingUpgradePhase("deploy-legacy", output);
         var logs = new PhaseAwareLogCapture(phase);
         var staleCacheEvidence = new StaleCacheEvidenceCapture();
         var retiredAddresses = new HashSet<SiloAddress>();
@@ -891,12 +892,11 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         {
             if (!upgradedSiloNames.ContainsKey(siloOptions.SiloName))
             {
+                siloBuilder.UseLegacyGrainDirectory();
                 return;
             }
 
-#pragma warning disable ORLEANSEXP003
             siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003
         });
         builder.ConfigureSiloHost((siloOptions, hostBuilder) =>
         {
@@ -929,7 +929,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             Assert.Empty(upgradedSiloNames);
 
             output.WriteLine(
-                $"Phase '{phase.Current}': {SiloCount} LocalGrainDirectory silos: "
+                $"Phase '{phase.Current}': {SiloCount} LegacyGrainDirectory silos: "
                 + string.Join(", ", cluster.Silos.Select(static silo => $"{silo.Name}={silo.SiloAddress}")));
 
             var initialObservations = await CallIdentityGrainsAsync(
@@ -942,13 +942,13 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 trackedGrainKeys,
                 operationTimeout,
                 cancellationToken);
-            AssertStableActivationProgress(initialObservations, repeatedInitialObservations, "initial LocalGrainDirectory phase");
+            AssertStableActivationProgress(initialObservations, repeatedInitialObservations, "initial LegacyGrainDirectory phase");
             await ValidateTrackedDirectoryCheckpointAsync(
                 cluster,
                 repeatedInitialObservations,
                 cluster.Silos.Select(static silo => silo.SiloAddress).ToHashSet(),
                 retiredAddresses,
-                "initial LocalGrainDirectory phase",
+                "initial LegacyGrainDirectory phase",
                 staleCacheEvidence,
                 cancellationToken);
 
@@ -969,7 +969,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 cancellationToken);
             await traffic.WaitForAllWorkersProgressAsync(
                 initialWorkerProgress,
-                "initial LocalGrainDirectory traffic",
+                "initial LegacyGrainDirectory traffic",
                 operationTimeout,
                 cancellationToken);
             AssertNoTrafficFailures(traffic, phase.Current);
