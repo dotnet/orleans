@@ -249,11 +249,11 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="deploymentId">The deployment for which to query the gateways.</param>
         /// <returns>The gateways for the silo.</returns>
-        internal Task<List<Uri>> ActiveGatewaysAsync(string deploymentId)
+        internal Task<List<Uri>> ActiveGatewaysAsync(string deploymentId, CancellationToken cancellationToken = default)
         {
             return ReadAsync(dbStoredQueries.GatewaysQueryKey, DbStoredQueries.Converters.GetGatewayUri, command =>
                 new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, Status = SiloStatus.Active },
-                ret => ret.ToList());
+                ret => ret.ToList(), cancellationToken);
         }
 
         /// <summary>
