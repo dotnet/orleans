@@ -148,19 +148,26 @@ namespace Orleans.AzureUtils
             return address.ToGatewayUri();
         }
 
-        public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
+        public async Task<IList<Uri>> FindAllGatewayProxyEndpoints(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogDebugSearchingGateway(this.DeploymentId);
 
             try
             {
                 const string Zero = "0";
-                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(TableClient.CreateQueryFilter($"PartitionKey eq {DeploymentId} and Status eq {INSTANCE_STATUS_ACTIVE} and ProxyPort ne {Zero}"));
+                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(
+                    TableClient.CreateQueryFilter($"PartitionKey eq {DeploymentId} and Status eq {INSTANCE_STATUS_ACTIVE} and ProxyPort ne {Zero}"),
+                    cancellationToken);
 
                 var gatewaySiloInstances = queryResults.Select(entity => ConvertToGatewayUri(entity.Item1)).ToList();
 
                 LogFoundGateway(gatewaySiloInstances.Count, this.DeploymentId);
                 return gatewaySiloInstances;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exc)
             {

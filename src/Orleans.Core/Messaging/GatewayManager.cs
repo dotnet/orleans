@@ -69,11 +69,11 @@ namespace Orleans.Messaging
             cancellationToken.ThrowIfCancellationRequested();
             if (!gatewayListProviderInitialized)
             {
-                await this.gatewayListProvider.InitializeGatewayListProvider().WaitAsync(cancellationToken);
+                await this.gatewayListProvider.InitializeGatewayListProviderAsync(cancellationToken);
                 gatewayListProviderInitialized = true;
             }
 
-            var knownGateways = await this.gatewayListProvider.GetGateways().WaitAsync(cancellationToken);
+            var knownGateways = await this.gatewayListProvider.GetGatewaysAsync(cancellationToken);
             if (knownGateways == null || knownGateways.Count == 0)
             {
                 // this situation can occur if the client starts faster than the silos.
@@ -271,7 +271,7 @@ namespace Orleans.Messaging
 
                 // the listProvider.GetGateways() is not under lock.
                 shutdownToken.ThrowIfCancellationRequested();
-                var allGateways = await gatewayListProvider.GetGateways().WaitAsync(shutdownToken);
+                var allGateways = await gatewayListProvider.GetGatewaysAsync(shutdownToken);
                 var refreshedGateways = allGateways.Select(gw => gw.ToGatewayAddress()!).ToList();
 
                 await UpdateLiveGatewaysSnapshot(refreshedGateways, gatewayListProvider.MaxStaleness);

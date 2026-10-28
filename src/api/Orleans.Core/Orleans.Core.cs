@@ -1008,7 +1008,9 @@ namespace Orleans.Messaging
         System.TimeSpan MaxStaleness { get; }
 
         System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>> GetGateways();
+        System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>> GetGatewaysAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task InitializeGatewayListProvider();
+        System.Threading.Tasks.Task InitializeGatewayListProviderAsync(System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial class StaticGatewayListProvider : IGatewayListProvider
@@ -1021,7 +1023,11 @@ namespace Orleans.Messaging
 
         public System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>> GetGateways() { throw null; }
 
+        public System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>> GetGatewaysAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public System.Threading.Tasks.Task InitializeGatewayListProvider() { throw null; }
+
+        public System.Threading.Tasks.Task InitializeGatewayListProviderAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 
