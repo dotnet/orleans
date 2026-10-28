@@ -19,14 +19,31 @@ namespace UnitTests.GrainDirectory;
 [TestProvider("None")]
 [TestArea("GrainDirectory")]
 [TestCategory("BVT"), TestCategory("Directory")]
-public sealed class DefaultGrainDirectoryTests(DefaultClusterFixture fixture, ITestOutputHelper output)
-    : GrainDirectoryTests<IGrainDirectory>(output), IClassFixture<DefaultClusterFixture>
+public sealed class DefaultGrainDirectoryTests(DefaultGrainDirectoryFixture fixture, ITestOutputHelper output)
+    : GrainDirectoryTests<IGrainDirectory>(output), IClassFixture<DefaultGrainDirectoryFixture>
 {
     private readonly TestCluster _testCluster = fixture.HostedCluster;
     private InProcessSiloHandle Primary => (InProcessSiloHandle)_testCluster.Primary!;
 
     protected override IGrainDirectory CreateGrainDirectory() =>
         Primary.SiloHost.Services.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
+}
+
+public sealed class DefaultGrainDirectoryFixture : BaseTestClusterFixture
+{
+    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    {
+        builder.AddSiloBuilderConfigurator<DefaultClusterFixture.SiloHostConfigurator>();
+        builder.AddSiloBuilderConfigurator<SyntheticMembershipConfigurator>();
+    }
+
+    private sealed class SyntheticMembershipConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder siloBuilder) =>
+            // The provider contract tests register synthetic, absent silos with fixed generations.
+            // Their directory semantics are independent of clock-derived generation retirement.
+            siloBuilder.Configure<ClusterMembershipOptions>(options => options.SiloGenerationRetirementAge = null);
+    }
 }
 
 [TestSuite("BVT")]

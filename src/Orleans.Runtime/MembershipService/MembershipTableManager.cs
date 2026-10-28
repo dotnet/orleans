@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -185,7 +186,9 @@ namespace Orleans.Runtime.MembershipService
             LogInformationReceivedClusterMembershipSnapshot(this.log, snapshot);
 
             cancellationToken.ThrowIfCancellationRequested();
-            this.TryProcessMembershipUpdate(MembershipTableSnapshot.Update, snapshot, nameof(RefreshFromSnapshot));
+            this.TryProcessMembershipUpdate(
+                MembershipTableSnapshot.Update, snapshot, nameof(RefreshFromSnapshot),
+                snapshot.GetSiloStatus(this.myAddress, includeRetirement: false), snapshot.Version);
         }
 
         private async Task<bool> RefreshInternal(bool requireCleanup, CancellationToken cancellationToken)
@@ -530,7 +533,11 @@ namespace Orleans.Runtime.MembershipService
             if (table is null) throw new ArgumentNullException(nameof(table));
             LogDebugProcessTableUpdate(this.log, caller, table);
 
-            if (this.TryProcessMembershipUpdate(MembershipTableSnapshot.Update, table, caller))
+            var observedLocalStatus = table.TryGet(this.myAddress)?.Item1.Status
+                ?? MembershipTableSnapshot.GetMissingSiloStatus(
+                    this.myAddress, 0, FrozenSet<SiloAddress>.Empty, table.Members.Select(entry => entry.Item1.SiloAddress));
+            if (this.TryProcessMembershipUpdate(
+                MembershipTableSnapshot.Update, table, caller, observedLocalStatus, new MembershipVersion(table.Version.Version)))
             {
                 this.LogMissedIAmAlives(table);
 
@@ -542,48 +549,44 @@ namespace Orleans.Runtime.MembershipService
         private bool TryProcessMembershipUpdate<TState>(
             Func<MembershipTableSnapshot, TState, MembershipTableSnapshot> updateFunc,
             TState state,
-            string caller)
+            string caller,
+            SiloStatus observedLocalStatus,
+            MembershipVersion observedVersion)
         {
             var wasPublished = this.updates.TryPublish(
                 static (published, update) => update.Manager.ProcessMembershipUpdate(
                     published,
-                    update.UpdateFunc(published, update.State)),
-                (Manager: this, UpdateFunc: updateFunc, State: state));
+                    update.UpdateFunc(published, update.State),
+                    update.ObservedLocalStatus,
+                    update.ObservedVersion),
+                (Manager: this, UpdateFunc: updateFunc, State: state, ObservedLocalStatus: observedLocalStatus, ObservedVersion: observedVersion));
 
-            // Even a rejected snapshot can establish local death from previously unseen registration evidence.
+            // Snapshot merging includes death evidence from delayed reads and write completions.
             this.CheckIfLocalSiloIsDead(caller);
             return wasPublished;
         }
 
         private MembershipTableSnapshot ProcessMembershipUpdate(
             MembershipTableSnapshot published,
-            MembershipTableSnapshot candidate)
+            MembershipTableSnapshot candidate,
+            SiloStatus observedLocalStatus,
+            MembershipVersion observedVersion)
         {
-            // This runs under the publication lock. The candidate comes from an incoming read or
-            // successful write result, which can arrive out of version order.
-            //
-            // For example, our Joining write can commit at V, then a peer declares us Dead and prunes
-            // our row at V+1. If we observe V+1 before the write completes, local status is still Created.
-            // The delayed result proves we were registered and subsequently removed, so it establishes
-            // local death even though the canonical view must remain at V+1.
-            if (candidate.Version <= published.Version
-                && candidate.Entries.TryGetValue(this.myAddress, out var localEntry)
-                && !published.Entries.ContainsKey(this.myAddress))
+            Debug.Assert(candidate.Version >= published.Version, "Snapshot merging preserves the latest canonical membership view.");
+            // Compaction can replace explicit registration/removal evidence with the age cutoff.
+            // Preserve that terminal local decision before applying the pre-registration age exemption.
+            var hasLocalDeathEvidence = published.Entries.ContainsKey(this.myAddress)
+                ? candidate.Version > published.Version
+                : observedLocalStatus == SiloStatus.Dead
+                    || (observedLocalStatus != SiloStatus.None && observedVersion < candidate.Version);
+            if (!candidate.Entries.ContainsKey(this.myAddress) && hasLocalDeathEvidence)
             {
-                // Equal versions cover a Dead row whose pruning did not advance the table version.
-                Debug.Assert(
-                    candidate.Version < published.Version || localEntry.Status == SiloStatus.Dead,
-                    "Only Dead rows can be pruned without advancing the membership version.");
-                var current = Volatile.Read(ref _state);
-                if (current.LocalSiloStatus != SiloStatus.Dead)
-                {
-                    Interlocked.Exchange(ref _state, new MembershipState(published, SiloStatus.Dead));
-                }
+                Interlocked.Exchange(ref _state, new MembershipState(published, SiloStatus.Dead));
             }
 
-            // Successor validation decides whether equal/newer candidates advance the view, including
-            // rejecting an equal-version candidate which would reintroduce a pruned row.
-            return candidate.Version < published.Version ? published : candidate;
+            // TODO: Establish the floor centrally through membership and fence admissions with its version/ETag.
+            // A write stalled beyond the retirement age can otherwise commit after local absence was classified as death.
+            return candidate.RetireGenerations(this.timeProvider.GetUtcNow().UtcDateTime, this.clusterMembershipOptions.SiloGenerationRetirementAge);
         }
 
         private void CheckIfLocalSiloIsDead(string caller)
@@ -592,7 +595,7 @@ namespace Orleans.Runtime.MembershipService
             if (!this.IsStopping && current.LocalSiloStatus == SiloStatus.Dead)
             {
                 LogWarningFoundMyselfDeadInMembershipUpdate(this.log, caller, current.Snapshot);
-                this.KillMyselfLocally($"I should be Dead according to the membership table (in {caller}). Membership: {current.Snapshot}.");
+                this.KillMyselfLocally($"The membership view classifies this silo as Dead (in {caller}). Membership: {current.Snapshot}.");
             }
         }
 
@@ -701,11 +704,17 @@ namespace Orleans.Runtime.MembershipService
         private void PublishSnapshot(MembershipTableSnapshot snapshot)
         {
             var previous = Volatile.Read(ref _state);
-            var localSiloStatus = previous.LocalSiloStatus == SiloStatus.Dead
-                ? SiloStatus.Dead
-                : snapshot.Entries.TryGetValue(this.myAddress, out var localEntry)
-                    ? localEntry.Status
-                    : previous.Snapshot.Entries.ContainsKey(this.myAddress) ? SiloStatus.Dead : previous.LocalSiloStatus;
+            // Before registration, age alone cannot establish local death, including with a zero retirement age.
+            // Recorded death, removal, and successor evidence still apply.
+            var localSiloStatus = snapshot.GetSiloStatus(this.myAddress, includeRetirement: previous.LocalSiloStatus != SiloStatus.Created);
+            if (previous.LocalSiloStatus == SiloStatus.Dead)
+            {
+                localSiloStatus = SiloStatus.Dead;
+            }
+            else if (localSiloStatus == SiloStatus.None)
+            {
+                localSiloStatus = previous.LocalSiloStatus;
+            }
             Debug.Assert(localSiloStatus >= previous.LocalSiloStatus, "The local silo status cannot transition backwards.");
 
             Interlocked.Exchange(ref _state, new MembershipState(snapshot, localSiloStatus));

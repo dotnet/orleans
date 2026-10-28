@@ -49,7 +49,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     private Func<Task> _onPublishRegistered = static () => Task.CompletedTask;
     private Action _schedulePublishUpdate;
     private Task? _runTask;
-    private MembershipVersion _observedMembershipVersion = MembershipVersion.MinValue;
+    private ClusterMembershipSnapshot? _observedMembership;
     private long _observedConnectedClientsVersion = -1;
     private long _localVersion = 1;
     private IRemoteClientDirectory[] _remoteDirectories = Array.Empty<IRemoteClientDirectory>();
@@ -178,7 +178,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
         bool IsStale()
         {
-            return _observedMembershipVersion < _clusterMembershipService.CurrentSnapshot.Version
+            return !ReferenceEquals(_observedMembership, _clusterMembershipService.CurrentSnapshot)
                 || _observedConnectedClientsVersion != _connectedClients.Version;
         }
     }
@@ -253,7 +253,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             }
 
             // Ensure that the remote directories are up-to-date.
-            if (membershipSnapshot.Version > _observedMembershipVersion)
+            if (_observedMembership is null || membershipSnapshot.Version > _observedMembership.Version)
             {
                 var remotesBuilder = new List<IRemoteClientDirectory>(membershipSnapshot.Members.Count);
                 foreach (var member in membershipSnapshot.Members.Values)
@@ -268,19 +268,19 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             }
 
             // Remove defunct silos.
+            foreach (var silo in _table.Keys)
+            {
+                if (membershipSnapshot.GetSiloStatus(silo).IsTerminating())
+                {
+                    table ??= _table.ToBuilder();
+                    table.Remove(silo);
+                }
+            }
+
             foreach (var member in membershipSnapshot.Members.Values)
             {
                 var silo = member.SiloAddress;
-                if (member.Status.IsTerminating())
-                {
-                    // Remove the silo only if it is in the table. This prevents us from rebuilding data structures unnecessarily.
-                    if (_table.ContainsKey(silo))
-                    {
-                        table ??= _table.ToBuilder();
-                        table.Remove(silo);
-                    }
-                }
-                else if (member.Status == SiloStatus.Active)
+                if (member.Status == SiloStatus.Active)
                 {
                     // If the silo has just become active and we have not yet received a set of connected clients from it,
                     // add the hosted client automatically, to expedite the process.
@@ -294,7 +294,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 }
             }
 
-            _observedMembershipVersion = membershipSnapshot.Version;
+            _observedMembership = membershipSnapshot;
 
             // Update locally connected clients.
             var (clients, version) = GetConnectedClients(_localClients, _localVersion);

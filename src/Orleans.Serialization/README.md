@@ -12,6 +12,9 @@ dotnet add package Microsoft.Orleans.Serialization
 
 This package is automatically included when you reference the Orleans SDK or the Orleans client/server metapackages.
 
+The package includes the Orleans source generator and analyzers. Codecs and
+copiers for types marked with `[GenerateSerializer]` are generated during compilation.
+
 ## Example
 
 ```csharp

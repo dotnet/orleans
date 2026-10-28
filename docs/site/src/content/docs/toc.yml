@@ -445,6 +445,8 @@ items:
             href: diagnostics/orleans0026.md
           - name: ORLEANS0027
             href: diagnostics/orleans0027.md
+          - name: ORLEANS0028
+            href: diagnostics/orleans0028.md
       - name: API context and examples
         href: resources/api-reference-guide.md
       - name: Best practices
@@ -461,10 +463,12 @@ items:
         href: resources/frequently-asked-questions.md
       - name: Symptom and signal catalog
         href: host/monitoring/troubleshooting-symptom-catalog.md
-  - name: Upgrade to Orleans 10
+  - name: Upgrade and migration
     items:
       - name: Migration overview
         href: migration-guide.md
+      - name: Migrate contract identities
+        href: migration/contract-identities.md
       - name: Deployment and rollback
         href: migration/deployment-and-rollback.md
       - name: Upgrade from Orleans 9

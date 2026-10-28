@@ -57,6 +57,11 @@ namespace Orleans.Runtime.Configuration
                 throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.DefunctSiloMinimumRetention)} ({clusterMembershipOptions.DefunctSiloMinimumRetention}) must be greater than or equal to 0.");
             }
 
+            if (clusterMembershipOptions.SiloGenerationRetirementAge < TimeSpan.Zero)
+            {
+                throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.SiloGenerationRetirementAge)} ({clusterMembershipOptions.SiloGenerationRetirementAge}) must be greater than or equal to 0, or null.");
+            }
+
             if (clusterMembershipOptions.ProbeTimeout <= TimeSpan.Zero)
             {
                 throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.ProbeTimeout)} ({clusterMembershipOptions.ProbeTimeout}) must be greater than 0.");

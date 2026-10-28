@@ -123,6 +123,21 @@ namespace Orleans.Runtime
             return unchecked((int)elapsed); // Unchecked to truncate any bits beyond the lower 32
         }
 
+        internal static int GetGenerationRetirementFloor(DateTime utcNow, TimeSpan retirementAge)
+        {
+            var elapsedTicks = utcNow.Ticks - epoch;
+            if (retirementAge.Ticks >= elapsedTicks)
+            {
+                return 0;
+            }
+
+            // Generations identify whole seconds. Round up so the exclusive floor includes
+            // generations strictly older than a cutoff falling between seconds.
+            return (int)Math.Min(
+                (elapsedTicks - retirementAge.Ticks + TimeSpan.TicksPerSecond - 1) / TimeSpan.TicksPerSecond,
+                int.MaxValue);
+        }
+
         /// <summary>
         /// Return this SiloAddress in a standard string form, suitable for later use with the <c>FromParsableString</c> method.
         /// </summary>
