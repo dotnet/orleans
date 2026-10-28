@@ -21,6 +21,15 @@ namespace Orleans.Transactions.Abstractions
         Task<TResult> PerformRead<TResult>(Func<TState, TResult> readFunction);
 
         /// <summary>
+        /// Performs a read operation with the specified isolation and returns the result.
+        /// </summary>
+        /// <typeparam name="TResult">The result type.</typeparam>
+        /// <param name="readFunction">A function that reads the state and returns the result.</param>
+        /// <param name="isolation">The read isolation.</param>
+        /// <returns>A task whose result is the value returned by <paramref name="readFunction"/>.</returns>
+        Task<TResult> PerformRead<TResult>(Func<TState, TResult> readFunction, ReadIsolation isolation);
+
+        /// <summary>
         /// Performs an update operation and returns the result.
         /// </summary>
         /// <typeparam name="TResult">The result type.</typeparam>

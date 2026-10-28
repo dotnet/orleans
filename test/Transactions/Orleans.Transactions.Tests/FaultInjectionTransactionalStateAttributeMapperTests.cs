@@ -1,6 +1,7 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
+using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.TestKit;
 using TestExtensions;
 using Xunit;
@@ -90,6 +91,9 @@ public class FaultInjectionTransactionalStateAttributeMapperTests
 
         public Task<TResult> PerformRead<TResult>(Func<TestState, TResult> readFunction) =>
             Task.FromResult(readFunction(new TestState()));
+
+        public Task<TResult> PerformRead<TResult>(Func<TestState, TResult> readFunction, ReadIsolation isolation) =>
+            PerformRead(readFunction);
 
         public Task<TResult> PerformUpdate<TResult>(Func<TestState, TResult> updateFunction) =>
             Task.FromResult(updateFunction(new TestState()));

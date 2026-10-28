@@ -78,6 +78,13 @@ namespace Orleans.Transactions.TestKit
             return grain.Add(numberToAdd);
         }
 
+        /// <inheritdoc/>
+        public Task<int[]> GetCommittedInTransaction(ITransactionTestGrain grain)
+        {
+            ArgumentNullException.ThrowIfNull(grain);
+            return grain.GetCommitted();
+        }
+
         private async Task Double(ITransactionTestGrain grain)
         {
             int[] values = await grain.Get();
