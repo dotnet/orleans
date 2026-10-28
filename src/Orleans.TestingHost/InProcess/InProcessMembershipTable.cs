@@ -113,10 +113,19 @@ internal sealed class InProcessMembershipTable : IMembershipTable, IGatewayListP
         return Task.CompletedTask;
     }
 
-    public Task InitializeGatewayListProvider() => Task.CompletedTask;
+    public Task InitializeGatewayListProvider() => InitializeGatewayListProviderAsync(CancellationToken.None);
 
-    public Task<IList<Uri>> GetGateways()
+    public Task InitializeGatewayListProviderAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public Task<IList<Uri>> GetGateways() => GetGatewaysAsync(CancellationToken.None);
+
+    public Task<IList<Uri>> GetGatewaysAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         var table = _table.ReadAll();
         var result = table.Members
            .Where(x => x.Item1.Status == SiloStatus.Active && x.Item1.ProxyPort != 0)
