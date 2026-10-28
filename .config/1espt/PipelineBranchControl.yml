@@ -7,3 +7,4 @@ pipelines:
   1397:
     allowedBranches:
     - main
+    - '^10\.x$'
