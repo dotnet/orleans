@@ -240,7 +240,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.True(await table.UpdateRowAsync(
             row.Item1, row.Item2, snapshot.Version.Next(), TestContext.Current.CancellationToken));
 
-        Assert.Equal(2, client.Transactions);
+        Assert.Equal(1, client.Transactions);
         Assert.Equal(2, Assert.Single(client.Reads).Documents.Count);
         Assert.Empty(client.Queries);
         Assert.Equal(new[] { 0, 1, 2 }, client.Commits.Select(commit => commit.Writes.Count));
@@ -261,7 +261,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.True(await CreateTable(client).UpdateRowAsync(
             entry, token, NextVersion(client), TestContext.Current.CancellationToken));
 
-        Assert.Equal(1, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Empty(client.Queries);
         Assert.Single(client.Commits);
@@ -292,7 +292,7 @@ public sealed class FirestoreMembershipHeartbeatTests
 
         Assert.False(await table.UpdateRowAsync(entry, token, NextVersion(client), TestContext.Current.CancellationToken));
 
-        Assert.Equal(1, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Empty(client.Queries);
         Assert.Single(client.Commits);
@@ -317,11 +317,11 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.True(await CreateTable(client).UpdateRowAsync(
             entry, ETag(client.Documents[original.Name]), NextVersion(client), TestContext.Current.CancellationToken));
 
-        Assert.Equal(1, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Empty(client.Queries);
         var commit = Assert.Single(client.Commits);
-        Assert.False(commit.Transaction.IsEmpty);
+        Assert.True(commit.Transaction.IsEmpty);
         Assert.Equal(2, commit.Writes.Count);
         Assert.Equal(new[] { original.Name, VersionPath }, commit.Writes.Select(write => write.Update.Name));
         Assert.Equal(Google.Cloud.Firestore.V1.Precondition.ConditionTypeOneofCase.Exists, commit.Writes[0].CurrentDocument.ConditionTypeCase);
@@ -347,7 +347,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.True(await CreateTable(client).UpdateRowAsync(
             entry, token, new TableVersion(9, ETag(version)), TestContext.Current.CancellationToken));
 
-        Assert.Equal(1, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Empty(client.Queries);
         Assert.Single(client.Commits);
@@ -371,7 +371,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.False(await CreateTable(client).UpdateRowAsync(
             entry, ETag(original), staleVersion, TestContext.Current.CancellationToken));
 
-        Assert.Equal(1, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Empty(client.Queries);
         Assert.Single(client.Commits);
@@ -397,7 +397,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.False(await CreateTable(client).UpdateRowAsync(
             entry, ETag(version), NextVersion(client), TestContext.Current.CancellationToken));
 
-        Assert.Equal(1, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Empty(client.Queries);
         Assert.Single(client.Commits);
@@ -419,7 +419,7 @@ public sealed class FirestoreMembershipHeartbeatTests
             entry, ETag(version), NextVersion(client), TestContext.Current.CancellationToken));
 
         Assert.Same(failure, exception);
-        Assert.Equal(1, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Single(client.Commits);
         Assert.Equal(2, client.AttemptedWrites.Count);
@@ -438,7 +438,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         var attempts = 0;
         var client = new MembershipClient
         {
-            OnCommit = request =>
+            OnCommit = _ =>
             {
                 if (++attempts == 1)
                 {
@@ -471,12 +471,11 @@ public sealed class FirestoreMembershipHeartbeatTests
 
         Assert.Equal(!concurrentChange, result);
         Assert.Equal(2, attempts);
-        Assert.Equal(2, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Empty(client.Queries);
         Assert.Equal(2, client.Commits.Count);
-        Assert.All(client.Commits, commit => Assert.False(commit.Transaction.IsEmpty));
-        Assert.NotEqual(client.Commits[0].Transaction, client.Commits[1].Transaction);
+        Assert.All(client.Commits, commit => Assert.True(commit.Transaction.IsEmpty));
         Assert.Equal(client.Commits[0].Writes, client.Commits[1].Writes);
         Assert.All(client.Commits, commit =>
             Assert.Equal(expected: Utils.ParseTimestamp(version.VersionEtag).ToProto(), actual: commit.Writes[1].CurrentDocument.UpdateTime));
@@ -516,8 +515,38 @@ public sealed class FirestoreMembershipHeartbeatTests
             : await table.UpdateRowAsync(entry, ETag(client.Documents[VersionPath]), NextVersion(client), TestContext.Current.CancellationToken);
 
         Assert.False(result);
-        Assert.Equal(Google.Cloud.Firestore.TransactionOptions.Default.MaxAttempts, client.Transactions);
-        Assert.Equal(client.Transactions, client.Commits.Count);
+        Assert.Equal(0, client.Transactions);
+        Assert.Equal(5, client.Commits.Count);
+        Assert.Empty(client.CommittedWrites);
+        Assert.Equal(expected.Count, client.Documents.Count);
+        Assert.All(expected, pair => Assert.Equal(pair.Value, client.Documents[pair.Key]));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CanonicalWriteCancellationStopsAbortRetries(bool insert)
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var client = new MembershipClient
+        {
+            CommitFailure = new RpcException(new Status(StatusCode.Aborted, "Transaction lock timeout.")),
+            BeforeCommit = cancellation.Cancel
+        };
+        var entry = Entry();
+        if (!insert)
+        {
+            client.AddRow(entry, Now);
+        }
+
+        var expected = client.Documents.ToDictionary(pair => pair.Key, pair => pair.Value.Clone());
+        var table = CreateTable(client);
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => insert
+            ? table.InsertRowAsync(entry, NextVersion(client), cancellation.Token)
+            : table.UpdateRowAsync(entry, ETag(client.Documents[VersionPath]), NextVersion(client), cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Single(client.Commits);
         Assert.Empty(client.CommittedWrites);
         Assert.Equal(expected.Count, client.Documents.Count);
         Assert.All(expected, pair => Assert.Equal(pair.Value, client.Documents[pair.Key]));
@@ -959,6 +988,60 @@ public sealed class FirestoreMembershipHeartbeatTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task MembershipReadsRetryAbortedStreamUsingFreshSnapshot(bool readAll)
+    {
+        var client = new MembershipClient();
+        var entry = Entry();
+        var document = client.AddRow(entry, Now);
+        document.Fields[nameof(SiloInstanceEntity.ProxyPort)] = new Value { IntegerValue = 7 };
+        client.AfterFirstReadResponse = () =>
+        {
+            client.AfterFirstReadResponse = null;
+            client.Change(document.Name, nameof(SiloInstanceEntity.ProxyPort), new Value { IntegerValue = 8 });
+            client.Change(document.Name, nameof(SiloInstanceEntity.MembershipVersion), new Value { IntegerValue = 8 });
+            client.Change(VersionPath, nameof(ClusterVersionEntity.MembershipVersion), new Value { IntegerValue = 8 });
+            throw new RpcException(new Status(StatusCode.Aborted, "Transaction lock timeout."));
+        };
+        var table = CreateTable(client);
+
+        var result = readAll
+            ? await table.ReadAllAsync(TestContext.Current.CancellationToken)
+            : await table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
+
+        Assert.Equal(8, result.Version.Version);
+        Assert.Equal(ETag(client.Documents[VersionPath]), result.Version.VersionEtag);
+        var row = Assert.Single(result.Members);
+        Assert.Equal(8, row.Item1.ProxyPort);
+        Assert.Equal(ETag(client.Documents[document.Name]), row.Item2);
+        Assert.Equal(2, client.Transactions);
+        Assert.Equal(2, client.Reads.Count + client.Queries.Count);
+        Assert.Empty(Assert.Single(client.Commits).Writes);
+        Assert.Empty(client.CommittedWrites);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MembershipReadsBoundTransactionAbortRetries(bool readAll)
+    {
+        var failure = new RpcException(new Status(StatusCode.Aborted, "Transaction lock timeout."));
+        var client = new MembershipClient { ReadFailure = failure };
+        var table = CreateTable(client);
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() => readAll
+            ? table.ReadAllAsync(TestContext.Current.CancellationToken)
+            : table.ReadRowAsync(Entry().SiloAddress, TestContext.Current.CancellationToken));
+
+        Assert.Same(failure, exception);
+        Assert.Equal(5, client.Transactions);
+        Assert.Equal(5, client.Reads.Count + client.Queries.Count);
+        Assert.Empty(client.Commits);
+        Assert.Empty(client.CommittedWrites);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task MembershipReadsConsumeOneSnapshotDuringStreamedChanges(bool readAll)
     {
         var client = new MembershipClient();
@@ -1112,7 +1195,7 @@ public sealed class FirestoreMembershipHeartbeatTests
 
         Assert.Same(failure, exception.InnerException);
         Assert.Equal(cancellation.Token, exception.CancellationToken);
-        Assert.Equal(operation == "Cleanup" ? 0 : 1, client.Transactions);
+        Assert.Equal(operation is "ReadRow" or "ReadAll" ? 1 : 0, client.Transactions);
         Assert.Equal(1, client.Reads.Count + client.Queries.Count + client.Commits.Count);
         Assert.Empty(client.CommittedWrites);
 
@@ -1136,8 +1219,8 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.True(await CreateTable(client).InsertRowAsync(entry, NextVersion(client), TestContext.Current.CancellationToken));
 
         var commit = Assert.Single(client.Commits);
-        Assert.Equal(1, client.Transactions);
-        Assert.False(commit.Transaction.IsEmpty);
+        Assert.Equal(0, client.Transactions);
+        Assert.True(commit.Transaction.IsEmpty);
         Assert.Empty(client.Reads);
         Assert.Equal(2, commit.Writes.Count);
         Assert.Equal(RowPath(entry), commit.Writes[0].Update.Name);
@@ -1169,7 +1252,7 @@ public sealed class FirestoreMembershipHeartbeatTests
 
         Assert.False(await CreateTable(client).InsertRowAsync(entry, version, TestContext.Current.CancellationToken));
 
-        Assert.Equal(1, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Empty(client.Queries);
         Assert.Single(client.Commits);
