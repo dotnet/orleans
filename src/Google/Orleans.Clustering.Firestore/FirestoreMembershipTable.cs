@@ -15,6 +15,8 @@ namespace Orleans.Clustering.Firestore;
 internal partial class FirestoreMembershipTable : IMembershipTable
 {
     private const string ClusterGroup = "Cluster";
+    private const int MaxContentionAttempts = 5;
+    private static readonly TransactionOptions ReadTransactionOptions = TransactionOptions.ForMaxAttempts(1);
     private readonly FirestoreOptions _options;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger _logger;
@@ -139,7 +141,7 @@ internal partial class FirestoreMembershipTable : IMembershipTable
         try
         {
             var collection = this._storage.GetCollection();
-            var entries = await this._storage.ExecuteTransaction(async transaction =>
+            var entries = await ExecuteWithContentionRetries(() => collection.Database.RunTransactionAsync(async transaction =>
             {
                 // The transaction binds every streamed document to one serializable snapshot.
                 var snapshot = await transaction.GetSnapshotAsync(collection, transaction.CancellationToken);
@@ -150,7 +152,7 @@ internal partial class FirestoreMembershipTable : IMembershipTable
                     .Select(document => document.ConvertTo<SiloInstanceEntity>())
                     .ToArray();
                 return (silos, versionSnapshot.ConvertTo<ClusterVersionEntity>());
-            }, cancellationToken);
+            }, ReadTransactionOptions, cancellationToken), cancellationToken);
             var data = Convert(entries);
             LogReadAll(data);
 
@@ -180,23 +182,19 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             var collection = this._storage.GetCollection();
             var siloReference = collection.Document(silo.Id);
             var versionReference = collection.Document(this._partitionId);
-            bool result;
             try
             {
                 var batch = collection.Database.StartBatch();
                 batch.Create(siloReference, silo);
                 batch.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
-                await FirestoreDataManager.ExecuteWithCancellation(batch.CommitAsync(cancellationToken), cancellationToken);
-                result = true;
+                await ExecuteWithContentionRetries(() => batch.CommitAsync(cancellationToken), cancellationToken);
+                return true;
             }
             catch (RpcException exception) when (IsContention(exception))
             {
-                result = false;
+                LogInsertContention(exception, entry, tableVersion);
+                return false;
             }
-
-            if (result == false)
-                LogInsertContention(entry, tableVersion);
-            return result;
         }
         catch (Exception exc) when (exc is not OperationCanceledException)
         {
@@ -222,24 +220,20 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             var collection = this._storage.GetCollection();
             var siloReference = collection.Document(silo.Id);
             var versionReference = collection.Document(this._partitionId);
-            bool result;
             try
             {
                 var batch = collection.Database.StartBatch();
                 // The version guards canonical changes; heartbeat writes can change the row ETag.
                 batch.Update(siloReference, silo.GetFields(), Precondition.MustExist);
                 batch.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
-                await FirestoreDataManager.ExecuteWithCancellation(batch.CommitAsync(cancellationToken), cancellationToken);
-                result = true;
+                await ExecuteWithContentionRetries(() => batch.CommitAsync(cancellationToken), cancellationToken);
+                return true;
             }
             catch (RpcException exception) when (IsContention(exception))
             {
-                result = false;
+                LogUpdateContention(exception, entry, etag, tableVersion);
+                return false;
             }
-
-            if (result == false)
-                LogUpdateContention(entry, etag, tableVersion);
-            return result;
         }
         catch (Exception exc) when (exc is not OperationCanceledException)
         {
@@ -304,6 +298,22 @@ internal partial class FirestoreMembershipTable : IMembershipTable
     private static bool IsContention(RpcException exception) =>
         exception.StatusCode is StatusCode.Aborted or StatusCode.AlreadyExists or StatusCode.FailedPrecondition or StatusCode.NotFound;
 
+    private static async Task<TResult> ExecuteWithContentionRetries<TResult>(Func<Task<TResult>> operation, CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await FirestoreDataManager.ExecuteWithCancellation(operation(), cancellationToken);
+            }
+            catch (RpcException exception) when (exception.StatusCode == StatusCode.Aborted && attempt < MaxContentionAttempts - 1)
+            {
+                // Retry a whole aborted snapshot or the same conditional batch, preserving the caller's CAS preconditions.
+                await Task.Delay(TimeSpan.FromMilliseconds(100 * (1 << attempt)), cancellationToken);
+            }
+        }
+    }
+
     private static DateTimeOffset GetEffectiveUpdateTime(SiloInstanceEntity entity)
     {
         var result = entity.StartTime > entity.IAmAliveTime ? entity.StartTime : entity.IAmAliveTime;
@@ -361,8 +371,8 @@ internal partial class FirestoreMembershipTable : IMembershipTable
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Insert failed due to contention on the table. Will retry. Entry {Data}, table version = {TableVersion}")]
-    private partial void LogInsertContention(MembershipEntry data, TableVersion tableVersion);
+        Message = "Insert encountered membership contention. Entry {Data}, table version = {TableVersion}")]
+    private partial void LogInsertContention(Exception exception, MembershipEntry data, TableVersion tableVersion);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
@@ -376,8 +386,8 @@ internal partial class FirestoreMembershipTable : IMembershipTable
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Update failed due to contention on the table. Will retry. Entry {Data}, eTag {ETag}, table version = {TableVersion}")]
-    private partial void LogUpdateContention(MembershipEntry data, string etag, TableVersion tableVersion);
+        Message = "Update encountered membership contention. Entry {Data}, eTag {ETag}, table version = {TableVersion}")]
+    private partial void LogUpdateContention(Exception exception, MembershipEntry data, string etag, TableVersion tableVersion);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
