@@ -21,7 +21,7 @@
     <LangVersion>preview</LangVersion>
     <Features>strict</Features>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>10.0</AnalysisLevel>
+    <AnalysisLevel>11.0</AnalysisLevel>
     <AnalysisMode>Recommended</AnalysisMode>
     <Nullable>enable</Nullable>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
