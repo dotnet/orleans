@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Storage;
+using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using Orleans.Persistence.TestKit;
 using UnitTests.StorageTests.Relational;
@@ -89,6 +90,47 @@ namespace Tester.AdoNet.Persistence
             await storage.ReadStateAsync(grainType, grainId, readState);
             Assert.True(readState.RecordExists);
             Assert.Equal(grainState.State, readState.State);
+        }
+
+        [Fact]
+        public Task VersionWrapsAfterMaximum() => GrainStorageVersionWrapTests.VersionWrapsAfterMaximum(
+            this.fixture.Storage,
+            this.fixture.DatabaseStorage,
+            deleteStateOnClear: false,
+            TestContext.Current.CancellationToken);
+
+        [Fact]
+        public async Task ReapplyingScriptRepairsVersionCommittedPastMaximum()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var storage = this.fixture.Storage;
+            var key = $"version-repair-{Guid.NewGuid():N}";
+            var grainId = GrainId.Create("version-repair", key);
+            const string grainType = "sqlite-version-repair-grain";
+            var grainState = new GrainState<TestState1> { State = new TestState1 { A = "committed-past-maximum" } };
+            await storage.WriteStateAsync(grainType, grainId, grainState, cancellationToken);
+            var updated = await this.fixture.DatabaseStorage.ExecuteAsync(
+                "UPDATE OrleansStorage SET Version = 2147483648 WHERE GrainIdExtensionString = @GrainKey",
+                command => command.AddParameter("GrainKey", key),
+                cancellationToken: cancellationToken);
+            Assert.Equal(1, updated);
+
+            await this.fixture.InitializeSchemaAsync(cancellationToken);
+            var repaired = new GrainState<TestState1>();
+            await storage.ReadStateAsync(grainType, grainId, repaired, cancellationToken);
+
+            Assert.True(repaired.RecordExists);
+            Assert.Equal("1", repaired.ETag);
+            Assert.Equal(grainState.State, repaired.State);
+
+            repaired.State = new TestState1 { A = "written-after-repair" };
+            await storage.WriteStateAsync(grainType, grainId, repaired, cancellationToken);
+            var written = new GrainState<TestState1>();
+            await storage.ReadStateAsync(grainType, grainId, written, cancellationToken);
+
+            Assert.Equal("2", repaired.ETag);
+            Assert.Equal("2", written.ETag);
+            Assert.Equal(repaired.State, written.State);
         }
 
         [Fact]
