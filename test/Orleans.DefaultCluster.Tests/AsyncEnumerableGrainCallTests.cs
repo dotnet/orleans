@@ -818,7 +818,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
         cts.CancelAfter(TimeSpan.FromSeconds(30));
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
         using var listener = CreateListener(grain.GetGrainId());
-        
+
         var producer = Task.Run(async () =>
         {
             foreach (var value in Enumerable.Range(0, 5))
@@ -969,7 +969,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
 /// </summary>
 [Collection(AsyncEnumerableGrainCallTestCollection.Name)]
 public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture)
-{   
+{
     private IGrainFactory GrainFactory => fixture.GrainFactory;
 
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(10);
@@ -1170,7 +1170,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
                     // we do NOT wait async after yield since the iterator would supply up to batch size of elements
                     // and the client would notice cancellation at that point which would result in say errIdx = 1, val.Count = 10 (if batch size is 10)
                     // This is true for all tests with cancellation.
-                    .WithBatchSize(1)) 
+                    .WithBatchSize(1))
                 {
                     values.Add(value);
                     if (values.Count == errorIndex)
@@ -1393,7 +1393,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var enumerator = observerRef.GetBlockingEnumerable(cancellationToken).GetAsyncEnumerator(cancellationToken);
-            
+
             Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TestTimeout));
             Assert.Equal("first", enumerator.Current);
 
@@ -1403,7 +1403,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
             await enumerator.DisposeAsync().AsTask().WaitAsync(TestTimeout);
             await observerImpl.BlockingEnumeratorFinished.WaitAsync(TestTimeout);
 
-            var completedTask = await Task.WhenAny(pendingMoveNext, Task.Delay(TestTimeout));
+            var completedTask = await Task.WhenAny(pendingMoveNext).WaitAsync(TestTimeout, cancellationToken);
             Assert.Same(pendingMoveNext, completedTask);
 
             // Disposal may surface as cancellation or a terminal enumeration error, depending on timing.
@@ -1461,7 +1461,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         // MoveNext reached the extension before deregistration of the observer) or Dispatch rejects it
         // and returns a ObserverNotReachableException-baked response, because deregistration won the race).
         // Both are terminal responses, as this tests is about NOT leaving the client waiting.
-        var completedTask = await Task.WhenAny(pendingMoveNext, Task.Delay(TestTimeout, cancellationToken));
+        var completedTask = await Task.WhenAny(pendingMoveNext).WaitAsync(TestTimeout, cancellationToken);
         Assert.Same(pendingMoveNext, completedTask);
 
         try
@@ -1746,7 +1746,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
        new AsyncEnumerableExtensionListener(
            diagnosticListenerName: "Orleans.Runtime.AsyncEnumerableGrainObserverExtension",
            isTargetExtension: value => value is InvokableObjectManager.AsyncEnumerableGrainObserverExtension
-               { GrainContext.GrainInstance: var instance } && ReferenceEquals(instance, observerImpl));
+           { GrainContext.GrainInstance: var instance } && ReferenceEquals(instance, observerImpl));
 
     private async Task AdvanceToNextObserverCleanupAsync(AsyncEnumerableExtensionListener listener, CancellationToken cancellationToken)
     {
