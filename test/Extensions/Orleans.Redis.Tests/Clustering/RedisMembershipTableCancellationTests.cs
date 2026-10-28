@@ -20,6 +20,107 @@ public sealed class RedisMembershipTableCancellationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task Gateway_PreCanceled_DoesNotCreateConnection(bool initialize)
+    {
+        var factoryCalls = 0;
+        using var table = CreateTable(_ =>
+        {
+            factoryCalls++;
+            throw new InvalidOperationException("No connection should be created.");
+        });
+        var provider = new RedisGatewayListProvider(table, Options.Create(new GatewayOptions()));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => initialize
+            ? provider.InitializeGatewayListProviderAsync(cancellation.Token)
+            : provider.GetGatewaysAsync(cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(0, factoryCalls);
+        Assert.False(table.IsInitialized);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Gateway_CancellationDuringInitialization_BoundsTokenlessFactory(bool initialize)
+    {
+        var backend = new MembershipBackend();
+        var creation = new TaskCompletionSource<(IConnectionMultiplexer, bool)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var factoryCalls = 0;
+        using var table = CreateTable(_ =>
+        {
+            factoryCalls++;
+            return creation.Task;
+        });
+        var provider = new RedisGatewayListProvider(table, Options.Create(new GatewayOptions()));
+        using var cancellation = new CancellationTokenSource();
+        var operation = initialize
+            ? provider.InitializeGatewayListProviderAsync(cancellation.Token)
+            : provider.GetGatewaysAsync(cancellation.Token);
+        try
+        {
+            Assert.Equal(1, factoryCalls);
+            cancellation.Cancel();
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => operation.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            Assert.False(creation.Task.IsCompleted);
+            Assert.False(table.IsInitialized);
+            Assert.Empty(backend.Database.ReceivedCalls());
+        }
+        finally
+        {
+            // Shared late connections must not be used or disposed by canceled initialization.
+            creation.TrySetResult((backend.Multiplexer, true));
+        }
+    }
+
+    [Fact]
+    public async Task Gateway_CancellationDuringRead_BoundsTokenlessSdkWaitAndAllowsRetry()
+    {
+        var backend = new MembershipBackend();
+        using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, true)));
+        var provider = new RedisGatewayListProvider(table, Options.Create(new GatewayOptions()));
+        await provider.InitializeGatewayListProviderAsync(TestContext.Current.CancellationToken);
+        var pending = new TaskCompletionSource<HashEntry[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var readEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.Database.HashGetAllAsync(MembershipBackend.ClusterKey, CommandFlags.DemandMaster).Returns(_ =>
+        {
+            readEntered.TrySetResult();
+            return pending.Task;
+        });
+        using var cancellation = new CancellationTokenSource();
+        var lookup = provider.GetGatewaysAsync(cancellation.Token);
+        await readEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        cancellation.Cancel();
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => lookup.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.False(pending.Task.IsCompleted);
+        Assert.True(table.IsInitialized);
+        pending.SetException(new InvalidOperationException("Late Redis read failure."));
+        var entry = CreateEntry();
+        entry.ProxyPort = 30001;
+        backend.Database.HashGetAllAsync(MembershipBackend.ClusterKey, CommandFlags.DemandMaster).Returns(
+            Task.FromResult(new[]
+            {
+                new HashEntry("Version", "1"),
+                new HashEntry(entry.SiloAddress.ToString(), JsonConvert.SerializeObject(entry, JsonSettings.JsonSerializerSettings))
+            }));
+
+        var result = await provider.GetGatewaysAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal([new Uri("gwy.tcp://127.0.0.1:30001/1")], result);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task PointReads_AreUnsupportedWithoutBackendAccess(bool initialized)
     {
         var backend = new MembershipBackend();

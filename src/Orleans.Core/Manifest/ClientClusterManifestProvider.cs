@@ -76,11 +76,18 @@ namespace Orleans.Runtime
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var shutdownToken = _shutdownCts.Token;
             _runTask = Task.Run(RunAsync, CancellationToken.None);
             try
             {
-                await _initialized.Task.WaitAsync(cancellationToken);
+                var initialized = await _initialized.Task.WaitAsync(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+                if (!initialized)
+                {
+                    await _runTask;
+                    Debug.Assert(shutdownToken.IsCancellationRequested);
+                    throw new OperationCanceledException(shutdownToken);
+                }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

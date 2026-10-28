@@ -117,7 +117,7 @@ public sealed class CassandraMembershipStatementTests
         var backend = new Backend();
         var queries = await OrleansQueries.CreateInstance(backend.Session);
         var token = TestContext.Current.CancellationToken;
-        var gateway = await queries.GatewaysQuery("service-cluster", (int)SiloStatus.Active);
+        var gateway = await queries.GatewaysQuery("service-cluster", (int)SiloStatus.Active, token);
         Assert.Equal(ConsistencyLevel.Quorum, gateway.ConsistencyLevel);
 
         var version = await queries.MembershipReadVersion("service-cluster", token);

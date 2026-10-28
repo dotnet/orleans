@@ -248,6 +248,7 @@ namespace Orleans.Tests.SqlUtils
         /// Lists active gateways. Used mainly by Orleans clients.
         /// </summary>
         /// <param name="deploymentId">The deployment for which to query the gateways.</param>
+        /// <param name="cancellationToken">The token used to cancel the query.</param>
         /// <returns>The gateways for the silo.</returns>
         internal Task<List<Uri>> ActiveGatewaysAsync(string deploymentId, CancellationToken cancellationToken = default)
         {
