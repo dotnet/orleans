@@ -1,7 +1,7 @@
 ---
 title: Orleans migration guides
 description: Plan upgrades to Orleans 11 preview or Orleans 10, preserving application, provider, deployment, and rollback compatibility.
-ms.date: 10/21/2026
+ms.date: 10/28/2026
 ms.topic: how-to
 ms.custom: migration-guide
 ---
