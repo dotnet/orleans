@@ -361,9 +361,21 @@ namespace Orleans.AzureUtils
             var after = entries[^1].Entity.MembershipVersion
                 ?? throw new InvalidOperationException("The closing boundary row does not contain a membership version.");
 
-            // Every canonical write changes both ordered markers atomically with the membership data.
-            return string.Equals(before, after, StringComparison.Ordinal)
-                && string.Equals(before, version, StringComparison.Ordinal);
+            // Boundary-aware writes atomically advance all three versions.
+            return (string.Equals(before, after, StringComparison.Ordinal)
+                && string.Equals(before, version, StringComparison.Ordinal))
+                || IsLegacyTableVersionAhead(version, before, after);
+        }
+
+        private static bool IsLegacyTableVersionAhead(string? tableVersion, string beforeVersion, string afterVersion)
+        {
+            // Older writers advance only VersionRow. A version ahead of both markers retains legacy
+            // read semantics, including potentially torn paginated snapshots, during rolling upgrades.
+            return int.TryParse(tableVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedTableVersion)
+                && int.TryParse(beforeVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedBeforeVersion)
+                && int.TryParse(afterVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedAfterVersion)
+                && parsedTableVersion > parsedBeforeVersion
+                && parsedTableVersion > parsedAfterVersion;
         }
 
         private static List<(SiloInstanceTableEntry Entity, string ETag)> RemoveBoundaryVersionRows(
