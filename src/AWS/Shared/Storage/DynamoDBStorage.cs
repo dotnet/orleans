@@ -921,8 +921,12 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="expression">The filter expression</param>
         /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
         /// <returns>The collection containing a list of objects translated by the resolver function</returns>
-        public async Task<List<TResult>> ScanAsync<TResult>(string tableName, Dictionary<string, AttributeValue> attributes, string expression, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
+        public Task<List<TResult>> ScanAsync<TResult>(string tableName, Dictionary<string, AttributeValue> attributes, string expression, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class =>
+            ScanAsync(tableName, attributes, expression, resolver, CancellationToken.None);
+
+        internal async Task<List<TResult>> ScanAsync<TResult>(string tableName, Dictionary<string, AttributeValue> attributes, string expression, Func<Dictionary<string, AttributeValue>, TResult> resolver, CancellationToken cancellationToken) where TResult : class
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // From the Amazon documentation:
             // "A single Scan operation will read up to the maximum number of items set
             // (if using the Limit parameter) or a maximum of 1 MB of data and then apply
@@ -951,7 +955,7 @@ namespace Orleans.Transactions.DynamoDB
                         request.ExclusiveStartKey = exclusiveStartKey;
                     }
 
-                    var response = await _ddbClient.ScanAsync(request);
+                    var response = await _ddbClient.ScanAsync(request, cancellationToken);
 
                     if (response.Items != null)
                     {
@@ -972,6 +976,10 @@ namespace Orleans.Transactions.DynamoDB
                 }
 
                 return resultList;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exc)
             {

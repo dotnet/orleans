@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -56,19 +57,27 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <inheritdoc />
-        public async Task InitializeGatewayListProvider()
+        public Task InitializeGatewayListProvider() => InitializeGatewayListProviderAsync(CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task InitializeGatewayListProviderAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceInitializeGatewayListProvider();
-            _orleansQueries = await RelationalOrleansQueries.CreateInstance(_options.Invariant, _options.ConnectionString, _options.DataSource);
+            _orleansQueries = await RelationalOrleansQueries.CreateInstance(_options.Invariant, _options.ConnectionString, _options.DataSource, cancellationToken);
         }
 
         /// <inheritdoc />
-        public async Task<IList<Uri>> GetGateways()
+        public Task<IList<Uri>> GetGateways() => GetGatewaysAsync(CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task<IList<Uri>> GetGatewaysAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceGetGateways();
             try
             {
-                return await _orleansQueries.ActiveGatewaysAsync(this._clusterId);
+                return await _orleansQueries.ActiveGatewaysAsync(this._clusterId, cancellationToken);
             }
             catch (Exception ex)
             {

@@ -333,7 +333,7 @@ internal sealed class MpscBoundedBuffer<T> where T : class
     private static void Write(Span<T> output, int index, T item) => output[index] = item;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int Length(Span<T> output) => output.Length;
+    private static int Length(ReadOnlySpan<T> output) => output.Length;
 
     /// <summary>
     /// Removes all values from the buffer.

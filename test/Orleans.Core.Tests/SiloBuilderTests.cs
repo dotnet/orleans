@@ -272,6 +272,31 @@ namespace NonSilo.Tests
             });
         }
 
+        [Fact]
+        public void FailureDetectionTimeout_PreservesRepresentableTickBoundary()
+        {
+            var options = new ClusterMembershipOptions
+            {
+                MaxProbeTimeout = TimeSpan.FromTicks(long.MaxValue / int.MaxValue),
+                NumMissedProbesLimit = int.MaxValue
+            };
+
+            Assert.Equal(TimeSpan.FromTicks(long.MaxValue - 1), options.GetFailureDetectionTimeout());
+        }
+
+        [Fact]
+        public void FailureDetectionTimeout_ReportsOverflowAsConfigurationError()
+        {
+            var options = new ClusterMembershipOptions
+            {
+                MaxProbeTimeout = TimeSpan.FromTicks(long.MaxValue / int.MaxValue + 1),
+                NumMissedProbesLimit = int.MaxValue
+            };
+
+            var exception = Assert.Throws<OrleansConfigurationException>(() => options.GetFailureDetectionTimeout());
+            Assert.IsType<OverflowException>(exception.InnerException);
+        }
+
         [Theory]
         [InlineData(0L, true)]
         [InlineData(-1L, true)]

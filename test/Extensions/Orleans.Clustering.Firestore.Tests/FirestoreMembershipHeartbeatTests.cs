@@ -450,6 +450,130 @@ public sealed class FirestoreMembershipHeartbeatTests
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task CanonicalWriteRetriesAbortedCommitWithOriginalPreconditions(bool insert, bool concurrentChange)
+    {
+        var attempts = 0;
+        var client = new MembershipClient
+        {
+            OnCommit = _ =>
+            {
+                if (++attempts == 1)
+                {
+                    throw new RpcException(new Status(StatusCode.Aborted, "Transaction lock timeout."));
+                }
+            }
+        };
+        var entry = Entry();
+        if (!insert)
+        {
+            client.AddRow(entry, Now);
+        }
+
+        var version = NextVersion(client);
+        var rowToken = ETag(client.Documents[VersionPath]);
+        var expected = client.Documents.ToDictionary(pair => pair.Key, pair => pair.Value.Clone());
+        if (concurrentChange)
+        {
+            client.BeforeCommit = () =>
+            {
+                client.Change(VersionPath, nameof(ClusterVersionEntity.MembershipVersion), new Value { IntegerValue = 9 });
+                expected[VersionPath] = client.Documents[VersionPath].Clone();
+            };
+        }
+
+        var table = CreateTable(client);
+        var result = insert
+            ? await table.InsertRowAsync(entry, version, TestContext.Current.CancellationToken)
+            : await table.UpdateRowAsync(entry, rowToken, version, TestContext.Current.CancellationToken);
+
+        Assert.Equal(!concurrentChange, result);
+        Assert.Equal(2, attempts);
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Reads);
+        Assert.Empty(client.Queries);
+        Assert.Equal(2, client.Commits.Count);
+        Assert.All(client.Commits, commit => Assert.True(commit.Transaction.IsEmpty));
+        Assert.Equal(client.Commits[0].Writes, client.Commits[1].Writes);
+        Assert.All(client.Commits, commit =>
+            Assert.Equal(expected: Utils.ParseTimestamp(version.VersionEtag).ToProto(), actual: commit.Writes[1].CurrentDocument.UpdateTime));
+        if (concurrentChange)
+        {
+            Assert.Empty(client.CommittedWrites);
+            Assert.Equal(expected.Count, client.Documents.Count);
+            Assert.All(expected, pair => Assert.Equal(pair.Value, client.Documents[pair.Key]));
+        }
+        else
+        {
+            Assert.Equal(2, client.CommittedWrites.Count);
+            Assert.Equal(8, client.Documents[VersionPath].Fields[nameof(ClusterVersionEntity.MembershipVersion)].IntegerValue);
+            Assert.Equal(8, client.Documents[RowPath(entry)].Fields[nameof(SiloInstanceEntity.MembershipVersion)].IntegerValue);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CanonicalWriteBoundsTransactionAbortRetries(bool insert)
+    {
+        var client = new MembershipClient
+        {
+            CommitFailure = new RpcException(new Status(StatusCode.Aborted, "Transaction lock timeout."))
+        };
+        var entry = Entry();
+        if (!insert)
+        {
+            client.AddRow(entry, Now);
+        }
+
+        var expected = client.Documents.ToDictionary(pair => pair.Key, pair => pair.Value.Clone());
+        var table = CreateTable(client);
+        var result = insert
+            ? await table.InsertRowAsync(entry, NextVersion(client), TestContext.Current.CancellationToken)
+            : await table.UpdateRowAsync(entry, ETag(client.Documents[VersionPath]), NextVersion(client), TestContext.Current.CancellationToken);
+
+        Assert.False(result);
+        Assert.Equal(0, client.Transactions);
+        Assert.Equal(5, client.Commits.Count);
+        Assert.Empty(client.CommittedWrites);
+        Assert.Equal(expected.Count, client.Documents.Count);
+        Assert.All(expected, pair => Assert.Equal(pair.Value, client.Documents[pair.Key]));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CanonicalWriteCancellationStopsAbortRetries(bool insert)
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var client = new MembershipClient
+        {
+            CommitFailure = new RpcException(new Status(StatusCode.Aborted, "Transaction lock timeout.")),
+            BeforeCommit = cancellation.Cancel
+        };
+        var entry = Entry();
+        if (!insert)
+        {
+            client.AddRow(entry, Now);
+        }
+
+        var expected = client.Documents.ToDictionary(pair => pair.Key, pair => pair.Value.Clone());
+        var table = CreateTable(client);
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => insert
+            ? table.InsertRowAsync(entry, NextVersion(client), cancellation.Token)
+            : table.UpdateRowAsync(entry, ETag(client.Documents[VersionPath]), NextVersion(client), cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Single(client.Commits);
+        Assert.Empty(client.CommittedWrites);
+        Assert.Equal(expected.Count, client.Documents.Count);
+        Assert.All(expected, pair => Assert.Equal(pair.Value, client.Documents[pair.Key]));
+    }
+
+    [Theory]
     [InlineData(0, 0, true)]
     [InlineData(1, 0, false)]
     [InlineData(0, 1, false)]
@@ -864,6 +988,52 @@ public sealed class FirestoreMembershipHeartbeatTests
         var commit = Assert.Single(client.Commits);
         Assert.Equal(query.Transaction, commit.Transaction);
         Assert.Empty(commit.Writes);
+    }
+
+    [Fact]
+    public async Task MembershipReadsRetryAbortedStreamUsingFreshSnapshot()
+    {
+        var client = new MembershipClient();
+        var entry = Entry();
+        var document = client.AddRow(entry, Now);
+        document.Fields[nameof(SiloInstanceEntity.ProxyPort)] = new Value { IntegerValue = 7 };
+        client.AfterFirstReadResponse = () =>
+        {
+            client.AfterFirstReadResponse = null;
+            client.Change(document.Name, nameof(SiloInstanceEntity.ProxyPort), new Value { IntegerValue = 8 });
+            client.Change(document.Name, nameof(SiloInstanceEntity.MembershipVersion), new Value { IntegerValue = 8 });
+            client.Change(VersionPath, nameof(ClusterVersionEntity.MembershipVersion), new Value { IntegerValue = 8 });
+            throw new RpcException(new Status(StatusCode.Aborted, "Transaction lock timeout."));
+        };
+        var table = CreateTable(client);
+
+        var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(8, result.Version.Version);
+        Assert.Equal(ETag(client.Documents[VersionPath]), result.Version.VersionEtag);
+        var row = Assert.Single(result.Members);
+        Assert.Equal(8, row.Item1.ProxyPort);
+        Assert.Equal(ETag(client.Documents[document.Name]), row.Item2);
+        Assert.Equal(2, client.Transactions);
+        Assert.Equal(2, client.Reads.Count + client.Queries.Count);
+        Assert.Empty(Assert.Single(client.Commits).Writes);
+        Assert.Empty(client.CommittedWrites);
+    }
+
+    [Fact]
+    public async Task MembershipReadsBoundTransactionAbortRetries()
+    {
+        var failure = new RpcException(new Status(StatusCode.Aborted, "Transaction lock timeout."));
+        var client = new MembershipClient { ReadFailure = failure };
+        var table = CreateTable(client);
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() => table.ReadAllAsync(TestContext.Current.CancellationToken));
+
+        Assert.Same(failure, exception);
+        Assert.Equal(5, client.Transactions);
+        Assert.Equal(5, client.Reads.Count + client.Queries.Count);
+        Assert.Empty(client.Commits);
+        Assert.Empty(client.CommittedWrites);
     }
 
     [Fact]
