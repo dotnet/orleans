@@ -967,6 +967,8 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
 /// <summary>
 /// Tests support for observer methods which return <see cref="IAsyncEnumerable{T}"/>.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
 [Collection(AsyncEnumerableGrainCallTestCollection.Name)]
 public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture)
 {
