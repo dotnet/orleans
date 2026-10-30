@@ -68,7 +68,7 @@ internal sealed class CassandraJournalStorageProvider : IJournalStorageProvider,
                 $"{nameof(CassandraJournalStorageProvider)} has not been initialized. Ensure the silo lifecycle has started before listing journals.");
         var catalogPartitions = await Task.WhenAll(
             Enumerable.Range(0, CatalogPartitionCount)
-                .Select(bucket => queries.Session.ExecuteAsync(queries.ReadCatalogEntries(bucket))))
+                .Select(bucket => queries.Session.ExecuteAsync(queries.ReadCatalogEntries(bucket, range))))
             .ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         using var concurrencyGate = new SemaphoreSlim(CatalogHeaderReadConcurrency);
@@ -221,7 +221,7 @@ internal sealed class CassandraJournalStorageQueries
     private PreparedStatement? _deleteGeneration;
     private PreparedStatement? _deleteOlderGenerations;
     private PreparedStatement? _registerCatalogEntry;
-    private PreparedStatement? _readCatalogEntries;
+    private PreparedStatement[]? _readCatalogEntries;
 
     public CassandraJournalStorageQueries(ISession session, CassandraJournalStorageOptions options)
     {
@@ -272,9 +272,15 @@ internal sealed class CassandraJournalStorageQueries
         _registerCatalogEntry = await PrepareAsync(
             $"INSERT INTO {_catalogTableName} (bucket, journal_id) VALUES (?, ?)",
             cancellationToken).ConfigureAwait(false);
-        _readCatalogEntries = await PrepareAsync(
-            $"SELECT journal_id FROM {_catalogTableName} WHERE bucket = ?",
-            cancellationToken).ConfigureAwait(false);
+        var catalogReadQueries = new PreparedStatement[Enum.GetValues<CatalogRangeQueryKind>().Length];
+        foreach (var queryKind in Enum.GetValues<CatalogRangeQueryKind>())
+        {
+            catalogReadQueries[(int)queryKind] = await PrepareAsync(
+                GetCatalogReadQuery(queryKind),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        _readCatalogEntries = catalogReadQueries;
 
         _createHeader = await PrepareAsync($"""
             INSERT INTO {_tableName} (
@@ -354,15 +360,45 @@ internal sealed class CassandraJournalStorageQueries
         cancellationToken.ThrowIfCancellationRequested();
     }
 
-    public BoundStatement ReadCatalogEntries(int bucket)
+    public BoundStatement ReadCatalogEntries(int bucket, JournalCatalogRange range)
     {
-        var statement = Get(_readCatalogEntries).Bind(bucket);
+        var lowerBound = range.LowerBound;
+        var upperBound = range.UpperBound;
+        var upperBoundInclusive = upperBound is not null && range.Contains(upperBound);
+        return ReadCatalogEntries(bucket, lowerBound, upperBound, upperBoundInclusive);
+    }
+
+    internal BoundStatement ReadCatalogEntries(int bucket, string? lowerBound, string? upperBound, bool upperBoundInclusive)
+    {
+        var queryKind = (lowerBound is not null, upperBound is not null, upperBoundInclusive) switch
+        {
+            (false, false, _) => CatalogRangeQueryKind.Unbounded,
+            (true, false, _) => CatalogRangeQueryKind.LowerBound,
+            (false, true, true) => CatalogRangeQueryKind.UpperBoundInclusive,
+            (false, true, false) => CatalogRangeQueryKind.UpperBoundExclusive,
+            (true, true, true) => CatalogRangeQueryKind.BoundedInclusive,
+            (true, true, false) => CatalogRangeQueryKind.BoundedExclusive,
+        };
+        var values = new object[1 + (lowerBound is null ? 0 : 1) + (upperBound is null ? 0 : 1)];
+        values[0] = bucket;
+        var valueIndex = 1;
+        if (lowerBound is not null)
+        {
+            values[valueIndex++] = lowerBound;
+        }
+
+        if (upperBound is not null)
+        {
+            values[valueIndex] = upperBound;
+        }
+
+        var statement = Get(_readCatalogEntries?[(int)queryKind]).Bind(values);
         statement.SetConsistencyLevel(_options.ReadConsistencyLevel);
         statement.SetPageSize(_options.ReadPageSize);
         return statement;
     }
 
-    private static int GetCatalogBucket(string journalId)
+    internal static int GetCatalogBucket(string journalId)
     {
         // Use a stable hash: process-randomized string hashes would place the same id in
         // different catalog partitions after a restart.
@@ -373,6 +409,36 @@ internal sealed class CassandraJournalStorageQueries
         }
 
         return (int)(hash % CassandraJournalStorageProvider.CatalogPartitionCount);
+    }
+
+    private string GetCatalogReadQuery(CatalogRangeQueryKind queryKind)
+    {
+        var query = $"SELECT journal_id FROM {_catalogTableName} WHERE bucket = ?";
+        if (queryKind is CatalogRangeQueryKind.LowerBound or CatalogRangeQueryKind.BoundedInclusive or CatalogRangeQueryKind.BoundedExclusive)
+        {
+            query += " AND journal_id >= ?";
+        }
+
+        if (queryKind is CatalogRangeQueryKind.UpperBoundInclusive or CatalogRangeQueryKind.BoundedInclusive)
+        {
+            query += " AND journal_id <= ?";
+        }
+        else if (queryKind is CatalogRangeQueryKind.UpperBoundExclusive or CatalogRangeQueryKind.BoundedExclusive)
+        {
+            query += " AND journal_id < ?";
+        }
+
+        return query;
+    }
+
+    private enum CatalogRangeQueryKind
+    {
+        Unbounded,
+        LowerBound,
+        UpperBoundExclusive,
+        UpperBoundInclusive,
+        BoundedExclusive,
+        BoundedInclusive
     }
 
     public BoundStatement ReadHeader(string journalId)

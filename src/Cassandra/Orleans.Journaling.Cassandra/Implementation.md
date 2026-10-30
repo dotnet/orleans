@@ -232,15 +232,17 @@ The catalog identity is inserted before the journal header is created, so a
 failed create can leave an index-only entry but cannot leave a live journal
 undiscoverable.
 
-The index is append-only. A catalog enumeration filters IDs by the requested
-range, then reads each candidate's current header; this hides IDs left behind
-by failed creates or journal deletion and returns current metadata when
-requested. Index rows are not removed: deleting them safely would race with a
-concurrent create across Cassandra partitions and could hide a live journal.
-This trades storage proportional to the number of distinct journal IDs ever
-registered for crash-safe discovery; there is no automatic index-row
-reclamation. Catalog enumeration work is proportional to the index size, not
-the journal payload size, and catalog reads are paged.
+The index is append-only. Catalog queries apply available lower and upper ID
+bounds to the clustering key, including an exclusive upper bound for a prefix
+successor. The provider also applies the shared range predicate before reading
+each candidate's current header; this hides IDs left behind by failed creates
+or journal deletion and returns current metadata when requested. Index rows are
+not removed: deleting them safely would race with a concurrent create across
+Cassandra partitions and could hide a live journal. This trades storage
+proportional to the number of distinct journal IDs ever registered for
+crash-safe discovery; there is no automatic index-row reclamation. Bounded
+catalog listings read only matching clustering-key ranges; an unbounded listing
+scans the index, not journal payload partitions. Catalog reads are paged.
 
 The Cassandra identity therefore needs table-creation permission even if an
 operator pre-provisions the tables. Keep schema changes explicit and versioned:

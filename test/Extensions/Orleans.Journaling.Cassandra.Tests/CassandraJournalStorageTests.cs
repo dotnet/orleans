@@ -98,6 +98,48 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     }
 
     [Fact]
+    public async Task CatalogQueriesApplyBoundsToCassandraClusteringKey()
+    {
+        await using var harness = await CreateHarnessAsync(readPageSize: 1);
+        var prefix = $"catalog-bounds/{Guid.NewGuid():N}/";
+        var prefixSuccessor = prefix[..^1] + "0";
+        var bucket = CassandraJournalStorageQueries.GetCatalogBucket(prefixSuccessor);
+        var below = new JournalId(FindIdInCatalogBucket(prefix, 'a', bucket));
+        var included = new JournalId(FindIdInCatalogBucket(prefix, 'm', bucket));
+        var above = new JournalId(FindIdInCatalogBucket(prefix, 'z', bucket));
+        var ids = new[] { below, included, above, new JournalId(prefixSuccessor) };
+
+        foreach (var id in ids)
+        {
+            await harness.Provider.CreateStorage(id).CreateIfNotExistsAsync(
+                cancellationToken: TestContext.Current.CancellationToken);
+        }
+
+        var queries = new CassandraJournalStorageQueries(harness.Session, harness.Options);
+        await queries.InitializeAsync(TestContext.Current.CancellationToken);
+
+        var prefixQuery = queries.ReadCatalogEntries(bucket, prefix, prefixSuccessor, upperBoundInclusive: false);
+        Assert.Contains("journal_id >= ?", prefixQuery.PreparedStatement.QueryString, StringComparison.Ordinal);
+        Assert.Contains("journal_id < ?", prefixQuery.PreparedStatement.QueryString, StringComparison.Ordinal);
+        Assert.DoesNotContain("journal_id <= ?", prefixQuery.PreparedStatement.QueryString, StringComparison.Ordinal);
+        Assert.Equal(
+            new[] { below.Value, included.Value, above.Value },
+            await ReadCatalogIdsAsync(harness.Session, prefixQuery));
+
+        var boundedQuery = queries.ReadCatalogEntries(
+            bucket,
+            prefix + "b",
+            prefix + "y",
+            upperBoundInclusive: true);
+        Assert.Contains("journal_id >= ?", boundedQuery.PreparedStatement.QueryString, StringComparison.Ordinal);
+        Assert.Contains("journal_id <= ?", boundedQuery.PreparedStatement.QueryString, StringComparison.Ordinal);
+        Assert.DoesNotContain("journal_id < ?", boundedQuery.PreparedStatement.QueryString, StringComparison.Ordinal);
+        Assert.Equal(
+            new[] { included.Value },
+            await ReadCatalogIdsAsync(harness.Session, boundedQuery));
+    }
+
+    [Fact]
     public async Task AppendAsync_RejectsJournalCreatedAfterThisHandleObservedAbsence()
     {
         await using var harness = await CreateHarnessAsync();
@@ -1060,6 +1102,32 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         => await storage.ReadAsync(new CapturingConsumer(), TestContext.Current.CancellationToken);
 
     private static JournalId NewJournalId() => new($"test/{Guid.NewGuid():N}");
+
+    private static string FindIdInCatalogBucket(string prefix, char firstCharacter, int bucket)
+    {
+        for (var suffix = 0; suffix < 10_000; suffix++)
+        {
+            var candidate = $"{prefix}{firstCharacter}{suffix:X}";
+            if (CassandraJournalStorageQueries.GetCatalogBucket(candidate) == bucket)
+            {
+                return candidate;
+            }
+        }
+
+        throw new InvalidOperationException($"Could not find a journal ID in catalog bucket {bucket}.");
+    }
+
+    private static async Task<string[]> ReadCatalogIdsAsync(ISession session, BoundStatement statement)
+    {
+        var result = await session.ExecuteAsync(statement);
+        var ids = new List<string>();
+        await foreach (var row in CassandraJournalStorage.ReadRowsAsync(result, TestContext.Current.CancellationToken))
+        {
+            ids.Add(row.GetValue<string>("journal_id"));
+        }
+
+        return ids.ToArray();
+    }
 
     private static ReadOnlySequence<byte> CreateSegmentedSequence(byte[] value, int[] segmentLengths)
     {
