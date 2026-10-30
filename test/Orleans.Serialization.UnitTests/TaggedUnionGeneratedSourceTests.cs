@@ -24,6 +24,7 @@ public class TaggedUnionGeneratedSourceTests
     [InlineData("CallbackPet")]
     [InlineData("CallbackNumber")]
     [InlineData("ImmutableCallbackPet")]
+    [InlineData("CustomAccessUnion")]
     public Task GeneratedSourceMatchesSnapshot(string typeName)
     {
         // Capture the SDK compiler's output: the test-host Roslyn version does not expose union case metadata.
