@@ -207,12 +207,12 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             .WithTrackingName(MetadataAggregateTrackingName);
 
         // Enums have one declaration, so their emission plans can retain the discovery provider's per-owner identity.
+        // Preserve null slots when a type becomes invalid: filtering here can corrupt Roslyn 4.5 tracked state on reparse.
         var enumSerializerPlans = serializableTypeResults
-            .Where(static result => result.EnumSerializerPlan is not null)
-            .Select(static (result, _) => result.EnumSerializerPlan!)
+            .Select(static (result, _) => result.EnumSerializerPlan)
             .WithTrackingName(EnumSerializerPlansTrackingName);
         var enumSerializerOutputs = enumSerializerPlans
-            .Select(static (plan, _) => EnumSerializerGenerator.GenerateSource(plan))
+            .Select(static (plan, _) => plan is null ? default : EnumSerializerGenerator.GenerateSource(plan))
             .WithTrackingName(EnumSerializerOutputsTrackingName);
 
         var compilationAwareTypes = collectedSerializableTypeResults
@@ -233,7 +233,8 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
 
         var serializerOutputs = compilationAwareSerializerOutputs
             .Combine(enumSerializerOutputs.Collect())
-            .Select(static (input, _) => GeneratedSourceOutput.DeduplicateSourceOutputs(input.Left.AddRange(input.Right)))
+            .Select(static (input, _) => GeneratedSourceOutput.DeduplicateSourceOutputs(
+                input.Left.AddRange(input.Right.Where(static output => output.SourceEntry is not null))))
             .WithComparer(ImmutableArrayComparer<SourceOutputResult>.Instance)
             .WithTrackingName(SerializerOutputsTrackingName);
 

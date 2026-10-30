@@ -202,7 +202,7 @@ public sealed class EnumSerializerPlanTests(ITestOutputHelper output)
             }
             """);
         var (_, result) = Run(CreateDriver(), compilation);
-        Assert.False(result.TrackedSteps.ContainsKey(OrleansSerializationSourceGenerator.EnumSerializerPlansTrackingName));
+        Assert.Empty(GetPlans(result));
         var entry = Assert.Single(GetSerializerEntries(result));
         Assert.Equal(Assert.Single(GenerateLegacy(compilation, "Outer`1+Nested")).SourceEntry, entry);
         Assert.Contains("where T : class, new()", entry.Source, StringComparison.Ordinal);
@@ -280,6 +280,55 @@ public sealed class EnumSerializerPlanTests(ITestOutputHelper output)
         Assert.NotSame(firstDiagnostic.Location.SourceTree, diagnostic.Location.SourceTree);
     }
 
+    [Fact]
+    public async Task EarlierEnumBecomesInaccessible_ReparsePreservesDiagnosticAndRecovers()
+    {
+        const string source = """
+            public class Container
+            {
+                [Orleans.GenerateSerializer] public enum First { One }
+            }
+            [Orleans.GenerateSerializer] public enum Second { Two }
+            """;
+        var compilation = await TestCompilationHelper.CreateCompilation(source);
+        var (driver, original) = Run(CreateDriver(), compilation);
+        var invalidSource = source.Replace("public enum First", "private enum First", StringComparison.Ordinal);
+        var invalid = ReplaceSource(compilation, invalidSource);
+        Diagnostic? previousDiagnostic = null;
+        foreach (var current in new[] { invalid, ReplaceSource(invalid, invalidSource) })
+        {
+            driver = driver.RunGeneratorsAndUpdateCompilation(current, out var updated, out var diagnostics, TestContext.Current.CancellationToken);
+            var result = Assert.Single(driver.GetRunResult().Results);
+            Assert.Null(result.Exception);
+            var diagnostic = Assert.Single(diagnostics);
+            Assert.Equal(Diagnostics.InaccessibleSerializableTypeDiagnostic.RuleId, diagnostic.Id);
+            Assert.Same(current.SyntaxTrees.Single(), diagnostic.Location.SourceTree);
+            Assert.Contains("Container.First", diagnostic.GetMessage(), StringComparison.Ordinal);
+            if (previousDiagnostic is not null)
+            {
+                Assert.Equal(previousDiagnostic.Location.SourceSpan, diagnostic.Location.SourceSpan);
+                Assert.NotSame(previousDiagnostic.Location.SourceTree, diagnostic.Location.SourceTree);
+            }
+
+            var entry = Assert.Single(GetSerializerEntries(result));
+            Assert.Contains("sealed class Codec_Second", entry.Source, StringComparison.Ordinal);
+            Assert.Equal(entry, Assert.Single(AssertCachedEmitters(result)));
+            Assert.Empty(updated.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+            var fresh = CreateDriver().RunGenerators(current, TestContext.Current.CancellationToken);
+            var freshResult = Assert.Single(fresh.GetRunResult().Results);
+            Assert.Null(freshResult.Exception);
+            Assert.Equal(GetSources(freshResult), GetSources(result));
+            Assert.Equal(Assert.Single(fresh.GetRunResult().Diagnostics).ToString(), diagnostic.ToString());
+            previousDiagnostic = diagnostic;
+        }
+
+        var recoveredCompilation = ReplaceSource(invalid, source);
+        var (_, recovered) = Run(driver, recoveredCompilation);
+        Assert.Equal(GetSources(original), GetSources(recovered));
+        AssertFreshParity(recoveredCompilation, recovered);
+    }
+
     private static GeneratorDriver CreateDriver(Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptionsProvider? options = null)
         => CSharpGeneratorDriver.Create(
             generators: [new OrleansSerializationSourceGenerator().AsSourceGenerator()],
@@ -324,12 +373,13 @@ public sealed class EnumSerializerPlanTests(ITestOutputHelper output)
 
     private static EnumSerializerOutputPlan[] GetPlans(GeneratorRunResult result)
         => result.TrackedSteps[OrleansSerializationSourceGenerator.EnumSerializerPlansTrackingName]
-            .SelectMany(static step => step.Outputs).Select(static output => (EnumSerializerOutputPlan)output.Value).ToArray();
+            .SelectMany(static step => step.Outputs).Select(static output => output.Value).OfType<EnumSerializerOutputPlan>().ToArray();
 
     private static (GeneratedSourceEntry Entry, IncrementalStepRunReason Reason)[] GetEmitterOutputs(GeneratorRunResult result)
         => result.TrackedSteps[OrleansSerializationSourceGenerator.EnumSerializerOutputsTrackingName]
             .SelectMany(static step => step.Outputs)
-            .Where(static output => output.Reason != IncrementalStepRunReason.Removed)
+            .Where(static output => output.Reason != IncrementalStepRunReason.Removed
+                && ((SourceOutputResult)output.Value).SourceEntry is not null)
             .Select(static output => (((SourceOutputResult)output.Value).SourceEntry!.Value, output.Reason)).ToArray();
 
     private static GeneratedSourceEntry[] AssertCachedEmitters(GeneratorRunResult result)
