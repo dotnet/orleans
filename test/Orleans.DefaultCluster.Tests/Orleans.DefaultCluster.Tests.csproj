@@ -18,8 +18,4 @@
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="AsyncEnumerableTests\" />
-  </ItemGroup>
 </Project>
