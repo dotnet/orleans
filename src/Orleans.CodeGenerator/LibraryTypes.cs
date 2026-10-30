@@ -368,7 +368,9 @@ internal sealed class LibraryTypes
                 return _shallowCopyableTypes[type] = true;
             }
 
-            if (!type.HasAttribute(GenerateSerializerAttribute))
+            // Referenced unions provide their copy policy through registration, independently of this compiler's case metadata.
+            if (!type.HasAttribute(GenerateSerializerAttribute)
+                || !SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, Compilation.Assembly))
             {
                 return _shallowCopyableTypes[type] = false;
             }

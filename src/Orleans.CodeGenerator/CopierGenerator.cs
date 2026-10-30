@@ -308,6 +308,13 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
     private TypeSyntax GetCopierType(IMemberDescription member)
     {
         var t = member.Type;
+        if (LanguageFeatureSymbols.IsUnion(t)
+            && !SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, LibraryTypes.Compilation.Assembly))
+        {
+            // A referenced shallow union can register ShallowCopier<T> without emitting a concrete generated copier.
+            return LibraryTypes.DeepCopier_1.ToTypeSyntax(member.TypeSyntax);
+        }
+
         if (t.HasAttribute(LibraryTypes.GenerateSerializerAttribute)
             && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, LibraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
             && t is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 0 })
