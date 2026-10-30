@@ -1657,7 +1657,7 @@ public sealed class RetirementHandoffTests
 
             // Once activated, the activation has no request to run.
             state.ReleaseActivation.TrySetResult();
-            await WaitUntilAsync(() => activation.State is ActivationState.Valid);
+            await WaitUntilAsync(() => activation.State is ActivationState.Active);
             await activation.RunOrQueueTask(() => Task.CompletedTask);
             Assert.False(state.HoldEntered.Task.IsCompleted);
             Assert.Equal(0, activation.GetRequestCount());
@@ -2102,7 +2102,7 @@ public sealed class RetirementHandoffTests
 
         // Retirement interrupts the activation. Its state may be partially initialized, so it does not migrate, and its queued request is forwarded or rejected as before.
         var stopping = cluster.StopSiloAsync(retiring, Cancellation);
-        await WaitUntilAsync(() => activation.State is ActivationState.Deactivating or ActivationState.Invalid);
+        await WaitUntilAsync(() => activation.IsDeactivationRequested);
         state.ReleaseActivation.TrySetResult();
         await stopping.WaitAsync(Timeout, Cancellation);
         await call.WaitAsync(Timeout, Cancellation).ContinueWith(static _ => { }, TaskScheduler.Default);
@@ -2475,7 +2475,7 @@ public sealed class RetirementHandoffTests
             Assert.Equal(rejectResponseFails ? 2 : 3, ownedCount);
             Assert.Equal(bodies.Take(ownedCount), ownedBodies);
             await activation!.Deactivated.WaitAsync(Timeout, Cancellation);
-            Assert.Equal(ActivationState.Invalid, activation.State);
+            Assert.Equal(ActivationState.Destroyed, activation.State);
             Assert.Equal(0, activation.WaitingCount);
             Assert.Null(FindActivation(silo, grainId));
             Assert.Empty(package.Requests!);

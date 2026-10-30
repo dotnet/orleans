@@ -411,7 +411,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 }
 
                 if (address.MembershipVersion == MembershipVersion.MinValue
-                    || activation is ActivationData { State: ActivationState.Deactivating or ActivationState.Invalid })
+                    || activation is ActivationData { IsTerminating: true })
                 {
                     ++skippedActivationCount;
                     continue;
