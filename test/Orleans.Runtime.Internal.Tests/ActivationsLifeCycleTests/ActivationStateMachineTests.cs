@@ -284,7 +284,7 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
     }
 
     /// <summary>
-    /// A deactivation request which arrives after <c>OnActivateAsync</c> returns and passes its cancellation check, but before the activation
+    /// A deactivation request which arrives after <c>OnActivateAsync</c> returns, but before the activation
     /// becomes active, finds activation completed. Teardown therefore starts at Deactivating and runs <c>OnDeactivateAsync</c>.
     /// </summary>
     [Fact]
@@ -293,7 +293,7 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
         await using var executor = new ActivationLifecycleExecutor(fixture);
         var grainId = executor.GrainId.ToString();
 
-        // The OnActivateAsync span stops between OnActivateAsync's cancellation check and the Active boundary.
+        // The OnActivateAsync span stops between OnActivateAsync's return and the Active boundary.
         using var listener = new ActivityListener
         {
             ShouldListenTo = static source => source.Name == ActivitySources.LifecycleActivitySourceName,
@@ -554,10 +554,11 @@ internal static class ActivationLifecycleModel
             (ActivationLifecycleOperation.Release, ActivationState.Registering) => requested ? ActivationState.Unregistering : ActivationState.Starting,
             (ActivationLifecycleOperation.Fail, ActivationState.Registering) => ActivationState.Unregistering,
 
-            // A deactivation request cancels setup, and a canceled setup phase fails. A failed phase enters teardown at the mirror of the
-            // last completed phase, except that lifecycle stop undoes a partial start.
+            // A deactivation request cancels setup. A canceled Starting phase fails, while OnActivateAsync's outcome decides Activating:
+            // these callbacks return normally, so Activating completes. A failed phase enters teardown at the mirror of the last completed
+            // phase, except that lifecycle stop undoes a partial start.
             (ActivationLifecycleOperation.Release, ActivationState.Starting) => requested ? ActivationState.Stopping : ActivationState.Activating,
-            (ActivationLifecycleOperation.Release, ActivationState.Activating) => requested ? ActivationState.Stopping : ActivationState.Active,
+            (ActivationLifecycleOperation.Release, ActivationState.Activating) => requested ? ActivationState.Deactivating : ActivationState.Active,
             (ActivationLifecycleOperation.Fail, ActivationState.Starting or ActivationState.Activating) => ActivationState.Stopping,
 
             // Teardown continues past failures. Dehydrating does not migrate: the activation is the only placement candidate, and a
