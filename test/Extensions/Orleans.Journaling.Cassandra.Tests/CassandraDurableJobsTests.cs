@@ -63,7 +63,6 @@ public sealed class CassandraDurableJobsTestFixture : IAsyncLifetime, IJobShardM
 
     public async Task<IJobShardManagerTestScope> CreateScopeAsync(CancellationToken cancellationToken)
     {
-        _container.EnsurePreconditionsMet();
         var session = await _container.GetSessionAsync(cancellationToken);
         var tableName = $"durablejobs_test_{Guid.NewGuid():N}";
         var catalogTableName = $"{tableName}_catalog";

@@ -12,6 +12,14 @@ namespace Tester.Cassandra.Journaling;
 [TestCategory("Cassandra")]
 public sealed class CassandraJournalContainerTests
 {
+    [Theory]
+    [InlineData(null, "cassandra:5.0")]
+    [InlineData("", "cassandra:5.0")]
+    [InlineData(" ", "cassandra:5.0")]
+    [InlineData("4.1", "cassandra:4.1")]
+    public void GetImageNameUsesDefaultVersionWhenUnset(string? version, string expected)
+        => Assert.Equal(expected, CassandraJournalContainer.GetImageName(version));
+
     [Fact]
     public async Task DisposeAsyncWaitsForPendingStartupAndDisposesItsContainer()
     {

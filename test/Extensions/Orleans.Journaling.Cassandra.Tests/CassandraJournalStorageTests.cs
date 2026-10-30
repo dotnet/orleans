@@ -23,7 +23,6 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     public CassandraJournalStorageTests(CassandraJournalContainer container)
     {
         _container = container;
-        _container.EnsurePreconditionsMet();
     }
 
     [Fact]

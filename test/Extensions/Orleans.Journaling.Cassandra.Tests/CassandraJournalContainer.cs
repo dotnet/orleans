@@ -8,6 +8,7 @@ namespace Tester.Cassandra.Journaling;
 
 public sealed class CassandraJournalContainer : IAsyncLifetime
 {
+    private const string DefaultCassandraVersion = "5.0";
     private readonly object _lock = new();
     private readonly Func<CancellationToken, Task<(IContainer Container, Cluster Cluster, ISession Session)>> _startBackendAsync;
     private Task<(IContainer Container, Cluster Cluster, ISession Session)>? _backend;
@@ -22,12 +23,8 @@ public sealed class CassandraJournalContainer : IAsyncLifetime
         _startBackendAsync = startBackendAsync ?? throw new ArgumentNullException(nameof(startBackendAsync));
     }
 
-    public void EnsurePreconditionsMet()
-        => Assert.SkipWhen(string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CASSANDRAVERSION")), "CASSANDRAVERSION is not configured.");
-
     public async Task<ISession> GetSessionAsync(CancellationToken cancellationToken)
     {
-        EnsurePreconditionsMet();
         Task<(IContainer Container, Cluster Cluster, ISession Session)> task;
         lock (_lock)
         {
@@ -67,8 +64,7 @@ public sealed class CassandraJournalContainer : IAsyncLifetime
 
     private static async Task<(IContainer Container, Cluster Cluster, ISession Session)> StartAsync(CancellationToken cancellationToken)
     {
-        var version = Environment.GetEnvironmentVariable("CASSANDRAVERSION");
-        var image = $"cassandra:{version}";
+        var image = GetImageName(Environment.GetEnvironmentVariable("CASSANDRAVERSION"));
         IContainer? container = null;
         try
         {
@@ -105,6 +101,9 @@ public sealed class CassandraJournalContainer : IAsyncLifetime
             throw;
         }
     }
+
+    internal static string GetImageName(string? version)
+        => $"cassandra:{(string.IsNullOrWhiteSpace(version) ? DefaultCassandraVersion : version)}";
 
     public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 }
