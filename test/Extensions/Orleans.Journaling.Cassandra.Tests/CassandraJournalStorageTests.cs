@@ -399,7 +399,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
             $"DELETE FROM {harness.Options.TableName} WHERE journal_id = ? AND generation = ? AND sequence = ?",
             id.Value,
             generation,
-            0L));
+            0L).SetConsistencyLevel(ConsistencyLevel.Quorum));
         var consumer = new CapturingConsumer();
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
@@ -1160,7 +1160,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         var result = await session.ExecuteAsync(new SimpleStatement(
             $"SELECT sequence FROM {table} WHERE journal_id = ? AND generation = ?",
             id.Value,
-            generation));
+            generation).SetConsistencyLevel(ConsistencyLevel.Quorum));
         return result.Select(row => row.GetValue<long>("sequence")).Order().ToArray();
     }
 
