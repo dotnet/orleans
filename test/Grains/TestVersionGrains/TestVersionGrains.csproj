@@ -5,6 +5,8 @@
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <PublishRoot>bin\$(Configuration)\publish\</PublishRoot>
+    <!-- Build prepares the standalone silo deployment consumed by the upgrade tests. -->
+    <OutputPath>$(PublishRoot)</OutputPath>
     <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
     <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
     <Nullable>enable</Nullable>
@@ -22,8 +24,4 @@
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
   </ItemGroup>
-
-  <Target Name="PostBuildPublish" AfterTargets="Build">
-    <CallTarget Targets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" />
-  </Target>
 </Project>
