@@ -2,6 +2,15 @@
 # Orleans build script
 # --------------------
 
+[CmdletBinding()]
+param(
+    [Parameter(Position = 0)]
+    [ValidateSet("BuildAndPack", "Build", "Pack")]
+    [string] $Action = "BuildAndPack",
+    [switch] $NoRestore,
+    [string] $VersionDateSuffix
+)
+
 . ./common.ps1
 
 $scriptDir = Split-Path $script:MyInvocation.MyCommand.Path
@@ -24,27 +33,34 @@ $Platform = $null
 # Disable multilevel lookup https://github.com/dotnet/core-setup/blob/main/Documentation/design-docs/multilevel-sharedfx-lookup.md
  $DOTNET_MULTILEVEL_LOOKUP = 0
 
-$BuildProperties = "/p:Configuration=$env:BuildConfiguration";
+$BuildProperties = @("/p:Configuration=$env:BuildConfiguration")
+$BuildFlags = @($env:BUILD_FLAGS -split "\s+" | Where-Object { $_ })
 
- # Set DateTime suffix for debug builds
- if ($env:BuildConfiguration -eq "Debug")
- {
-    $dateSuffix = Get-Date -Format "yyyyMMddHHmm"
-    $BuildProperties = $BuildProperties + " /p:VersionDateSuffix=$dateSuffix"
- }
+# A shared, explicit suffix keeps build and pack metadata identical for uniquely versioned packages.
+if ($VersionDateSuffix)
+{
+    $BuildProperties += "/p:VersionDateSuffix=$VersionDateSuffix"
+}
 
 Write-Output "===== Building $solution ====="
 
 Install-Dotnet
 
-if ($args[0] -ne "Pack")
+if ($Action -ne "Pack")
 {
     Write-Output "Build $env:BuildConfiguration =============================="
-    Invoke-Dotnet -Command "restore" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Restore.binlog ${BuildProperties} `"$solution`""
-    Invoke-Dotnet -Command "build" -Arguments "$env:BUILD_FLAGS /bl:${env:BuildConfiguration}-Build.binlog ${BuildProperties} `"$solution`""
+    if (-not $NoRestore)
+    {
+        Invoke-Dotnet -Command "restore" -Arguments ($BuildFlags + "/bl:${env:BuildConfiguration}-Restore.binlog" + $BuildProperties + $solution)
+    }
+
+    Invoke-Dotnet -Command "build" -Arguments (@("--no-restore") + $BuildFlags + "/bl:${env:BuildConfiguration}-Build.binlog" + $BuildProperties + $solution)
 }
 
-Write-Output "Package $env:BuildConfiguration ============================"
-Invoke-Dotnet -Command "pack" -Arguments "--no-build --no-restore $BUILD_FLAGS /bl:${env:BuildConfiguration}-Pack.binlog ${BuildProperties} `"$solution`""
+if ($Action -ne "Build")
+{
+    Write-Output "Package $env:BuildConfiguration ============================"
+    Invoke-Dotnet -Command "pack" -Arguments (@("--no-build", "--no-restore") + $BuildFlags + "/bl:${env:BuildConfiguration}-Pack.binlog" + $BuildProperties + $solution)
+}
 
 Write-Output "===== Build succeeded for $solution ====="

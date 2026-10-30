@@ -41,16 +41,16 @@ function Invoke-Dotnet
    param 
    (
        $Command,
-       $Arguments
+       [string[]] $Arguments
    )
    $cmdArgs = @()
    $cmdArgs = $cmdArgs + $Command
-   $cmdArgs = $cmdArgs + ($Arguments -split "\s+")
+   $cmdArgs = $cmdArgs + $Arguments
    Write-Output "dotnet $cmdArgs"
-   & dotnet $cmdArgs
+   & dotnet @cmdArgs
    if ($LASTEXITCODE -ne 0)
    {
-       Write-Error "===== Build FAILED -- $Command with error $LASTEXITCODE - CANNOT CONTINUE ====="
+       Write-Error "===== Build FAILED -- $Command with error $LASTEXITCODE - CANNOT CONTINUE =====" -ErrorAction Continue
        Exit $LASTEXITCODE
    }
 }

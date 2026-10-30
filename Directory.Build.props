@@ -61,7 +61,7 @@
     <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">10.0.0</VersionPrefix>
   </PropertyGroup>
 
-  <!-- For Debug builds generated a date/time dependent version suffix -->
+  <!-- Debug builds use a stable suffix; an explicit VersionDateSuffix identifies unique packages. -->
   <PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
     <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">dev</VersionSuffix>
     <VersionSuffix Condition=" '$(VersionDateSuffix)'!='' ">$(VersionSuffix)-$(VersionDateSuffix)</VersionSuffix>

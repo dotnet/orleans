@@ -1,1 +1,1 @@
-powershell -NoProfile -ExecutionPolicy unrestricted -Command "./build.ps1 %1"
+@powershell -NoProfile -ExecutionPolicy unrestricted -File "%~dp0build.ps1" %*

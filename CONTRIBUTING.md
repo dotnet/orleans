@@ -20,6 +20,16 @@ dotnet build Orleans.slnx -bl
 
 The `Orleans.slnx` solution includes the source projects under `src` and the test projects under `test`. On Windows, `Build.cmd` additionally restores, builds, and packs the solution, placing packages in `Artifacts/<Configuration>`.
 
+For an incremental compile-only loop, run `Build.cmd Build` (or `.\build.ps1 Build` in PowerShell). After a successful restore, `Build.cmd Build -NoRestore` reuses the restored dependencies. Run with restore again after changing projects, package references, or restore properties. These script modes build the full solution with its configured target frameworks and analysis.
+
+For focused changes, build the affected project directly:
+
+```console
+dotnet build src/Orleans.Runtime/Orleans.Runtime.csproj --no-restore -bl
+```
+
+Debug builds use a stable `dev` version suffix so unchanged builds can reuse their assemblies. To produce uniquely versioned Debug packages, pass an explicit suffix, for example `Build.cmd -VersionDateSuffix 202610291900`. The script uses that suffix throughout restore, build, and pack. `Build.cmd Pack` packages an existing build; use the same `BuildConfiguration`, build flags, and version suffix as that build. Set `BuildConfiguration=Release` in the environment for Release artifacts.
+
 ### Verify formatting
 
 After building the solution, verify the repository-wide formatting baseline with:
