@@ -362,10 +362,29 @@ internal sealed class CassandraJournalStorageQueries
 
     public BoundStatement ReadCatalogEntries(int bucket, JournalCatalogRange range)
     {
-        var lowerBound = range.LowerBound;
-        var upperBound = range.UpperBound;
+        var lowerBound = GetCqlOrderingSafeBound(range.LowerBound);
+        var upperBound = GetCqlOrderingSafeBound(range.UpperBound);
         var upperBoundInclusive = upperBound is not null && range.Contains(upperBound);
         return ReadCatalogEntries(bucket, lowerBound, upperBound, upperBoundInclusive);
+    }
+
+    private static string? GetCqlOrderingSafeBound(string? bound)
+    {
+        if (bound is null)
+        {
+            return null;
+        }
+
+        // Cassandra orders text by UTF-8 bytes, while catalog ranges use UTF-16 ordinal comparison.
+        foreach (var character in bound)
+        {
+            if (character > 0x7F)
+            {
+                return null;
+            }
+        }
+
+        return bound;
     }
 
     internal BoundStatement ReadCatalogEntries(int bucket, string? lowerBound, string? upperBound, bool upperBoundInclusive)

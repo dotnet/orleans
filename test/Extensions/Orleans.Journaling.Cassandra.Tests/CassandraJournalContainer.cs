@@ -9,7 +9,18 @@ namespace Tester.Cassandra.Journaling;
 public sealed class CassandraJournalContainer : IAsyncLifetime
 {
     private readonly object _lock = new();
+    private readonly Func<CancellationToken, Task<(IContainer Container, Cluster Cluster, ISession Session)>> _startBackendAsync;
     private Task<(IContainer Container, Cluster Cluster, ISession Session)>? _backend;
+
+    public CassandraJournalContainer() : this(StartAsync)
+    {
+    }
+
+    internal CassandraJournalContainer(
+        Func<CancellationToken, Task<(IContainer Container, Cluster Cluster, ISession Session)>> startBackendAsync)
+    {
+        _startBackendAsync = startBackendAsync ?? throw new ArgumentNullException(nameof(startBackendAsync));
+    }
 
     public void EnsurePreconditionsMet()
         => Assert.SkipWhen(string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CASSANDRAVERSION")), "CASSANDRAVERSION is not configured.");
@@ -25,7 +36,7 @@ public sealed class CassandraJournalContainer : IAsyncLifetime
                 _backend = null;
             }
 
-            task = _backend ??= StartAsync(cancellationToken);
+            task = _backend ??= _startBackendAsync(cancellationToken);
         }
 
         return (await task.WaitAsync(cancellationToken)).Session;
@@ -40,11 +51,17 @@ public sealed class CassandraJournalContainer : IAsyncLifetime
             _backend = null;
         }
 
-        if (backend is { IsCompletedSuccessfully: true })
+        if (backend is not null)
         {
-            var result = await backend;
-            result.Cluster.Dispose();
-            await result.Container.DisposeAsync();
+            var result = await backend.ConfigureAwait(false);
+            try
+            {
+                result.Cluster.Dispose();
+            }
+            finally
+            {
+                await result.Container.DisposeAsync().ConfigureAwait(false);
+            }
         }
     }
 

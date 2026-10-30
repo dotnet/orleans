@@ -27,7 +27,7 @@ public sealed class CassandraJournalStorageOptions
     public int MaxAppendBytes { get; set; } = 2 * 1024 * 1024;
 
     /// <summary>
-    /// Gets or sets the size of each journal row in bytes.
+    /// Gets or sets the maximum payload size of a row written when replacing a journal.
     /// </summary>
     public int RowSizeBytes { get; set; } = 64 * 1024;
 
@@ -105,7 +105,7 @@ public sealed class CassandraJournalStorageOptions
             throw new ArgumentException("The Cassandra catalog table name must be a simple CQL identifier.", nameof(CatalogTableName));
         }
 
-        if (string.Equals(TableName, EffectiveCatalogTableName, StringComparison.Ordinal))
+        if (string.Equals(TableName, EffectiveCatalogTableName, StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException("The Cassandra catalog table name must differ from the journal table name.", nameof(CatalogTableName));
         }

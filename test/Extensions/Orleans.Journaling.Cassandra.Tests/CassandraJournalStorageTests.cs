@@ -140,6 +140,28 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     }
 
     [Fact]
+    public async Task CatalogListingsPreserveOrdinalBoundsWhenCassandraTextOrderingDiffers()
+    {
+        await using var harness = await CreateHarnessAsync();
+        var includedId = new JournalId("tenant/\U0001F600");
+        var maximumId = new JournalId("tenant/\uE000");
+
+        Assert.True(string.CompareOrdinal(includedId.Value, maximumId.Value) < 0);
+        await harness.Provider.CreateStorage(includedId).CreateIfNotExistsAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        var entries = new List<JournalCatalogEntry>();
+        await foreach (var entry in harness.Provider.ListAsync(
+            new JournalCatalogListOptions { MaxId = maximumId },
+            TestContext.Current.CancellationToken))
+        {
+            entries.Add(entry);
+        }
+
+        Assert.Contains(entries, entry => entry.Id == includedId);
+    }
+
+    [Fact]
     public async Task AppendAsync_RejectsJournalCreatedAfterThisHandleObservedAbsence()
     {
         await using var harness = await CreateHarnessAsync();

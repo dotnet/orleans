@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -18,15 +20,30 @@ namespace Tester.Cassandra.Journaling;
 public sealed class CassandraDurableJobsConfigurationTests
 {
     [Fact]
-    public void CassandraJournalStorageOptions_RejectsCatalogTableNameMatchingJournalTable()
+    public void CassandraJournalStorageOptions_RejectsCatalogTableNameResolvingToJournalTable()
     {
-        var options = new CassandraJournalStorageOptions
-        {
-            TableName = "same_table",
-            CatalogTableName = "same_table",
-        };
+        AssertCatalogTableNameRejected("same_table", "same_table");
+        AssertCatalogTableNameRejected("Journal", "journal");
 
-        Assert.Throws<ArgumentException>(options.Validate);
+        static void AssertCatalogTableNameRejected(string tableName, string catalogTableName)
+        {
+            var options = new CassandraJournalStorageOptions
+            {
+                TableName = tableName,
+                CatalogTableName = catalogTableName,
+            };
+
+            Assert.Throws<ArgumentException>(options.Validate);
+        }
+    }
+
+    [Fact]
+    public void CassandraJournalStorageAssemblyIsMarkedExperimental()
+    {
+        var attribute = typeof(CassandraJournalStorageOptions).Assembly.GetCustomAttribute<ExperimentalAttribute>();
+
+        Assert.NotNull(attribute);
+        Assert.Equal("ORLEANSEXP005", attribute.DiagnosticId);
     }
 
     [Theory]
