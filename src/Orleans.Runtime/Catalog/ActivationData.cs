@@ -1195,10 +1195,12 @@ internal sealed partial class ActivationData :
                             var currentVersion = _shared.InternalRuntime.GrainVersionManifest.GetLocalVersion(message.InterfaceType);
                             if (!compatibilityDirector.IsCompatible(message.InterfaceVersion, currentVersion))
                             {
-                                if (i > 0)
+                                if (i > 0 || IsCurrentlyExecuting)
                                 {
                                     // Requests queued ahead of this one have not started yet. Deactivating now would forward
                                     // them to a new activation, so wait until they start to preserve their order.
+                                    // Running requests must also finish first: a deactivating activation stops dispatching
+                                    // interleaved requests, including cancellation of this one.
                                     ++i;
                                     continue;
                                 }
