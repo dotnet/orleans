@@ -34,7 +34,7 @@ internal sealed partial class InvokableObjectManager
     private readonly object _observerLifecycleLock = new();
 #endif
 
-    private readonly List<Task> _observerDisposals = [];
+    private readonly HashSet<Task> _observerDisposals = [];
     private bool _isStopping;
 
     private List<IIncomingGrainCallFilter> GrainCallFilters
