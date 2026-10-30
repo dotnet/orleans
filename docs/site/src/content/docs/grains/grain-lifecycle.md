@@ -17,7 +17,10 @@ Override the cancellation-token overload:
 
 :::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="activate_grain":::
 
-<xref:Orleans.Grain.OnActivateAsync*> accepts a <xref:System.Threading.CancellationToken>; there is no parameterless overload. If activation fails, Orleans doesn't make that activation available for calls.
+Orleans requests cancellation through the token passed to <xref:Orleans.Grain.OnActivateAsync*> when the activation timeout elapses or deactivation is requested. The runtime awaits the callback to completion while retaining the activation's directory registration and services. The callback's outcome determines the activation's outcome:
+
+- To stop early, throw, for example by calling <xref:System.Threading.CancellationToken.ThrowIfCancellationRequested*?displayProperty=nameWithType>. Activation fails, and Orleans releases the activation's resources without calling <xref:Orleans.Grain.OnDeactivateAsync*>.
+- A normal return completes activation, including after cancellation was requested. If deactivation was requested, Orleans proceeds with deactivation and calls <xref:Orleans.Grain.OnDeactivateAsync*>. If only the activation timeout elapsed, the activation remains available for calls, and Orleans logs a warning.
 
 Avoid doing unnecessary work during activation. Activations can be recreated after collection, migration, silo restart, or failure.
 

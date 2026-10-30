@@ -138,6 +138,7 @@ namespace UnitTests.Grains
                 catch (Exception exception)
                 {
                     _log.LogInformation(exception, "Error while waiting");
+                    throw;
                 }
             }
 

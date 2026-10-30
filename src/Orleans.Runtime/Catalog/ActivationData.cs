@@ -894,9 +894,7 @@ internal sealed partial class ActivationData :
                 Command.Deactivate? command = null;
                 if (!requested)
                 {
-                    var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
-                    command = new Command.Deactivate(cts, deactivateActivity);
+                    command = new Command.Deactivate(CancellationTokenSource.CreateLinkedTokenSource(cancellationToken), deactivateActivity);
                     MarkDeactivationRequested();
                 }
 
@@ -2266,6 +2264,13 @@ internal sealed partial class ActivationData :
             {
                 if (completed is ActivationState.Activating)
                 {
+                    // A normal return from OnActivateAsync completes activation, including after its token was canceled. When only the
+                    // activation timeout canceled the token, the activation becomes active.
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        LogActivationCompletedAfterTimeout(_shared.Logger, this, _shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+                    }
+
                     _activationActivity?.AddEvent(new ActivityEvent("state-valid"));
                     activationMetrics.Succeeded();
                 }
@@ -2399,8 +2404,9 @@ internal sealed partial class ActivationData :
         {
             _activationActivity?.AddEvent(new ActivityEvent("lifecycle-start"));
 
-            // The activation timeout cancels this token. The runtime awaits user code to completion, so the activation keeps
-            // its registration and services while that code runs. Activation fails if the token was canceled.
+            // The activation timeout and deactivation cancel this token. The runtime awaits user code to completion, so the activation
+            // keeps its registration and services while that code runs. Once cancellation is requested, the runtime does not proceed to
+            // OnActivateAsync.
             await lifecycle.OnStart(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             _activationActivity?.AddEvent(new ActivityEvent("lifecycle-started"));
@@ -2437,10 +2443,8 @@ internal sealed partial class ActivationData :
 
         try
         {
+            // The outcome of OnActivateAsync decides activation: a normal return completes it, including after its token was canceled.
             await grainBase.OnActivateAsync(cancellationToken);
-
-            // Activation fails if its token was canceled, even if OnActivateAsync returned normally.
-            cancellationToken.ThrowIfCancellationRequested();
             return null;
         }
         catch (Exception exception) when (IsObservedCancellation(exception, cancellationToken))
@@ -2488,6 +2492,9 @@ internal sealed partial class ActivationData :
     private async Task FinishDeactivating(Command.Deactivate deactivateCommand, CancellationToken cancellationToken)
     {
         using var _ = deactivateCommand.Activity;
+
+        // The timeout bounds teardown, which starts only after setup and running requests complete.
+        deactivateCommand.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
 
         var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start(_shared.CatalogInstruments, _shared.GrainTypeMetricName);
         ActivationMigration? migration = null;
@@ -3146,6 +3153,15 @@ internal sealed partial class ActivationData :
             }
         }
 
+        public void CancelAfter(TimeSpan delay)
+        {
+            lock (_lock)
+            {
+                if (_disposed) return;
+                _cts.CancelAfter(delay);
+            }
+        }
+
         public virtual void Dispose()
         {
             try
@@ -3452,6 +3468,12 @@ internal sealed partial class ActivationData :
         Message = "Activation was cancelled for {Grain}. CancellationRequested={CancellationRequested}, DeactivationReasonCode={DeactivationReasonCode}, DeactivationReason={DeactivationReason}, ForwardingAddress={ForwardingAddress}"
     )]
     private static partial void LogActivationCancelled(ILogger logger, ActivationData grain, bool cancellationRequested, DeactivationReasonCode deactivationReasonCode, string? deactivationReason, SiloAddress? forwardingAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Activation of {Grain} completed after its activation timeout of {ActivationTimeout} elapsed. The activation remains active.")]
+    private static partial void LogActivationCompletedAfterTimeout(ILogger logger, ActivationData grain, TimeSpan activationTimeout);
+
     [LoggerMessage(
         Level = LogLevel.Trace,
         Message = "Completing deactivation of '{Activation}'")]
