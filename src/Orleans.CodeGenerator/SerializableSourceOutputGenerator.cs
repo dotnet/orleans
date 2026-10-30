@@ -38,7 +38,9 @@ internal static class SerializableSourceOutputGenerator
             }
 
             var model = ModelExtractor.ExtractSerializableTypeModel(typeDescription, sourceLocation);
-            return SerializableTypeResult.FromModel(model);
+            var enumPlan = EnumSerializerGenerator.CreateOutputPlan(
+                typeDescription, libraryTypes, compilation.AssemblyName ?? "assembly", metadataIdentity);
+            return SerializableTypeResult.FromModel(model, enumPlan);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -468,5 +470,4 @@ internal static class SerializableSourceOutputGenerator
             && string.Equals(metadataIdentity.AssemblyName, assemblyIdentity.Name, StringComparison.Ordinal);
     }
 }
-
 
