@@ -1,6 +1,5 @@
 #nullable enable
 using System.Diagnostics;
-using System.Drawing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -744,15 +743,22 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
         }, cancellationToken);
 
         var values = new List<string>();
-        await foreach (var entry in grain.GetValues(cancellationToken).WithCancellation(cancellationToken))
+        try
         {
-            values.Add(entry);
-            if (values.Count == 2)
+            await foreach (var entry in grain.GetValues(cancellationToken).WithCancellation(cancellationToken))
             {
-                break;
-            }
+                values.Add(entry);
+                if (values.Count == 2)
+                {
+                    break;
+                }
 
-            Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
+                Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
+            }
+        }
+        finally
+        {
+            await producer;
         }
 
         Assert.Equal(2, values.Count);
@@ -976,6 +982,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
 
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(10);
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable()
     {
@@ -1012,6 +1020,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_Batch()
     {
@@ -1042,6 +1052,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_SplitBatch()
     {
@@ -1070,6 +1082,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_NoBatching()
     {
@@ -1098,6 +1112,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT"), TestCategory("Observable")]
     [InlineData(0, false)]
     [InlineData(0, true)]
@@ -1139,6 +1155,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT"), TestCategory("Observable")]
     [InlineData(0, false)]
     [InlineData(0, true)]
@@ -1200,6 +1218,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_CancelBeforeYield()
     {
@@ -1242,6 +1262,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT"), TestCategory("Observable")]
     [InlineData(0, false)]
     [InlineData(0, true)]
@@ -1280,6 +1302,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Theory, TestCategory("BVT"), TestCategory("Observable")]
     [InlineData(0, false)]
     [InlineData(0, true)]
@@ -1340,6 +1364,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_WithCancellation()
     {
@@ -1388,6 +1414,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_EnumeratorDisposed_WhileMoveNextIsPending()
     {
@@ -1423,6 +1451,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_ObserverDeregistration_DisposesWholeExtension()
     {
@@ -1476,6 +1506,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         }
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_MoveNextCall_AfterDeregistration_Fails()
     {
@@ -1502,6 +1534,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
             async () => await enumerator.MoveNextAsync().AsTask().WaitAsync(TestTimeout, cancellationToken));
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_SingleValue()
     {
@@ -1528,6 +1562,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_BatchOnce()
     {
@@ -1558,6 +1594,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_SlowConsumer()
     {
@@ -1599,6 +1637,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_SlowConsumer_Evicted()
     {
@@ -1648,6 +1688,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_SlowProducer()
     {
@@ -1667,13 +1709,20 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
             }, cancellationToken);
 
             var values = new List<string>();
-            await foreach (var value in observerRef.GetValues(cancellationToken).WithCancellation(cancellationToken))
+            try
             {
-                values.Add(value);
-                if (values.Count == 2)
+                await foreach (var value in observerRef.GetValues(cancellationToken).WithCancellation(cancellationToken))
                 {
-                    break;
+                    values.Add(value);
+                    if (values.Count == 2)
+                    {
+                        break;
+                    }
                 }
+            }
+            finally
+            {
+                await producer;
             }
 
             Assert.Equal(2, values.Count);
@@ -1683,6 +1732,8 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task Observer_AsyncEnumerable_Fail()
     {
