@@ -214,6 +214,213 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
         Assert.Contains("AddSerializer<byte[]>", source, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(8, false)]
+    [InlineData(2, true)]
+    [InlineData(8, true)]
+    public void PartialContextsConstructOneGraphWithAllRoots(int attributedDeclarations, bool separateFiles)
+    {
+        const string declaration = "public partial class DemoContext : Orleans.Serialization.SerializerContext { }";
+        string[] roots = ["int?", "byte[]", "System.Collections.Generic.List<int>"];
+        var attributes = Enumerable.Range(0, attributedDeclarations)
+            .Select(index => $"[Orleans.GenerateSerializerContext<{roots[index % roots.Length]}>]").ToArray();
+        var partials = attributes.Select(attribute => $"{attribute} public partial class DemoContext {{ }}");
+        var sources = new[] { declaration }.Concat(partials).ToArray();
+        var compilation = CreateCompilation(separateFiles ? sources : [string.Join(Environment.NewLine, sources)]);
+        var (generated, result) = Generate(compilation);
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(generated.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Single(GetContextResults(result));
+
+        var (_, consolidated) = Generate($"{string.Join(Environment.NewLine, attributes)} {declaration}");
+        Assert.Equal(GetContextSources(consolidated), GetContextSources(result));
+    }
+
+    [Theory]
+    [InlineData(true, "int", "ORLEANS0114")]
+    [InlineData(false, "System.IO.Stream", "ORLEANS0115")]
+    public void PartialContextDiagnosticsKeepTheFirstDeclarationLocation(bool invalidContext, string root, string diagnosticId)
+    {
+        var compilation = CreateCompilation([
+            $"public {(invalidContext ? "" : "partial")} class DemoContext : Orleans.Serialization.SerializerContext {{ }}",
+            $"[Orleans.GenerateSerializerContext<{root}>] public partial class DemoContext {{ }}",
+            "[Orleans.GenerateSerializerContext<byte[]>] public partial class DemoContext { }"
+        ]);
+        var (_, result) = Generate(compilation);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(diagnosticId, diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        var firstDeclaration = compilation.SyntaxTrees.First().GetRoot(TestContext.Current.CancellationToken)
+            .DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
+        Assert.Same(firstDeclaration.SyntaxTree, diagnostic.Location.SourceTree);
+        Assert.Equal(firstDeclaration.Identifier.Span, diagnostic.Location.SourceSpan);
+        Assert.Single(GetContextResults(result));
+
+        var (_, consolidated) = Generate(compilation.RemoveSyntaxTrees(compilation.SyntaxTrees.Skip(1))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(
+                $"[Orleans.GenerateSerializerContext<{root}>][Orleans.GenerateSerializerContext<byte[]>] public partial class DemoContext {{ }}",
+                (CSharpParseOptions)firstDeclaration.SyntaxTree.Options,
+                cancellationToken: TestContext.Current.CancellationToken)));
+        var expected = Assert.Single(consolidated.Diagnostics);
+        Assert.Equal(expected.GetMessage(), diagnostic.GetMessage());
+        Assert.Equal(GetContextSources(consolidated), GetContextSources(result));
+    }
+
+    [Fact]
+    public void PartialContextEditsKeepAllRootsWhenOwnershipMoves()
+    {
+        var compilation = CreateCompilation([
+            "public partial class DemoContext : Orleans.Serialization.SerializerContext { }",
+            "[Orleans.GenerateSerializerContext<int>] public partial class DemoContext { }",
+            """
+            using Root = Orleans.GenerateSerializerContextAttribute<string>;
+            [Root] public partial class DemoContext { }
+            """
+        ]);
+        var original = compilation;
+        var driver = CreateDriver(compilation);
+        AssertMatchesConsolidated("int", "string");
+        var owner = compilation.SyntaxTrees.ElementAt(1);
+        var other = compilation.SyntaxTrees.Last();
+        var changed = CSharpSyntaxTree.ParseText(
+            "[Orleans.GenerateSerializerContext<bool>] public partial class DemoContext { }",
+            (CSharpParseOptions)other.Options,
+            cancellationToken: TestContext.Current.CancellationToken);
+        compilation = compilation.ReplaceSyntaxTree(other, changed);
+        AssertMatchesConsolidated("int", "bool");
+        var added = CSharpSyntaxTree.ParseText(
+            "[Orleans.GenerateSerializerContext<byte[]>] public partial class DemoContext { }",
+            (CSharpParseOptions)other.Options,
+            cancellationToken: TestContext.Current.CancellationToken);
+        compilation = compilation.AddSyntaxTrees(added);
+        AssertMatchesConsolidated("int", "bool", "byte[]");
+        compilation = compilation.RemoveSyntaxTrees(owner);
+        AssertMatchesConsolidated("bool", "byte[]");
+        compilation = original;
+        AssertMatchesConsolidated("int", "string");
+
+        void AssertMatchesConsolidated(params string[] roots)
+        {
+            driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var generated, out _, TestContext.Current.CancellationToken);
+            var result = driver.GetRunResult();
+            Assert.Empty(result.Diagnostics);
+            Assert.Empty(generated.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+            Assert.Single(GetContextResults(result));
+            var attributes = string.Join(Environment.NewLine, roots.Select(root => $"[Orleans.GenerateSerializerContext<{root}>]"));
+            var (_, expected) = Generate($"{attributes} public partial class DemoContext : Orleans.Serialization.SerializerContext {{ }}");
+            Assert.Equal(GetContextSources(expected), GetContextSources(result));
+        }
+    }
+
+    [Fact]
+    public void PartialContextCancellationLeavesTheDriverReusable()
+    {
+        var compilation = CreateCompilation([
+            "[Orleans.GenerateSerializerContext<int[]>] public partial class DemoContext : Orleans.Serialization.SerializerContext { }",
+            "[Orleans.GenerateSerializerContext<string>] public partial class DemoContext { }"
+        ]);
+        var driver = CreateDriver(compilation);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.Cancel();
+        Assert.ThrowsAny<OperationCanceledException>(() => driver.RunGenerators(compilation, cancellation.Token));
+        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var generated, out _, TestContext.Current.CancellationToken);
+        var result = driver.GetRunResult();
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(generated.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Single(GetContextResults(result));
+        var (_, expected) = Generate("""
+            [Orleans.GenerateSerializerContext<int[]>]
+            [Orleans.GenerateSerializerContext<string>]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """);
+        Assert.Equal(GetContextSources(expected), GetContextSources(result));
+    }
+
+    [Fact]
+    public void PartialContextCyclesKeepTheConsolidatedRegistrationGraph()
+    {
+        const string models = """
+            [Orleans.GenerateSerializer]
+            public sealed class Node
+            {
+                [Orleans.Id(0)] public Node Next { get; set; }
+                [Orleans.Id(1)] public Branch[] Children { get; set; }
+            }
+            [Orleans.GenerateSerializer]
+            public sealed class Branch
+            {
+                [Orleans.Id(0)] public Node Parent { get; set; }
+            }
+            """;
+        const string first = """
+            [Orleans.GenerateSerializerContext<Node>]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """;
+        const string second = """
+            [Orleans.GenerateSerializerContext<Branch[]>]
+            public partial class DemoContext { }
+            """;
+        var (generated, result) = Generate(CreateCompilation([models, first, second]));
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(generated.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Single(GetContextResults(result));
+        var (_, expected) = Generate($"""
+            {models}
+            [Orleans.GenerateSerializerContext<Branch[]>]
+            {first}
+            """);
+        Assert.Equal(GetContextSources(expected), GetContextSources(result));
+        var implementation = Assert.Single(GetContextSources(result),
+            static source => source.Key.Contains(".context.", StringComparison.Ordinal)).Value;
+        Assert.Contains("CreateCodecHolder<global::Branch>(provider)", implementation, StringComparison.Ordinal);
+        Assert.Contains("CreateCopierHolder<global::Branch>(provider)", implementation, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PartialContextsPreserveTheClosedTypeGraphLimit(bool exceedsLimit)
+    {
+        var models = string.Join(Environment.NewLine, Enumerable.Range(0, 9)
+            .Select(static index => $"[Orleans.GenerateSerializer] public sealed class Payload{index} {{ }}"));
+        // Eight disjoint chains of 127 arrays plus their element types contribute exactly 1024 registrations and metadata types.
+        var arrays = string.Concat(Enumerable.Repeat("[]", 127));
+        var roots = Enumerable.Range(0, 8).Select(index => $"Payload{index}{arrays}").ToList();
+        if (exceedsLimit) roots.Add("Payload8");
+        var attributes = roots.Select(static root => $"[Orleans.GenerateSerializerContext<{root}>]").ToArray();
+        var (_, result) = Generate(CreateCompilation([
+            models,
+            $"{string.Join(Environment.NewLine, attributes.Take(4))} public partial class DemoContext : Orleans.Serialization.SerializerContext {{ }}",
+            $"{string.Join(Environment.NewLine, attributes.Skip(4))} public partial class DemoContext {{ }}"
+        ]));
+        Assert.Single(GetContextResults(result));
+        if (exceedsLimit)
+        {
+            var diagnostic = Assert.Single(result.Diagnostics);
+            Assert.Equal("ORLEANS0115", diagnostic.Id);
+            Assert.Contains("dependency graph exceeds 1024 closed types", diagnostic.GetMessage(), StringComparison.Ordinal);
+            Assert.DoesNotContain(GetContextSources(result),
+                static source => source.Key.Contains(".context.", StringComparison.Ordinal));
+        }
+        else
+        {
+            Assert.Empty(result.Diagnostics);
+            var implementation = Assert.Single(GetContextSources(result),
+                static source => source.Key.Contains(".context.", StringComparison.Ordinal)).Value;
+            var registrations = SyntaxFactory.ParseCompilationUnit(implementation)
+                .DescendantNodes().OfType<InvocationExpressionSyntax>()
+                .Where(static invocation => invocation.Expression is MemberAccessExpressionSyntax
+                { Name: GenericNameSyntax { Identifier.ValueText: "AddSerializer" } });
+            Assert.Equal(1024, registrations.Count());
+        }
+    }
+
     [Fact]
     public void GeneratedModelFieldsAndFactoriesUseConcreteDependencies()
     {
@@ -503,19 +710,36 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
         => Generate(CreateCompilation(source));
 
     private static CSharpCompilation CreateCompilation(string source, LanguageVersion languageVersion = LanguageVersion.Preview)
+        => CreateCompilation([source], languageVersion);
+
+    private static CSharpCompilation CreateCompilation(string[] sources, LanguageVersion languageVersion = LanguageVersion.Preview)
     {
-        var references = TestCompilationHelper.CreateCompilation(source, "ContextGeneratorTests").GetAwaiter().GetResult().References;
+        var references = TestCompilationHelper.CreateCompilation(sources[0], "ContextGeneratorTests").GetAwaiter().GetResult().References;
         var parseOptions = new CSharpParseOptions(languageVersion);
         return CSharpCompilation.Create("ContextGeneratorTests",
-            [CSharpSyntaxTree.ParseText(source, parseOptions)], references,
+            sources.Select((source, index) => CSharpSyntaxTree.ParseText(source, parseOptions, $"Context{index}.cs")), references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 
+    private static object[] GetContextResults(GeneratorDriverRunResult result)
+        => Assert.Single(result.Results).TrackedSteps[OrleansSerializationSourceGenerator.SerializerContextResultsTrackingName]
+            .SelectMany(static step => step.Outputs).Select(static output => output.Value).ToArray();
+
+    private static KeyValuePair<string, string>[] GetContextSources(GeneratorDriverRunResult result)
+        => result.Results.SelectMany(static result => result.GeneratedSources)
+            .Where(static source => source.HintName.Contains(".context", StringComparison.Ordinal))
+            .OrderBy(static source => source.HintName, StringComparer.Ordinal)
+            .Select(static source => KeyValuePair.Create(source.HintName, source.SourceText.ToString())).ToArray();
+
+    private static GeneratorDriver CreateDriver(CSharpCompilation compilation)
+        => CSharpGeneratorDriver.Create(
+            [new OrleansSerializationSourceGenerator().AsSourceGenerator()],
+            parseOptions: (CSharpParseOptions)compilation.SyntaxTrees.First().Options,
+            driverOptions: new GeneratorDriverOptions(default, trackIncrementalGeneratorSteps: true));
+
     private static (Compilation Compilation, GeneratorDriverRunResult Result) Generate(CSharpCompilation compilation)
     {
-        var parseOptions = (CSharpParseOptions)compilation.SyntaxTrees.First().Options;
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            [new OrleansSerializationSourceGenerator().AsSourceGenerator()], parseOptions: parseOptions);
+        var driver = CreateDriver(compilation);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out _, TestContext.Current.CancellationToken);
         return (output, driver.GetRunResult());
     }
