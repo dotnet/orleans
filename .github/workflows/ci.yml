@@ -47,7 +47,7 @@ jobs:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
-        node-version: '24.x'
+        node-version-file: src/Dashboard/Orleans.Dashboard.App/.node-version
     - name: Cache npm downloads
       uses: ./.github/actions/cache-dependencies
       with:
@@ -82,10 +82,13 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-    - name: Setup Node.js
+    - name: Setup frontend generation toolchain
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
-        node-version: '24.x'
+        node-version-file: src/Dashboard/Orleans.Dashboard.App/.node-version
+    - name: Check committed Dashboard assets
+      working-directory: src/Dashboard/Orleans.Dashboard.App
+      run: npm run assets:check
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -98,6 +101,9 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       shell: pwsh
       run: ./.github/scripts/test-summarize-coverage.ps1
+    - name: Test Dashboard asset validation
+      shell: pwsh
+      run: ./.github/scripts/test-dashboard-frontend.ps1
     - name: Build
       run: dotnet build -bl
     - name: Check CodeGen graph inventory

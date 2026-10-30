@@ -23,3 +23,9 @@
 
 # GitHub Actions helper scripts run under Bash on Linux.
 .github/scripts/*.sh text eol=lf
+
+# Canonical frontend inputs use LF; generated assets preserve their exact bytes.
+src/Dashboard/Orleans.Dashboard.App/** text=auto eol=lf
+# Minified literals and upstream notices retain their generated whitespace.
+src/Dashboard/Orleans.Dashboard.App/dist/** -text -whitespace linguist-generated=true
+src/Dashboard/Orleans.Dashboard.App/assets.*.sha256 text eol=lf linguist-generated=true

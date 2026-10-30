@@ -1,102 +1,49 @@
 # Orleans Dashboard App
 
-This directory contains the frontend web application for the Orleans Dashboard, built with React and Vite.
-
-## Structure
-
-```
-Orleans.Dashboard.App/
-├── src/              # React application source code
-│   ├── components/   # Reusable React components
-│   ├── grains/       # Grain-specific views
-│   ├── logstream/    # Log streaming components
-│   ├── overview/     # Dashboard overview components
-│   ├── reminders/    # Reminders view components
-│   ├── silos/        # Silo management components
-│   ├── lib/          # Utility libraries
-│   └── index.jsx     # Application entry point
-├── public/           # Static assets (copied to build output)
-│   ├── favicon.ico
-│   ├── OrleansLogo.png
-│   └── *.css, *.js   # Third-party CSS/JS libraries
-├── screenshots/      # Dashboard screenshots for documentation
-├── index.html        # HTML template
-├── package.json      # npm dependencies and scripts
-├── vite.config.ts    # Vite build configuration
-└── tsconfig.json     # TypeScript configuration
-```
+The Orleans Dashboard frontend uses React and Vite. Its deployable assets are committed under `dist/`. Building or packing `Orleans.Dashboard` validates their source and output content hashes and embeds every asset in the assembly using the .NET SDK.
 
 ## Development
 
-### Prerequisites
+Use the exact Node.js version in `.node-version` and npm version in `package.json`. From this directory:
 
-- Node.js (v24 or later)
-- npm
-
-### Setup
-
-```bash
-cd src/Dashboard/Orleans.Dashboard.App
-npm install
-```
-
-### Development Server
-
-Run the Vite development server for hot module replacement:
-
-```bash
+```shell
+npm ci
 npm run dev
 ```
 
-This will start the development server at `http://localhost:5173` (or another port if 5173 is in use).
+The development server provides hot module replacement at `http://localhost:5173`. `npm run build` produces a local production preview in `dist/`, and `npm run preview` serves it. Regenerate canonical assets before building the .NET project after frontend changes.
 
-### Building
+## Regenerating committed assets
 
-To build the production bundle:
-
-```bash
-npm run build
+```shell
+npm run assets:generate
 ```
 
-This builds the application to `../Orleans.Dashboard/wwwroot/` which is then embedded as resources in the Orleans.Dashboard C# project.
+The generator checks the pinned Node/npm versions, snapshots the inputs into a temporary directory, installs the locked dependencies with `npm ci`, and builds in production mode. It uses an explicit environment, isolated npm configuration, and a fresh dependency tree. Registry fetches use bounded retries and the local npm download cache.
 
-### Navigation Tests
+Commit `dist/`, `assets.inputs.sha256`, and `assets.outputs.sha256` together with the source change. Generation preserves source maps and adds `THIRD-PARTY-NOTICES.txt` containing the installed production dependencies' license notices. The .NET package also includes the notices as a standalone file.
 
-The browser tests exercise the production bundle's counter refresh, slow requests, route changes, narrow-screen navigation, keyboard dismissal, and desktop breakpoint:
+Inputs comprise every file in `src/` and `public/`, plus every frontend-root file except this README, `.gitignore`, and the two generated manifests. This includes the HTML entry point, dependency manifests, lockfile, build configuration, generation and verification scripts, and toolchain pins. Keep build helpers within these boundaries so canonical generation can copy their complete inputs. Documentation screenshots and browser tests live outside the generation inputs.
 
-```bash
+Source text with JavaScript, TypeScript, C#, CSS, JSON, HTML, SVG, or TXT extensions, `.npmrc`, `.node-version`, and `.env*` files is hashed and copied with LF line endings. Binary source assets retain their bytes. Generated files are hashed byte-for-byte; Git attributes preserve their exact output bytes. Paths use case-sensitive relative names with `/` separators. File contents and the complete path sets determine freshness, including additions, removals, and renames.
+
+Canonical generation uses production mode, UTC, and the `C` locale. Move `.env.local` and `.env.*.local` overrides out of this directory for regeneration. Add shared environment files to source control when the build uses them.
+
+## Reproducibility
+
+```shell
+npm run assets:check
+```
+
+This independently installs and regenerates in a fresh temporary directory, then compares every generated file and both manifests with the committed files. The Windows and Linux CI build jobs require this step to succeed before the .NET build. An actionable .NET build error identifies stale source or output paths and directs contributors to explicit regeneration.
+
+Framework discovery and Clean operate on the .NET project graph and intermediate outputs. The committed frontend files remain available across target frameworks and clean builds.
+
+## Navigation tests
+
+The Playwright tests exercise the production bundle's counter refresh, slow requests, route changes, narrow-screen navigation, keyboard dismissal, and desktop breakpoint:
+
+```shell
 npx playwright install chromium
 npm run test:ui
 ```
-
-### Preview Production Build
-
-To preview the production build locally:
-
-```bash
-npm run preview
-```
-
-## Integration with Orleans.Dashboard
-
-The frontend application is automatically built when you build the Orleans.Dashboard C# project. The build process is managed by `Orleans.Dashboard.Frontend.targets` which:
-
-1. Installs npm packages if `node_modules` doesn't exist
-2. Runs `npm run build` to compile the frontend
-3. Embeds the built assets as resources in the Orleans.Dashboard assembly
-
-The build uses incremental compilation, so the frontend is only rebuilt when source files change.
-
-## Migration from Browserify
-
-This project was migrated from Browserify to Vite for improved:
-- Build performance
-- Development experience with HMR
-- Modern JavaScript/TypeScript support
-- Better tree-shaking and optimization
-
-The migration updated:
-- React from v15 to v18
-- Chart.js from v2 to v4
-- Build tooling from Browserify/Babel to Vite
-- Module system from CommonJS to ESM
