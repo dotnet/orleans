@@ -5,41 +5,60 @@
     <!-- Frontend paths -->
     <NpmAppRootDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Orleans.Dashboard.App'))</NpmAppRootDirectory>
     <NpmBuildOutput>$([System.IO.Path]::GetFullPath('$(NpmAppRootDirectory)\dist\'))</NpmBuildOutput>
-  </PropertyGroup>
-
-  <!-- Collect frontend source files for incremental build tracking -->
-  <ItemGroup Condition="'$(BuildExternalAssets)' != 'false'">
-    <NpmAppSources Include="$(NpmAppRootDirectory)\src\**\*" />
-    <NpmAppSources Include="$(NpmAppRootDirectory)\public\**\*" />
-    <NpmAppSources Include="$(NpmAppRootDirectory)\package.json" />
-    <NpmAppSources Include="$(NpmAppRootDirectory)\package-lock.json" />
-    <NpmAppSources Include="$(NpmAppRootDirectory)\.npmrc" />
-    <NpmAppSources Include="$(NpmAppRootDirectory)\vite.config.ts" />
-    <NpmAppSources Include="$(NpmAppRootDirectory)\tsconfig.json" />
-    <NpmAppSources Include="$(NpmAppRootDirectory)\index.html" />
-  </ItemGroup>
-
-  <!-- Use a marker file for incremental build tracking -->
-  <PropertyGroup>
     <NpmAppBuildMarker>$(BaseIntermediateOutputPath)frontend.build.marker</NpmAppBuildMarker>
+    <NpmAppBuildInputs>$(BaseIntermediateOutputPath)frontend.build.inputs</NpmAppBuildInputs>
+    <NpmAppBuildOutputs>$(BaseIntermediateOutputPath)frontend.build.outputs</NpmAppBuildOutputs>
+    <!-- Installation state belongs to the dependency tree and survives Clean. -->
+    <NpmAppInstallMarker>$(NpmAppRootDirectory)\node_modules\.orleans.install.marker</NpmAppInstallMarker>
+    <_NpmFrontendTargets>$(MSBuildThisFileFullPath)</_NpmFrontendTargets>
   </PropertyGroup>
 
   <Target
     Name="DeleteNpmBuildMarker"
-    AfterTargets="Clean"
-    Condition="Exists($(NpmAppBuildMarker))">
-    <Delete Files="$(NpmAppBuildMarker)" />
+    AfterTargets="Clean">
+    <Delete Files="$(NpmAppBuildMarker);$(NpmAppBuildInputs);$(NpmAppBuildOutputs)" />
   </Target>
 
-  <!-- Build the frontend application.
-       This target runs once regardless of how many target frameworks are being built.
-       See: https://learn.microsoft.com/visualstudio/msbuild/run-target-exactly-once -->
-  <Target Name="BuildNpmApp" Inputs="@(NpmAppSources)" Outputs="$(NpmAppBuildMarker)" Condition="'$(BuildExternalAssets)' != 'false'">
-    <Exec Command="node --version" ConsoleToMsBuild="true" StandardOutputImportance="Low">
+  <Target Name="PrepareNpmAppInstall" Condition="'$(BuildExternalAssets)' != 'false'">
+    <Exec Command="node --version" WorkingDirectory="$(NpmAppRootDirectory)" ConsoleToMsBuild="true" StandardOutputImportance="Low">
       <Output TaskParameter="ConsoleOutput" PropertyName="NodeVersion" />
     </Exec>
-    <Message Importance="High" Text="Building Orleans Dashboard frontend with Node.js $(NodeVersion)" />
+    <Exec Command="npm --version" WorkingDirectory="$(NpmAppRootDirectory)" ConsoleToMsBuild="true" StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="NpmVersion" />
+    </Exec>
+    <!-- Query only configuration paths and dependency-tree options: config list can expose credentials. -->
+    <Exec
+      Command="npm config get userconfig globalconfig omit include ignore-scripts legacy-peer-deps install-links bin-links"
+      WorkingDirectory="$(NpmAppRootDirectory)"
+      ConsoleToMsBuild="true"
+      StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" ItemName="_NpmInstallConfig" />
+    </Exec>
 
+    <ItemGroup>
+      <_NpmConfigPaths Include="@(_NpmInstallConfig)" Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(Identity)', '^(userconfig|globalconfig)='))">
+        <ConfigPath>$([System.Text.RegularExpressions.Regex]::Replace('%(Identity)', '^[^=]*=', ''))</ConfigPath>
+      </_NpmConfigPaths>
+      <_NpmInstallFiles Include="$(NpmAppRootDirectory)\package.json;$(NpmAppRootDirectory)\package-lock.json" />
+      <_NpmInstallFiles Include="$(NpmAppRootDirectory)\.npmrc" Condition="Exists('$(NpmAppRootDirectory)\.npmrc')" />
+      <_NpmInstallFiles Include="@(_NpmConfigPaths->'%(ConfigPath)')" Condition="Exists('%(_NpmConfigPaths.ConfigPath)')" />
+    </ItemGroup>
+    <GetFileHash Files="@(_NpmInstallFiles)">
+      <Output TaskParameter="Items" ItemName="_NpmInstallHashes" />
+    </GetFileHash>
+    <ReadLinesFromFile File="$(NpmAppInstallMarker)" Condition="Exists('$(NpmAppInstallMarker)')">
+      <Output TaskParameter="Lines" ItemName="_NpmPreviousInstall" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <_NpmInstallFingerprint>@(_NpmInstallHashes->'%(Identity)=%(FileHash)', '|')|node=$(NodeVersion)|npm=$(NpmVersion)|@(_NpmInstallConfig, '|')</_NpmInstallFingerprint>
+    </PropertyGroup>
+  </Target>
+
+  <Target
+    Name="InstallNpmApp"
+    Condition="'$(BuildExternalAssets)' != 'false' and '$(_NpmInstallFingerprint)' != '@(_NpmPreviousInstall)'">
+    <Delete Files="$(NpmAppInstallMarker);$(NpmAppBuildMarker)" />
+    <Message Importance="High" Text="Installing Orleans Dashboard frontend dependencies with Node.js $(NodeVersion) and npm $(NpmVersion)" />
     <PropertyGroup>
       <!-- npm defaults to two fetch retries, which was insufficient when the package
            registry reset a connection during CI. Allow five retries, starting at five
@@ -80,13 +99,64 @@
       Code="MSB3073"
       Text="The command &quot;npm ci --prefer-offline --no-audit $(NpmFetchRetryArgs)&quot; exited with code $(NpmInstallExitCode)." />
 
-    <!-- Build the frontend -->
+    <WriteLinesToFile File="$(NpmAppInstallMarker)" Lines="$(_NpmInstallFingerprint)" Overwrite="true" />
+  </Target>
+
+  <Target Name="PrepareNpmAppBuild" DependsOnTargets="PrepareNpmAppInstall;InstallNpmApp" Condition="'$(BuildExternalAssets)' != 'false'">
+    <ItemGroup>
+      <NpmAppSources Include="$(NpmAppRootDirectory)\src\**\*;$(NpmAppRootDirectory)\public\**\*" />
+      <NpmAppSources Include="$(NpmAppRootDirectory)\*.json;$(NpmAppRootDirectory)\*.js;$(NpmAppRootDirectory)\*.ts;$(NpmAppRootDirectory)\.env*" />
+      <NpmAppSources Include="$(NpmAppRootDirectory)\index.html;$(_NpmFrontendTargets)" />
+    </ItemGroup>
+    <GetFileHash Files="@(NpmAppSources)">
+      <Output TaskParameter="Items" ItemName="_NpmAppSourceHashes" />
+    </GetFileHash>
+    <MakeDir Directories="$(BaseIntermediateOutputPath)" />
+    <!-- Tracking paths and content detects removals, renames, and restored timestamps. -->
+    <WriteLinesToFile
+      File="$(NpmAppBuildInputs)"
+      Lines="@(_NpmAppSourceHashes->'%(Identity)=%(FileHash)')"
+      Overwrite="true"
+      WriteOnlyWhenDifferent="true" />
+    <ReadLinesFromFile File="$(NpmAppBuildOutputs)" Condition="Exists('$(NpmAppBuildOutputs)')">
+      <Output TaskParameter="Lines" ItemName="_NpmPreviousBuildOutputs" />
+    </ReadLinesFromFile>
+    <ItemGroup>
+      <_NpmExpectedBuildOutputs Include="$(NpmBuildOutput)index.html;$(NpmBuildOutput)index.min.js;$(NpmBuildOutput)index.css;@(_NpmPreviousBuildOutputs)" />
+      <_NpmMissingBuildOutputs Include="@(_NpmExpectedBuildOutputs)" Condition="!Exists('%(Identity)')" />
+    </ItemGroup>
+    <!-- Static assets can retain source timestamps; freshness belongs to the build stamp. -->
+    <Delete Files="$(NpmAppBuildMarker)" Condition="'@(_NpmMissingBuildOutputs)' != ''" />
+  </Target>
+
+  <!-- All framework builds request this target in the same outer project instance. -->
+  <Target
+    Name="BuildNpmApp"
+    DependsOnTargets="PrepareNpmAppBuild"
+    Inputs="$(NpmAppBuildInputs);$(NpmAppInstallMarker)"
+    Outputs="$(NpmAppBuildMarker);$(NpmAppBuildOutputs)"
+    Condition="'$(BuildExternalAssets)' != 'false'">
+    <Delete Files="$(NpmAppBuildMarker)" />
+    <Message Importance="High" Text="Building Orleans Dashboard frontend with Node.js $(NodeVersion)" />
     <Exec
       Command="npm run build"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true" />
 
-    <!-- Create marker file to track successful build -->
+    <Error
+      Condition="!Exists('$(NpmBuildOutput)index.html')"
+      Text="Required frontend asset is missing: $(NpmBuildOutput)index.html." />
+    <Error
+      Condition="!Exists('$(NpmBuildOutput)index.min.js')"
+      Text="Required frontend asset is missing: $(NpmBuildOutput)index.min.js." />
+    <Error
+      Condition="!Exists('$(NpmBuildOutput)index.css')"
+      Text="Required frontend asset is missing: $(NpmBuildOutput)index.css." />
+
+    <ItemGroup>
+      <_NpmBuildOutputs Include="$(NpmBuildOutput)**\*" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(NpmAppBuildOutputs)" Lines="@(_NpmBuildOutputs)" Overwrite="true" />
     <Touch Files="$(NpmAppBuildMarker)" AlwaysCreate="true" />
   </Target>
 
@@ -103,8 +173,7 @@
   <!-- Include frontend assets as embedded resources.
        This target:
        1. Calls BuildNpmApp to ensure the dist folder exists (via MSBuild task for outer build)
-       2. Validates required files exist
-       3. Dynamically discovers and adds all dist files as embedded resources
+       2. Dynamically discovers and adds all dist files as embedded resources
        
        BeforeTargets="BeforeBuild" ensures items are added early enough to be processed by the compiler.
        We use ItemGroup inside the target to dynamically discover files at target execution time,
@@ -115,17 +184,6 @@
       Projects="$(MSBuildProjectFullPath)"
       Targets="BuildNpmApp"
       RemoveProperties="TargetFramework" />
-
-    <!-- Validate required files exist -->
-    <Error 
-      Condition="!Exists('$(NpmBuildOutput)index.html')" 
-      Text="Required frontend asset is missing: $(NpmBuildOutput)index.html. The frontend build may have failed. Ensure Node.js is installed." />
-    <Error 
-      Condition="!Exists('$(NpmBuildOutput)index.min.js')" 
-      Text="Required frontend asset is missing: $(NpmBuildOutput)index.min.js. The frontend build may have failed. Ensure Node.js is installed." />
-    <Error 
-      Condition="!Exists('$(NpmBuildOutput)index.css')" 
-      Text="Required frontend asset is missing: $(NpmBuildOutput)index.css. The frontend build may have failed. Ensure Node.js is installed." />
 
     <!-- Dynamically discover and add all dist files as embedded resources -->
     <ItemGroup>

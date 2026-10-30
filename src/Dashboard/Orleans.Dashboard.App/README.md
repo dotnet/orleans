@@ -58,7 +58,7 @@ To build the production bundle:
 npm run build
 ```
 
-This builds the application to `../Orleans.Dashboard/wwwroot/` which is then embedded as resources in the Orleans.Dashboard C# project.
+This builds the application to `dist/`. Building the Orleans.Dashboard C# project embeds every file in that directory as a resource, including fonts, images, and source maps.
 
 ### Navigation Tests
 
@@ -81,11 +81,11 @@ npm run preview
 
 The frontend application is automatically built when you build the Orleans.Dashboard C# project. The build process is managed by `Orleans.Dashboard.Frontend.targets` which:
 
-1. Installs npm packages if `node_modules` doesn't exist
-2. Runs `npm run build` to compile the frontend
-3. Embeds the built assets as resources in the Orleans.Dashboard assembly
+1. Runs `npm ci` when dependency manifests, npm configuration, or Node.js/npm versions change, or when the installed dependency stamp is missing.
+2. Runs `npm run build` when source paths or content, build configuration, or dependencies change, or when a previously built asset is missing.
+3. Embeds every built asset as a resource in the Orleans.Dashboard assembly.
 
-The build uses incremental compilation, so the frontend is only rebuilt when source files change.
+Source edits reuse installed dependencies. Multi-framework builds share one frontend build. Clean and Rebuild refresh the compiled frontend while retaining the stamped `node_modules` dependency tree. Remove `node_modules` to request a fresh installation.
 
 ## Migration from Browserify
 
