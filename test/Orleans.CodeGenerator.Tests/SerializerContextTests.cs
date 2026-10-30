@@ -340,6 +340,42 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void GenericArrayPlansCloseComposedElementTypes()
+    {
+        var (compilation, result) = Generate("""
+            [Orleans.GenerateSerializer]
+            public sealed class Box<T> where T : struct
+            {
+                [Orleans.Id(0)] public System.Collections.Generic.List<T>[] Lists { get; set; }
+                [Orleans.Id(1)] public T?[] Nullable { get; set; }
+                [Orleans.Id(2)] public Nested.Item<T>[] Items { get; set; }
+            }
+            public static class Nested
+            {
+                [Orleans.GenerateSerializer]
+                public sealed class Item<T> { [Orleans.Id(0)] public T Value { get; set; } }
+            }
+            [Orleans.GenerateSerializerContext<Box<byte>>]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """);
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var context = Assert.Single(result.Results.SelectMany(static result => result.GeneratedSources),
+            static source => source.HintName.Contains(".context.", StringComparison.Ordinal)).SourceText.ToString();
+        var registeredTypes = SyntaxFactory.ParseCompilationUnit(context).DescendantNodes().OfType<GenericNameSyntax>()
+            .Where(static name => name.Identifier.ValueText == "AddSerializer")
+            .Select(static name => string.Concat(name.TypeArgumentList.Arguments.Single().DescendantTokens().Select(static token => token.Text)))
+            .ToArray();
+        foreach (var element in new[] { "global::System.Collections.Generic.List<byte>", "byte?", "global::Nested.Item<byte>" })
+        {
+            Assert.Contains($"AddSerializerService<global::Orleans.Serialization.Codecs.ArrayCodec<{element}>>", context, StringComparison.Ordinal);
+            Assert.Contains($"AddSerializerService<global::Orleans.Serialization.Codecs.ArrayCopier<{element}>>", context, StringComparison.Ordinal);
+            Assert.Contains($"{element}[]", registeredTypes);
+        }
+    }
+
+    [Fact]
     public void IncidentalPrivateInterfaceArgumentsPreserveAccessibleAliasMetadata()
     {
         var (compilation, result) = Generate("""

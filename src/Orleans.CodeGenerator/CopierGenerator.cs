@@ -77,8 +77,9 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         if (!isShallowCopyable)
         {
             var fieldDescriptions = GetFieldDescriptions(type, members, isExceptionType, out var onlyDeepFields);
+            var construction = new GeneratedTypeConstruction(LibraryTypes, fieldDescriptions, !isExceptionType && !type.IsSealedType, isExceptionType);
             var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
-            var ctor = GenerateConstructor(simpleClassName, fieldDescriptions, isExceptionType);
+            var ctor = GenerateConstructor(simpleClassName, fieldDescriptions, isExceptionType, construction);
 
             classDeclaration = classDeclaration.AddMembers(fieldDeclarations);
 
@@ -91,12 +92,12 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             if (ctor != null)
                 classDeclaration = classDeclaration.AddMembers(ctor);
 
-            if (isExceptionType || !type.IsSealedType)
+            if (isExceptionType || construction.HasBaseContract)
             {
                 if (GenerateBaseCopierDeepCopyMethod(type, fieldDescriptions, members, isExceptionType) is { } baseCopier)
                     classDeclaration = classDeclaration.AddMembers(baseCopier);
 
-                if (!isExceptionType)
+                if (construction.HasBaseContract)
                     classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(LibraryTypes.BaseCopier_1.ToTypeSyntax(type.TypeSyntax)));
             }
         }
@@ -107,6 +108,16 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         }
 
         return classDeclaration;
+    }
+
+    internal GeneratedTypeConstruction GetConstruction(ISerializableTypeDescription type)
+    {
+        if (type.IsShallowCopyable)
+            return new(LibraryTypes, [], hasBaseContract: false);
+
+        var isExceptionType = type.IsExceptionType && type.SerializationHooks.Count == 0;
+        return new(LibraryTypes, GetFieldDescriptions(type, [], isExceptionType, out _),
+            !isExceptionType && !type.IsSealedType, isExceptionType);
     }
 
     public static string GetSimpleClassName(ISerializableTypeDescription serializableType) => GetSimpleClassName(serializableType.Name);
@@ -140,24 +151,16 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         }
     }
 
-    private ConstructorDeclarationSyntax? GenerateConstructor(string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions, bool isExceptionType)
+    private static ConstructorDeclarationSyntax? GenerateConstructor(
+        string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions, bool isExceptionType, GeneratedTypeConstruction construction)
     {
-        var codecProviderAdded = false;
-        var parameters = new List<ParameterSyntax>();
         var statements = new List<StatementSyntax>();
-
-        if (isExceptionType)
-        {
-            parameters.Add(Parameter(Identifier("codecProvider")).WithType(LibraryTypes.ICodecProvider.ToTypeSyntax()));
-            codecProviderAdded = true;
-        }
 
         foreach (var field in fieldDescriptions)
         {
             switch (field)
             {
                 case GeneratedFieldDescription _ when field.IsInjected:
-                    parameters.Add(Parameter(field.FieldName.ToIdentifier()).WithType(field.FieldType));
                     statements.Add(ExpressionStatement(
                         AssignmentExpression(
                             SyntaxKind.SimpleAssignmentExpression,
@@ -165,11 +168,9 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
                             Unwrapped(field.FieldName.ToIdentifierName()))));
                     break;
                 case CodecProviderFieldDescription:
-                    AddCodecProviderParameter();
                     statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), IdentifierName("codecProvider"))));
                     break;
                 case CopierFieldDescription or BaseCopierFieldDescription when !field.IsInjected:
-                    AddCodecProviderParameter();
                     statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), GetServiceExpression(field.FieldType, IdentifierName("codecProvider")))));
                     break;
             }
@@ -177,20 +178,9 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
 
         return statements.Count == 0 && !isExceptionType ? null : ConstructorDeclaration(simpleClassName)
             .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters([.. parameters])
+            .AddParameterListParameters([.. construction.Parameters.Select(static parameter => parameter.ToSyntax())])
             .AddBodyStatements([.. statements])
             .WithInitializer(isExceptionType ? ConstructorInitializer(SyntaxKind.BaseConstructorInitializer, ArgumentList(SingletonSeparatedList(Argument(IdentifierName("codecProvider"))))) : null);
-
-        void AddCodecProviderParameter()
-        {
-            if (codecProviderAdded)
-            {
-                return;
-            }
-
-            parameters.Add(Parameter(Identifier("codecProvider")).WithType(LibraryTypes.ICodecProvider.ToTypeSyntax()));
-            codecProviderAdded = true;
-        }
 
         static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
         {

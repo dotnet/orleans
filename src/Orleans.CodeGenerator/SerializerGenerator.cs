@@ -54,8 +54,9 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         }
 
         var fieldDescriptions = GetFieldDescriptions(type, members);
+        var construction = new GeneratedTypeConstruction(LibraryTypes, fieldDescriptions, HasBaseCodec(type));
         var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
-        var ctor = GenerateConstructor(simpleClassName, fieldDescriptions);
+        var ctor = GenerateConstructor(simpleClassName, fieldDescriptions, construction);
 
         var accessibility = type.Accessibility switch
         {
@@ -97,7 +98,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                 var readValueMethod = GenerateCompoundTypeReadValueMethod(type, fieldDescriptions);
                 classDeclaration = classDeclaration.AddMembers(serializeMethod!, deserializeMethod!, writeFieldMethod, readValueMethod);
 
-                var serializerInterface = type.IsValueType ? LibraryTypes.ValueSerializer : type.IsSealedType ? null : LibraryTypes.BaseCodec_1;
+                var serializerInterface = type.IsValueType ? LibraryTypes.ValueSerializer : construction.HasBaseContract ? LibraryTypes.BaseCodec_1 : null;
                 if (serializerInterface != null)
                     classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(serializerInterface.ToTypeSyntax(type.TypeSyntax)));
             }
@@ -110,6 +111,12 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         return classDeclaration;
     }
+
+    internal GeneratedTypeConstruction GetConstruction(ISerializableTypeDescription type)
+        => new(LibraryTypes, GetFieldDescriptions(type, []), HasBaseCodec(type));
+
+    private static bool HasBaseCodec(ISerializableTypeDescription type)
+        => !type.IsEnumType && !type.IsAbstractType && !type.IsValueType && !type.IsSealedType;
 
     public static string GetSimpleClassName(ISerializableTypeDescription serializableType) => GetSimpleClassName(serializableType.Name);
 
@@ -209,17 +216,15 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
     }
 
-    private ConstructorDeclarationSyntax? GenerateConstructor(string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions)
+    private static ConstructorDeclarationSyntax? GenerateConstructor(
+        string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions, GeneratedTypeConstruction construction)
     {
-        var codecProviderAdded = false;
-        var parameters = new List<ParameterSyntax>();
         var statements = new List<StatementSyntax>();
         foreach (var field in fieldDescriptions)
         {
             switch (field)
             {
                 case GeneratedFieldDescription _ when field.IsInjected:
-                    parameters.Add(Parameter(field.FieldName.ToIdentifier()).WithType(field.FieldType));
                     statements.Add(ExpressionStatement(
                         AssignmentExpression(
                             SyntaxKind.SimpleAssignmentExpression,
@@ -227,11 +232,9 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                             Unwrapped(field.FieldName.ToIdentifierName()))));
                     break;
                 case CodecProviderFieldDescription:
-                    AddCodecProviderParameter();
                     statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), IdentifierName("codecProvider"))));
                     break;
                 case CodecFieldDescription or BaseCodecFieldDescription when !field.IsInjected:
-                    AddCodecProviderParameter();
                     statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), GetServiceExpression(field.FieldType, IdentifierName("codecProvider")))));
                     break;
             }
@@ -239,19 +242,8 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         return statements.Count == 0 ? null : ConstructorDeclaration(simpleClassName)
             .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters([.. parameters])
+            .AddParameterListParameters([.. construction.Parameters.Select(static parameter => parameter.ToSyntax())])
             .AddBodyStatements([.. statements]);
-
-        void AddCodecProviderParameter()
-        {
-            if (codecProviderAdded)
-            {
-                return;
-            }
-
-            parameters.Add(Parameter(Identifier("codecProvider")).WithType(LibraryTypes.ICodecProvider.ToTypeSyntax()));
-            codecProviderAdded = true;
-        }
 
         static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
         {
