@@ -19,6 +19,8 @@ namespace Orleans.Journaling
 
     public sealed partial class CassandraJournalStorageOptions
     {
+        public string? CatalogTableName { get { throw null; } set { } }
+
         public int CompactionAppendCount { get { throw null; } set { } }
 
         public long CompactionThresholdBytes { get { throw null; } set { } }

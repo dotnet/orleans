@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Cassandra;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -5,8 +6,10 @@ using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal sealed class CassandraJournalStorageProvider : IJournalStorageProvider, ILifecycleParticipant<ISiloLifecycle>
+internal sealed class CassandraJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, ILifecycleParticipant<ISiloLifecycle>
 {
+    internal const int CatalogPartitionCount = 32;
+    private const int CatalogHeaderReadConcurrency = 16;
     private readonly CassandraJournalStorageOptions _options;
     private readonly string _journalFormatKey;
     private readonly IServiceProvider _serviceProvider;
@@ -47,6 +50,110 @@ internal sealed class CassandraJournalStorageProvider : IJournalStorageProvider,
             ?? throw new InvalidOperationException(
                 $"{nameof(CassandraJournalStorageProvider)} has not been initialized. Ensure the silo lifecycle has started before using journal storage.");
         return new CassandraJournalStorage(queries, _options, journalId, _journalFormatKey, _storageLogger);
+    }
+
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
+        JournalCatalogListOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var range = new JournalCatalogRange(options);
+        if (range.IsEmpty)
+        {
+            yield break;
+        }
+
+        var queries = _queries
+            ?? throw new InvalidOperationException(
+                $"{nameof(CassandraJournalStorageProvider)} has not been initialized. Ensure the silo lifecycle has started before listing journals.");
+        var catalogPartitions = await Task.WhenAll(
+            Enumerable.Range(0, CatalogPartitionCount)
+                .Select(bucket => queries.Session.ExecuteAsync(queries.ReadCatalogEntries(bucket))))
+            .ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        using var concurrencyGate = new SemaphoreSlim(CatalogHeaderReadConcurrency);
+        var candidates = new List<JournalId>(CatalogHeaderReadConcurrency);
+        foreach (var rows in catalogPartitions)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await foreach (var row in CassandraJournalStorage.ReadRowsAsync(rows, cancellationToken).ConfigureAwait(false))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var journalId = new JournalId(row.GetValue<string>("journal_id"));
+                if (!range.Contains(journalId.Value))
+                {
+                    continue;
+                }
+
+                candidates.Add(journalId);
+                if (candidates.Count >= CatalogHeaderReadConcurrency)
+                {
+                    var entries = await ReadCatalogHeadersAsync(candidates, range.IncludeMetadata, concurrencyGate, cancellationToken)
+                        .ConfigureAwait(false);
+                    foreach (var entry in entries)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (entry is { } catalogEntry)
+                        {
+                            yield return catalogEntry;
+                        }
+                    }
+
+                    candidates.Clear();
+                }
+            }
+
+            if (candidates.Count > 0)
+            {
+                var entries = await ReadCatalogHeadersAsync(candidates, range.IncludeMetadata, concurrencyGate, cancellationToken)
+                    .ConfigureAwait(false);
+                foreach (var entry in entries)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (entry is { } catalogEntry)
+                    {
+                        yield return catalogEntry;
+                    }
+                }
+
+                candidates.Clear();
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    private async Task<JournalCatalogEntry?[]> ReadCatalogHeadersAsync(
+        List<JournalId> journalIds,
+        bool includeMetadata,
+        SemaphoreSlim concurrencyGate,
+        CancellationToken cancellationToken)
+    {
+        var tasks = new Task<JournalCatalogEntry?>[journalIds.Count];
+        for (var index = 0; index < journalIds.Count; index++)
+        {
+            tasks[index] = ReadCatalogHeaderAsync(journalIds[index]);
+        }
+
+        return await Task.WhenAll(tasks).ConfigureAwait(false);
+
+        async Task<JournalCatalogEntry?> ReadCatalogHeaderAsync(JournalId journalId)
+        {
+            await concurrencyGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                // The index is append-only so a failed create/delete cannot make a live journal undiscoverable.
+                // Confirm the header to hide abandoned index entries and return its current metadata.
+                var metadata = await CreateStorage(journalId).GetMetadataAsync(cancellationToken).ConfigureAwait(false);
+                return metadata is null
+                    ? null
+                    : new JournalCatalogEntry(journalId, includeMetadata ? metadata : null);
+            }
+            finally
+            {
+                concurrencyGate.Release();
+            }
+        }
     }
 
     public void Participate(ISiloLifecycle observer)
@@ -98,6 +205,7 @@ internal sealed class CassandraJournalStorageProvider : IJournalStorageProvider,
 internal sealed class CassandraJournalStorageQueries
 {
     private readonly string _tableName;
+    private readonly string _catalogTableName;
     private readonly CassandraJournalStorageOptions _options;
     private readonly ISession _session;
 
@@ -112,12 +220,15 @@ internal sealed class CassandraJournalStorageQueries
     private PreparedStatement? _deleteHeader;
     private PreparedStatement? _deleteGeneration;
     private PreparedStatement? _deleteOlderGenerations;
+    private PreparedStatement? _registerCatalogEntry;
+    private PreparedStatement? _readCatalogEntries;
 
     public CassandraJournalStorageQueries(ISession session, CassandraJournalStorageOptions options)
     {
         _session = session;
         _options = options;
         _tableName = options.TableName;
+        _catalogTableName = options.EffectiveCatalogTableName;
     }
 
     public ISession Session => _session;
@@ -147,6 +258,23 @@ internal sealed class CassandraJournalStorageQueries
             """).SetConsistencyLevel(_options.WriteConsistencyLevel);
         await _session.ExecuteAsync(createTable).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+
+        var createCatalogTable = new SimpleStatement($"""
+            CREATE TABLE IF NOT EXISTS {_catalogTableName} (
+                bucket int,
+                journal_id text,
+                PRIMARY KEY ((bucket), journal_id)
+            ) WITH CLUSTERING ORDER BY (journal_id ASC)
+            """).SetConsistencyLevel(_options.WriteConsistencyLevel);
+        await _session.ExecuteAsync(createCatalogTable).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        _registerCatalogEntry = await PrepareAsync(
+            $"INSERT INTO {_catalogTableName} (bucket, journal_id) VALUES (?, ?)",
+            cancellationToken).ConfigureAwait(false);
+        _readCatalogEntries = await PrepareAsync(
+            $"SELECT journal_id FROM {_catalogTableName} WHERE bucket = ?",
+            cancellationToken).ConfigureAwait(false);
 
         _createHeader = await PrepareAsync($"""
             INSERT INTO {_tableName} (
@@ -214,6 +342,37 @@ internal sealed class CassandraJournalStorageQueries
         statement.SetConsistencyLevel(_options.WriteConsistencyLevel);
         statement.SetSerialConsistencyLevel(_options.SerialConsistencyLevel);
         return statement;
+    }
+
+    public async Task RegisterCatalogEntryAsync(string journalId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var bucket = GetCatalogBucket(journalId);
+        var statement = Get(_registerCatalogEntry).Bind(bucket, journalId);
+        statement.SetConsistencyLevel(_options.WriteConsistencyLevel);
+        await _session.ExecuteAsync(statement).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    public BoundStatement ReadCatalogEntries(int bucket)
+    {
+        var statement = Get(_readCatalogEntries).Bind(bucket);
+        statement.SetConsistencyLevel(_options.ReadConsistencyLevel);
+        statement.SetPageSize(_options.ReadPageSize);
+        return statement;
+    }
+
+    private static int GetCatalogBucket(string journalId)
+    {
+        // Use a stable hash: process-randomized string hashes would place the same id in
+        // different catalog partitions after a restart.
+        uint hash = 2166136261;
+        foreach (var character in journalId)
+        {
+            hash = unchecked((hash ^ character) * 16777619);
+        }
+
+        return (int)(hash % CassandraJournalStorageProvider.CatalogPartitionCount);
     }
 
     public BoundStatement ReadHeader(string journalId)

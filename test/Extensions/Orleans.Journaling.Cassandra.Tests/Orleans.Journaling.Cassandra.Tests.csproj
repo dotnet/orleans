@@ -10,6 +10,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)test\Orleans.DurableJobs.Tests\Orleans.DurableJobs.Tests.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Cassandra\Orleans.DurableJobs.Cassandra\Orleans.DurableJobs.Cassandra.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Cassandra\Orleans.Journaling.Cassandra\Orleans.Journaling.Cassandra.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>

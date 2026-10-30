@@ -43,15 +43,17 @@ internal sealed class CassandraJournalStorage : IJournalStorage
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var initialMetadata = CopyMetadata(metadata);
+        await _queries.RegisterCatalogEntryAsync(_journalId.Value, cancellationToken).ConfigureAwait(false);
         var generation = CassandraJournalGenerationId.Create();
         var revision = Guid.NewGuid();
         var result = await _queries.Session.ExecuteAsync(
-            _queries.CreateHeader(_journalId.Value, generation, _journalFormatKey, CopyMetadata(metadata), revision, revision))
+            _queries.CreateHeader(_journalId.Value, generation, _journalFormatKey, initialMetadata, revision, revision))
             .ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         if (CassandraJournalStorageQueries.WasApplied(result))
         {
-            SetState(new HeaderState(generation, 0, 0, 0, 0, _journalFormatKey, CopyMetadata(metadata), revision, revision));
+            SetState(new HeaderState(generation, 0, 0, 0, 0, _journalFormatKey, initialMetadata, revision, revision));
             return true;
         }
 
@@ -483,7 +485,7 @@ internal sealed class CassandraJournalStorage : IJournalStorage
         return batch;
     }
 
-    private static async IAsyncEnumerable<Row> ReadRowsAsync(
+    internal static async IAsyncEnumerable<Row> ReadRowsAsync(
         RowSet rows,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {

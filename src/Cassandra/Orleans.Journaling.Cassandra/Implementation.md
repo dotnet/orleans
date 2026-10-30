@@ -223,9 +223,28 @@ compaction operations.
 ## Schema and deployment
 
 Provider initialization executes `CREATE TABLE IF NOT EXISTS` and prepares
-statements. The Cassandra identity therefore needs table-creation permission
-even if an operator pre-provisions the table. Keep schema changes explicit and
-versioned: the header includes `schema_version`, and recovery rejects unknown
+statements for the journal table and the catalog table. The journal table keeps
+one partition per journal so header LWTs and entry writes remain atomic. The
+catalog table uses 32 hash partitions, with journal IDs as clustering keys; a
+stable FNV-1a hash places each ID in the same partition on every silo. This
+sharded index avoids `ALLOW FILTERING` and scans of journal payload partitions.
+The catalog identity is inserted before the journal header is created, so a
+failed create can leave an index-only entry but cannot leave a live journal
+undiscoverable.
+
+The index is append-only. A catalog enumeration filters IDs by the requested
+range, then reads each candidate's current header; this hides IDs left behind
+by failed creates or journal deletion and returns current metadata when
+requested. Index rows are not removed: deleting them safely would race with a
+concurrent create across Cassandra partitions and could hide a live journal.
+This trades storage proportional to the number of distinct journal IDs ever
+registered for crash-safe discovery; there is no automatic index-row
+reclamation. Catalog enumeration work is proportional to the index size, not
+the journal payload size, and catalog reads are paged.
+
+The Cassandra identity therefore needs table-creation permission even if an
+operator pre-provisions the tables. Keep schema changes explicit and versioned:
+the journal header includes `schema_version`, and recovery rejects unknown
 versions instead of silently interpreting them.
 
 The table name is validated as a simple CQL identifier because it is embedded

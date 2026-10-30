@@ -104,6 +104,7 @@
   </Folder>
   <Folder Name="/src/Extensions/Cassandra/">
     <Project Path="src/Cassandra/Orleans.Clustering.Cassandra/Orleans.Clustering.Cassandra.csproj" />
+    <Project Path="src/Cassandra/Orleans.DurableJobs.Cassandra/Orleans.DurableJobs.Cassandra.csproj" />
     <Project Path="src/Cassandra/Orleans.Journaling.Cassandra/Orleans.Journaling.Cassandra.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/Google/">

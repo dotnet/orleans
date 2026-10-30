@@ -16,6 +16,12 @@ public sealed class CassandraJournalStorageOptions
     public string TableName { get; set; } = "orleans_journal";
 
     /// <summary>
+    /// Gets or sets the Cassandra catalog table name. Defaults to the storage table name with
+    /// <c>_catalog</c> appended.
+    /// </summary>
+    public string? CatalogTableName { get; set; }
+
+    /// <summary>
     /// Gets or sets the maximum number of bytes written by one append operation.
     /// </summary>
     public int MaxAppendBytes { get; set; } = 2 * 1024 * 1024;
@@ -46,6 +52,7 @@ public sealed class CassandraJournalStorageOptions
     internal Func<IServiceProvider, Task<ISession>> CreateSessionAsync
         => _createSession ?? throw new InvalidOperationException("Configure a Cassandra session before starting the silo.");
     internal bool OwnsSession { get; private set; }
+    internal string EffectiveCatalogTableName => CatalogTableName ?? $"{TableName}_catalog";
 
     /// <summary>
     /// Configures the Cassandra client using a connection string.
@@ -90,6 +97,17 @@ public sealed class CassandraJournalStorageOptions
         if (!IsValidIdentifier(TableName))
         {
             throw new ArgumentException("The Cassandra table name must be a simple CQL identifier.", nameof(TableName));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(EffectiveCatalogTableName);
+        if (!IsValidIdentifier(EffectiveCatalogTableName))
+        {
+            throw new ArgumentException("The Cassandra catalog table name must be a simple CQL identifier.", nameof(CatalogTableName));
+        }
+
+        if (string.Equals(TableName, EffectiveCatalogTableName, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("The Cassandra catalog table name must differ from the journal table name.", nameof(CatalogTableName));
         }
 
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MaxAppendBytes);

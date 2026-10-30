@@ -64,6 +64,40 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     }
 
     [Fact]
+    public async Task CatalogListsLiveJournalsWithCurrentMetadataAndFiltersDeletedEntries()
+    {
+        await using var harness = await CreateHarnessAsync(readPageSize: 1);
+        var prefix = $"catalog-tests/{Guid.NewGuid():N}/";
+        var firstId = new JournalId(prefix + "a");
+        var deletedId = new JournalId(prefix + "b");
+        var otherId = new JournalId($"outside/{Guid.NewGuid():N}");
+
+        await harness.Provider.CreateStorage(firstId).CreateIfNotExistsAsync(
+            new Dictionary<string, string> { ["owner"] = "alice" },
+            TestContext.Current.CancellationToken);
+        await harness.Provider.CreateStorage(deletedId).CreateIfNotExistsAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
+        await harness.Provider.CreateStorage(otherId).CreateIfNotExistsAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
+        await harness.Provider.CreateStorage(firstId).UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["owner"] = "bob" },
+            cancellationToken: TestContext.Current.CancellationToken);
+        await harness.Provider.CreateStorage(deletedId).DeleteAsync(TestContext.Current.CancellationToken);
+
+        var entries = new List<JournalCatalogEntry>();
+        await foreach (var entry in harness.Provider.ListAsync(
+            new JournalCatalogListOptions { Prefix = new JournalId(prefix), IncludeMetadata = true },
+            TestContext.Current.CancellationToken))
+        {
+            entries.Add(entry);
+        }
+
+        var catalogEntry = Assert.Single(entries);
+        Assert.Equal(firstId, catalogEntry.Id);
+        Assert.Equal("bob", catalogEntry.Metadata!.Properties["owner"]);
+    }
+
+    [Fact]
     public async Task AppendAsync_RejectsJournalCreatedAfterThisHandleObservedAbsence()
     {
         await using var harness = await CreateHarnessAsync();
