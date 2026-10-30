@@ -234,7 +234,7 @@ try {
             Invoke-Build
             Assert-Commands (++$installs) $installs
         }
-        Remove-Item -LiteralPath (Join-Path $appRoot '.npmrc')
+        Remove-Item -LiteralPath (Join-Path $appRoot '.npmrc') -Force
         Invoke-Build
         Assert-Commands (++$installs) $installs
         Set-ToolState @{ Omit = 'dev' }
@@ -274,7 +274,7 @@ try {
         Remove-Item -LiteralPath (Join-Path $appRoot 'node_modules') -Recurse -Force
         Invoke-Build
         Assert-Commands 2 2
-        Remove-Item -LiteralPath $installMarker
+        Remove-Item -LiteralPath $installMarker -Force
         Invoke-Build
         Assert-Commands 3 3
     }
