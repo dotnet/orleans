@@ -11,6 +11,62 @@ namespace Orleans.CodeGenerator.Tests;
 public class ReferenceAssemblyModelExtractorTests
 {
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Generator_KeywordNamespacesPreserveMetadataIdentityAndSourceReuse(bool generateSerializer)
+    {
+        var declaration = generateSerializer
+            ? """
+              public class Outer<T>
+              {
+                  [Orleans.GenerateSerializer]
+                  public class Dto<TItem> { [Orleans.Id(0)] public TItem Value { get; set; } }
+              }
+              """
+            : """
+              public interface ITargetGrain : Orleans.IGrainWithIntegerKey
+              {
+                  System.Threading.Tasks.Task<int> Get();
+              }
+              """;
+        var compilation = await TestCompilationHelper.CreateCompilation("namespace @event.@namespace;\n" + declaration);
+        var metadataName = generateSerializer ? "event.namespace.Outer`1+Dto`1" : "event.namespace.ITargetGrain";
+        var symbol = compilation.Assembly.GetTypeByMetadataName(metadataName);
+        Assert.NotNull(symbol);
+        var identity = TypeMetadataIdentity.Create(symbol);
+        Assert.Equal(metadataName, identity.MetadataName);
+        Assert.Same(symbol, compilation.Assembly.GetTypeByMetadataName(identity.MetadataName));
+
+        // Exercise discovery separately from the namespace emission issue tracked by #11640.
+        var driver = CreateTrackedDriver().RunGenerators(compilation, TestContext.Current.CancellationToken);
+        var result = Assert.Single(driver.GetRunResult().Results);
+        Assert.Empty(result.Diagnostics);
+        var referenceData = GetTrackedOutput<ReferenceAssemblyDataResult>(
+            result, OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName).Model;
+        if (generateSerializer)
+        {
+            var model = Assert.Single(GetTrackedOutput<ImmutableArray<SerializableTypeModel>>(
+                result, OrleansSerializationSourceGenerator.CollectedSerializableTypesTrackingName));
+            Assert.Same(model, Assert.Single(referenceData.ReferencedSerializableTypes));
+            Assert.Single(result.GeneratedSources, static source => source.HintName.Contains(".orleans.ser.", StringComparison.Ordinal));
+            Assert.Empty(referenceData.ReferencedProxyInterfaces);
+        }
+        else
+        {
+            var model = Assert.Single(GetTrackedOutput<ImmutableArray<ProxyInterfaceModel>>(
+                result, OrleansSerializationSourceGenerator.CollectedProxyInterfacesTrackingName));
+            Assert.Same(model, Assert.Single(referenceData.ReferencedProxyInterfaces));
+            Assert.Single(result.GeneratedSources, static source => source.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal));
+            Assert.Empty(referenceData.ReferencedSerializableTypes);
+        }
+
+        Assert.Equal(
+            ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(
+                compilation, new CodeGeneratorOptions(), TestContext.Current.CancellationToken),
+            referenceData);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Generator_SourceDiscoveriesAreReusedWithFullScanParity(bool useMetadataReference)
