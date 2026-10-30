@@ -152,10 +152,11 @@ internal readonly struct ProxyOutputPreparationResult(
     public static ProxyOutputPreparationResult FromDiagnostic(Diagnostic diagnostic)
         => new([], [], [diagnostic]);
 
+    // Diagnostics retain the current compilation's source trees even when their messages and spans match.
     public bool Equals(ProxyOutputPreparationResult other)
         => StructuralEquality.SequenceEqual(ProxyOutputModels, other.ProxyOutputModels)
             && StructuralEquality.SequenceEqual(SourceOutputs, other.SourceOutputs)
-            && SourceGeneratorDiagnosticComparer.AreSequencesEqual(Diagnostics, other.Diagnostics);
+            && StructuralEquality.SequenceEqual(Diagnostics, other.Diagnostics);
 
     public override bool Equals(object? obj) => obj is ProxyOutputPreparationResult other && Equals(other);
 
@@ -165,7 +166,7 @@ internal readonly struct ProxyOutputPreparationResult(
         {
             var hash = StructuralEquality.GetSequenceHashCode(ProxyOutputModels);
             hash = hash * 31 + StructuralEquality.GetSequenceHashCode(SourceOutputs);
-            hash = hash * 31 + SourceGeneratorDiagnosticComparer.GetSequenceHashCode(Diagnostics);
+            hash = hash * 31 + StructuralEquality.GetSequenceHashCode(Diagnostics);
             return hash;
         }
     }
