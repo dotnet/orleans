@@ -13,8 +13,8 @@ namespace Orleans.Runtime;
 /// </para>
 /// <para>
 /// An activation advances one state at a time. Teardown starts at the mirror of the last completed setup phase and runs every later
-/// teardown phase. A deactivation request during setup is recorded intent rather than a state: it cancels setup, and setup diverts into
-/// teardown at its next phase boundary. Forced disposal moves an activation from any earlier state directly to <see cref="Disposing"/>,
+/// teardown phase. A deactivation request during setup is recorded intent rather than a state: it cancels setup, setup stops at its next
+/// phase boundary, and the deactivation operation enters teardown. Forced disposal moves an activation from any earlier state directly to <see cref="Disposing"/>,
 /// skipping the phases which have not run.
 /// </para>
 /// </remarks>
@@ -77,7 +77,7 @@ internal enum ActivationState
 
     /// <summary>
     /// The activation is being removed from the grain directory, unless its registration was handed to a migration target or the activation
-    /// was deactivated because of a directory failure. A registration which threw may have committed, so teardown after it starts here.
+    /// was deactivated because of a directory failure, which removed or prevented its registration.
     /// </summary>
     Unregistering,
 
