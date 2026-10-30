@@ -28,7 +28,7 @@
     </Exec>
     <!-- Query only configuration paths and dependency-tree options: config list can expose credentials. -->
     <Exec
-      Command="npm config get userconfig globalconfig omit include ignore-scripts legacy-peer-deps install-links bin-links"
+      Command="npm config get userconfig globalconfig omit include ignore-scripts legacy-peer-deps install-links bin-links install-strategy"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true"
       StandardOutputImportance="Low">

@@ -9,7 +9,7 @@ $targetsPath = Join-Path $PSScriptRoot '..\..\src\Dashboard\Orleans.Dashboard\Or
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) "orleans frontend tests $([guid]::NewGuid())"
 $savedPath = $env:PATH
 $savedTestRoot = $env:ORLEANS_DASHBOARD_TEST_ROOT
-$nodePath = (Get-Command node -CommandType Application).Source
+$nodePath = (Get-Command node -CommandType Application -TotalCount 1).Source
 $testsRun = 0
 
 function Assert-Equal {
@@ -37,6 +37,17 @@ function Assert-Commands {
     param([int] $Installs, [int] $Builds)
     $commands = @(Get-Content (Join-Path $caseRoot 'commands.log'))
     Assert-Equal "installs=$Installs;builds=$Builds" "installs=$(@($commands | Where-Object { $_ -eq 'ci' }).Count);builds=$(@($commands | Where-Object { $_ -eq 'run build' }).Count)"
+}
+
+function Assert-Discovery {
+    param([int] $Builds)
+    $expected = @(
+        'node --version'
+        'npm --version'
+        'npm config get userconfig globalconfig omit include ignore-scripts legacy-peer-deps install-links bin-links install-strategy'
+    )
+    $probes = @(Get-Content (Join-Path $caseRoot 'probes.log') | Where-Object { $_ -notlike 'npm ci *' -and $_ -ne 'npm run build' })
+    Assert-Equal (($expected * $Builds) -join '|') ($probes -join '|')
 }
 
 function Invoke-Build {
@@ -119,11 +130,24 @@ log('probes.log', tool + ' ' + args.join(' '));
 if (tool === 'node') { console.log(state.NodeVersion); process.exit(0); }
 switch (args[0]) {
     case '--version': console.log(state.NpmVersion); break;
-    case 'config':
-        console.log('userconfig=' + path.join(root, 'user.npmrc'));
-        console.log('globalconfig=' + path.join(root, 'global.npmrc'));
-        console.log('omit=' + state.Omit);
+    case 'config': {
+        const config = {
+            userconfig: path.join(root, 'user.npmrc'),
+            globalconfig: path.join(root, 'global.npmrc'),
+            omit: state.Omit,
+            include: '',
+            'ignore-scripts': false,
+            'legacy-peer-deps': false,
+            'install-links': false,
+            'bin-links': true,
+            'install-strategy': process.env.NPM_CONFIG_INSTALL_STRATEGY || 'hoisted',
+        };
+        for (const key of args.slice(2)) {
+            if (!Object.hasOwn(config, key)) throw new Error('Unexpected npm config key: ' + key);
+            console.log(key + '=' + config[key]);
+        }
         break;
+    }
     case 'ci':
         log('commands.log', 'ci');
         fs.mkdirSync('node_modules', { recursive: true });
@@ -162,9 +186,11 @@ switch (args[0]) {
 }
 
 try {
-    Test-Case 'UnchangedBuildRunsNoNpmWork' {
+    Test-Case 'UnchangedBuildRunsDiscoveryOnly' {
         Invoke-Build
+        Assert-Discovery 1
         Invoke-Build
+        Assert-Discovery 2
         Assert-Commands 1 1
     }
 
@@ -224,6 +250,23 @@ try {
         Set-ToolState @{ NpmVersion = '12.0.0' }
         Invoke-Build
         Assert-Commands 3 3
+    }
+
+    Test-Case 'InstallStrategyEnvironmentChangeReinstalls' {
+        $savedStrategy = $env:NPM_CONFIG_INSTALL_STRATEGY
+        try {
+            $env:NPM_CONFIG_INSTALL_STRATEGY = 'hoisted'
+            Invoke-Build
+            Assert-Commands 1 1
+            $env:NPM_CONFIG_INSTALL_STRATEGY = 'nested'
+            Invoke-Build
+            Assert-Commands 2 2
+            Invoke-Build
+            Assert-Commands 2 2
+            Assert-Discovery 3
+        } finally {
+            $env:NPM_CONFIG_INSTALL_STRATEGY = $savedStrategy
+        }
     }
 
     Test-Case 'MissingDependencyTreeOrStampReinstalls' {
@@ -298,6 +341,7 @@ try {
     Test-Case 'MultiFrameworkBuildOwnsAssetsOnceAndEmbedsAllFiles' {
         Invoke-Build
         Assert-Commands 1 1
+        Assert-Discovery 1
         $expected = @('wwwroot/fonts/font.woff2', 'wwwroot/image.svg', 'wwwroot/index.css', 'wwwroot/index.html', 'wwwroot/index.min.js', 'wwwroot/index.min.js.map')
         foreach ($framework in @('net8.0', 'net10.0')) {
             $resources = @(Get-Content (Join-Path $caseRoot "Orleans.Dashboard\obj\resources.$framework.txt"))
@@ -309,6 +353,7 @@ try {
         Invoke-Build -Properties '-p:TargetFramework=net8.0'
         Invoke-Build -Properties '-p:TargetFramework=net10.0'
         Assert-Commands 1 1
+        Assert-Discovery 2
     }
 
     Test-Case 'DisabledExternalAssetsRunNoTools' {

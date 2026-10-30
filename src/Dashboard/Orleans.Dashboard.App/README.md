@@ -87,6 +87,8 @@ The frontend application is automatically built when you build the Orleans.Dashb
 
 Source edits reuse installed dependencies. Multi-framework builds share one frontend build. Clean and Rebuild refresh the compiled frontend while retaining the stamped `node_modules` dependency tree. Remove `node_modules` to request a fresh installation.
 
+Every outer build refreshes dependency identity and configuration using three discovery commands: `node --version`, `npm --version`, and a scoped `npm config get`. These commands run once across all target frameworks, including on unchanged builds, keeping tool and configuration changes visible while retaining their subprocess startup and execution cost.
+
 ## Migration from Browserify
 
 This project was migrated from Browserify to Vite for improved:
