@@ -1,0 +1,61 @@
+name: Cache dependency stores
+description: Reuse NuGet packages and npm downloads across jobs with matching tools, manifests, and feed configuration.
+
+inputs:
+  nuget:
+    description: Cache the NuGet global packages folder.
+    required: false
+    default: 'true'
+  nuget-scope:
+    description: Restore source policy (repository or genapi).
+    required: false
+    default: repository
+  npm:
+    description: Cache the npm content-addressable download store after Node.js setup.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+  - name: Locate NuGet store
+    if: inputs.nuget == 'true'
+    id: nuget
+    shell: pwsh
+    run: |
+      $sdk = dotnet --version
+      if ($LASTEXITCODE -ne 0) { throw 'Could not determine the .NET SDK version.' }
+      $store = dotnet nuget locals global-packages --list --force-english-output
+      if ($LASTEXITCODE -ne 0 -or $store -notmatch '^global-packages: (.+)$') {
+        throw 'Could not locate the NuGet global packages folder.'
+      }
+      "sdk=$sdk" >> $env:GITHUB_OUTPUT
+      "path=$($Matches[1])" >> $env:GITHUB_OUTPUT
+  # GitHub isolates pull-request cache writes to their merge ref, while allowing reads from the base branch.
+  # Feed changes require a fresh store, since NuGet can satisfy a restore from already-extracted packages.
+  - name: Cache NuGet packages
+    if: inputs.nuget == 'true'
+    uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+    with:
+      path: ${{ steps.nuget.outputs.path }}
+      key: nuget-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.nuget.outputs.sdk }}-${{ inputs.nuget-scope }}-${{ hashFiles('global.json', '**/*.*proj', '**/*.props', '**/*.targets', '**/*.sln*', '**/packages.lock.json', '**/packages.config', '**/[Nn]u[Gg]et*.[Cc]onfig', '.config/dotnet-tools.json', '.github/actions/cache-dependencies/action.yml') }}
+  - name: Locate npm store
+    if: inputs.npm == 'true'
+    id: npm
+    shell: pwsh
+    run: |
+      $node = node --version
+      if ($LASTEXITCODE -ne 0) { throw 'Could not determine the Node.js version.' }
+      $npm = npm --version
+      if ($LASTEXITCODE -ne 0) { throw 'Could not determine the npm version.' }
+      $store = npm config get cache
+      if ($LASTEXITCODE -ne 0) { throw 'Could not locate the npm cache.' }
+      "node=$node" >> $env:GITHUB_OUTPUT
+      "npm=$npm" >> $env:GITHUB_OUTPUT
+      "path=$(Join-Path $store '_cacache')" >> $env:GITHUB_OUTPUT
+  - name: Cache npm downloads
+    if: inputs.npm == 'true'
+    uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+    with:
+      path: ${{ steps.npm.outputs.path }}
+      key: npm-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.npm.outputs.node }}-${{ steps.npm.outputs.npm }}-${{ hashFiles('**/package.json', '**/package-lock.json', '**/npm-shrinkwrap.json', '**/.npmrc', '.github/workflows/ci.yml', '.github/actions/cache-dependencies/action.yml') }}

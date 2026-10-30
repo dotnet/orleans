@@ -20,6 +20,11 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Cache dependencies
+        uses: ./.github/actions/cache-dependencies
+        with:
+          nuget-scope: genapi
+
       - name: Restore, build, and generate APIs
         env:
           CI: 'false'
