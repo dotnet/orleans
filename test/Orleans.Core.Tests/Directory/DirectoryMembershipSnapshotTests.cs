@@ -384,6 +384,78 @@ public sealed class DirectoryMembershipSnapshotTests
         Assert.False(await nextUpdate);
     }
 
+    [Fact]
+    public async Task DisposeWithoutCallbacksWaitsForSubscriptionAndClosesRetainedWaitHandle()
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        var processing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseProcessing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var subscriptionStopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSubscription = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken subscriptionToken = default;
+        var membership = Substitute.For<IClusterMembershipService>();
+        membership.MembershipUpdates.Returns(Updates(CancellationToken.None));
+        var directoryMembership = new DirectoryMembershipService(
+            membership, null!, NullLogger<DirectoryMembershipService>.Instance, 3, DirectoryMembershipSnapshot.DefaultGetRingBoundaries);
+
+        try
+        {
+            await processing.Task.WaitAsync(timeout.Token);
+            var waitHandle = subscriptionToken.WaitHandle;
+            Assert.False(waitHandle.WaitOne(0));
+
+            var firstDisposal = directoryMembership.DisposeAsync().AsTask();
+            var secondDisposal = directoryMembership.DisposeAsync().AsTask();
+            // Observe cancellation without registering a callback: CancelAsync's no-callback path must not leak this handle.
+            Assert.True(await Task.Run(() => waitHandle.WaitOne(TimeSpan.FromSeconds(10)), timeout.Token).WaitAsync(timeout.Token));
+            Assert.True(subscriptionToken.IsCancellationRequested);
+            Assert.Same(waitHandle, subscriptionToken.WaitHandle);
+            Assert.Same(firstDisposal, secondDisposal);
+            Assert.False(firstDisposal.IsCompleted);
+            Assert.False(secondDisposal.IsCompleted);
+
+            releaseProcessing.SetResult();
+            await subscriptionStopping.Task.WaitAsync(timeout.Token);
+            Assert.Same(waitHandle, subscriptionToken.WaitHandle);
+            Assert.True(waitHandle.WaitOne(0));
+            Assert.False(firstDisposal.IsCompleted);
+            Assert.False(secondDisposal.IsCompleted);
+
+            releaseSubscription.SetResult();
+            await Task.WhenAll(firstDisposal, secondDisposal).WaitAsync(timeout.Token);
+            var repeatedDisposal = directoryMembership.DisposeAsync().AsTask();
+            Assert.Same(firstDisposal, repeatedDisposal);
+            await repeatedDisposal.WaitAsync(timeout.Token);
+            Assert.Throws<ObjectDisposedException>(() => subscriptionToken.WaitHandle);
+            Assert.Throws<ObjectDisposedException>(() => waitHandle.WaitOne(0));
+        }
+        finally
+        {
+            releaseProcessing.TrySetResult();
+            releaseSubscription.TrySetResult();
+            await directoryMembership.DisposeAsync();
+        }
+
+        async IAsyncEnumerable<ClusterMembershipSnapshot> Updates([EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            subscriptionToken = cancellationToken;
+            try
+            {
+                yield return new ClusterMembershipSnapshot(
+                    ImmutableDictionary<SiloAddress, ClusterMember>.Empty, new MembershipVersion(1));
+                processing.SetResult();
+                // Neither phase barrier registers with the owner token.
+                await releaseProcessing.Task;
+            }
+            finally
+            {
+                subscriptionStopping.SetResult();
+                await releaseSubscription.Task;
+            }
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -394,6 +466,8 @@ public sealed class DirectoryMembershipSnapshotTests
         var subscribed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var subscriptionStopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseSubscription = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var notifying = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseNotification = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         CancellationToken subscriptionToken = default;
         var membership = Substitute.For<IClusterMembershipService>();
         membership.MembershipUpdates.Returns(Updates(CancellationToken.None));
@@ -408,6 +482,8 @@ public sealed class DirectoryMembershipSnapshotTests
             var waitHandle = subscriptionToken.WaitHandle;
             using var registration = subscriptionToken.Register(() =>
             {
+                notifying.SetResult();
+                releaseNotification.Task.WaitAsync(timeout.Token).GetAwaiter().GetResult();
                 if (callbackThrows)
                 {
                     throw expected;
@@ -416,9 +492,20 @@ public sealed class DirectoryMembershipSnapshotTests
 
             firstDisposal = directoryMembership.DisposeAsync().AsTask();
             var secondDisposal = directoryMembership.DisposeAsync().AsTask();
+            await notifying.Task.WaitAsync(timeout.Token);
+
+            Assert.True(subscriptionToken.IsCancellationRequested);
+            Assert.Same(waitHandle, subscriptionToken.WaitHandle);
+            Assert.True(waitHandle.WaitOne(0));
+            Assert.Same(firstDisposal, secondDisposal);
+            Assert.False(firstDisposal.IsCompleted);
+            Assert.False(secondDisposal.IsCompleted);
+
+            releaseNotification.SetResult();
             await subscriptionStopping.Task.WaitAsync(timeout.Token);
 
             Assert.True(subscriptionToken.IsCancellationRequested);
+            Assert.Same(waitHandle, subscriptionToken.WaitHandle);
             Assert.True(waitHandle.WaitOne(0));
             Assert.False(firstDisposal.IsCompleted);
             Assert.False(secondDisposal.IsCompleted);
@@ -426,9 +513,12 @@ public sealed class DirectoryMembershipSnapshotTests
 
             if (callbackThrows)
             {
-                foreach (var disposal in new[] { firstDisposal, secondDisposal, directoryMembership.DisposeAsync().AsTask() })
+                var firstFailure = await Assert.ThrowsAsync<AggregateException>(() => firstDisposal.WaitAsync(timeout.Token));
+                Assert.Same(expected, Assert.Single(firstFailure.InnerExceptions));
+                foreach (var disposal in new[] { secondDisposal, directoryMembership.DisposeAsync().AsTask() })
                 {
                     var failure = await Assert.ThrowsAsync<AggregateException>(() => disposal.WaitAsync(timeout.Token));
+                    Assert.Same(firstFailure, failure);
                     Assert.Same(expected, Assert.Single(failure.InnerExceptions));
                 }
             }
@@ -443,6 +533,7 @@ public sealed class DirectoryMembershipSnapshotTests
         }
         finally
         {
+            releaseNotification.TrySetResult();
             releaseSubscription.TrySetResult();
             if (callbackThrows && firstDisposal is not null)
             {

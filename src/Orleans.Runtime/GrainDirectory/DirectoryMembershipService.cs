@@ -158,7 +158,9 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     {
         try
         {
-            await _shutdownCts.CancelAsync().ConfigureAwait(false);
+            // Cancel completes notification state even with no callbacks, allowing Dispose to close wait handles.
+            // See https://github.com/dotnet/runtime/issues/136748 for the CancelAsync fast-path defect.
+            await Task.Run(_shutdownCts.Cancel).ConfigureAwait(false);
         }
         finally
         {
