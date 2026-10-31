@@ -108,6 +108,34 @@ namespace NonSilo.Tests
     public class SiloBuilderTests
     {
         [Fact]
+        public void ConfigureServicesRejectsNullBuilderBeforeCallingDelegate()
+        {
+            var invoked = false;
+
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => ((ISiloBuilder)null!).ConfigureServices(_ => invoked = true));
+
+            Assert.Equal("builder", exception.ParamName);
+            Assert.False(invoked);
+        }
+
+        [Fact]
+        public void ConfigureServicesAppliesRegistrationsToBuilderCollection()
+        {
+            var marker = new object();
+            using var host = new HostBuilder().UseOrleans(builder =>
+            {
+                builder.UseLocalhostClustering();
+
+                var result = builder.ConfigureServices(services => services.AddSingleton(marker));
+
+                Assert.Same(builder, result);
+            }).Build();
+
+            Assert.Same(marker, host.Services.GetRequiredService<object>());
+        }
+
+        [Fact]
         public void ActivityPropagationRejectsNullSiloBuilder()
         {
             var exception = Assert.Throws<ArgumentNullException>(
