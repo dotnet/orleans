@@ -34,6 +34,8 @@ items:
         href: grains/grainservices.md
       - name: Stateless worker grains
         href: grains/stateless-worker-grains.md
+      - name: Scale grain reads
+        href: grains/read-scaling.md
       - name: Grain timers
         href: grains/timers.md
       - name: Reminders
