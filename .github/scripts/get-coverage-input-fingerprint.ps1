@@ -40,7 +40,7 @@ foreach ($line in [IO.File]::ReadAllLines($resolvedManifest)) {
     if ($relativePath -ne ($parts -join '/') -or
         $parts.Count -eq 0 -or
         $parts.Where({ $_ -in '.', '..' }, 'First').Count -gt 0 -or
-        $relativePath -notmatch '^(?:(?:\.github|eng)/[A-Za-z0-9._/-]+|global\.json)$') {
+        $relativePath -notmatch '^(?:\.github/[A-Za-z0-9._/-]+|global\.json)$') {
         throw "Invalid coverage input path '$relativePath'"
     }
     if (-not $inputs.Add($relativePath)) {

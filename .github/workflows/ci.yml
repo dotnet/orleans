@@ -86,7 +86,7 @@ jobs:
     - name: Test coverage reporting
       if: matrix.os == 'ubuntu-latest'
       shell: pwsh
-      run: ./eng/test-summarize-coverage.ps1
+      run: ./.github/scripts/test-summarize-coverage.ps1
     - name: Build
       run: dotnet build -bl
     - name: Pack and validate package compatibility
@@ -118,7 +118,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$REDIS_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$REDIS_IMAGE"
 
         docker run -d --pull=never --name redis \
           -p 6379:6379 \
@@ -128,7 +128,7 @@ jobs:
           --health-retries 5 \
           "$REDIS_IMAGE"
 
-        bash eng/docker-wait-for-health.sh redis
+        bash .github/scripts/docker-wait-for-health.sh redis
     - name: Test
       uses: ./.github/actions/run-tests
       with:
@@ -157,8 +157,8 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
-        bash eng/docker-pull-with-retry.sh "$CASSANDRA_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$CASSANDRA_IMAGE"
     - name: Test
       uses: ./.github/actions/run-tests
       with:
@@ -184,7 +184,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$POSTGRES_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$POSTGRES_IMAGE"
 
         docker run -d --pull=never --name postgres \
           -p 5432:5432 \
@@ -196,7 +196,7 @@ jobs:
           "$POSTGRES_IMAGE" \
           -c max_connections=200
 
-        bash eng/docker-wait-for-health.sh postgres
+        bash .github/scripts/docker-wait-for-health.sh postgres
     - name: Test
       uses: ./.github/actions/run-tests
       with:
@@ -231,10 +231,10 @@ jobs:
         set -euo pipefail
 
         mariadb_image="$MARIADB_IMAGE"
-        if ! bash eng/docker-pull-with-retry.sh "$mariadb_image"; then
+        if ! bash .github/scripts/docker-pull-with-retry.sh "$mariadb_image"; then
           echo "Pulling MariaDB from Docker Hub after the mirror failed."
           mariadb_image="$MARIADB_FALLBACK_IMAGE"
-          bash eng/docker-pull-with-retry.sh "$mariadb_image"
+          bash .github/scripts/docker-pull-with-retry.sh "$mariadb_image"
         fi
 
         docker run -d --pull=never --name mariadb \
@@ -292,7 +292,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$MSSQL_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$MSSQL_IMAGE"
 
         docker run -d --pull=never --name mssql \
           -p 1433:1433 \
@@ -305,7 +305,7 @@ jobs:
           --health-retries 60 \
           "$MSSQL_IMAGE"
 
-        bash eng/docker-wait-for-health.sh mssql 120
+        bash .github/scripts/docker-wait-for-health.sh mssql 120
     - name: Test
       uses: ./.github/actions/run-tests
       with:
@@ -353,7 +353,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$AZURITE_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$AZURITE_IMAGE"
 
         docker run -d --pull=never --name azurite \
           -p 10000:10000 \
@@ -393,7 +393,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$AZURITE_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$AZURITE_IMAGE"
 
         docker run -d --pull=never --name azurite \
           -p 10000:10000 \
@@ -410,7 +410,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$EVENTHUBS_EMULATOR_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$EVENTHUBS_EMULATOR_IMAGE"
 
         docker run -d --pull=never --name eventhubs-emulator \
           -v ${{ github.workspace }}/.github/eventhubs-emulator/Config.json:/Eventhubs_Emulator/ConfigFiles/Config.json \
@@ -457,7 +457,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$COSMOSDB_EMULATOR_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$COSMOSDB_EMULATOR_IMAGE"
 
         docker run -d --pull=never --name cosmosdb-emulator \
           -p 8081:8081 -p 8080:8080 \
@@ -514,12 +514,12 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
         consul_image="$CONSUL_IMAGE"
-        if ! bash eng/docker-pull-with-retry.sh "$consul_image"; then
+        if ! bash .github/scripts/docker-pull-with-retry.sh "$consul_image"; then
           echo "Pulling Consul from Docker Hub after the mirror failed."
           consul_image="$CONSUL_FALLBACK_IMAGE"
-          bash eng/docker-pull-with-retry.sh "$consul_image"
+          bash .github/scripts/docker-pull-with-retry.sh "$consul_image"
         fi
 
         echo "CONSUL_IMAGE=$consul_image" >> "$GITHUB_ENV"
@@ -543,7 +543,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$ZOOKEEPER_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$ZOOKEEPER_IMAGE"
 
         docker run -d --pull=never --name zookeeper \
           -p 2181:2181 \
@@ -583,7 +583,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$DYNAMODB_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$DYNAMODB_IMAGE"
 
         docker run -d --pull=never --name dynamodb \
           -p 8000:8000 \
@@ -624,8 +624,8 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
-        bash eng/docker-pull-with-retry.sh "$SEAWEEDFS_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$SEAWEEDFS_IMAGE"
     - name: Test
       uses: ./.github/actions/run-tests
       with:
@@ -652,7 +652,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$DYNAMODB_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$DYNAMODB_IMAGE"
 
         docker run -d --pull=never --name dynamodb \
           -p 8000:8000 \
@@ -665,7 +665,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$ELASTICMQ_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$ELASTICMQ_IMAGE"
 
         docker run -d --pull=never --name elasticmq \
           -p 9324:9324 \
@@ -716,7 +716,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$NATS_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$NATS_IMAGE"
 
         docker run -d --pull=never --name nats \
           -p 4222:4222 \
@@ -760,7 +760,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$MINISTACK_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$MINISTACK_IMAGE"
 
         docker run -d --pull=never --name ministack \
           -p 4566:4566 \
@@ -771,7 +771,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash eng/docker-pull-with-retry.sh "$DYNAMODB_IMAGE"
+        bash .github/scripts/docker-pull-with-retry.sh "$DYNAMODB_IMAGE"
 
         docker run -d --pull=never --name dynamodb \
           -p 8000:8000 \

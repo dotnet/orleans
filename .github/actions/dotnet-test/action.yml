@@ -62,11 +62,11 @@ runs:
       exit 0
   - name: Restore
     shell: pwsh
-    run: ./eng/invoke-restore.ps1
+    run: ./.github/scripts/invoke-restore.ps1
   - name: Prepare coverage report
     if: inputs.coverage == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)))
     shell: pwsh
-    run: ./eng/coverage-report.ps1 -Action Prepare -CoverageId "${{ inputs.coverage-id }}"
+    run: ./.github/scripts/coverage-report.ps1 -Action Prepare -CoverageId "${{ inputs.coverage-id }}"
   - name: Test
     if: inputs.coverage != 'true' || (github.event_name != 'pull_request' && (github.event_name != 'push' || github.ref != format('refs/heads/{0}', github.event.repository.default_branch)))
     shell: pwsh
@@ -96,7 +96,7 @@ runs:
         '--max-parallel-test-modules'
         '1'
       )
-      ./eng/invoke-test.ps1 -ResultFilePattern 'test_results_${{ inputs.result-id }}_*.trx' -Command $command
+      ./.github/scripts/invoke-test.ps1 -ResultFilePattern 'test_results_${{ inputs.result-id }}_*.trx' -Command $command
   - name: Test with coverage
     if: inputs.coverage == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)))
     shell: pwsh
@@ -127,8 +127,8 @@ runs:
         '--max-parallel-test-modules'
         '1'
       )
-      ./eng/invoke-coverage.ps1 -Settings ./.github/coverage.config.xml -Output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" -RetryLogFile "logs/${{ inputs.coverage-id }}.retry.log" -Command $command
+      ./.github/scripts/invoke-coverage.ps1 -Settings ./.github/coverage.config.xml -Output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" -RetryLogFile "logs/${{ inputs.coverage-id }}.retry.log" -Command $command
   - name: Validate coverage report
     if: inputs.coverage == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)))
     shell: pwsh
-    run: ./eng/coverage-report.ps1 -Action Validate -CoverageId "${{ inputs.coverage-id }}"
+    run: ./.github/scripts/coverage-report.ps1 -Action Validate -CoverageId "${{ inputs.coverage-id }}"

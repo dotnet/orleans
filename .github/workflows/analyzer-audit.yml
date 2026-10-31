@@ -87,7 +87,7 @@ jobs:
         continue-on-error: true
         shell: pwsh
         run: |
-          ./eng/merge-analyzer-sarif.ps1 `
+          ./.github/scripts/merge-analyzer-sarif.ps1 `
             -InputDirectory "$env:RESULTS_DIRECTORY/Sarif" `
             -OutputFile "$env:RESULTS_DIRECTORY/roslyn-analyzers.sarif" `
             -AutomationIdPrefix 'roslyn-analyzers-net10'
@@ -152,7 +152,7 @@ jobs:
         continue-on-error: true
         shell: pwsh
         run: |
-          ./eng/merge-analyzer-sarif.ps1 `
+          ./.github/scripts/merge-analyzer-sarif.ps1 `
             -InputDirectory "$env:RESULTS_DIRECTORY/Sarif" `
             -OutputFile "$env:RESULTS_DIRECTORY/compatibility-analyzers.sarif" `
             -AutomationIdPrefix 'compatibility-analyzers-net10-core-runtime'

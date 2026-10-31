@@ -20,7 +20,7 @@ dotnet build Orleans.slnx -bl
 
 The `Orleans.slnx` solution includes the source projects under `src` and the test projects under `test`. On Windows, `Build.cmd` additionally restores, builds, and packs the solution, placing packages in `Artifacts/<Configuration>`.
 
-Shared build, test, and validation scripts live under `eng`. GitHub Actions workflows and publishing scripts live under `.github`.
+Contributor build, test, and validation tooling lives under `eng`. GitHub Actions workflows and CI-specific scripts live under `.github`.
 
 ### Verify formatting
 

@@ -14,4 +14,4 @@ runs:
       fi
   - name: Install dotnet-coverage
     shell: pwsh
-    run: ./eng/setup-coverage.ps1
+    run: ./.github/scripts/setup-coverage.ps1

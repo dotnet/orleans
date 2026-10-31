@@ -5,25 +5,25 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $scriptPath = Join-Path $PSScriptRoot 'summarize-coverage.ps1'
-$coverageConfigPath = Join-Path $PSScriptRoot '../.github/coverage.config.xml'
+$coverageConfigPath = Join-Path $PSScriptRoot '../coverage.config.xml'
 $coverageInputFingerprintScriptPath = Join-Path $PSScriptRoot 'get-coverage-input-fingerprint.ps1'
-$coverageInputsPath = Join-Path $PSScriptRoot '../.github/coverage-inputs.txt'
+$coverageInputsPath = Join-Path $PSScriptRoot '../coverage-inputs.txt'
 $compareCoverageScriptPath = Join-Path $PSScriptRoot 'compare-coverage.ps1'
 $coverageReportScriptPath = Join-Path $PSScriptRoot 'coverage-report.ps1'
-$archiveTestResultsActionPath = Join-Path $PSScriptRoot '../.github/actions/archive-test-results/action.yml'
-$expectedCoverageArtifactsPath = Join-Path $PSScriptRoot '../.github/coverage-artifacts.txt'
-$azureBuildTemplatePath = Join-Path $PSScriptRoot '../.azure/pipelines/templates/build.yaml'
-$azureVariablesPath = Join-Path $PSScriptRoot '../.azure/pipelines/templates/vars.yaml'
-$dotnetTestActionPath = Join-Path $PSScriptRoot '../.github/actions/dotnet-test/action.yml'
+$archiveTestResultsActionPath = Join-Path $PSScriptRoot '../actions/archive-test-results/action.yml'
+$expectedCoverageArtifactsPath = Join-Path $PSScriptRoot '../coverage-artifacts.txt'
+$azureBuildTemplatePath = Join-Path $PSScriptRoot '../../.azure/pipelines/templates/build.yaml'
+$azureVariablesPath = Join-Path $PSScriptRoot '../../.azure/pipelines/templates/vars.yaml'
+$dotnetTestActionPath = Join-Path $PSScriptRoot '../actions/dotnet-test/action.yml'
 $invokeCoverageScriptPath = Join-Path $PSScriptRoot 'invoke-coverage.ps1'
 $invokeRestoreScriptPath = Join-Path $PSScriptRoot 'invoke-restore.ps1'
 $invokeTestScriptPath = Join-Path $PSScriptRoot 'invoke-test.ps1'
-$runTestsActionPath = Join-Path $PSScriptRoot '../.github/actions/run-tests/action.yml'
-$selectCoverageBaselineScriptPath = Join-Path $PSScriptRoot '../.github/scripts/select-coverage-baseline.ps1'
+$runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
+$selectCoverageBaselineScriptPath = Join-Path $PSScriptRoot 'select-coverage-baseline.ps1'
 $setupCoverageScriptPath = Join-Path $PSScriptRoot 'setup-coverage.ps1'
-$testResultsWorkflowPath = Join-Path $PSScriptRoot '../.github/workflows/test-results.yml'
+$testResultsWorkflowPath = Join-Path $PSScriptRoot '../workflows/test-results.yml'
 $validateCoverageArtifactsScriptPath = Join-Path $PSScriptRoot 'validate-coverage-artifacts.ps1'
-$workflowPath = Join-Path $PSScriptRoot '../.github/workflows/ci.yml'
+$workflowPath = Join-Path $PSScriptRoot '../workflows/ci.yml'
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) "orleans-coverage-tests-$([guid]::NewGuid())"
 $testsRun = 0
 
@@ -754,7 +754,7 @@ try {
 
     Invoke-Test 'uses external coverage collection for CI builds' {
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
-        $setupTestEnvironmentAction = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot '../.github/actions/setup-test-environment/action.yml')
+        $setupTestEnvironmentAction = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot '../actions/setup-test-environment/action.yml')
         $coverageReportScript = Get-Content -Raw -LiteralPath $coverageReportScriptPath
         $coverageConfig = Get-Content -Raw -LiteralPath $coverageConfigPath
         Assert-Matches `
@@ -860,7 +860,7 @@ exit 0
 
         Assert-Matches `
             $dotnetTestAction `
-            '(?ms)^  - name: Restore\r?\n    shell: pwsh\r?\n    run: \./eng/invoke-restore\.ps1\r?\n  - name: Prepare coverage report' `
+            '(?ms)^  - name: Restore\r?\n    shell: pwsh\r?\n    run: \./\.github/scripts/invoke-restore\.ps1\r?\n  - name: Prepare coverage report' `
             'Restore must run inside the replaceable test action before coverage preparation.'
         Assert-Equal 0 ([regex]::Matches($runTestsAction, '(?m)^  - name: Restore\r?$')).Count 'The test coordinator must not restore outside the replaceable test action.'
         Assert-Equal 2 ([regex]::Matches($dotnetTestAction, '''--no-restore''| --no-restore ')).Count 'Both test launch paths must reuse the explicit restore.'
@@ -1339,13 +1339,12 @@ exit 0
         $testCase = New-TestCase
         $repository = Join-Path $testCase.Root 'repository'
         [void] (New-Item -ItemType Directory -Path (Join-Path $repository '.github/scripts') -Force)
-        [void] (New-Item -ItemType Directory -Path (Join-Path $repository 'eng') -Force)
-        [IO.File]::WriteAllText((Join-Path $repository 'eng/a.ps1'), 'first', [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $repository '.github/scripts/a.ps1'), 'first', [Text.UTF8Encoding]::new($false))
         [IO.File]::WriteAllText((Join-Path $repository '.github/scripts/B.ps1'), 'second', [Text.UTF8Encoding]::new($false))
         $manifest = Join-Path $testCase.Root 'inputs.txt'
         [IO.File]::WriteAllLines(
             $manifest,
-            @('eng/a.ps1', '.github/scripts/B.ps1'),
+            @('.github/scripts/a.ps1', '.github/scripts/B.ps1'),
             [Text.UTF8Encoding]::new($false)
         )
         $firstOutput = Join-Path $testCase.Root 'first.json'
@@ -1354,7 +1353,7 @@ exit 0
         & $coverageInputFingerprintScriptPath -RepositoryRoot $repository -Manifest $manifest -JsonOutput $firstOutput
         [IO.File]::WriteAllLines(
             $manifest,
-            @('.github/scripts/B.ps1', 'eng/a.ps1'),
+            @('.github/scripts/B.ps1', '.github/scripts/a.ps1'),
             [Text.UTF8Encoding]::new($false)
         )
         $previousCulture = [Threading.Thread]::CurrentThread.CurrentCulture
@@ -1364,7 +1363,7 @@ exit 0
         } finally {
             [Threading.Thread]::CurrentThread.CurrentCulture = $previousCulture
         }
-        [IO.File]::WriteAllText((Join-Path $repository 'eng/a.ps1'), 'changed', [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $repository '.github/scripts/a.ps1'), 'changed', [Text.UTF8Encoding]::new($false))
         & $coverageInputFingerprintScriptPath -RepositoryRoot $repository -Manifest $manifest -JsonOutput $secondOutput
         $first = Get-Content -Raw $firstOutput | ConvertFrom-Json
         $reordered = Get-Content -Raw $reorderedOutput | ConvertFrom-Json
@@ -1377,17 +1376,15 @@ exit 0
     Invoke-Test 'rejects unsafe coverage input paths' {
         $testCase = New-TestCase
         $manifest = Join-Path $testCase.Root 'inputs.txt'
-        foreach ($path in '../ci.yml', 'eng/../ci.yml', 'eng//script.ps1') {
-            [IO.File]::WriteAllText($manifest, $path, [Text.UTF8Encoding]::new($false))
-            Assert-Throws `
-                {
-                    & $coverageInputFingerprintScriptPath `
-                        -RepositoryRoot $testCase.Root `
-                        -Manifest $manifest `
-                        -JsonOutput (Join-Path $testCase.Root 'fingerprint.json')
-                } `
-                'Invalid coverage input path'
-        }
+        [IO.File]::WriteAllText($manifest, '../ci.yml', [Text.UTF8Encoding]::new($false))
+        Assert-Throws `
+            {
+                & $coverageInputFingerprintScriptPath `
+                    -RepositoryRoot $testCase.Root `
+                    -Manifest $manifest `
+                    -JsonOutput (Join-Path $testCase.Root 'fingerprint.json')
+            } `
+            'Invalid coverage input path'
     }
 
     Invoke-Test 'reports line and branch variance' {

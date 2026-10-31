@@ -27,7 +27,7 @@ function Assert-NotReparsePoint {
     }
 }
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $coverageDirectory = Join-Path $repositoryRoot 'TestResults'
 $coverageOutput = Join-Path $coverageDirectory "$CoverageId.cobertura.xml"
 
