@@ -1,4 +1,6 @@
 ﻿#pragma warning disable
+[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.DependencyContract:OrleansCodeGen.TestProject.Codec_UsesGenericWithCtor", "1;0;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null31:TestProject.UsesGenericWithCtor0;1;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null29:TestProject.GenericWithCtor`11;n89:System.Private.CoreLib, Version=0.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e13:System.String0;0;")]
+[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.DependencyContract:OrleansCodeGen.TestProject.Copier_UsesGenericWithCtor", "1;0;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null31:TestProject.UsesGenericWithCtor0;1;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null29:TestProject.GenericWithCtor`11;n89:System.Private.CoreLib, Version=0.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e13:System.String0;0;")]
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]

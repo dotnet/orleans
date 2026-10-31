@@ -336,6 +336,15 @@ public sealed class ReferencedSerializerContextTests
         var implementations = CSharpCompilation.Create("ReferencedContextProducer",
             compilation.SyntaxTrees.Skip(1), compilation.References.Append(contractsReference),
             (CSharpCompilationOptions)compilation.Options);
+        // This split fixture models legacy producers, before reference-visible dependency contracts.
+        foreach (var tree in implementations.SyntaxTrees.ToArray())
+        {
+            var root = (CompilationUnitSyntax)tree.GetRoot(TestContext.Current.CancellationToken);
+            implementations = implementations.ReplaceSyntaxTree(tree, tree.WithRootAndOptions(
+                root.WithAttributeLists(SyntaxFactory.List(root.AttributeLists.Where(static attribute =>
+                    !attribute.ToString().Contains(SerializerDependencyContract.KeyPrefix, StringComparison.Ordinal)))), tree.Options));
+        }
+
         return [contractsReference, EmitReference(implementations, metadataOnly: true)];
     }
 

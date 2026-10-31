@@ -293,11 +293,13 @@ internal sealed record CopierEmissionPlan(
 // Project shared construction data without retaining the symbol-bearing service fields.
 internal sealed record ConstructionEmissionPlan(
     bool HasBaseContract,
-    EquatableArray<ConstructorParameterEmissionPlan> Parameters)
+    EquatableArray<ConstructorParameterEmissionPlan> Parameters,
+    string? DependencyContract)
 {
-    public static ConstructionEmissionPlan Create(GeneratedTypeConstruction construction)
+    public static ConstructionEmissionPlan Create(GeneratedTypeConstruction construction, string? dependencyContract)
         => new(construction.HasBaseContract, construction.Parameters.Select(static parameter =>
-            new ConstructorParameterEmissionPlan(CodeText.Type(parameter.Type), CodeText.Identifier(parameter.Name))).ToImmutableArray());
+            new ConstructorParameterEmissionPlan(CodeText.Type(parameter.Type), CodeText.Identifier(parameter.Name))).ToImmutableArray(),
+            dependencyContract);
 
     /// <summary>Appends <c>Type name, ...</c> for the constructor's parameter list.</summary>
     public void AppendParameters(StringBuilder builder)

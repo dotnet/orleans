@@ -5,7 +5,6 @@
     <OrleansHotReload>true</OrleansHotReload>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <IsAotCompatible>true</IsAotCompatible>
-    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />

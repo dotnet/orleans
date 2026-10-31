@@ -16,4 +16,5 @@ internal sealed record EnumSerializerOutputPlan(
     string AssemblyName,
     TypeMetadataIdentity MetadataIdentity,
     string GeneratedNamespace,
-    string TypeSyntax);
+    string TypeSyntax,
+    string? DependencyContract);
