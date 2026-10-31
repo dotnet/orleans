@@ -22,6 +22,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     private readonly int _partitionsPerSilo;
     private readonly Func<SiloAddress, int, ImmutableArray<uint>> _getRingBoundaries;
     private DirectoryMembershipSnapshot _currentView = DirectoryMembershipSnapshot.Default;
+    private Task? _disposeTask;
 
     public DirectoryMembershipSnapshot CurrentView
     {
@@ -145,10 +146,26 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        _shutdownCts.Cancel();
-        await _runTask.SuppressThrowing();
+        lock (_shutdownCts)
+        {
+            return new(_disposeTask ??= DisposeCoreAsync());
+        }
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        try
+        {
+            await _shutdownCts.CancelAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            // The membership processor owns its subscription until it has completed.
+            await _runTask.SuppressThrowing();
+            _shutdownCts.Dispose();
+        }
     }
 
     [LoggerMessage(
