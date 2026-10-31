@@ -297,7 +297,7 @@ internal static class ReferenceAssemblyModelExtractor
             }
 
             var originalDefinition = type.OriginalDefinition;
-            var metadataName = TypeMetadataIdentity.Create(originalDefinition).MetadataName;
+            var metadataName = TypeMetadataIdentity.GetMetadataName(originalDefinition);
             return compilation.GetTypeByMetadataName(metadataName) is { } resolvedType
                 && SymbolEqualityComparer.Default.Equals(resolvedType, originalDefinition);
         }
