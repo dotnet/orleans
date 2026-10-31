@@ -430,7 +430,7 @@ namespace Orleans.Storage
             //it means two grains were activated an the other one succeeded in writing its state.
             //
             //NOTE: the storage could return also the new and old ETag (Version), but currently it doesn't.
-            if (storageVersion == grainVersion || storageVersion == string.Empty || (storageVersion is null && grainVersion is not null))
+            if (storageVersion == grainVersion || storageVersion is { Length: 0 } || (storageVersion is null && grainVersion is not null))
             {
                 //TODO: Note that this error message should be canonical across back-ends.
                 return new InconsistentStateException($"Version conflict ({operation}): ServiceId={serviceId} ProviderName={providerName} GrainType={normalizedGrainType} GrainId={grainId} ETag={grainVersion}.");
@@ -510,7 +510,7 @@ namespace Orleans.Storage
         /// <returns>The extracted base class or the one given as a parameter if it didn't have a generic part.</returns>
         private static string ExtractBaseClass(string typeName)
         {
-            var genericPosition = typeName.IndexOf("`", StringComparison.OrdinalIgnoreCase);
+            var genericPosition = typeName.IndexOf('`', StringComparison.Ordinal);
             if (genericPosition != -1)
             {
                 //The following relies the generic argument list to be in form as described
@@ -553,7 +553,7 @@ namespace Orleans.Storage
 
             int GetGenericArity(string input)
             {
-                var arityIndex = input.IndexOf("`", StringComparison.OrdinalIgnoreCase);
+                var arityIndex = input.IndexOf('`', StringComparison.Ordinal);
                 if (arityIndex != -1)
                 {
                     return int.Parse(input.AsSpan()[(arityIndex + 1)..]);
