@@ -32,8 +32,10 @@ namespace Orleans.Serialization
         /// <param name="services">The service collection.</param>
         /// <param name="configure">The configuration delegate.</param>
         /// <returns>The service collection.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="services"/> is <see langword="null"/>.</exception>
         public static IServiceCollection AddSerializer(this IServiceCollection services, Action<ISerializerBuilder>? configure = null)
         {
+            if (services is null) throw new ArgumentNullException(nameof(services));
             var context = GetOrCreateConfigurationContext(services, static builder =>
             {
                 foreach (var asm in ReferencedAssemblyProvider.GetRelevantAssemblies())

@@ -13,6 +13,18 @@ namespace Orleans.Serialization.UnitTests;
 public sealed class SerializerBuilderExtensionsTests
 {
     [Fact]
+    public void AddSerializerRejectsNullServicesBeforeConfiguration()
+    {
+        var invoked = false;
+
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => ((IServiceCollection)null!).AddSerializer(_ => invoked = true));
+
+        Assert.Equal("services", exception.ParamName);
+        Assert.False(invoked);
+    }
+
+    [Fact]
     public void ConfigureFactoryRejectsNullBuilder()
     {
         var exception = Assert.Throws<ArgumentNullException>(
