@@ -7,8 +7,7 @@ param(
     [Parameter(Position = 0)]
     [ValidateSet("BuildAndPack", "Build", "Pack")]
     [string] $Action = "BuildAndPack",
-    [switch] $NoRestore,
-    [string] $VersionDateSuffix
+    [switch] $NoRestore
 )
 
 . ./common.ps1
@@ -36,10 +35,11 @@ $Platform = $null
 $BuildProperties = @("/p:Configuration=$env:BuildConfiguration")
 $BuildFlags = @($env:BUILD_FLAGS -split "\s+" | Where-Object { $_ })
 
-# A shared, explicit suffix keeps build and pack metadata identical for uniquely versioned packages.
-if ($VersionDateSuffix)
+# Timestamp Debug packaging once so restore, build, and pack use the same version.
+if ($env:BuildConfiguration -eq "Debug" -and $Action -ne "Build")
 {
-    $BuildProperties += "/p:VersionDateSuffix=$VersionDateSuffix"
+    $dateSuffix = Get-Date -Format "yyyyMMddHHmmssfff"
+    $BuildProperties += "/p:VersionDateSuffix=$dateSuffix"
 }
 
 Write-Output "===== Building $solution ====="
