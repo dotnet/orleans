@@ -24,10 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestTraits.cs" Link="Shared\TestTraits.cs" />
-    <Compile Include="..\Grains\TestGrainInterfaces\EventSourcing\XDocumentSerialization.cs" Link="Shared\XDocumentSerialization.cs" />
-    <Using Include="System" />
-    <Using Include="System.Collections.Generic" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestUtilities\TestUtilities.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.TestKit\Orleans.Serialization.TestKit.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.FSharp\Orleans.Serialization.FSharp.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />

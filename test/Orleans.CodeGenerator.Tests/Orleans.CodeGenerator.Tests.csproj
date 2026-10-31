@@ -30,7 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\TestInfrastructure\TestExtensions\TestTraits.cs" Link="Shared\TestTraits.cs" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestUtilities\TestUtilities.csproj" />
     <Compile Include="..\Orleans.NativeAotSmoke\FieldsPayloads.cs" Link="FieldAccess\Payloads.cs" />
     <Compile Include="..\Orleans.NativeAotSmoke\FieldsChecks.cs" Link="FieldAccess\FieldAccessChecks.cs" />
     <ProjectReference Include="..\..\src\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" />
