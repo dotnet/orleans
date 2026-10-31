@@ -47,6 +47,53 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.RunAsync();
 ```
 
+### Buffered publishing
+
+For workloads which publish many small events concurrently, the provider can allow the Azure SDK to combine
+multiple Orleans stream publications into Event Hubs batches:
+
+```csharp
+configurator.ConfigureEventHub(builder => builder.Configure(options =>
+{
+    options.ConfigureEventHubConnection(
+        "YOUR_EVENT_HUB_CONNECTION_STRING",
+        "YOUR_EVENT_HUB_NAME",
+        "YOUR_CONSUMER_GROUP");
+    options.BufferedProducerOptions = new()
+    {
+        MaximumWaitTime = TimeSpan.FromMilliseconds(20),
+        MaximumEventBufferLengthPerPartition = 1_500,
+        MaximumConcurrentSends = 32,
+        MaximumConcurrentSendsPerPartition = 1,
+        EnableIdempotentRetries = true,
+    };
+}));
+```
+
+Configure `BufferedProducerOptions` to enable buffered publishing. Orleans applies backpressure when the configured
+buffer is full and completes a stream publication when Event Hubs acknowledges its batch. Batch failures propagate
+to the affected publications. Graceful silo or client shutdown drains accepted publications after stopping receivers,
+for both `AddEventHubStreams` and `AddPersistentStreams` registrations. A shutdown deadline bounds the host's wait;
+accepted publications continue draining and cleanup failures are logged. The values above should be tuned for the workload;
+increasing the wait time or buffer size can improve throughput at the cost of latency and memory.
+
+Orleans closes its producer and the connection created from a connection string, credentials, or connection factory.
+A connection factory supplies a new provider-owned connection on each invocation. When configured with an existing
+`EventHubConnection` instance, the caller owns that connection and closes it after its providers have stopped.
+
+The default factory defers activation until `CreateAdapter`, after the stream provider
+has acquired the factory, so initialization failures use the same asynchronous cleanup path as shutdown. The factory
+owns connections it creates even if producer construction fails.
+
+Each partition's adapter receiver also owns its factory-created connection. It closes that connection after closing
+the partition receiver on shutdown or partition handoff, including when initialization or checkpoint flushing fails.
+Connections supplied through the connection-instance overload remain caller-owned on both producer and receiver paths.
+Receiver and connection cleanup failures are logged individually, even after the shutdown wait times out, and combined
+when both fail before shutdown completes.
+
+The Azure SDK can map the same partition key to a different partition when switching between direct and buffered
+producers. Avoid changing publishing modes while strict ordering must be preserved for active streams.
+
 ### Using Orleans grain storage for checkpoints
 
 Azure Table Storage remains the default checkpoint store for compatibility with existing deployments. As an alternative, checkpoints can be stored using Orleans grains and the configured `PubSubStore` grain storage provider:

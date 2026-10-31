@@ -7,14 +7,14 @@ using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Streams;
-using Orleans.Streaming.EventHubs.Testing;
-using Azure.Messaging.EventHubs;
 using Orleans.Statistics;
+using Orleans.Streaming.EventHubs.Testing;
+using Orleans.Streams;
 
 namespace Orleans.Streaming.EventHubs
 {
@@ -55,6 +55,7 @@ namespace Orleans.Streaming.EventHubs
         private IEventHubQueueCache? cache;
 
         private IEventHubReceiver? receiver;
+        private EventHubConnection? ownedConnection;
 
         private readonly Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> eventHubReceiverFactory;
 
@@ -109,7 +110,7 @@ namespace Orleans.Streaming.EventHubs
             this.monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
             this.loadSheddingOptions = loadSheddingOptions ?? throw new ArgumentNullException(nameof(loadSheddingOptions));
             this.environmentStatisticsProvider = environmentStatisticsProvider;
-            this.eventHubReceiverFactory = eventHubReceiverFactory == null ? EventHubAdapterReceiver.CreateReceiver : eventHubReceiverFactory;
+            this.eventHubReceiverFactory = eventHubReceiverFactory ?? CreateReceiver;
         }
 
         public async Task Initialize(TimeSpan timeout)
@@ -333,6 +334,7 @@ namespace Orleans.Streaming.EventHubs
                 IEventHubQueueCache? localCache = Interlocked.Exchange(ref this.cache, null);
 
                 var localReceiver = Interlocked.Exchange(ref this.receiver, null);
+                var localConnection = Interlocked.Exchange(ref this.ownedConnection, null);
 
                 // start closing receiver
                 Task closeTask = Task.CompletedTask;
@@ -340,10 +342,7 @@ namespace Orleans.Streaming.EventHubs
                 var closeCancellationToken = closeCancellation?.Token ?? CancellationToken.None;
                 try
                 {
-                    if (localReceiver != null)
-                    {
-                        closeTask = localReceiver.CloseAsync(closeCancellationToken);
-                    }
+                    closeTask = CloseReceiverAsync(localReceiver, localConnection, closeCancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -367,6 +366,8 @@ namespace Orleans.Streaming.EventHubs
                 }
                 catch (Exception ex)
                 {
+                    // Cleanup logs its own failures, including those which outlive this wait.
+                    closeTask.Ignore();
                     shutdownExceptions.Add(ex);
                 }
 
@@ -382,23 +383,64 @@ namespace Orleans.Streaming.EventHubs
                 throw;
             }
 
-            static void ThrowIfAny(List<Exception> exceptions)
-            {
-                if (exceptions.Count == 1)
-                {
-                    ExceptionDispatchInfo.Capture(exceptions[0]).Throw();
-                }
+        }
 
-                if (exceptions.Count > 1)
-                {
-                    throw new AggregateException(exceptions);
-                }
+        private static void ThrowIfAny(List<Exception> exceptions)
+        {
+            if (exceptions.Count == 1)
+            {
+                ExceptionDispatchInfo.Capture(exceptions[0]).Throw();
+            }
+
+            if (exceptions.Count > 1)
+            {
+                throw new AggregateException(exceptions);
             }
         }
 
-        private static IEventHubReceiver CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger)
+        private async Task CloseReceiverAsync(
+            IEventHubReceiver? receiver, EventHubConnection? ownedConnection, CancellationToken cancellationToken)
         {
-            return new EventHubReceiverProxy(partitionSettings, offset, logger);
+            var exceptions = new List<Exception>();
+            try
+            {
+                if (receiver != null)
+                {
+                    await receiver.CloseAsync(cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                exceptions.Add(ex);
+                LogErrorFailedToCloseEventHubPartition("receiver", this.settings.Hub.EventHubName, this.settings.Partition, ex);
+            }
+            finally
+            {
+                try
+                {
+                    if (ownedConnection != null)
+                    {
+                        // The shutdown deadline bounds the observer, not connection cleanup.
+                        await ownedConnection.CloseAsync(CancellationToken.None);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    exceptions.Add(ex);
+                    LogErrorFailedToCloseEventHubPartition("connection", this.settings.Hub.EventHubName, this.settings.Partition, ex);
+                }
+            }
+
+            ThrowIfAny(exceptions);
+        }
+
+        private IEventHubReceiver CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger)
+        {
+            var options = partitionSettings.Hub;
+            // Keep the owned connection across construction retries so shutdown can close it.
+            var connection = this.ownedConnection ?? options.CreateConnection(options.ConnectionOptions);
+            this.ownedConnection = options.OwnsConnection ? connection : null;
+            return new EventHubReceiverProxy(partitionSettings, offset, logger, connection);
         }
 
         /// <summary>
@@ -506,6 +548,13 @@ namespace Orleans.Streaming.EventHubs
             Message = "Stopping reading from EventHub partition {EventHubName}-{Partition}"
         )]
         private partial void LogInfoStoppingReadingFromEventHubPartition(string eventHubName, string partition);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            EventId = (int)OrleansEventHubErrorCode.FailedPartitionClose,
+            Message = "Failed to close {Resource} for EventHub partition {EventHubName}-{Partition}."
+        )]
+        private partial void LogErrorFailedToCloseEventHubPartition(string resource, string eventHubName, string partition, Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
