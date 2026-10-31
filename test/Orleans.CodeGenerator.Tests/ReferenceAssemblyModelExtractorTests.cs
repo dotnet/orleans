@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.IO;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -9,6 +10,367 @@ namespace Orleans.CodeGenerator.Tests;
 
 public class ReferenceAssemblyModelExtractorTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Generator_KeywordNamespacesPreserveMetadataIdentityAndSourceReuse(bool generateSerializer)
+    {
+        var declaration = generateSerializer
+            ? """
+              public class Outer<T>
+              {
+                  [Orleans.GenerateSerializer]
+                  public class Dto<TItem> { [Orleans.Id(0)] public TItem Value { get; set; } }
+              }
+              """
+            : """
+              public interface ITargetGrain : Orleans.IGrainWithIntegerKey
+              {
+                  System.Threading.Tasks.Task<int> Get();
+              }
+              """;
+        var compilation = await TestCompilationHelper.CreateCompilation("namespace @event.@namespace;\n" + declaration);
+        var metadataName = generateSerializer ? "event.namespace.Outer`1+Dto`1" : "event.namespace.ITargetGrain";
+        var symbol = compilation.Assembly.GetTypeByMetadataName(metadataName);
+        Assert.NotNull(symbol);
+        var identity = TypeMetadataIdentity.Create(symbol);
+        Assert.Equal(metadataName, identity.MetadataName);
+        Assert.Same(symbol, compilation.Assembly.GetTypeByMetadataName(identity.MetadataName));
+
+        // Exercise discovery separately from the namespace emission issue tracked by #11640.
+        var driver = CreateTrackedDriver().RunGenerators(compilation, TestContext.Current.CancellationToken);
+        var result = Assert.Single(driver.GetRunResult().Results);
+        Assert.Empty(result.Diagnostics);
+        var referenceData = GetTrackedOutput<ReferenceAssemblyDataResult>(
+            result, OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName).Model;
+        if (generateSerializer)
+        {
+            var model = Assert.Single(GetTrackedOutput<ImmutableArray<SerializableTypeModel>>(
+                result, OrleansSerializationSourceGenerator.CollectedSerializableTypesTrackingName));
+            Assert.Same(model, Assert.Single(referenceData.ReferencedSerializableTypes));
+            Assert.Single(result.GeneratedSources, static source => source.HintName.Contains(".orleans.ser.", StringComparison.Ordinal));
+            Assert.Empty(referenceData.ReferencedProxyInterfaces);
+        }
+        else
+        {
+            var model = Assert.Single(GetTrackedOutput<ImmutableArray<ProxyInterfaceModel>>(
+                result, OrleansSerializationSourceGenerator.CollectedProxyInterfacesTrackingName));
+            Assert.Same(model, Assert.Single(referenceData.ReferencedProxyInterfaces));
+            Assert.Single(result.GeneratedSources, static source => source.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal));
+            Assert.Empty(referenceData.ReferencedSerializableTypes);
+        }
+
+        Assert.Equal(
+            ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(
+                compilation, new CodeGeneratorOptions(), TestContext.Current.CancellationToken),
+            referenceData);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Generator_SourceDiscoveriesAreReusedWithFullScanParity(bool useMetadataReference)
+    {
+        var library = await TestCompilationHelper.CreateCompilation(
+            """
+            using Orleans;
+            namespace External;
+            [GenerateSerializer, Alias("external")]
+            public class Dto { [Id(0)] public int Value { get; set; } }
+            public interface IExternalGrain : IGrainWithIntegerKey
+            {
+                System.Threading.Tasks.Task<Dto> Get();
+            }
+            """, "External");
+        MetadataReference reference = library.ToMetadataReference();
+        if (useMetadataReference)
+        {
+            using var stream = new MemoryStream();
+            var emit = library.Emit(stream, cancellationToken: TestContext.Current.CancellationToken);
+            Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+            reference = MetadataReference.CreateFromImage(stream.ToArray());
+        }
+
+        var compilation = await TestCompilationHelper.CreateCompilation(
+            """
+            using Orleans;
+            using System.Threading.Tasks;
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(External.Dto))]
+            [assembly: RegisterProvider("test", "Clustering", "Client", typeof(Targets.Provider))]
+            namespace Targets;
+            public class Provider { }
+            public partial class Outer<T>
+            {
+                [GenerateSerializer, Id(42), Alias("dto"), CompoundTypeAlias("dto", typeof(string))]
+                public partial class Dto<TItem> { [Id(0)] public TItem Value { get; set; } }
+            }
+            [GenerateSerializer]
+            public enum State : byte { Ready }
+            public interface ITargetGrain : IGrainWithIntegerKey
+            {
+                Task<Outer<int>.Dto<string>> Get();
+            }
+            public interface IDerivedGrain : ITargetGrain { }
+            public class TargetGrain : Grain, IDerivedGrain
+            {
+                public Task<Outer<int>.Dto<string>> Get() => Task.FromResult(new Outer<int>.Dto<string>());
+            }
+            [RegisterActivator]
+            public class Activator : Orleans.Serialization.Activators.IActivator<Provider>
+            {
+                public Provider Create() => new();
+            }
+            """, "Targets", reference,
+            MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location));
+        compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(
+            """
+            namespace Targets;
+            public partial class Outer<T>
+            {
+                public partial class Dto<TItem> { [Orleans.Id(1)] public T Other { get; set; } }
+            }
+            """, cancellationToken: TestContext.Current.CancellationToken));
+        var result = RunTrackedGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+        var serializers = GetTrackedOutput<ImmutableArray<SerializableTypeModel>>(
+            result, OrleansSerializationSourceGenerator.CollectedSerializableTypesTrackingName);
+        var proxies = GetTrackedOutput<ImmutableArray<ProxyInterfaceModel>>(
+            result, OrleansSerializationSourceGenerator.CollectedProxyInterfacesTrackingName);
+        var referenceData = GetTrackedOutput<ReferenceAssemblyDataResult>(
+            result, OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName);
+        var fullScan = ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(
+            compilation, new CodeGeneratorOptions(), TestContext.Current.CancellationToken, out var diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(fullScan, referenceData.Model);
+        Assert.Equal(2, serializers.Length);
+        Assert.Equal(2, proxies.Length);
+        foreach (var model in serializers)
+        {
+            Assert.Same(model, Assert.Single(referenceData.Model.ReferencedSerializableTypes,
+                candidate => candidate.MetadataIdentity == model.MetadataIdentity));
+        }
+
+        foreach (var model in proxies)
+        {
+            Assert.Same(model, Assert.Single(referenceData.Model.ReferencedProxyInterfaces,
+                candidate => candidate.MetadataIdentity == model.MetadataIdentity));
+        }
+
+        Assert.Contains(referenceData.Model.ReferencedSerializableTypes, static model => model.MetadataIdentity.AssemblyName == "External");
+        Assert.Contains(referenceData.Model.ReferencedProxyInterfaces, static model => model.MetadataIdentity.AssemblyName == "External");
+        Assert.Equal(new WellKnownTypeIdModel(new TypeRef("global::Targets.Outer<>.Dto<>"), 42),
+            Assert.Single(referenceData.Model.WellKnownTypeIds));
+        Assert.Single(referenceData.Model.RegisteredProviders);
+        Assert.Single(referenceData.Model.RegisteredCodecs);
+        Assert.Single(referenceData.Model.InterfaceImplementations);
+
+        var prepared = GetTrackedOutput<ProxyOutputPreparationResult>(
+            result, OrleansSerializationSourceGenerator.PreparedProxyOutputsTrackingName);
+        var aggregate = ModelExtractor.CreateMetadataAggregate("Targets", serializers, prepared.ProxyOutputModels, fullScan);
+        var expectedMetadata = MetadataSourceOutputGenerator.CreateMetadataSourceOutput(
+            aggregate, SourceGeneratorOptionsParser.ParseOptions(TestCompilationHelper.CreateOptionsProvider().GlobalOptions),
+            supportsModuleInitializers: true);
+        Assert.Null(expectedMetadata.Diagnostic);
+        var metadata = Assert.Single(result.GeneratedSources,
+            source => source.HintName == expectedMetadata.SourceEntry!.Value.HintName);
+        Assert.Equal(expectedMetadata.SourceEntry!.Value.Source, metadata.SourceText.ToString());
+    }
+
+    [Theory]
+    [InlineData(32)]
+    [InlineData(64)]
+    public async Task ExtractReferenceAssemblyData_ReusesAvailableDiscoveriesAndReducesAllocations(int discoveredCount)
+    {
+        var source = new StringBuilder("using Orleans;\nnamespace Targets;\n");
+        for (var i = 0; i < 64; i++)
+        {
+            source.Append("[GenerateSerializer] public class Dto").Append(i)
+                .Append(" { [Id(0)] public string Name { get; set; } [Id(1)] public int Value { get; set; } }\n")
+                .Append("public interface IGrain").Append(i)
+                .Append(" : IGrainWithIntegerKey { System.Threading.Tasks.Task<int> Get(); }\n");
+        }
+
+        var compilation = await TestCompilationHelper.CreateCompilation(source.ToString());
+        var options = new CodeGeneratorOptions();
+        var fullScan = ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(
+            compilation, options, TestContext.Current.CancellationToken);
+        Assert.Equal(64, fullScan.ReferencedSerializableTypes.Length);
+        Assert.Equal(64, fullScan.ReferencedProxyInterfaces.Length);
+        var serializers = fullScan.ReferencedSerializableTypes.Take(discoveredCount).ToImmutableArray();
+        var proxies = fullScan.ReferencedProxyInterfaces.Take(discoveredCount).ToImmutableArray();
+
+        _ = Extract();
+        var start = GC.GetAllocatedBytesForCurrentThread();
+        var reused = Extract();
+        var reusedBytes = GC.GetAllocatedBytesForCurrentThread() - start;
+        start = GC.GetAllocatedBytesForCurrentThread();
+        var scanned = ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(
+            compilation, options, TestContext.Current.CancellationToken);
+        var scannedBytes = GC.GetAllocatedBytesForCurrentThread() - start;
+
+        Assert.Equal(fullScan, reused);
+        Assert.Equal(fullScan, scanned);
+        foreach (var model in serializers)
+        {
+            Assert.Same(model, Assert.Single(reused.ReferencedSerializableTypes,
+                candidate => candidate.MetadataIdentity == model.MetadataIdentity));
+        }
+
+        foreach (var model in proxies)
+        {
+            Assert.Same(model, Assert.Single(reused.ReferencedProxyInterfaces,
+                candidate => candidate.MetadataIdentity == model.MetadataIdentity));
+        }
+
+        TestContext.Current.SendDiagnosticMessage(
+            $"{discoveredCount * 2} reused source models: {reusedBytes:N0} bytes allocated versus {scannedBytes:N0} bytes for full discovery.");
+        Assert.True(reusedBytes < scannedBytes,
+            $"Reuse allocated {reusedBytes:N0} bytes versus {scannedBytes:N0} bytes for full discovery.");
+
+        ReferenceAssemblyModel Extract() => ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(
+            compilation, options, TestContext.Current.CancellationToken, out _, serializers, proxies);
+    }
+
+    [Fact]
+    public async Task Generator_ReferenceReplacementWithSameIdentityRefreshesExternalDiscoveries()
+    {
+        const string librarySource = """
+            using Orleans;
+            namespace External;
+            [GenerateSerializer, Id(42), Alias("original")]
+            public class Dto { [Id(0)] public int Value { get; set; } }
+            public interface IExternalGrain : IGrainWithIntegerKey
+            {
+                System.Threading.Tasks.Task<int> Get();
+            }
+            """;
+        var library = await TestCompilationHelper.CreateCompilation(librarySource, "External");
+        var changedLibrary = await TestCompilationHelper.CreateCompilation(
+            librarySource.Replace("42", "43", StringComparison.Ordinal)
+                .Replace("original", "changed", StringComparison.Ordinal)
+                .Replace("public int Value", "public long Value", StringComparison.Ordinal)
+                .Replace("Task<int>", "Task<long>", StringComparison.Ordinal), "External");
+        var reference = library.ToMetadataReference();
+        var changedReference = changedLibrary.ToMetadataReference();
+        var compilation = await TestCompilationHelper.CreateCompilation(
+            """
+            using Orleans;
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(External.Dto))]
+            [GenerateSerializer]
+            public class SourceDto { [Id(0)] public int Value { get; set; } }
+            """, additionalReferences: [reference]);
+        var changed = compilation.ReplaceReference(reference, changedReference);
+        GeneratorDriver driver = CreateTrackedDriver();
+        driver = driver.RunGenerators(compilation, TestContext.Current.CancellationToken);
+        var first = Assert.Single(driver.GetRunResult().Results);
+        driver = driver.RunGenerators(changed, TestContext.Current.CancellationToken);
+        var second = Assert.Single(driver.GetRunResult().Results);
+        Assert.Empty(first.Diagnostics);
+        Assert.Empty(second.Diagnostics);
+        var before = GetTrackedOutput<ReferenceAssemblyDataResult>(first, OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName).Model;
+        var after = GetTrackedOutput<ReferenceAssemblyDataResult>(second, OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName).Model;
+        Assert.NotEqual(before, after);
+        Assert.Equal(42u, Assert.Single(before.WellKnownTypeIds).Id);
+        Assert.Equal(43u, Assert.Single(after.WellKnownTypeIds).Id);
+        Assert.Equal("changed", Assert.Single(after.TypeAliases).Alias);
+        Assert.Equal("long", Assert.Single(Assert.Single(after.ReferencedSerializableTypes,
+            static model => model.Name == "Dto").Members).Type.SyntaxString);
+        Assert.Equal(
+            ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(changed, new CodeGeneratorOptions(), TestContext.Current.CancellationToken),
+            after);
+        Assert.NotEqual(
+            Assert.Single(first.GeneratedSources, static source => source.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal)).SourceText.ToString(),
+            Assert.Single(second.GeneratedSources, static source => source.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal)).SourceText.ToString());
+    }
+
+    [Fact]
+    public async Task Generator_PartialRemovalRefreshesReusedSourceModel()
+    {
+        var compilation = await TestCompilationHelper.CreateCompilation(
+            """
+            [Orleans.GenerateSerializer]
+            public partial class Dto { [Orleans.Id(0)] public int First { get; set; } }
+            """);
+        var partial = CSharpSyntaxTree.ParseText(
+            "public partial class Dto { [Orleans.Id(1)] public int Second { get; set; } }",
+            cancellationToken: TestContext.Current.CancellationToken);
+        compilation = compilation.AddSyntaxTrees(partial);
+        var changed = compilation.RemoveSyntaxTrees(partial);
+        GeneratorDriver driver = CreateTrackedDriver();
+        driver = driver.RunGenerators(compilation, TestContext.Current.CancellationToken);
+        var first = Assert.Single(driver.GetRunResult().Results);
+        driver = driver.RunGenerators(changed, TestContext.Current.CancellationToken);
+        var second = Assert.Single(driver.GetRunResult().Results);
+        driver = driver.RunGenerators(compilation, TestContext.Current.CancellationToken);
+        var restored = Assert.Single(driver.GetRunResult().Results);
+        Assert.Empty(first.Diagnostics);
+        Assert.Empty(second.Diagnostics);
+        Assert.Empty(restored.Diagnostics);
+        var before = GetTrackedOutput<ReferenceAssemblyDataResult>(first, OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName).Model;
+        var after = GetTrackedOutput<ReferenceAssemblyDataResult>(second, OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName).Model;
+        Assert.Equal(["First", "Second"], Assert.Single(before.ReferencedSerializableTypes).Members.Select(static member => member.BackingPropertyName));
+        Assert.Equal("First", Assert.Single(Assert.Single(after.ReferencedSerializableTypes).Members).BackingPropertyName);
+        Assert.Equal(
+            ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(changed, new CodeGeneratorOptions(), TestContext.Current.CancellationToken),
+            after);
+        Assert.NotEqual(
+            Assert.Single(first.GeneratedSources, static source => source.HintName.Contains(".orleans.ser.", StringComparison.Ordinal)).SourceText.ToString(),
+            Assert.Single(second.GeneratedSources, static source => source.HintName.Contains(".orleans.ser.", StringComparison.Ordinal)).SourceText.ToString());
+        Assert.Equal(
+            first.GeneratedSources.Select(static source => (source.HintName, source.SourceText.ToString())),
+            restored.GeneratedSources.Select(static source => (source.HintName, source.SourceText.ToString())));
+    }
+
+    [Fact]
+    public async Task Generator_UnsuccessfulSourceDiscoveryRetainsCurrentDiagnosticLocation()
+    {
+        const string source = """
+            public class Container
+            {
+                [Orleans.GenerateSerializer]
+                private class Hidden { [Orleans.Id(0)] public int Value { get; set; } }
+            }
+            """;
+        var compilation = await TestCompilationHelper.CreateCompilation(source);
+        var originalTree = compilation.SyntaxTrees.Single();
+        var newTree = CSharpSyntaxTree.ParseText("\n" + source, cancellationToken: TestContext.Current.CancellationToken);
+        var changed = compilation.ReplaceSyntaxTree(originalTree, newTree);
+        GeneratorDriver driver = CreateTrackedDriver();
+        driver = driver.RunGenerators(compilation, TestContext.Current.CancellationToken);
+        var first = Assert.Single(driver.GetRunResult().Results);
+        driver = driver.RunGenerators(changed, TestContext.Current.CancellationToken);
+        var second = Assert.Single(driver.GetRunResult().Results);
+        var originalDiagnostic = Assert.Single(first.Diagnostics);
+        var currentDiagnostic = Assert.Single(second.Diagnostics);
+        Assert.Equal(originalDiagnostic.Id, currentDiagnostic.Id);
+        Assert.Equal(originalDiagnostic.GetMessage(), currentDiagnostic.GetMessage());
+        Assert.Same(originalTree, originalDiagnostic.Location.SourceTree);
+        Assert.Same(newTree, currentDiagnostic.Location.SourceTree);
+        var referenceData = GetTrackedOutput<ReferenceAssemblyDataResult>(
+            second, OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName);
+        Assert.Empty(referenceData.Model.ReferencedSerializableTypes);
+        Assert.Empty(referenceData.Diagnostics);
+    }
+
+    private static GeneratorDriver CreateTrackedDriver() => CSharpGeneratorDriver.Create(
+        [new OrleansSerializationSourceGenerator().AsSourceGenerator()],
+        optionsProvider: TestCompilationHelper.CreateOptionsProvider(),
+        driverOptions: new GeneratorDriverOptions(disabledOutputs: default, trackIncrementalGeneratorSteps: true));
+
+    private static GeneratorRunResult RunTrackedGenerator(CSharpCompilation compilation)
+    {
+        var driver = CreateTrackedDriver().RunGeneratorsAndUpdateCompilation(
+            compilation, out var updated, out var diagnostics, TestContext.Current.CancellationToken);
+        Assert.Empty(diagnostics);
+        Assert.Empty(updated.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        return Assert.Single(driver.GetRunResult().Results);
+    }
+
+    private static T GetTrackedOutput<T>(GeneratorRunResult result, string name)
+        => Assert.IsType<T>(Assert.Single(Assert.Single(result.TrackedSteps[name]).Outputs).Value);
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

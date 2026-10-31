@@ -25,8 +25,11 @@ internal static class ModelExtractor
         Compilation compilation,
         CodeGeneratorOptions options,
         CancellationToken cancellationToken,
-        out ImmutableArray<Diagnostic> diagnostics)
-        => ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(compilation, options, cancellationToken, out diagnostics);
+        out ImmutableArray<Diagnostic> diagnostics,
+        ImmutableArray<SerializableTypeModel> sourceSerializableTypes = default,
+        ImmutableArray<ProxyInterfaceModel> sourceProxyInterfaces = default)
+        => ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(
+            compilation, options, cancellationToken, out diagnostics, sourceSerializableTypes, sourceProxyInterfaces);
 
     public static MetadataAggregateModel CreateMetadataAggregate(
         string assemblyName,
