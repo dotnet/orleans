@@ -17,6 +17,5 @@
     <ProjectReference Include="$(SourceRoot)test\Orleans.DurableJobs.Tests\Orleans.DurableJobs.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
-    <ProjectReference Include="$(SourceRoot)test\Orleans.CodeGenerator.Tests\Orleans.CodeGenerator.Tests.csproj" />
   </ItemGroup>
 </Project>

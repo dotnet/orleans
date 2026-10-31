@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 {

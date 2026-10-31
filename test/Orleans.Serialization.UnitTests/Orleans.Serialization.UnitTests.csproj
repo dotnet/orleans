@@ -24,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestUtilities\TestUtilities.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.TestKit\Orleans.Serialization.TestKit.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.FSharp\Orleans.Serialization.FSharp.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
@@ -33,12 +34,10 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.MessagePack\Orleans.Serialization.MessagePack.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Serializers\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj" />
     <ProjectReference Include="..\Misc\TestSerializerExternalModels\TestSerializerExternalModels.csproj" />
-    <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Tests\Orleans.Runtime.Tests.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Protobuf Include="protobuf-model.proto" GrpcServices="None" />
-    <Compile Include="..\Orleans.NativeAotSmoke\InterfaceCollections.Contracts.cs" Link="InterfaceCollections.Contracts.cs" />
   </ItemGroup>
 
   <Target
