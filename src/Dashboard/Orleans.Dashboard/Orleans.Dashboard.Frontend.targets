@@ -76,6 +76,8 @@
       Command="npm ci --prefer-offline --no-audit $(NpmFetchRetryArgs)"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true"
+      StandardOutputImportance="High"
+      StandardErrorImportance="High"
       IgnoreExitCode="true">
       <Output TaskParameter="ExitCode" PropertyName="NpmInstallExitCode" />
     </Exec>
@@ -83,7 +85,7 @@
     <Message
       Condition="'$(NpmInstallExitCode)' == '152' and $([MSBuild]::IsOSPlatform('Linux'))"
       Importance="High"
-      Text="npm ci exit code 152 maps to SIGXCPU (signal 24) on Linux." />
+      Text="npm ci exit code 152 can result from ECONNRESET (errno -104 modulo 256) or SIGXCPU (128 + signal 24) on Linux. Use the npm output and resource snapshot to investigate the cause." />
 
     <Exec
       Condition="'$(NpmInstallExitCode)' != '0' and $([MSBuild]::IsOSPlatform('Linux'))"
