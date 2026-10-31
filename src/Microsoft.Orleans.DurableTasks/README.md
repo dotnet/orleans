@@ -344,11 +344,14 @@ synchronously on the activation which makes them, when the runtime stages them: 
   from durable code, whose durable wait ends its segment. Code which holds the
   grain's exclusive section, such as a transaction, holds the segments back
   until it closes the section, even from an `[AlwaysInterleave]` method, so it
-  waits for its grain's tasks only outside the section. A request whose own
-  admission rules would hold the segments behind it throws
+  waits for its grain's tasks only outside the section. The grain runs no
+  segment until it has activated, so its activation code, such as
+  `OnActivateAsync`, schedules its tasks without waiting for them. A request
+  whose own admission rules would hold the segments behind it throws
   `InvalidOperationException` at once, naming the remedies, instead of waiting
   until the call times out, and so does a wait from code which holds the
-  section. The check runs only before a wait which can block, and a grain
+  section or from activation code. The check runs only before a wait which can
+  block, and a grain
   which hosts durable tasks records the request which each request's code
   belongs to, and the exclusive section which code requests, which costs one
   `AsyncLocal` write each.

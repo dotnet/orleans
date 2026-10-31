@@ -1656,6 +1656,10 @@ internal sealed partial class ActivationData :
 
     void IGrainRequestAdmission.TrackCurrentRequest() => _shared.TracksCurrentRequest = true;
 
+    // The message loop invokes requests only once the activation is valid, so its scheduler runs only activation code before.
+    bool IGrainRequestAdmission.IsCurrentCodeActivating() =>
+        RuntimeContext.Current == this && State is ActivationState.Creating or ActivationState.Activating;
+
     bool IGrainRequestAdmission.IsBlockedByCurrentRequest(ILocalRequest request, LocalRequestOptions options)
     {
         Debug.Assert(_shared.TracksCurrentRequest, "The activation's type tracks the request which the current code belongs to.");

@@ -46,6 +46,22 @@ public abstract class DurableTaskSelfWaitTests(string journalFormatKey) : IAsync
     }
 
     [Fact]
+    public async Task WaitForAnOwnTaskFromOnActivateAsyncFailsAtOnce()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var key = Guid.NewGuid();
+        ActivationSelfWaitingGrain.WaitOnNextActivation(key);
+        var grain = _fixture.Client.GetGrain<IActivationSelfWaitingGrain>(key);
+
+        // The grain runs the task's segments only once it has activated, so a wait from its activation code can't end.
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.PingAsync().WaitAsync(Timeout, cancellationToken));
+        Assert.Contains("OnActivateAsync", exception.Message, StringComparison.Ordinal);
+
+        // The task itself runs once a later activation completes.
+        Assert.Equal(6, (await grain.GetDurableTask<int>("own").GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken)).GetResult<int>());
+    }
+
+    [Fact]
     public async Task InterleavingWaitForAnOwnTaskInsideItsOwnExclusiveSectionFailsAtOnce()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -198,6 +214,13 @@ public interface ISelfWaitingGrain : IGrainWithGuidKey
     Task BlockAsync();
 }
 
+public interface IActivationSelfWaitingGrain : IGrainWithGuidKey
+{
+    DurableTask<int> TripleAsync(int value);
+
+    Task PingAsync();
+}
+
 public interface IReentrantSelfWaitingGrain : IGrainWithGuidKey
 {
     DurableTask<int> TripleAsync(int value);
@@ -263,6 +286,27 @@ public sealed class SelfWaitingGrain(IDurableTaskManager tasks) : DurableGrain, 
         var gate = GetGate(this.GetPrimaryKey());
         gate.Blocked.TrySetResult();
         await gate.Release.Task;
+    }
+}
+
+[GrainType("durable-task-activation-self-waiting-test")]
+public sealed class ActivationSelfWaitingGrain : DurableGrain, IActivationSelfWaitingGrain
+{
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, bool> WaitingActivations = new();
+
+    public static void WaitOnNextActivation(Guid key) => WaitingActivations[key] = true;
+
+    public DurableTask<int> TripleAsync(int value) => DurableTask.FromResult(value * 3);
+
+    public Task PingAsync() => Task.CompletedTask;
+
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await base.OnActivateAsync(cancellationToken);
+        if (WaitingActivations.TryRemove(this.GetPrimaryKey(), out _))
+        {
+            await SelfWaiting.ScheduleAndAwaitAsync(this.AsReference<IActivationSelfWaitingGrain>().TripleAsync(2));
+        }
     }
 }
 

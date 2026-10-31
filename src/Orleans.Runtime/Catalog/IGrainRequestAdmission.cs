@@ -1,8 +1,8 @@
 namespace Orleans.Runtime;
 
 /// <summary>
-/// Answers how an activation admits a request relative to the request which the calling code belongs to, and opens
-/// exclusive sections, which hold requests back while code runs on the activation.
+/// Answers how an activation admits a request relative to the calling code, such as its activation code or the request
+/// which it belongs to, and opens exclusive sections, which hold requests back while code runs on the activation.
 /// </summary>
 /// <remarks>
 /// The activation implements this component, which <c>IGrainContext.GetComponent</c> returns. Members
@@ -13,6 +13,17 @@ namespace Orleans.Runtime;
 /// </remarks>
 internal interface IGrainRequestAdmission
 {
+    /// <summary>
+    /// Returns whether the calling code is this activation's activation code, such as its lifecycle's start or the grain's
+    /// <c>OnActivateAsync</c>, which the activation runs before it invokes any request.
+    /// </summary>
+    /// <remarks>
+    /// While the activation is being created or activated, it invokes no request, so code which runs on its scheduler then
+    /// is activation code, or code which activation code started. Code which waits there for one of the activation's own
+    /// requests waits until activation completes.
+    /// </remarks>
+    bool IsCurrentCodeActivating();
+
     /// <summary>
     /// Makes activations of this grain's type record, for the code which each request they invoke from now on runs, the
     /// request it belongs to, and, for the code which requests an exclusive section, that section.
