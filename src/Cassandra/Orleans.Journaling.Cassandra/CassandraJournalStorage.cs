@@ -634,11 +634,11 @@ internal sealed class CassandraJournalStorage : IJournalStorage
         return result;
     }
 
-    private static InconsistentStateException CreateInconsistentStateException(string message, Guid? expectedRevision, Guid? currentRevision)
+    private static InconsistentStateException CreateInconsistentStateException(string message, Guid? inMemoryRevision, Guid? storedRevision)
         => new(
             message,
-            expectedRevision?.ToString("D") ?? "Unknown",
-            currentRevision?.ToString("D") ?? "Unknown");
+            storedEtag: storedRevision?.ToString("D") ?? "Unknown",
+            currentEtag: inMemoryRevision?.ToString("D") ?? "Unknown");
 
     private readonly record struct HeaderState(
         Guid Generation,

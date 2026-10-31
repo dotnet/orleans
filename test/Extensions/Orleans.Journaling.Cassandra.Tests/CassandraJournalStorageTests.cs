@@ -858,10 +858,16 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         var second = harness.Provider.CreateStorage(id);
         await RecoverAsync(first);
         await RecoverAsync(second);
+        var staleMetadata = await second.GetMetadataAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(staleMetadata);
 
         await first.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
-        await Assert.ThrowsAsync<InconsistentStateException>(
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
             () => second.AppendAsync(new ReadOnlySequence<byte>([3]), TestContext.Current.CancellationToken).AsTask());
+        var storedMetadata = await harness.Provider.CreateStorage(id).GetMetadataAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(storedMetadata);
+        Assert.Equal(storedMetadata.ETag, exception.StoredEtag);
+        Assert.Equal(staleMetadata.ETag, exception.CurrentEtag);
 
         var consumer = new CapturingConsumer();
         await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
