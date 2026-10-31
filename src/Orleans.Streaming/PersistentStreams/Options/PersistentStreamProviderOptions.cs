@@ -153,6 +153,20 @@ namespace Orleans.Configuration
         public static readonly TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME = TimeSpan.FromMinutes(1);
 
         /// <summary>
+        /// Gets or sets whether checkpointing providers retain failed deliveries for retry after
+        /// <see cref="MaxEventDeliveryTime"/> expires. The default is <see langword="false"/>.
+        /// </summary>
+        /// <remarks>
+        /// The built-in Event Hubs provider skips an exhausted delivery batch after notifying the consumer
+        /// and failure handler. Set this option to <see langword="true"/> to retry the retained batch on a
+        /// later queue-pump tick, holding checkpoint advancement and cache reclamation behind it.
+        /// Subscription faulting and removal continue to follow the configured failure handler.
+        /// Failed reads, incomplete batch selection, and unknown cache positions always require recovery.
+        /// Other providers retain their established delivery-failure policy.
+        /// </remarks>
+        public bool RetryFailedDeliveries { get; set; }
+
+        /// <summary>
         /// Gets or sets the stream inactivity period.
         /// </summary>
         /// <value>The stream inactivity period.</value>
