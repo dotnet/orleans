@@ -191,7 +191,7 @@ namespace Orleans.Runtime
 
             RecordElapsedTime();
             SignalCancellation();
-            shared.Unregister(Message);
+            shared.Unregister(this);
             shared.ApplicationRequests.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
@@ -213,7 +213,7 @@ namespace Orleans.Runtime
                 SignalCancellation();
             }
 
-            this.shared.Unregister(this.Message);
+            this.shared.Unregister(this);
             DisposeCancellationRegistration();
             shared.ApplicationRequests.OnAppRequestsTimedOut(GetTargetGrainType());
 
@@ -244,7 +244,7 @@ namespace Orleans.Runtime
             }
 
             RecordElapsedTime();
-            this.shared.Unregister(this.Message);
+            this.shared.Unregister(this);
             DisposeCancellationRegistration();
 
             OrleansCallBackDataEvent.Instance.OnTargetSiloFail(this.Message);
@@ -263,7 +263,7 @@ namespace Orleans.Runtime
             }
 
             RecordElapsedTime();
-            this.shared.Unregister(this.Message);
+            this.shared.Unregister(this);
             DisposeCancellationRegistration();
 
             var msg = this.Message;
@@ -273,9 +273,14 @@ namespace Orleans.Runtime
 
         public void DoCallback(Message response)
         {
+            TryDoCallback(response);
+        }
+
+        internal bool TryDoCallback(Message response)
+        {
             if (!TryComplete())
             {
-                return;
+                return false;
             }
 
             OrleansCallBackDataEvent.Instance.DoCallback(this.Message);
@@ -285,6 +290,7 @@ namespace Orleans.Runtime
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
+            return true;
         }
 
         private bool TryComplete() => (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
