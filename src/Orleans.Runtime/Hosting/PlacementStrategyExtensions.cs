@@ -66,6 +66,7 @@ namespace Orleans.Hosting
         /// <param name="services">The service collection.</param>
         /// <param name="strategyLifetime">The lifetime of the placement strategy.</param>
         /// <returns>The service collection.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="services"/> is <see langword="null"/>.</exception>
         public static void AddPlacementDirector<
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TStrategy,
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TDirector>(
@@ -74,6 +75,7 @@ namespace Orleans.Hosting
             where TStrategy : PlacementStrategy, new()
             where TDirector : class, IPlacementDirector
         {
+            ArgumentNullException.ThrowIfNull(services);
             services.Add(ServiceDescriptor.DescribeKeyed(typeof(PlacementStrategy), typeof(TStrategy).Name, typeof(TStrategy), strategyLifetime));
             services.AddKeyedSingleton<IPlacementDirector, TDirector>(typeof(TStrategy));
         }
@@ -99,6 +101,7 @@ namespace Orleans.Hosting
         /// <param name="createDirector">The delegate used to create the placement director.</param>
         /// <param name="strategyLifetime">The lifetime of the placement strategy.</param>
         /// <returns>The service collection.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="services"/> or <paramref name="createDirector"/> is <see langword="null"/>.</exception>
         public static void AddPlacementDirector<
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TStrategy>(
             this IServiceCollection services,
@@ -106,6 +109,8 @@ namespace Orleans.Hosting
             ServiceLifetime strategyLifetime)
             where TStrategy : PlacementStrategy, new()
         {
+            ArgumentNullException.ThrowIfNull(services);
+            ArgumentNullException.ThrowIfNull(createDirector);
             services.Add(ServiceDescriptor.DescribeKeyed(typeof(PlacementStrategy), typeof(TStrategy).Name, typeof(TStrategy), strategyLifetime));
             services.AddKeyedSingleton<IPlacementDirector>(typeof(TStrategy), (sp, type) => createDirector(sp));
         }
