@@ -43,11 +43,8 @@ function Invoke-Dotnet
        $Command,
        [string[]] $Arguments
    )
-   $cmdArgs = @()
-   $cmdArgs = $cmdArgs + $Command
-   $cmdArgs = $cmdArgs + $Arguments
-   Write-Output "dotnet $cmdArgs"
-   & dotnet @cmdArgs
+   Write-Output "dotnet $Command $Arguments"
+   & dotnet $Command @Arguments
    if ($LASTEXITCODE -ne 0)
    {
        Write-Error "===== Build FAILED -- $Command with error $LASTEXITCODE - CANNOT CONTINUE =====" -ErrorAction Continue

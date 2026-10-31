@@ -32,15 +32,17 @@ $Platform = $null
 # Disable multilevel lookup https://github.com/dotnet/core-setup/blob/main/Documentation/design-docs/multilevel-sharedfx-lookup.md
  $DOTNET_MULTILEVEL_LOOKUP = 0
 
-$BuildProperties = @("/p:Configuration=$env:BuildConfiguration")
-$BuildFlags = @($env:BUILD_FLAGS -split "\s+" | Where-Object { $_ })
+$BuildArguments = @($env:BUILD_FLAGS -split "\s+" | Where-Object { $_ })
+$BuildArguments += "/p:Configuration=$env:BuildConfiguration"
 
 # Timestamp Debug packaging once so restore, build, and pack use the same version.
 if ($env:BuildConfiguration -eq "Debug" -and $Action -ne "Build")
 {
     $dateSuffix = Get-Date -Format "yyyyMMddHHmmssfff"
-    $BuildProperties += "/p:VersionDateSuffix=$dateSuffix"
+    $BuildArguments += "/p:VersionDateSuffix=$dateSuffix"
 }
+
+$BuildArguments += $solution
 
 Write-Output "===== Building $solution ====="
 
@@ -51,16 +53,16 @@ if ($Action -ne "Pack")
     Write-Output "Build $env:BuildConfiguration =============================="
     if (-not $NoRestore)
     {
-        Invoke-Dotnet -Command "restore" -Arguments ($BuildFlags + "/bl:${env:BuildConfiguration}-Restore.binlog" + $BuildProperties + $solution)
+        Invoke-Dotnet -Command "restore" -Arguments ($BuildArguments + "/bl:${env:BuildConfiguration}-Restore.binlog")
     }
 
-    Invoke-Dotnet -Command "build" -Arguments (@("--no-restore") + $BuildFlags + "/bl:${env:BuildConfiguration}-Build.binlog" + $BuildProperties + $solution)
+    Invoke-Dotnet -Command "build" -Arguments (@("--no-restore") + $BuildArguments + "/bl:${env:BuildConfiguration}-Build.binlog")
 }
 
 if ($Action -ne "Build")
 {
     Write-Output "Package $env:BuildConfiguration ============================"
-    Invoke-Dotnet -Command "pack" -Arguments (@("--no-build", "--no-restore") + $BuildFlags + "/bl:${env:BuildConfiguration}-Pack.binlog" + $BuildProperties + $solution)
+    Invoke-Dotnet -Command "pack" -Arguments (@("--no-build", "--no-restore") + $BuildArguments + "/bl:${env:BuildConfiguration}-Pack.binlog")
 }
 
 Write-Output "===== Build succeeded for $solution ====="
