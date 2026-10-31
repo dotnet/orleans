@@ -46,7 +46,7 @@ internal static class EnumSerializerGenerator
         var plan = output.Serializer;
         return SourceOutputResult.FromSource(GeneratedSourceOutput.CreateSerializableSourceEntry(
             output.AssemblyName, output.TypeSyntax, output.MetadataIdentity, output.GeneratedNamespace, 0,
-            output.GeneratedNamespace, writer => Write(writer, plan)));
+            output.GeneratedNamespace, writer => Write(writer, plan)), new(output.MetadataIdentity, output.TypeSyntax));
     }
 
     private static void Write(SourceWriter writer, EnumSerializerPlan plan)
