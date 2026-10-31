@@ -140,29 +140,49 @@ internal partial class SiloMetadataCache(
 
     public ValueTask DisposeAsync()
     {
+        TaskCompletionSource completion;
         lock (_cts)
         {
-            return new(_disposeTask ??= DisposeCoreAsync());
+            if (_disposeTask is { } task)
+            {
+                return new(task);
+            }
+
+            completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Publish completion before cancellation callbacks can reenter disposal.
+            _disposeTask = completion.Task;
         }
+
+        _ = DisposeCoreAsync(completion);
+        return new(completion.Task);
     }
 
-    private async Task DisposeCoreAsync()
+    private async Task DisposeCoreAsync(TaskCompletionSource completion)
     {
         try
         {
-            // Cancel completes notification state even with no callbacks, allowing Dispose to close wait handles.
-            // See https://github.com/dotnet/runtime/issues/136748 for the CancelAsync fast-path defect.
-            await Task.Run(_cts.Cancel).ConfigureAwait(false);
-        }
-        finally
-        {
-            // The subscription and its metadata requests retain the source until the processor exits.
-            if (_runTask is { } task)
+            try
             {
-                await task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+#pragma warning disable CA1849 // Notify on the caller's scheduler before asynchronously draining metadata requests.
+                _cts.Cancel();
+#pragma warning restore CA1849
+            }
+            finally
+            {
+                // The subscription and its metadata requests retain the source until the processor exits.
+                if (_runTask is { } task)
+                {
+                    await task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                }
+
+                _cts.Dispose();
             }
 
-            _cts.Dispose();
+            completion.SetResult();
+        }
+        catch (AggregateException exception)
+        {
+            completion.SetException(exception);
         }
     }
 

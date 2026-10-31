@@ -475,6 +475,8 @@ public sealed class DirectoryMembershipSnapshotTests
             membership, null!, NullLogger<DirectoryMembershipService>.Instance, 3, DirectoryMembershipSnapshot.DefaultGetRingBoundaries);
         var expected = new InvalidOperationException("Cancellation callback failed.");
         Task? firstDisposal = null;
+        var callerThread = 0;
+        var callbackThread = 0;
 
         try
         {
@@ -482,6 +484,7 @@ public sealed class DirectoryMembershipSnapshotTests
             var waitHandle = subscriptionToken.WaitHandle;
             using var registration = subscriptionToken.Register(() =>
             {
+                callbackThread = Environment.CurrentManagedThreadId;
                 notifying.SetResult();
                 releaseNotification.Task.WaitAsync(timeout.Token).GetAwaiter().GetResult();
                 if (callbackThrows)
@@ -490,18 +493,25 @@ public sealed class DirectoryMembershipSnapshotTests
                 }
             });
 
-            firstDisposal = directoryMembership.DisposeAsync().AsTask();
-            var secondDisposal = directoryMembership.DisposeAsync().AsTask();
+            var initiateDisposal = Task.Run(() =>
+            {
+                callerThread = Environment.CurrentManagedThreadId;
+                firstDisposal = directoryMembership.DisposeAsync().AsTask();
+            }, timeout.Token);
             await notifying.Task.WaitAsync(timeout.Token);
+            var secondDisposal = directoryMembership.DisposeAsync().AsTask();
 
+            Assert.Equal(callerThread, callbackThread);
             Assert.True(subscriptionToken.IsCancellationRequested);
             Assert.Same(waitHandle, subscriptionToken.WaitHandle);
             Assert.True(waitHandle.WaitOne(0));
-            Assert.Same(firstDisposal, secondDisposal);
-            Assert.False(firstDisposal.IsCompleted);
+            Assert.False(initiateDisposal.IsCompleted);
             Assert.False(secondDisposal.IsCompleted);
 
             releaseNotification.SetResult();
+            await initiateDisposal.WaitAsync(timeout.Token);
+            Assert.NotNull(firstDisposal);
+            Assert.Same(firstDisposal, secondDisposal);
             await subscriptionStopping.Task.WaitAsync(timeout.Token);
 
             Assert.True(subscriptionToken.IsCancellationRequested);

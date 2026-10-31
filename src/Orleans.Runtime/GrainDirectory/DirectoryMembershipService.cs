@@ -148,25 +148,45 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
 
     public ValueTask DisposeAsync()
     {
+        TaskCompletionSource completion;
         lock (_shutdownCts)
         {
-            return new(_disposeTask ??= DisposeCoreAsync());
+            if (_disposeTask is { } task)
+            {
+                return new(task);
+            }
+
+            completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Publish completion before cancellation callbacks can reenter disposal.
+            _disposeTask = completion.Task;
         }
+
+        _ = DisposeCoreAsync(completion);
+        return new(completion.Task);
     }
 
-    private async Task DisposeCoreAsync()
+    private async Task DisposeCoreAsync(TaskCompletionSource completion)
     {
         try
         {
-            // Cancel completes notification state even with no callbacks, allowing Dispose to close wait handles.
-            // See https://github.com/dotnet/runtime/issues/136748 for the CancelAsync fast-path defect.
-            await Task.Run(_shutdownCts.Cancel).ConfigureAwait(false);
+            try
+            {
+#pragma warning disable CA1849 // Notify on the caller's scheduler before asynchronously draining the subscription.
+                _shutdownCts.Cancel();
+#pragma warning restore CA1849
+            }
+            finally
+            {
+                // The membership processor owns its subscription until it has completed.
+                await _runTask.SuppressThrowing();
+                _shutdownCts.Dispose();
+            }
+
+            completion.SetResult();
         }
-        finally
+        catch (AggregateException exception)
         {
-            // The membership processor owns its subscription until it has completed.
-            await _runTask.SuppressThrowing();
-            _shutdownCts.Dispose();
+            completion.SetException(exception);
         }
     }
 

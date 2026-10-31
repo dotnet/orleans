@@ -74,16 +74,27 @@ public class InMemoryTransportTests
         var waitHandle = token.WaitHandle;
         var notifying = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var callerThread = 0;
+        var callbackThread = 0;
+        Task reentrantDisposal = null!;
         using var registration = token.Register(() =>
         {
+            callbackThread = Environment.CurrentManagedThreadId;
+            reentrantDisposal = listener.DisposeAsync().AsTask();
             notifying.TrySetResult();
             release.Task.GetAwaiter().GetResult();
         });
-        var first = Task.Run(async () => await listener.UnbindAsync(TestContext.Current.CancellationToken), TestContext.Current.CancellationToken);
+        var first = Task.Run(async () =>
+        {
+            callerThread = Environment.CurrentManagedThreadId;
+            await listener.UnbindAsync(TestContext.Current.CancellationToken);
+        }, TestContext.Current.CancellationToken);
         try
         {
             await notifying.Task.WaitAsync(timeout.Token);
             var second = listener.DisposeAsync().AsTask();
+            Assert.Equal(callerThread, callbackThread);
+            Assert.Same(reentrantDisposal, second);
             Assert.True(token.IsCancellationRequested);
             Assert.Same(waitHandle, token.WaitHandle);
             Assert.True(waitHandle.WaitOne(0));

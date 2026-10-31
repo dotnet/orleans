@@ -28,18 +28,22 @@ public sealed class SiloMetadataCacheTests
         var token = await fixture.StartAsync();
         var handle = token.WaitHandle;
         var expected = new InvalidOperationException("Cancellation callback failed.");
+        var callbackThread = 0;
         using var registration = token.Register(() =>
         {
+            callbackThread = Environment.CurrentManagedThreadId;
             if (callbackThrows)
             {
                 throw expected;
             }
         });
 
+        var callerThread = Environment.CurrentManagedThreadId;
         var first = fixture.Cache.DisposeAsync().AsTask();
         var second = fixture.Cache.DisposeAsync().AsTask();
         await fixture.SubscriptionStopping.Task.WaitAsync(TestContext.Current.CancellationToken);
 
+        Assert.Equal(callerThread, callbackThread);
         Assert.Same(first, second);
         Assert.True(token.IsCancellationRequested);
         Assert.True(handle.WaitOne(0));

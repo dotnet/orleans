@@ -19,7 +19,7 @@ internal class InMemoryTransportListener : MessageTransportListener
     private readonly string? _endpointValue;
     private readonly InMemoryTransportConnectionHub _hub;
     [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
-        Justification = "DisposeAsync delegates to the cached UnbindCoreAsync task, which disposes this source in finally after cancellation notifications finish.")]
+        Justification = "UnbindCore disposes this source in finally after cancellation notifications finish; concurrent disposal calls observe its shared completion task.")]
     private readonly CancellationTokenSource _disposedCts = new();
     private readonly CancellationToken _disposedToken;
     private Task? _unbindTask;
@@ -96,13 +96,24 @@ internal class InMemoryTransportListener : MessageTransportListener
 
     public override ValueTask UnbindAsync(CancellationToken cancellationToken = default)
     {
+        TaskCompletionSource completion;
         lock (_disposedCts)
         {
-            return new(_unbindTask ??= UnbindCoreAsync());
+            if (_unbindTask is { } task)
+            {
+                return new(task);
+            }
+
+            completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Publish completion before cancellation callbacks can reenter shutdown.
+            _unbindTask = completion.Task;
         }
+
+        UnbindCore(completion);
+        return new(completion.Task);
     }
 
-    private async Task UnbindCoreAsync()
+    private void UnbindCore(TaskCompletionSource completion)
     {
         _acceptQueue.Writer.TryComplete();
         while (_acceptQueue.Reader.TryRead(out var item))
@@ -113,13 +124,21 @@ internal class InMemoryTransportListener : MessageTransportListener
 
         try
         {
-            // Cancel completes notification state even with no callbacks, allowing Dispose to close wait handles.
-            // See https://github.com/dotnet/runtime/issues/136748 for the CancelAsync fast-path defect.
-            await Task.Run(_disposedCts.Cancel).ConfigureAwait(false);
+            try
+            {
+                // Cancellation callbacks run on the initiating caller's scheduler.
+                _disposedCts.Cancel();
+            }
+            finally
+            {
+                _disposedCts.Dispose();
+            }
+
+            completion.SetResult();
         }
-        finally
+        catch (AggregateException exception)
         {
-            _disposedCts.Dispose();
+            completion.SetException(exception);
         }
     }
 }
