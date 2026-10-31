@@ -26,6 +26,7 @@ stateDiagram-v2
     Unregistering --> Disposing
     Disposing --> Destroyed
     Destroyed --> [*]
+    None --> Disposing: deactivated before start
     Constructing --> Disposing: failed or deactivated
     Registering --> Unregistering: deactivated, or registration threw
     Registering --> Disposing: competing registration
@@ -35,9 +36,11 @@ stateDiagram-v2
     Activating --> Deactivating: deactivated after OnActivateAsync completed
 ```
 
+Forced disposal can also move an activation from any state before `Disposing` directly to `Disposing`.
+
 ## Activation states
 
-An activation moves through a linear chain of states which is symmetric around `Active`. Each setup phase is paired with the teardown phase which undoes it:
+An activation moves through a linear chain of states which is symmetric around `Active`. Each setup phase is paired with its mirror, the teardown phase which is eligible to run once that setup phase completed:
 
 | Setup phase | Work | Teardown phase | Work |
 | --- | --- | --- | --- |
@@ -53,6 +56,7 @@ An activation moves through a linear chain of states which is symmetric around `
 The state machine enforces these rules:
 
 - Each transition advances one state.
+- Migrated state is installed only once the activation holds its directory registration, so `Registering` precedes `Rehydrating`. A migrating activation hands its registration to the migration target and unregisters only if that handoff fails, so `Dehydrating` precedes `Unregistering`. `Dehydrating` acts only for an activation whose grain lifecycle started.
 - Teardown starts at the mirror of the last completed setup phase and runs every later teardown phase. A failed phase leaves the phase before it as the last completed phase. `Stopping` stops only the lifecycle stages which started, so a failed `Starting` phase enters teardown at `Stopping`. `Disposing` undoes partial construction. A directory registration which threw may have committed, so teardown treats it as completed. `Unregistering` skips an activation which was deactivated because of a directory failure, since the failure removed or prevented its registration.
 - A deactivation request during setup is recorded intent. It cancels the setup phase's token, setup stops at its next phase boundary, and the deactivation operation enters teardown. A canceled `Starting` or `Activating` phase fails. A deactivation request while the activation is `Active` enters `Deactivating` immediately.
 - Forced disposal, such as disposal of the activation directory when the silo's services are disposed, moves an activation directly to `Disposing`, skips the phases which have not run, and disposes the activation's resources. A deactivation already in progress then leaves the catalog and forwards queued requests.
@@ -93,7 +97,7 @@ A deactivation reason distinguishes normal collection, application-requested dea
 
 Migration moves an activation while preserving its grain identity. `ActivationMigrationManager` starts migration by creating a `MigrationContext`, asking registered migration participants to dehydrate state, and deactivating with the `Migrating` reason. The target creates the activation, registers it, rehydrates participants, runs activation, and waits until the activation reaches a stable state.
 
-The migration package also carries the requests which are queued for the source activation. The catalog delivers them through the activation's ordinary request admission, with per-request overload checks and FIFO queueing. A new activation receives them before rehydration and directory registration. An existing activation receives them before the catalog disposes the unused migration context. Requests already queued at the destination retain their place. Once the target accepts the migration, the source retargets their callers' pending calls to the target on a best-effort basis, so the calls survive the source silo's departure. The package serializes its request list using the same message framing as silo connections, preserving received requests' serialized bodies. The target decodes each body when it invokes the request and drops requests whose remaining lifetime has elapsed before admission. A source sends queued requests only to silos whose manifest lists version 1 or later of `IActivationMigrationManagerSystemTarget`. The source activation remains in the catalog until the migration completes, so requests which reach the source silo for the grain reach it. A caller which cancels its call before the call is retargeted signals the cancellation to the target as well, once the call is retargeted. When the migration fails or its outcome is unknown, the source rejects the requests which it carried, so their callers can retry them. It forwards the requests which arrived meanwhile.
+The migration package also carries the requests which are queued for the source activation. The catalog delivers them through the activation's ordinary request admission, with per-request overload checks and FIFO queueing. A new activation receives them before directory registration and rehydration. An existing activation receives them before the catalog disposes the unused migration context. Requests already queued at the destination retain their place. Once the target accepts the migration, the source retargets their callers' pending calls to the target on a best-effort basis, so the calls survive the source silo's departure. The package serializes its request list using the same message framing as silo connections, preserving received requests' serialized bodies. The target decodes each body when it invokes the request and drops requests whose remaining lifetime has elapsed before admission. A source sends queued requests only to silos whose manifest lists version 1 or later of `IActivationMigrationManagerSystemTarget`. The source activation remains in the catalog until the migration completes, so requests which reach the source silo for the grain reach it. A caller which cancels its call before the call is retargeted signals the cancellation to the target as well, once the call is retargeted. When the migration fails or its outcome is unknown, the source rejects the requests which it carried, so their callers can retry them. It forwards the requests which arrived meanwhile.
 
 The serializer claims a migration's context and request bodies under the migration's completion lock and releases them when serialization finishes, including on failure. Completion releases a payload which serialization has not claimed; a later writer then discards the completed migration. Once serialization owns the payload, completion proceeds independently while the serializer keeps its buffers valid. The source retains routing headers for failure reporting. Transport retries reuse the serialized RPC body. On the destination, embedded messages share the receive buffer and retain their own body slices until invocation. The RPC decoder requires a context object and non-null entries in a carried request list. Malformed packages fail before admission, and GC reclaims abandoned partial decode graphs once they become unreachable. Migration context keeps its existing wire format.
 

@@ -327,6 +327,7 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
 
         protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
+            ActivationAssertionRecorder.Install();
             builder.Options.InitialSilosCount = 1;
             builder.ConfigureSilo((_, silo) => silo.Services.AddSingleton<PhaseGateRegistry>());
         }
@@ -335,6 +336,7 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
         {
             Gates.ReleaseAll();
             await base.DisposeAsync();
+            ActivationAssertionRecorder.AssertNone();
         }
     }
 
@@ -413,6 +415,7 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
         {
             Assert.False(Gate.TryReadObservation(out var observation), $"grain={GrainId}; unexpected observation {observation}; history=[{string.Join(", ", _history)}]");
             Assert.Empty(Gate.Violations);
+            ActivationAssertionRecorder.AssertNone();
         }
 
         /// <summary>

@@ -7,9 +7,15 @@ namespace Orleans.Runtime;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The states form a totally ordered chain which is symmetric around <see cref="Active"/>. Each setup phase is paired with the
-/// teardown phase which undoes it, its mirror: <c>mirror(s) = Destroyed - s</c>. Group checks are therefore range comparisons:
+/// The states form a totally ordered chain which is symmetric around <see cref="Active"/>. Each setup phase is paired with its mirror,
+/// <c>mirror(s) = Destroyed - s</c>, the teardown phase which is eligible to run once that setup phase completed. Group checks are range comparisons:
 /// states before <see cref="Active"/> set the activation up and states after it tear the activation down.
+/// </para>
+/// <para>
+/// Two ordering dependencies fix the positions of the directory and migration phases. Migrated state is installed only once the activation
+/// holds its directory registration, so <see cref="Registering"/> precedes <see cref="Rehydrating"/>. A migrating activation hands its
+/// registration to the migration target, and unregisters only if that handoff fails, so <see cref="Dehydrating"/> precedes
+/// <see cref="Unregistering"/>. <see cref="Dehydrating"/> acts only for an activation whose grain lifecycle started.
 /// </para>
 /// <para>
 /// An activation advances one state at a time. Teardown starts at the mirror of the last completed setup phase and runs every later
@@ -88,7 +94,7 @@ internal enum ActivationState
     Disposing,
 
     /// <summary>
-    /// Tombstone for an activation which has terminated.
+    /// The activation's resources are disposed. A deactivation operation which forced disposal preempted still leaves the catalog afterwards.
     /// </summary>
     Destroyed,
 }
