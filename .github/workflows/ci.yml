@@ -82,13 +82,18 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      with:
+        # Retain the immutable synthetic PR merge and both parent trees for selection.
+        fetch-depth: 2
+    - name: Select Dashboard asset reproduction
+      id: dashboard-assets
+      shell: pwsh
+      run: ./.github/scripts/select-dashboard-frontend-check.ps1
     - name: Setup frontend generation toolchain
+      if: steps.dashboard-assets.outputs.required != 'false'
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version-file: src/Dashboard/Orleans.Dashboard.App/.node-version
-    - name: Check committed Dashboard assets
-      working-directory: src/Dashboard/Orleans.Dashboard.App
-      run: npm run assets:check
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -96,7 +101,11 @@ jobs:
     - name: Cache dependencies
       uses: ./.github/actions/cache-dependencies
       with:
-        npm: 'true'
+        npm: ${{ steps.dashboard-assets.outputs.required != 'false' }}
+    - name: Check committed Dashboard assets
+      if: steps.dashboard-assets.outputs.required != 'false'
+      working-directory: src/Dashboard/Orleans.Dashboard.App
+      run: npm run assets:check
     - name: Test coverage reporting
       if: matrix.os == 'ubuntu-latest'
       shell: pwsh
@@ -104,6 +113,9 @@ jobs:
     - name: Test Dashboard asset validation
       shell: pwsh
       run: ./.github/scripts/test-dashboard-frontend.ps1
+    - name: Test Dashboard reproduction selection
+      shell: pwsh
+      run: ./.github/scripts/test-dashboard-frontend-selection.ps1
     - name: Build
       run: dotnet build -bl
     - name: Check CodeGen graph inventory

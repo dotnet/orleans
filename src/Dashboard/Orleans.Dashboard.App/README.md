@@ -35,7 +35,9 @@ Canonical generation uses production mode, UTC, and the `C` locale. Move `.env.l
 npm run assets:check
 ```
 
-This independently installs and regenerates in a fresh temporary directory, then compares every generated file and both manifests with the committed files. The Windows and Linux CI build jobs require this step to succeed before the .NET build. An actionable .NET build error identifies stale source or output paths and directs contributors to explicit regeneration.
+This independently installs and regenerates in a fresh temporary directory, then compares every generated file and both manifests with the committed files. The Windows and Linux CI build jobs run this check when the complete tested PR delta affects frontend files, .NET Dashboard integration, CI/bootstrap configuration, or the repository line-ending policy. The selector compares the immutable synthetic merge with its event-identified base parent, covering changes from every PR commit and both paths of renames. Node setup and npm download caching follow the same selection; NuGet caching and every .NET build/pack manifest check remain active.
+
+Pushes, manual runs, merge queues, and comparisons with unavailable or inconsistent commit identities run full reproduction with an explicit reason. A proven unrelated PR, including frontend README, screenshot, or browser-test-only edits, proceeds directly to the SDK validation. An actionable .NET build error identifies stale source or output paths and directs contributors to explicit regeneration.
 
 Framework discovery and Clean operate on the .NET project graph and intermediate outputs. The committed frontend files remain available across target frameworks and clean builds.
 
