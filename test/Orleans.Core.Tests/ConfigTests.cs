@@ -183,6 +183,29 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void DurationAttributes_ExposeParsedTimeSpanValuesAndPreserveCollectionMetadata()
+        {
+            var response = new ResponseTimeoutAttribute("00:00:42");
+            var collection = new CollectionAgeLimitAttribute("00:01:15");
+            var properties = new Dictionary<string, string>();
+
+            collection.Populate(null!, null!, default, properties);
+
+            Assert.Equal(TimeSpan.FromSeconds(42), response.Timeout);
+            Assert.Equal(TimeSpan.FromSeconds(75), collection.AgeLimit);
+            Assert.Equal("00:01:15", properties[WellKnownGrainTypeProperties.IdleDeactivationPeriod]);
+        }
+
+        [Theory, TestCategory("Functional"), TestCategory("Config")]
+        [InlineData("")]
+        [InlineData("not-a-duration")]
+        public void DurationAttributes_InvalidDuration_PropagatesFormatException(string duration)
+        {
+            Assert.Throws<FormatException>(() => new ResponseTimeoutAttribute(duration));
+            Assert.Throws<FormatException>(() => new CollectionAgeLimitAttribute(duration));
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void ClusterOptionsValidator_NullOptions_ThrowsWithExactParameterName()
         {
             var exception = Assert.Throws<ArgumentNullException>(() => new ClusterOptionsValidator(null!));

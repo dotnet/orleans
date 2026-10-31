@@ -591,6 +591,8 @@ namespace Orleans
         /// Specifies the response timeout for the interface method which it is specified on.
         /// </summary>
         /// <param name="timeout">The response timeout, using <see cref="TimeSpan.Parse(string)"/> syntax.</param>
+        [SuppressMessage("Design", "CA1019:Define accessors for attribute arguments",
+            Justification = "Attribute-compatible text is parsed and exposed through the typed TimeSpan Timeout property.")]
         public ResponseTimeoutAttribute(string timeout) => Timeout = TimeSpan.Parse(timeout);
 
         /// <summary>
