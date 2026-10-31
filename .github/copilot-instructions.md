@@ -25,7 +25,7 @@ For code review, use `.github/skills/code-review/SKILL.md`.
 * `src\Orleans.Runtime` is the silo implementation: activation lifecycle, placement, cluster membership, reminders, runtime services, and grain execution.
 * `src\Orleans.Sdk`, `src\Orleans.Client`, and `src\Orleans.Server` are packaging/metapackage projects. The SDK brings in core packages plus analyzers/code generation; the client/server packages compose the SDK with client or silo dependencies.
 * Provider packages are intentionally split by backend and capability under `src\Azure`, `src\AWS`, `src\AdoNet`, `src\Cassandra`, `src\Redis`, and related top-level provider directories. They usually expose builder extensions in `Orleans.Hosting` and options in `Orleans.Configuration`.
-* Tests mirror runtime areas under `test\`. Shared cluster fixtures are in `test\TestInfrastructure\TestExtensions`; shared traits and XML serialization helpers are in the lean `test\TestInfrastructure\TestUtilities` library. Test grains and grain interfaces are under `test\Grains`, and `Orleans.TestingHost`/`TestClusterBuilder` are the primary integration-test harnesses.
+* Tests mirror runtime areas under `test\`. Shared cluster fixtures are in `test\TestInfrastructure\TestExtensions`; shared traits are in the lean `test\TestInfrastructure\TestUtilities` library. Test grains and grain interfaces are under `test\Grains`, and `Orleans.TestingHost`/`TestClusterBuilder` are the primary integration-test harnesses.
 * `src\api` contains generated public API surfaces. Follow the regeneration and package compatibility commands in root `AGENTS.md`.
 
 ## Key conventions

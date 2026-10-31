@@ -10,9 +10,6 @@ namespace TestGrainInterfaces;
 /// <summary>
 /// Serializes and deep-copies XML documents for tests.
 /// </summary>
-/// <remarks>
-/// Shared by serialization tests and event-sourced test grains.
-/// </remarks>
 [RegisterSerializer]
 [RegisterCopier]
 public class XDocumentSerialization : GeneralizedReferenceTypeSurrogateCodec<XDocument, XDocumentSurrogate>, IDeepCopier<XDocument>
