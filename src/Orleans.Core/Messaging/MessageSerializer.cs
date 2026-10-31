@@ -102,7 +102,8 @@ namespace Orleans.Runtime.Messaging
 
         private ResponseCodec GetRawCodec(Type fieldType)
         {
-            var rawCodec = (ResponseCodec)_codecProvider.GetCodec(typeof(Response<>).MakeGenericType(fieldType));
+            if (!_codecProvider.TryGetResponseCodec(fieldType, out var rawCodec))
+                rawCodec = (ResponseCodec)_codecProvider.GetCodec(typeof(Response<>).MakeGenericType(fieldType));
             _rawResponseCodecs.Add(fieldType, rawCodec);
             return rawCodec;
         }

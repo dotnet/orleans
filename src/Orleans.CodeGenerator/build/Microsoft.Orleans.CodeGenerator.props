@@ -7,6 +7,8 @@
     <CompilerVisibleProperty Include="Orleans_ConstructorAttributes" />
     <CompilerVisibleProperty Include="OrleansGenerateCompatibilityInvokers" />
     <CompilerVisibleProperty Include="OrleansHotReload" />
+    <CompilerVisibleProperty Include="OrleansValidateRpcResponseFactories" />
+    <CompilerVisibleProperty Include="PublishAot" />
     <CompilerVisibleProperty Include="TargetFrameworkIdentifier" />
     <CompilerVisibleProperty Include="TargetFrameworkVersion" />
   </ItemGroup>
