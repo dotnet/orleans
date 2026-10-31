@@ -95,8 +95,10 @@ namespace Orleans.Runtime
         public static bool operator !=(GuidId? left, GuidId? right) => !(left == right);
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="info"/> is <see langword="null"/>.</exception>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
+            ArgumentNullException.ThrowIfNull(info);
             info.AddValue("Guid", Guid, typeof(Guid));
         }
 
@@ -117,8 +119,11 @@ namespace Orleans.Runtime
             => ReadCore(ref reader);
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
         public override void Write(Utf8JsonWriter writer, GuidId value, JsonSerializerOptions options)
         {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
             Span<byte> buffer = stackalloc byte[32];
             if (!value.Guid.TryFormat(buffer, out var written, "N"))
             {
@@ -153,8 +158,11 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
         public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] GuidId value, JsonSerializerOptions options)
         {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
             Span<byte> buffer = stackalloc byte[32];
             if (value.Guid.TryFormat(buffer, out var written, "N"))
             {

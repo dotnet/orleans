@@ -70,8 +70,10 @@ namespace Orleans.Runtime
         /// <param name="ep">IP endpoint address of the silo.</param>
         /// <param name="gen">Generation number of the silo.</param>
         /// <returns>SiloAddress object initialized with specified address and silo generation.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="ep"/> is <see langword="null"/>.</exception>
         public static SiloAddress New(IPEndPoint ep, int gen)
         {
+            ArgumentNullException.ThrowIfNull(ep);
             return siloAddressInterningCache.FindOrCreate((ep.Address, ep.Port, gen),
                 // Normalize endpoints
                 (k, ep) => k.Address.IsIPv4MappedToIPv6 ? New(k.Address.MapToIPv4(), k.Port, k.Generation) : new(ep, k.Generation), ep);
@@ -551,22 +553,24 @@ namespace Orleans.Runtime
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value and is a successor to this server, otherwise <see langword="false"/>.
         /// </summary>
         /// <param name="other">
-        /// The other instance.
+        /// The other instance, or <see langword="null"/> to return <see langword="false"/>.
         /// </param>
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value and is a successor to this server, otherwise <see langword="false"/>.
         /// </returns>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "IsSameLogicalSilo returns false for null, short-circuiting the dereference and preserving the null-tolerant predicate contract.")]
         public bool IsSuccessorOf(SiloAddress other) => IsSameLogicalSilo(other) && other.Generation > 0 && Generation > other.Generation;
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided value represents the same logical server as this value and is a predecessor to this server, otherwise <see langword="false"/>.
         /// </summary>
         /// <param name="other">
-        /// The other instance.
+        /// The other instance, or <see langword="null"/> to return <see langword="false"/>.
         /// </param>
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value and is a predecessor to this server, otherwise <see langword="false"/>.
         /// </returns>
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "IsSameLogicalSilo returns false for null, short-circuiting the dereference and preserving the null-tolerant predicate contract.")]
         public bool IsPredecessorOf(SiloAddress other) => IsSameLogicalSilo(other) && Generation > 0 && Generation < other.Generation;
 
         /// <inheritdoc/>
@@ -597,12 +601,24 @@ namespace Orleans.Runtime
             => SiloAddress.FromParsableString(reader.GetString() ?? throw new JsonException($"Could not deserialize {nameof(SiloAddress)}."));
 
         /// <inheritdoc />
-        public override void Write(Utf8JsonWriter writer, SiloAddress value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToUtf8String());
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
+        public override void Write(Utf8JsonWriter writer, SiloAddress value, JsonSerializerOptions options)
+        {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
+            writer.WriteStringValue(value.ToUtf8String());
+        }
 
         /// <inheritdoc />
         public override SiloAddress ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => SiloAddress.FromParsableString(reader.GetString()!);
 
         /// <inheritdoc />
-        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] SiloAddress value, JsonSerializerOptions options) => writer.WritePropertyName(value.ToUtf8String());
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> or <paramref name="value"/> is <see langword="null"/>.</exception>
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] SiloAddress value, JsonSerializerOptions options)
+        {
+            ArgumentNullException.ThrowIfNull(writer);
+            ArgumentNullException.ThrowIfNull(value);
+            writer.WritePropertyName(value.ToUtf8String());
+        }
     }
 }
