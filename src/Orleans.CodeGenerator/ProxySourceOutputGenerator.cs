@@ -9,99 +9,6 @@ namespace Orleans.CodeGenerator;
 internal static class ProxySourceOutputGenerator
 {
     internal static SourceOutputResult CreateProxySourceOutput(
-        Compilation compilation,
-        TypeSymbolResolver resolver,
-        ProxyOutputModel proxyOutputModel,
-        SourceGeneratorOptions options,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            SourceGeneratorOptionsParser.AttachDebuggerIfRequested(options);
-            var codeGeneratorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options);
-            var generatorServices = new GeneratorServices(compilation, codeGeneratorOptions);
-            var proxyContext = new ProxyGenerationContext(compilation, codeGeneratorOptions);
-            var model = proxyOutputModel.ProxyInterface;
-            PopulateProxyInterfaces(proxyContext, resolver, [model], cancellationToken);
-
-            var assemblyName = compilation.AssemblyName ?? "assembly";
-            var interfaceDescription = GetProxyInterfaceDescription(proxyContext, resolver, model, cancellationToken);
-            var proxyGenerator = new ProxyGenerator(generatorServices, new CopierGenerator(generatorServices));
-            var (proxyClass, _) = proxyGenerator.Generate(interfaceDescription);
-            var targetHintName = GeneratedSourceOutput.CreateProxyHintName(assemblyName, interfaceDescription);
-            var ownedInvokableMetadataNames = new HashSet<string>(
-                proxyOutputModel.OwnedInvokableMetadataNames,
-                StringComparer.Ordinal);
-            var emitDeclaredMethodsFallback = proxyOutputModel.UseDeclaredInvokableFallback;
-            var generatedInvokables = GetGeneratedInvokables(proxyContext, interfaceDescription).ToImmutableArray();
-            var generatedMemberMetadataNames = new HashSet<string>(
-                generatedInvokables.Select(static invokable => invokable.MetadataName),
-                StringComparer.Ordinal);
-            generatedMemberMetadataNames.Add(GetMetadataName(interfaceDescription.GeneratedNamespace, proxyClass));
-            var additionalInvokableClasses = proxyContext.GetEmittedMembers()
-                .Where(entry => entry.Member is ClassDeclarationSyntax classDeclaration
-                    && !generatedMemberMetadataNames.Contains(GetMetadataName(entry.Namespace, classDeclaration)))
-                .Select(entry => (entry.Namespace, ClassDeclaration: (ClassDeclarationSyntax)entry.Member))
-                .OrderBy(static entry => entry.Namespace, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.ClassDeclaration.Identifier.ValueText, StringComparer.Ordinal)
-                .ToImmutableArray();
-
-            var serializerGenerator = new SerializerGenerator(generatorServices);
-            var copierGenerator = new CopierGenerator(generatorServices);
-            var activatorGenerator = new ActivatorGenerator(generatorServices);
-            var emittedInvokables = generatedInvokables
-                .Where(invokable => ShouldEmitInvokable(
-                    invokable,
-                    interfaceDescription.InterfaceType,
-                    ownedInvokableMetadataNames,
-                    emitDeclaredMethodsFallback))
-                .ToImmutableArray();
-
-            var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
-            foreach (var invokable in emittedInvokables)
-            {
-                GeneratedSourceOutput.AddMember(namespacedMembers, invokable.GeneratedNamespace, invokable.ClassDeclarationSyntax);
-            }
-
-            GeneratedSourceOutput.AddMember(namespacedMembers, interfaceDescription.GeneratedNamespace, proxyClass);
-
-            foreach (var invokable in emittedInvokables)
-            {
-                GeneratedSourceOutput.AddMember(namespacedMembers, invokable.GeneratedNamespace, serializerGenerator.Generate(invokable));
-
-                var copier = invokable.IsShallowCopyable && proxyContext.MetadataModel.DefaultCopiers.ContainsKey(invokable)
-                    ? null
-                    : copierGenerator.GenerateCopier(invokable, proxyContext.MetadataModel.DefaultCopiers);
-                if (copier is not null)
-                {
-                    GeneratedSourceOutput.AddMember(namespacedMembers, invokable.GeneratedNamespace, copier);
-                }
-
-                if (ActivatorGenerator.ShouldGenerateActivator(invokable))
-                {
-                    GeneratedSourceOutput.AddMember(namespacedMembers, invokable.GeneratedNamespace, activatorGenerator.GenerateActivator(invokable));
-                }
-            }
-
-            foreach (var (generatedNamespace, classDeclaration) in additionalInvokableClasses)
-            {
-                GeneratedSourceOutput.AddMember(namespacedMembers, generatedNamespace, classDeclaration);
-            }
-
-            return SourceOutputResult.FromSource(
-                new GeneratedSourceEntry(targetHintName, GeneratedSourceOutput.CreateSourceString(GeneratedSourceOutput.CreateCompilationUnit(namespacedMembers))));
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (OrleansGeneratorDiagnosticAnalysisException analysisException)
-        {
-            return SourceOutputResult.FromDiagnostic(analysisException.Diagnostic);
-        }
-    }
-
-    internal static SourceOutputResult CreateProxySourceOutput(
         ProxyGenerationContext proxyContext,
         IGeneratorServices generatorServices,
         TypeSymbolResolver resolver,
@@ -114,8 +21,7 @@ internal static class ProxySourceOutputGenerator
             cancellationToken.ThrowIfCancellationRequested();
             var model = proxyOutputModel.ProxyInterface;
             var interfaceDescription = GetProxyInterfaceDescription(proxyContext, resolver, model, cancellationToken);
-            var proxyGenerator = new ProxyGenerator(generatorServices, new CopierGenerator(generatorServices));
-            var (proxyClass, _) = proxyGenerator.Generate(interfaceDescription);
+            var proxyClass = proxyContext.GetProxyDeclaration(interfaceDescription);
             var targetHintName = GeneratedSourceOutput.CreateProxyHintName(assemblyName, interfaceDescription);
             var ownedInvokableMetadataNames = new HashSet<string>(
                 proxyOutputModel.OwnedInvokableMetadataNames,
@@ -158,6 +64,18 @@ internal static class ProxySourceOutputGenerator
                 {
                     GeneratedSourceOutput.AddMember(namespacedMembers, invokable.GeneratedNamespace, activatorGenerator.GenerateActivator(invokable));
                 }
+            }
+
+            var generatedMemberMetadataNames = new HashSet<string>(
+                generatedInvokables.Select(static invokable => invokable.MetadataName),
+                StringComparer.Ordinal);
+            generatedMemberMetadataNames.Add(GetMetadataName(interfaceDescription.GeneratedNamespace, proxyClass));
+            foreach (var (generatedNamespace, declaration) in proxyContext.GetCompatibilityDeclarations(interfaceDescription.InterfaceType)
+                .Where(entry => !generatedMemberMetadataNames.Contains(GetMetadataName(entry.Namespace, entry.Declaration)))
+                .OrderBy(static entry => entry.Namespace, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.Declaration.Identifier.ValueText, StringComparer.Ordinal))
+            {
+                GeneratedSourceOutput.AddMember(namespacedMembers, generatedNamespace, declaration);
             }
 
             return SourceOutputResult.FromSource(
@@ -240,29 +158,18 @@ internal static class ProxySourceOutputGenerator
         }
 
         var sourceOutputs = ImmutableArray.CreateBuilder<SourceOutputResult>(proxyOutputModels.Length);
-        if (options.GenerateCompatibilityInvokers)
+        SourceGeneratorOptionsParser.AttachDebuggerIfRequested(options);
+        var assemblyName = compilation.AssemblyName ?? "assembly";
+        foreach (var proxyOutputModel in proxyOutputModels)
         {
-            foreach (var proxyOutputModel in proxyOutputModels)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                sourceOutputs.Add(CreateProxySourceOutput(compilation, resolver, proxyOutputModel, options, cancellationToken));
-            }
-        }
-        else
-        {
-            SourceGeneratorOptionsParser.AttachDebuggerIfRequested(options);
-            var assemblyName = compilation.AssemblyName ?? "assembly";
-            foreach (var proxyOutputModel in proxyOutputModels)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                sourceOutputs.Add(CreateProxySourceOutput(
-                    proxyContext,
-                    generatorServices,
-                    resolver,
-                    assemblyName,
-                    proxyOutputModel,
-                    cancellationToken));
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+            sourceOutputs.Add(CreateProxySourceOutput(
+                proxyContext,
+                generatorServices,
+                resolver,
+                assemblyName,
+                proxyOutputModel,
+                cancellationToken));
         }
 
         return GeneratedSourceOutput.DeduplicateSourceOutputs(sourceOutputs);
