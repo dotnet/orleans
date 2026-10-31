@@ -916,19 +916,22 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         var control = services.GetRequiredService<LifecycleControl>();
         var id = GetCall(fixture.GrainFactory, "ordinary", 705).Reference.GrainId;
         var migrationContext = new MigrationContext(services.GetRequiredService<SerializerSessionPool>());
-        var disposal = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var disposal = new TaskCompletionSource<(ActivationState State, Task Disposed)>(TaskCreationOptions.RunContinuationsAsynchronously);
         ActivationData? activation = null;
 
         // The rehydrate span starts after the activation takes its migration context and before migration participants run.
+        // The listener is process-wide, so it reacts only to the target activation's rehydration, which runs on that activation's scheduler.
         using var listener = new ActivityListener
         {
             ShouldListenTo = static source => source.Name == ActivitySources.LifecycleActivitySourceName,
             Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
             ActivityStarted = started =>
             {
-                if (started.OperationName == ActivityNames.ActivationRehydrate && Volatile.Read(ref activation) is { } target)
+                if (started.OperationName == ActivityNames.ActivationRehydrate
+                    && Volatile.Read(ref activation) is { } target
+                    && ReferenceEquals(RuntimeContext.Current, target))
                 {
-                    disposal.TrySetResult(target.DisposeAsync().AsTask());
+                    disposal.TrySetResult((target.State, target.DisposeAsync().AsTask()));
                 }
             },
         };
@@ -940,7 +943,9 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         {
             var registration = await control.DirectoryEntered.Task.WaitAsync(Timeout, TestCancellation);
             control.DirectoryResponse.TrySetResult(registration);
-            await (await disposal.Task.WaitAsync(Timeout, TestCancellation)).WaitAsync(Timeout, TestCancellation);
+            var (stateWhenDisposed, disposed) = await disposal.Task.WaitAsync(Timeout, TestCancellation);
+            await disposed.WaitAsync(Timeout, TestCancellation);
+            Assert.Equal(ActivationState.Rehydrating, stateWhenDisposed);
 
             // Setup stops in the same turn in which disposal preempted it.
             await activation!.RunOrQueueTask(() => Task.CompletedTask).WaitAsync(Timeout, TestCancellation);
