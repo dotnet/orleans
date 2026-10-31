@@ -525,7 +525,7 @@ namespace Orleans.Storage
 
             string WithoutAssemblyVersion(string input)
             {
-                var asmNameIndex = input.IndexOf(',');
+                var asmNameIndex = input.IndexOf(',', StringComparison.Ordinal);
                 if (asmNameIndex >= 0)
                 {
                     var asmVersionIndex = input.IndexOf(',', asmNameIndex + 1);

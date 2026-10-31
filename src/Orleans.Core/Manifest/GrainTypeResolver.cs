@@ -64,7 +64,7 @@ namespace Orleans.Metadata
             var name = type.Name.ToLowerInvariant();
 
             // Trim generic arity
-            var index = name.IndexOf('`');
+            var index = name.IndexOf('`', StringComparison.Ordinal);
             if (index > 0)
             {
                 name = name[..index];

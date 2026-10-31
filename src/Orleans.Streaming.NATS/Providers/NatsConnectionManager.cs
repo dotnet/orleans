@@ -184,7 +184,7 @@ internal sealed partial class NatsConnectionManager
 
         var subject = $"{this._providerName}.{ns}.{id}";
 
-        var context = this._producerNatsContexts[GetProducerIndex(id.GetHashCode(), this._producerNatsContexts.Length)];
+        var context = this._producerNatsContexts[GetProducerIndex(id.GetHashCode(StringComparison.Ordinal), this._producerNatsContexts.Length)];
 
         var ack = await context.TryPublishAsync(
             subject,

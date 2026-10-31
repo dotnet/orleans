@@ -475,7 +475,7 @@ namespace Orleans.AzureUtils
                 throw new ArgumentException(string.Format("A queue name can only contain letters, numbers, and the dash (-) character, while your queueName is {0}.", queueName), queueName);
             }
 
-            if (queueName.Contains("--"))
+            if (queueName.Contains("--", StringComparison.Ordinal))
             {
                 // Consecutive dash characters are not permitted in the queue name.
                 throw new ArgumentException(string.Format("Consecutive dash characters are not permitted in the queue name, while your queueName is {0}.", queueName), queueName);
