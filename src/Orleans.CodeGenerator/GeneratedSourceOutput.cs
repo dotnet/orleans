@@ -142,8 +142,8 @@ internal static class GeneratedSourceOutput
     internal static ImmutableArray<SourceOutputResult> DeduplicateSourceOutputs(
         ImmutableArray<SourceOutputResult> sourceEntries)
     {
-        var emittedSourcesByOriginalHintName = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
         var emittedSourceByHintName = new Dictionary<string, string>(StringComparer.Ordinal);
+        Dictionary<string, HashSet<string>>? collidingSourcesByOriginalHintName = null;
         var result = ImmutableArray.CreateBuilder<SourceOutputResult>();
         foreach (var sourceOutput in sourceEntries)
         {
@@ -154,20 +154,8 @@ internal static class GeneratedSourceOutput
             }
 
             var source = entry.Source ?? string.Empty;
-            if (!emittedSourcesByOriginalHintName.TryGetValue(entry.HintName, out var emittedSources))
-            {
-                emittedSources = new Dictionary<string, string>(StringComparer.Ordinal);
-                emittedSourcesByOriginalHintName.Add(entry.HintName, emittedSources);
-            }
-
-            if (emittedSources.ContainsKey(source))
-            {
-                continue;
-            }
-
             if (!emittedSourceByHintName.TryGetValue(entry.HintName, out var emittedSource))
             {
-                emittedSources.Add(source, entry.HintName);
                 emittedSourceByHintName.Add(entry.HintName, source);
                 result.Add(sourceOutput);
                 continue;
@@ -175,12 +163,23 @@ internal static class GeneratedSourceOutput
 
             if (string.Equals(emittedSource, source, StringComparison.Ordinal))
             {
-                emittedSources.Add(source, entry.HintName);
+                continue;
+            }
+
+            // Only conflicting hints need full-source hashing and per-original-hint deduplication.
+            collidingSourcesByOriginalHintName ??= new(StringComparer.Ordinal);
+            if (!collidingSourcesByOriginalHintName.TryGetValue(entry.HintName, out var collidingSources))
+            {
+                collidingSources = new HashSet<string>(StringComparer.Ordinal);
+                collidingSourcesByOriginalHintName.Add(entry.HintName, collidingSources);
+            }
+
+            if (!collidingSources.Add(source))
+            {
                 continue;
             }
 
             var uniqueHintName = CreateDistinctSourceHintName(entry.HintName, source, emittedSourceByHintName);
-            emittedSources.Add(source, uniqueHintName);
             emittedSourceByHintName.Add(uniqueHintName, source);
             result.Add(SourceOutputResult.FromSource(new GeneratedSourceEntry(uniqueHintName, source)));
         }
