@@ -48,6 +48,11 @@ jobs:
     - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: '24.x'
+    - name: Cache npm downloads
+      uses: ./.github/actions/cache-dependencies
+      with:
+        nuget: 'false'
+        npm: 'true'
     - run: npm ci --no-audit --no-fund
     - run: npx playwright install --with-deps chromium
     - run: npm run test:ui
@@ -62,6 +67,8 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Cache dependencies
+      uses: ./.github/actions/cache-dependencies
     - name: Verify .NET formatter
       run: dotnet format --version
     - name: Check solution
@@ -83,6 +90,10 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Cache dependencies
+      uses: ./.github/actions/cache-dependencies
+      with:
+        npm: 'true'
     - name: Test coverage reporting
       if: matrix.os == 'ubuntu-latest'
       shell: pwsh
@@ -819,6 +830,12 @@ jobs:
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: '24.x'
+    - name: Cache npm downloads
+      if: matrix.suite == 'BVT'
+      uses: ./.github/actions/cache-dependencies
+      with:
+        nuget: 'false'
+        npm: 'true'
     - name: Test
       uses: ./.github/actions/run-tests
       with:
@@ -860,6 +877,12 @@ jobs:
       with:
         distribution: temurin
         java-version: '21'
+    - name: Cache npm downloads
+      uses: ./.github/actions/cache-dependencies
+      with:
+        nuget: 'false'
+        npm: 'true'
+        npm-scope: firebase
     - name: Setup Google Emulators
       working-directory: test/Extensions/Google/Emulators
       run: |

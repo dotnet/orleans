@@ -1,4 +1,5 @@
 .github/actions/archive-test-results/action.yml
+.github/actions/cache-dependencies/action.yml
 .github/actions/dotnet-test/action.yml
 .github/actions/run-tests/action.yml
 .github/actions/setup-coverage/action.yml
