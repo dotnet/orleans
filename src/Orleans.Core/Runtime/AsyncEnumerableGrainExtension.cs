@@ -117,6 +117,11 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
     /// <inheritdoc/>
     public ValueTask<(EnumerationResult Status, object? Value)> StartEnumeration<T>(Guid requestId, [Immutable] IAsyncEnumerableRequest<T> request, CancellationToken cancellationToken)
     {
+        if (request.MaxBatchSize <= 0)
+        {
+            return ThrowInvalidBatchSize(request);
+        }
+
         ref var entry = ref CollectionsMarshal.GetValueRefOrAddDefault(_enumerators, requestId, out bool exists);
         if (exists)
         {
@@ -130,10 +135,15 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         entry.Enumerator = enumerator;
         entry.MaxBatchSize = request.MaxBatchSize;
         entry.CancellationTokenSource = cts;
-        Debug.Assert(entry.MaxBatchSize > 0, "Max batch size must be positive.");
         return MoveNextCore(ref entry, requestId, enumerator, cancellationToken);
 
-        static ValueTask<(EnumerationResult Status, object? Value)> ThrowAlreadyExists() => ValueTask.FromException<(EnumerationResult Status, object? Value)>(new InvalidOperationException("An enumerator with the same id already exists."));
+        static ValueTask<(EnumerationResult Status, object? Value)> ThrowAlreadyExists() =>
+            ValueTask.FromException<(EnumerationResult Status, object? Value)>(
+                new InvalidOperationException("An enumerator with the same id already exists."));
+
+        static ValueTask<(EnumerationResult Status, object? Value)> ThrowInvalidBatchSize(IAsyncEnumerableRequest<T> request) =>
+            ValueTask.FromException<(EnumerationResult Status, object? Value)>(
+                new ArgumentOutOfRangeException(nameof(request), request.MaxBatchSize, "Max batch size must be positive."));
     }
 
     /// <inheritdoc/>

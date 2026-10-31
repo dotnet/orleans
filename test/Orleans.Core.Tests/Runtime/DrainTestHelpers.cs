@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 
@@ -197,4 +198,33 @@ internal sealed class CallbackCompletionSource : IResponseCompletionSource
         Interlocked.Increment(ref _completionCount);
         Completed.TrySetResult();
     }
+}
+
+internal class TestAsyncEnumerableRequest<T>(Func<IAsyncEnumerable<T>> factory, int maxBatchSize = 1) : IAsyncEnumerableRequest<T>
+{
+    public int MaxBatchSize { get; set; } = maxBatchSize;
+
+    public ITargetHolder? TargetHolder { get; private set; }
+
+    // Used by the extension
+    public IAsyncEnumerable<T> InvokeImplementation() => factory();
+    public void SetTarget(ITargetHolder holder) => TargetHolder = holder;
+    public CancellationToken GetCancellationToken() => default;
+
+    // Required by IRequest / IInvokable
+    public InvokeMethodOptions Options => default;
+    public void AddInvokeMethodOptions(InvokeMethodOptions options) { }
+    public object? GetTarget() => TargetHolder?.GetTarget();
+    public ValueTask<Response> Invoke() => throw new InvalidOperationException("Not used by async enumerable extension.");
+    public int GetArgumentCount() => 0;
+    public object? GetArgument(int index) => null;
+    public void SetArgument(int index, object value) { }
+    public string GetMethodName() => nameof(InvokeImplementation);
+    public string GetInterfaceName() => typeof(IAsyncEnumerableRequest<T>).Name;
+    public string GetActivityName() => $"{GetInterfaceName()}.{GetMethodName()}";
+    public MethodInfo GetMethod() => typeof(IAsyncEnumerableRequest<T>).GetMethod(nameof(InvokeImplementation))!;
+    public Type GetInterfaceType() => typeof(IAsyncEnumerableRequest<T>);
+    public bool IsCancellable => false;
+    public bool TryCancel() => false;
+    public void Dispose() { GC.SuppressFinalize(this); }
 }

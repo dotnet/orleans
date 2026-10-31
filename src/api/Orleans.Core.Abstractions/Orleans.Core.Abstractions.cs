@@ -2896,6 +2896,12 @@ namespace Orleans.Runtime
     }
 
     [GenerateSerializer]
+    public sealed partial class ObserverNotReachableException : OrleansException
+    {
+        internal ObserverNotReachableException() { }
+    }
+
+    [GenerateSerializer]
     public sealed partial class OrleansConfigurationException : System.Exception
     {
         public OrleansConfigurationException(string message, System.Exception innerException) { }
@@ -4385,6 +4391,24 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_ObserverNotReachableException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.ObserverNotReachableException>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_ObserverNotReachableException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Runtime.ObserverNotReachableException> _activator) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Runtime.ObserverNotReachableException instance) { }
+
+        public global::Orleans.Runtime.ObserverNotReachableException ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Runtime.ObserverNotReachableException instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Runtime.ObserverNotReachableException value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_OrleansConfigurationException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.OrleansConfigurationException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_OrleansConfigurationException(global::Orleans.Serialization.Serializers.IBaseCodec<System.Exception> _baseTypeSerializer, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Runtime.OrleansConfigurationException> _activator) { }
@@ -4690,6 +4714,14 @@ namespace OrleansCodeGen.Orleans.Runtime
     public sealed partial class Copier_LimitExceededException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Runtime.LimitExceededException, global::Orleans.Runtime.OrleansException>
     {
         public Copier_LimitExceededException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_ObserverNotReachableException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Runtime.ObserverNotReachableException, global::Orleans.Runtime.OrleansException>
+    {
+        public Copier_ObserverNotReachableException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
