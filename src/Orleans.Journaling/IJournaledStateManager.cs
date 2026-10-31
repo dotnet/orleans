@@ -66,6 +66,7 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// </summary>
     /// <remarks>
     /// The caller keeps other operations quiescent through completion: deletion resets every registered state machine.
+    /// Successful storage deletion discards pending journal entries along with the state being reset.
     /// Cancellation ends the caller's wait; an already queued deletion continues to its storage and reset outcome.
     /// A failed deletion permanently fences the manager and requests deactivation of its owning grain.
     /// </remarks>

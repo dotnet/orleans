@@ -254,7 +254,7 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
         var isAdopted = false;
         if (descriptor.Owner is { } previousOwner)
         {
-            var ownerStatus = membershipSnapshot.GetSiloStatus(previousOwner);
+            var ownerStatus = membershipSnapshot.GetSiloStatus(previousOwner, descriptor.MembershipVersion);
             if (ownerStatus is not SiloStatus.Dead and not SiloStatus.None)
             {
                 return default;

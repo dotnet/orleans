@@ -543,6 +543,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
                                     lock (_lock)
                                     {
+                                        // Discard entries for the state being reset before writing the new directory.
+                                        _journalWriter.Reset();
+
                                         // Reset the state id collection.
                                         _journalStreamDirectory.ResetVolatileState();
 

@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -21,7 +20,20 @@ namespace Orleans.Hosting
     /// </summary>
     public static class CoreHostingExtensions
     {
+        // Runtime-owned descriptor identities keep alias registration, lifecycle participation, and opt-out cleanup together.
         private static readonly ServiceDescriptor DirectoryDescriptor = ServiceDescriptor.Singleton<DistributedGrainDirectory, DistributedGrainDirectory>();
+        private static readonly ServiceDescriptor DirectoryLifecycleDescriptor =
+            ServiceDescriptor.Singleton<ILifecycleParticipant<ISiloLifecycle>>(static sp => sp.GetRequiredService<DistributedGrainDirectory>());
+        private static readonly ServiceDescriptor DirectoryMembershipDescriptor = ServiceDescriptor.Singleton(static sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value;
+            return new DirectoryMembershipService(
+                sp.GetRequiredService<ClusterMembershipService>(),
+                sp.GetRequiredService<IInternalGrainFactory>(),
+                sp.GetRequiredService<ILogger<DirectoryMembershipService>>(),
+                options.PartitionsPerSilo,
+                options.GetPartitionBoundaries);
+        });
 
         /// <summary>
         /// Add <see cref="Activity.Current"/> propagation through grain calls.
@@ -148,12 +160,44 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Opts-in to the experimental distributed grain directory.
+        /// Selects the legacy grain directory as the default for grain types without an explicit directory selection.
+        /// </summary>
+        /// <param name="siloBuilder">The silo builder.</param>
+        /// <returns>The provided silo builder.</returns>
+        /// <remarks>
+        /// Configure every silo with this option to defer migration to the distributed grain directory.
+        /// Migration from the legacy directory to the distributed directory is one-way.
+        /// </remarks>
+        public static ISiloBuilder UseLegacyGrainDirectory(this ISiloBuilder siloBuilder)
+        {
+            siloBuilder.Services.RemoveDefaultGrainDirectory();
+            return siloBuilder;
+        }
+
+        internal static void RemoveUnusedDistributedGrainDirectory(IServiceCollection services)
+        {
+            foreach (var service in services)
+            {
+                if (!service.IsKeyedService
+                    && service.ImplementationInstance is NamedService<IGrainDirectory> registration
+                    && registration.ImplementationType == typeof(DistributedGrainDirectory))
+                {
+                    return;
+                }
+            }
+
+            // Removing unused distributed services lets the legacy directory install its compatibility endpoints.
+            services.Remove(DirectoryDescriptor);
+            services.Remove(DirectoryLifecycleDescriptor);
+            services.Remove(DirectoryMembershipDescriptor);
+        }
+
+        /// <summary>
+        /// Configures the distributed grain directory.
         /// </summary>
         /// <param name="siloBuilder">The silo builder to register the directory implementation with.</param>
-        /// <param name="name">The name of the directory to register, or null to register the directory as the default.</param>
+        /// <param name="name">The name to register the directory under, or null to register it as the default. Multiple names share one directory instance.</param>
         /// <returns>The provided silo builder.</returns>
-        [Experimental("ORLEANSEXP003")]
         public static ISiloBuilder AddDistributedGrainDirectory(this ISiloBuilder siloBuilder, string? name = null)
         {
             var services = siloBuilder.Services;
@@ -162,24 +206,23 @@ namespace Orleans.Hosting
                 name = GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY;
             }
 
+            if (name == GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY)
+            {
+                services.RemoveDefaultGrainDirectory();
+            }
+
             // Distributed Grain Directory
             services.AddOptions<GrainDirectoryOptions>();
-            services.TryAddSingleton(static sp =>
-            {
-                var options = sp.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value;
-                return new DirectoryMembershipService(
-                    sp.GetRequiredService<ClusterMembershipService>(),
-                    sp.GetRequiredService<IInternalGrainFactory>(),
-                    sp.GetRequiredService<ILogger<DirectoryMembershipService>>(),
-                    options.PartitionsPerSilo,
-                    options.GetPartitionBoundaries);
-            });
+            services.TryAdd(DirectoryMembershipDescriptor);
             if (!services.Contains(DirectoryDescriptor))
             {
                 services.Add(DirectoryDescriptor);
-                services.AddGrainDirectory<DistributedGrainDirectory>(name, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
+                services.Add(DirectoryLifecycleDescriptor);
             }
 
+            services.AddGrainDirectoryAlias<DistributedGrainDirectory>(
+                name,
+                static (sp, _) => sp.GetRequiredService<DistributedGrainDirectory>());
             return siloBuilder;
         }
     }

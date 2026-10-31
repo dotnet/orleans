@@ -81,7 +81,7 @@ namespace Orleans.Streaming.EventHubs
             if (this.bufferPool == null)
             {
                 var bufferSize = 1 << 20;
-                this.bufferPoolId = $"BlockPool-{new Guid().ToString()}-BlockSize-{bufferSize}";
+                this.bufferPoolId = $"BlockPool-{Guid.NewGuid()}-BlockSize-{bufferSize}";
                 var monitorDimensions = new EventHubBlockPoolMonitorDimensions(sharedDimensions, this.bufferPoolId);
                 var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(monitorDimensions, loggerFactory), bufferSize);
                 this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(bufferSize),

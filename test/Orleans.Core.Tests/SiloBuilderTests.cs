@@ -193,6 +193,16 @@ namespace NonSilo.Tests
                 {
                     siloBuilder
                         .UseLocalhostClustering()
+                        .Configure<ClusterMembershipOptions>(options => options.DefunctSiloMinimumRetention = TimeSpan.FromTicks(-1));
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
+            });
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
+            {
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
                         .Configure<ClusterMembershipOptions>(options => options.ProbeTimeout = TimeSpan.Zero);
                 }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
@@ -260,6 +270,31 @@ namespace NonSilo.Tests
                         });
                 }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
+        }
+
+        [Fact]
+        public void FailureDetectionTimeout_PreservesRepresentableTickBoundary()
+        {
+            var options = new ClusterMembershipOptions
+            {
+                MaxProbeTimeout = TimeSpan.FromTicks(long.MaxValue / int.MaxValue),
+                NumMissedProbesLimit = int.MaxValue
+            };
+
+            Assert.Equal(TimeSpan.FromTicks(long.MaxValue - 1), options.GetFailureDetectionTimeout());
+        }
+
+        [Fact]
+        public void FailureDetectionTimeout_ReportsOverflowAsConfigurationError()
+        {
+            var options = new ClusterMembershipOptions
+            {
+                MaxProbeTimeout = TimeSpan.FromTicks(long.MaxValue / int.MaxValue + 1),
+                NumMissedProbesLimit = int.MaxValue
+            };
+
+            var exception = Assert.Throws<OrleansConfigurationException>(() => options.GetFailureDetectionTimeout());
+            Assert.IsType<OverflowException>(exception.InnerException);
         }
 
         [Theory]

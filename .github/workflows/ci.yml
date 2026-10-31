@@ -37,6 +37,25 @@ env:
   TESTCONTAINERS_RYUK_IMAGE: testcontainers/ryuk:0.14.0
   ZOOKEEPER_IMAGE: zookeeper:3.9
 jobs:
+  dashboard-ui:
+    name: Dashboard UI regressions
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/Dashboard/Orleans.Dashboard.App
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      with:
+        node-version: '24.x'
+    - name: Cache npm downloads
+      uses: ./.github/actions/cache-dependencies
+      with:
+        nuget: 'false'
+        npm: 'true'
+    - run: npm ci --no-audit --no-fund
+    - run: npx playwright install --with-deps chromium
+    - run: npm run test:ui
   whitespace:
     name: Whitespace formatting
     runs-on: ubuntu-latest
@@ -48,6 +67,8 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Cache dependencies
+      uses: ./.github/actions/cache-dependencies
     - name: Verify .NET formatter
       run: dotnet format --version
     - name: Check solution
@@ -69,6 +90,10 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Cache dependencies
+      uses: ./.github/actions/cache-dependencies
+      with:
+        npm: 'true'
     - name: Test coverage reporting
       if: matrix.os == 'ubuntu-latest'
       shell: pwsh
@@ -78,6 +103,10 @@ jobs:
     - name: Pack and validate package compatibility
       if: matrix.os == 'ubuntu-latest'
       run: dotnet pack Orleans.slnx --configuration Debug --no-build --no-restore -bl:package_validation.binlog
+    - name: Test package consumers
+      if: matrix.os == 'ubuntu-latest'
+      shell: pwsh
+      run: ./.github/scripts/test-package-consumers.ps1 -Configuration Debug -SkipPack
     - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       continue-on-error: true
       with:
@@ -87,7 +116,8 @@ jobs:
           **/*.binlog
   test-redis:
     name: Redis provider tests
-    runs-on: ubuntu-latest
+    # dotnet-coverage requires libxml2.so.2, supplied by the Ubuntu 24.04 image.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -123,7 +153,7 @@ jobs:
       run: docker rm -f redis || true
   test-cassandra:
     name: Cassandra provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       CASSANDRA_IMAGE: cassandra:${{ matrix.dbversion }}
     strategy:
@@ -150,7 +180,7 @@ jobs:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
   test-postgres:
     name: PostgreSQL provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       POSTGRES_PASSWORD: postgres
@@ -192,7 +222,7 @@ jobs:
       run: docker rm -f postgres || true
   test-mariadb:
     name: MariaDB/MySQL provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # The official MariaDB 10.6 image is not published to GHCR. Prefer Google's Docker Hub
       # mirror, with Docker Hub as a fallback, and pin both references to the same digest.
@@ -256,7 +286,7 @@ jobs:
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
   test-sqlserver:
     name: Microsoft SQL Server provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       ACCEPT_EULA: "Y"
       MSSQL_PID: "Developer"
@@ -308,7 +338,7 @@ jobs:
       run: docker rm -f mssql || true
   test-sqlite:
     name: SQLite provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -323,7 +353,7 @@ jobs:
         provider: Sqlite
   test-azure-storage:
     name: Azure Storage provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -363,7 +393,7 @@ jobs:
       run: docker rm -f azurite || true
   test-azure-eventhubs:
     name: Azure Event Hubs provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -427,7 +457,7 @@ jobs:
       run: docker rm -f azurite || true
   test-azure-cosmosdb:
     name: Azure Cosmos DB provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -483,7 +513,7 @@ jobs:
         fi
   test-consul:
     name: Consul provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -512,7 +542,7 @@ jobs:
         provider: Consul
   test-zookeeper:
     name: ZooKeeper provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -546,7 +576,7 @@ jobs:
       run: docker rm -f zookeeper || true
   test-dynamodb:
     name: AWS DynamoDB provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       AWS_ACCESS_KEY_ID: root
@@ -593,7 +623,7 @@ jobs:
       run: docker rm -f dynamodb || true
   test-s3:
     name: AWS S3 provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -615,7 +645,7 @@ jobs:
         provider: S3
   test-sqs:
     name: AWS SQS provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       AWS_ACCESS_KEY_ID: root
@@ -677,7 +707,7 @@ jobs:
       run: docker rm -f dynamodb || true
   test-nats:
     name: NATS stream provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -723,7 +753,7 @@ jobs:
       run: docker rm -f nats || true
   test-kinesis:
     name: AWS Kinesis provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       AWS_ACCESS_KEY_ID: test
@@ -791,7 +821,7 @@ jobs:
       fail-fast: false
       matrix:
         suite: [BVT, SlowBVT, Functional]
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-24.04, windows-latest]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -800,6 +830,12 @@ jobs:
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: '24.x'
+    - name: Cache npm downloads
+      if: matrix.suite == 'BVT'
+      uses: ./.github/actions/cache-dependencies
+      with:
+        nuget: 'false'
+        npm: 'true'
     - name: Test
       uses: ./.github/actions/run-tests
       with:
@@ -813,7 +849,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-24.04, windows-latest]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -825,7 +861,7 @@ jobs:
         framework: ${{ matrix.framework }}
   test-google:
     name: Google Cloud providers tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -841,6 +877,12 @@ jobs:
       with:
         distribution: temurin
         java-version: '21'
+    - name: Cache npm downloads
+      uses: ./.github/actions/cache-dependencies
+      with:
+        nuget: 'false'
+        npm: 'true'
+        npm-scope: firebase
     - name: Setup Google Emulators
       working-directory: test/Extensions/Google/Emulators
       run: |

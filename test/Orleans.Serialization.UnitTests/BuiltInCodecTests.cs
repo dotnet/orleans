@@ -2544,6 +2544,19 @@ namespace Orleans.Serialization.UnitTests
 
         protected override bool Equals(Stack<int>? left, Stack<int>? right) => ReferenceEquals(left, right) || left!.SequenceEqual(right!);
         protected override Stack<int>[] TestValues => [null!, new Stack<int>(), CreateValue(), CreateValue(), CreateValue()];
+
+        [Fact]
+        public void PreservesSharedStackReferences()
+        {
+            var serializer = ServiceProvider.GetRequiredService<Serializer<List<Stack<int>>>>();
+            var stack = new Stack<int>([1, 2, 3]);
+
+            var result = serializer.Deserialize(serializer.SerializeToArray([stack, stack]))!;
+
+            Assert.Equal(2, result.Count);
+            Assert.Same(result[0], result[1]);
+            Assert.Equal(stack, result[1]);
+        }
     }
 
     public class StackCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Stack<int>, StackCopier<int>>(output, fixture), IClassFixture<SerializationTesterFixture>
@@ -4327,6 +4340,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
 #if NET8_0_OR_GREATER
+#pragma warning disable CS0618 // Verify serialization compatibility for the legacy cancellation token.
     public class GrainCancellationTokenCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<GrainCancellationToken, IFieldCodec<GrainCancellationToken>>(output, fixture), IClassFixture<SerializationTesterFixture>
     {
         private static readonly PropertyInfo TokenIdProperty = typeof(GrainCancellationToken).GetProperty("Id", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -4383,6 +4397,7 @@ namespace Orleans.Serialization.UnitTests
         private static Guid GetTokenId(GrainCancellationToken token)
             => (Guid)TokenIdProperty.GetValue(token)!;
     }
+#pragma warning restore CS0618
 
     public class IdSpanCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IdSpan, IdSpanCodec>(output, fixture), IClassFixture<SerializationTesterFixture>
     {

@@ -11,9 +11,16 @@ A grain directory maps a grain identity to the silo that currently hosts its act
 
 ## Start with the default directory
 
-Orleans uses the built-in `LocalGrainDirectory` by default. Despite its name, the directory is distributed across the cluster using a consistent-hash ring. It requires no external service and is the right starting point for most applications.
+Orleans uses the built-in `DistributedGrainDirectory` by default. It keeps registrations in the cluster and coordinates partition ownership using versioned membership views. It requires no external service.
 
-The default directory is eventually consistent during membership changes. A brief duplicate activation is possible during failures; Orleans resolves the conflict and deactivates the duplicate. Grain state and operations should therefore tolerate activation races and retries.
+The directory coordinates registration and ownership transfer so that callers agree on an activation's location as membership changes. Keep grain operations idempotent: failed calls and retries can still repeat application work.
+
+To select `LegacyGrainDirectory`, call <xref:Orleans.Hosting.CoreHostingExtensions.UseLegacyGrainDirectory*> on every silo.
+
+<a id="local-to-distributed-directory-upgrade"></a>
+<a id="legacy-to-distributed-directory-upgrade"></a>
+
+For version upgrades, follow [Grain directory migration](../migration/grain-directory.md#legacy-to-distributed-directory-upgrade).
 
 ## Which grain directory should you use?
 
@@ -70,22 +77,17 @@ Named directories can also be configured under `Orleans:GrainDirectory:{name}` w
 <a id="key-features"></a>
 <a id="when-to-use"></a>
 
-<xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> adds a strongly consistent in-cluster directory based on partitioned ranges and membership views.
+The default `DistributedGrainDirectory` is a strongly consistent in-cluster directory based on partitioned ranges and membership views. <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> selects it explicitly or registers an additional name for the same directory instance.
 
-> [!CAUTION]
-> <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> is experimental and emits diagnostic `ORLEANSEXP003`. Its API and behavior can change or be removed. It is not the default grain directory.
+Configure default and named directory mappings consistently across the cluster. Multiple names share the same distributed directory instance.
 
-:::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="distributed_grain_directory":::
-
-The experimental directory defaults to one partition per silo (<xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> = `1`). Change this only after testing with the expected cluster size and workload.
+The distributed directory defaults to one partition per silo (<xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> = `1`). Change this only after testing with the expected cluster size and workload.
 
 <xref:Orleans.Configuration.GrainDirectoryOptions.GetPartitionBoundaries> configures the function which assigns starting hash boundaries to numbered partitions. The default uses the silo's consistent hash for a single partition and cached uniform hashes in generation order for multiple partitions. A custom function returns an initialized <xref:System.Collections.Immutable.ImmutableArray`1> containing exactly the configured number of boundaries, with each index identifying a partition. Keep each partition's starting boundary stable throughout the silo's membership and use equivalent functions on every silo. The immutable array shares its backing storage safely with directory membership snapshots.
 
 If the boundary function throws or returns an invalid result, Orleans stops directory membership processing and reports an <xref:Orleans.Runtime.OrleansConfigurationException> to membership readers and refresh calls. Correct the boundary configuration and restart the affected silos.
 
-The partition count and boundary function are captured when the directory is created. Keep both consistent across the cluster, including during rollout and rollback. See [Distributed-directory upgrade compatibility](../deployment/upgrades.md#distributed-directory-upgrade-compatibility) for retaining the mapping used by an existing cluster.
-
-Evaluate it when stronger coordination during membership changes is worth adopting an experimental feature. Keep a rollout and rollback plan, and don't describe it as a drop-in production default.
+The partition count and boundary function are captured when the directory is created. Keep both consistent across the cluster.
 
 ## Operational guidance
 

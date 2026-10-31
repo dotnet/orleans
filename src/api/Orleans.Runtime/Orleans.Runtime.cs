@@ -386,7 +386,6 @@ namespace Orleans.Hosting
     {
         public static ISiloBuilder AddActivityPropagation(this ISiloBuilder builder) { throw null; }
 
-        [System.Diagnostics.CodeAnalysis.Experimental("ORLEANSEXP003")]
         public static ISiloBuilder AddDistributedGrainDirectory(this ISiloBuilder siloBuilder, string? name = null) { throw null; }
 
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.DevelopmentClusterMembershipOptions>> configureOptions) { throw null; }
@@ -394,6 +393,8 @@ namespace Orleans.Hosting
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Action<Configuration.DevelopmentClusterMembershipOptions> configureOptions) { throw null; }
 
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Net.IPEndPoint? primarySiloEndpoint) { throw null; }
+
+        public static ISiloBuilder UseLegacyGrainDirectory(this ISiloBuilder siloBuilder) { throw null; }
 
         public static ISiloBuilder UseLocalhostClustering(this ISiloBuilder builder, int siloPort = 11111, int gatewayPort = 30000, System.Net.IPEndPoint? primarySiloEndpoint = null, string serviceId = "dev", string clusterId = "dev") { throw null; }
     }
@@ -508,6 +509,10 @@ namespace Orleans.Hosting
     public static partial class SystemTextJsonSerializerExtensions
     {
         public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder) { throw null; }
+
+        public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Serialization.SystemTextJsonGrainStorageSerializerOptions>> configureOptions) { throw null; }
+
+        public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder, System.Action<Serialization.SystemTextJsonGrainStorageSerializerOptions> configureOptions) { throw null; }
     }
 }
 

@@ -30,7 +30,7 @@ namespace UnitTests.Directory
             this.snapshot = ToSnapshot(this.statuses, ++version);
             this.updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
                 initialValue: this.snapshot,
-                updateValidator: (previous, proposed) => proposed.Version > previous.Version,
+                updateValidator: (previous, proposed) => proposed.IsSuccessorTo(previous),
                 onPublished: update => Interlocked.Exchange(ref this.snapshot, update));
         }
 
@@ -38,6 +38,17 @@ namespace UnitTests.Directory
         {
             this.statuses[siloAddress] = (siloStatus, name);
             this.updates.Publish(ToSnapshot(this.statuses, ++version));
+        }
+
+        public void PublishSnapshot(ClusterMembershipSnapshot value)
+        {
+            this.updates.Publish(value);
+            this.version = value.Version.Value;
+            this.statuses.Clear();
+            foreach (var member in value.Members.Values)
+            {
+                this.statuses.Add(member.SiloAddress, (member.Status, member.Name));
+            }
         }
 
         internal static ClusterMembershipSnapshot ToSnapshot(Dictionary<SiloAddress, (SiloStatus Status, string Name)> statuses, long version)

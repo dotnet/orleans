@@ -19,14 +19,31 @@ namespace UnitTests.GrainDirectory;
 [TestProvider("None")]
 [TestArea("GrainDirectory")]
 [TestCategory("BVT"), TestCategory("Directory")]
-public sealed class DefaultGrainDirectoryTests(DefaultClusterFixture fixture, ITestOutputHelper output)
-    : GrainDirectoryTests<IGrainDirectory>(output), IClassFixture<DefaultClusterFixture>
+public sealed class DefaultGrainDirectoryTests(DefaultGrainDirectoryFixture fixture, ITestOutputHelper output)
+    : GrainDirectoryTests<IGrainDirectory>(output), IClassFixture<DefaultGrainDirectoryFixture>
 {
     private readonly TestCluster _testCluster = fixture.HostedCluster;
     private InProcessSiloHandle Primary => (InProcessSiloHandle)_testCluster.Primary!;
 
     protected override IGrainDirectory CreateGrainDirectory() =>
         Primary.SiloHost.Services.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
+}
+
+public sealed class DefaultGrainDirectoryFixture : BaseTestClusterFixture
+{
+    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    {
+        builder.AddSiloBuilderConfigurator<DefaultClusterFixture.SiloHostConfigurator>();
+        builder.AddSiloBuilderConfigurator<SyntheticMembershipConfigurator>();
+    }
+
+    private sealed class SyntheticMembershipConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder siloBuilder) =>
+            // The provider contract tests register synthetic, absent silos with fixed generations.
+            // Their directory semantics are independent of clock-derived generation retirement.
+            siloBuilder.Configure<ClusterMembershipOptions>(options => options.SiloGenerationRetirementAge = null);
+    }
 }
 
 [TestSuite("BVT")]
@@ -36,13 +53,42 @@ public sealed class DefaultGrainDirectoryTests(DefaultClusterFixture fixture, IT
 public sealed class DistributedGrainDirectoryMembershipTests
 {
     [Fact]
+    public async Task NamedAliasesAreEnumeratedOnceForInstanceOperations()
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        builder.Options.UseDistributedGrainDirectory = true;
+        builder.ConfigureSilo((_, siloBuilder) =>
+        {
+            siloBuilder.AddDistributedGrainDirectory("first");
+            siloBuilder.AddDistributedGrainDirectory("first");
+            siloBuilder.AddDistributedGrainDirectory("second");
+        });
+        var cluster = builder.Build();
+
+        try
+        {
+            await cluster.DeployAsync(TestContext.Current.CancellationToken);
+            var services = cluster.Silos[0].ServiceProvider;
+            var defaultDirectory = services.GetRequiredKeyedService<IGrainDirectory>(
+                GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY);
+            var first = services.GetRequiredKeyedService<IGrainDirectory>("first");
+            var second = services.GetRequiredKeyedService<IGrainDirectory>("second");
+            Assert.Same(defaultDirectory, first);
+            Assert.Same(defaultDirectory, second);
+            Assert.Same(defaultDirectory, Assert.Single(services.GetRequiredService<GrainDirectoryResolver>().Directories));
+        }
+        finally
+        {
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task OwnerResolutionWaitsForActiveDirectoryMembership()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(1);
-#pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
-#pragma warning restore ORLEANSEXP003
         builder.ConfigureSilo((_, siloBuilder) => siloBuilder.ConfigureServices(services =>
         {
             services.AddSingleton<ControlledMembershipService>();

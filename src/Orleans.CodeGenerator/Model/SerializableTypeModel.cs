@@ -3,8 +3,8 @@ using Microsoft.CodeAnalysis;
 namespace Orleans.CodeGenerator.Model;
 
 /// <summary>
-/// Describes a <c>[GenerateSerializer]</c>-annotated type for incremental pipeline caching and generation.
-/// Contains all data needed to generate a serializer, copier, and activator without holding <c>ISymbol</c> references.
+/// Describes a <c>[GenerateSerializer]</c>-annotated type for incremental discovery and metadata generation.
+/// Serializer, copier, and activator emission resolves additional semantic dependencies against the current compilation.
 /// </summary>
 internal sealed record class SerializableTypeModel(
     Accessibility Accessibility,

@@ -809,6 +809,15 @@ namespace Orleans.Transactions.State
             this.RWLock.Notify();
         }
 
+        /// <summary>
+        /// Returns the most recently committed state, excluding commit-queue entries which may still abort.
+        /// </summary>
+        public void GetCommittedState(out TState state, out long sequenceNumber)
+        {
+            state = this.stableState;
+            sequenceNumber = this.stableSequenceNumber;
+        }
+
         public void GetMostRecentState(out TState state, out long sequenceNumber)
         {
             if (commitQueue.Count == 0)

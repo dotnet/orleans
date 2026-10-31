@@ -56,15 +56,39 @@ upgrades, capacity, cost, and diagnosis under load.
 - **Conceptual**: the mental model, suitability, trade-offs, and verified constraints.
 - **API reference**: semantics, thread-safety, lifetime, exceptions, defaults, and examples.
 - **FAQ/troubleshooting**: observed symptoms, causes, remedies, and prevention.
+- **Migration guides**: actionable version-to-version prerequisites, compatibility
+  changes, upgrade steps, verification, and recovery constraints.
+- **Release notes**: what changed in a release, including announcements,
+  experimental-feature history, and one-off compatibility notes for experimental adopters.
 
 Place updates in the appropriate category and cross-link rather than mix purposes.
 
+## Content placement
+
+- Main conceptual, how-to, architecture, and API documentation describes current
+  runtime behavior, defaults, configuration, and supported constraints. Keep
+  past-state descriptions, previous defaults, release comparisons, and
+  experimental-era settings out of those pages.
+- Put version-specific migration procedures and API adaptation guidance under
+  `docs/site/src/content/docs/migration/`. Main pages link to the relevant
+  migration guide instead of repeating its procedure.
+- Put release announcements and historical experimental-feature details in release
+  notes. Link to migration guides for the supported upgrade procedure and to main
+  documentation for current feature behavior.
+- Keep general deployment guidance, including `deployment/upgrades.md`,
+  version-agnostic. Release-specific transitions belong in migration guides,
+  even when they involve rolling deployment or rollback.
+
 ## Content
 
-- Keep ordinary conceptual and how-to documentation timeless. Name Orleans releases only in migration or upgrade guidance where the release boundary matters.
+- Keep main documentation focused on the current state. Name Orleans releases
+  only in migration guides and release notes where the release boundary matters.
 - Describe implemented behavior and verified constraints: relevant triggers,
   runtime actions, outcomes, and operator responses. Attribute responsibilities to
   the mechanism that performs them.
+- Use `LegacyGrainDirectory` for the user-facing directory name and
+  `UseLegacyGrainDirectory` for its configuration API. Keep implementation
+  identifiers such as `LocalGrainDirectory` in source paths and code references.
 - Preserve useful content and authoritative references; update affected contracts
   and behavior. Remove obsolete or redundant material.
 - Treat hub pages as overviews: link to peer detail pages instead of singling out one provider or feature for inline configuration guidance.

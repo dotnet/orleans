@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
@@ -67,6 +68,22 @@ namespace UnitTests.StorageTests.Relational
             return PersistenceStorageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel(nameof(Relational_HashCollisionTests), 2);
         }
 
+        internal async Task Relational_GrainTypeQualifiedKeyFormatIsolatesGrains()
+        {
+            var storage = await Fixture.CreateConstantHashStorageProviderAsync(_adoNetInvariant, AdoNetGrainStorageKeyFormat.GrainTypeQualified, TestContext.Current.CancellationToken);
+            await GrainStorageKeyFormatTests.GrainTypesSharingKeyAreIsolated(storage);
+            await GrainStorageKeyFormatTests.GrainTypeAndStateNameBoundariesAreIsolated(storage);
+            await GrainStorageKeyFormatTests.StateNamesOfOneGrainAreIsolated(storage);
+            await GrainStorageKeyFormatTests.KeysParsingToSameValueAreIsolated(storage);
+            await GrainStorageKeyFormatTests.KeysOfDifferentKindsAreIsolated(storage);
+        }
+
+        internal async Task Relational_LegacyKeyFormatSharesRowAcrossGrainTypes()
+        {
+            var storage = await Fixture.CreateConstantHashStorageProviderAsync(_adoNetInvariant, AdoNetGrainStorageKeyFormat.Legacy, TestContext.Current.CancellationToken);
+            await GrainStorageKeyFormatTests.LegacyFormatSharesRowAcrossGrainTypes(storage);
+        }
+
         internal async Task Relational_WriteDuplicateFailsWithInconsistentStateException()
         {
             var exception = await PersistenceStorageTests.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
@@ -78,6 +95,12 @@ namespace UnitTests.StorageTests.Relational
             var exception = await PersistenceStorageTests.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
             CommonStorageUtilities.AssertRelationalInconsistentExceptionMessage(exception.Message);
         }
+
+        internal Task Relational_VersionWrapsAfterMaximum() => GrainStorageVersionWrapTests.VersionWrapsAfterMaximum(
+            PersistenceStorageTests.Storage,
+            Fixture.Storage!.Storage,
+            _deleteStateOnClear,
+            TestContext.Current.CancellationToken);
 
         internal Task Relational_Json_WriteRead(string grainType, GrainId grainId, GrainState<TestStateGeneric1<string>> grainState)
         {

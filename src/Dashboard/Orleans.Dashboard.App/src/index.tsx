@@ -45,10 +45,11 @@ import Overview from './overview/overview';
 import SiloState from './silos/silo-state-label';
 import Alert from './components/alert';
 import LogStream from './logstream/log-stream';
-import SiloCounters from './silos/silo-counters';
+import SiloCounters, { type Counter } from './silos/silo-counters';
 import Reminders from './reminders/reminders';
 import Preferences from './components/preferences';
 import storage from './lib/storage';
+import initializeSidebar from './lib/sidebar';
 import Lifecycle, { LifecycleStageInfo } from './lifecycle/lifecycle';
 
 interface Settings {
@@ -65,6 +66,7 @@ interface MenuItem {
 }
 
 const target = document.getElementById('content');
+initializeSidebar();
 
 // Restore theme preference.
 let defaultTheme = storage.get('theme') || 'dark';
@@ -276,15 +278,35 @@ function renderPage(jsx: JSX.Element, path: string) {
 
   let siloData: any[] = [];
   let siloStats: any[] = [];
+  let siloCounters: Counter[] = [];
+  let historicalStatsIsPending = false;
+  let siloStatsIsPending = false;
+  let siloCountersIsPending = false;
   const loadData = function () {
-    http.get(`HistoricalStats/${host}`, (err, data) => {
-      siloData = data;
-      render();
-    });
-    http.get(`SiloStats/${host}`, (err, data) => {
-      siloStats = data;
-      render();
-    });
+    if (!historicalStatsIsPending) {
+      historicalStatsIsPending = true;
+      http.get(`HistoricalStats/${host}`, (err, data) => {
+        if (routeIndex != thisRouteIndex) return;
+        siloData = data;
+        render();
+      }).finally(() => historicalStatsIsPending = false).catch(() => {});
+    }
+    if (!siloStatsIsPending) {
+      siloStatsIsPending = true;
+      http.get(`SiloStats/${host}`, (err, data) => {
+        if (routeIndex != thisRouteIndex) return;
+        siloStats = data;
+        render();
+      }).finally(() => siloStatsIsPending = false).catch(() => {});
+    }
+    if (!siloCountersIsPending) {
+      siloCountersIsPending = true;
+      http.get(`SiloCounters/${host}`, (_err, data) => {
+        if (routeIndex != thisRouteIndex) return;
+        siloCounters = data;
+        render();
+      }).finally(() => siloCountersIsPending = false).catch(() => {});
+    }
   };
 
   const renderOverloaded = function () {
@@ -318,6 +340,7 @@ function renderPage(jsx: JSX.Element, path: string) {
           siloMetadata={siloMetadata}
           dashboardCounters={dashboardCounters}
           siloStats={siloStats}
+          counters={siloCounters}
         />
       </Page>,
       '#/silos'
@@ -344,20 +367,31 @@ function renderPage(jsx: JSX.Element, path: string) {
   scroll();
   renderLoading();
 
-  http.get(`SiloCounters/${host}`, (err, data) => {
+  let counters: Counter[] = [];
+  let loadDataIsPending = false;
+  const loadData = function () {
+    if (loadDataIsPending) return;
+    loadDataIsPending = true;
+    http.get(`SiloCounters/${host}`, (err, data) => {
+      if (routeIndex != thisRouteIndex) return;
+      counters = data;
+      render();
+    }).finally(() => loadDataIsPending = false).catch(() => {});
+  };
+
+  render = function () {
     if (routeIndex != thisRouteIndex) return;
     const subTitle = <a href={`#/host/${host}`}>Silo Details</a>;
     renderPage(
       <Page title={`Silo ${host}`} subTitle={subTitle}>
-        <SiloCounters
-          silo={host}
-          dashboardCounters={dashboardCounters}
-          counters={data}
-        />
+        <SiloCounters counters={counters} />
       </Page>,
       '#/silos'
     );
-  });
+  };
+
+  events.on('refresh', loadData);
+  loadData();
 });
 
 (routie as any)('/grain/:grainType', function (grainType: string) {
@@ -370,10 +404,11 @@ function renderPage(jsx: JSX.Element, path: string) {
   let loadDataIsPending = false;
   const loadData = function () {
     if (!loadDataIsPending) {
+      loadDataIsPending = true;
       http.get('GrainStats/' + grainType, function (err, data) {
         grainStats = data;
         render();
-      }).finally(() => loadDataIsPending = false);
+      }).finally(() => loadDataIsPending = false).catch(() => {});
     }
   };
 

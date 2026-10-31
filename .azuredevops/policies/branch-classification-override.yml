@@ -1,0 +1,15 @@
+name: branch_classification
+description: Production branches for Orleans build and release pipelines
+resource: repository
+disabled: false
+where:
+configuration:
+  branchClassificationSettings:
+    defaultClassification: nonproduction
+    ruleset:
+    - name: production-branches
+      branchNames:
+      - main
+      - 10.x
+      - 3.x
+      classification: production

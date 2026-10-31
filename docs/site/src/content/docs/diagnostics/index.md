@@ -115,6 +115,10 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 
 [Grain interface member removed from source](orleans0027.md) — Warning. The manifest retains an RPC signature which is absent from source.
 
+## ORLEANS0028
+
+[Invalid Orleans identity](orleans0028.md) — Error. An alias, grain type, or grain interface type violates the identity syntax.
+
 ## ORLEANS0200
 
 [Access grain state in recorded effects or after the last durable operation](orleans0200.md) — Warning. Durable task code reads or changes grain state where a replay runs it again.

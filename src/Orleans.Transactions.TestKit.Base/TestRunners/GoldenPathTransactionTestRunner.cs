@@ -240,5 +240,48 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        /// <summary>
+        /// Verifies that a read-committed read observes a committed write.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select the test grain.</param>
+        /// <returns>A task which represents the test.</returns>
+        public virtual async Task SingleGrainReadCommitted(string grainStates)
+        {
+            const int expected = 7;
+
+            ITransactionTestGrain grain = RandomTestGrain(grainStates);
+
+            var initial = await grain.GetCommitted();
+            initial.Should().AllSatisfy(value => value.Should().Be(0));
+
+            await grain.Set(expected);
+
+            // Non-manager participants commit once the confirmation arrives, so the snapshot may briefly lag.
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+            int[] actual;
+            while ((actual = await grain.GetCommitted()).Any(value => value != expected) && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(50);
+            }
+
+            actual.Should().AllSatisfy(value => value.Should().Be(expected));
+        }
+
+        /// <summary>
+        /// Verifies that a read-committed read is rejected inside a transaction.
+        /// </summary>
+        /// <param name="grainStates">The transaction state configuration used to select the test grain.</param>
+        /// <returns>A task which represents the test.</returns>
+        public virtual async Task ReadCommittedRejectedInsideTransaction(string grainStates)
+        {
+            ITransactionTestGrain grain = RandomTestGrain(grainStates);
+            ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+
+            Func<Task> task = () => coordinator.GetCommittedInTransaction(grain);
+            await task.Should().ThrowAsync<OrleansTransactionException>();
+
+            var actual = await grain.Get();
+            actual.Should().AllSatisfy(value => value.Should().Be(0));
+        }
     }
 }

@@ -13,6 +13,11 @@ namespace Orleans.Runtime
         long Version { get; }
 
         /// <summary>
+        /// Gets the number of clients in the collection.
+        /// </summary>
+        int Count { get; }
+
+        /// <summary>
         /// Gets the collection of ids for the connected clients.
         /// </summary>
         List<GrainId> GetConnectedClientIds();
@@ -21,6 +26,8 @@ namespace Orleans.Runtime
     internal sealed class EmptyConnectedClientCollection : IConnectedClientCollection
     {
         public long Version => 0;
+
+        public int Count => 0;
 
         public List<GrainId> GetConnectedClientIds() => new List<GrainId>(0);
     }

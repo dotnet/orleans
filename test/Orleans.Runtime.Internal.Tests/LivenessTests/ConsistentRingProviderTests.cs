@@ -1,4 +1,5 @@
 using System.Net;
+using CsCheck;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
@@ -18,6 +19,148 @@ namespace UnitTests.LivenessTests
     public class ConsistentRingProviderTests(ITestOutputHelper output)
     {
         private readonly ITestOutputHelper _output = output;
+
+        [Fact, TestCategory("BVT"), TestCategory("Ring")]
+        public void ConsistentRingProvider_NegativeHashEndpointRoutesToLocalSilo()
+        {
+            var local = SiloAddress.FromParsableString("127.0.0.1:100@100");
+            var peer = SiloAddress.FromParsableString("127.0.0.1:200@100");
+            using var ring = new ConsistentRingProvider(local, NullLoggerFactory.Instance, new FakeSiloStatusOracle());
+            ring.AddServer(peer);
+
+            var key = unchecked((uint)local.GetConsistentHashCode());
+            Assert.Equal(0xDE956F46u, key);
+            Assert.Equal(0x8ADE38B7u, unchecked((uint)peer.GetConsistentHashCode()));
+            Assert.True(ring.GetMyRange().InRange(key));
+            Assert.Equal(local, ring.GetPrimaryTargetSilo(key));
+        }
+
+        [Theory, TestCategory("BVT"), TestCategory("Ring")]
+        [InlineData(-1)]
+        [InlineData(0)]
+        [InlineData(1)]
+        public void ConsistentRingProvider_RoutingAgreesWithRangesAcrossMembershipChanges(int hashSign)
+        {
+            var candidates = Enumerable.Range(1, 32)
+                .Select(i => SiloAddress.New(IPAddress.Loopback, i * 100, 100))
+                .ToArray();
+            var negative = candidates.Where(silo => silo.GetConsistentHashCode() < 0).Take(2).ToArray();
+            var positive = candidates.Where(silo => silo.GetConsistentHashCode() >= 0).Take(2).ToArray();
+            Assert.Equal(2, negative.Length);
+            Assert.Equal(2, positive.Length);
+            var silos = hashSign switch
+            {
+                -1 => negative,
+                1 => positive,
+                _ => negative.Concat(positive).ToArray()
+            };
+
+            VerifyRingMembershipChanges(silos, 0);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Ring")]
+        public void ConsistentRingProvider_RandomRingsPreserveOwnershipAndLookup()
+        {
+            Gen.Select(Gen.Int.Array[Gen.Int[1, 8]], Gen.UInt).Sample((generations, key) =>
+            {
+                var silos = generations
+                    .Select(generation => SiloAddress.New(IPAddress.Loopback, 100, generation))
+                    .DistinctBy(silo => silo.GetConsistentHashCode())
+                    .ToArray();
+                VerifyRingMembershipChanges(silos, key);
+            }, iter: 100);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Ring")]
+        public void ConsistentRingProvider_StoppingSkipsLocalOwner()
+        {
+            var local = SiloAddress.FromParsableString("127.0.0.1:100@100");
+            var peer = SiloAddress.FromParsableString("127.0.0.1:200@100");
+            using var ring = new ConsistentRingProvider(local, NullLoggerFactory.Instance, new FakeSiloStatusOracle());
+            ring.AddServer(peer);
+            ring.SiloStatusChangeNotification(local, SiloStatus.ShuttingDown);
+
+            foreach (var key in new[] { 0u, (uint)int.MaxValue, unchecked((uint)int.MinValue), uint.MaxValue, unchecked((uint)local.GetConsistentHashCode()) })
+            {
+                Assert.Equal(peer, ring.GetPrimaryTargetSilo(key));
+            }
+
+            ring.RemoveServer(peer);
+            Assert.Null(ring.GetPrimaryTargetSilo(0));
+            Assert.Null(ring.GetPrimaryTargetSilo(uint.MaxValue));
+        }
+
+        private static void VerifyRingMembershipChanges(SiloAddress[] silos, uint key)
+        {
+            var rings = new List<ConsistentRingProvider>();
+            try
+            {
+                foreach (var silo in silos)
+                {
+                    var ring = new ConsistentRingProvider(silo, NullLoggerFactory.Instance, new FakeSiloStatusOracle());
+                    rings.Add(ring);
+                    foreach (var other in rings)
+                    {
+                        ring.AddServer(other.MyAddress);
+                        other.AddServer(silo);
+                    }
+
+                    VerifyRing(rings, key);
+                }
+
+                while (rings.Count > 1)
+                {
+                    var removed = rings[0];
+                    rings.RemoveAt(0);
+                    removed.Dispose();
+                    foreach (var ring in rings)
+                    {
+                        ring.RemoveServer(removed.MyAddress);
+                    }
+
+                    VerifyRing(rings, key);
+                }
+            }
+            finally
+            {
+                foreach (var ring in rings)
+                {
+                    ring.Dispose();
+                }
+            }
+        }
+
+        private static void VerifyRing(List<ConsistentRingProvider> rings, uint key)
+        {
+            // Signed and unsigned sorting differ by a rotation, preserving the existing cyclic ranges.
+            var legacyOrder = rings.OrderBy(ring => ring.MyAddress.GetConsistentHashCode()).ToArray();
+            for (var i = 0; i < legacyOrder.Length; i++)
+            {
+                var ring = legacyOrder[i];
+                var predecessor = legacyOrder[(i + legacyOrder.Length - 1) % legacyOrder.Length];
+                var expected = rings.Count == 1
+                    ? RangeFactory.CreateFullRange()
+                    : RangeFactory.CreateRange(
+                        unchecked((uint)predecessor.MyAddress.GetConsistentHashCode()),
+                        unchecked((uint)ring.MyAddress.GetConsistentHashCode()));
+                Assert.Equal(expected, ring.GetMyRange());
+            }
+
+            uint[] boundaryKeys = [0, int.MaxValue, unchecked((uint)int.MinValue), uint.MaxValue, key];
+            var keys = boundaryKeys.Concat(rings.SelectMany(ring =>
+            {
+                var endpoint = unchecked((uint)ring.MyAddress.GetConsistentHashCode());
+                return new[] { unchecked(endpoint - 1), endpoint, unchecked(endpoint + 1) };
+            }));
+            foreach (var testKey in keys)
+            {
+                var owner = Assert.Single(rings, ring => ring.GetMyRange().InRange(testKey));
+                foreach (var ring in rings)
+                {
+                    Assert.Equal(owner.MyAddress, ring.GetPrimaryTargetSilo(testKey));
+                }
+            }
+        }
 
         [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void ConsistentRingProvider_Test1()

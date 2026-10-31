@@ -1,3 +1,6 @@
+-- Apply this script for setup and repeatable upgrades after the shared Main script creates OrleansQuery.
+-- Stop all silos using this database before applying it, then restart them to reload the queries.
+--
 -- The design criteria for this table are:
 --
 -- 1. It can contain arbitrary content serialized as binary, XML or JSON. These formats
@@ -43,7 +46,19 @@
 --
 -- 7. In the storage operations queries the columns need to be in the exact same order
 -- since the storage table operations support optionally streaming.
-CREATE TABLE "ORLEANSSTORAGE"
+--
+-- 8. The next Version wraps from 2147483647 back to 1 so a frequently written grain never overflows
+-- the 32-bit Version. Orleans compares versions only for equality, so the version must change on
+-- every write but does not need to increase forever. A stale version can only match again after
+-- 2147483647 further writes to the same grain.
+DECLARE
+    objectCount NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO objectCount
+    FROM ALL_TABLES
+    WHERE OWNER = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA') AND TABLE_NAME = 'ORLEANSSTORAGE';
+    IF objectCount = 0 THEN
+        EXECUTE IMMEDIATE q'[CREATE TABLE "ORLEANSSTORAGE"
 (
 
     -- These are for the book keeping. Orleans calculates
@@ -75,9 +90,16 @@ CREATE TABLE "ORLEANSSTORAGE"
     -- to be indexed, so the values are hashed and only collisions will be solved
     -- by using the fields. That is, after the indexed queries have pinpointed the right
     -- rows down to [0, n] relevant ones, n being the number of collided value pairs.
-);
-CREATE INDEX "IX_ORLEANSSTORAGE" ON "ORLEANSSTORAGE" ("GRAINIDHASH", "GRAINTYPEHASH") PARALLEL
-COMPRESS;
+)]';
+    END IF;
+
+    SELECT COUNT(*) INTO objectCount
+    FROM ALL_INDEXES
+    WHERE OWNER = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA') AND INDEX_NAME = 'IX_ORLEANSSTORAGE';
+    IF objectCount = 0 THEN
+        EXECUTE IMMEDIATE 'CREATE INDEX "IX_ORLEANSSTORAGE" ON "ORLEANSSTORAGE" ("GRAINIDHASH", "GRAINTYPEHASH") PARALLEL COMPRESS';
+    END IF;
+END;
 /
 
 CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAINIDN0 IN NUMBER, PARAM_GRAINIDN1 IN NUMBER, PARAM_GRAINTYPEHASH IN NUMBER, PARAM_GRAINTYPESTRING IN NVARCHAR2,
@@ -111,7 +133,7 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
         SET
             PayloadBinary = PARAM_PAYLOADBINARY,
             ModifiedOn = sys_extract_utc(systimestamp),
-            Version = Version + 1
+            Version = MOD(Version, 2147483647) + 1
         WHERE
             GrainIdHash = PARAM_GRAINIDHASH AND PARAM_GRAINIDHASH IS NOT NULL
             AND GrainTypeHash = PARAM_GRAINTYPEHASH AND PARAM_GRAINTYPEHASH IS NOT NULL
@@ -195,7 +217,7 @@ CREATE OR REPLACE FUNCTION ClearStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAIN
     SET
         PayloadBinary = NULL,
         ModifiedOn = sys_extract_utc(systimestamp),
-        Version = Version + 1
+        Version = MOD(Version, 2147483647) + 1
     WHERE GrainIdHash = PARAM_GRAINIDHASH AND PARAM_GRAINIDHASH IS NOT NULL
       AND GrainTypeHash = PARAM_GRAINTYPEHASH AND PARAM_GRAINTYPEHASH IS NOT NULL
       AND (GrainIdN0 = PARAM_GRAINIDN0 OR PARAM_GRAINIDN0 IS NULL)
@@ -231,7 +253,7 @@ CREATE OR REPLACE FUNCTION DeleteStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAI
     rowCount := SQL%ROWCOUNT;
 
     IF rowCount > 0 THEN
-        newGrainStateVersion := PARAM_GRAINSTATEVERSION + 1;
+        newGrainStateVersion := MOD(PARAM_GRAINSTATEVERSION, 2147483647) + 1;
     END IF;
 
     COMMIT;
@@ -239,38 +261,27 @@ CREATE OR REPLACE FUNCTION DeleteStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAI
   END;
 /
 
-INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
+MERGE INTO OrleansQuery target
+USING
 (
-    'WriteToStorageKey','
+    SELECT 'WriteToStorageKey' AS QueryKey,'
   SELECT WriteToStorage(:GrainIdHash, :GrainIdN0, :GrainIdN1, :GrainTypeHash, :GrainTypeString,
                                              :GrainIdExtensionString, :ServiceId, :GrainStateVersion, :PayloadBinary)
                                              AS NewGrainStateVersion FROM DUAL
-');
-/
+' AS QueryText FROM DUAL
 
-INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
-(
-    'ClearStorageKey',
+    UNION ALL
+    SELECT 'ClearStorageKey',
     'SELECT ClearStorage(:GrainIdHash, :GrainIdN0, :GrainIdN1, :GrainTypeHash, :GrainTypeString,
-                                             :GrainIdExtensionString, :ServiceId, :GrainStateVersion) AS Version FROM DUAL'
-);
-/
+                                             :GrainIdExtensionString, :ServiceId, :GrainStateVersion) AS Version FROM DUAL' FROM DUAL
 
-INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
-(
-    'DeleteStorageKey',
+    UNION ALL
+    SELECT 'DeleteStorageKey',
     'SELECT DeleteStorage(:GrainIdHash, :GrainIdN0, :GrainIdN1, :GrainTypeHash, :GrainTypeString,
-                                             :GrainIdExtensionString, :ServiceId, :GrainStateVersion) AS Version FROM DUAL'
-);
-/
+                                             :GrainIdExtensionString, :ServiceId, :GrainStateVersion) AS Version FROM DUAL' FROM DUAL
 
-INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
-(
-    'ReadFromStorageKey',
+    UNION ALL
+    SELECT 'ReadFromStorageKey',
     '
      SELECT PayloadBinary, Version
      FROM OrleansStorage
@@ -280,8 +291,17 @@ VALUES
        AND GrainTypeHash = :GrainTypeHash AND :GrainTypeHash IS NOT NULL
        AND (GrainTypeString = :GrainTypeString OR :GrainTypeString IS NULL)
        AND ((:GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = :GrainIdExtensionString) OR :GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
-       AND ServiceId = :ServiceId AND :ServiceId IS NOT NULL'
-);
+       AND ServiceId = :ServiceId AND :ServiceId IS NOT NULL' FROM DUAL
+) source
+ON (target.QueryKey = source.QueryKey)
+WHEN MATCHED THEN UPDATE SET target.QueryText = source.QueryText
+WHEN NOT MATCHED THEN INSERT (QueryKey, QueryText) VALUES (source.QueryKey, source.QueryText);
+/
+
+-- Normalize oversized versions while preserving their payloads.
+UPDATE ORLEANSSTORAGE
+SET VERSION = MOD(VERSION - 1, 2147483647) + 1
+WHERE VERSION > 2147483647;
 /
 
 COMMIT;

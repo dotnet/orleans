@@ -38,7 +38,9 @@ internal static class SerializableSourceOutputGenerator
             }
 
             var model = ModelExtractor.ExtractSerializableTypeModel(typeDescription, sourceLocation);
-            return SerializableTypeResult.FromModel(model);
+            var enumPlan = EnumSerializerGenerator.CreateOutputPlan(
+                typeDescription, libraryTypes, compilation.AssemblyName ?? "assembly", metadataIdentity);
+            return SerializableTypeResult.FromModel(model, enumPlan);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -224,12 +226,12 @@ internal static class SerializableSourceOutputGenerator
         string hintGeneratedNamespace,
         int genericArity)
     {
-        var serializer = serializerGenerator.Generate(typeDescription);
-        var copier = typeDescription.IsShallowCopyable && defaultCopiers.ContainsKey(typeDescription)
+        var serializerPlan = serializerGenerator.CreatePlan(typeDescription);
+        var copierPlan = typeDescription.IsShallowCopyable && defaultCopiers.ContainsKey(typeDescription)
             ? null
-            : copierGenerator.GenerateCopier(typeDescription, defaultCopiers);
-        var activatorClass = ActivatorGenerator.ShouldGenerateActivator(typeDescription)
-            ? activatorGenerator.GenerateActivator(typeDescription)
+            : copierGenerator.CreatePlan(typeDescription, defaultCopiers, serializerPlan.Type);
+        var activatorPlan = ActivatorGenerator.ShouldGenerateActivator(typeDescription)
+            ? activatorGenerator.CreatePlan(typeDescription, serializerPlan.Type)
             : null;
 
         return SourceOutputResult.FromSource(
@@ -239,9 +241,9 @@ internal static class SerializableSourceOutputGenerator
                 metadataIdentity,
                 hintGeneratedNamespace,
                 genericArity,
-                serializer,
-                copier,
-                activatorClass,
+                serializerPlan,
+                copierPlan,
+                activatorPlan,
                 typeDescription.GeneratedNamespace));
     }
 
@@ -468,5 +470,4 @@ internal static class SerializableSourceOutputGenerator
             && string.Equals(metadataIdentity.AssemblyName, assemblyIdentity.Name, StringComparison.Ordinal);
     }
 }
-
 

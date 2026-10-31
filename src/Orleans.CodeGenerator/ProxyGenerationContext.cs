@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
@@ -10,7 +9,8 @@ namespace Orleans.CodeGenerator;
 
 internal sealed class ProxyGenerationContext : IGeneratorServices
 {
-    private readonly Dictionary<string, List<MemberDeclarationSyntax>> _namespacedMembers = new();
+    private readonly Dictionary<INamedTypeSymbol, ProxyEmissionPlan> _proxyPlans = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<INamedTypeSymbol, Dictionary<string, (string Namespace, InvokableEmissionPlan Plan)>> _compatibilityDeclarations = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<InvokableMethodId, InvokableMethodDescription> _invokableMethodDescriptions = new();
     private readonly Dictionary<INamedTypeSymbol, List<CompoundTypeAliasModel>> _compatibilityInvokableAliases = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _generatedCompatibilityInvokableMetadataNames = new(StringComparer.Ordinal);
@@ -42,26 +42,11 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
     internal ProxyGenerator ProxyGenerator { get; }
     internal InvokableGenerator InvokableGenerator { get; }
 
-    internal void AddMember(string ns, MemberDeclarationSyntax member)
-    {
-        if (!_namespacedMembers.TryGetValue(ns, out var existing))
-        {
-            existing = _namespacedMembers[ns] = new List<MemberDeclarationSyntax>();
-        }
+    internal ProxyEmissionPlan GetProxyPlan(ProxyInterfaceDescription description)
+        => _proxyPlans[description.InterfaceType.OriginalDefinition];
 
-        existing.Add(member);
-    }
-
-    internal IEnumerable<(string Namespace, MemberDeclarationSyntax Member)> GetEmittedMembers()
-    {
-        foreach (var entry in _namespacedMembers)
-        {
-            foreach (var member in entry.Value)
-            {
-                yield return (entry.Key, member);
-            }
-        }
-    }
+    internal IEnumerable<(string Namespace, InvokableEmissionPlan Plan)> GetCompatibilityDeclarations(INamedTypeSymbol interfaceType)
+        => _compatibilityDeclarations.TryGetValue(interfaceType.OriginalDefinition, out var declarations) ? declarations.Values : [];
 
     internal IReadOnlyList<CompoundTypeAliasModel> GetCompatibilityInvokableAliases(INamedTypeSymbol interfaceType)
         => _compatibilityInvokableAliases.TryGetValue(interfaceType.OriginalDefinition, out var aliases) ? aliases : [];
@@ -168,14 +153,8 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
         description = new ProxyInterfaceDescription(this, proxyBaseType, originalInterface);
         MetadataModel.InvokableInterfaces.Add(originalInterface, description);
 
-        // Generate a proxy.
-        var (generatedClass, proxyDescription) = ProxyGenerator.Generate(description);
-
-        // Emit the generated proxy
-        if (Compilation.GetTypeByMetadataName(proxyDescription.MetadataName) == null)
-        {
-            AddMember(proxyDescription.InterfaceDescription.GeneratedNamespace, generatedClass);
-        }
+        // Planning the proxy discovers its invokables; emission writes this plan.
+        _proxyPlans.Add(originalInterface, ProxyGenerator.CreatePlan(description));
 
         return description;
     }
@@ -214,12 +193,6 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
             }
 
             generatedInvokable = MetadataModel.GeneratedInvokables[invokableId] = InvokableGenerator.Generate(methodDescription);
-
-            if (Compilation.GetTypeByMetadataName(generatedInvokable.MetadataName) == null)
-            {
-                // Emit the generated code on-demand.
-                AddMember(generatedInvokable.GeneratedNamespace, generatedInvokable.ClassDeclarationSyntax);
-            }
         }
 
         var proxyMethodDescription = ProxyMethodDescription.Create(interfaceDescription, generatedInvokable, method);
@@ -231,12 +204,22 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
             var compatMethodDescription = InvokableMethodDescription.Create(compatInvokableId, interfaceType);
             var includeGeneratedMethodId = !InvokableGenerator.IsGeneratedMethodIdExplicitlyClaimed(compatMethodDescription);
             var compatInvokable = InvokableGenerator.Generate(compatMethodDescription);
+            if (!_compatibilityDeclarations.TryGetValue(interfaceType.OriginalDefinition, out var declarations))
+            {
+                declarations = _compatibilityDeclarations[interfaceType.OriginalDefinition] = new(StringComparer.Ordinal);
+            }
+
+            // Each owner retains its declarations even when another owner claims the same alias.
+            if (!declarations.ContainsKey(compatInvokable.MetadataName))
+            {
+                declarations.Add(compatInvokable.MetadataName, (compatInvokable.GeneratedNamespace, compatInvokable.EmissionPlan));
+            }
+
             if (!_generatedCompatibilityInvokableMetadataNames.Add(compatInvokable.MetadataName))
             {
                 return proxyMethodDescription;
             }
 
-            AddMember(compatInvokable.GeneratedNamespace, compatInvokable.ClassDeclarationSyntax);
             if (includeGeneratedMethodId)
             {
                 var aliasComponents = InvokableGenerator.GetCompoundTypeAliasComponents(

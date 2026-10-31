@@ -4,19 +4,26 @@
     <InformationalVersion>$(Version). Commit Hash: $(GitHeadSha)</InformationalVersion>
   </PropertyGroup>
 
+  <!-- Roslyn authoring projects enable extended analyzer rules in their project files. -->
+  <ItemGroup Condition="'$(EnforceExtendedAnalyzerRules)' != 'true'">
+    <EditorConfigFiles Include="$(MSBuildThisFileDirectory)eng\roslyn-non-authoring.globalconfig" />
+  </ItemGroup>
+
   <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.CodeGenerator/build/Microsoft.Orleans.CodeGenerator.props" />
   <Import
     Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and '$(IsOrleansFrameworkPart)' != 'false' and '$(PackageId)' != 'Microsoft.Orleans.Core.Abstractions' "
     Project="$(MSBuildThisFileDirectory)src/Orleans.Core/build/Microsoft.Orleans.Core.targets" />
 
   <ItemGroup>
-    <!-- Enable code generator -->
+    <!-- Packable projects retain analyzer dependencies while keeping their assemblies out of copy-local outputs. -->
     <ProjectReference
       Include="$(SourceRoot)src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj"
       OutputItemType="Analyzer"
-      ReferenceOutputAssembly="false"
       PrivateAssets="None"
-      Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
+      Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
+      <ReferenceOutputAssembly Condition="'$(IsPackable)' != 'true'">false</ReferenceOutputAssembly>
+      <Private Condition="'$(IsPackable)' == 'true'">false</Private>
+    </ProjectReference>
     <ProjectReference
       Include="$(SourceRoot)src/Orleans.Analyzers/Orleans.Analyzers.csproj"
       AssetTargetFallback="netstandard2.0"
@@ -32,9 +39,11 @@
       UndefineProperties="TargetFramework"
       SkipGetTargetFrameworkProperties="true"
       OutputItemType="Analyzer"
-      ReferenceOutputAssembly="false"
       PrivateAssets="None"
-      Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and '$(EnableOrleansContractsAnalyzer)' == 'true' "/>
+      Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and '$(EnableOrleansContractsAnalyzer)' == 'true' ">
+      <ReferenceOutputAssembly Condition="'$(IsPackable)' != 'true'">false</ReferenceOutputAssembly>
+      <Private Condition="'$(IsPackable)' == 'true'">false</Private>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup Condition="'$(IsTestingPlatformApplication)' == 'true'">

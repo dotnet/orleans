@@ -27,6 +27,13 @@ namespace UnitTests.StorageTests.Relational
 
         [Fact]
         [TestCategory("Functional")]
+        public async Task VersionWrapsAfterMaximum()
+        {
+            await Relational_VersionWrapsAfterMaximum();
+        }
+
+        [Fact]
+        [TestCategory("Functional")]
         public async Task WriteReadCyrillic()
         {
             await PersistenceStorageTests.PersistenceStorage_Relational_WriteReadIdCyrillic();
@@ -44,6 +51,20 @@ namespace UnitTests.StorageTests.Relational
         public async Task StorageDataSetGeneric_HashCollisionTests()
         {
             await Relational_HashCollisionTests();
+        }
+
+        [Fact]
+        [TestCategory("Functional")]
+        public async Task GrainTypeQualifiedKeyFormat_IsolatesGrains()
+        {
+            await Relational_GrainTypeQualifiedKeyFormatIsolatesGrains();
+        }
+
+        [Fact]
+        [TestCategory("Functional")]
+        public async Task LegacyKeyFormat_SharesRowAcrossGrainTypes()
+        {
+            await Relational_LegacyKeyFormatSharesRowAcrossGrainTypes();
         }
 
         [Fact]

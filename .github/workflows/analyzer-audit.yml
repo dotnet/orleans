@@ -27,7 +27,7 @@ jobs:
     continue-on-error: true
     timeout-minutes: 360
     env:
-      ANALYSIS_LEVEL: ${{ github.event_name == 'schedule' && 'preview' || '10.0' }}
+      ANALYSIS_LEVEL: ${{ github.event_name == 'schedule' && 'preview' || '11.0' }}
       RESULTS_DIRECTORY: Artifacts/AnalyzerAudit/Roslyn
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -141,7 +141,7 @@ jobs:
             --configuration Release `
             --no-incremental `
             -bl:$env:RESULTS_DIRECTORY/compatibility-audit.binlog `
-            -p:AnalysisLevel=10.0 `
+            -p:AnalysisLevel=11.0 `
             -p:EnableCompatibilityAnalyzerAudit=true `
             -p:AnalyzerAuditResultsDirectory="$env:GITHUB_WORKSPACE/$env:RESULTS_DIRECTORY/Sarif" `
             -p:CustomBeforeMicrosoftCommonTargets="$env:GITHUB_WORKSPACE/.github/scripts/analyzer-audit.targets" `

@@ -34,6 +34,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Orleans.Serialization.Abstractions\IdentityNameValidator.cs" Link="IdentityNameValidator.cs" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.Abstractions\Orleans.Serialization.Abstractions.csproj" />
   </ItemGroup>
 

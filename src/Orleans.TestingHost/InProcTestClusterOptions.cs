@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -42,7 +41,7 @@ public sealed class InProcessTestClusterOptions
     /// Gets or sets a value indicating whether to use test cluster membership.
     /// </summary>
     /// <value><see langword="true" /> if test cluster membership should be used; otherwise, <see langword="false" />.</value>
-    internal bool UseTestClusterMembership { get; set; }
+    public bool UseTestClusterMembership { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether to use test cluster grain directory, which is only applicable if <see cref="UseTestClusterMembership"/> is <see langword="true"/>.
@@ -51,10 +50,19 @@ public sealed class InProcessTestClusterOptions
     internal bool UseTestClusterGrainDirectory { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether to use the experimental distributed grain directory.
+    /// Gets or sets a value indicating whether to select the distributed grain directory after applying silo configuration delegates.
     /// </summary>
-    /// <value><see langword="true" /> if the distributed grain directory should be used; otherwise, <see langword="false" />.</value>
-    [Experimental("ORLEANSEXP003")]
+    /// <value>
+    /// <see langword="true"/> to select the distributed directory as the default;
+    /// <see langword="false"/> to use the applicable test-directory substitution or configured silo directory.
+    /// The default is <see langword="false"/>.
+    /// </value>
+    /// <remarks>
+    /// With test membership and the test grain directory enabled, <see langword="false"/> selects the in-process test directory.
+    /// Otherwise, <see langword="false"/> preserves the directory selected by silo configuration, including the runtime default.
+    /// To select the legacy directory, call <see cref="CoreHostingExtensions.UseLegacyGrainDirectory"/>
+    /// from <see cref="InProcessTestClusterBuilder.ConfigureSilo"/> and leave this option <see langword="false"/>.
+    /// </remarks>
     public bool UseDistributedGrainDirectory { get; set; }
 
     /// <summary>

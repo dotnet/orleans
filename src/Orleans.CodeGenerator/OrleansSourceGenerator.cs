@@ -25,9 +25,12 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
     internal const string ReferenceAssemblyDataTrackingName = "Orleans.ReferenceAssemblyData";
     internal const string MetadataAggregateTrackingName = "Orleans.MetadataAggregate";
     internal const string SerializerOutputsTrackingName = "Orleans.SerializerOutputs";
+    internal const string EnumSerializerPlansTrackingName = "Orleans.EnumSerializerPlans";
+    internal const string EnumSerializerOutputsTrackingName = "Orleans.EnumSerializerOutputs";
     internal const string ReferencedSerializerOutputsTrackingName = "Orleans.ReferencedSerializerOutputs";
     internal const string ProxyOutputsTrackingName = "Orleans.ProxyOutputs";
     internal const string MetadataOutputsTrackingName = "Orleans.MetadataOutputs";
+    internal const string SerializerContextResultsTrackingName = "Orleans.SerializerContextResults";
     internal const string SerializerContextOutputsTrackingName = "Orleans.SerializerContextOutputs";
 
     /// <inheritdoc/>
@@ -46,10 +49,20 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
                 "Orleans.GenerateSerializerContextAttribute`1",
                 predicate: static (node, _) => node is ClassDeclarationSyntax,
                 transform: static (ctx, _) => ctx)
+            .Where(static ctx =>
+            {
+                // One attributed partial owns generation; Generate reads roots and validates declarations from the whole symbol.
+                var attribute = ctx.TargetSymbol.GetAttributes().First(attribute =>
+                    SymbolEqualityComparer.Default.Equals(
+                        attribute.AttributeClass?.OriginalDefinition,
+                        ctx.Attributes[0].AttributeClass!.OriginalDefinition));
+                var reference = attribute.ApplicationSyntaxReference!;
+                return reference.SyntaxTree == ctx.TargetNode.SyntaxTree && ctx.TargetNode.Span.Contains(reference.Span);
+            })
             .Combine(generatorOptions)
             .SelectMany(static (input, ct) => SerializerContextGenerator.Generate(input.Left, input.Right, ct))
+            .WithTrackingName(SerializerContextResultsTrackingName)
             .Collect()
-            .Select(static (outputs, _) => outputs.Distinct().ToImmutableArray())
             .WithComparer(ImmutableArrayComparer<SerializerContextOutput>.Instance)
             .WithTrackingName(SerializerContextOutputsTrackingName);
         var serializerContextEntries = serializerContextOutputs.SelectMany(static (outputs, _) => outputs);
@@ -137,10 +150,14 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
         // Extract reference assembly data (application parts, well-known type IDs, aliases)
         var refAssemblyDataResults = compilationProvider
             .Combine(generatorOptions)
-            .Select(static (input, ct) => ReferenceAssemblyDataProvider.CreateReferenceAssemblyDataResult(
-                input.Left,
-                input.Right,
-                ct))
+            .Combine(collectedTypes)
+            .Combine(collectedProxies)
+            .Select(static (input, ct) =>
+            {
+                var (((compilation, options), serializableTypes), proxyInterfaces) = input;
+                return ReferenceAssemblyDataProvider.CreateReferenceAssemblyDataResult(
+                    compilation, options, serializableTypes, proxyInterfaces, ct);
+            })
             .WithTrackingName(ReferenceAssemblyDataTrackingName);
 
         context.RegisterSourceOutput(refAssemblyDataResults, static (productionContext, result) =>
@@ -151,6 +168,15 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
                 {
                     productionContext.ReportDiagnostic(diagnostic);
                 }
+            }
+        });
+
+        // Diagnostics about the generated metadata are reported only when implementation outputs are emitted.
+        context.RegisterImplementationSourceOutput(refAssemblyDataResults, static (productionContext, result) =>
+        {
+            foreach (var diagnostic in result.ImplementationDiagnostics)
+            {
+                productionContext.ReportDiagnostic(diagnostic);
             }
         });
 
@@ -191,7 +217,22 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
                 input.Right))
             .WithTrackingName(MetadataAggregateTrackingName);
 
-        var serializerOutputs = collectedTypes
+        // Enums have one declaration, so their emission plans can retain the discovery provider's per-owner identity.
+        // Preserve null slots when a type becomes invalid: filtering here can corrupt Roslyn 4.5 tracked state on reparse.
+        var enumSerializerPlans = serializableTypeResults
+            .Select(static (result, _) => result.EnumSerializerPlan)
+            .WithTrackingName(EnumSerializerPlansTrackingName);
+        var enumSerializerOutputs = enumSerializerPlans
+            .Select(static (plan, _) => plan is null ? default : EnumSerializerGenerator.GenerateSource(plan))
+            .WithTrackingName(EnumSerializerOutputsTrackingName);
+
+        var compilationAwareTypes = collectedSerializableTypeResults
+            .Select(static (results, _) => results
+                .Where(static result => result.Model is not null && result.EnumSerializerPlan is null)
+                .Select(static result => result.Model!)
+                .ToImmutableArray())
+            .WithComparer(ImmutableArrayComparer<SerializableTypeModel>.Instance);
+        var compilationAwareSerializerOutputs = compilationAwareTypes
             .Combine(compilationProvider)
             .Combine(generatorOptions)
             .Select(static (input, ct) => SerializableSourceOutputGenerator.CreateSerializableSourceOutputs(
@@ -199,12 +240,30 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
                 input.Left.Left,
                 input.Right,
                 ct))
+            .WithComparer(ImmutableArrayComparer<SourceOutputResult>.Instance);
+
+        var serializerOutputs = compilationAwareSerializerOutputs
+            .Combine(enumSerializerOutputs.Collect())
+            .Select(static (input, _) => GeneratedSourceOutput.DeduplicateSourceOutputs(
+                input.Left.AddRange(input.Right.Where(static output => output.SourceEntry is not null))))
             .WithComparer(ImmutableArrayComparer<SourceOutputResult>.Instance)
             .WithTrackingName(SerializerOutputsTrackingName);
 
-        GeneratedSourceOutput.RegisterImplementationSourceOutputs(
-            context,
-            serializerOutputs.SelectMany(static (input, _) => input));
+        // Keep the deduplicated batch intact: Roslyn 4.5 can lose re-added entries when flattening an equal prior batch.
+        context.RegisterSourceOutput(serializerOutputs, static (productionContext, outputs) =>
+        {
+            foreach (var output in outputs)
+            {
+                GeneratedSourceOutput.ReportDiagnostic(productionContext, output);
+            }
+        });
+        context.RegisterImplementationSourceOutput(serializerOutputs, static (productionContext, outputs) =>
+        {
+            foreach (var output in outputs)
+            {
+                GeneratedSourceOutput.EmitSource(productionContext, output);
+            }
+        });
 
         var referencedSerializerOutputs = refAssemblyData
             .Combine(compilationProvider)

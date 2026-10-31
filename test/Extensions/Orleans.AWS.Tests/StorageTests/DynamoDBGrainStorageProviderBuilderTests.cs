@@ -33,7 +33,7 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
         Assert.Null(options.Token);
         Assert.Null(options.ProfileName);
         Assert.Null(options.Service);
-        Assert.Equal(string.Empty, options.ServiceId);
+        Assert.Null(options.ServiceId);
         Assert.Equal("OrleansGrainState", options.TableName);
         Assert.Equal(10, options.ReadCapacityUnits);
         Assert.Equal(5, options.WriteCapacityUnits);
@@ -101,6 +101,31 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
 
         Assert.Equal("region-sentinel", options.Service);
         Assert.Null(options.AccessKey);
+    }
+
+    [Fact]
+    public void Configure_EmptyServiceId_SetsEmptyServiceId()
+    {
+        var (builder, _) = ConfigureBuilder((nameof(DynamoDBStorageOptions.ServiceId), ""));
+
+        using var services = builder.Services.BuildServiceProvider();
+        var options = GetOptions(services);
+
+        Assert.Equal(string.Empty, options.ServiceId);
+        Assert.Single(services.GetServices<IConfigurationValidator>()).ValidateConfiguration();
+    }
+
+    [Fact]
+    public void Configure_ServiceIdNotSet_RegistersRejectingValidator()
+    {
+        var (builder, _) = ConfigureBuilder();
+        using var services = builder.Services.BuildServiceProvider();
+        var validator = Assert.Single(services.GetServices<IConfigurationValidator>());
+
+        var exception = Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+
+        Assert.Contains(ProviderName, exception.Message);
+        Assert.Contains(nameof(DynamoDBStorageOptions.ServiceId), exception.Message);
     }
 
     [Theory]
@@ -259,7 +284,7 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
         Assert.Equal("named-table", namedOptions.TableName);
         Assert.Equal("named-service", namedOptions.ServiceId);
         Assert.Equal("OrleansGrainState", defaultOptions.TableName);
-        Assert.Equal(string.Empty, defaultOptions.ServiceId);
+        Assert.Null(defaultOptions.ServiceId);
         validator.ValidateConfiguration();
     }
 
@@ -291,6 +316,35 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
 
         Assert.Contains(ProviderName, exception.Message);
         Assert.Contains(nameof(DynamoDBStorageOptions.TableName), exception.Message);
+    }
+
+    [Fact]
+    public void ValidateConfiguration_ServiceIdNotSet_Throws()
+    {
+        var options = CreateValidOptions();
+        options.ServiceId = null;
+        var validator = new DynamoDBGrainStorageOptionsValidator(options, ProviderName);
+
+        var exception = Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+
+        Assert.Contains(ProviderName, exception.Message);
+        Assert.Contains(nameof(DynamoDBStorageOptions.ServiceId), exception.Message);
+        Assert.Contains("retain the ServiceId used to write its state", exception.Message);
+        Assert.Contains("string.Empty", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("service")]
+    public void ValidateConfiguration_ServiceIdSet_Succeeds(string serviceId)
+    {
+        var options = CreateValidOptions();
+        options.ServiceId = serviceId;
+        var validator = new DynamoDBGrainStorageOptionsValidator(options, ProviderName);
+
+        var exception = Record.Exception(validator.ValidateConfiguration);
+
+        Assert.Null(exception);
     }
 
     [Fact]
@@ -370,6 +424,7 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
 
     private static DynamoDBStorageOptions CreateValidOptions() => new()
     {
+        ServiceId = "valid-service",
         TableName = "valid-table",
         UseProvisionedThroughput = true,
         ReadCapacityUnits = 11,
