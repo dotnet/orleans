@@ -1,9 +1,8 @@
-#if NET10_0_OR_GREATER
 using Orleans;
 
 namespace Orleans.CodeGenerator.Tests.ReferencedTaggedUnions
 {
-    // The SDK compiles these producer models; generator tests consume their metadata using Roslyn 5.9.
+    // The SDK compiles these producer models; generator tests consume their metadata using the Roslyn version referenced by each test target.
     [GenerateSerializer]
     public union ReferencedShallowUnion(int, string);
 
@@ -33,5 +32,4 @@ namespace System.Runtime.CompilerServices
         object? Value { get; }
     }
 }
-#endif
 #endif
