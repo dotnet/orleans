@@ -27,7 +27,7 @@ The TCP transport enables keep-alive on outbound and accepted sockets. By defaul
 
 ## Message path and framing
 
-When `MessageCenter.SendMessage` has a target silo, it reuses an existing connection or obtains one from `ConnectionManager`. A local target uses receive processing directly. A known-dead target causes a transient rejection for request and one-way messages, and expired messages are dropped before consuming transport work.
+When `MessageCenter.SendMessage` has a target silo, it reuses an existing connection or obtains one from `ConnectionManager`. A local target uses receive processing directly. Before the first transport attempt for an application grain request or one-way message, routing checks whether the target is known dead. It invalidates a stale activation address and re-addresses the unsent message through the grain locator and placement service, within `MaxForwardCount`. The same repair applies when the silo becomes known dead during asynchronous connection acquisition. Transport retries and requests explicitly addressed to a system target retain their endpoint-specific behavior, and expired messages are dropped before consuming transport work.
 
 The connection pipeline performs the protocol preamble and then exchanges framed payloads. `MessageSerializer` encodes the message header and body using Orleans serialization. `MessageReadRequest` validates frame lengths before consuming the header and body. The body remains buffered until deserialization, forwarding, or disposal releases it. TLS decorates the message transport while preserving Orleans framing and the message protocol.
 
