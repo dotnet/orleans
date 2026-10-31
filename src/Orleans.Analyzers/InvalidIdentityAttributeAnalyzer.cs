@@ -33,12 +33,16 @@ public sealed class InvalidIdentityAttributeAnalyzer : DiagnosticAnalyzer
             var aliasAttribute = context.Compilation.GetTypeByMetadataName(Constants.AliasAttributeFullyQualifiedName);
             var grainTypeAttribute = context.Compilation.GetTypeByMetadataName(Constants.GrainTypeAttributeFullyQualifiedName);
             var grainInterfaceTypeAttribute = context.Compilation.GetTypeByMetadataName(Constants.GrainInterfaceTypeAttributeFullyQualifiedName);
+            if (aliasAttribute is null && grainTypeAttribute is null && grainInterfaceTypeAttribute is null)
+            {
+                return;
+            }
 
             context.RegisterSyntaxNodeAction(context =>
             {
                 var attribute = (AttributeSyntax)context.Node;
-                if (context.SemanticModel.GetSymbolInfo(attribute, context.CancellationToken).Symbol is not IMethodSymbol constructor
-                    || attribute.ArgumentList is not { Arguments.Count: > 0 } arguments)
+                if (attribute.ArgumentList is not { Arguments.Count: > 0 } arguments
+                    || context.SemanticModel.GetSymbolInfo(attribute, context.CancellationToken).Symbol is not IMethodSymbol constructor)
                 {
                     return;
                 }
