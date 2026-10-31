@@ -137,10 +137,14 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
         // Extract reference assembly data (application parts, well-known type IDs, aliases)
         var refAssemblyDataResults = compilationProvider
             .Combine(generatorOptions)
-            .Select(static (input, ct) => ReferenceAssemblyDataProvider.CreateReferenceAssemblyDataResult(
-                input.Left,
-                input.Right,
-                ct))
+            .Combine(collectedTypes)
+            .Combine(collectedProxies)
+            .Select(static (input, ct) =>
+            {
+                var (((compilation, options), serializableTypes), proxyInterfaces) = input;
+                return ReferenceAssemblyDataProvider.CreateReferenceAssemblyDataResult(
+                    compilation, options, serializableTypes, proxyInterfaces, ct);
+            })
             .WithTrackingName(ReferenceAssemblyDataTrackingName);
 
         context.RegisterSourceOutput(refAssemblyDataResults, static (productionContext, result) =>

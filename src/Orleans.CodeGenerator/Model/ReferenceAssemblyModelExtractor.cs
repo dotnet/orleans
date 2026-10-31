@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.Model;
@@ -20,14 +21,44 @@ internal static class ReferenceAssemblyModelExtractor
         CancellationToken cancellationToken)
         => ExtractReferenceAssemblyData(compilation, options, cancellationToken, out _, out _);
 
+    /// <summary>
+    /// Reuses successful, deduplicated source discoveries from this compilation for current-assembly
+    /// serializer and proxy metadata. Uncovered types and selected external assemblies use symbol-based discovery.
+    /// </summary>
     internal static ReferenceAssemblyModel ExtractReferenceAssemblyData(
         Compilation compilation,
         CodeGeneratorOptions options,
         CancellationToken cancellationToken,
         out ImmutableArray<Diagnostic> diagnostics,
-        out ImmutableArray<Diagnostic> implementationDiagnostics)
+        out ImmutableArray<Diagnostic> implementationDiagnostics,
+        ImmutableArray<SerializableTypeModel> sourceSerializableTypes = default,
+        ImmutableArray<ProxyInterfaceModel> sourceProxyInterfaces = default)
     {
         var libraryTypes = LibraryTypes.FromCompilation(compilation, options);
+        var sourceSerializers = new Dictionary<INamedTypeSymbol, SerializableTypeModel>(SymbolEqualityComparer.Default);
+        var sourceProxies = new Dictionary<INamedTypeSymbol, ProxyInterfaceModel>(SymbolEqualityComparer.Default);
+
+        if (!sourceSerializableTypes.IsDefaultOrEmpty)
+        {
+            foreach (var model in sourceSerializableTypes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var symbol = compilation.Assembly.GetTypeByMetadataName(model.MetadataIdentity.MetadataName);
+                Debug.Assert(symbol is not null);
+                sourceSerializers.Add(symbol!, model);
+            }
+        }
+
+        if (!sourceProxyInterfaces.IsDefaultOrEmpty)
+        {
+            foreach (var model in sourceProxyInterfaces)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var symbol = compilation.Assembly.GetTypeByMetadataName(model.MetadataIdentity.MetadataName);
+                Debug.Assert(symbol is not null);
+                sourceProxies.Add(symbol!, model);
+            }
+        }
 
         var applicationParts = new List<string>();
         var applicationPartSet = new HashSet<string>(StringComparer.Ordinal);
@@ -77,7 +108,10 @@ internal static class ReferenceAssemblyModelExtractor
 
                 try
                 {
-                    if (SerializableTypeModelExtractor.TryExtractSerializableTypeModel(symbol, compilation, libraryTypes, options, reportSerializableTypeDiagnostics) is { } serializableTypeModel)
+                    var serializableTypeModel = !reportSerializableTypeDiagnostics && sourceSerializers.TryGetValue(symbol, out var sourceSerializer)
+                        ? sourceSerializer
+                        : SerializableTypeModelExtractor.TryExtractSerializableTypeModel(symbol, compilation, libraryTypes, options, reportSerializableTypeDiagnostics);
+                    if (serializableTypeModel is not null)
                     {
                         referencedSerializableTypes.Add(serializableTypeModel);
                     }
@@ -87,7 +121,10 @@ internal static class ReferenceAssemblyModelExtractor
                     diagnosticBuilder.Add(exception.Diagnostic);
                 }
 
-                if (ProxyInterfaceModelExtractor.ExtractProxyInterfaceModel(symbol, compilation, cancellationToken) is { } proxyInterfaceModel)
+                var proxyInterfaceModel = !reportSerializableTypeDiagnostics && sourceProxies.TryGetValue(symbol, out var sourceProxy)
+                    ? sourceProxy
+                    : ProxyInterfaceModelExtractor.ExtractProxyInterfaceModel(symbol, compilation, cancellationToken);
+                if (proxyInterfaceModel is not null)
                 {
                     referencedProxyInterfaces.Add(proxyInterfaceModel);
                 }
