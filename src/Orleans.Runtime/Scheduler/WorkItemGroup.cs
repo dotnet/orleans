@@ -80,7 +80,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         var logger = Logger;
         if (logger.IsEnabled(LogLevel.Trace))
         {
-            LogTraceEnqueueWorkItem(logger, task.ToString(), GrainContext, System.Threading.Tasks.TaskScheduler.Current);
+            LogTraceEnqueueWorkItem(logger, task.ToString()!, GrainContext, System.Threading.Tasks.TaskScheduler.Current);
         }
 #endif
 
@@ -112,7 +112,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
             var runQueueLogger = Logger;
             if (runQueueLogger.IsEnabled(LogLevel.Trace))
             {
-                LogTraceAddToRunQueue(runQueueLogger, task.ToString(), thisSequenceNumber, GrainContext);
+                LogTraceAddToRunQueue(runQueueLogger, task.ToString()!, thisSequenceNumber, GrainContext);
             }
 #endif
             ScheduleExecution(this);
@@ -227,7 +227,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         var logger = Logger;
         if (logger.IsEnabled(LogLevel.Trace))
         {
-            LogTraceAboutToExecuteTask(logger, task.ToString(), GrainContext);
+            LogTraceAboutToExecuteTask(logger, task.ToString()!, GrainContext);
         }
     }
 #endif
@@ -249,7 +249,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         var taskDuration = TimeSpan.FromMilliseconds(taskDurationMs);
         LogWarningLongRunningTurn(
             Logger,
-            (task.AsyncState ?? task).ToString(),
+            (task.AsyncState ?? task).ToString()!,
             GrainContext?.ToString() ?? "Unknown",
             taskDuration.ToString("g"),
             _schedulingOptions.TurnWarningLengthThreshold,
