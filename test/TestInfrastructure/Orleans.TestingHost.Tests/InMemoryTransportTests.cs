@@ -12,6 +12,78 @@ namespace Orleans.TestingHost.Tests;
 [TestCategory("BVT")]
 public class InMemoryTransportTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
+    public async Task ConcurrentUnbindWaitsForNotificationsBeforeReleasingCancellationResources()
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        var hub = new InMemoryTransportConnectionHub();
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 12348);
+        await using var listener = new InMemoryTransportListener("test", endpoint.ToString(), hub);
+        await listener.BindAsync(timeout.Token);
+        var token = listener.OnDisposed;
+        var waitHandle = token.WaitHandle;
+        var notifying = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = token.Register(() =>
+        {
+            notifying.TrySetResult();
+            release.Task.GetAwaiter().GetResult();
+        });
+        var first = Task.Run(async () => await listener.UnbindAsync(TestContext.Current.CancellationToken), TestContext.Current.CancellationToken);
+        try
+        {
+            await notifying.Task.WaitAsync(timeout.Token);
+            var second = listener.DisposeAsync().AsTask();
+            Assert.True(token.IsCancellationRequested);
+            Assert.True(waitHandle.WaitOne(0));
+            Assert.False(first.IsCompleted);
+            Assert.False(second.IsCompleted);
+            release.SetResult();
+            await Task.WhenAll(first, second).WaitAsync(timeout.Token);
+
+            Assert.False(listener.IsValid);
+            Assert.True(listener.OnDisposed.IsCancellationRequested);
+            Assert.Throws<ObjectDisposedException>(() => token.WaitHandle);
+            Assert.Throws<ObjectDisposedException>(() => waitHandle.WaitOne(0));
+            await listener.UnbindAsync(timeout.Token);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await first;
+        }
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
+    public async Task UnbindReleasesCancellationResourcesWhenNotificationFails()
+    {
+        var listener = new InMemoryTransportListener("test", endpointValue: null, new InMemoryTransportConnectionHub());
+        var token = listener.OnDisposed;
+        var waitHandle = token.WaitHandle;
+        var expected = new InvalidOperationException("Listener notification failed.");
+        using var registration = token.Register(() => throw expected);
+        try
+        {
+            var failure = await Assert.ThrowsAsync<AggregateException>(
+                () => listener.UnbindAsync(TestContext.Current.CancellationToken).AsTask());
+
+            Assert.Same(expected, Assert.Single(failure.InnerExceptions));
+            Assert.False(listener.IsValid);
+            Assert.True(listener.OnDisposed.IsCancellationRequested);
+            Assert.Throws<ObjectDisposedException>(() => token.WaitHandle);
+            Assert.Throws<ObjectDisposedException>(() => waitHandle.WaitOne(0));
+        }
+        finally
+        {
+            await Assert.ThrowsAsync<AggregateException>(() => listener.DisposeAsync().AsTask());
+        }
+    }
+
     [Fact]
     public async Task PreCanceledBindLeavesEndpointUnregistered()
     {

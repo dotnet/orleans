@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipelines;
 using System.Net;
 using System.Threading;
@@ -17,16 +18,21 @@ internal class InMemoryTransportListener : MessageTransportListener
     private readonly Channel<(InMemoryMessageTransport Connection, TaskCompletionSource<bool> ConnectionAcceptedTcs)> _acceptQueue = Channel.CreateUnbounded<(InMemoryMessageTransport, TaskCompletionSource<bool>)>();
     private readonly string? _endpointValue;
     private readonly InMemoryTransportConnectionHub _hub;
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "DisposeAsync delegates to the cached UnbindCoreAsync task, which disposes this source in finally after cancellation notifications finish.")]
     private readonly CancellationTokenSource _disposedCts = new();
+    private readonly CancellationToken _disposedToken;
+    private Task? _unbindTask;
 
     public InMemoryTransportListener(string endpointName, string? endpointValue, InMemoryTransportConnectionHub hub)
     {
         ListenerName = endpointName;
         _endpointValue = endpointValue;
         _hub = hub;
+        _disposedToken = _disposedCts.Token;
     }
 
-    public CancellationToken OnDisposed => _disposedCts.Token;
+    public CancellationToken OnDisposed => _disposedToken;
 
     public override bool IsValid => _endpointValue is not null && !OnDisposed.IsCancellationRequested;
     public override IFeatureCollection Features { get; } = new FeatureCollection();
@@ -90,6 +96,14 @@ internal class InMemoryTransportListener : MessageTransportListener
 
     public override ValueTask UnbindAsync(CancellationToken cancellationToken = default)
     {
+        lock (_disposedCts)
+        {
+            return new(_unbindTask ??= UnbindCoreAsync());
+        }
+    }
+
+    private async Task UnbindCoreAsync()
+    {
         _acceptQueue.Writer.TryComplete();
         while (_acceptQueue.Reader.TryRead(out var item))
         {
@@ -97,8 +111,14 @@ internal class InMemoryTransportListener : MessageTransportListener
             item.ConnectionAcceptedTcs.TrySetResult(false);
         }
 
-        _disposedCts.Cancel();
-        return default;
+        try
+        {
+            await _disposedCts.CancelAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _disposedCts.Dispose();
+        }
     }
 }
 
