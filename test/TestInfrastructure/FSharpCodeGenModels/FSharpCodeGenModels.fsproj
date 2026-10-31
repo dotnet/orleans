@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Models.fs" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.Abstractions\Orleans.Serialization.Abstractions.csproj" />
+    <PackageReference Include="FSharp.Core" />
+  </ItemGroup>
+</Project>
