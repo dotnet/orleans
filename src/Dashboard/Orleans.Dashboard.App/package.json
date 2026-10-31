@@ -6,10 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "restore": "node scripts/install.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test",
+    "test:install": "node --test ../../../.github/scripts/test-dashboard-npm.mjs"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.1.0",
