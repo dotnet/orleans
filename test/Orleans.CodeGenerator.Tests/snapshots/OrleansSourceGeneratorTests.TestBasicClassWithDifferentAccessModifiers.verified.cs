@@ -1,4 +1,8 @@
 ﻿#pragma warning disable
+[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.DependencyContract:OrleansCodeGen.TestProject.Codec_InternalDemoData", "1;0;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null28:TestProject.InternalDemoData0;0;0;")]
+[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.DependencyContract:OrleansCodeGen.TestProject.Copier_InternalDemoData", "1;0;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null28:TestProject.InternalDemoData0;0;0;")]
+[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.DependencyContract:OrleansCodeGen.TestProject.Codec_PublicDemoData", "1;0;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null26:TestProject.PublicDemoData0;0;0;")]
+[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.DependencyContract:OrleansCodeGen.TestProject.Copier_PublicDemoData", "1;0;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null26:TestProject.PublicDemoData0;0;0;")]
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]

@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -2295,7 +2297,7 @@ public class DemoClass
             .ThenBy(static item => item.Index))
         {
             var root = CSharpSyntaxTree.ParseText(item.Source.SourceText.ToString().TrimStart('\uFEFF').TrimEnd()).GetCompilationUnitRoot();
-            assemblyAttributes.AddRange(root.AttributeLists);
+            assemblyAttributes.AddRange(root.AttributeLists.Select(NormalizeAssemblyAttribute));
 
             foreach (var member in root.Members)
             {
@@ -2330,6 +2332,11 @@ public class DemoClass
         var unit = SyntaxFactory.CompilationUnit()
             .WithAttributeLists(SyntaxFactory.List(assemblyAttributes))
             .WithMembers(SyntaxFactory.List(combinedMembers));
+        if (assemblyAttributes.Count > 0)
+        {
+            unit = unit.WithLeadingTrivia(SyntaxFactory.ParseLeadingTrivia("#pragma warning disable\n"));
+        }
+
         var resultText = unit.NormalizeWhitespace().ToFullString();
         resultText = resultText.Replace(".Add(typeof(int));", ".Add(typeof( int ));", StringComparison.Ordinal);
         if (assemblyAttributes.Count > 0)
@@ -2338,6 +2345,30 @@ public class DemoClass
         }
 
         return resultText;
+
+        static AttributeListSyntax NormalizeAssemblyAttribute(AttributeListSyntax list)
+        {
+            if (list.Attributes.SingleOrDefault()?.ArgumentList is { Arguments.Count: 2 } arguments
+                && arguments.Arguments[0].Expression is LiteralExpressionSyntax key
+                && key.Token.ValueText.StartsWith(SerializerDependencyContract.KeyPrefix, StringComparison.Ordinal)
+                && arguments.Arguments[1].Expression is LiteralExpressionSyntax value)
+            {
+                // Snapshot contract shapes across frameworks; protocol tests verify exact identities and retargeting.
+                var normalized = Regex.Replace(value.Token.ValueText,
+                    @"(?<length>\d+):(?<identity>[^:]+, Version=\d+\.\d+\.\d+\.\d+, Culture=[^,]+, PublicKeyToken=(?:[0-9a-f]{16}|null))",
+                    static match =>
+                    {
+                        var identity = match.Groups["identity"].Value;
+                        Assert.Equal(int.Parse(match.Groups["length"].Value, CultureInfo.InvariantCulture), identity.Length);
+                        identity = Regex.Replace(identity, @"Version=[^,]+", "Version=0.0.0.0");
+                        return identity.Length.ToString(CultureInfo.InvariantCulture) + ":" + identity;
+                    });
+                list = list.ReplaceNode(value, SyntaxFactory.LiteralExpression(
+                    SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(normalized)));
+            }
+
+            return list.WithoutLeadingTrivia();
+        }
 
         static int GetSnapshotSourceOrder(string hintName)
         {

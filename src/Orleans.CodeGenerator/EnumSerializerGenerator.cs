@@ -38,7 +38,9 @@ internal static class EnumSerializerGenerator
             return null;
         }
 
-        return new(CreatePlan(type, libraryTypes), assemblyName, metadataIdentity, type.GeneratedNamespace, type.TypeSyntax.ToString());
+        var dependencyContract = SerializerDependencyContract.CreateAttribute(type, [], SerializerGenerator.GetSimpleClassName(type.Name));
+        return new(CreatePlan(type, libraryTypes), assemblyName, metadataIdentity, type.GeneratedNamespace, type.TypeSyntax.ToString(),
+            dependencyContract);
     }
 
     internal static SourceOutputResult GenerateSource(EnumSerializerOutputPlan output)
@@ -46,7 +48,7 @@ internal static class EnumSerializerGenerator
         var plan = output.Serializer;
         return SourceOutputResult.FromSource(GeneratedSourceOutput.CreateSerializableSourceEntry(
             output.AssemblyName, output.TypeSyntax, output.MetadataIdentity, output.GeneratedNamespace, 0,
-            output.GeneratedNamespace, writer => Write(writer, plan)));
+            output.GeneratedNamespace, output.DependencyContract is { } contract ? [contract] : null, writer => Write(writer, plan)));
     }
 
     private static void Write(SourceWriter writer, EnumSerializerPlan plan)

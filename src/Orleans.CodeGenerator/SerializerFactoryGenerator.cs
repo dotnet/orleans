@@ -36,6 +36,9 @@ internal static class SerializerFactoryGenerator
 
     internal sealed record Failure(ITypeSymbol Type, string Reason, bool RequiresImplementation = false);
 
+    internal static bool HasSupportedModelConstruction(ISerializableTypeDescription model)
+        => !model.HasComplexBaseType && !model.UseActivator && model.SerializationHooks.Count == 0;
+
     internal static bool TryCreate(
         IGeneratorServices services,
         IEnumerable<ITypeSymbol> roots,
@@ -49,6 +52,7 @@ internal static class SerializerFactoryGenerator
             ? csharp.WithOptions(csharp.Options.WithMetadataImportOptions(MetadataImportOptions.All))
             : services.Compilation;
         var registrations = new Dictionary<ITypeSymbol, Registration>(SymbolEqualityComparer.Default);
+        var dependencyContracts = new SerializerDependencyContract.Index(services.Compilation);
         var pending = new Queue<ITypeSymbol>(roots);
         while (pending.Count > 0)
         {
@@ -61,7 +65,7 @@ internal static class SerializerFactoryGenerator
                 return false;
             }
             var registration = new Registration(type);
-            if (Describe(registration, services, implementationCompilation, cancellationToken, out var requiresImplementation) is { } reason)
+            if (Describe(registration, services, implementationCompilation, dependencyContracts, cancellationToken, out var requiresImplementation) is { } reason)
             {
                 if (!requiresImplementation)
                 {
@@ -183,6 +187,7 @@ internal static class SerializerFactoryGenerator
 
     private static string? Describe(
         Registration registration, IGeneratorServices services, Compilation implementationCompilation,
+        SerializerDependencyContract.Index dependencyContracts,
         CancellationToken cancellationToken, out bool requiresImplementation)
     {
         requiresImplementation = false;
@@ -241,7 +246,7 @@ internal static class SerializerFactoryGenerator
         if (named.IsAbstract || named.TypeKind == TypeKind.Interface)
             return "declare concrete model types";
         if (!SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, services.Compilation.Assembly))
-            return DescribeReferenced(registration, named, services, implementationCompilation, cancellationToken, out requiresImplementation);
+            return DescribeReferenced(registration, named, services, implementationCompilation, dependencyContracts, cancellationToken, out requiresImplementation);
         ISerializableTypeDescription? model;
         try
         {
@@ -252,7 +257,7 @@ internal static class SerializerFactoryGenerator
             return exception.Diagnostic.GetMessage();
         }
         if (model is null) return "the model has no generated serialization implementation";
-        if (model.HasComplexBaseType || model.UseActivator || model.SerializationHooks.Count > 0)
+        if (!HasSupportedModelConstruction(model))
             return "this context supports models with default construction, an object base, and generated member serialization";
         foreach (var member in model.Members)
         {
@@ -325,7 +330,8 @@ internal static class SerializerFactoryGenerator
 
     private static string? DescribeReferenced(
         Registration registration, INamedTypeSymbol named, IGeneratorServices services,
-        Compilation implementationCompilation, CancellationToken cancellationToken, out bool requiresImplementation)
+        Compilation implementationCompilation, SerializerDependencyContract.Index dependencyContracts,
+        CancellationToken cancellationToken, out bool requiresImplementation)
     {
         requiresImplementation = false;
         var binding = implementationCompilation.GetSemanticModel(implementationCompilation.SyntaxTrees.First());
@@ -339,7 +345,7 @@ internal static class SerializerFactoryGenerator
         var library = LibraryTypes.FromCompilation(implementationCompilation, services.Options);
         var model = new SerializableTypeDescription(implementationCompilation, implementationType,
             SerializableSourceOutputGenerator.ShouldIncludePrimaryConstructorParameters(implementationType, library), [], library);
-        if (model.HasComplexBaseType || model.UseActivator || model.SerializationHooks.Count > 0)
+        if (!HasSupportedModelConstruction(model))
             return "this context supports models with default construction, an object base, and generated member serialization";
         registration.Model = model;
         registration.ReferencedCodec = ResolveImplementation(SerializerGenerator.GetSimpleClassName(named.Name));
@@ -376,6 +382,16 @@ internal static class SerializerFactoryGenerator
         {
             if (implementation is null) continue;
             cancellationToken.ThrowIfCancellationRequested();
+            if (dependencyContracts.TryRead(implementation, named, registration.Dependencies, registration.CanonicalArrays, out var contractFailure))
+            {
+                if (contractFailure is not null)
+                {
+                    return contractFailure;
+                }
+
+                continue;
+            }
+
             if (SerializableSourceOutputGenerator.HasReferenceAssemblyAttribute(implementation.ContainingAssembly))
             {
                 var options = new CodeGeneratorOptions();

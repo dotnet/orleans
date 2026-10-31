@@ -104,7 +104,9 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             !isShallowCopyable && !isExceptionType && !type.IsSealedType, isExceptionType && !isShallowCopyable);
         return new(typePlan ?? SerializableTypeEmissionPlan.Create(type, LibraryTypes), isShallowCopyable, isExceptionType,
             onlyDeepFields, baseType, CodeText.Type(LibraryTypes.BaseCopier_1.ToTypeSyntax(type.TypeSyntax)),
-            ConstructionEmissionPlan.Create(construction),
+            ConstructionEmissionPlan.Create(construction,
+                SerializerDependencyContract.CreateAttribute(type,
+                    fields.OfType<CopierFieldDescription>().Select(static field => field.UnderlyingType), GetSimpleClassName(type.Name))),
             fields.Select(FieldEmissionPlan.Create).ToImmutableArray(), memberPlans);
     }
 

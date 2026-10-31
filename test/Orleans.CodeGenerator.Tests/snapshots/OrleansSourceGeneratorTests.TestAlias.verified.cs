@@ -1,4 +1,5 @@
 ﻿#pragma warning disable
+[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.DependencyContract:OrleansCodeGen.TestProject.Codec_MyTypeAliasStruct", "1;0;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null29:TestProject.MyTypeAliasStruct0;0;0;")]
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
