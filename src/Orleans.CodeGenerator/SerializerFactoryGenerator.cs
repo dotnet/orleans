@@ -16,6 +16,8 @@ internal static class SerializerFactoryGenerator
         public string Copier { get; set; } = "";
         public string CodecConstruction { get; set; } = "";
         public string CopierConstruction { get; set; } = "";
+        public bool HasBaseCodec { get; set; }
+        public bool HasBaseCopier { get; set; }
         public List<ITypeSymbol> Dependencies { get; } = [];
         public ISerializableTypeDescription? Model { get; set; }
         public INamedTypeSymbol? ReferencedCodec { get; set; }
@@ -88,8 +90,6 @@ internal static class SerializerFactoryGenerator
             return false;
         }
 
-        var serializerGenerator = new SerializerGenerator(services);
-        var copierGenerator = new CopierGenerator(services);
         var result = new StringBuilder();
         var metadataTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
         var auxiliaryServices = new HashSet<string>(StringComparer.Ordinal);
@@ -97,37 +97,21 @@ internal static class SerializerFactoryGenerator
         foreach (var registration in registrations.Values.OrderBy(value => Name(value.Type), StringComparer.Ordinal))
         {
             var typeName = Name(registration.Type);
-            var hasBaseCodec = false;
-            var hasBaseCopier = false;
-            if (registration.Model is { } model)
+            var hasBaseCodec = registration.HasBaseCodec;
+            var hasBaseCopier = registration.HasBaseCopier;
+            if (registration.ReferencedCodec is { } referencedCodec)
             {
-                if (registration.ReferencedCodec is { } referencedCodec)
-                {
-                    var implementationLibrary = LibraryTypes.FromCompilation(implementationCompilation, services.Options);
-                    hasBaseCodec = referencedCodec.AllInterfaces.Any(contract =>
-                        SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, implementationLibrary.BaseCodec_1));
-                    hasBaseCopier = registration.ReferencedCopier?.AllInterfaces.Any(contract =>
-                        SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, implementationLibrary.BaseCopier_1)) == true;
-                    registration.CodecConstruction = ConstructReferenced(registration.Codec, referencedCodec);
-                    registration.CopierConstruction = registration.ReferencedCopier is { } referencedCopier
-                        ? ConstructReferenced(registration.Copier, referencedCopier)
-                        : $"new {registration.Copier}()";
-                }
-                else
-                {
-                    var codecDeclaration = serializerGenerator.Generate(model);
-                    var copierDeclaration = copierGenerator.GenerateCopier(model, new());
-                    hasBaseCodec = codecDeclaration.BaseList!.Types.Any(contract =>
-                        contract.Type.ToString() == services.LibraryTypes.BaseCodec_1.ToTypeSyntax(model.TypeSyntax).ToString());
-                    hasBaseCopier = copierDeclaration?.BaseList?.Types.Any(contract =>
-                        contract.Type.ToString() == services.LibraryTypes.BaseCopier_1.ToTypeSyntax(model.TypeSyntax).ToString()) == true;
-                    registration.CodecConstruction = ConstructGenerated(registration.Codec, codecDeclaration);
-                    registration.CopierConstruction = copierDeclaration is null
-                        ? $"new {registration.Copier}()"
-                        : ConstructGenerated(registration.Copier, copierDeclaration);
-                }
+                var implementationLibrary = LibraryTypes.FromCompilation(implementationCompilation, services.Options);
+                hasBaseCodec = referencedCodec.AllInterfaces.Any(contract =>
+                    SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, implementationLibrary.BaseCodec_1));
+                hasBaseCopier = registration.ReferencedCopier?.AllInterfaces.Any(contract =>
+                    SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, implementationLibrary.BaseCopier_1)) == true;
+                registration.CodecConstruction = ConstructReferenced(registration.Codec, referencedCodec);
+                registration.CopierConstruction = registration.ReferencedCopier is { } referencedCopier
+                    ? ConstructReferenced(registration.Copier, referencedCopier)
+                    : $"new {registration.Copier}()";
             }
-            else if (registration.Dependencies.Count > 0)
+            else if (registration.Model is null && registration.Dependencies.Count > 0)
             {
                 var codecArguments = new List<string>();
                 var copierArguments = new List<string>();
@@ -300,35 +284,48 @@ internal static class SerializerFactoryGenerator
             ? $"global::Orleans.Serialization.Cloning.ShallowCopier<{Name(type)}>"
             : $"global::{generatedNamespace}.{CopierGenerator.GetSimpleClassName(named.Name)}{argumentsSuffix}";
         registration.Model = definitionModel;
-        var substitutions = definitionModel.TypeParameters
-            .Zip(named.GetAllTypeArguments(), static (parameter, argument) => (parameter.Parameter.Name, Type: argument.ToTypeSyntax()))
-            .ToDictionary(static entry => entry.Name, static entry => entry.Type, StringComparer.Ordinal);
-        var binding = services.Compilation.GetSemanticModel(services.Compilation.SyntaxTrees.First());
-        var declarations = new List<ClassDeclarationSyntax> { new SerializerGenerator(services).Generate(definitionModel) };
-        if (new CopierGenerator(services).GenerateCopier(definitionModel, new()) is { } copierDeclaration)
-            declarations.Add(copierDeclaration);
-        foreach (var request in declarations.SelectMany(static declaration => declaration.DescendantNodes().OfType<InvocationExpressionSyntax>())
-            .Where(static invocation => invocation.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax { Identifier.ValueText: "GetService" } })
-            .Select(static invocation => ((GenericNameSyntax)((MemberAccessExpressionSyntax)invocation.Expression).Name).TypeArgumentList.Arguments.Single()))
+        var codecConstruction = new SerializerGenerator(services).GetConstruction(definitionModel);
+        var copierConstruction = new CopierGenerator(services).GetConstruction(definitionModel);
+        registration.CodecConstruction = ConstructGenerated(registration.Codec, codecConstruction);
+        registration.CopierConstruction = ConstructGenerated(registration.Copier, copierConstruction);
+        registration.HasBaseCodec = codecConstruction.HasBaseContract;
+        registration.HasBaseCopier = copierConstruction.HasBaseContract;
+        var substitutions = new Dictionary<ITypeParameterSymbol, ITypeSymbol>(SymbolEqualityComparer.Default);
+        foreach (var (parameter, argument) in definitionModel.TypeParameters.Zip(named.GetAllTypeArguments(),
+            static (parameter, argument) => (parameter.Parameter, argument)))
+            substitutions.Add(parameter, argument);
+        foreach (var request in codecConstruction.CanonicalArrays.Concat(copierConstruction.CanonicalArrays))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var substituted = request.ReplaceNodes(request.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()
-                .Where(identifier => identifier.Parent is not QualifiedNameSyntax and not AliasQualifiedNameSyntax
-                    && substitutions.ContainsKey(identifier.Identifier.ValueText)),
-                (original, _) => substitutions[original.Identifier.ValueText]);
-            if (binding.GetSpeculativeTypeInfo(0, substituted, SpeculativeBindingOption.BindAsTypeOrNamespace).Type is INamedTypeSymbol service
-                && (SymbolEqualityComparer.Default.Equals(service.OriginalDefinition, services.LibraryTypes.ArrayCodec)
-                    || SymbolEqualityComparer.Default.Equals(service.OriginalDefinition, services.LibraryTypes.ArrayCopier)))
-            {
-                var canonicalArray = services.Compilation.CreateArrayTypeSymbol(service.TypeArguments[0]);
-                if (!registration.CanonicalArrays.Any(existing => SymbolEqualityComparer.Default.Equals(existing, canonicalArray)))
-                    registration.CanonicalArrays.Add(canonicalArray);
-                registration.Dependencies.Add(canonicalArray);
-                registration.Dependencies.Add(canonicalArray.ElementType);
-            }
+            var canonicalArray = (IArrayTypeSymbol)CloseType(request);
+            if (!registration.CanonicalArrays.Any(existing => SymbolEqualityComparer.Default.Equals(existing, canonicalArray)))
+                registration.CanonicalArrays.Add(canonicalArray);
+            registration.Dependencies.Add(canonicalArray);
+            registration.Dependencies.Add(canonicalArray.ElementType);
         }
 
         return null;
+
+        ITypeSymbol CloseType(ITypeSymbol symbol)
+        {
+            switch (symbol)
+            {
+                case ITypeParameterSymbol parameter:
+                    return substitutions[parameter];
+                case IArrayTypeSymbol array:
+                    return services.Compilation.CreateArrayTypeSymbol(CloseType(array.ElementType), array.Rank);
+                case INamedTypeSymbol { IsGenericType: true } generic:
+                    var definition = generic is { TypeKind: not TypeKind.Error, ContainingType.IsGenericType: true }
+                        ? ((INamedTypeSymbol)CloseType(generic.ContainingType)).GetTypeMembers(generic.Name, generic.Arity)
+                            .Single(candidate => SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, generic.OriginalDefinition))
+                        : generic.ConstructedFrom;
+                    return generic.Arity > 0
+                        ? definition.Construct([.. generic.TypeArguments.Select(CloseType)])
+                        : definition;
+                default:
+                    return symbol;
+            }
+        }
     }
 
     private static string? DescribeReferenced(
@@ -460,14 +457,12 @@ internal static class SerializerFactoryGenerator
         return $"new {name}({string.Join(", ", arguments)})";
     }
 
-    private static string ConstructGenerated(string name, ClassDeclarationSyntax declaration)
+    private static string ConstructGenerated(string name, GeneratedTypeConstruction construction)
     {
-        var constructor = declaration.Members.OfType<ConstructorDeclarationSyntax>().SingleOrDefault();
-        var arguments = constructor?.ParameterList.Parameters.Select(parameter =>
-            parameter.Type!.ToString().EndsWith(".ICodecProvider", StringComparison.Ordinal)
-                || parameter.Type.ToString() == "ICodecProvider"
+        var arguments = construction.Parameters.Select(parameter =>
+            parameter.IsCodecProvider
                 ? "provider"
-                : Resolve(parameter.Type.ToString())) ?? [];
+                : Resolve(parameter.Type.ToString()));
         return $"new {name}({string.Join(", ", arguments)})";
     }
 
