@@ -778,9 +778,9 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             Assert.Equal(1, control.ScopeDisposed);
             Assert.DoesNotContain(events.Events, e => e.Payload is GrainLifecycleEvents.Activated a && a.GrainContext.GrainId == id);
 
-            // A competing registration enters teardown at Disposing. A registration which threw enters at Unregistering, which skips
-            // unregistering because the activation was deactivated by the directory failure. Neither changes the directory.
-            Assert.Equal(["register"], control.Events);
+            // A competing registration enters teardown at Disposing, leaving the directory unchanged. A registration which threw may have
+            // committed, so teardown enters at Unregistering and removes it.
+            Assert.Equal(existing is null ? new[] { "register", "unregister" } : ["register"], control.Events);
         }
         finally
         {
@@ -1029,6 +1029,48 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             {
                 throw new InvalidOperationException("Injected rehydration context disposal failure.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Only an activation which completed activation migrates. A migration requested during setup stops setup and is discarded, so the
+    /// activation's partially initialized state does not reach the migration target.
+    /// </summary>
+    [Fact]
+    public async Task Runtime_MigrationRequestedDuringSetup_IsDiscarded()
+    {
+        await using var fixture = new MetricsFixture("directory-rehydrate-migrate-during-start", siloCount: 2);
+        await fixture.InitializeAsync();
+        var services = fixture.PrimaryServices;
+        var control = services.GetRequiredService<LifecycleControl>();
+        control.MigrationTarget = Assert.Single(fixture.HostedCluster.SecondarySilos).SiloAddress;
+        var id = GetCall(fixture.GrainFactory, "ordinary", 707).Reference.GrainId;
+        var activation = Assert.IsType<ActivationData>(services.GetRequiredService<Catalog>().GetOrCreateActivation(id, null));
+        try
+        {
+            var registration = await control.DirectoryEntered.Task.WaitAsync(Timeout, TestCancellation);
+            control.DirectoryResponse.TrySetResult(registration);
+
+            // A migration which was wrongly sent waits for the target's directory registration, which this test never completes.
+            try
+            {
+                await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
+            }
+            catch (TimeoutException exception)
+            {
+                throw new TimeoutException($"Deactivation did not complete. Events: [{string.Join(", ", control.Events)}]", exception);
+            }
+
+            // The grain lifecycle requested migration while it was starting.
+            Assert.True(control.MigrationAccepted);
+            Assert.Equal(ActivationState.Destroyed, activation.State);
+            Assert.Equal(["register", "start", "stop", "unregister"], control.Events);
+            Assert.Equal(0, control.ActivationInvocations);
+        }
+        finally
+        {
+            control.DirectoryResponse.TrySetResult(null);
+            await activation.DisposeAsync();
         }
     }
 
@@ -1899,6 +1941,8 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         public TaskCompletionSource ActivationExited { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource DisposalEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource DisposalRelease { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public SiloAddress? MigrationTarget;
+        public bool? MigrationAccepted;
         public int CreateInvocations;
         public int ActivationInvocations;
         public int ObserverCreated;
@@ -2037,6 +2081,13 @@ public class ActivationDataMigrationTestsRuntimeMetrics
                 _ =>
                 {
                     control.Events.Enqueue("start");
+                    if (control.Mode == "directory-rehydrate-migrate-during-start")
+                    {
+                        var activation = (ActivationData)context;
+                        activation.ForwardingAddress = control.MigrationTarget;
+                        control.MigrationAccepted = activation.TryStartMigration(requestContext: null, CancellationToken.None);
+                    }
+
                     return Task.CompletedTask;
                 },
                 _ =>

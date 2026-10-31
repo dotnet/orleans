@@ -1,11 +1,15 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 using Microsoft.Accordant;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Diagnostics;
+using Orleans.GrainDirectory;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -122,8 +126,8 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
     }
 
     /// <summary>
-    /// Drives real activations through generated sequences of phase completions, phase failures, and deactivation requests,
-    /// comparing each observed phase and state with the state machine model.
+    /// Drives real activations through generated sequences of phase completions, phase failures, deactivation requests, migration requests,
+    /// and forced disposal, comparing each observed phase, state, and migration outcome with the state machine model.
     /// </summary>
     [Fact]
     public async Task Lifecycle_ConformsToStateMachineModel()
@@ -135,8 +139,8 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
             spec.CreateInputSet(),
             new TestGenerationOptions
             {
-                MaxDepth = 8,
-                SequentialTestCaseAlgorithm = SequentialTestCaseAlgorithms.CreateTransitionCoverage(maxSequenceLength: 8),
+                MaxDepth = 10,
+                SequentialTestCaseAlgorithm = SequentialTestCaseAlgorithms.CreateTransitionCoverage(maxSequenceLength: 10),
                 ShouldApply = (input, state) => ActivationLifecycleModel.CanApply(((ActivationLifecycleRequest)input.Request).Kind, (ActivationLifecycleModelState)state),
             });
         Assert.NotEmpty(cases);
@@ -185,7 +189,10 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
 
         // Every phase which the gated grain exposes was reached by some generated case.
         Assert.Equal(
-            [ActivationState.Starting, ActivationState.Activating, ActivationState.Active, ActivationState.Deactivating, ActivationState.Stopping, ActivationState.Destroyed],
+            [
+                ActivationState.Registering, ActivationState.Starting, ActivationState.Activating, ActivationState.Active,
+                ActivationState.Deactivating, ActivationState.Stopping, ActivationState.Unregistering, ActivationState.Destroyed,
+            ],
             observed.Keys.Order());
     }
 
@@ -194,6 +201,7 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
     {
         await using var executor = new ActivationLifecycleExecutor(fixture);
         await executor.Execute(ActivationLifecycleOperation.Activate);
+        await executor.Execute(ActivationLifecycleOperation.Release);
         await executor.Execute(ActivationLifecycleOperation.Release);
         var activation = executor.Activation!;
         Assert.Equal(ActivationState.Activating, activation.State);
@@ -222,6 +230,7 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
         await executor.Execute(ActivationLifecycleOperation.Activate);
         await executor.Execute(ActivationLifecycleOperation.Release);
         await executor.Execute(ActivationLifecycleOperation.Release);
+        await executor.Execute(ActivationLifecycleOperation.Release);
         await executor.Execute(ActivationLifecycleOperation.Deactivate);
         var activation = executor.Activation!;
         Assert.Equal(ActivationState.Deactivating, activation.State);
@@ -229,7 +238,7 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
         await activation.DisposeAsync().AsTask().WaitAsync(Timeout, Cancellation);
         Assert.Equal(ActivationState.Destroyed, activation.State);
 
-        // Teardown resumes after OnDeactivateAsync, skips the lifecycle stop which forced disposal preempted, and completes deactivation.
+        // Teardown resumes after OnDeactivateAsync, skips the lifecycle stop and unregistration which forced disposal preempted, and completes deactivation.
         // Later callbacks are recorded without waiting, so a wrongly run lifecycle stop is observed rather than blocked.
         executor.Gate.ReleaseAll();
         await activation.Deactivated.WaitAsync(Timeout, Cancellation);
@@ -248,6 +257,7 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
     {
         await using var executor = new ActivationLifecycleExecutor(fixture);
         await executor.Execute(ActivationLifecycleOperation.Activate);
+        await executor.Execute(ActivationLifecycleOperation.Release);
         await executor.Execute(ActivationLifecycleOperation.Release);
         await executor.Execute(ActivationLifecycleOperation.Release);
         var activation = executor.Activation!;
@@ -312,10 +322,12 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
         };
         ActivitySource.AddActivityListener(listener);
 
-        Assert.Equal(new ActivationLifecycleObservation(ActivationState.Starting, ActivationState.Starting, false), await executor.Execute(ActivationLifecycleOperation.Activate));
+        Assert.Equal(new ActivationLifecycleObservation(ActivationState.Registering, ActivationState.Registering, false), await executor.Execute(ActivationLifecycleOperation.Activate));
+        Assert.Equal(new ActivationLifecycleObservation(ActivationState.Starting, ActivationState.Starting, false), await executor.Execute(ActivationLifecycleOperation.Release));
         Assert.Equal(new ActivationLifecycleObservation(ActivationState.Activating, ActivationState.Activating, false), await executor.Execute(ActivationLifecycleOperation.Release));
         Assert.Equal(new ActivationLifecycleObservation(ActivationState.Deactivating, ActivationState.Deactivating, true), await executor.Execute(ActivationLifecycleOperation.Release));
         Assert.Equal(new ActivationLifecycleObservation(ActivationState.Stopping, ActivationState.Stopping, true), await executor.Execute(ActivationLifecycleOperation.Release));
+        Assert.Equal(new ActivationLifecycleObservation(ActivationState.Unregistering, ActivationState.Unregistering, true), await executor.Execute(ActivationLifecycleOperation.Release));
         Assert.Equal(new ActivationLifecycleObservation(ActivationState.Destroyed, ActivationState.Destroyed, true), await executor.Execute(ActivationLifecycleOperation.Release));
         executor.AssertQuiescent();
     }
@@ -329,7 +341,12 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
         {
             ActivationAssertionRecorder.Install();
             builder.Options.InitialSilosCount = 1;
-            builder.ConfigureSilo((_, silo) => silo.Services.AddSingleton<PhaseGateRegistry>());
+            builder.ConfigureSilo((_, silo) =>
+            {
+                silo.Services.AddSingleton<PhaseGateRegistry>();
+                silo.Services.AddSingleton<PhaseGateDirectory>();
+                silo.Services.AddSingleton<IGrainDirectoryResolver, PhaseGateDirectoryResolver>();
+            });
         }
 
         public override async ValueTask DisposeAsync()
@@ -362,6 +379,7 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
         public async Task<ActivationLifecycleObservation> Execute(ActivationLifecycleOperation operation)
         {
             _history.Add(operation.ToString());
+            bool? migrationAccepted = null;
             try
             {
                 switch (operation)
@@ -390,9 +408,38 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
                         }
 
                         break;
+                    case ActivationLifecycleOperation.Migrate:
+                        var wasActiveForMigration = Activation!.State is ActivationState.Active;
+                        migrationAccepted = Activation.TryStartMigration(requestContext: null, Cancellation);
+
+                        // An accepted request deactivates the activation, which an active activation does immediately.
+                        if (migrationAccepted is true && wasActiveForMigration)
+                        {
+                            _phase = await Gate.ReadObservation();
+                        }
+
+                        break;
+                    case ActivationLifecycleOperation.Dispose:
+                        await Activation!.DisposeAsync().AsTask().WaitAsync(Timeout, Cancellation);
+                        if (Activation.IsDeactivationRequested)
+                        {
+                            // The deactivation operation resumes once its pending callback completes. Later callbacks are recorded without
+                            // waiting, so a phase which forced disposal should have preempted is observed before the activation's destruction.
+                            Gate.ReleaseAll();
+                            await Activation.Deactivated.WaitAsync(Timeout, Cancellation);
+                            _phase = await Gate.ReadObservation();
+                        }
+                        else
+                        {
+                            // Forced disposal disposes resources only. Its caller removes the activation from the catalog, as ActivationDirectory disposal does.
+                            _fixture.Catalog.UnregisterMessageTarget(Activation);
+                            _phase = Activation.State;
+                        }
+
+                        break;
                 }
 
-                var result = new ActivationLifecycleObservation(_phase, Activation!.State, Activation.IsDeactivationRequested);
+                var result = new ActivationLifecycleObservation(_phase, Activation!.State, Activation.IsDeactivationRequested, migrationAccepted);
                 _history[^1] += $" => {result}";
                 if (_phase is { } phase)
                 {
@@ -403,7 +450,7 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
             }
             catch (Exception exception)
             {
-                return new ActivationLifecycleObservation(_phase, Activation?.State, Activation?.IsDeactivationRequested ?? false,
+                return new ActivationLifecycleObservation(_phase, Activation?.State, Activation?.IsDeactivationRequested ?? false, migrationAccepted,
                     $"grain={GrainId}; history=[{string.Join(", ", _history)}]; {exception}");
             }
         }
@@ -442,6 +489,8 @@ public enum ActivationLifecycleOperation
     Release,
     Fail,
     Deactivate,
+    Migrate,
+    Dispose,
 }
 
 internal sealed record ActivationLifecycleRequest(ActivationLifecycleOperation Kind)
@@ -450,11 +499,18 @@ internal sealed record ActivationLifecycleRequest(ActivationLifecycleOperation K
 }
 
 /// <summary>
-/// The phase which the activation reached after an operation, its state, and whether deactivation has been requested.
+/// The phase which the activation reached after an operation, its state, whether deactivation has been requested, and whether a
+/// migration request was accepted.
 /// </summary>
-internal sealed record ActivationLifecycleObservation(ActivationState? Phase, ActivationState? State, bool DeactivationRequested, string? Failure = null)
+internal sealed record ActivationLifecycleObservation(
+    ActivationState? Phase,
+    ActivationState? State,
+    bool DeactivationRequested,
+    bool? MigrationAccepted = null,
+    string? Failure = null)
 {
-    public override string ToString() => Failure ?? $"Phase={Phase}, State={State}, DeactivationRequested={DeactivationRequested}";
+    public override string ToString() =>
+        Failure ?? $"Phase={Phase}, State={State}, DeactivationRequested={DeactivationRequested}, MigrationAccepted={MigrationAccepted}";
 }
 
 [State]
@@ -469,8 +525,9 @@ internal partial class ActivationLifecycleModelState : State
 }
 
 /// <summary>
-/// The activation state machine, as observed through a grain whose lifecycle start, <c>OnActivateAsync</c>, <c>OnDeactivateAsync</c>,
-/// and lifecycle stop each wait for the test to complete or fail them.
+/// The activation state machine, as observed through a grain whose directory registration, lifecycle start, <c>OnActivateAsync</c>,
+/// <c>OnDeactivateAsync</c>, lifecycle stop, and directory unregistration each wait for the test to complete or fail them. The grain
+/// has no migration context and its silo is the only placement candidate, so rehydration and dehydration complete without waiting.
 /// </summary>
 internal static class ActivationLifecycleModel
 {
@@ -479,20 +536,37 @@ internal static class ActivationLifecycleModel
         ActivationLifecycleOperation.Activate => state.Phase is ActivationState.None,
         ActivationLifecycleOperation.Release or ActivationLifecycleOperation.Fail => IsGated(state.Phase),
         ActivationLifecycleOperation.Deactivate => state.Phase is not ActivationState.None,
+        ActivationLifecycleOperation.Migrate or ActivationLifecycleOperation.Dispose => state.Phase is not (ActivationState.None or ActivationState.Destroyed),
         _ => false,
     };
+
+    /// <summary>
+    /// Gets whether a migration request is accepted: from the start of the grain lifecycle until teardown decides whether to migrate.
+    /// </summary>
+    public static bool AcceptsMigration(ActivationState phase) => phase is >= ActivationState.Starting and < ActivationState.Dehydrating;
 
     public static void Apply(ActivationLifecycleOperation kind, ActivationLifecycleModelState state)
     {
         var phase = state.Phase;
         var requested = state.DeactivationRequested;
+        // A destroyed activation ignores deactivation requests.
+        var requests = kind is ActivationLifecycleOperation.Deactivate && phase is not ActivationState.Destroyed
+            || kind is ActivationLifecycleOperation.Migrate && AcceptsMigration(phase);
         state.Phase = (kind, phase) switch
         {
-            (ActivationLifecycleOperation.Activate, _) => ActivationState.Starting,
+            (ActivationLifecycleOperation.Activate, _) => ActivationState.Registering,
+
+            // Forced disposal moves the activation to Disposing and disposes it, skipping every phase which has not run.
+            (ActivationLifecycleOperation.Dispose, _) => ActivationState.Destroyed,
 
             // A request enters teardown only once the activation is active. During setup and teardown, it leaves the state unchanged.
-            (ActivationLifecycleOperation.Deactivate, ActivationState.Active) => ActivationState.Deactivating,
-            (ActivationLifecycleOperation.Deactivate, _) => phase,
+            (ActivationLifecycleOperation.Deactivate or ActivationLifecycleOperation.Migrate, ActivationState.Active) when requests => ActivationState.Deactivating,
+            (ActivationLifecycleOperation.Deactivate or ActivationLifecycleOperation.Migrate, _) => phase,
+
+            // Registration which completed, or which threw and so may have committed, is undone by Unregistering. Otherwise, setup continues
+            // through Rehydrating, which has no migration context.
+            (ActivationLifecycleOperation.Release, ActivationState.Registering) => requested ? ActivationState.Unregistering : ActivationState.Starting,
+            (ActivationLifecycleOperation.Fail, ActivationState.Registering) => ActivationState.Unregistering,
 
             // A deactivation request cancels setup, and a canceled setup phase fails. A failed phase enters teardown at the mirror of the
             // last completed phase, except that lifecycle stop undoes a partial start.
@@ -500,20 +574,22 @@ internal static class ActivationLifecycleModel
             (ActivationLifecycleOperation.Release, ActivationState.Activating) => requested ? ActivationState.Stopping : ActivationState.Active,
             (ActivationLifecycleOperation.Fail, ActivationState.Starting or ActivationState.Activating) => ActivationState.Stopping,
 
-            // Teardown continues past failures in grain callbacks. Dehydrating, Unregistering, and Disposing complete without waiting.
+            // Teardown continues past failures. Dehydrating does not migrate: the activation is the only placement candidate, and a
+            // migration requested during setup is discarded.
             (_, ActivationState.Deactivating) => ActivationState.Stopping,
-            (_, ActivationState.Stopping) => ActivationState.Destroyed,
+            (_, ActivationState.Stopping) => ActivationState.Unregistering,
+            (_, ActivationState.Unregistering) => ActivationState.Destroyed,
             _ => throw new InvalidOperationException($"{kind} does not apply in {phase}."),
         };
 
         state.DeactivationRequested = requested
-            || kind is ActivationLifecycleOperation.Deactivate
+            || requests
             || kind is ActivationLifecycleOperation.Fail && phase.IsSettingUp();
     }
 
-    public static bool IsGated(ActivationState phase) => phase is ActivationState.Starting or ActivationState.Activating or ActivationState.Deactivating or ActivationState.Stopping;
+    public static bool IsGated(ActivationState phase) => phase is ActivationState.Registering or ActivationState.Starting
+        or ActivationState.Activating or ActivationState.Deactivating or ActivationState.Stopping or ActivationState.Unregistering;
 }
-
 internal sealed class ActivationLifecycleSpec : Spec<ActivationLifecycleModelState>
 {
     private readonly Dictionary<ActivationLifecycleOperation, ActivationLifecycleModelOperation> _operations = [];
@@ -547,27 +623,63 @@ internal sealed class ActivationLifecycleModelOperation(ActivationLifecycleOpera
     {
         var expected = new ActivationLifecycleModelState { Phase = state.Phase, DeactivationRequested = state.DeactivationRequested };
         ActivationLifecycleModel.Apply(request.Kind, expected);
-        return Expect.That((ActivationLifecycleObservation observation) => Validate(expected, observation))
+        bool? migrationAccepted = request.Kind is ActivationLifecycleOperation.Migrate ? ActivationLifecycleModel.AcceptsMigration(state.Phase) : null;
+        return Expect.That((ActivationLifecycleObservation observation) => Validate(expected, migrationAccepted, observation))
             .ThenState(next => ActivationLifecycleModel.Apply(request.Kind, next));
     }
 
     public override Task<ActivationLifecycleObservation> ExecuteAsync(TestingContext context, ActivationLifecycleRequest request) =>
         context.Get<ActivationStateMachineTests.ActivationLifecycleExecutor>().Execute(request.Kind);
 
-    private static ValidationResult Validate(ActivationLifecycleModelState expected, ActivationLifecycleObservation observation)
+    private static ValidationResult Validate(ActivationLifecycleModelState expected, bool? migrationAccepted, ActivationLifecycleObservation observation)
     {
         if (observation.Failure is { } failure)
         {
             return ValidationResult.Invalid(failure);
         }
 
-        if (observation.Phase != expected.Phase || observation.State != expected.Phase || observation.DeactivationRequested != expected.DeactivationRequested)
+        if (observation.Phase != expected.Phase
+            || observation.State != expected.Phase
+            || observation.DeactivationRequested != expected.DeactivationRequested
+            || observation.MigrationAccepted != migrationAccepted)
         {
             return ValidationResult.Invalid(
-                $"Expected Phase={expected.Phase}, State={expected.Phase}, DeactivationRequested={expected.DeactivationRequested}; observed {observation}.");
+                $"Expected Phase={expected.Phase}, State={expected.Phase}, DeactivationRequested={expected.DeactivationRequested}, MigrationAccepted={migrationAccepted}; observed {observation}.");
         }
 
         return ValidationResult.Valid();
+    }
+}
+
+/// <summary>
+/// A grain directory for <see cref="PhaseGateGrain"/> whose registration and unregistration wait at the grain's <see cref="PhaseGate"/>.
+/// </summary>
+public sealed class PhaseGateDirectory(PhaseGateRegistry registry) : IGrainDirectory
+{
+    public Task<GrainAddress?> Register(GrainAddress address) => Register(address, null, CancellationToken.None);
+
+    public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress, CancellationToken cancellationToken)
+    {
+        // The directory call completes only when the test completes or fails it, regardless of cancellation.
+        await registry.Get(address.GrainId).Enter(ActivationState.Registering);
+        return address;
+    }
+
+    public Task Unregister(GrainAddress address) => registry.Get(address.GrainId).Enter(ActivationState.Unregistering);
+
+    public Task<GrainAddress?> Lookup(GrainId grainId) => Task.FromResult<GrainAddress?>(null);
+
+    public Task UnregisterSilos(List<SiloAddress> siloAddresses) => Task.CompletedTask;
+}
+
+public sealed class PhaseGateDirectoryResolver(PhaseGateDirectory directory, GrainTypeResolver resolver) : IGrainDirectoryResolver
+{
+    private readonly GrainType _grainType = resolver.GetGrainType(typeof(PhaseGateGrain));
+
+    public bool TryResolveGrainDirectory(GrainType grainType, GrainProperties? properties, [NotNullWhen(true)] out IGrainDirectory? grainDirectory)
+    {
+        grainDirectory = grainType == _grainType ? directory : null;
+        return grainDirectory is not null;
     }
 }
 
@@ -707,7 +819,8 @@ public interface IPhaseGateGrain : IGrainWithStringKey
 }
 
 /// <summary>
-/// A grain whose lifecycle start, <see cref="OnActivateAsync"/>, <see cref="OnDeactivateAsync"/>, and lifecycle stop each wait at a <see cref="PhaseGate"/>.
+/// A grain whose lifecycle start, <see cref="OnActivateAsync"/>, <see cref="OnDeactivateAsync"/>, and lifecycle stop each wait at a <see cref="PhaseGate"/>,
+/// as do its registration and unregistration in <see cref="PhaseGateDirectory"/>.
 /// The callbacks ignore cancellation, modeling user code which runs to completion after its token is canceled.
 /// </summary>
 public sealed class PhaseGateGrain(PhaseGateRegistry registry) : Grain, IPhaseGateGrain, ILifecycleParticipant<IGrainLifecycle>

@@ -187,6 +187,7 @@ internal sealed partial class ActivationData :
     /// </remarks>
     internal bool IsDeactivationRequested => _extras?.IsDeactivationRequested ?? false;
 
+
     /// <summary>
     /// Gets whether this activation is going away: deactivation was requested or it is disposing.
     /// </summary>
@@ -821,7 +822,8 @@ internal sealed partial class ActivationData :
     {
         lock (_lock)
         {
-            // Migration can be requested once the grain lifecycle starts, until teardown reaches Dehydrating, which decides whether the activation migrates.
+            // Migration can be requested once the grain lifecycle starts, until teardown reaches Dehydrating, which decides whether the activation
+            // migrates. Only an activation which completed activation migrates, so a request during setup only deactivates the activation.
             if (State is < ActivationState.Starting or >= ActivationState.Dehydrating)
             {
                 return false;
@@ -2160,7 +2162,7 @@ internal sealed partial class ActivationData :
                     }
                     else
                     {
-                        // A registration which threw may have committed, so teardown treats registration as completed.
+                        // A registration which threw may have committed, so teardown treats registration as completed and unregisters.
                         Deactivate(reason, CancellationToken.None);
                         SetActivityError(_activationActivity, registrationException, ActivityErrorEvents.ActivationCancelled);
                     }
@@ -2664,14 +2666,26 @@ internal sealed partial class ActivationData :
     /// <summary>
     /// Migrates this activation if migration was requested or its silo is retiring.
     /// </summary>
-    /// <param name="completedActivation">Whether the activation completed activation, which retirement requires, since an interrupted
-    /// activation may hold partially initialized state.</param>
+    /// <param name="completedActivation">Whether the activation completed activation. Only an activation which completed activation migrates,
+    /// since an interrupted activation may hold partially initialized state, such as grain state which storage never loaded.</param>
     /// <param name="cancellationToken">The token which cancels a migration which has not been sent.</param>
     /// <returns>The migration, which completes successfully once the target accepts it, or <see langword="null"/> if none was sent.</returns>
     private async Task<ActivationMigration?> DehydrateAsync(bool completedActivation, CancellationToken cancellationToken)
     {
+        if (!completedActivation)
+        {
+            // Setup stopped, so a migration requested during setup is discarded. The activation deactivates, and its requests are forwarded.
+            if (DehydrationContext is { } discarded)
+            {
+                DehydrationContext = null;
+                discarded.MigrationContext.Dispose();
+            }
+
+            return null;
+        }
+
         // When its silo retires, an activation which still has queued requests migrates, carrying the requests with it.
-        if (completedActivation && DehydrationContext is null && WaitingCount > 0 && MigratesOnRetirement())
+        if (DehydrationContext is null && WaitingCount > 0 && MigratesOnRetirement())
         {
             DehydrationContext = new(_shared.SerializerSessionPool, requestContext: null);
         }
@@ -2718,11 +2732,13 @@ internal sealed partial class ActivationData :
         return migration;
     }
 
+    /// <summary>
+    /// Removes the registration which <see cref="ActivationState.Registering"/> created, or which it may have created if registration threw.
+    /// Unregistration is conditional on this activation's identity, so it is harmless when the directory no longer holds the registration.
+    /// </summary>
     private async Task UnregisterAsync(CancellationToken cancellationToken)
     {
-        // An activation which was deactivated because of a directory failure does not unregister: either its registration failed,
-        // or the silo which owned its directory partition failed, removing the registration.
-        if (!IsUsingGrainDirectory || cancellationToken.IsCancellationRequested || DeactivationReason.ReasonCode is DeactivationReasonCode.DirectoryFailure)
+        if (!IsUsingGrainDirectory || cancellationToken.IsCancellationRequested)
         {
             return;
         }
@@ -2994,6 +3010,7 @@ internal sealed partial class ActivationData :
         private const int IsStuckDeactivatingFlag = 1 << 1;
         private const int IsDisposalClaimedFlag = 1 << 2;
         private const int IsDeactivationRequestedFlag = 1 << 3;
+
         private byte _flags;
 
         /// <summary>
@@ -3050,6 +3067,7 @@ internal sealed partial class ActivationData :
         /// </summary>
         public bool IsDisposalClaimed { get => GetFlag(IsDisposalClaimedFlag); set => SetFlag(IsDisposalClaimedFlag, value); }
         public bool IsDeactivationRequested { get => GetFlag(IsDeactivationRequestedFlag); set => SetFlag(IsDeactivationRequestedFlag, value); }
+
 
         private void SetFlag(int flag, bool value)
         {

@@ -46,7 +46,7 @@ An activation moves through a linear chain of states which is symmetric around `
 | --- | --- | --- | --- |
 | `None` | The context exists without a grain instance. | `Destroyed` | The activation is a tombstone. |
 | `Constructing` | Create the grain instance and its per-activation components, and read the previous registration from a migration context. | `Disposing` | Dispose the grain instance and activation services. Deactivation then leaves the catalog and rejects or forwards queued requests. |
-| `Registering` | Register the activation in the grain directory, replacing a previous registration. | `Unregistering` | Remove the directory registration, unless it was handed to a migration target or a directory failure deactivated the activation. |
+| `Registering` | Register the activation in the grain directory, replacing a previous registration. | `Unregistering` | Remove the directory registration, unless it was handed to a migration target. |
 | `Rehydrating` | Restore migration participants from the migration context. | `Dehydrating` | Dehydrate migration participants and send them, with queued requests, to the migration target. |
 | `Starting` | Start the grain lifecycle. | `Stopping` | Stop the grain lifecycle stages which started. |
 | `Activating` | Run <xref:Orleans.IGrainBase.OnActivateAsync*>. | `Deactivating` | Run <xref:Orleans.IGrainBase.OnDeactivateAsync*>. |
@@ -56,12 +56,12 @@ An activation moves through a linear chain of states which is symmetric around `
 The state machine enforces these rules:
 
 - Each transition advances one state.
-- Migrated state is installed only once the activation holds its directory registration, so `Registering` precedes `Rehydrating`. A migrating activation hands its registration to the migration target and unregisters only if that handoff fails, so `Dehydrating` precedes `Unregistering`. `Dehydrating` acts only for an activation whose grain lifecycle started.
-- Teardown starts at the mirror of the last completed setup phase and runs every later teardown phase. A failed phase leaves the phase before it as the last completed phase. `Stopping` stops only the lifecycle stages which started, so a failed `Starting` phase enters teardown at `Stopping`. `Disposing` undoes partial construction. A directory registration which threw may have committed, so teardown treats it as completed. `Unregistering` skips an activation which was deactivated because of a directory failure, since the failure removed or prevented its registration.
+- Migrated state is installed only once the activation holds its directory registration, so `Registering` precedes `Rehydrating`. A migrating activation hands its registration to the migration target and unregisters only if that handoff fails, so `Dehydrating` precedes `Unregistering`. Only an activation which completed activation migrates, so `Dehydrating` discards a migration requested during setup.
+- Teardown starts at the mirror of the last completed setup phase and runs every later teardown phase. A failed phase leaves the phase before it as the last completed phase. `Stopping` stops only the lifecycle stages which started, so a failed `Starting` phase enters teardown at `Stopping`. `Disposing` undoes partial construction. A directory registration which threw may have committed, so teardown treats it as completed and unregisters it.
 - A deactivation request during setup is recorded intent. It cancels the setup phase's token, setup stops at its next phase boundary, and the deactivation operation enters teardown. A canceled `Starting` or `Activating` phase fails. A deactivation request while the activation is `Active` enters `Deactivating` immediately.
 - Forced disposal, such as disposal of the activation directory when the silo's services are disposed, moves an activation directly to `Disposing`, skips the phases which have not run, and disposes the activation's resources. A deactivation already in progress then leaves the catalog and forwards queued requests.
 
-For example, an activation which finds a competing registration enters teardown at `Disposing` and leaves the directory unchanged, while an activation whose `OnActivateAsync` throws runs lifecycle stop, unregisters, and disposes without running `OnDeactivateAsync`. Migration can be requested once the grain lifecycle starts; `Dehydrating` decides whether the activation migrates.
+For example, an activation which finds a competing registration enters teardown at `Disposing` and leaves the directory unchanged, while an activation whose `OnActivateAsync` throws runs lifecycle stop, unregisters, and disposes without running `OnDeactivateAsync`. Migration can be requested once the grain lifecycle starts. A request during setup stops setup, and the activation deactivates without migrating, since its state may be partially initialized.
 
 ## Creation and activation
 

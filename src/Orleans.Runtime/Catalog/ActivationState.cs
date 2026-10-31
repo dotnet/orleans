@@ -15,7 +15,8 @@ namespace Orleans.Runtime;
 /// Two ordering dependencies fix the positions of the directory and migration phases. Migrated state is installed only once the activation
 /// holds its directory registration, so <see cref="Registering"/> precedes <see cref="Rehydrating"/>. A migrating activation hands its
 /// registration to the migration target, and unregisters only if that handoff fails, so <see cref="Dehydrating"/> precedes
-/// <see cref="Unregistering"/>. <see cref="Dehydrating"/> acts only for an activation whose grain lifecycle started.
+/// <see cref="Unregistering"/>. Only an activation which completed activation migrates, so <see cref="Dehydrating"/> discards a migration
+/// requested during setup.
 /// </para>
 /// <para>
 /// An activation advances one state at a time. Teardown starts at the mirror of the last completed setup phase and runs every later
@@ -82,8 +83,7 @@ internal enum ActivationState
     Dehydrating,
 
     /// <summary>
-    /// The activation is being removed from the grain directory, unless its registration was handed to a migration target or the activation
-    /// was deactivated because of a directory failure, which removed or prevented its registration.
+    /// The activation is being removed from the grain directory, unless its registration was handed to a migration target.
     /// </summary>
     Unregistering,
 
