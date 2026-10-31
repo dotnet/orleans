@@ -17,33 +17,35 @@ internal partial class SiloMetadataCache(
     IOptions<ClusterMembershipOptions> clusterMembershipOptions,
     ILocalSiloDetails localSiloDetails,
     ILogger<SiloMetadataCache> logger)
-    : ISiloMetadataCache, ILifecycleParticipant<ISiloLifecycle>, IDisposable
+    : ISiloMetadataCache, ILifecycleParticipant<ISiloLifecycle>, IDisposable, IAsyncDisposable
 {
     private readonly ConcurrentDictionary<SiloAddress, SiloMetadata> _metadata = new();
     private readonly Dictionary<SiloAddress, DateTime> _negativeCache = new();
     private readonly CancellationTokenSource _cts = new();
+    private Task? _runTask;
+    private Task? _disposeTask;
     private TimeSpan negativeCachePeriod;
     private long _updateSequence;
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
     {
-        Task? task = null;
         Task OnStart(CancellationToken _)
         {
             // This gives time for the cluster to be voted Dead and for membership updates to propagate that out
             negativeCachePeriod = clusterMembershipOptions.Value.GetFailureDetectionTimeout()
                                   + (2 * clusterMembershipOptions.Value.TableRefreshTimeout);
-            task = Task.Run(() => this.ProcessMembershipUpdates(_cts.Token), CancellationToken.None);
+            lock (_cts)
+            {
+                ObjectDisposedException.ThrowIf(_disposeTask is not null, this);
+                var cancellationToken = _cts.Token;
+                _runTask = Task.Run(() => this.ProcessMembershipUpdates(cancellationToken), CancellationToken.None);
+            }
             return Task.CompletedTask;
         }
 
         async Task OnStop(CancellationToken ct)
         {
-            await _cts.CancelAsync().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-            if (task is not null)
-            {
-                await task.WaitAsync(ct).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-            }
+            await DisposeAsync().AsTask().WaitAsync(ct).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         }
 
         lifecycle.Subscribe(
@@ -134,7 +136,35 @@ internal partial class SiloMetadataCache(
 
     public void SetMetadata(SiloAddress siloAddress, SiloMetadata metadata) => _metadata.TryAdd(siloAddress, metadata);
 
-    public void Dispose() => _cts.Cancel();
+    public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+    public ValueTask DisposeAsync()
+    {
+        lock (_cts)
+        {
+            return new(_disposeTask ??= DisposeCoreAsync());
+        }
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        try
+        {
+            // Cancel completes notification state even with no callbacks, allowing Dispose to close wait handles.
+            // See https://github.com/dotnet/runtime/issues/136748 for the CancelAsync fast-path defect.
+            await Task.Run(_cts.Cancel).ConfigureAwait(false);
+        }
+        finally
+        {
+            // The subscription and its metadata requests retain the source until the processor exits.
+            if (_runTask is { } task)
+            {
+                await task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            }
+
+            _cts.Dispose();
+        }
+    }
 
     [LoggerMessage(
         Level = LogLevel.Debug,
