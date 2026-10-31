@@ -1,7 +1,7 @@
+using System.Collections.Immutable;
+using System.Text;
+using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator;
 
@@ -9,57 +9,72 @@ internal class ActivatorGenerator(IGeneratorServices generatorServices)
 {
     private readonly IGeneratorServices _generatorServices = generatorServices;
 
-    private struct ConstructorArgument
+    /// <summary>Returns the activator declaration for <paramref name="type"/>, written without enclosing indentation.</summary>
+    public string GenerateActivator(ISerializableTypeDescription type)
     {
-        public TypeSyntax Type { get; set; }
-        public string FieldName { get; set; }
-        public string ParameterName { get; set; }
+        var writer = new SourceWriter();
+        Write(writer, CreatePlan(type));
+        return writer.ToString();
     }
 
-    public ClassDeclarationSyntax GenerateActivator(ISerializableTypeDescription type)
+    internal ActivatorEmissionPlan CreatePlan(ISerializableTypeDescription type, SerializableTypeEmissionPlan? typePlan = null)
+        => new(typePlan ?? SerializableTypeEmissionPlan.Create(type, _generatorServices.LibraryTypes),
+            CodeText.Type(_generatorServices.LibraryTypes.IActivator_1.ToTypeSyntax(type.TypeSyntax)),
+            type.ActivatorConstructorParameters.Select(static parameter => CodeText.Type(parameter)).ToImmutableArray());
+
+    internal static void Write(SourceWriter writer, ActivatorEmissionPlan plan)
     {
-        var simpleClassName = GetSimpleClassName(type);
+        var type = plan.Type;
+        var simpleClassName = GetSimpleClassName(type.Name);
+        var parameters = plan.ConstructorParameters;
 
-        var baseInterface = _generatorServices.LibraryTypes.IActivator_1.ToTypeSyntax(type.TypeSyntax);
-
-        var orderedFields = new List<ConstructorArgument>();
-        var index = 0;
-        if (type.ActivatorConstructorParameters is { Count: > 0 } parameters)
+        var declaration = new StringBuilder();
+        declaration.Append("internal sealed class ").Append(simpleClassName);
+        type.AppendTypeParameterList(declaration);
+        declaration.Append(" : ").Append(plan.BaseInterface);
+        writer.WriteLine(GeneratedCodeUtilities.GeneratedCodeAttributeText);
+        GenericParameterEmissionPlan.WriteDeclarationLine(writer, declaration, type.TypeParameters);
+        writer.OpenBlock();
+        for (var index = 0; index < parameters.Count; index++)
         {
-            foreach (var arg in parameters)
+            writer.WriteLine($"private readonly {parameters[index]} _arg{index};");
+        }
+
+        string createObject;
+        if (parameters.Count > 0)
+        {
+            var constructor = new StringBuilder();
+            var arguments = new StringBuilder();
+            constructor.Append("public ").Append(simpleClassName).Append('(');
+            for (var index = 0; index < parameters.Count; index++)
             {
-                orderedFields.Add(new ConstructorArgument { Type = arg, FieldName = $"_arg{index}", ParameterName = $"arg{index}" });
-                index++;
+                if (index > 0)
+                {
+                    constructor.Append(", ");
+                    arguments.Append(", ");
+                }
+
+                constructor.Append(parameters[index]).Append(" arg").Append(index);
+                arguments.Append("_arg").Append(index);
             }
-        }
 
-        var members = new List<MemberDeclarationSyntax>();
-        foreach (var field in orderedFields)
+            writer.WriteLine(constructor.Append(')').ToString());
+            writer.OpenBlock();
+            for (var index = 0; index < parameters.Count; index++)
+            {
+                writer.WriteLine($"_arg{index} = OrleansGeneratedCodeHelper.UnwrapService(this, arg{index});");
+            }
+
+            writer.CloseBlock();
+            createObject = $"new {type.Type}({arguments})";
+        }
+        else
         {
-            members.Add(
-                FieldDeclaration(VariableDeclaration(field.Type, SingletonSeparatedList(VariableDeclarator(field.FieldName))))
-                .AddModifiers(
-                    Token(SyntaxKind.PrivateKeyword),
-                    Token(SyntaxKind.ReadOnlyKeyword)));
+            createObject = type.ObjectCreation;
         }
 
-        if (orderedFields.Count > 0)
-            members.Add(GenerateConstructor(simpleClassName, orderedFields));
-
-        members.Add(GenerateCreateMethod(type, orderedFields));
-
-        var classDeclaration = ClassDeclaration(simpleClassName)
-            .AddBaseListTypes(SimpleBaseType(baseInterface))
-            .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-            .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
-            .AddMembers([.. members]);
-
-        if (type.IsGenericType)
-        {
-            classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, type.TypeParameters);
-        }
-
-        return classDeclaration;
+        writer.WriteLine($"public {type.Type} Create() => {createObject};");
+        writer.CloseBlock();
     }
 
     public static string GetSimpleClassName(ISerializableTypeDescription serializableType) => GetSimpleClassName(serializableType.Name);
@@ -78,61 +93,5 @@ internal class ActivatorGenerator(IGeneratorServices generatorServices)
                 && !type.UseActivator
                 && type is not GeneratedInvokableDescription
                 || type.HasActivatorConstructor);
-    }
-
-    private static ConstructorDeclarationSyntax GenerateConstructor(
-        string simpleClassName,
-        List<ConstructorArgument> orderedFields)
-    {
-        var parameters = new List<ParameterSyntax>();
-        var body = new List<StatementSyntax>();
-        foreach (var field in orderedFields)
-        {
-            parameters.Add(Parameter(field.ParameterName.ToIdentifier()).WithType(field.Type));
-
-            body.Add(ExpressionStatement(
-                        AssignmentExpression(
-                            SyntaxKind.SimpleAssignmentExpression,
-                            field.FieldName.ToIdentifierName(),
-                            Unwrapped(field.ParameterName.ToIdentifierName()))));
-        }
-
-        var constructorDeclaration = ConstructorDeclaration(simpleClassName)
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters([.. parameters])
-            .AddBodyStatements([.. body]);
-
-        return constructorDeclaration;
-
-        static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
-        {
-            return InvocationExpression(
-                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), IdentifierName("UnwrapService")),
-                ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(expr)])));
-        }
-    }
-
-    private static MemberDeclarationSyntax GenerateCreateMethod(ISerializableTypeDescription type, List<ConstructorArgument> orderedFields)
-    {
-        ExpressionSyntax createObject;
-        if (type.ActivatorConstructorParameters is { Count: > 0 })
-        {
-            var argList = new List<ArgumentSyntax>();
-            foreach (var field in orderedFields)
-            {
-                argList.Add(Argument(field.FieldName.ToIdentifierName()));
-            }
-
-            createObject = ObjectCreationExpression(type.TypeSyntax).WithArgumentList(ArgumentList(SeparatedList(argList)));
-        }
-        else
-        {
-            createObject = type.GetObjectCreationExpression();
-        }
-
-        return MethodDeclaration(type.TypeSyntax, "Create")
-            .WithExpressionBody(ArrowExpressionClause(createObject))
-            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-            .AddModifiers(Token(SyntaxKind.PublicKeyword));
     }
 }

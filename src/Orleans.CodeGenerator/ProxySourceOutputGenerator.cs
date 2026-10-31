@@ -21,7 +21,7 @@ internal static class ProxySourceOutputGenerator
             cancellationToken.ThrowIfCancellationRequested();
             var model = proxyOutputModel.ProxyInterface;
             var interfaceDescription = GetProxyInterfaceDescription(proxyContext, resolver, model, cancellationToken);
-            var proxyClass = proxyContext.GetProxyDeclaration(interfaceDescription);
+            var proxyPlan = proxyContext.GetProxyPlan(interfaceDescription);
             var targetHintName = GeneratedSourceOutput.CreateProxyHintName(assemblyName, interfaceDescription);
             var ownedInvokableMetadataNames = new HashSet<string>(
                 proxyOutputModel.OwnedInvokableMetadataNames,
@@ -40,46 +40,49 @@ internal static class ProxySourceOutputGenerator
                     emitDeclaredMethodsFallback))
                 .ToImmutableArray();
 
-            var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
+            var namespacedMembers = new Dictionary<string, List<Action<SourceWriter>>>(StringComparer.Ordinal);
             foreach (var invokable in emittedInvokables)
             {
-                GeneratedSourceOutput.AddMember(namespacedMembers, invokable.GeneratedNamespace, invokable.ClassDeclarationSyntax);
+                var plan = invokable.EmissionPlan;
+                GeneratedSourceOutput.AddMember(namespacedMembers, invokable.GeneratedNamespace, writer => InvokableGenerator.Write(writer, plan));
             }
 
-            GeneratedSourceOutput.AddMember(namespacedMembers, interfaceDescription.GeneratedNamespace, proxyClass);
+            GeneratedSourceOutput.AddMember(namespacedMembers, interfaceDescription.GeneratedNamespace, writer => ProxyGenerator.Write(writer, proxyPlan));
 
             foreach (var invokable in emittedInvokables)
             {
-                GeneratedSourceOutput.AddMember(namespacedMembers, invokable.GeneratedNamespace, serializerGenerator.Generate(invokable));
+                var serializerPlan = serializerGenerator.CreatePlan(invokable);
+                GeneratedSourceOutput.AddMember(namespacedMembers, invokable.GeneratedNamespace, writer => SerializerGenerator.Write(writer, serializerPlan));
 
-                var copier = invokable.IsShallowCopyable && defaultCopiers.ContainsKey(invokable)
+                var copierPlan = invokable.IsShallowCopyable && defaultCopiers.ContainsKey(invokable)
                     ? null
-                    : copierGenerator.GenerateCopier(invokable, defaultCopiers);
-                if (copier is not null)
+                    : copierGenerator.CreatePlan(invokable, defaultCopiers);
+                if (copierPlan is not null)
                 {
-                    GeneratedSourceOutput.AddMember(namespacedMembers, invokable.GeneratedNamespace, copier);
+                    GeneratedSourceOutput.AddMember(namespacedMembers, invokable.GeneratedNamespace, writer => CopierGenerator.Write(writer, copierPlan));
                 }
 
                 if (ActivatorGenerator.ShouldGenerateActivator(invokable))
                 {
-                    GeneratedSourceOutput.AddMember(namespacedMembers, invokable.GeneratedNamespace, activatorGenerator.GenerateActivator(invokable));
+                    var activatorPlan = activatorGenerator.CreatePlan(invokable);
+                    GeneratedSourceOutput.AddMember(namespacedMembers, invokable.GeneratedNamespace, writer => ActivatorGenerator.Write(writer, activatorPlan));
                 }
             }
 
             var generatedMemberMetadataNames = new HashSet<string>(
                 generatedInvokables.Select(static invokable => invokable.MetadataName),
                 StringComparer.Ordinal);
-            generatedMemberMetadataNames.Add(GetMetadataName(interfaceDescription.GeneratedNamespace, proxyClass));
-            foreach (var (generatedNamespace, declaration) in proxyContext.GetCompatibilityDeclarations(interfaceDescription.InterfaceType)
-                .Where(entry => !generatedMemberMetadataNames.Contains(GetMetadataName(entry.Namespace, entry.Declaration)))
+            generatedMemberMetadataNames.Add(proxyPlan.GetMetadataName(interfaceDescription.GeneratedNamespace));
+            foreach (var (generatedNamespace, plan) in proxyContext.GetCompatibilityDeclarations(interfaceDescription.InterfaceType)
+                .Where(entry => !generatedMemberMetadataNames.Contains(entry.Plan.GetMetadataName(entry.Namespace)))
                 .OrderBy(static entry => entry.Namespace, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.Declaration.Identifier.ValueText, StringComparer.Ordinal))
+                .ThenBy(static entry => entry.Plan.ClassName, StringComparer.Ordinal))
             {
-                GeneratedSourceOutput.AddMember(namespacedMembers, generatedNamespace, declaration);
+                GeneratedSourceOutput.AddMember(namespacedMembers, generatedNamespace, writer => InvokableGenerator.Write(writer, plan));
             }
 
             return SourceOutputResult.FromSource(
-                new GeneratedSourceEntry(targetHintName, GeneratedSourceOutput.CreateSourceString(GeneratedSourceOutput.CreateCompilationUnit(namespacedMembers))));
+                new GeneratedSourceEntry(targetHintName, GeneratedSourceOutput.CreateSourceString(namespacedMembers)));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -395,14 +398,5 @@ internal static class ProxySourceOutputGenerator
             .OfType<GeneratedInvokableDescription>()
             .Where(generatedInvokable => proxyContext.Compilation.GetTypeByMetadataName(generatedInvokable.MetadataName) is null)
             .OrderBy(static generatedInvokable => generatedInvokable.MetadataName, StringComparer.Ordinal);
-    }
-
-    private static string GetMetadataName(string generatedNamespace, ClassDeclarationSyntax classDeclaration)
-    {
-        var name = string.IsNullOrEmpty(generatedNamespace)
-            ? classDeclaration.Identifier.ValueText
-            : $"{generatedNamespace}.{classDeclaration.Identifier.ValueText}";
-        var arity = classDeclaration.TypeParameterList?.Parameters.Count ?? 0;
-        return arity == 0 ? name : $"{name}`{arity}";
     }
 }

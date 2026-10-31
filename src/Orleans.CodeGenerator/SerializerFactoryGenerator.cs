@@ -9,6 +9,9 @@ namespace Orleans.CodeGenerator;
 
 internal static class SerializerFactoryGenerator
 {
+    // Configuration statements are written inside the context's partial class and configuration method.
+    private const int ContextStatementIndentation = 2;
+
     internal sealed class Registration(ITypeSymbol type)
     {
         public ITypeSymbol Type { get; } = type;
@@ -75,7 +78,7 @@ internal static class SerializerFactoryGenerator
 
         if (failure is not null)
         {
-            var metadata = new StringBuilder();
+            var metadata = new SourceWriter(initialIndentation: ContextStatementIndentation);
             var visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
             foreach (var type in registrations.Keys)
             {
@@ -90,7 +93,7 @@ internal static class SerializerFactoryGenerator
             return false;
         }
 
-        var result = new StringBuilder();
+        var result = new SourceWriter(initialIndentation: ContextStatementIndentation);
         var metadataTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
         var auxiliaryServices = new HashSet<string>(StringComparer.Ordinal);
 
@@ -131,26 +134,20 @@ internal static class SerializerFactoryGenerator
                 registration.CopierConstruction = $"new {registration.Copier}({string.Join(", ", copierArguments)})";
             }
 
-            result.Append("options.AddSerializerService<").Append(registration.Codec).Append(">(static provider => ")
-                .Append(registration.CodecConstruction).AppendLine(");");
-            result.Append("options.AddSerializerService<").Append(registration.Copier).Append(">(static provider => ")
-                .Append(registration.CopierConstruction).AppendLine(");");
-            result.Append("options.AddSerializer<").Append(typeName).Append(">(static provider => ")
-                .Append(Resolve(registration.Codec)).Append(", static provider => ").Append(Resolve(registration.Copier)).AppendLine(");");
+            result.WriteLine($"options.AddSerializerService<{registration.Codec}>(static provider => {registration.CodecConstruction});");
+            result.WriteLine($"options.AddSerializerService<{registration.Copier}>(static provider => {registration.CopierConstruction});");
+            result.WriteLine($"options.AddSerializer<{typeName}>(static provider => {Resolve(registration.Codec)}, static provider => {Resolve(registration.Copier)});");
             if (registration.Model is { IsValueType: true, IsEnumType: false })
             {
-                result.Append("options.AddSerializerService<global::Orleans.Serialization.Serializers.IValueSerializer<")
-                    .Append(typeName).Append(">>(static provider => ").Append(Resolve(registration.Codec)).AppendLine(");");
+                result.WriteLine($"options.AddSerializerService<global::Orleans.Serialization.Serializers.IValueSerializer<{typeName}>>(static provider => {Resolve(registration.Codec)});");
             }
             if (hasBaseCodec)
             {
-                result.Append("options.AddSerializerService<global::Orleans.Serialization.Serializers.IBaseCodec<")
-                    .Append(typeName).Append(">>(static provider => ").Append(Resolve(registration.Codec)).AppendLine(");");
+                result.WriteLine($"options.AddSerializerService<global::Orleans.Serialization.Serializers.IBaseCodec<{typeName}>>(static provider => {Resolve(registration.Codec)});");
             }
             if (hasBaseCopier)
             {
-                result.Append("options.AddSerializerService<global::Orleans.Serialization.Cloning.IBaseCopier<")
-                    .Append(typeName).Append(">>(static provider => ").Append(Resolve(registration.Copier)).AppendLine(");");
+                result.WriteLine($"options.AddSerializerService<global::Orleans.Serialization.Cloning.IBaseCopier<{typeName}>>(static provider => {Resolve(registration.Copier)});");
             }
 
             foreach (var array in registration.CanonicalArrays)
@@ -163,18 +160,16 @@ internal static class SerializerFactoryGenerator
                 if (arrayRegistration.Codec != canonicalCodec && auxiliaryServices.Add(canonicalCodec))
                 {
                     var codecDependency = cyclic ? $"CreateCodecHolder<{Name(array.ElementType)}>(provider)" : $"provider.GetCodec<{Name(array.ElementType)}>()";
-                    result.Append("options.AddSerializerService<").Append(canonicalCodec).Append(">(static provider => new ")
-                        .Append(canonicalCodec).Append('(').Append(codecDependency).AppendLine("));");
+                    result.WriteLine($"options.AddSerializerService<{canonicalCodec}>(static provider => new {canonicalCodec}({codecDependency}));");
                 }
                 if (arrayRegistration.Copier != canonicalCopier && auxiliaryServices.Add(canonicalCopier))
                 {
                     var copierDependency = cyclic ? $"CreateCopierHolder<{Name(array.ElementType)}>(provider)" : $"provider.GetDeepCopier<{Name(array.ElementType)}>()";
-                    result.Append("options.AddSerializerService<").Append(canonicalCopier).Append(">(static provider => new ")
-                        .Append(canonicalCopier).Append('(').Append(copierDependency).AppendLine("));");
+                    result.WriteLine($"options.AddSerializerService<{canonicalCopier}>(static provider => new {canonicalCopier}({copierDependency}));");
                 }
             }
 
-            result.Append("options.AddAllowedType(typeof(").Append(typeName).AppendLine("));");
+            result.WriteLine($"options.AddAllowedType(typeof({typeName}));");
             if (AppendTypeMetadata(result, registration.Type, services.LibraryTypes, metadataTypes) is { } metadataFailure)
             {
                 failure = metadataFailure;
@@ -265,8 +260,8 @@ internal static class SerializerFactoryGenerator
             if (SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, services.Compilation.Assembly))
             {
                 var generatedMember = new SerializerGenerator.SerializableMember(services, member);
-                if (generatedMember.GetGetterFieldDescription() is { InitializationSyntax: not null }
-                    || generatedMember.GetSetterFieldDescription() is { InitializationSyntax: not null })
+                if (generatedMember.GetGetterFieldDescription() is { Initialization: not null }
+                    || generatedMember.GetSetterFieldDescription() is { Initialization: not null })
                     return $"serialized member '{member.Symbol.Name}' requires statically generated field accessor support";
             }
             registration.Dependencies.Add(member.Type);
@@ -462,11 +457,11 @@ internal static class SerializerFactoryGenerator
         var arguments = construction.Parameters.Select(parameter =>
             parameter.IsCodecProvider
                 ? "provider"
-                : Resolve(parameter.Type.ToString()));
+                : Resolve(CodeText.Type(parameter.Type)));
         return $"new {name}({string.Join(", ", arguments)})";
     }
 
-    private static Failure? AppendTypeMetadata(StringBuilder result, ITypeSymbol symbol, LibraryTypes library, HashSet<ITypeSymbol> visited, int depth = 0)
+    private static Failure? AppendTypeMetadata(SourceWriter result, ITypeSymbol symbol, LibraryTypes library, HashSet<ITypeSymbol> visited, int depth = 0)
     {
         if (visited.Contains(symbol)) return null;
         if (visited.Count >= 1024)
@@ -500,28 +495,26 @@ internal static class SerializerFactoryGenerator
             if (!ContainsTypeParameter(argument))
             {
                 if (library.Compilation.IsSymbolAccessibleWithin(argument, library.Compilation.Assembly))
-                    result.Append("options.AddAllowedType(typeof(").Append(Name(argument)).AppendLine("));");
+                    result.WriteLine($"options.AddAllowedType(typeof({Name(argument)}));");
                 if (AppendTypeMetadata(result, argument, library, visited, depth + 1) is { } argumentFailure) return argumentFailure;
             }
         }
-        var openType = type.ToOpenTypeSyntax().ToString();
+        // Only metadata-bearing types need their open spelling; predefined types have no generic definition to spell.
+        string? openTypeText = null;
+        string OpenType() => openTypeText ??= CodeText.Type(type.ToOpenTypeSyntax());
         if (type.HasAttribute(library.AliasAttribute) || type.HasAttribute(library.CompoundTypeAliasAttribute)
             || GeneratedCodeUtilities.GetId(library, type) is not null)
         {
-            result.Append("options.AddAllowedType(typeof(").Append(openType).AppendLine("));");
+            result.WriteLine($"options.AddAllowedType(typeof({OpenType()}));");
         }
         if (GeneratedCodeUtilities.GetAlias(library, type) is { } alias)
         {
-            result.AppendLine(MetadataGenerator.CreateTypeMetadataRegistration(
-                SyntaxFactory.ParseExpression("options.WellKnownTypeAliases"), alias.GetLiteralExpression(),
-                SyntaxFactory.ParseExpression($"typeof({openType})")).NormalizeWhitespace().ToFullString());
+            MetadataGenerator.WriteTypeMetadataRegistration(result, "options.WellKnownTypeAliases", CodeText.QuotedText(alias), $"typeof({OpenType()})");
         }
 
         if (GeneratedCodeUtilities.GetId(library, type) is { } id)
         {
-            result.AppendLine(MetadataGenerator.CreateTypeMetadataRegistration(
-                SyntaxFactory.ParseExpression("options.WellKnownTypeIds"), SyntaxFactory.ParseExpression($"{id}U"),
-                SyntaxFactory.ParseExpression($"typeof({openType})")).NormalizeWhitespace().ToFullString());
+            MetadataGenerator.WriteTypeMetadataRegistration(result, "options.WellKnownTypeIds", CodeText.Literal(id), $"typeof({OpenType()})");
         }
 
         foreach (var compound in type.GetAttributes().Where(attribute =>
@@ -533,26 +526,26 @@ internal static class SerializerFactoryGenerator
             {
                 if (!library.Compilation.IsSymbolAccessibleWithin(componentType, library.Compilation.Assembly))
                     return new Failure(componentType, "required compound-alias component metadata is inaccessible to the generated context");
-                result.Append("options.AddAllowedType(typeof(").Append(Name(componentType)).AppendLine("));");
+                result.WriteLine($"options.AddAllowedType(typeof({Name(componentType)}));");
                 if (AppendTypeMetadata(result, componentType, library, visited, depth + 1) is { } componentFailure) return componentFailure;
             }
 
-            result.Append("options.CompoundTypeAliases");
+            var compoundAlias = new StringBuilder("options.CompoundTypeAliases");
             for (var index = 0; index < components.Length; index++)
             {
                 var component = components[index].Value switch
                 {
-                    string value => value.GetLiteralExpression().ToString(),
+                    string value => CodeText.QuotedText(value),
                     ITypeSymbol componentSymbol => $"typeof({Name(componentSymbol)})",
                     _ => throw new InvalidOperationException("Compound aliases contain type or string components.")
                 };
-                result.Append(index == components.Length - 1 ? ".Add(" : ".GetOrAdd(").Append(component);
+                compoundAlias.Append(index == components.Length - 1 ? ".Add(" : ".GetOrAdd(").Append(component);
                 if (index == components.Length - 1)
-                    result.Append(", typeof(").Append(openType).Append(')');
-                result.Append(')');
+                    compoundAlias.Append(", typeof(").Append(OpenType()).Append(')');
+                compoundAlias.Append(')');
             }
 
-            result.AppendLine(";");
+            result.WriteLine(compoundAlias.Append(';').ToString());
         }
         return null;
     }

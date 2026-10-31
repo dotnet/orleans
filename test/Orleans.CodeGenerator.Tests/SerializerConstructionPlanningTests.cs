@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
@@ -42,15 +43,15 @@ public sealed class SerializerConstructionPlanningTests
             .Where(symbol => symbol.HasAttribute(services.LibraryTypes.GenerateSerializerAttribute)))
         {
             var model = SerializableSourceOutputGenerator.CreateSerializableTypeDescription(services, symbol)!;
-            Verify(serializer.GetConstruction(model), serializer.Generate(model), services.LibraryTypes.BaseCodec_1, services.LibraryTypes.ArrayCodec);
-            Verify(copier.GetConstruction(model), copier.GenerateCopier(model, new()), services.LibraryTypes.BaseCopier_1, services.LibraryTypes.ArrayCopier);
+            Verify(serializer.GetConstruction(model), ParseClass(serializer.Generate(model)), services.LibraryTypes.BaseCodec_1, services.LibraryTypes.ArrayCodec);
+            Verify(copier.GetConstruction(model), ParseClass(copier.GenerateCopier(model, new())), services.LibraryTypes.BaseCopier_1, services.LibraryTypes.ArrayCopier);
         }
 
         static void Verify(GeneratedTypeConstruction plan, ClassDeclarationSyntax? declaration, INamedTypeSymbol baseContract, INamedTypeSymbol arrayService)
         {
             var constructor = declaration?.Members.OfType<ConstructorDeclarationSyntax>().SingleOrDefault();
             Assert.Equal(constructor?.ParameterList.Parameters.Select(static parameter => parameter.ToString()) ?? [],
-                plan.Parameters.Select(static parameter => parameter.ToSyntax().ToString()));
+                plan.Parameters.Select(static parameter => parameter.ToSyntax().NormalizeWhitespace().ToString()));
             Assert.Equal(declaration?.BaseList?.Types.Any(type =>
                 type.Type is QualifiedNameSyntax { Right: GenericNameSyntax generic }
                 && generic.Identifier.ValueText == baseContract.Name) == true, plan.HasBaseContract);
@@ -136,6 +137,9 @@ public sealed class SerializerConstructionPlanningTests
             Assert.Equal("the dependency graph exceeds 1024 closed types; declare a finite serialization graph", failure!.Reason);
         }
     }
+
+    private static ClassDeclarationSyntax? ParseClass(string? declaration)
+        => declaration is null ? null : SyntaxFactory.ParseCompilationUnit(declaration).Members.OfType<ClassDeclarationSyntax>().Single();
 
     private sealed class ConstructionOnlyDescription(Compilation compilation, INamedTypeSymbol type, List<IMemberDescription> members, LibraryTypes library)
         : SerializableTypeDescription(compilation, type, false, members, library), ISerializableTypeDescription

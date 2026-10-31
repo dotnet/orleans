@@ -9,25 +9,6 @@ namespace Orleans.CodeGenerator.SyntaxGeneration;
 /// </summary>
 internal static class StringExtensions
 {
-    /// <summary>
-    /// Returns the provided string as a literal expression.
-    /// </summary>
-    /// <param name="str">
-    /// The string.
-    /// </param>
-    /// <returns>
-    /// The literal expression.
-    /// </returns>
-    public static LiteralExpressionSyntax GetLiteralExpression(this string str)
-    {
-        var syntaxToken = SyntaxFactory.Literal(
-            SyntaxFactory.TriviaList(),
-            @"""" + str + @"""",
-            str,
-            SyntaxFactory.TriviaList());
-        return SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
-    }
-
     public static SyntaxToken ToIdentifier(this string identifier)
     {
         identifier = identifier.TrimStart('@');

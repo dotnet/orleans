@@ -35,78 +35,46 @@ internal static class SyntaxFactoryUtility
     /// </returns>
     public static MemberAccessExpressionSyntax Member(this ExpressionSyntax instance, IdentifierNameSyntax member) => MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, instance, member);
 
-    public static MemberAccessExpressionSyntax Member(this ExpressionSyntax instance, GenericNameSyntax member) => MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, instance, member);
-
-    public static MemberAccessExpressionSyntax Member(
-        this ExpressionSyntax instance,
-        string member,
-        params TypeSyntax[] genericTypes) => instance.Member(
-                member.ToGenericName()
-                    .AddTypeArgumentListArguments(genericTypes));
-
-    public static GenericNameSyntax ToGenericName(this string identifier) => GenericName(identifier.ToIdentifier());
-
-    public static ClassDeclarationSyntax AddGenericTypeParameters(
-        ClassDeclarationSyntax classDeclaration,
-        List<(string Name, ITypeParameterSymbol Parameter)> typeParameters)
+    /// <summary>
+    /// Returns each type parameter's spelled constraints, in declaration order, with type parameters renamed to their generated names.
+    /// </summary>
+    public static List<(string Name, List<string> Constraints)> GetTypeParameterConstraintTexts(List<(string Name, ITypeParameterSymbol Parameter)> typeParameters)
     {
-        var typeParametersWithConstraints = GetTypeParameterConstraints(typeParameters);
-        foreach (var (name, constraints) in typeParametersWithConstraints)
-        {
-            if (constraints.Count > 0)
-            {
-                classDeclaration = classDeclaration.AddConstraintClauses(
-                    TypeParameterConstraintClause(name).AddConstraints([.. constraints]));
-            }
-        }
-
-        if (typeParametersWithConstraints.Count > 0)
-        {
-            classDeclaration = classDeclaration.WithTypeParameterList(
-                TypeParameterList(SeparatedList(typeParametersWithConstraints.Select(tp => TypeParameter(tp.Name)))));
-        }
-
-        return classDeclaration;
-    }
-
-    public static List<(string Name, List<TypeParameterConstraintSyntax> Constraints)> GetTypeParameterConstraints(List<(string Name, ITypeParameterSymbol Parameter)> typeParameter)
-    {
-        var allConstraints = new List<(string, List<TypeParameterConstraintSyntax>)>();
+        var allConstraints = new List<(string, List<string>)>(typeParameters.Count);
         var substitutions = new Dictionary<ITypeParameterSymbol, string>(SymbolEqualityComparer.Default);
-        foreach (var (name, parameter) in typeParameter)
+        foreach (var (name, parameter) in typeParameters)
         {
             substitutions[parameter] = name;
         }
 
-        foreach (var (name, tp) in typeParameter)
+        foreach (var (name, tp) in typeParameters)
         {
-            var constraints = new List<TypeParameterConstraintSyntax>();
-
+            var constraints = new List<string>();
             if (tp.HasUnmanagedTypeConstraint)
             {
-                constraints.Add(TypeConstraint(IdentifierName("unmanaged")));
+                constraints.Add("unmanaged");
             }
             else if (tp.HasValueTypeConstraint)
             {
-                constraints.Add(ClassOrStructConstraint(SyntaxKind.StructConstraint));
+                constraints.Add("struct");
             }
             else if (tp.HasNotNullConstraint)
             {
-                constraints.Add(TypeConstraint(IdentifierName("notnull")));
+                constraints.Add("notnull");
             }
             else if (tp.HasReferenceTypeConstraint)
             {
-                constraints.Add(ClassOrStructConstraint(SyntaxKind.ClassConstraint));
+                constraints.Add("class");
             }
 
             foreach (var c in tp.ConstraintTypes)
             {
-                constraints.Add(TypeConstraint(c.ToTypeSyntax(substitutions)));
+                constraints.Add(CodeText.Type(c.ToTypeSyntax(substitutions)));
             }
 
             if (tp.HasConstructorConstraint)
             {
-                constraints.Add(ConstructorConstraint());
+                constraints.Add("new()");
             }
 
             allConstraints.Add((name, constraints));

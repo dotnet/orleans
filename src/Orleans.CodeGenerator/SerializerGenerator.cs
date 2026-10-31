@@ -1,8 +1,11 @@
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Diagnostics;
 using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Orleans.CodeGenerator.InvokableGenerator;
@@ -13,12 +16,9 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 {
     private const string BaseTypeSerializerFieldName = "_baseTypeSerializer";
     private const string ActivatorFieldName = "_activator";
-    private const string SerializeMethodName = "Serialize";
-    private const string DeserializeMethodName = "Deserialize";
-    private const string WriteFieldMethodName = "WriteField";
-    private const string ReadValueMethodName = "ReadValue";
     private const string CodecFieldTypeFieldName = "_codecFieldType";
     private const string CodecProviderFieldName = "_codecProvider";
+    private const string ValueParameter = "@value";
     private readonly IGeneratorServices _generatorServices = generatorServices;
 
     private LibraryTypes LibraryTypes => _generatorServices.LibraryTypes;
@@ -27,10 +27,16 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
     private bool UseHotReloadShape(ISerializableTypeDescription type)
         => HotReloadSafe && !type.IsEnumType && type.SupportsHotReloadMemberAddition;
 
-    public ClassDeclarationSyntax Generate(ISerializableTypeDescription type)
+    /// <summary>Returns the codec declaration for <paramref name="type"/>, written without enclosing indentation.</summary>
+    public string Generate(ISerializableTypeDescription type)
     {
-        var simpleClassName = GetSimpleClassName(type);
+        var writer = new SourceWriter();
+        Write(writer, CreatePlan(type));
+        return writer.ToString();
+    }
 
+    internal SerializerEmissionPlan CreatePlan(ISerializableTypeDescription type, SerializableTypeEmissionPlan? typePlan = null)
+    {
         var members = new List<ISerializableMember>();
         foreach (var member in type.Members)
         {
@@ -55,62 +61,71 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         var fieldDescriptions = GetFieldDescriptions(type, members);
         var construction = new GeneratedTypeConstruction(LibraryTypes, fieldDescriptions, HasBaseCodec(type));
-        var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
-        var ctor = GenerateConstructor(simpleClassName, fieldDescriptions, construction);
-
-        var accessibility = type.Accessibility switch
+        var hotReloadShape = UseHotReloadShape(type);
+        var memberPlans = members.Select(member =>
         {
-            Accessibility.Public => SyntaxKind.PublicKeyword,
-            _ => SyntaxKind.InternalKeyword,
-        };
+            var memberType = member.Member.Type;
+            var staticCodec = LibraryTypes.StaticCodecs.FindByUnderlyingType(memberType);
+            var codec = staticCodec is not null ? CodeText.Type(staticCodec.CodecType.ToNameSyntax())
+                : GetCodecExpression(fieldDescriptions.OfType<CodecFieldDescription>()
+                    .First(field => SymbolEqualityComparer.Default.Equals(field.UnderlyingType, memberType)));
+            var expectedType = staticCodec is not null ? null : hotReloadShape
+                ? $"typeof({CodeText.Type(member.Member.TypeSyntax)})"
+                : CodeText.Identifier(fieldDescriptions.OfType<TypeFieldDescription>()
+                    .First(field => SymbolEqualityComparer.Default.Equals(field.UnderlyingType, memberType)).FieldName);
+            var getter = member.GetGetter();
+            var setter = member.GetSetter();
+            return new MemberEmissionPlan(member.Member.FieldId, member.IsPrimaryConstructorParameter,
+                member.IsValueType, getter, setter, codec, expectedType, null);
+        }).ToImmutableArray();
 
-        var baseType = (type.IsAbstractType ? LibraryTypes.AbstractTypeSerializer : LibraryTypes.FieldCodec_1).ToTypeSyntax(type.TypeSyntax);
+        var serializerInterface = type.IsValueType ? LibraryTypes.ValueSerializer : construction.HasBaseContract ? LibraryTypes.BaseCodec_1 : null;
+        return new(typePlan ?? SerializableTypeEmissionPlan.Create(type, LibraryTypes),
+            CodeText.Type((type.IsAbstractType ? LibraryTypes.AbstractTypeSerializer : LibraryTypes.FieldCodec_1).ToTypeSyntax(type.TypeSyntax)),
+            serializerInterface is not null ? CodeText.Type(serializerInterface.ToTypeSyntax(type.TypeSyntax)) : null,
+            ConstructionEmissionPlan.Create(construction),
+            fieldDescriptions.Select(FieldEmissionPlan.Create).ToImmutableArray(), memberPlans,
+            type.IsEnumType ? EnumSerializerGenerator.CreatePlan(type, LibraryTypes) : null);
+    }
 
-        var classDeclaration = ClassDeclaration(simpleClassName)
-            .AddBaseListTypes(SimpleBaseType(baseType))
-            .AddModifiers(Token(accessibility), Token(SyntaxKind.SealedKeyword))
-            .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
-            .AddMembers(fieldDeclarations);
+    internal static void Write(SourceWriter writer, SerializerEmissionPlan plan)
+    {
+        var type = plan.Type;
+        var simpleClassName = GetSimpleClassName(type.Name);
+        var members = plan.Members.ToList();
 
-        if (ctor != null)
-            classDeclaration = classDeclaration.AddMembers(ctor);
-
-        if (type.IsEnumType)
+        var declaration = new StringBuilder();
+        declaration.Append(type.IsPublic ? "public" : "internal").Append(" sealed class ").Append(simpleClassName);
+        type.AppendTypeParameterList(declaration);
+        declaration.Append(" : ").Append(plan.BaseType);
+        if (plan.Enum is null && !type.IsAbstractType && plan.AdditionalInterface is { } additionalInterface)
         {
-            var plan = EnumSerializerGenerator.CreatePlan(type, LibraryTypes);
-            var writeMethod = EnumSerializerGenerator.GenerateWriteMethod(plan);
-            var readMethod = EnumSerializerGenerator.GenerateReadMethod(plan);
-            classDeclaration = classDeclaration.AddMembers(writeMethod, readMethod);
+            declaration.Append(", ").Append(additionalInterface);
+        }
+
+        writer.WriteLine(GeneratedCodeUtilities.GeneratedCodeAttributeText);
+        GenericParameterEmissionPlan.WriteDeclarationLine(writer, declaration, type.TypeParameters);
+        writer.OpenBlock();
+        WriteFieldDeclarations(writer, plan.Fields);
+        WriteConstructor(writer, simpleClassName, plan.Fields, plan.Construction);
+
+        if (plan.Enum is { } enumPlan)
+        {
+            EnumSerializerGenerator.WriteWriteMethod(writer, enumPlan);
+            EnumSerializerGenerator.WriteReadMethod(writer, enumPlan);
         }
         else
         {
-            var serializeMethod = GenerateSerializeMethod(type, fieldDescriptions, members);
-            var deserializeMethod = GenerateDeserializeMethod(type, fieldDescriptions, members);
-            if (type.IsAbstractType)
+            WriteSerializeMethod(writer, type, members);
+            WriteDeserializeMethod(writer, type, members);
+            if (!type.IsAbstractType)
             {
-                if (serializeMethod != null) classDeclaration = classDeclaration.AddMembers(serializeMethod);
-                if (deserializeMethod != null) classDeclaration = classDeclaration.AddMembers(deserializeMethod);
-            }
-            else
-            {
-                Debug.Assert(serializeMethod is not null);
-                Debug.Assert(deserializeMethod is not null);
-                var writeFieldMethod = GenerateCompoundTypeWriteFieldMethod(type);
-                var readValueMethod = GenerateCompoundTypeReadValueMethod(type, fieldDescriptions);
-                classDeclaration = classDeclaration.AddMembers(serializeMethod!, deserializeMethod!, writeFieldMethod, readValueMethod);
-
-                var serializerInterface = type.IsValueType ? LibraryTypes.ValueSerializer : construction.HasBaseContract ? LibraryTypes.BaseCodec_1 : null;
-                if (serializerInterface != null)
-                    classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(serializerInterface.ToTypeSyntax(type.TypeSyntax)));
+                WriteCompoundTypeWriteFieldMethod(writer, type);
+                WriteCompoundTypeReadValueMethod(writer, type, plan.Fields);
             }
         }
 
-        if (type.IsGenericType)
-        {
-            classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, type.TypeParameters);
-        }
-
-        return classDeclaration;
+        writer.CloseBlock();
     }
 
     internal GeneratedTypeConstruction GetConstruction(ISerializableTypeDescription type)
@@ -129,128 +144,106 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         _ => GeneratedCodeUtilities.CodeGeneratorName
     };
 
-    internal static ExpressionSyntax GetServiceExpression(TypeSyntax serviceType, ExpressionSyntax codecProvider)
-        => InvocationExpression(
-            IdentifierName("OrleansGeneratedCodeHelper").Member(GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(serviceType)))),
-            ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(codecProvider)])));
+    internal static string GetServiceExpression(string serviceType, string codecProvider)
+        => $"OrleansGeneratedCodeHelper.GetService<{serviceType}>(this, {codecProvider})";
 
     /// <summary>
     /// Returns the expression used to reference a codec or copier field, resolving the field on first use when it was
     /// added by hot reload and therefore skipped by the already-executed constructor.
     /// </summary>
-    internal static ExpressionSyntax GetCodecExpression(GeneratedFieldDescription field)
+    internal static string GetCodecExpression(GeneratedFieldDescription field)
         => field.LazyInitialization
-            ? ParenthesizedExpression(AssignmentExpression(SyntaxKind.CoalesceAssignmentExpression, IdentifierName(field.FieldName), GetServiceExpression(field.FieldType, IdentifierName(CodecProviderFieldName))))
-            : IdentifierName(field.FieldName);
+            ? $"({field.FieldName} ??= {GetServiceExpression(CodeText.Type(field.FieldType), CodecProviderFieldName)})"
+            : field.FieldName;
 
-    private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
+    internal static void WriteFieldDeclarations(SourceWriter writer, EquatableArray<FieldEmissionPlan> fields)
     {
-        return [.. fieldDescriptions.Select(GetFieldDeclaration)];
-
-        static MemberDeclarationSyntax GetFieldDeclaration(GeneratedFieldDescription description)
-        {
-            switch (description)
-            {
-                case TypeFieldDescription type:
-                    return FieldDeclaration(
-                            VariableDeclaration(
-                                type.FieldType,
-                                SingletonSeparatedList(VariableDeclarator(type.FieldName)
-                                    .WithInitializer(EqualsValueClause(TypeOfExpression(type.UnderlyingTypeSyntax))))))
-                        .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                case CodecFieldTypeFieldDescription type:
-                    return FieldDeclaration(
-                            VariableDeclaration(
-                                type.FieldType,
-                                SingletonSeparatedList(VariableDeclarator(type.FieldName)
-                                    .WithInitializer(EqualsValueClause(TypeOfExpression(type.CodecFieldType))))))
-                        .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                case FieldAccessorDescription { LazyInitialization: true, InitializationSyntax: not null } accessor:
-                    return
-                        FieldDeclaration(VariableDeclaration(accessor.FieldType, SingletonSeparatedList(VariableDeclarator(accessor.FieldName))))
-                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword));
-                case FieldAccessorDescription accessor when accessor.InitializationSyntax != null:
-                    return
-                        FieldDeclaration(VariableDeclaration(accessor.FieldType,
-                            SingletonSeparatedList(VariableDeclarator(accessor.FieldName).WithInitializer(EqualsValueClause(accessor.InitializationSyntax)))))
-                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                case FieldAccessorDescription accessor when accessor.InitializationSyntax == null:
-                    return GetUnsafeAccessorDeclaration(accessor);
-                default:
-                    var declaration = FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
-                        .AddModifiers(Token(SyntaxKind.PrivateKeyword));
-                    return description.LazyInitialization ? declaration : declaration.AddModifiers(Token(SyntaxKind.ReadOnlyKeyword));
-            }
-        }
-    }
-
-    internal static MethodDeclarationSyntax GetUnsafeAccessorDeclaration(FieldAccessorDescription accessor)
-    {
-        var instance = Parameter(Identifier("instance")).WithType(accessor.ContainingType);
-        if (accessor.ContainingTypeIsValueType)
-        {
-            instance = instance.AddModifiers(Token(SyntaxKind.RefKeyword));
-        }
-
-        var parameters = new List<ParameterSyntax> { instance };
-        TypeSyntax returnType;
-        if (accessor.IsUnsafeFieldAccessor)
-        {
-            returnType = RefType(accessor.FieldType);
-        }
-        else
-        {
-            returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
-            parameters.Add(Parameter(Identifier("value")).WithType(accessor.FieldType));
-        }
-
-        return MethodDeclaration(returnType, accessor.AccessorName)
-            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ExternKeyword), Token(SyntaxKind.StaticKeyword))
-            .AddAttributeLists(AttributeList(SingletonSeparatedList(
-                Attribute(ParseName("global::System.Runtime.CompilerServices.UnsafeAccessorAttribute"))
-                    .AddArgumentListArguments(
-                        AttributeArgument(ParseName("global::System.Runtime.CompilerServices.UnsafeAccessorKind")
-                            .Member(accessor.IsUnsafeFieldAccessor ? "Field" : "Method")),
-                        AttributeArgument((accessor.IsUnsafeFieldAccessor ? accessor.FieldName : $"set_{accessor.FieldName}").GetLiteralExpression())
-                            .WithNameEquals(NameEquals("Name"))))))
-            .WithParameterList(ParameterList(SeparatedList(parameters)))
-            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
-    }
-
-    private static ConstructorDeclarationSyntax? GenerateConstructor(
-        string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions, GeneratedTypeConstruction construction)
-    {
-        var statements = new List<StatementSyntax>();
-        foreach (var field in fieldDescriptions)
+        foreach (var field in fields)
         {
             switch (field)
             {
-                case GeneratedFieldDescription _ when field.IsInjected:
-                    statements.Add(ExpressionStatement(
-                        AssignmentExpression(
-                            SyntaxKind.SimpleAssignmentExpression,
-                            ThisExpression().Member(field.FieldName.ToIdentifierName()),
-                            Unwrapped(field.FieldName.ToIdentifierName()))));
+                case { Kind: EmissionFieldKind.Type }:
+                    writer.WriteLine($"private readonly {field.Type} {field.FieldName} = {field.Initializer};");
                     break;
-                case CodecProviderFieldDescription:
-                    statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), IdentifierName("codecProvider"))));
+                case { Kind: EmissionFieldKind.Accessor, LazyInitialization: true, Initializer: not null }:
+                    writer.WriteLine($"private static {field.Type} {field.FieldName};");
                     break;
-                case CodecFieldDescription or BaseCodecFieldDescription when !field.IsInjected:
-                    statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), GetServiceExpression(field.FieldType, IdentifierName("codecProvider")))));
+                case { Kind: EmissionFieldKind.Accessor, Initializer: not null }:
+                    writer.WriteLine($"private static readonly {field.Type} {field.FieldName} = {field.Initializer};");
+                    break;
+                case { Kind: EmissionFieldKind.Accessor }:
+                    WriteUnsafeAccessorDeclaration(writer, field);
+                    break;
+                default:
+                    writer.WriteLine(field.LazyInitialization
+                        ? $"private {field.Type} {field.FieldName};"
+                        : $"private readonly {field.Type} {field.FieldName};");
                     break;
             }
         }
+    }
 
-        return statements.Count == 0 ? null : ConstructorDeclaration(simpleClassName)
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters([.. construction.Parameters.Select(static parameter => parameter.ToSyntax())])
-            .AddBodyStatements([.. statements]);
+    internal static void WriteUnsafeAccessorDeclaration(SourceWriter writer, FieldEmissionPlan accessor)
+    {
+        Debug.Assert(accessor.Kind == EmissionFieldKind.Accessor);
+        Debug.Assert(accessor.ContainingType is not null);
+        Debug.Assert(accessor.AccessorName is not null);
+        var kind = accessor.IsUnsafeFieldAccessor ? "Field" : "Method";
+        var name = accessor.IsUnsafeFieldAccessor ? accessor.FieldName : $"set_{accessor.FieldName}";
+        writer.WriteLine($"[global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.{kind}, Name = {CodeText.QuotedText(name)})]");
+        var instance = $"{(accessor.ContainingTypeIsValueType ? "ref " : string.Empty)}{accessor.ContainingType} instance";
+        writer.WriteLine(accessor.IsUnsafeFieldAccessor
+            ? $"private extern static ref {accessor.Type} {accessor.AccessorName}({instance});"
+            : $"private extern static void {accessor.AccessorName}({instance}, {accessor.Type} value);");
+    }
 
-        static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
+    private static void WriteConstructor(SourceWriter writer, string simpleClassName, EquatableArray<FieldEmissionPlan> fields, ConstructionEmissionPlan construction)
+    {
+        if (!fields.Any(HasConstructorStatement))
         {
-            return InvocationExpression(
-                IdentifierName("OrleansGeneratedCodeHelper").Member("UnwrapService"),
-                ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(expr)])));
+            return;
+        }
+
+        WriteConstructorDeclaration(writer, simpleClassName, construction, baseInitializer: null);
+        writer.OpenBlock();
+        WriteConstructorStatements(writer, fields);
+        writer.CloseBlock();
+    }
+
+    internal static bool HasConstructorStatement(FieldEmissionPlan field)
+        => field.IsInjected || field.Kind is EmissionFieldKind.CodecProvider || field is { Kind: EmissionFieldKind.Service, IsInjected: false };
+
+    internal static void WriteConstructorDeclaration(SourceWriter writer, string simpleClassName, ConstructionEmissionPlan construction, string? baseInitializer)
+    {
+        var declaration = new StringBuilder();
+        declaration.Append("public ").Append(simpleClassName).Append('(');
+        construction.AppendParameters(declaration);
+        declaration.Append(')');
+        if (baseInitializer is not null)
+        {
+            declaration.Append(" : ").Append(baseInitializer);
+        }
+
+        writer.WriteLine(declaration.ToString());
+    }
+
+    internal static void WriteConstructorStatements(SourceWriter writer, EquatableArray<FieldEmissionPlan> fields)
+    {
+        foreach (var field in fields)
+        {
+            var name = CodeText.Identifier(field.FieldName);
+            switch (field)
+            {
+                case { IsInjected: true }:
+                    writer.WriteLine($"this.{name} = OrleansGeneratedCodeHelper.UnwrapService(this, {name});");
+                    break;
+                case { Kind: EmissionFieldKind.CodecProvider }:
+                    writer.WriteLine($"{name} = codecProvider;");
+                    break;
+                case { Kind: EmissionFieldKind.Service, IsInjected: false }:
+                    writer.WriteLine($"{name} = {GetServiceExpression(field.Type, "codecProvider")};");
+                    break;
+            }
         }
     }
 
@@ -396,616 +389,339 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         return new(LibraryTypes.BaseCodec_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax));
     }
 
-    private MemberDeclarationSyntax? GenerateSerializeMethod(
-        ISerializableTypeDescription type,
-        List<GeneratedFieldDescription> serializerFields,
-        List<ISerializableMember> members)
+    private static int CountCallbacks(SerializableTypeEmissionPlan type, string callbackMethodName)
+        => type.SerializationHooks.Count(callback => callback.Method == callbackMethodName);
+
+    private static void WriteSerializeMethod(SourceWriter writer, SerializableTypeEmissionPlan type, List<MemberEmissionPlan> members)
     {
-        var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
-
-        var writerParam = "writer".ToIdentifierName();
-        var instanceParam = "instance".ToIdentifierName();
-
-        var body = new List<StatementSyntax>();
-        if (type.HasComplexBaseType)
+        // An abstract base serializer contributes no member when it has nothing to write.
+        if (type.IsAbstractType && !type.HasComplexBaseType && !type.IncludePrimaryConstructorParameters && members.Count == 0
+            && CountCallbacks(type, "OnSerializing") == 0 && CountCallbacks(type, "OnSerialized") == 0)
         {
-            body.Add(
-                ExpressionStatement(
-                    InvocationExpression(
-                        BaseTypeSerializerFieldName.ToIdentifierName().Member(SerializeMethodName),
-                        ArgumentList(SeparatedList([Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(instanceParam)])))));
-            body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
+            return;
         }
 
-        AddSerializationCallbacks(type, instanceParam, "OnSerializing", body);
+        writer.WriteLine(GeneratedCodeUtilities.MethodImplAttributeText);
+        var instanceModifiers = type.IsValueType ? type.Library.HasScopedKeyword ? "scoped ref " : "ref " : string.Empty;
+        writer.WriteLine($"public {(type.IsAbstractType ? "override " : string.Empty)}void Serialize<TBufferWriter>(ref {type.Library.Writer} writer, {instanceModifiers}{type.Type} instance)");
+        if (!type.IsAbstractType)
+        {
+            WriteBufferWriterConstraint(writer, type.Library);
+        }
+
+        writer.OpenBlock();
+        if (type.HasComplexBaseType)
+        {
+            writer.WriteLine($"{BaseTypeSerializerFieldName}.Serialize(ref writer, instance);");
+            writer.WriteLine("writer.WriteEndBase();");
+        }
+
+        WriteSerializationCallbacks(writer, type, "instance", "OnSerializing");
 
         // Order members according to their FieldId, since fields must be serialized in order and FieldIds are serialized as deltas.
-        var previousFieldIdVar = "previousFieldId".ToIdentifierName();
         if (type.OmitDefaultMemberValues && members.Count > 0)
         {
-            // C#: uint previousFieldId = 0;
-            body.Add(LocalDeclarationStatement(
-                VariableDeclaration(
-                    PredefinedType(Token(SyntaxKind.UIntKeyword)),
-                    SingletonSeparatedList(VariableDeclarator(previousFieldIdVar.Identifier)
-                        .WithInitializer(EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0U))))))));
+            writer.WriteLine("uint previousFieldId = 0U;");
         }
 
         if (type.IncludePrimaryConstructorParameters)
         {
-            AddSerializationMembers(type, serializerFields, members.Where(m => m.IsPrimaryConstructorParameter), writerParam, instanceParam, previousFieldIdVar, body);
-            body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
+            WriteSerializationMembers(writer, type, members.Where(static m => m.IsPrimaryConstructorParameter));
+            writer.WriteLine("writer.WriteEndBase();");
         }
 
-        AddSerializationMembers(type, serializerFields, members.Where(m => !m.IsPrimaryConstructorParameter), writerParam, instanceParam, previousFieldIdVar, body);
-
-        AddSerializationCallbacks(type, instanceParam, "OnSerialized", body);
-
-        if (body.Count == 0 && type.IsAbstractType)
-            return null;
-
-        var parameters = new[]
-        {
-            Parameter("writer".ToIdentifier()).WithType(LibraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-            Parameter("instance".ToIdentifier()).WithType(type.TypeSyntax)
-        };
-
-        if (type.IsValueType)
-        {
-            parameters[1] = parameters[1].WithModifiers(LibraryTypes.HasScopedKeyword() ? TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)) : TokenList(Token(SyntaxKind.RefKeyword)));
-        }
-
-        var res = MethodDeclaration(returnType, SerializeMethodName)
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters(parameters)
-            .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
-            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
-            .AddBodyStatements([.. body]);
-
-        res = type.IsAbstractType
-            ? res.AddModifiers(Token(SyntaxKind.OverrideKeyword))
-            : res.AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(LibraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))));
-
-        return res;
+        WriteSerializationMembers(writer, type, members.Where(static m => !m.IsPrimaryConstructorParameter));
+        WriteSerializationCallbacks(writer, type, "instance", "OnSerialized");
+        writer.CloseBlock();
     }
 
-    private void AddSerializationMembers(ISerializableTypeDescription type, List<GeneratedFieldDescription> serializerFields, IEnumerable<ISerializableMember> members, IdentifierNameSyntax writerParam, IdentifierNameSyntax instanceParam, IdentifierNameSyntax previousFieldIdVar, List<StatementSyntax> body)
+    private static void WriteBufferWriterConstraint(SourceWriter writer, EmissionLibraryTypes library)
+    {
+        writer.Indent();
+        writer.WriteLine($"where TBufferWriter : {library.BufferWriter}");
+        writer.Unindent();
+    }
+
+    private static void WriteSerializationMembers(SourceWriter writer, SerializableTypeEmissionPlan type, IEnumerable<MemberEmissionPlan> members)
     {
         uint previousFieldId = 0;
-        foreach (var member in members.OrderBy(m => m.Member.FieldId))
+        foreach (var member in members.OrderBy(static m => m.FieldId))
         {
-            var description = member.Member;
-            ExpressionSyntax fieldIdDeltaExpr;
+            string fieldIdDelta;
             if (type.OmitDefaultMemberValues)
             {
-                // C#: <fieldId> - previousFieldId
-                fieldIdDeltaExpr = BinaryExpression(SyntaxKind.SubtractExpression, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(description.FieldId)), previousFieldIdVar);
+                fieldIdDelta = $"{CodeText.Literal(member.FieldId)} - previousFieldId";
             }
             else
             {
-                var fieldIdDelta = description.FieldId - previousFieldId;
-                previousFieldId = description.FieldId;
-                fieldIdDeltaExpr = LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(fieldIdDelta));
+                fieldIdDelta = CodeText.Literal(member.FieldId - previousFieldId);
+                previousFieldId = member.FieldId;
             }
 
             // Codecs can either be static classes or injected into the constructor.
             // Either way, the member signatures are the same.
-            var memberType = description.Type;
-            var staticCodec = LibraryTypes.StaticCodecs.FindByUnderlyingType(memberType);
-            ExpressionSyntax codecExpression;
-            if (staticCodec != null)
-            {
-                codecExpression = staticCodec.CodecType.ToNameSyntax();
-            }
-            else
-            {
-                var instanceCodec = serializerFields.First(f => f is CodecFieldDescription cf && SymbolEqualityComparer.Default.Equals(cf.UnderlyingType, memberType));
-                codecExpression = GetCodecExpression(instanceCodec);
-            }
-
-            // When a static codec is available, we can call it directly and can skip passing the expected type,
-            // since it is known to be the static codec's field type:
-            //   C#: <staticCodec>.WriteField(ref writer, <fieldIdDelta, <member>)
-            // When no static codec is available:
-            //   C#: <codecField>.WriteField(ref writer, <fieldIdDelta>, <expectedType>, <member>)
-            var writeFieldArgs = new List<ArgumentSyntax> {
-                Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                Argument(fieldIdDeltaExpr)
-            };
-
-            if (staticCodec is null)
-                writeFieldArgs.Add(Argument(UseHotReloadShape(type)
-                    ? TypeOfExpression(description.TypeSyntax)
-                    : serializerFields.First(f => f is TypeFieldDescription tf && SymbolEqualityComparer.Default.Equals(tf.UnderlyingType, memberType)).FieldName.ToIdentifierName()));
-
-            writeFieldArgs.Add(Argument(member.GetGetter(instanceParam)));
-
-            var writeFieldExpr = ExpressionStatement(InvocationExpression(codecExpression.Member("WriteField"), ArgumentList(SeparatedList(writeFieldArgs))));
+            // When a static codec is available, the expected type is known to be the static codec's field type.
+            Debug.Assert(member.Codec is not null);
+            var getter = member.GetGetter("instance");
+            var writeField = member.ExpectedType is { } expectedType
+                ? $"{member.Codec}.WriteField(ref writer, {fieldIdDelta}, {expectedType}, {getter});"
+                : $"{member.Codec}.WriteField(ref writer, {fieldIdDelta}, {getter});";
 
             if (!type.OmitDefaultMemberValues)
             {
-                body.Add(writeFieldExpr);
+                writer.WriteLine(writeField);
             }
             else
             {
-                ExpressionSyntax condition = member.IsValueType switch
-                {
-                    true => BinaryExpression(SyntaxKind.NotEqualsExpression, member.GetGetter(instanceParam), LiteralExpression(SyntaxKind.DefaultLiteralExpression)),
-                    false => IsPatternExpression(member.GetGetter(instanceParam), TypePattern(PredefinedType(Token(SyntaxKind.ObjectKeyword))))
-                };
-
-                body.Add(IfStatement(
-                    condition,
-                    Block(
-                        writeFieldExpr,
-                        ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, previousFieldIdVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(description.FieldId)))))));
+                writer.WriteLine(member.IsValueType ? $"if ({getter} != default)" : $"if ({getter} is object)");
+                writer.OpenBlock();
+                writer.WriteLine(writeField);
+                writer.WriteLine($"previousFieldId = {CodeText.Literal(member.FieldId)};");
+                writer.CloseBlock();
             }
         }
     }
 
-    private MemberDeclarationSyntax? GenerateDeserializeMethod(
-        ISerializableTypeDescription type,
-        List<GeneratedFieldDescription> serializerFields,
-        List<ISerializableMember> members)
+    private static void WriteDeserializeMethod(SourceWriter writer, SerializableTypeEmissionPlan type, List<MemberEmissionPlan> members)
     {
-        var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
+        var nonCtorMembers = type.IncludePrimaryConstructorParameters ? members.FindAll(static m => !m.IsPrimaryConstructorParameter) : members;
+        var consumesEmptyObject = (members.Count == 0 || nonCtorMembers.Count == 0) && !type.IncludePrimaryConstructorParameters;
 
-        var readerParam = "reader".ToIdentifierName();
-        var instanceParam = "instance".ToIdentifierName();
-        var idVar = "id".ToIdentifierName();
-        var headerVar = "header".ToIdentifierName();
-
-        var body = new List<StatementSyntax>();
-
-        if (type.HasComplexBaseType)
+        // An abstract base serializer contributes no member when it only consumes the end of the object.
+        if (type.IsAbstractType && consumesEmptyObject && !type.HasComplexBaseType
+            && CountCallbacks(type, "OnDeserializing") == 0 && CountCallbacks(type, "OnDeserialized") == 0)
         {
-            // C#: _baseTypeSerializer.Deserialize(ref reader, instance);
-            body.Add(
-                ExpressionStatement(
-                    InvocationExpression(
-                        BaseTypeSerializerFieldName.ToIdentifierName().Member(DeserializeMethodName),
-                        ArgumentList(SeparatedList(
-                        [
-                            Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                            Argument(instanceParam)
-                        ])))));
+            return;
         }
 
-        AddSerializationCallbacks(type, instanceParam, "OnDeserializing", body);
-
-        int emptyBodyCount;
-        var nonCtorMembers = type.IncludePrimaryConstructorParameters ? members.FindAll(static m => !m.IsPrimaryConstructorParameter) : members;
-        if ((members.Count == 0 || nonCtorMembers.Count == 0) && !type.IncludePrimaryConstructorParameters)
+        writer.WriteLine(GeneratedCodeUtilities.MethodImplAttributeText);
+        var instanceModifiers = type.IsValueType ? type.Library.HasScopedKeyword ? "scoped ref " : "ref " : string.Empty;
+        writer.WriteLine($"public {(type.IsAbstractType ? "override " : string.Empty)}void Deserialize<TReaderInput>(ref {type.Library.Reader} reader, {instanceModifiers}{type.Type} instance)");
+        writer.OpenBlock();
+        if (type.HasComplexBaseType)
         {
-            // C#: reader.ConsumeEndBaseOrEndObject();
-            body.Add(ExpressionStatement(InvocationExpression(readerParam.Member("ConsumeEndBaseOrEndObject"))));
-            emptyBodyCount = 1;
+            writer.WriteLine($"{BaseTypeSerializerFieldName}.Deserialize(ref reader, instance);");
+        }
+
+        WriteSerializationCallbacks(writer, type, "instance", "OnDeserializing");
+        if (consumesEmptyObject)
+        {
+            writer.WriteLine("reader.ConsumeEndBaseOrEndObject();");
         }
         else
         {
-            // C#: uint id = 0;
             if (members.Count > 0)
             {
-                body.Add(LocalDeclarationStatement(
-                    VariableDeclaration(
-                        PredefinedType(Token(SyntaxKind.UIntKeyword)),
-                        SingletonSeparatedList(VariableDeclarator(idVar.Identifier, null, EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0U))))))));
+                writer.WriteLine("uint id = 0U;");
             }
 
-            // C#: Field header = default;
-            body.Add(LocalDeclarationStatement(
-                VariableDeclaration(
-                    LibraryTypes.Field.ToTypeSyntax(),
-                    SingletonSeparatedList(VariableDeclarator(headerVar.Identifier, null, EqualsValueClause(LiteralExpression(SyntaxKind.DefaultLiteralExpression)))))));
-
-            emptyBodyCount = 2;
-
+            writer.WriteLine($"{type.Library.Field} header = default;");
             if (type.IncludePrimaryConstructorParameters)
             {
-                var constructorParameterMembers = members.FindAll(m => m.IsPrimaryConstructorParameter);
-                body.Add(GetDeserializerLoop(constructorParameterMembers));
+                WriteDeserializerLoop(writer, members.FindAll(static m => m.IsPrimaryConstructorParameter));
                 if (members.Count > 0)
                 {
-                    body.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, idVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0U)))));
+                    writer.WriteLine("id = 0U;");
                 }
 
-                body.Add(IfStatement(headerVar.Member("IsEndBaseFields"), GetDeserializerLoop(nonCtorMembers)));
+                writer.WriteLine("if (header.IsEndBaseFields)");
+                if (nonCtorMembers.Count == 0)
+                {
+                    WriteDeserializerLoop(writer, nonCtorMembers);
+                }
+                else
+                {
+                    writer.Indent();
+                    WriteDeserializerLoop(writer, nonCtorMembers);
+                    writer.Unindent();
+                }
             }
             else
             {
-                body.Add(GetDeserializerLoop(nonCtorMembers));
+                WriteDeserializerLoop(writer, nonCtorMembers);
             }
         }
 
-        AddSerializationCallbacks(type, instanceParam, "OnDeserialized", body);
+        WriteSerializationCallbacks(writer, type, "instance", "OnDeserialized");
+        writer.CloseBlock();
 
-        if (body.Count == emptyBodyCount && type.IsAbstractType)
-            return null;
-
-        var genericParam = ParseTypeName("TReaderInput");
-        var parameters = new[]
+        // Writes the field loop. An empty member set consumes the remaining fields in a block.
+        static void WriteDeserializerLoop(SourceWriter writer, List<MemberEmissionPlan> members)
         {
-            Parameter(readerParam.Identifier).WithType(LibraryTypes.Reader.ToTypeSyntax(genericParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-            Parameter(instanceParam.Identifier).WithType(type.TypeSyntax)
-        };
-
-        if (type.IsValueType)
-        {
-            parameters[1] = parameters[1].WithModifiers(LibraryTypes.HasScopedKeyword() ? TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)) : TokenList(Token(SyntaxKind.RefKeyword)));
-        }
-
-        var res = MethodDeclaration(returnType, DeserializeMethodName)
-            .AddTypeParameterListParameters(TypeParameter("TReaderInput"))
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters(parameters)
-            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
-            .AddBodyStatements([.. body]);
-
-        if (type.IsAbstractType)
-            res = res.AddModifiers(Token(SyntaxKind.OverrideKeyword));
-
-        return res;
-
-        // Create the loop body.
-        StatementSyntax GetDeserializerLoop(List<ISerializableMember> members)
-        {
-            var refHeaderVar = ArgumentList(SingletonSeparatedList(Argument(null, Token(SyntaxKind.RefKeyword), headerVar)));
             if (members.Count == 0)
             {
-                // C#: reader.ReadFieldHeader(ref header);
-                // C#: reader.ConsumeEndBaseOrEndObject(ref header);
-                return Block(
-                    ExpressionStatement(InvocationExpression(readerParam.Member("ReadFieldHeader"), refHeaderVar)),
-                    ExpressionStatement(InvocationExpression(readerParam.Member("ConsumeEndBaseOrEndObject"), refHeaderVar)));
+                writer.OpenBlock();
+                writer.WriteLine("reader.ReadFieldHeader(ref header);");
+                writer.WriteLine("reader.ConsumeEndBaseOrEndObject(ref header);");
+                writer.CloseBlock();
+                return;
             }
 
-            var loopBody = new List<StatementSyntax>();
+            writer.WriteLine("while (true)");
+            writer.OpenBlock();
+            WriteReadFieldHeader(writer, "id += header.FieldIdDelta;");
 
-            // C#: reader.ReadFieldHeader(ref header);
-            // C#: if (header.IsEndBaseOrEndObject) break;
-            // C#: id += header.FieldIdDelta;
-            var readFieldHeader = ExpressionStatement(InvocationExpression(readerParam.Member("ReadFieldHeader"), refHeaderVar));
-            var endObjectCheck = IfStatement(headerVar.Member("IsEndBaseOrEndObject"), BreakStatement());
-            var idUpdate = ExpressionStatement(AssignmentExpression(SyntaxKind.AddAssignmentExpression, idVar, headerVar.Member("FieldIdDelta")));
-            loopBody.Add(readFieldHeader);
-            loopBody.Add(endObjectCheck);
-            loopBody.Add(idUpdate);
-
-            members.Sort((x, y) => x.Member.FieldId.CompareTo(y.Member.FieldId));
-            var contiguousIds = members[members.Count - 1].Member.FieldId == members.Count - 1;
+            members.Sort(static (x, y) => x.FieldId.CompareTo(y.FieldId));
+            var contiguousIds = members[members.Count - 1].FieldId == members.Count - 1;
             foreach (var member in members)
             {
-                var description = member.Member;
-
-                // C#: instance.<member> = <codec>.ReadValue(ref reader, header);
                 // Codecs can either be static classes or injected into the constructor.
                 // Either way, the member signatures are the same.
-                ExpressionSyntax codecExpression;
-                if (LibraryTypes.StaticCodecs.FindByUnderlyingType(description.Type) is { } staticCodec)
-                {
-                    codecExpression = staticCodec.CodecType.ToNameSyntax();
-                }
-                else
-                {
-                    var instanceCodec = serializerFields.OfType<CodecFieldDescription>().First(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, description.Type));
-                    codecExpression = GetCodecExpression(instanceCodec);
-                }
-
-                ExpressionSyntax readValueExpression = InvocationExpression(
-                    codecExpression.Member("ReadValue"),
-                    ArgumentList(SeparatedList([Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(headerVar)])));
-
-                var memberAssignment = ExpressionStatement(member.GetSetter(instanceParam, readValueExpression));
-
-                BlockSyntax ifBody;
+                Debug.Assert(member.Codec is not null);
+                writer.WriteLine($"if (id == {CodeText.Literal(member.FieldId)})");
+                writer.OpenBlock();
+                writer.WriteLine(member.GetSetter("instance", $"{member.Codec}.ReadValue(ref reader, header)") + ";");
                 if (member != members[members.Count - 1])
                 {
-                    ifBody = Block(memberAssignment, readFieldHeader, endObjectCheck, idUpdate);
+                    WriteReadFieldHeader(writer, "id += header.FieldIdDelta;");
                 }
                 else if (contiguousIds)
                 {
-                    ifBody = Block(memberAssignment, readFieldHeader);
+                    writer.WriteLine("reader.ReadFieldHeader(ref header);");
                 }
                 else
                 {
-                    idUpdate = ExpressionStatement(PostfixUnaryExpression(SyntaxKind.PostIncrementExpression, idVar));
-                    ifBody = Block(memberAssignment, readFieldHeader, endObjectCheck, idUpdate);
+                    WriteReadFieldHeader(writer, "id++;");
                 }
 
-                // C#: if (id == <fieldId>) { ... }
-                var ifStatement = IfStatement(BinaryExpression(SyntaxKind.EqualsExpression, idVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(description.FieldId))),
-                    ifBody);
-
-                loopBody.Add(ifStatement);
+                writer.CloseBlock();
             }
 
             // Consume any unknown fields
             if (contiguousIds)
             {
-                // C#: reader.ConsumeEndBaseOrEndObject(ref header); break;
-                loopBody.Add(ExpressionStatement(InvocationExpression(readerParam.Member("ConsumeEndBaseOrEndObject"), refHeaderVar)));
-                loopBody.Add(BreakStatement());
+                writer.WriteLine("reader.ConsumeEndBaseOrEndObject(ref header);");
+                writer.WriteLine("break;");
             }
             else
             {
-                // C#: reader.ConsumeUnknownField(ref header);
-                loopBody.Add(ExpressionStatement(InvocationExpression(readerParam.Member("ConsumeUnknownField"), refHeaderVar)));
+                writer.WriteLine("reader.ConsumeUnknownField(ref header);");
             }
 
-            return WhileStatement(LiteralExpression(SyntaxKind.TrueLiteralExpression), Block(loopBody));
+            writer.CloseBlock();
+        }
+
+        static void WriteReadFieldHeader(SourceWriter writer, string idUpdate)
+        {
+            writer.WriteLine("reader.ReadFieldHeader(ref header);");
+            writer.WriteLine("if (header.IsEndBaseOrEndObject)");
+            writer.Indent();
+            writer.WriteLine("break;");
+            writer.Unindent();
+            writer.WriteLine(idUpdate);
         }
     }
 
-    private static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax instanceParam, string callbackMethodName, List<StatementSyntax> body)
+    private static void WriteSerializationCallbacks(SourceWriter writer, SerializableTypeEmissionPlan type, string instance, string callbackMethodName)
     {
-        for (var hookIndex = 0; hookIndex < type.SerializationHooks.Count; ++hookIndex)
+        foreach (var callback in type.SerializationHooks)
         {
-            var hookType = type.SerializationHooks[hookIndex];
-            var member = hookType.GetAllMembers<IMethodSymbol>(callbackMethodName, Accessibility.Public).FirstOrDefault();
-            if (member is null || member.Parameters.Length != 1)
+            if (callback.Method != callbackMethodName)
             {
                 continue;
             }
 
-            var argument = Argument(instanceParam);
-            if (member.Parameters[0].RefKind == RefKind.Ref)
-            {
-                argument = argument.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
-            }
-
-            body.Add(ExpressionStatement(InvocationExpression(
-                IdentifierName($"_hook{hookIndex}").Member(callbackMethodName),
-                ArgumentList(SeparatedList([argument])))));
+            writer.WriteLine($"_hook{callback.HookIndex}.{callbackMethodName}({(callback.FirstByRef ? "ref " : string.Empty)}{instance});");
         }
     }
 
-    private MemberDeclarationSyntax GenerateCompoundTypeWriteFieldMethod(
-        ISerializableTypeDescription type)
+    private static void WriteCompoundTypeWriteFieldMethod(SourceWriter writer, SerializableTypeEmissionPlan type)
     {
-        var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
-
-        var writerParam = "writer".ToIdentifierName();
-        var fieldIdDeltaParam = "fieldIdDelta".ToIdentifierName();
-        var expectedTypeParam = "expectedType".ToIdentifierName();
-        var valueParam = "value".ToIdentifierName();
-
-        var innerBody = new List<StatementSyntax>();
-
-        if (type.IsValueType)
+        writer.WriteLine(GeneratedCodeUtilities.MethodImplAttributeText);
+        writer.WriteLine($"public void WriteField<TBufferWriter>(ref {type.Library.Writer} writer, uint fieldIdDelta, {type.Library.SystemType} expectedType, {type.Type} {ValueParameter})");
+        WriteBufferWriterConstraint(writer, type.Library);
+        writer.OpenBlock();
+        if (type.IsSealedType)
         {
-            // C#: ReferenceCodec.MarkValueField(reader.Session);
-            innerBody.Add(ExpressionStatement(InvocationExpression(IdentifierName("ReferenceCodec").Member("MarkValueField"), ArgumentList(SingletonSeparatedList(Argument(writerParam.Member("Session")))))));
+            WriteInnerBody(writer, type);
         }
         else
         {
-            if (type.TrackReferences)
+            // For types which are not sealed/value types, add some extra logic to support sub-types.
+            writer.WriteLine($"if ({ValueParameter} is null || {ValueParameter}.GetType() == typeof({type.Type}))");
+            writer.OpenBlock();
+            WriteInnerBody(writer, type);
+            writer.CloseBlock();
+            writer.ContinueStatement();
+            writer.WriteLine("else");
+            writer.Indent();
+            writer.WriteLine($"writer.SerializeUnexpectedType(fieldIdDelta, expectedType, {ValueParameter});");
+            writer.Unindent();
+        }
+
+        writer.CloseBlock();
+
+        static void WriteInnerBody(SourceWriter writer, SerializableTypeEmissionPlan type)
+        {
+            if (type.IsValueType)
             {
-                // C#: if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value)) return;
-                innerBody.Add(
-                    IfStatement(
-                        InvocationExpression(
-                            IdentifierName("ReferenceCodec").Member("TryWriteReferenceField"),
-                            ArgumentList(SeparatedList(
-                            [
-                        Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                        Argument(fieldIdDeltaParam),
-                        Argument(expectedTypeParam),
-                        Argument(valueParam)
-                            ]))),
-                        ReturnStatement())
-                );
+                writer.WriteLine("ReferenceCodec.MarkValueField(writer.Session);");
+            }
+            else if (type.TrackReferences)
+            {
+                writer.WriteLine($"if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, {ValueParameter}))");
+                writer.Indent();
+                writer.WriteLine("return;");
+                writer.Unindent();
             }
             else
             {
-                // C#: if (value is null) { ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta); return; }
-                innerBody.Add(
-                    IfStatement(
-                        IsPatternExpression(valueParam, ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression))),
-                        Block(
-                            ExpressionStatement(InvocationExpression(IdentifierName("ReferenceCodec").Member("WriteNullReference"),
-                                ArgumentList(SeparatedList(
-                                [
-                                    Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                                    Argument(fieldIdDeltaParam)
-                                ])))),
-                            ReturnStatement()))
-                );
-
-                // C#: ReferenceCodec.MarkValueField(reader.Session);
-                innerBody.Add(ExpressionStatement(InvocationExpression(IdentifierName("ReferenceCodec").Member("MarkValueField"), ArgumentList(SingletonSeparatedList(Argument(writerParam.Member("Session")))))));
+                writer.WriteLine($"if ({ValueParameter} is null)");
+                writer.OpenBlock();
+                writer.WriteLine("ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);");
+                writer.WriteLine("return;");
+                writer.CloseBlock();
+                writer.WriteLine("ReferenceCodec.MarkValueField(writer.Session);");
             }
+
+            writer.WriteLine($"writer.WriteStartObject(fieldIdDelta, expectedType, {CodecFieldTypeFieldName});");
+            writer.WriteLine($"Serialize(ref writer, {(type.IsValueType ? "ref " : string.Empty)}{ValueParameter});");
+            writer.WriteLine("writer.WriteEndObject();");
         }
-
-        // C#: writer.WriteStartObject(fieldIdDelta, expectedType, _codecFieldType);
-        innerBody.Add(
-            ExpressionStatement(InvocationExpression(writerParam.Member("WriteStartObject"),
-            ArgumentList(SeparatedList([
-                        Argument(fieldIdDeltaParam),
-                        Argument(expectedTypeParam),
-                        Argument(IdentifierName(CodecFieldTypeFieldName))
-                ])))
-            ));
-
-        // C#: this.Serialize(ref writer, [ref] value);
-        var valueParamArgument = type.IsValueType switch
-        {
-            true => Argument(valueParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-            false => Argument(valueParam)
-        };
-
-        innerBody.Add(
-            ExpressionStatement(
-                InvocationExpression(
-                    IdentifierName(SerializeMethodName),
-                    ArgumentList(
-                        SeparatedList(
-                            [
-                                Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                                valueParamArgument
-                            ])))));
-
-        // C#: writer.WriteEndObject();
-        innerBody.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndObject"))));
-
-        List<StatementSyntax> body;
-        if (type.IsSealedType)
-        {
-            body = innerBody;
-        }
-        else
-        {
-            // For types which are not sealed/value types, add some extra logic to support sub-types:
-            body = new()
-            {
-                // C#: if (value is null || value.GetType() == typeof(TField)) { <inner body> }
-                // C#: else writer.SerializeUnexpectedType(fieldIdDelta, expectedType, value);
-                IfStatement(
-                    BinaryExpression(SyntaxKind.LogicalOrExpression,
-                        IsPatternExpression(valueParam, ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression))),
-                        BinaryExpression(SyntaxKind.EqualsExpression, InvocationExpression(valueParam.Member("GetType")), TypeOfExpression(type.TypeSyntax))),
-                    Block(innerBody),
-                    ElseClause(ExpressionStatement(
-                        InvocationExpression(
-                            writerParam.Member("SerializeUnexpectedType"),
-                            ArgumentList(
-                                SeparatedList([
-                                    Argument(fieldIdDeltaParam),
-                                    Argument(expectedTypeParam),
-                                    Argument(valueParam)
-                                ])))
-                    )))
-            };
-        }
-
-        var parameters = new[]
-        {
-            Parameter("writer".ToIdentifier()).WithType(LibraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-            Parameter("fieldIdDelta".ToIdentifier()).WithType(PredefinedType(Token(SyntaxKind.UIntKeyword))),
-            Parameter("expectedType".ToIdentifier()).WithType(LibraryTypes.Type.ToTypeSyntax()),
-            Parameter("value".ToIdentifier()).WithType(type.TypeSyntax)
-        };
-
-        return MethodDeclaration(returnType, WriteFieldMethodName)
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters(parameters)
-            .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
-            .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(LibraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
-            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
-            .AddBodyStatements([.. body]);
     }
 
-    private MemberDeclarationSyntax GenerateCompoundTypeReadValueMethod(
-        ISerializableTypeDescription type,
-        List<GeneratedFieldDescription> serializerFields)
+    private static void WriteCompoundTypeReadValueMethod(SourceWriter writer, SerializableTypeEmissionPlan type, EquatableArray<FieldEmissionPlan> serializerFields)
     {
-        var readerParam = "reader".ToIdentifierName();
-        var fieldParam = "field".ToIdentifierName();
-        var resultVar = "result".ToIdentifierName();
-        var readerInputTypeParam = ParseTypeName("TReaderInput");
-
-        var body = new List<StatementSyntax>();
-        var innerBody = type.IsSealedType ? body : new List<StatementSyntax>();
-
+        writer.WriteLine(GeneratedCodeUtilities.MethodImplAttributeText);
+        writer.WriteLine($"public {type.Type} ReadValue<TReaderInput>(ref {type.Library.Reader} reader, {type.Library.Field} field)");
+        writer.OpenBlock();
         if (!type.IsValueType)
         {
-            // C#: if (field.IsReference) return ReferenceCodec.ReadReference<TField, TReaderInput>(ref reader, field);
-            body.Add(
-                IfStatement(
-                    fieldParam.Member("IsReference"),
-                    ReturnStatement(InvocationExpression(
-                        IdentifierName("ReferenceCodec").Member("ReadReference", [type.TypeSyntax, readerInputTypeParam]),
-                        ArgumentList(SeparatedList(
-                        [
-                            Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                            Argument(fieldParam),
-                        ])))))
-                );
+            writer.WriteLine("if (field.IsReference)");
+            writer.Indent();
+            writer.WriteLine($"return ReferenceCodec.ReadReference<{type.Type}, TReaderInput>(ref reader, field);");
+            writer.Unindent();
         }
 
-        // C#: field.EnsureWireTypeTagDelimited();
-        body.Add(ExpressionStatement(InvocationExpression(fieldParam.Member("EnsureWireTypeTagDelimited"))));
-
-        ExpressionSyntax createValueExpression = type.UseActivator switch
+        writer.WriteLine("field.EnsureWireTypeTagDelimited();");
+        if (type.IsSealedType)
         {
-            true => InvocationExpression(serializerFields.OfType<ActivatorFieldDescription>().Single().FieldName.ToIdentifierName().Member("Create")),
-            false => type.GetObjectCreationExpression()
-        };
-
-        // C#: var result = _activator.Create();
-        // or C#: var result = new TField();
-        // or C#: var result = default(TField);
-        innerBody.Add(LocalDeclarationStatement(
-            VariableDeclaration(
-                IdentifierName("var"),
-                SingletonSeparatedList(VariableDeclarator(resultVar.Identifier)
-                .WithInitializer(EqualsValueClause(createValueExpression))))));
-
-        if (type.TrackReferences)
-        {
-            // C#: ReferenceCodec.RecordObject(reader.Session, result);
-            innerBody.Add(ExpressionStatement(InvocationExpression(IdentifierName("ReferenceCodec").Member("RecordObject"), ArgumentList(SeparatedList([Argument(readerParam.Member("Session")), Argument(resultVar)])))));
+            WriteInnerBody(writer, type, serializerFields);
         }
         else
         {
-            // C#: ReferenceCodec.MarkValueField(reader.Session);
-            innerBody.Add(ExpressionStatement(InvocationExpression(IdentifierName("ReferenceCodec").Member("MarkValueField"), ArgumentList(SingletonSeparatedList(Argument(readerParam.Member("Session")))))));
+            writer.WriteLine($"{type.Library.SystemType} valueType = field.FieldType;");
+            writer.WriteLine($"if (valueType is null || valueType == {CodecFieldTypeFieldName})");
+            writer.OpenBlock();
+            WriteInnerBody(writer, type, serializerFields);
+            writer.CloseBlock();
+            writer.WriteLine($"return reader.DeserializeUnexpectedType<TReaderInput, {type.Type}>(ref field);");
         }
 
-        // C#: this.Deserializer(ref reader, [ref] result);
-        var resultArgument = type.IsValueType switch
+        writer.CloseBlock();
+
+        static void WriteInnerBody(SourceWriter writer, SerializableTypeEmissionPlan type, EquatableArray<FieldEmissionPlan> serializerFields)
         {
-            true => Argument(resultVar).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-            false => Argument(resultVar)
-        };
-        innerBody.Add(
-            ExpressionStatement(
-                InvocationExpression(
-                    IdentifierName(DeserializeMethodName),
-                    ArgumentList(
-                        SeparatedList(
-                            [
-                                Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                                resultArgument
-                            ])))));
-
-        innerBody.Add(ReturnStatement(resultVar));
-
-        if (!type.IsSealedType)
-        {
-            // C#: var fieldType = field.FieldType;
-            var valueTypeField = "valueType".ToIdentifierName();
-            body.Add(
-                LocalDeclarationStatement(
-                    VariableDeclaration(
-                        LibraryTypes.Type.ToTypeSyntax(),
-                        SingletonSeparatedList(VariableDeclarator(valueTypeField.Identifier)
-                            .WithInitializer(EqualsValueClause(fieldParam.Member("FieldType")))))));
-            body.Add(
-                IfStatement(
-                    BinaryExpression(SyntaxKind.LogicalOrExpression,
-                    IsPatternExpression(valueTypeField, ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression))),
-                    BinaryExpression(SyntaxKind.EqualsExpression, valueTypeField, IdentifierName(CodecFieldTypeFieldName))),
-                    Block(innerBody)));
-
-            body.Add(ReturnStatement(
-                            InvocationExpression(
-                                readerParam.Member("DeserializeUnexpectedType", [readerInputTypeParam, type.TypeSyntax]),
-                                ArgumentList(
-                                    SingletonSeparatedList(Argument(null, Token(SyntaxKind.RefKeyword), fieldParam))))));
+            var createValue = type.UseActivator
+                ? $"{serializerFields.Single(static field => field.Kind == EmissionFieldKind.Service && field.FieldName == ActivatorFieldName).FieldName}.Create()"
+                : type.ObjectCreation;
+            writer.WriteLine($"var result = {createValue};");
+            writer.WriteLine(type.TrackReferences
+                ? "ReferenceCodec.RecordObject(reader.Session, result);"
+                : "ReferenceCodec.MarkValueField(reader.Session);");
+            writer.WriteLine($"Deserialize(ref reader, {(type.IsValueType ? "ref " : string.Empty)}result);");
+            writer.WriteLine("return result;");
         }
-
-        var parameters = new[]
-        {
-            Parameter(readerParam.Identifier).WithType(LibraryTypes.Reader.ToTypeSyntax(readerInputTypeParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-            Parameter(fieldParam.Identifier).WithType(LibraryTypes.Field.ToTypeSyntax())
-        };
-
-        return MethodDeclaration(type.TypeSyntax, ReadValueMethodName)
-            .AddTypeParameterListParameters(TypeParameter("TReaderInput"))
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters(parameters)
-            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
-            .AddBodyStatements([.. body]);
     }
 
     internal abstract class GeneratedFieldDescription(TypeSyntax fieldType, string fieldName)
@@ -1051,15 +767,24 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         public override bool IsInjected => false;
     }
 
-    internal sealed class FieldAccessorDescription(TypeSyntax containingType, TypeSyntax fieldType, string fieldName, string accessorName, ExpressionSyntax? initializationSyntax = null, bool lazyInitialization = false, bool isUnsafeFieldAccessor = false, bool containingTypeIsValueType = false) : GeneratedFieldDescription(fieldType, fieldName)
+    /// <summary>
+    /// Describes a generated accessor for an inaccessible member: a delegate field (initialized from <see cref="Initialization"/>)
+    /// or, without an initializer, an <c>UnsafeAccessor</c> method.
+    /// </summary>
+    internal sealed class FieldAccessorDescription(TypeSyntax containingType, TypeSyntax fieldType, string fieldName, string accessorName, string? initialization = null, bool lazyInitialization = false, bool isUnsafeFieldAccessor = false, bool containingTypeIsValueType = false) : GeneratedFieldDescription(fieldType, fieldName)
     {
         public override bool IsInjected => false;
         public override bool LazyInitialization { get; } = lazyInitialization;
         public readonly string AccessorName = accessorName;
         public readonly TypeSyntax ContainingType = containingType;
-        public readonly ExpressionSyntax? InitializationSyntax = initializationSyntax;
+        public readonly string? Initialization = initialization;
         public bool IsUnsafeFieldAccessor { get; } = isUnsafeFieldAccessor;
         public bool ContainingTypeIsValueType { get; } = containingTypeIsValueType;
+
+        /// <summary>The expression which invokes this accessor, resolving a lazily initialized accessor on first use.</summary>
+        public string AccessExpression => LazyInitialization && Initialization is { } initialization
+            ? $"({AccessorName} ??= {initialization})"
+            : AccessorName;
     }
 
     internal sealed class SerializationHookFieldDescription(TypeSyntax fieldType, string fieldName) : GeneratedFieldDescription(fieldType, fieldName)
@@ -1081,19 +806,14 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         TypeSyntax TypeSyntax { get; }
 
         /// <summary>
-        /// Returns syntax for retrieving the value of this field, deep copying it if necessary.
+        /// Returns the plan for reading this member's value from an instance of the containing type.
         /// </summary>
-        /// <param name="instance">The instance of the containing type.</param>
-        /// <returns>Syntax for retrieving the value of this field.</returns>
-        ExpressionSyntax GetGetter(ExpressionSyntax instance);
+        MemberAccessPlan GetGetter();
 
         /// <summary>
-        /// Returns syntax for setting the value of this field.
+        /// Returns the plan for assigning this member's value on an instance of the containing type.
         /// </summary>
-        /// <param name="instance">The instance of the containing type.</param>
-        /// <param name="value">Syntax for the new value.</param>
-        /// <returns>Syntax for setting the value of this field.</returns>
-        ExpressionSyntax GetSetter(ExpressionSyntax instance, ExpressionSyntax value);
+        MemberAccessPlan GetSetter();
 
         FieldAccessorDescription? GetGetterFieldDescription();
         FieldAccessorDescription? GetSetterFieldDescription();
@@ -1120,23 +840,9 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         public bool IsPrimaryConstructorParameter => Member.IsPrimaryConstructorParameter;
 
-        /// <summary>
-        /// Returns syntax for retrieving the value of this field, deep copying it if necessary.
-        /// </summary>
-        /// <param name="instance">The instance of the containing type.</param>
-        /// <returns>Syntax for retrieving the value of this field.</returns>
-        public ExpressionSyntax GetGetter(ExpressionSyntax instance) => instance.Member(Member.FieldName);
+        public MemberAccessPlan GetGetter() => MemberAccessPlan.ForMember(Member.FieldName);
 
-        /// <summary>
-        /// Returns syntax for setting the value of this field.
-        /// </summary>
-        /// <param name="instance">The instance of the containing type.</param>
-        /// <param name="value">Syntax for the new value.</param>
-        /// <returns>Syntax for setting the value of this field.</returns>
-        public ExpressionSyntax GetSetter(ExpressionSyntax instance, ExpressionSyntax value) => AssignmentExpression(
-                    SyntaxKind.SimpleAssignmentExpression,
-                    instance.Member(Member.FieldName),
-                    value);
+        public MemberAccessPlan GetSetter() => MemberAccessPlan.ForMember(Member.FieldName);
 
         public FieldAccessorDescription? GetGetterFieldDescription() => null;
         public FieldAccessorDescription? GetSetterFieldDescription() => null;
@@ -1228,64 +934,34 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         public bool IsPrimaryConstructorParameter => Member.IsPrimaryConstructorParameter;
 
-        /// <summary>
-        /// Returns syntax for retrieving the value of this field, deep copying it if necessary.
-        /// </summary>
-        /// <param name="instance">The instance of the containing type.</param>
-        /// <returns>Syntax for retrieving the value of this field.</returns>
-        public ExpressionSyntax GetGetter(ExpressionSyntax instance)
+        public MemberAccessPlan GetGetter()
         {
             // If the field is the backing field for an accessible auto-property use the property directly.
-            ExpressionSyntax result;
             if (Property is { } property && IsGettableProperty)
             {
-                result = instance.Member(property.Name);
+                return MemberAccessPlan.ForMember(property.Name);
             }
-            else if (Field is { } field && IsGettableField)
+
+            if (Field is { } field && IsGettableField)
             {
-                result = instance.Member(field.Name);
-            }
-            else
-            {
-
-                var instanceArg = Argument(instance);
-                if (ContainingType?.IsValueType == true)
-                {
-                    instanceArg = instanceArg.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
-                }
-
-                // Retrieve the field using the generated getter.
-                result =
-                    InvocationExpression(GetAccessorExpression(GetGetterFieldDescription()!))
-                        .AddArgumentListArguments(instanceArg);
+                return MemberAccessPlan.ForMember(field.Name);
             }
 
-            return result;
+            // Retrieve the field using the generated getter.
+            return new(MemberAccessKind.Invoke, GetGetterFieldDescription()!.AccessExpression, RefInstance: ContainingType?.IsValueType == true);
         }
 
-        /// <summary>
-        /// Returns syntax for setting the value of this field.
-        /// </summary>
-        /// <param name="instance">The instance of the containing type.</param>
-        /// <param name="value">Syntax for the new value.</param>
-        /// <returns>Syntax for setting the value of this field.</returns>
-        public ExpressionSyntax GetSetter(ExpressionSyntax instance, ExpressionSyntax value)
+        public MemberAccessPlan GetSetter()
         {
             // If the field is the backing field for an accessible auto-property use the property directly.
             if (Property is { } property && IsSettableProperty)
             {
-                return AssignmentExpression(
-                    SyntaxKind.SimpleAssignmentExpression,
-                    instance.Member(property.Name),
-                    value);
+                return MemberAccessPlan.ForMember(property.Name);
             }
 
             if (Field is { } field && IsSettableField)
             {
-                return AssignmentExpression(
-                    SyntaxKind.SimpleAssignmentExpression,
-                    instance.Member(field.Name),
-                    value);
+                return MemberAccessPlan.ForMember(field.Name);
             }
 
             // If the symbol itself is a property but is not settable, then error out, since we do not know how to set it value
@@ -1302,23 +978,10 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                 throw new OrleansGeneratorDiagnosticAnalysisException(InaccessibleSetterDiagnostic.CreateDiagnostic(location, Member.Symbol?.ToDisplayString() ?? $"{ContainingType.ToDisplayString()}.{MemberName}"));
             }
 
-            var instanceArg = Argument(instance);
-            if (ContainingType?.IsValueType == true)
-            {
-                instanceArg = instanceArg.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
-            }
-
             var accessor = GetSetterFieldDescription()!;
-            var invocation = InvocationExpression(GetAccessorExpression(accessor)).AddArgumentListArguments(instanceArg);
-            return accessor.IsUnsafeFieldAccessor
-                ? AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, invocation, value)
-                : invocation.AddArgumentListArguments(Argument(value));
+            return new(accessor.IsUnsafeFieldAccessor ? MemberAccessKind.FieldReference : MemberAccessKind.Invoke,
+                accessor.AccessExpression, RefInstance: ContainingType?.IsValueType == true);
         }
-
-        private static ExpressionSyntax GetAccessorExpression(FieldAccessorDescription accessor)
-            => accessor.LazyInitialization && accessor.InitializationSyntax is { } initialization
-                ? ParenthesizedExpression(AssignmentExpression(SyntaxKind.CoalesceAssignmentExpression, IdentifierName(accessor.AccessorName), initialization))
-                : IdentifierName(accessor.AccessorName);
 
         public FieldAccessorDescription? GetGetterFieldDescription()
         {
@@ -1354,15 +1017,12 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             var delegateType = (setter ? (valueType ? library.ValueTypeSetter_2 : library.Action_2) : (valueType ? library.ValueTypeGetter_2 : library.Func_2))
                 .ToTypeSyntax(containingTypeSyntax, fieldType);
 
-            // Generate syntax to initialize the field in the constructor
-            var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
+            // The accessor field is initialized from a reflection-backed delegate.
             var accessorMethod = setter ? (valueType ? "GetValueSetter" : "GetReferenceSetter") : (valueType ? "GetValueGetter" : "GetGetter");
-            var accessorInvoke = CastExpression(delegateType,
-                InvocationExpression(fieldAccessorUtility.Member(accessorMethod))
-                    .AddArgumentListArguments(Argument(TypeOfExpression(containingTypeSyntax)), Argument(fieldName.GetLiteralExpression())));
+            var initialization = $"({CodeText.Type(delegateType)})global::Orleans.Serialization.Utilities.FieldAccessor.{accessorMethod}(typeof({CodeText.Type(containingTypeSyntax)}), {CodeText.QuotedText(fieldName)})";
 
             // Existing case, accessor is the field in both cases
-            return new(containingTypeSyntax, delegateType, accessorName, accessorName, accessorInvoke, lazyInitialization);
+            return new(containingTypeSyntax, delegateType, accessorName, accessorName, initialization, lazyInitialization);
         }
     }
 }
