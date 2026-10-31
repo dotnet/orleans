@@ -289,6 +289,48 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         }
 
         /// <summary>
+        /// Writes the header of a tagged-union field.
+        /// </summary>
+        /// <remarks>
+        /// A tagged-union field is a tag-delimited field which contains at most one field. The identifier of that inner field is the case identifier.
+        /// The union field occupies one reference identifier, which keeps reference identifiers aligned with readers that skip the field.
+        /// </remarks>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldIdDelta">The field identifier delta.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="unionType">The union type or closed base type.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteStartUnion<TBufferWriter>(this ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type? expectedType, Type unionType) where TBufferWriter : IBufferWriter<byte>
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteStartObject(fieldIdDelta, expectedType, unionType);
+        }
+
+        /// <summary>
+        /// Throws an exception indicating that a serialized tagged-union value has an unknown case identifier.
+        /// </summary>
+        /// <typeparam name="TField">The union type or closed base type.</typeparam>
+        /// <param name="caseId">The case identifier which was read.</param>
+        /// <returns>This method does not return.</returns>
+        [DoesNotReturn]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static TField ThrowUnknownUnionCase<TField>(uint caseId) => throw new UnknownUnionCaseException(typeof(TField), caseId);
+
+        /// <summary>
+        /// Throws an exception indicating that a value is not an instance of any case of a union type or closed type hierarchy.
+        /// </summary>
+        /// <typeparam name="TField">The union type or closed base type.</typeparam>
+        /// <param name="value">The value.</param>
+        [DoesNotReturn]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void ThrowUnsupportedUnionValue<TField>(object value)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(value);
+            throw new SerializerException($"A value of type {value.GetType()} is not a case of {typeof(TField)}.");
+        }
+
+        /// <summary>
         /// Gets the <see cref="MethodInfo"/> matching the provided values.
         /// </summary>
         /// <param name="interfaceType">Type of the interface.</param>

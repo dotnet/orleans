@@ -8,6 +8,8 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <ImplicitUsings>disable</ImplicitUsings>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)generated\$(Configuration)\$(TargetFramework)</CompilerGeneratedFilesOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +23,8 @@
 
   <ItemGroup>
     <PackageReference Include="Verify.XunitV3" />
+    <Compile Remove="snapshots\**\*.cs" />
+    <None Include="snapshots\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -40,6 +44,20 @@
     <Protobuf Include="protobuf-model.proto" GrpcServices="None" />
     <Compile Include="..\Orleans.NativeAotSmoke\InterfaceCollections.Contracts.cs" Link="InterfaceCollections.Contracts.cs" />
   </ItemGroup>
+
+  <Target
+    Name="CopyTaggedUnionGeneratedSources"
+    AfterTargets="Build"
+    Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <_TaggedUnionGeneratedSource Include="$(CompilerGeneratedFilesOutputPath)\**\*.TaggedUnions.*.g.cs" />
+    </ItemGroup>
+    <Error Condition="'@(_TaggedUnionGeneratedSource)' == ''" Text="Tagged-union generated sources are required by the source snapshot tests." />
+    <Copy
+      SourceFiles="@(_TaggedUnionGeneratedSource)"
+      DestinationFolder="$(TargetDir)TaggedUnionGeneratedSources"
+      SkipUnchangedFiles="true" />
+  </Target>
 
   <Target
     Name="CopyNetStandardSerializationAsset"

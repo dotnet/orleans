@@ -287,6 +287,88 @@ namespace Orleans
     }
 
     /// <summary>
+    /// Assigns a case identifier to a direct subtype of a <see langword="closed"/> type which has <see cref="GenerateSerializerAttribute"/> applied.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// When the direct subtypes of a closed type have case identifiers, a field declared as the closed type is serialized as a tagged union:
+    /// the case identifier is encoded in the header of the field holding the case value, so the runtime type of a value is not encoded
+    /// when it is exactly the case type. Values whose runtime type derives from an unsealed case type are encoded as that case, followed by
+    /// their runtime type.
+    /// </para>
+    /// <para>
+    /// Case identifiers are scoped to the closed type and must be unique within it. Every direct subtype of the closed type must have a case identifier.
+    /// Case identifiers are part of the serialized format, so they must remain stable once data has been serialized.
+    /// Identifiers 0 through 6 are encoded without additional bytes.
+    /// </para>
+    /// <para>
+    /// Adding case identifiers changes writers to the tagged-union format. Adopt them on an existing hierarchy using a coordinated deployment
+    /// of the updated hierarchy to all processes which exchange these values. Readers generated for the updated hierarchy accept both
+    /// the runtime-type format and the tagged-union format.
+    /// </para>
+    /// <para>
+    /// A closed type and a union type have the same serialized representation when the union's cases are the closed type's direct subtypes with the same
+    /// case identifiers (see <see cref="CaseIdsAttribute"/>). A <see langword="null"/> closed-type value is represented as an empty union value.
+    /// A closed type hierarchy can therefore be replaced by an equivalent union type without changing serialized data.
+    /// Each case's own representation includes its base type's members, so to remove the closed base from the cases when replacing it with a union,
+    /// declare the closed base without serialized members and apply <see cref="SerializerTransparentAttribute"/> to it.
+    /// </para>
+    /// </remarks>
+    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
+    public sealed class CaseAttribute : Attribute
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CaseAttribute"/> class.
+        /// </summary>
+        /// <param name="id">The case identifier, which is unique among the direct subtypes of the closed base type.</param>
+        public CaseAttribute(uint id)
+        {
+            Id = id;
+        }
+
+        /// <summary>
+        /// Gets the case identifier.
+        /// </summary>
+        public uint Id { get; }
+    }
+
+    /// <summary>
+    /// Assigns case identifiers to the cases of a union type which has <see cref="GenerateSerializerAttribute"/> applied.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Union values are serialized as tagged unions: the case identifier is encoded in the header of the field holding the case value.
+    /// By default, each case is identified by its zero-based position in the union declaration.
+    /// This attribute specifies one identifier per case, in declaration order, so that cases can be reordered or removed without changing
+    /// the identifiers of the remaining cases.
+    /// </para>
+    /// <para>
+    /// Identifiers must be unique. Identifiers 0 through 6 are encoded without additional bytes.
+    /// </para>
+    /// <para>
+    /// A union type whose cases are the direct subtypes of a closed type, with the same case identifiers, has the same serialized representation
+    /// as that closed type (see <see cref="CaseAttribute"/>). An empty union value is represented as a <see langword="null"/> closed-type value.
+    /// </para>
+    /// </remarks>
+    [AttributeUsage(AttributeTargets.Struct, Inherited = false)]
+    public sealed class CaseIdsAttribute : Attribute
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CaseIdsAttribute"/> class.
+        /// </summary>
+        /// <param name="ids">The case identifiers, one per case in declaration order.</param>
+        public CaseIdsAttribute(params uint[] ids)
+        {
+            Ids = ids;
+        }
+
+        /// <summary>
+        /// Gets the case identifiers, one per case in declaration order.
+        /// </summary>
+        public uint[] Ids { get; }
+    }
+
+    /// <summary>
     /// Specifies the constructor the serializer should use when creating new instances from serialized data.
     /// </summary>
     /// <remarks>

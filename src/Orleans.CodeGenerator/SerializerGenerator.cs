@@ -29,6 +29,18 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
     public ClassDeclarationSyntax Generate(ISerializableTypeDescription type)
     {
+        var unionCodecGenerator = new UnionCodecGenerator(_generatorServices);
+        if (type is SerializableTypeDescription { UnionCases: { } unionCases })
+        {
+            return unionCodecGenerator.GenerateUnionCodec(type, unionCases);
+        }
+
+        // A closed type whose subtypes declare case identifiers is serialized as a tagged union, so its codec is a field codec rather than
+        // an abstract type serializer. The codec also remains the base codec which serializes the closed type's members for its subtypes.
+        var closedTypeCaseCodecs = type is SerializableTypeDescription { IsAbstractType: true } closedType && closedType.GetClosedTypeCases() is { } closedTypeCases
+            ? unionCodecGenerator.GetCaseCodecs(closedTypeCases)
+            : null;
+        var isAbstractSerializer = type.IsAbstractType && closedTypeCaseCodecs is null;
         var simpleClassName = GetSimpleClassName(type);
 
         var members = new List<ISerializableMember>();
@@ -54,6 +66,12 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         }
 
         var fieldDescriptions = GetFieldDescriptions(type, members);
+        if (closedTypeCaseCodecs is not null)
+        {
+            fieldDescriptions.Add(new CodecFieldTypeFieldDescription(LibraryTypes.Type.ToTypeSyntax(), CodecFieldTypeFieldName, type.TypeSyntax));
+            fieldDescriptions.AddRange(closedTypeCaseCodecs.Where(static codec => codec.CodecField is not null).Select(static codec => codec.CodecField!));
+        }
+
         var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
         var ctor = GenerateConstructor(simpleClassName, fieldDescriptions);
 
@@ -63,7 +81,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             _ => SyntaxKind.InternalKeyword,
         };
 
-        var baseType = (type.IsAbstractType ? LibraryTypes.AbstractTypeSerializer : LibraryTypes.FieldCodec_1).ToTypeSyntax(type.TypeSyntax);
+        var baseType = (isAbstractSerializer ? LibraryTypes.AbstractTypeSerializer : LibraryTypes.FieldCodec_1).ToTypeSyntax(type.TypeSyntax);
 
         var classDeclaration = ClassDeclaration(simpleClassName)
             .AddBaseListTypes(SimpleBaseType(baseType))
@@ -82,12 +100,21 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         }
         else
         {
-            var serializeMethod = GenerateSerializeMethod(type, fieldDescriptions, members);
-            var deserializeMethod = GenerateDeserializeMethod(type, fieldDescriptions, members);
-            if (type.IsAbstractType)
+            var serializeMethod = GenerateSerializeMethod(type, fieldDescriptions, members, isAbstractSerializer);
+            var deserializeMethod = GenerateDeserializeMethod(type, fieldDescriptions, members, isAbstractSerializer);
+            if (isAbstractSerializer)
             {
                 if (serializeMethod != null) classDeclaration = classDeclaration.AddMembers(serializeMethod);
                 if (deserializeMethod != null) classDeclaration = classDeclaration.AddMembers(deserializeMethod);
+            }
+            else if (closedTypeCaseCodecs is not null)
+            {
+                Debug.Assert(serializeMethod is not null);
+                Debug.Assert(deserializeMethod is not null);
+                classDeclaration = classDeclaration
+                    .AddMembers(serializeMethod!, deserializeMethod!)
+                    .AddMembers([.. unionCodecGenerator.GenerateClosedTypeFieldCodecMembers(type, closedTypeCaseCodecs)])
+                    .AddBaseListTypes(SimpleBaseType(LibraryTypes.BaseCodec_1.ToTypeSyntax(type.TypeSyntax)));
             }
             else
             {
@@ -135,7 +162,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             ? ParenthesizedExpression(AssignmentExpression(SyntaxKind.CoalesceAssignmentExpression, IdentifierName(field.FieldName), GetServiceExpression(field.FieldType, IdentifierName(CodecProviderFieldName))))
             : IdentifierName(field.FieldName);
 
-    private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
+    internal static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
     {
         return [.. fieldDescriptions.Select(GetFieldDeclaration)];
 
@@ -209,7 +236,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
     }
 
-    private ConstructorDeclarationSyntax? GenerateConstructor(string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions)
+    internal ConstructorDeclarationSyntax? GenerateConstructor(string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions)
     {
         var codecProviderAdded = false;
         var parameters = new List<ParameterSyntax>();
@@ -406,7 +433,8 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
     private MemberDeclarationSyntax? GenerateSerializeMethod(
         ISerializableTypeDescription type,
         List<GeneratedFieldDescription> serializerFields,
-        List<ISerializableMember> members)
+        List<ISerializableMember> members,
+        bool isAbstractSerializer)
     {
         var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
 
@@ -448,7 +476,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         AddSerializationCallbacks(type, instanceParam, "OnSerialized", body);
 
-        if (body.Count == 0 && type.IsAbstractType)
+        if (body.Count == 0 && isAbstractSerializer)
             return null;
 
         var parameters = new[]
@@ -469,7 +497,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
             .AddBodyStatements([.. body]);
 
-        res = type.IsAbstractType
+        res = isAbstractSerializer
             ? res.AddModifiers(Token(SyntaxKind.OverrideKeyword))
             : res.AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(LibraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))));
 
@@ -553,7 +581,8 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
     private MemberDeclarationSyntax? GenerateDeserializeMethod(
         ISerializableTypeDescription type,
         List<GeneratedFieldDescription> serializerFields,
-        List<ISerializableMember> members)
+        List<ISerializableMember> members,
+        bool isAbstractSerializer)
     {
         var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
 
@@ -626,7 +655,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         AddSerializationCallbacks(type, instanceParam, "OnDeserialized", body);
 
-        if (body.Count == emptyBodyCount && type.IsAbstractType)
+        if (body.Count == emptyBodyCount && isAbstractSerializer)
             return null;
 
         var genericParam = ParseTypeName("TReaderInput");
@@ -648,7 +677,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
             .AddBodyStatements([.. body]);
 
-        if (type.IsAbstractType)
+        if (isAbstractSerializer)
             res = res.AddModifiers(Token(SyntaxKind.OverrideKeyword));
 
         return res;
@@ -743,7 +772,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         }
     }
 
-    private static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax instanceParam, string callbackMethodName, List<StatementSyntax> body)
+    internal static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax instanceParam, string callbackMethodName, List<StatementSyntax> body)
     {
         for (var hookIndex = 0; hookIndex < type.SerializationHooks.Count; ++hookIndex)
         {

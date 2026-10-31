@@ -189,4 +189,17 @@
     <PackageVersion Update="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <PackageVersion Update="System.Text.Json" Version="10.0.5" />
   </ItemGroup>
+  <!-- net10.0 test applications compile closed types and unions in generator tests, which requires a compiler that parses them.
+       Product packages keep the Roslyn versions above. -->
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net10.0' and '$(IsOrleansTestApplication)' == 'true' ">
+    <PackageVersion Update="Microsoft.CodeAnalysis.Common" Version="5.9.0" />
+    <PackageVersion Update="Microsoft.CodeAnalysis.CSharp.Features" Version="5.9.0" />
+    <PackageVersion Update="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" />
+    <PackageVersion Update="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Features" Version="5.9.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Scripting.Common" Version="5.9.0" />
+    <PackageVersion Update="Microsoft.CodeAnalysis.Workspaces.Common" Version="5.9.0" />
+    <PackageVersion Update="Microsoft.CodeAnalysis" Version="5.9.0" />
+    <PackageVersion Update="System.Collections.Immutable" Version="10.0.1" />
+  </ItemGroup>
 </Project>

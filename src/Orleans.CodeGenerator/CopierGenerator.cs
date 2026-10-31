@@ -34,6 +34,11 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             return null;
         }
 
+        if (!isShallowCopyable && type is SerializableTypeDescription { UnionCases: { } unionCases })
+        {
+            return new UnionCodecGenerator(_generatorServices).GenerateUnionCopier(type, unionCases);
+        }
+
         var simpleClassName = GetSimpleClassName(type);
 
         var members = new List<ISerializableMember>();
@@ -140,7 +145,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         }
     }
 
-    private ConstructorDeclarationSyntax? GenerateConstructor(string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions, bool isExceptionType)
+    internal ConstructorDeclarationSyntax? GenerateConstructor(string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions, bool isExceptionType)
     {
         var codecProviderAdded = false;
         var parameters = new List<ParameterSyntax>();
@@ -303,6 +308,13 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
     private TypeSyntax GetCopierType(IMemberDescription member)
     {
         var t = member.Type;
+        if (LanguageFeatureSymbols.IsUnion(t)
+            && !SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, LibraryTypes.Compilation.Assembly))
+        {
+            // A referenced shallow union can register ShallowCopier<T> without emitting a concrete generated copier.
+            return LibraryTypes.DeepCopier_1.ToTypeSyntax(member.TypeSyntax);
+        }
+
         if (t.HasAttribute(LibraryTypes.GenerateSerializerAttribute)
             && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, LibraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
             && t is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 0 })
@@ -642,7 +654,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         return getValueExpression;
     }
 
-    private static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax originalInstance, IdentifierNameSyntax resultInstance, string callbackMethodName, List<StatementSyntax> body)
+    internal static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax originalInstance, IdentifierNameSyntax resultInstance, string callbackMethodName, List<StatementSyntax> body)
     {
         var serializationHooks = type.SerializationHooks;
         for (var hookIndex = 0; hookIndex < serializationHooks.Count; ++hookIndex)
