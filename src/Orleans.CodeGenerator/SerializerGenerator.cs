@@ -77,8 +77,9 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         if (type.IsEnumType)
         {
-            var writeMethod = GenerateEnumWriteMethod(type);
-            var readMethod = GenerateEnumReadMethod(type);
+            var plan = EnumSerializerGenerator.CreatePlan(type, LibraryTypes);
+            var writeMethod = EnumSerializerGenerator.GenerateWriteMethod(plan);
+            var readMethod = EnumSerializerGenerator.GenerateReadMethod(plan);
             classDeclaration = classDeclaration.AddMembers(writeMethod, readMethod);
         }
         else
@@ -996,89 +997,6 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         var parameters = new[]
         {
             Parameter(readerParam.Identifier).WithType(LibraryTypes.Reader.ToTypeSyntax(readerInputTypeParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-            Parameter(fieldParam.Identifier).WithType(LibraryTypes.Field.ToTypeSyntax())
-        };
-
-        return MethodDeclaration(type.TypeSyntax, ReadValueMethodName)
-            .AddTypeParameterListParameters(TypeParameter("TReaderInput"))
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters(parameters)
-            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
-            .AddBodyStatements([.. body]);
-    }
-
-    private MemberDeclarationSyntax GenerateEnumWriteMethod(
-        ISerializableTypeDescription type)
-    {
-        var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
-
-        var writerParam = "writer".ToIdentifierName();
-        var fieldIdDeltaParam = "fieldIdDelta".ToIdentifierName();
-        var expectedTypeParam = "expectedType".ToIdentifierName();
-        var valueParam = "value".ToIdentifierName();
-
-        var body = new List<StatementSyntax>();
-
-        // Codecs can either be static classes or injected into the constructor.
-        // Either way, the member signatures are the same.
-        var staticCodec = LibraryTypes.StaticCodecs.FindByUnderlyingType(type.BaseType);
-        Debug.Assert(staticCodec is not null);
-        var codecExpression = staticCodec!.CodecType.ToNameSyntax();
-
-        body.Add(
-            ExpressionStatement(
-                InvocationExpression(
-                    codecExpression.Member("WriteField"),
-                    ArgumentList(
-                        SeparatedList(
-                            [
-                                Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                                Argument(fieldIdDeltaParam),
-                                Argument(expectedTypeParam),
-                                Argument(CastExpression(type.BaseTypeSyntax, valueParam)),
-                                Argument(IdentifierName(CodecFieldTypeFieldName))
-                            ])))));
-
-        var parameters = new[]
-        {
-            Parameter("writer".ToIdentifier()).WithType(LibraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-            Parameter("fieldIdDelta".ToIdentifier()).WithType(PredefinedType(Token(SyntaxKind.UIntKeyword))),
-            Parameter("expectedType".ToIdentifier()).WithType(LibraryTypes.Type.ToTypeSyntax()),
-            Parameter("value".ToIdentifier()).WithType(type.TypeSyntax)
-        };
-
-        return MethodDeclaration(returnType, WriteFieldMethodName)
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters(parameters)
-            .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
-            .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(LibraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
-            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
-            .AddBodyStatements([.. body]);
-    }
-
-    private MemberDeclarationSyntax GenerateEnumReadMethod(
-        ISerializableTypeDescription type)
-    {
-        var readerParam = "reader".ToIdentifierName();
-        var fieldParam = "field".ToIdentifierName();
-
-        var staticCodec = LibraryTypes.StaticCodecs.FindByUnderlyingType(type.BaseType);
-        Debug.Assert(staticCodec is not null);
-        ExpressionSyntax codecExpression = staticCodec!.CodecType.ToNameSyntax();
-        ExpressionSyntax readValueExpression = InvocationExpression(
-            codecExpression.Member("ReadValue"),
-            ArgumentList(SeparatedList([Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(fieldParam)])));
-
-        readValueExpression = CastExpression(type.TypeSyntax, readValueExpression);
-        var body = new List<StatementSyntax>
-        {
-            ReturnStatement(readValueExpression)
-        };
-
-        var genericParam = ParseTypeName("TReaderInput");
-        var parameters = new[]
-        {
-            Parameter(readerParam.Identifier).WithType(LibraryTypes.Reader.ToTypeSyntax(genericParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
             Parameter(fieldParam.Identifier).WithType(LibraryTypes.Field.ToTypeSyntax())
         };
 
