@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Placement;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 
@@ -11,8 +13,13 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
     ISiloMetadataCache siloMetadataCache)
     : IPlacementFilterDirector
 {
-    public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
+    public Task<IReadOnlyList<SiloAddress>> FilterAsync(
+        PlacementFilterStrategy filterStrategy,
+        PlacementTarget target,
+        IReadOnlyList<SiloAddress> silos,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var preferredMatchSiloMetadataPlacementFilterStrategy = filterStrategy as PreferredMatchSiloMetadataPlacementFilterStrategy;
         var minCandidates = preferredMatchSiloMetadataPlacementFilterStrategy?.MinCandidates ?? 1;
         var orderedMetadataKeys = preferredMatchSiloMetadataPlacementFilterStrategy?.OrderedMetadataKeys ?? [];
@@ -21,13 +28,13 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
 
         if (localSiloMetadata.Count == 0)
         {
-            return silos;
+            return Task.FromResult(silos);
         }
 
-        var siloList = silos.ToList();
+        var siloList = silos;
         if (siloList.Count <= minCandidates)
         {
-            return siloList;
+            return Task.FromResult(siloList);
         }
 
         // return the list of silos that match the most metadata keys. The first key in the list is the least important.
@@ -38,6 +45,7 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
         var scoreCounts = new int[orderedMetadataKeys.Length + 1];
         for (var i = 0; i < siloList.Count; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var siloMetadata = siloMetadataCache.GetSiloMetadata(siloList[i]).Metadata;
             var siloScore = 0;
             for (var j = orderedMetadataKeys.Length - 1; j >= 0; --j)
@@ -59,7 +67,7 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
 
         if (maxScore == 0)
         {
-            return siloList;
+            return Task.FromResult(siloList);
         }
 
         var candidateCount = 0;
@@ -74,6 +82,7 @@ internal class PreferredMatchSiloMetadataPlacementFilterDirector(
             }
         }
 
-        return siloList.Where((_, i) => siloScores[i] >= scoreCutOff);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<IReadOnlyList<SiloAddress>>(siloList.Where((_, i) => siloScores[i] >= scoreCutOff).ToArray());
     }
 }

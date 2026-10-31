@@ -152,10 +152,11 @@ public class CoreGenericRegistrationTests
 
         public ActivationMarker Dependency { get; }
 
-        public IEnumerable<SiloAddress> Filter(
+        public Task<IReadOnlyList<SiloAddress>> FilterAsync(
             PlacementFilterStrategy filterStrategy,
             PlacementTarget target,
-            IEnumerable<SiloAddress> silos) => silos;
+            IReadOnlyList<SiloAddress> silos,
+            CancellationToken cancellationToken = default) => Task.FromResult(silos);
     }
 
     private sealed class TestOptions;

@@ -22,7 +22,7 @@ namespace UnitTests.Runtime
             var compatibleSilo = Silo("127.0.0.1:101@1");
             var director = CreateDirector(localSilo);
             var placementContext = Substitute.For<IPlacementContext>();
-            placementContext.GetCompatibleSilos(Arg.Any<PlacementTarget>()).Returns([compatibleSilo]);
+            placementContext.GetCompatibleSilosAsync(Arg.Any<PlacementTarget>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult<SiloAddress[]>([compatibleSilo]));
 
             var result = await director.OnAddActivation(strategy: null!, target: default, placementContext);
 
@@ -36,7 +36,7 @@ namespace UnitTests.Runtime
             var compatibleSilo = Silo("127.0.0.1:101@1");
             var director = CreateDirector(localSilo);
             var placementContext = Substitute.For<IPlacementContext>();
-            placementContext.GetCompatibleSilos(Arg.Any<PlacementTarget>()).Returns([compatibleSilo, localSilo]);
+            placementContext.GetCompatibleSilosAsync(Arg.Any<PlacementTarget>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult<SiloAddress[]>([compatibleSilo, localSilo]));
 
             var result = await director.OnAddActivation(strategy: null!, target: default, placementContext);
 
@@ -101,7 +101,7 @@ namespace UnitTests.Runtime
         private static IPlacementContext CreatePlacementContext(params SiloAddress[] compatibleSilos)
         {
             var placementContext = Substitute.For<IPlacementContext>();
-            placementContext.GetCompatibleSilos(Arg.Any<PlacementTarget>()).Returns(compatibleSilos);
+            placementContext.GetCompatibleSilosAsync(Arg.Any<PlacementTarget>(), Arg.Any<CancellationToken>()).Returns(compatibleSilos);
             return placementContext;
         }
 

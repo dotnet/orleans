@@ -371,7 +371,7 @@ namespace UnitTests.General
         /// Tests that FilterPlacementCandidates spans are properly parented under a PlaceGrain span
         /// when migration triggers placement via PlaceGrainAsync.
         /// This covers the code path where PlaceGrainAsync (not the PlacementWorker message path)
-        /// calls a placement director which calls GetCompatibleSilos with filters.
+        /// calls a placement director which calls GetCompatibleSilosAsync with filters.
         /// </summary>
         [Fact]
         [TestCategory("BVT")]
@@ -844,8 +844,10 @@ namespace UnitTests.General
     /// </summary>
     public class TracingTestPlacementFilterDirector : IPlacementFilterDirector
     {
-        public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
+        public async Task<IReadOnlyList<SiloAddress>> FilterAsync(PlacementFilterStrategy filterStrategy, PlacementTarget target, IReadOnlyList<SiloAddress> silos, CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             return silos;
         }
     }
@@ -867,8 +869,10 @@ namespace UnitTests.General
     /// </summary>
     public class SecondTracingTestPlacementFilterDirector : IPlacementFilterDirector
     {
-        public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
+        public async Task<IReadOnlyList<SiloAddress>> FilterAsync(PlacementFilterStrategy filterStrategy, PlacementTarget target, IReadOnlyList<SiloAddress> silos, CancellationToken cancellationToken = default)
         {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
             return silos;
         }
     }

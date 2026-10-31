@@ -153,10 +153,10 @@ public class TestPlacementFilterDirector() : IPlacementFilterDirector
 {
     public static SemaphoreSlim Triggered { get; } = new(0);
 
-    public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
+    public Task<IReadOnlyList<SiloAddress>> FilterAsync(PlacementFilterStrategy filterStrategy, PlacementTarget target, IReadOnlyList<SiloAddress> silos, CancellationToken cancellationToken = default)
     {
         Triggered.Release(1);
-        return silos;
+        return Task.FromResult(silos);
     }
 }
 
@@ -173,12 +173,12 @@ public class OrderAPlacementFilterStrategy(int order) : PlacementFilterStrategy(
 
 public class OrderAPlacementFilterDirector : IPlacementFilterDirector
 {
-    public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
+    public Task<IReadOnlyList<SiloAddress>> FilterAsync(PlacementFilterStrategy filterStrategy, PlacementTarget target, IReadOnlyList<SiloAddress> silos, CancellationToken cancellationToken = default)
     {
         var dict = GrainPlacementFilterTests.FilterScratchpad;
         var list = dict.GetValueOrAddNew(target.GrainIdentity.Type.ToString()!);
         list.Add("A");
-        return silos;
+        return Task.FromResult(silos);
     }
 }
 
@@ -195,12 +195,12 @@ public class OrderBPlacementFilterStrategy(int order) : PlacementFilterStrategy(
 
 public class OrderBPlacementFilterDirector() : IPlacementFilterDirector
 {
-    public IEnumerable<SiloAddress> Filter(PlacementFilterStrategy filterStrategy, PlacementTarget target, IEnumerable<SiloAddress> silos)
+    public Task<IReadOnlyList<SiloAddress>> FilterAsync(PlacementFilterStrategy filterStrategy, PlacementTarget target, IReadOnlyList<SiloAddress> silos, CancellationToken cancellationToken = default)
     {
         var dict = GrainPlacementFilterTests.FilterScratchpad;
         var list = dict.GetValueOrAddNew(target.GrainIdentity.Type.ToString()!);
         list.Add("B");
-        return silos;
+        return Task.FromResult(silos);
     }
 }
 
