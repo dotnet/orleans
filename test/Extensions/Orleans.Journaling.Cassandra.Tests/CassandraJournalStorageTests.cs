@@ -50,6 +50,79 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     }
 
     [Fact]
+    public async Task AppendAsync_WhenExecutionFailsBeforeCommit_LeavesJournalUnchangedAndCanBeRetried()
+    {
+        await using var harness = await CreateHarnessAsync(
+            sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
+        var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
+        var id = NewJournalId();
+        await harness.Provider.CreateStorage(id).CreateIfNotExistsAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
+        failureInjector.Arm(
+            static statement => statement is BatchStatement { BatchType: BatchType.Logged },
+            FailureInjectionTiming.BeforeExecution,
+            "Injected failure before append execution.");
+
+        var exception = await Assert.ThrowsAsync<TimeoutException>(
+            () => harness.Provider.CreateStorage(id).AppendAsync(
+                new ReadOnlySequence<byte>([1]),
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal("Injected failure before append execution.", exception.Message);
+        Assert.Equal(1, failureInjector.InjectedFailures);
+        var activeGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
+        Assert.Empty(await GetSequencesAsync(harness.Session, harness.Options.TableName, id, activeGeneration));
+        var consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Empty(consumer.Bytes.ToArray());
+        Assert.True(consumer.IsCompleted);
+
+        await harness.Provider.CreateStorage(id).AppendAsync(
+            new ReadOnlySequence<byte>([2]),
+            TestContext.Current.CancellationToken);
+        consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([2], consumer.Bytes.ToArray());
+    }
+
+    [Fact]
+    public async Task AppendAsync_WhenResponseIsLostAfterCommit_RecoversOneCompleteAppend()
+    {
+        await using var harness = await CreateHarnessAsync(
+            sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
+        var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
+        var id = NewJournalId();
+        await harness.Provider.CreateStorage(id).CreateIfNotExistsAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
+        failureInjector.Arm(
+            static statement => statement is BatchStatement { BatchType: BatchType.Logged },
+            FailureInjectionTiming.AfterExecution,
+            "Injected lost response after append commit.");
+
+        var exception = await Assert.ThrowsAsync<TimeoutException>(
+            () => harness.Provider.CreateStorage(id).AppendAsync(
+                new ReadOnlySequence<byte>([1]),
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal("Injected lost response after append commit.", exception.Message);
+        Assert.Equal(1, failureInjector.InjectedFailures);
+        var activeGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
+        var sequences = await GetSequencesAsync(harness.Session, harness.Options.TableName, id, activeGeneration);
+        Assert.Equal([0L], sequences);
+        var consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([1], consumer.Bytes.ToArray());
+        Assert.True(consumer.IsCompleted);
+
+        await harness.Provider.CreateStorage(id).AppendAsync(
+            new ReadOnlySequence<byte>([2]),
+            TestContext.Current.CancellationToken);
+        consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([1, 2], consumer.Bytes.ToArray());
+    }
+
+    [Fact]
     public async Task ReadAsync_WhenJournalDoesNotExist_CompletesEmpty()
     {
         await using var harness = await CreateHarnessAsync();
@@ -94,6 +167,84 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         var catalogEntry = Assert.Single(entries);
         Assert.Equal(firstId, catalogEntry.Id);
         Assert.Equal("bob", catalogEntry.Metadata!.Properties["owner"]);
+    }
+
+    [Fact]
+    public async Task CreateIfNotExistsAsync_WhenCatalogInsertResponseIsLost_RetryCreatesDiscoverableJournal()
+    {
+        await using var harness = await CreateHarnessAsync(
+            sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
+        var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
+        var id = NewJournalId();
+        failureInjector.Arm(
+            static statement => statement is BoundStatement bound
+                && bound.PreparedStatement.QueryString.Contains("(bucket, journal_id)", StringComparison.Ordinal),
+            FailureInjectionTiming.AfterExecution,
+            "Injected lost response after catalog insert.");
+
+        var exception = await Assert.ThrowsAsync<TimeoutException>(
+            () => harness.Provider.CreateStorage(id).CreateIfNotExistsAsync(
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal("Injected lost response after catalog insert.", exception.Message);
+        Assert.Equal(1, failureInjector.InjectedFailures);
+        Assert.Null(await harness.Provider.CreateStorage(id).GetMetadataAsync(TestContext.Current.CancellationToken));
+        var entries = new List<JournalCatalogEntry>();
+        await foreach (var entry in harness.Provider.ListAsync(
+            new JournalCatalogListOptions { Prefix = new JournalId("test/") },
+            TestContext.Current.CancellationToken))
+        {
+            entries.Add(entry);
+        }
+
+        Assert.DoesNotContain(entries, entry => entry.Id == id);
+        Assert.True(await harness.Provider.CreateStorage(id).CreateIfNotExistsAsync(
+            cancellationToken: TestContext.Current.CancellationToken));
+
+        entries.Clear();
+        await foreach (var entry in harness.Provider.ListAsync(
+            new JournalCatalogListOptions { Prefix = new JournalId("test/") },
+            TestContext.Current.CancellationToken))
+        {
+            entries.Add(entry);
+        }
+
+        Assert.Contains(entries, entry => entry.Id == id);
+    }
+
+    [Fact]
+    public async Task CreateIfNotExistsAsync_WhenHeaderResponseIsLost_RecoversCreatedJournalAndMetadata()
+    {
+        await using var harness = await CreateHarnessAsync(
+            sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
+        var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
+        var id = NewJournalId();
+        failureInjector.Arm(
+            static statement => statement is BoundStatement bound
+                && bound.PreparedStatement.QueryString.Contains("IF NOT EXISTS", StringComparison.Ordinal),
+            FailureInjectionTiming.AfterExecution,
+            "Injected lost response after journal creation.");
+
+        var exception = await Assert.ThrowsAsync<TimeoutException>(
+            () => harness.Provider.CreateStorage(id).CreateIfNotExistsAsync(
+                new Dictionary<string, string> { ["owner"] = "alice" },
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal("Injected lost response after journal creation.", exception.Message);
+        Assert.Equal(1, failureInjector.InjectedFailures);
+        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(
+            await harness.Provider.CreateStorage(id).GetMetadataAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("alice", metadata.Properties["owner"]);
+        var entries = new List<JournalCatalogEntry>();
+        await foreach (var entry in harness.Provider.ListAsync(
+            new JournalCatalogListOptions { Prefix = new JournalId("test/"), IncludeMetadata = true },
+            TestContext.Current.CancellationToken))
+        {
+            entries.Add(entry);
+        }
+
+        var catalogEntry = Assert.Single(entries, entry => entry.Id == id);
+        Assert.Equal("alice", catalogEntry.Metadata!.Properties["owner"]);
     }
 
     [Fact]
@@ -336,29 +487,65 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     [Fact]
     public async Task ReplaceAsync_WhenSecondStagingBatchFails_KeepsOldGenerationAndDeletesStagedRows()
     {
-        FailSecondStagingBatchSessionProxy? stagingProxy = null;
         await using var harness = await CreateHarnessAsync(
             rowSizeBytes: 1,
-            sessionDecorator: session => FailSecondStagingBatchSessionProxy.Create(session, out stagingProxy));
+            sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
+        var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
         var id = NewJournalId();
         var storage = harness.Provider.CreateStorage(id);
         await storage.AppendAsync(new ReadOnlySequence<byte>([99]), TestContext.Current.CancellationToken);
         var oldGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
-        stagingProxy!.Arm();
+        failureInjector.Arm(
+            static statement => statement is BatchStatement { BatchType: BatchType.Unlogged },
+            FailureInjectionTiming.BeforeExecution,
+            "Injected failure on the second replacement staging batch.",
+            occurrence: 2);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = await Assert.ThrowsAsync<TimeoutException>(
             () => storage.ReplaceAsync(
                 new ReadOnlySequence<byte>(Enumerable.Range(0, 65).Select(static value => (byte)value).ToArray()),
                 TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal("Injected failure on the second replacement staging batch.", exception.Message);
-        Assert.Equal(2, stagingProxy.AttemptedStagingBatches);
-        Assert.Equal(1, stagingProxy.SucceededStagingBatches);
+        Assert.Equal(2, failureInjector.MatchedStatements);
+        Assert.Equal(1, failureInjector.InjectedFailures);
         Assert.Equal(oldGeneration, await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id));
         var oldGenerationSequences = await GetSequencesAsync(harness.Session, harness.Options.TableName, id, oldGeneration);
         Assert.Equal([0L], oldGenerationSequences);
         var generations = await GetGenerationsAsync(harness.Session, harness.Options.TableName, id);
         Assert.True(new HashSet<Guid> { Guid.Empty, oldGeneration }.SetEquals(generations));
+        var consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([99], consumer.Bytes.ToArray());
+        Assert.True(consumer.IsCompleted);
+    }
+
+    [Fact]
+    public async Task ReplaceAsync_WhenStagingResponseIsLost_CleansUnpublishedGeneration()
+    {
+        await using var harness = await CreateHarnessAsync(
+            sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
+        var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
+        var id = NewJournalId();
+        await harness.Provider.CreateStorage(id).AppendAsync(
+            new ReadOnlySequence<byte>([99]),
+            TestContext.Current.CancellationToken);
+        var oldGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
+        failureInjector.Arm(
+            static statement => statement is BatchStatement { BatchType: BatchType.Unlogged },
+            FailureInjectionTiming.AfterExecution,
+            "Injected lost response after replacement staging.");
+
+        var exception = await Assert.ThrowsAsync<TimeoutException>(
+            () => harness.Provider.CreateStorage(id).ReplaceAsync(
+                new ReadOnlySequence<byte>([1, 2, 3]),
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal("Injected lost response after replacement staging.", exception.Message);
+        Assert.Equal(1, failureInjector.InjectedFailures);
+        Assert.Equal(oldGeneration, await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id));
+        Assert.True(new HashSet<Guid> { Guid.Empty, oldGeneration }.SetEquals(
+            await GetGenerationsAsync(harness.Session, harness.Options.TableName, id)));
         var consumer = new CapturingConsumer();
         await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
         Assert.Equal([99], consumer.Bytes.ToArray());
@@ -531,7 +718,8 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     public async Task ReplaceAsync_ReturnsSuccessWhenPostPublicationCleanupFails()
     {
         await using var harness = await CreateHarnessAsync(
-            sessionDecorator: static session => FailNextDeleteSessionProxy.Create(session));
+            sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
+        var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
         var id = NewJournalId();
         var storage = harness.Provider.CreateStorage(id);
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
@@ -546,8 +734,13 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
             Guid.NewGuid(),
             new byte[] { 99 }));
 
+        failureInjector.Arm(
+            IsGenerationDelete,
+            FailureInjectionTiming.BeforeExecution,
+            "Injected failure for the first generation delete.");
         await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
 
+        Assert.Equal(1, failureInjector.InjectedFailures);
         var activeGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
         Assert.NotEqual(previousGeneration, activeGeneration);
         var previousSequences = await GetSequencesAsync(harness.Session, harness.Options.TableName, id, previousGeneration);
@@ -562,17 +755,24 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     public async Task ReplaceAsync_PreservesPublishedGenerationWhenResponseIsLost()
     {
         await using var harness = await CreateHarnessAsync(
-            sessionDecorator: static session => PublicationResponseLossSessionProxy.Create(session));
+            sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
+        var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
         var id = NewJournalId();
         await harness.Provider.CreateStorage(id).AppendAsync(
             new ReadOnlySequence<byte>([1]),
             TestContext.Current.CancellationToken);
+        failureInjector.Arm(
+            static statement => statement is BoundStatement bound
+                && bound.PreparedStatement.QueryString.Contains("SET active_generation", StringComparison.Ordinal),
+            FailureInjectionTiming.AfterExecution,
+            "Injected lost response after replacement publication.");
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = await Assert.ThrowsAsync<TimeoutException>(
             () => harness.Provider.CreateStorage(id).ReplaceAsync(
                 new ReadOnlySequence<byte>([2, 3]),
                 TestContext.Current.CancellationToken).AsTask());
         Assert.Equal("Injected lost response after replacement publication.", exception.Message);
+        Assert.Equal(1, failureInjector.InjectedFailures);
 
         var consumer = new CapturingConsumer();
         await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
@@ -611,6 +811,40 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
         Assert.Equal([1, 2], consumer.Bytes.ToArray());
         Assert.Equal("closed", consumer.Metadata!.Properties["catalog"]);
+    }
+
+    [Fact]
+    public async Task UpdateMetadataAsync_WhenResponseIsLostAfterCommit_RecoversMetadataAndJournal()
+    {
+        await using var harness = await CreateHarnessAsync(
+            sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
+        var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
+        var id = NewJournalId();
+        await harness.Provider.CreateStorage(id).AppendAsync(
+            new ReadOnlySequence<byte>([1]),
+            TestContext.Current.CancellationToken);
+        failureInjector.Arm(
+            static statement => statement is BoundStatement bound
+                && bound.PreparedStatement.QueryString.Contains("SET caller_metadata", StringComparison.Ordinal),
+            FailureInjectionTiming.AfterExecution,
+            "Injected lost response after metadata update.");
+
+        var exception = await Assert.ThrowsAsync<TimeoutException>(
+            () => harness.Provider.CreateStorage(id).UpdateMetadataAsync(
+                set: new Dictionary<string, string> { ["owner"] = "alice" },
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal("Injected lost response after metadata update.", exception.Message);
+        Assert.Equal(1, failureInjector.InjectedFailures);
+        var storage = harness.Provider.CreateStorage(id);
+        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(
+            await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("alice", metadata.Properties["owner"]);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
+        var consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([1, 2], consumer.Bytes.ToArray());
+        Assert.Equal("alice", consumer.Metadata!.Properties["owner"]);
     }
 
     [Fact]
@@ -681,6 +915,50 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         var newGenerationSequences = await GetSequencesAsync(harness.Session, harness.Options.TableName, id, newGeneration);
         Assert.Equal([0L], newGenerationSequences);
         Assert.Empty(await GetSequencesAsync(harness.Session, harness.Options.TableName, id, deletedGeneration));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WhenResponseIsLostAfterHeaderDelete_HidesJournalAndAllowsRecreation()
+    {
+        await using var harness = await CreateHarnessAsync(
+            sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
+        var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
+        var id = NewJournalId();
+        await harness.Provider.CreateStorage(id).AppendAsync(
+            new ReadOnlySequence<byte>([1]),
+            TestContext.Current.CancellationToken);
+        var deletedGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
+        failureInjector.Arm(
+            static statement => statement is BoundStatement bound
+                && bound.PreparedStatement.QueryString.Contains("DELETE", StringComparison.OrdinalIgnoreCase)
+                && bound.PreparedStatement.QueryString.Contains("IF revision", StringComparison.OrdinalIgnoreCase),
+            FailureInjectionTiming.AfterExecution,
+            "Injected lost response after journal deletion.");
+
+        var exception = await Assert.ThrowsAsync<TimeoutException>(
+            () => harness.Provider.CreateStorage(id).DeleteAsync(TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal("Injected lost response after journal deletion.", exception.Message);
+        Assert.Equal(1, failureInjector.InjectedFailures);
+        Assert.Null(await harness.Provider.CreateStorage(id).GetMetadataAsync(TestContext.Current.CancellationToken));
+        var entries = new List<JournalCatalogEntry>();
+        await foreach (var entry in harness.Provider.ListAsync(
+            new JournalCatalogListOptions { Prefix = new JournalId("test/") },
+            TestContext.Current.CancellationToken))
+        {
+            entries.Add(entry);
+        }
+
+        Assert.DoesNotContain(entries, entry => entry.Id == id);
+        await harness.Provider.CreateStorage(id).AppendAsync(
+            new ReadOnlySequence<byte>([2]),
+            TestContext.Current.CancellationToken);
+
+        var newGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
+        Assert.NotEqual(deletedGeneration, newGeneration);
+        var consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([2], consumer.Bytes.ToArray());
     }
 
     [Fact]
@@ -804,16 +1082,22 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     public async Task DeleteAsync_WhenGenerationCleanupFails_ReportsFailureAfterHidingJournal()
     {
         await using var harness = await CreateHarnessAsync(
-            sessionDecorator: static session => FailGenerationDeleteSessionProxy.Create(session));
+            sessionDecorator: static session => new CassandraSessionFailureDecorator(session));
+        var failureInjector = Assert.IsType<CassandraSessionFailureDecorator>(harness.DecoratedSession);
         var id = NewJournalId();
         var storage = harness.Provider.CreateStorage(id);
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var generation = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
+        failureInjector.Arm(
+            IsGenerationDelete,
+            FailureInjectionTiming.BeforeExecution,
+            "Injected generation cleanup failure.");
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = await Assert.ThrowsAsync<TimeoutException>(
             () => storage.DeleteAsync(TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("generation cleanup", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, failureInjector.InjectedFailures);
         Assert.Null(await harness.Provider.CreateStorage(id).GetMetadataAsync(TestContext.Current.CancellationToken));
         var survivingSequences = await GetSequencesAsync(harness.Session, harness.Options.TableName, id, generation);
         Assert.Equal([0L], survivingSequences);
@@ -834,6 +1118,11 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         Assert.Null(await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
     }
 
+    private static bool IsGenerationDelete(IStatement statement)
+        => statement is BoundStatement bound
+            && bound.PreparedStatement.QueryString.TrimStart().StartsWith("DELETE", StringComparison.OrdinalIgnoreCase)
+            && !bound.PreparedStatement.QueryString.Contains("IF revision", StringComparison.OrdinalIgnoreCase);
+
     private async Task<ProviderHarness> CreateHarnessAsync(
         int maxAppendBytes = 2 * 1024 * 1024,
         int rowSizeBytes = 64 * 1024,
@@ -852,72 +1141,15 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
             CompactionAppendCount = compactionAppendCount,
             ReadPageSize = readPageSize,
         };
-        options.ConfigureClient(_ => Task.FromResult(sessionDecorator?.Invoke(session) ?? session));
+        var decoratedSession = sessionDecorator?.Invoke(session) ?? session;
+        options.ConfigureClient(_ => Task.FromResult(decoratedSession));
         var provider = new CassandraJournalStorageProvider(
             Options.Create(options),
             Options.Create(new JournaledStateManagerOptions { JournalFormatKey = journalFormatKey }),
             new ServiceCollection().BuildServiceProvider(),
             NullLogger<CassandraJournalStorage>.Instance);
         await provider.InitializeAsync(TestContext.Current.CancellationToken);
-        return new ProviderHarness(provider, options, session);
-    }
-
-    public class FailNextDeleteSessionProxy : DispatchProxy
-    {
-        private ISession? _inner;
-        private int _failNextDelete;
-
-        public static ISession Create(ISession inner)
-        {
-            var session = DispatchProxy.Create<ISession, FailNextDeleteSessionProxy>();
-            var proxy = (FailNextDeleteSessionProxy)(object)session;
-            proxy._inner = inner;
-            proxy._failNextDelete = 1;
-            return session;
-        }
-
-        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
-        {
-            if (targetMethod?.Name == nameof(ISession.ExecuteAsync)
-                && args is { Length: > 0 }
-                && args[0] is BoundStatement statement
-                && statement.PreparedStatement.QueryString.TrimStart().StartsWith("DELETE", StringComparison.OrdinalIgnoreCase)
-                && Interlocked.Exchange(ref _failNextDelete, 0) == 1)
-            {
-                throw new InvalidOperationException("Injected failure for the first generation delete.");
-            }
-
-            return targetMethod!.Invoke(_inner, args);
-        }
-    }
-
-    private class FailGenerationDeleteSessionProxy : DispatchProxy
-    {
-        private ISession? _inner;
-
-        public static ISession Create(ISession inner)
-        {
-            var session = DispatchProxy.Create<ISession, FailGenerationDeleteSessionProxy>();
-            ((FailGenerationDeleteSessionProxy)(object)session)._inner = inner;
-            return session;
-        }
-
-        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
-        {
-            if (targetMethod?.Name == nameof(ISession.ExecuteAsync)
-                && args is { Length: > 0 }
-                && args[0] is BoundStatement statement)
-            {
-                var query = statement.PreparedStatement.QueryString;
-                if (query.TrimStart().StartsWith("DELETE", StringComparison.OrdinalIgnoreCase)
-                    && !query.Contains("IF revision", StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException("Injected generation cleanup failure.");
-                }
-            }
-
-            return targetMethod!.Invoke(_inner, args);
-        }
+        return new ProviderHarness(provider, options, session, decoratedSession);
     }
 
     private class DeleteHeaderRaceSessionProxy : DispatchProxy
@@ -956,87 +1188,6 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
                 ?? throw new InvalidOperationException("A delete race callback was not configured.");
             await beforeDelete().ConfigureAwait(false);
             return await _inner!.ExecuteAsync(statement).ConfigureAwait(false);
-        }
-    }
-
-    private class PublicationResponseLossSessionProxy : DispatchProxy
-    {
-        private ISession? _inner;
-        private int _loseNextPublicationResponse = 1;
-
-        public static ISession Create(ISession inner)
-        {
-            var session = DispatchProxy.Create<ISession, PublicationResponseLossSessionProxy>();
-            ((PublicationResponseLossSessionProxy)(object)session)._inner = inner;
-            return session;
-        }
-
-        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
-        {
-            if (targetMethod?.Name == nameof(ISession.ExecuteAsync)
-                && args is { Length: > 0 }
-                && args[0] is BoundStatement statement
-                && statement.PreparedStatement.QueryString.Contains("SET active_generation", StringComparison.Ordinal)
-                && Interlocked.Exchange(ref _loseNextPublicationResponse, 0) == 1)
-            {
-                return ExecuteAndLoseResponseAsync(statement);
-            }
-
-            return targetMethod!.Invoke(_inner, args);
-        }
-
-        private async Task<RowSet> ExecuteAndLoseResponseAsync(BoundStatement statement)
-        {
-            await _inner!.ExecuteAsync(statement).ConfigureAwait(false);
-            throw new InvalidOperationException("Injected lost response after replacement publication.");
-        }
-    }
-
-    private class FailSecondStagingBatchSessionProxy : DispatchProxy
-    {
-        private ISession? _inner;
-        private int _armed;
-        private int _attemptedStagingBatches;
-        private int _succeededStagingBatches;
-
-        public int AttemptedStagingBatches => Volatile.Read(ref _attemptedStagingBatches);
-        public int SucceededStagingBatches => Volatile.Read(ref _succeededStagingBatches);
-
-        public static ISession Create(ISession inner, out FailSecondStagingBatchSessionProxy proxy)
-        {
-            var session = DispatchProxy.Create<ISession, FailSecondStagingBatchSessionProxy>();
-            proxy = (FailSecondStagingBatchSessionProxy)(object)session;
-            proxy._inner = inner;
-            return session;
-        }
-
-        public void Arm() => Volatile.Write(ref _armed, 1);
-
-        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
-        {
-            if (Volatile.Read(ref _armed) == 1
-                && targetMethod?.Name == nameof(ISession.ExecuteAsync)
-                && args is { Length: > 0 }
-                && args[0] is BatchStatement)
-            {
-                var attempt = Interlocked.Increment(ref _attemptedStagingBatches);
-                if (attempt == 2)
-                {
-                    return Task.FromException<RowSet>(
-                        new InvalidOperationException("Injected failure on the second replacement staging batch."));
-                }
-
-                return ExecuteStagingBatchAsync(targetMethod, args);
-            }
-
-            return targetMethod!.Invoke(_inner, args);
-        }
-
-        private async Task<RowSet> ExecuteStagingBatchAsync(MethodInfo targetMethod, object?[] args)
-        {
-            var result = await ((Task<RowSet>)targetMethod.Invoke(_inner, args)!).ConfigureAwait(false);
-            Interlocked.Increment(ref _succeededStagingBatches);
-            return result;
         }
     }
 
@@ -1211,11 +1362,13 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     private sealed class ProviderHarness(
         CassandraJournalStorageProvider provider,
         CassandraJournalStorageOptions options,
-        ISession session) : IAsyncDisposable
+        ISession session,
+        ISession decoratedSession) : IAsyncDisposable
     {
         public CassandraJournalStorageProvider Provider { get; } = provider;
         public CassandraJournalStorageOptions Options { get; } = options;
         public ISession Session { get; } = session;
+        public ISession DecoratedSession { get; } = decoratedSession;
 
         public async ValueTask DisposeAsync() => await Provider.CloseAsync(CancellationToken.None);
     }
