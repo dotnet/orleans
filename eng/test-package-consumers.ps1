@@ -12,7 +12,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $env:MSBUILDDISABLENODEREUSE = '1'
-$repositoryRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$repositoryRoot = Split-Path $PSScriptRoot -Parent
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) "orleans-package-tests-$([guid]::NewGuid())"
 $serializationProject = Join-Path $repositoryRoot 'src/Orleans.Serialization/Orleans.Serialization.csproj'
 

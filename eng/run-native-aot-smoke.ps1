@@ -24,7 +24,7 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 if ([string]::IsNullOrWhiteSpace($RepositoryRoot))
 {
-    $RepositoryRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $RepositoryRoot = Split-Path $PSScriptRoot -Parent
 }
 
 $RepositoryRoot = [System.IO.Path]::GetFullPath($RepositoryRoot)

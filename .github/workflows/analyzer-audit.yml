@@ -79,7 +79,7 @@ jobs:
             -bl:$env:RESULTS_DIRECTORY/analyzer-audit.binlog `
             -p:AnalyzerAuditAnalysisLevel=$env:ANALYSIS_LEVEL `
             -p:AnalyzerAuditResultsDirectory="$env:GITHUB_WORKSPACE/$env:RESULTS_DIRECTORY/Sarif" `
-            -p:CustomBeforeMicrosoftCommonTargets="$env:GITHUB_WORKSPACE/.github/scripts/analyzer-audit.targets" `
+            -p:CustomBeforeMicrosoftCommonTargets="$env:GITHUB_WORKSPACE/eng/analyzer-audit.targets" `
             -p:TreatWarningsAsErrors=false `
             -p:WarningsAsErrors=
       - name: Prepare Roslyn analyzer results
@@ -87,7 +87,7 @@ jobs:
         continue-on-error: true
         shell: pwsh
         run: |
-          ./.github/scripts/merge-analyzer-sarif.ps1 `
+          ./eng/merge-analyzer-sarif.ps1 `
             -InputDirectory "$env:RESULTS_DIRECTORY/Sarif" `
             -OutputFile "$env:RESULTS_DIRECTORY/roslyn-analyzers.sarif" `
             -AutomationIdPrefix 'roslyn-analyzers-net10'
@@ -144,7 +144,7 @@ jobs:
             -p:AnalysisLevel=11.0 `
             -p:EnableCompatibilityAnalyzerAudit=true `
             -p:AnalyzerAuditResultsDirectory="$env:GITHUB_WORKSPACE/$env:RESULTS_DIRECTORY/Sarif" `
-            -p:CustomBeforeMicrosoftCommonTargets="$env:GITHUB_WORKSPACE/.github/scripts/analyzer-audit.targets" `
+            -p:CustomBeforeMicrosoftCommonTargets="$env:GITHUB_WORKSPACE/eng/analyzer-audit.targets" `
             -p:TreatWarningsAsErrors=false `
             -p:WarningsAsErrors=
       - name: Prepare compatibility analyzer results
@@ -152,7 +152,7 @@ jobs:
         continue-on-error: true
         shell: pwsh
         run: |
-          ./.github/scripts/merge-analyzer-sarif.ps1 `
+          ./eng/merge-analyzer-sarif.ps1 `
             -InputDirectory "$env:RESULTS_DIRECTORY/Sarif" `
             -OutputFile "$env:RESULTS_DIRECTORY/compatibility-analyzers.sarif" `
             -AutomationIdPrefix 'compatibility-analyzers-net10-core-runtime'
@@ -242,7 +242,7 @@ jobs:
         id: scenarios
         shell: pwsh
         run: |
-          $matrix = ./.github/scripts/run-native-aot-smoke.ps1 -List
+          $matrix = ./eng/run-native-aot-smoke.ps1 -List
           "matrix=$matrix" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8NoBOM
 
   native-aot-smoke:
@@ -264,7 +264,7 @@ jobs:
       - name: Publish, check diagnostics, and execute native scenario
         shell: pwsh
         run: |
-          ./.github/scripts/run-native-aot-smoke.ps1 `
+          ./eng/run-native-aot-smoke.ps1 `
             -Scenario '${{ matrix.scenario }}' `
             -RuntimeIdentifier '${{ matrix.runtime }}' `
             -ResultsDirectory $env:RESULTS_DIRECTORY
