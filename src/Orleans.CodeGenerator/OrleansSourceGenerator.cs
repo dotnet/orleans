@@ -27,8 +27,8 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
     internal const string SerializerOutputsTrackingName = "Orleans.SerializerOutputs";
     internal const string EnumSerializerPlansTrackingName = "Orleans.EnumSerializerPlans";
     internal const string EnumSerializerOutputsTrackingName = "Orleans.EnumSerializerOutputs";
-    internal const string DtoSerializerPlansTrackingName = "Orleans.DtoSerializerPlans";
-    internal const string DtoSerializerOutputsTrackingName = "Orleans.DtoSerializerOutputs";
+    internal const string SerializableTypePlansTrackingName = "Orleans.SerializableTypePlans";
+    internal const string SerializableTypeOutputsTrackingName = "Orleans.SerializableTypeOutputs";
     internal const string ReferencedSerializerOutputsTrackingName = "Orleans.ReferencedSerializerOutputs";
     internal const string ProxyOutputsTrackingName = "Orleans.ProxyOutputs";
     internal const string MetadataOutputsTrackingName = "Orleans.MetadataOutputs";
@@ -229,21 +229,21 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             .WithTrackingName(EnumSerializerOutputsTrackingName);
 
         // Preserve declaration slots across diagnostics and undo on Roslyn 4.5.
-        var dtoSerializerPlans = serializableTypeResults
-            .Select(static (result, _) => result.DtoSerializerPlan)
-            .WithTrackingName(DtoSerializerPlansTrackingName);
-        var dtoSerializerOutputs = dtoSerializerPlans
+        var serializableTypePlans = serializableTypeResults
+            .Select(static (result, _) => result.SerializerPlan)
+            .WithTrackingName(SerializableTypePlansTrackingName);
+        var serializableTypeOutputs = serializableTypePlans
             .Select(static (plan, ct) =>
             {
                 ct.ThrowIfCancellationRequested();
-                return plan is null ? default : SerializableSourceOutputGenerator.GenerateDtoSource(plan);
+                return plan is null ? default : SerializableSourceOutputGenerator.GenerateSource(plan);
             })
-            .WithTrackingName(DtoSerializerOutputsTrackingName);
+            .WithTrackingName(SerializableTypeOutputsTrackingName);
 
         var compilationAwareTypes = collectedSerializableTypeResults
             .Select(static (results, _) => results
                 .Where(static result => result.Model is not null && result.Diagnostic is null
-                    && result.EnumSerializerPlan is null && result.DtoSerializerPlan is null)
+                    && result.EnumSerializerPlan is null && result.SerializerPlan is null)
                 .Select(static result => result.Model!)
                 .ToImmutableArray())
             .WithComparer(ImmutableArrayComparer<SerializableTypeModel>.Instance);
@@ -259,7 +259,7 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
 
         var serializerOutputs = compilationAwareSerializerOutputs
             .Combine(enumSerializerOutputs.Collect())
-            .Combine(dtoSerializerOutputs.Collect())
+            .Combine(serializableTypeOutputs.Collect())
             .Select(static (input, _) => GeneratedSourceOutput.DeduplicateSerializableSourceOutputs(
                 input.Left.Left.AddRange(input.Left.Right.Where(static output => output.SourceEntry is not null))
                     .AddRange(input.Right.Where(static output => output.SourceEntry is not null))))

@@ -15,7 +15,7 @@ namespace Orleans.CodeGenerator.Tests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("CodeGen")]
-public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
+public sealed class SerializableTypePlanTests(ITestOutputHelper output)
 {
     private const string IndependentTypes = """
         [Orleans.GenerateSerializer]
@@ -74,7 +74,7 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task ImmutableDtoWithRecursiveValueMember_GeneratesWithoutAnalyzingMemberCopyability(bool isSealed)
+    public async Task ImmutableTypeWithRecursiveValueMember_GeneratesWithoutAnalyzingMemberCopyability(bool isSealed)
     {
         var compilation = await TestCompilationHelper.CreateCompilation($$"""
             [Orleans.GenerateSerializer, Orleans.Immutable]
@@ -165,7 +165,7 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public async Task UnrelatedBodyEdit_CachesEveryDtoEmitterWithoutRendering()
+    public async Task UnrelatedBodyEdit_CachesEverySerializableTypeEmitterWithoutRendering()
     {
         var compilation = await TestCompilationHelper.CreateCompilation(RichSource);
         var (driver, first) = Run(CreateDriver(), compilation);
@@ -178,14 +178,14 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
         foreach (var plan in plans)
         {
             // Warm up the direct renderer, outside the measurement.
-            SerializableSourceOutputGenerator.GenerateDtoSource(plan);
+            SerializableSourceOutputGenerator.GenerateSource(plan);
         }
 
         var rendered = new SourceOutputResult[plans.Length];
         var start = GC.GetAllocatedBytesForCurrentThread();
         for (var index = 0; index < plans.Length; index++)
         {
-            rendered[index] = SerializableSourceOutputGenerator.GenerateDtoSource(plans[index]);
+            rendered[index] = SerializableSourceOutputGenerator.GenerateSource(plans[index]);
         }
         var renderingBytes = GC.GetAllocatedBytesForCurrentThread() - start;
         Assert.True(renderingBytes > 0);
@@ -205,10 +205,10 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
         Assert.Equal(GetSources(first), GetSources(second));
         AssertFreshParity(updated, second);
         Assert.True(retainedDriverBytes > 0);
-        output.WriteLine($"DTO emission executions: initial={CountEmissionExecutions(first)}, retained-body-edit={CountEmissionExecutions(second)} " +
-            $"({GetEmitterOutputs(second).Length} Cached, 0 Unchanged). Direct GenerateDtoSource allocated {renderingBytes} current-thread bytes for {plans.Length} plans. " +
+        output.WriteLine($"Serializable-type emission executions: initial={CountEmissionExecutions(first)}, retained-body-edit={CountEmissionExecutions(second)} " +
+            $"({GetEmitterOutputs(second).Length} Cached, 0 Unchanged). Direct GenerateSource allocated {renderingBytes} current-thread bytes for {plans.Length} plans. " +
             $"Whole retained driver, including updating the output compilation but excluding diagnostic validation, allocated {retainedDriverBytes} current-thread bytes. " +
-            "Cached DTO emitters do not write source; semantic planning still resolves text plans. " +
+            "Cached serializable-type emitters do not write source; semantic planning still resolves text plans. " +
             "This is not a claim of zero total source work or zero whole-driver allocation.");
     }
 
@@ -257,7 +257,7 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
     [InlineData("hook-ref")]
     [InlineData("field-id")]
     [InlineData("accessibility")]
-    public async Task SemanticDependencyEdit_InvalidatesOwnerAndCachesIndependentDto(string change)
+    public async Task SemanticDependencyEdit_InvalidatesOwnerAndCachesIndependentSerializableType(string change)
     {
         var (source, edited) = GetDependencySources(change);
         var compilation = await TestCompilationHelper.CreateCompilation(source + "\n" + IndependentTypes);
@@ -310,7 +310,7 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public async Task HotReloadOption_ChangesDtoShapeThenCachesEveryEmitterOnUnrelatedEdit()
+    public async Task HotReloadOption_ChangesSerializableTypeShapeThenCachesEveryEmitterOnUnrelatedEdit()
     {
         const string source = """
             [Orleans.GenerateSerializer]
@@ -335,7 +335,7 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
         Assert.Contains("FieldAccessor.Get", after, StringComparison.Ordinal);
         Assert.Contains("??=", after, StringComparison.Ordinal);
         Assert.NotEqual(before, after);
-        // Hot reload deliberately adds a provider field to ALL ordinary DTOs, even the independent one.
+        // Hot reload adds a provider field to every ordinary serializable type, including the independent one.
         Assert.Equal(2, CountEmissionExecutions(second));
         Assert.All(GetEmitterOutputs(second), static emitter => Assert.Equal(IncrementalStepRunReason.Modified, emitter.Reason));
         Assert.NotEqual(GetOwnerEntry(first, "Independent"), GetOwnerEntry(second, "Independent"));
@@ -562,7 +562,7 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
         }
 
         Assert.True(textCount > 0);
-        output.WriteLine($"Inspected {plans.Length} DTO plans, {visited.Count} reachable objects and {textCount} text values. " +
+        output.WriteLine($"Inspected {plans.Length} serializable-type plans, {visited.Count} reachable objects and {textCount} text values. " +
             "Traversal covers every plan instance field and sequence element; plans retain no syntax or compilation state.");
 
         void Inspect(object? value, string path)
@@ -603,7 +603,7 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
             }
 
             // Only descend into owned plan data, never runtime Type metadata or framework global caches.
-            Assert.Equal(typeof(DtoSerializerOutputPlan).Assembly, type.Assembly);
+            Assert.Equal(typeof(SerializableTypeOutputPlan).Assembly, type.Assembly);
             for (var current = type; current is not null && current != typeof(object) && current != typeof(ValueType); current = current.BaseType)
             {
                 foreach (var field in current.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
@@ -924,7 +924,7 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
         var fresh = Assert.Single(freshDriver.GetRunResult().Results);
         output.WriteLine($"Owner mismatch at transition: {transition}");
         output.WriteLine($"Roslyn: {typeof(Compilation).Assembly.FullName}");
-        output.WriteLine($"Expected DTO owners: [{string.Join(", ", expectedOwners)}]");
+        output.WriteLine($"Expected serializable-type owners: [{string.Join(", ", expectedOwners)}]");
         foreach (var tree in compilation.SyntaxTrees)
         {
             output.WriteLine($"Current fixture, path='{tree.FilePath}':{Environment.NewLine}{tree.GetText(TestContext.Current.CancellationToken)}");
@@ -938,8 +938,8 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
 
         void Dump(string label, GeneratorRunResult result)
         {
-            output.WriteLine($"{label}: filtered DTO plan owners=[{string.Join(", ", GetPlans(result).Select(static plan => plan.MetadataIdentity.MetadataName))}]; " +
-                $"filtered DTO emitters={GetEmitterOutputs(result).Length}; actual registered serializers={GetSerializerEntries(result).Length}; " +
+            output.WriteLine($"{label}: filtered serializable-type plan owners=[{string.Join(", ", GetPlans(result).Select(static plan => plan.MetadataIdentity.MetadataName))}]; " +
+                $"filtered serializable-type emitters={GetEmitterOutputs(result).Length}; actual registered serializers={GetSerializerEntries(result).Length}; " +
                 $"actual registered Independent={GetSerializerEntries(result).Any(static entry => IsOwnerEntry(entry.Source, "Independent"))}; " +
                 $"exception={result.Exception}");
             foreach (var entry in GetSerializerEntries(result))
@@ -955,8 +955,8 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
             foreach (var trackingName in new[]
             {
                 OrleansSerializationSourceGenerator.SerializableTypeResultsTrackingName,
-                OrleansSerializationSourceGenerator.DtoSerializerPlansTrackingName,
-                OrleansSerializationSourceGenerator.DtoSerializerOutputsTrackingName,
+                OrleansSerializationSourceGenerator.SerializableTypePlansTrackingName,
+                OrleansSerializationSourceGenerator.SerializableTypeOutputsTrackingName,
                 OrleansSerializationSourceGenerator.EnumSerializerPlansTrackingName,
                 OrleansSerializationSourceGenerator.EnumSerializerOutputsTrackingName,
                 OrleansSerializationSourceGenerator.SerializerOutputsTrackingName,
@@ -987,9 +987,9 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
         return value switch
         {
             null => "<empty declaration slot>",
-            SerializableTypeResult type => $"type={type.MetadataIdentity.MetadataName}; dtoPlan={type.DtoSerializerPlan is not null}; " +
+            SerializableTypeResult type => $"type={type.MetadataIdentity.MetadataName}; serializerPlan={type.SerializerPlan is not null}; " +
                 $"enumPlan={type.EnumSerializerPlan is not null}; diagnostic={type.Diagnostic?.Id ?? "<none>"}",
-            DtoSerializerOutputPlan plan => $"DTO plan={plan.MetadataIdentity.MetadataName}",
+            SerializableTypeOutputPlan plan => $"Serializable-type plan={plan.MetadataIdentity.MetadataName}",
             EnumSerializerOutputPlan => "enum plan",
             SourceOutputResult result => result.SourceEntry is { } entry
                 ? $"hint={entry.HintName}; codecs=[{string.Join(", ", Parse(entry.Source).GetRoot(TestContext.Current.CancellationToken).DescendantNodes().OfType<ClassDeclarationSyntax>().Select(static declaration => declaration.Identifier.ValueText).Where(static name => name.StartsWith("Codec_", StringComparison.Ordinal)))}]"
@@ -1025,15 +1025,15 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
             .OrderBy(static source => source.HintName, StringComparer.Ordinal)
             .Select(static source => new GeneratedSourceEntry(source.HintName, source.SourceText.ToString())).ToArray();
 
-    private static DtoSerializerOutputPlan[] GetPlans(GeneratorRunResult result)
-        => result.TrackedSteps.TryGetValue(OrleansSerializationSourceGenerator.DtoSerializerPlansTrackingName, out var steps)
+    private static SerializableTypeOutputPlan[] GetPlans(GeneratorRunResult result)
+        => result.TrackedSteps.TryGetValue(OrleansSerializationSourceGenerator.SerializableTypePlansTrackingName, out var steps)
             ? steps.SelectMany(static step => step.Outputs)
                 .Where(static output => output.Reason != IncrementalStepRunReason.Removed)
-                .Select(static output => output.Value).OfType<DtoSerializerOutputPlan>().ToArray()
+                .Select(static output => output.Value).OfType<SerializableTypeOutputPlan>().ToArray()
             : [];
 
     private static (GeneratedSourceEntry Entry, IncrementalStepRunReason Reason)[] GetEmitterOutputs(GeneratorRunResult result)
-        => GetEmitterOutputs(result, OrleansSerializationSourceGenerator.DtoSerializerOutputsTrackingName);
+        => GetEmitterOutputs(result, OrleansSerializationSourceGenerator.SerializableTypeOutputsTrackingName);
 
     private static (GeneratedSourceEntry Entry, IncrementalStepRunReason Reason)[] GetEmitterOutputs(GeneratorRunResult result, string trackingName)
         => result.TrackedSteps.TryGetValue(trackingName, out var steps)

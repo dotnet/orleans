@@ -60,7 +60,7 @@ internal static class SerializableSourceOutputGenerator
                 var activator = ActivatorGenerator.ShouldGenerateActivator(typeDescription)
                     ? new ActivatorGenerator(services).CreatePlan(typeDescription, serializer.Type) : null;
                 cancellationToken.ThrowIfCancellationRequested();
-                return SerializableTypeResult.FromModel(model, dtoSerializerPlan: new(
+                return SerializableTypeResult.FromModel(model, serializerPlan: new(
                     serializer, copier, activator, compilation.AssemblyName ?? "assembly",
                     metadataIdentity, model.GeneratedNamespace, model.TypeSyntax.SyntaxString));
             }
@@ -84,7 +84,7 @@ internal static class SerializableSourceOutputGenerator
         }
     }
 
-    internal static SourceOutputResult GenerateDtoSource(DtoSerializerOutputPlan plan)
+    internal static SourceOutputResult GenerateSource(SerializableTypeOutputPlan plan)
         => SourceOutputResult.FromSource(GeneratedSourceOutput.CreateSerializableSourceEntry(
             plan.AssemblyName, plan.TypeSyntax, plan.MetadataIdentity, plan.GeneratedNamespace,
             plan.Serializer.Type.TypeParameters.Count, plan.Serializer, plan.Copier, plan.Activator, plan.GeneratedNamespace),

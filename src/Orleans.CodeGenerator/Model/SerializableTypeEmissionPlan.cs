@@ -321,7 +321,7 @@ internal sealed record ActivatorEmissionPlan(
     string BaseInterface,
     EquatableArray<string> ConstructorParameters);
 
-internal sealed record DtoSerializerOutputPlan(
+internal sealed record SerializableTypeOutputPlan(
     SerializerEmissionPlan Serializer,
     CopierEmissionPlan? Copier,
     ActivatorEmissionPlan? Activator,

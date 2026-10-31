@@ -10,19 +10,19 @@ namespace Orleans.CodeGenerator.Tests;
 [TestArea("CodeGen")]
 public sealed class SerializerOutputOrderingTests
 {
-    private const string Dto = "[Orleans.GenerateSerializer] public sealed class Zeta { [Orleans.Id(0)] public int Value { get; set; } }";
+    private const string SerializableClass = "[Orleans.GenerateSerializer] public sealed class Zeta { [Orleans.Id(0)] public int Value { get; set; } }";
     private const string Enum = "[Orleans.GenerateSerializer] public enum Alpha { One }";
     private const string Fallback = "public class Outer<T> { [Orleans.GenerateSerializer] public enum Nested { One } }";
 
     [Fact]
-    public async Task DtoEnumAndFallbackOutputs_UseCanonicalOwnerOrderAfterDeclarationReordering()
+    public async Task SerializableClassEnumAndFallbackOutputs_UseCanonicalOwnerOrderAfterDeclarationReordering()
     {
-        var compilation = await TestCompilationHelper.CreateCompilation($"{Dto}\n{Enum}\n{Fallback}");
+        var compilation = await TestCompilationHelper.CreateCompilation($"{SerializableClass}\n{Enum}\n{Fallback}");
         var (driver, first) = Run(CreateDriver(), compilation);
         Assert.Equal(["Codec_Alpha", "Codec_Nested", "Codec_Zeta"], GetCodecNames(first));
 
         var reordered = compilation.ReplaceSyntaxTree(compilation.SyntaxTrees.Single(),
-            CSharpSyntaxTree.ParseText($"{Fallback}\n{Enum}\n{Dto}", cancellationToken: TestContext.Current.CancellationToken));
+            CSharpSyntaxTree.ParseText($"{Fallback}\n{Enum}\n{SerializableClass}", cancellationToken: TestContext.Current.CancellationToken));
         var (_, retained) = Run(driver, reordered);
         var (_, fresh) = Run(CreateDriver(), reordered);
         Assert.Equal(GetCodecNames(first), GetCodecNames(retained));
@@ -32,7 +32,7 @@ public sealed class SerializerOutputOrderingTests
     [Fact]
     public async Task CollidingHints_KeepCanonicalOwnerAndSuffixesAcrossEmissionStreamOrder()
     {
-        var compilation = await TestCompilationHelper.CreateCompilation($"{Dto}\n{Enum}\n{Fallback}");
+        var compilation = await TestCompilationHelper.CreateCompilation($"{SerializableClass}\n{Enum}\n{Fallback}");
         var (_, result) = Run(CreateDriver(), compilation);
         const string hint = "forced.orleans.ser.collision.g.cs";
         var colliding = GetOutputs(result).Select(output => SourceOutputResult.FromSource(
@@ -65,7 +65,7 @@ public sealed class SerializerOutputOrderingTests
         const string hint = "TestProject.orleans.ser.global_Collision_A_B_C_D_E_F_G_H_I_J_K_L_M_N_O_P_Q_R_S_T_U_V_W_X.647489D1.g.cs";
         var compilation = await TestCompilationHelper.CreateCompilation($"{elevenParameters}\n{tenParameters}");
         var (driver, first) = Run(CreateDriver(), compilation);
-        var rawOutputs = first.TrackedSteps[OrleansSerializationSourceGenerator.DtoSerializerOutputsTrackingName]
+        var rawOutputs = first.TrackedSteps[OrleansSerializationSourceGenerator.SerializableTypeOutputsTrackingName]
             .SelectMany(static step => step.Outputs).Select(static output => output.Value).OfType<SourceOutputResult>().ToArray();
         Assert.Equal(2, rawOutputs.Length);
         Assert.All(rawOutputs, output => Assert.Equal(hint, output.SourceEntry!.Value.HintName));
