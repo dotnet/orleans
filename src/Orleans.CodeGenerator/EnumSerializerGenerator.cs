@@ -1,10 +1,7 @@
 using System.Diagnostics;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator;
 
@@ -20,15 +17,11 @@ internal static class EnumSerializerGenerator
         return new(
             type.Name,
             type.Accessibility == Accessibility.Public,
-            new(type.TypeSyntax.ToString()),
-            new(type.BaseTypeSyntax.ToString()),
-            new(codec!.CodecType.ToNameSyntax().ToString()),
-            new(libraryTypes.FieldCodec_1.ToTypeSyntax(type.TypeSyntax).ToString()),
-            new(libraryTypes.Type.ToTypeSyntax().ToString()),
-            new(libraryTypes.Writer.ToTypeSyntax().ToString()),
-            new(libraryTypes.Reader.ToTypeSyntax(ParseTypeName("TReaderInput")).ToString()),
-            new(libraryTypes.Field.ToTypeSyntax().ToString()),
-            new(libraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))).ToString()));
+            CodeText.Type(type.TypeSyntax),
+            CodeText.Type(type.BaseTypeSyntax),
+            CodeText.Type(codec!.CodecType.ToNameSyntax()),
+            CodeText.Type(libraryTypes.FieldCodec_1.ToTypeSyntax(type.TypeSyntax)),
+            libraryTypes.EmissionTypes);
     }
 
     internal static EnumSerializerOutputPlan? CreateOutputPlan(
@@ -45,81 +38,46 @@ internal static class EnumSerializerGenerator
             return null;
         }
 
-        return new(CreatePlan(type, libraryTypes), assemblyName, metadataIdentity, type.GeneratedNamespace);
+        return new(CreatePlan(type, libraryTypes), assemblyName, metadataIdentity, type.GeneratedNamespace, type.TypeSyntax.ToString());
     }
 
     internal static SourceOutputResult GenerateSource(EnumSerializerOutputPlan output)
     {
         var plan = output.Serializer;
-        var serializer = ClassDeclaration(SerializerGenerator.GetSimpleClassName(plan.Name))
-            .AddBaseListTypes(SimpleBaseType(ParseTypeName(plan.CodecInterface.SyntaxString)))
-            .AddModifiers(Token(plan.IsPublic ? SyntaxKind.PublicKeyword : SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-            .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
-            .AddMembers(
-                FieldDeclaration(VariableDeclaration(
-                    ParseTypeName(plan.SystemType.SyntaxString),
-                    SingletonSeparatedList(VariableDeclarator(CodecFieldTypeFieldName)
-                        .WithInitializer(EqualsValueClause(TypeOfExpression(ParseTypeName(plan.Type.SyntaxString)))))))
-                    .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword)),
-                GenerateWriteMethod(plan),
-                GenerateReadMethod(plan));
-
         return SourceOutputResult.FromSource(GeneratedSourceOutput.CreateSerializableSourceEntry(
-            output.AssemblyName, plan.Type.SyntaxString, output.MetadataIdentity,
-            output.GeneratedNamespace, 0, serializer, null, null, output.GeneratedNamespace));
+            output.AssemblyName, output.TypeSyntax, output.MetadataIdentity, output.GeneratedNamespace, 0,
+            output.GeneratedNamespace, writer => Write(writer, plan)));
     }
 
-    internal static MemberDeclarationSyntax GenerateWriteMethod(EnumSerializerPlan plan)
+    private static void Write(SourceWriter writer, EnumSerializerPlan plan)
     {
-        var writerParam = "writer".ToIdentifierName();
-        var fieldIdDeltaParam = "fieldIdDelta".ToIdentifierName();
-        var expectedTypeParam = "expectedType".ToIdentifierName();
-        var valueParam = "value".ToIdentifierName();
-        var statement = ExpressionStatement(
-            InvocationExpression(
-                ParseName(plan.StaticCodec.SyntaxString).Member("WriteField"),
-                ArgumentList(SeparatedList(
-                [
-                    Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                    Argument(fieldIdDeltaParam),
-                    Argument(expectedTypeParam),
-                    Argument(CastExpression(ParseTypeName(plan.UnderlyingType.SyntaxString), valueParam)),
-                    Argument(IdentifierName(CodecFieldTypeFieldName))
-                ]))));
-
-        return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "WriteField")
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters(
-                Parameter("writer".ToIdentifier()).WithType(ParseTypeName(plan.Writer.SyntaxString)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-                Parameter("fieldIdDelta".ToIdentifier()).WithType(PredefinedType(Token(SyntaxKind.UIntKeyword))),
-                Parameter("expectedType".ToIdentifier()).WithType(ParseTypeName(plan.SystemType.SyntaxString)),
-                Parameter("value".ToIdentifier()).WithType(ParseTypeName(plan.Type.SyntaxString)))
-            .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
-            .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter")
-                .AddConstraints(TypeConstraint(ParseTypeName(plan.BufferWriter.SyntaxString))))
-            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
-            .AddBodyStatements(statement);
+        writer.WriteLine(GeneratedCodeUtilities.GeneratedCodeAttributeText);
+        writer.WriteLine($"{(plan.IsPublic ? "public" : "internal")} sealed class {SerializerGenerator.GetSimpleClassName(plan.Name)} : {plan.CodecInterface}");
+        writer.OpenBlock();
+        writer.WriteLine($"private readonly {plan.Library.SystemType} {CodecFieldTypeFieldName} = typeof({plan.Type});");
+        WriteWriteMethod(writer, plan);
+        WriteReadMethod(writer, plan);
+        writer.CloseBlock();
     }
 
-    internal static MemberDeclarationSyntax GenerateReadMethod(EnumSerializerPlan plan)
+    internal static void WriteWriteMethod(SourceWriter writer, EnumSerializerPlan plan)
     {
-        var readerParam = "reader".ToIdentifierName();
-        var fieldParam = "field".ToIdentifierName();
-        var readValue = InvocationExpression(
-            ParseName(plan.StaticCodec.SyntaxString).Member("ReadValue"),
-            ArgumentList(SeparatedList(
-            [
-                Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
-                Argument(fieldParam)
-            ])));
+        writer.WriteLine(GeneratedCodeUtilities.MethodImplAttributeText);
+        writer.WriteLine($"public void WriteField<TBufferWriter>(ref {plan.Library.Writer} writer, uint fieldIdDelta, {plan.Library.SystemType} expectedType, {plan.Type} @value)");
+        writer.Indent();
+        writer.WriteLine($"where TBufferWriter : {plan.Library.BufferWriter}");
+        writer.Unindent();
+        writer.OpenBlock();
+        writer.WriteLine($"{plan.StaticCodec}.WriteField(ref writer, fieldIdDelta, expectedType, ({plan.UnderlyingType})@value, {CodecFieldTypeFieldName});");
+        writer.CloseBlock();
+    }
 
-        return MethodDeclaration(ParseTypeName(plan.Type.SyntaxString), "ReadValue")
-            .AddTypeParameterListParameters(TypeParameter("TReaderInput"))
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters(
-                Parameter(readerParam.Identifier).WithType(ParseTypeName(plan.Reader.SyntaxString)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-                Parameter(fieldParam.Identifier).WithType(ParseTypeName(plan.Field.SyntaxString)))
-            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
-            .AddBodyStatements(ReturnStatement(CastExpression(ParseTypeName(plan.Type.SyntaxString), readValue)));
+    internal static void WriteReadMethod(SourceWriter writer, EnumSerializerPlan plan)
+    {
+        writer.WriteLine(GeneratedCodeUtilities.MethodImplAttributeText);
+        writer.WriteLine($"public {plan.Type} ReadValue<TReaderInput>(ref {plan.Library.Reader} reader, {plan.Library.Field} field)");
+        writer.OpenBlock();
+        writer.WriteLine($"return ({plan.Type}){plan.StaticCodec}.ReadValue(ref reader, field);");
+        writer.CloseBlock();
     }
 }

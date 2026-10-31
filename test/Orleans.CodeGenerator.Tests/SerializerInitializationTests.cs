@@ -47,12 +47,10 @@ public sealed class SerializerInitializationTests
     [InlineData(false, true)]
     public async Task GeneratedMetadataRejectsConflictingTypesInEitherOrder(bool alias, bool reverse)
     {
-        var dictionary = SyntaxFactory.ParseExpression(alias ? "options.WellKnownTypeAliases" : "options.WellKnownTypeIds");
-        var key = SyntaxFactory.ParseExpression(alias ? "\"conflict-key\"" : "1042U");
-        var first = MetadataGenerator.CreateTypeMetadataRegistration(dictionary, key,
-            SyntaxFactory.ParseExpression(reverse ? "typeof(string)" : "typeof(int)")).NormalizeWhitespace().ToFullString();
-        var second = MetadataGenerator.CreateTypeMetadataRegistration(dictionary, key,
-            SyntaxFactory.ParseExpression(reverse ? "typeof(int)" : "typeof(string)")).NormalizeWhitespace().ToFullString();
+        var dictionary = alias ? "options.WellKnownTypeAliases" : "options.WellKnownTypeIds";
+        var key = alias ? "\"conflict-key\"" : "1042U";
+        var first = WriteRegistration(dictionary, key, reverse ? "typeof(string)" : "typeof(int)");
+        var second = WriteRegistration(dictionary, key, reverse ? "typeof(int)" : "typeof(string)");
         var compilation = await TestCompilationHelper.CreateCompilation($$"""
             public static class MetadataConflictProof
             {
@@ -85,5 +83,12 @@ public sealed class SerializerInitializationTests
     {
         protected override void ConfigureInner(TypeManifestOptions options)
             => options.AddSerializer<int>(static _ => new Int32Codec(), static _ => new ShallowCopier<int>());
+    }
+
+    private static string WriteRegistration(string dictionary, string key, string type)
+    {
+        var writer = new SourceWriter();
+        MetadataGenerator.WriteTypeMetadataRegistration(writer, dictionary, key, type);
+        return writer.ToString();
     }
 }

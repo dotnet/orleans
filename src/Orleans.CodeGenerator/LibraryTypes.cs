@@ -16,6 +16,9 @@ internal sealed class LibraryTypes
     public static LibraryTypes FromCompilation(Compilation compilation, CodeGeneratorOptions options)
         => Cache.GetValue(compilation, static compilation => new LibraryTypes(compilation));
 
+    /// <summary>Spellings of the serialization library types which every generated codec and copier uses.</summary>
+    internal Model.EmissionLibraryTypes EmissionTypes => field ??= Model.EmissionLibraryTypes.Create(this);
+
     private LibraryTypes(Compilation compilation)
     {
         Compilation = compilation;

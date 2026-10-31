@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
@@ -10,8 +9,8 @@ namespace Orleans.CodeGenerator;
 
 internal sealed class ProxyGenerationContext : IGeneratorServices
 {
-    private readonly Dictionary<INamedTypeSymbol, ClassDeclarationSyntax> _proxyDeclarations = new(SymbolEqualityComparer.Default);
-    private readonly Dictionary<INamedTypeSymbol, Dictionary<string, (string Namespace, ClassDeclarationSyntax Declaration)>> _compatibilityDeclarations = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<INamedTypeSymbol, ProxyEmissionPlan> _proxyPlans = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<INamedTypeSymbol, Dictionary<string, (string Namespace, InvokableEmissionPlan Plan)>> _compatibilityDeclarations = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<InvokableMethodId, InvokableMethodDescription> _invokableMethodDescriptions = new();
     private readonly Dictionary<INamedTypeSymbol, List<CompoundTypeAliasModel>> _compatibilityInvokableAliases = new(SymbolEqualityComparer.Default);
     private readonly HashSet<string> _generatedCompatibilityInvokableMetadataNames = new(StringComparer.Ordinal);
@@ -43,10 +42,10 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
     internal ProxyGenerator ProxyGenerator { get; }
     internal InvokableGenerator InvokableGenerator { get; }
 
-    internal ClassDeclarationSyntax GetProxyDeclaration(ProxyInterfaceDescription description)
-        => _proxyDeclarations[description.InterfaceType.OriginalDefinition];
+    internal ProxyEmissionPlan GetProxyPlan(ProxyInterfaceDescription description)
+        => _proxyPlans[description.InterfaceType.OriginalDefinition];
 
-    internal IEnumerable<(string Namespace, ClassDeclarationSyntax Declaration)> GetCompatibilityDeclarations(INamedTypeSymbol interfaceType)
+    internal IEnumerable<(string Namespace, InvokableEmissionPlan Plan)> GetCompatibilityDeclarations(INamedTypeSymbol interfaceType)
         => _compatibilityDeclarations.TryGetValue(interfaceType.OriginalDefinition, out var declarations) ? declarations.Values : [];
 
     internal IReadOnlyList<CompoundTypeAliasModel> GetCompatibilityInvokableAliases(INamedTypeSymbol interfaceType)
@@ -154,9 +153,8 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
         description = new ProxyInterfaceDescription(this, proxyBaseType, originalInterface);
         MetadataModel.InvokableInterfaces.Add(originalInterface, description);
 
-        // Preparing the proxy discovers its invokables; emission reuses this declaration.
-        var (generatedClass, _) = ProxyGenerator.Generate(description);
-        _proxyDeclarations.Add(originalInterface, generatedClass);
+        // Planning the proxy discovers its invokables; emission writes this plan.
+        _proxyPlans.Add(originalInterface, ProxyGenerator.CreatePlan(description));
 
         return description;
     }
@@ -214,7 +212,7 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
             // Each owner retains its declarations even when another owner claims the same alias.
             if (!declarations.ContainsKey(compatInvokable.MetadataName))
             {
-                declarations.Add(compatInvokable.MetadataName, (compatInvokable.GeneratedNamespace, compatInvokable.ClassDeclarationSyntax));
+                declarations.Add(compatInvokable.MetadataName, (compatInvokable.GeneratedNamespace, compatInvokable.EmissionPlan));
             }
 
             if (!_generatedCompatibilityInvokableMetadataNames.Add(compatInvokable.MetadataName))

@@ -1,25 +1,16 @@
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.SyntaxGeneration;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator;
 
 internal static class ApplicationPartAttributeGenerator
 {
-    public static List<AttributeListSyntax> GenerateSyntax(NameSyntax applicationPartAttribute, IEnumerable<string> applicationParts)
+    /// <summary>Returns one assembly-level application part attribute for each named assembly.</summary>
+    public static List<string> GenerateAttributes(string applicationPartAttribute, IEnumerable<string> applicationParts)
     {
-        var attributes = new List<AttributeListSyntax>();
-
+        var attributes = new List<string>();
         foreach (var assemblyName in applicationParts)
         {
-            // Generate an assembly-level attribute with an instance of that class.
-            var attribute = AttributeList(
-                AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)),
-                SingletonSeparatedList(
-                    Attribute(applicationPartAttribute)
-                        .AddArgumentListArguments(AttributeArgument(assemblyName.GetLiteralExpression()))));
-            attributes.Add(attribute);
+            attributes.Add($"[assembly: {applicationPartAttribute}({CodeText.QuotedText(assemblyName)})]");
         }
 
         return attributes;
