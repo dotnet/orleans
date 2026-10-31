@@ -52,4 +52,5 @@ jobs:
         artifact-name: test_output_${{ github.job }}_macos-latest_${{ matrix.framework }}
         filter-query: /[(Provider=None)&(Area=CodeGen)&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))]
         framework: ${{ matrix.framework }}
+        solution: .github/solutions/CodeGenerator.slnf
         static-instrumentation: 'true'

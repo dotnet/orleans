@@ -8,6 +8,8 @@
 .github/coverage.config.xml
 .github/scripts/coverage-report.ps1
 .github/scripts/invoke-coverage.ps1
+.github/scripts/invoke-restore.ps1
 .github/scripts/setup-coverage.ps1
+.github/solutions/CodeGenerator.slnf
 .github/workflows/ci.yml
 global.json
