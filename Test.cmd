@@ -43,7 +43,7 @@ set TESTS=^
 
 @Echo Test assemblies = %TESTS%
 
-PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ./Parallel-Tests.ps1 -directories %TESTS% -dotnet '%_dotnet%'"
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ./eng/Parallel-Tests.ps1 -directories %TESTS% -dotnet '%_dotnet%'"
 set testresult=%errorlevel%
 popd
 endlocal&set testresult=%testresult%

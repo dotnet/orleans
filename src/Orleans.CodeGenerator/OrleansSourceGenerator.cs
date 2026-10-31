@@ -28,6 +28,7 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
     internal const string ReferencedSerializerOutputsTrackingName = "Orleans.ReferencedSerializerOutputs";
     internal const string ProxyOutputsTrackingName = "Orleans.ProxyOutputs";
     internal const string MetadataOutputsTrackingName = "Orleans.MetadataOutputs";
+    internal const string SerializerContextResultsTrackingName = "Orleans.SerializerContextResults";
     internal const string SerializerContextOutputsTrackingName = "Orleans.SerializerContextOutputs";
 
     /// <inheritdoc/>
@@ -46,10 +47,20 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
                 "Orleans.GenerateSerializerContextAttribute`1",
                 predicate: static (node, _) => node is ClassDeclarationSyntax,
                 transform: static (ctx, _) => ctx)
+            .Where(static ctx =>
+            {
+                // One attributed partial owns generation; Generate reads roots and validates declarations from the whole symbol.
+                var attribute = ctx.TargetSymbol.GetAttributes().First(attribute =>
+                    SymbolEqualityComparer.Default.Equals(
+                        attribute.AttributeClass?.OriginalDefinition,
+                        ctx.Attributes[0].AttributeClass!.OriginalDefinition));
+                var reference = attribute.ApplicationSyntaxReference!;
+                return reference.SyntaxTree == ctx.TargetNode.SyntaxTree && ctx.TargetNode.Span.Contains(reference.Span);
+            })
             .Combine(generatorOptions)
             .SelectMany(static (input, ct) => SerializerContextGenerator.Generate(input.Left, input.Right, ct))
+            .WithTrackingName(SerializerContextResultsTrackingName)
             .Collect()
-            .Select(static (outputs, _) => outputs.Distinct().ToImmutableArray())
             .WithComparer(ImmutableArrayComparer<SerializerContextOutput>.Instance)
             .WithTrackingName(SerializerContextOutputsTrackingName);
         var serializerContextEntries = serializerContextOutputs.SelectMany(static (outputs, _) => outputs);
@@ -137,10 +148,14 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
         // Extract reference assembly data (application parts, well-known type IDs, aliases)
         var refAssemblyDataResults = compilationProvider
             .Combine(generatorOptions)
-            .Select(static (input, ct) => ReferenceAssemblyDataProvider.CreateReferenceAssemblyDataResult(
-                input.Left,
-                input.Right,
-                ct))
+            .Combine(collectedTypes)
+            .Combine(collectedProxies)
+            .Select(static (input, ct) =>
+            {
+                var (((compilation, options), serializableTypes), proxyInterfaces) = input;
+                return ReferenceAssemblyDataProvider.CreateReferenceAssemblyDataResult(
+                    compilation, options, serializableTypes, proxyInterfaces, ct);
+            })
             .WithTrackingName(ReferenceAssemblyDataTrackingName);
 
         context.RegisterSourceOutput(refAssemblyDataResults, static (productionContext, result) =>
@@ -151,6 +166,15 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
                 {
                     productionContext.ReportDiagnostic(diagnostic);
                 }
+            }
+        });
+
+        // Diagnostics about the generated metadata are reported only when implementation outputs are emitted.
+        context.RegisterImplementationSourceOutput(refAssemblyDataResults, static (productionContext, result) =>
+        {
+            foreach (var diagnostic in result.ImplementationDiagnostics)
+            {
+                productionContext.ReportDiagnostic(diagnostic);
             }
         });
 

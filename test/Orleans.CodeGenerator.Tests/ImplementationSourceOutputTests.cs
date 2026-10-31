@@ -140,6 +140,8 @@ public sealed class ImplementationSourceOutputTests
             """
             [Orleans.GenerateSerializerContext<Producer.Payload>]
             public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GenerateSerializerContext<int>]
+            public partial class ConsumerContext { }
             """,
             "Consumer",
             producerOutput.ToMetadataReference());

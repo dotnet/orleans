@@ -2544,6 +2544,19 @@ namespace Orleans.Serialization.UnitTests
 
         protected override bool Equals(Stack<int>? left, Stack<int>? right) => ReferenceEquals(left, right) || left!.SequenceEqual(right!);
         protected override Stack<int>[] TestValues => [null!, new Stack<int>(), CreateValue(), CreateValue(), CreateValue()];
+
+        [Fact]
+        public void PreservesSharedStackReferences()
+        {
+            var serializer = ServiceProvider.GetRequiredService<Serializer<List<Stack<int>>>>();
+            var stack = new Stack<int>([1, 2, 3]);
+
+            var result = serializer.Deserialize(serializer.SerializeToArray([stack, stack]))!;
+
+            Assert.Equal(2, result.Count);
+            Assert.Same(result[0], result[1]);
+            Assert.Equal(stack, result[1]);
+        }
     }
 
     public class StackCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<Stack<int>, StackCopier<int>>(output, fixture), IClassFixture<SerializationTesterFixture>

@@ -40,18 +40,29 @@ internal readonly record struct TypeMetadataIdentity
             assembly?.Identity.GetDisplayName() ?? string.Empty);
     }
 
-    private static string GetMetadataName(INamedTypeSymbol symbol)
+    internal static string GetMetadataName(INamedTypeSymbol symbol)
     {
         var builder = new StringBuilder();
         var ns = symbol.ContainingNamespace;
         if (ns is not null && !ns.IsGlobalNamespace)
         {
-            builder.Append(ns.ToDisplayString());
+            AppendNamespaceMetadataName(builder, ns);
             builder.Append('.');
         }
 
         AppendMetadataName(builder, symbol);
         return builder.ToString();
+
+        static void AppendNamespaceMetadataName(StringBuilder builder, INamespaceSymbol current)
+        {
+            if (current.ContainingNamespace is { IsGlobalNamespace: false } containingNamespace)
+            {
+                AppendNamespaceMetadataName(builder, containingNamespace);
+                builder.Append('.');
+            }
+
+            builder.Append(current.MetadataName);
+        }
 
         static void AppendMetadataName(StringBuilder builder, INamedTypeSymbol current)
         {

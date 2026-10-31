@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Orleans.Analyzers;
 using Xunit;
@@ -5,11 +6,7 @@ using Xunit;
 namespace Analyzers.Tests;
 
 /// <summary>
-/// Tests for the analyzer that enforces proper return types for grain interface methods.
-/// Orleans grain methods must return Task, Task&lt;T&gt;, ValueTask, ValueTask&lt;T&gt;, or void
-/// because grain calls are inherently asynchronous across distributed systems.
-/// This analyzer prevents developers from using synchronous return types that would
-/// break the Orleans programming model.
+/// Tests registered grain-call return types and their resolution for each generated proxy receiver.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]
 [TestSuite("BVT")]
@@ -309,5 +306,181 @@ public class GrainInterfaceMethodReturnTypeDiagnosticAnalyzerTest : DiagnosticAn
         var diagnostic = Assert.Single(diagnostics);
         Assert.Equal(DiagnosticId, diagnostic.Id);
         Assert.Equal(MessageFormat, diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task ConstructedNonGrainBaseMethodsUseCustomMappings()
+    {
+        var code = """
+                    [assembly: Orleans.InvokableBaseType(
+                        typeof(Orleans.Runtime.GrainReference),
+                        typeof(CustomCall<int>),
+                        typeof(CustomRequest))]
+
+                    public class CustomCall<T> { }
+                    public abstract class CustomRequest { }
+
+                    public interface IBase<T>
+                    {
+                        CustomCall<T> Call();
+                        Task Call(int value);
+                    }
+
+                    public interface IUnrelated<T>
+                    {
+                        int Call();
+                    }
+
+                    public interface IGrain : IBase<int>, Orleans.IGrain { }
+                    """;
+
+        var (diagnostics, _) = await this.GetDiagnosticsAsync(code, []);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Theory]
+    [InlineData("Task", "int", false)]
+    [InlineData("int", "Task", true)]
+    public async Task MultipleConstructedViewsPreserveFirstMatchingView(
+        string firstReturnType,
+        string secondReturnType,
+        bool expectDiagnostic)
+    {
+        var code = $$"""
+                    public interface IBase<T>
+                    {
+                        T Call();
+                    }
+
+                    public interface IGrain : IBase<{{firstReturnType}}>, IBase<{{secondReturnType}}>, Orleans.IGrain { }
+                    """;
+
+        var (diagnostics, source) = await this.GetDiagnosticsAsync(code, []);
+
+        if (expectDiagnostic)
+        {
+            var diagnostic = Assert.Single(diagnostics);
+            Assert.Equal(DiagnosticId, diagnostic.Id);
+            Assert.Equal("T Call();", source.Substring(diagnostic.Location.SourceSpan.Start, diagnostic.Location.SourceSpan.Length));
+        }
+        else
+        {
+            Assert.Empty(diagnostics);
+        }
+    }
+
+    [Fact]
+    public async Task ConstructedDiamondPreservesDerivedProxyReceiver()
+    {
+        var code = """
+                    [assembly: Orleans.InvokableBaseType(
+                        typeof(Orleans.Runtime.GrainReference),
+                        typeof(CustomCall<int>),
+                        typeof(CustomRequest))]
+
+                    public class CustomCall<T> { }
+
+                    [Orleans.Invocation.ReturnValueProxy(nameof(InitializeRequest))]
+                    public abstract class CustomRequest
+                    {
+                        public CustomCall<int> InitializeRequest(IGrain proxy) => new();
+                    }
+
+                    public interface IBase<T>
+                    {
+                        CustomCall<T> Call();
+                    }
+
+                    public interface ILeft : IBase<int> { }
+                    public interface IRight : IBase<int> { }
+                    public interface IGrain : ILeft, IRight, Orleans.IGrain { }
+                    """;
+
+        var (diagnostics, _) = await this.GetDiagnosticsAsync(code, []);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Theory]
+    [InlineData("MissingProxy", "InvalidProxy", DiagnosticId)]
+    [InlineData("InvalidProxy", "MissingProxy", GrainInterfaceMethodReturnTypeDiagnosticAnalyzer.InvalidMappingDiagnosticId)]
+    public async Task RelevantProxyContextsPreserveFirstDiagnostic(
+        string firstProxy,
+        string secondProxy,
+        string expectedDiagnosticId)
+    {
+        var code = $$"""
+                    [assembly: Orleans.InvokableBaseType(typeof(InvalidProxy), typeof(CustomCall), typeof(InvalidRequest))]
+
+                    public abstract class MissingProxy { }
+                    public abstract class InvalidProxy { }
+                    public sealed class InvalidRequest { }
+                    public class CustomCall { }
+
+                    public interface IBase
+                    {
+                        CustomCall Call();
+                    }
+
+                    public interface IUnrelated : Orleans.IGrain
+                    {
+                        Task Call();
+                    }
+
+                    [Orleans.GenerateMethodSerializers(typeof({{firstProxy}}))]
+                    public interface IFirst : IBase, Orleans.IGrain { }
+
+                    [Orleans.GenerateMethodSerializers(typeof({{secondProxy}}))]
+                    public interface ISecond : IBase, Orleans.IGrain { }
+                    """;
+
+        var (diagnostics, source) = await this.GetDiagnosticsAsync(code, []);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(expectedDiagnosticId, diagnostic.Id);
+        var diagnosticSource = source.Substring(diagnostic.Location.SourceSpan.Start, diagnostic.Location.SourceSpan.Length);
+        if (expectedDiagnosticId == DiagnosticId)
+        {
+            Assert.Equal("CustomCall Call();", diagnosticSource);
+        }
+        else
+        {
+            Assert.Contains("must be a non-sealed, non-static class", diagnostic.GetMessage());
+            Assert.StartsWith("Orleans.InvokableBaseType(", diagnosticSource);
+        }
+    }
+
+    [Theory]
+    [InlineData(10)]
+    [InlineData(100)]
+    [InlineData(1000)]
+    public async Task UnrelatedProxyContextsPreserveDiagnosticsAtScale(int interfaceCount)
+    {
+        var code = new StringBuilder();
+        for (var index = 0; index < interfaceCount; index++)
+        {
+            code.AppendLine($$"""
+                public interface IGrain{{index}} : Orleans.IGrain
+                {
+                    Task Valid();
+                    int Invalid();
+                }
+
+                public interface IUnrelated{{index}}
+                {
+                    int Unchecked();
+                }
+                """);
+        }
+
+        var (diagnostics, source) = await this.GetDiagnosticsAsync(code.ToString(), []);
+
+        Assert.Equal(interfaceCount, diagnostics.Length);
+        Assert.All(diagnostics, diagnostic =>
+        {
+            Assert.Equal(DiagnosticId, diagnostic.Id);
+            Assert.Equal("int Invalid();", source.Substring(diagnostic.Location.SourceSpan.Start, diagnostic.Location.SourceSpan.Length));
+        });
     }
 }

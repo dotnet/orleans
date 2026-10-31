@@ -1,0 +1,25 @@
+<Project DefaultTargets="GenerateApi">
+  <ItemGroup>
+    <ApiProject Include="$(MSBuildThisFileDirectory)..\..\src\**\*.csproj"
+                Exclude="$(MSBuildThisFileDirectory)..\..\src\**\bin\**;$(MSBuildThisFileDirectory)..\..\src\**\obj\**;$(MSBuildThisFileDirectory)..\..\src\Orleans.Analyzers*\**;$(MSBuildThisFileDirectory)..\..\src\Orleans.CodeGenerator*\**" />
+    <!-- NuGet walks all entry points together, deduplicating their shared dependencies. -->
+    <RestoreGraphProjectInputItems Include="@(ApiProject->'%(FullPath)')" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildToolsPath)\NuGet.targets" />
+
+  <Target Name="Build">
+    <MSBuild Projects="@(ApiProject)"
+             Targets="Build"
+             Properties="TargetFramework=net8.0"
+             BuildInParallel="true" />
+  </Target>
+
+  <!-- Generate only after the entire build succeeds, using its completed assemblies and references. -->
+  <Target Name="GenerateApi" DependsOnTargets="Build">
+    <MSBuild Projects="@(ApiProject)"
+             Targets="GenAPIGenerateReferenceAssemblySource"
+             Properties="TargetFramework=net8.0;BuildProjectReferences=false"
+             BuildInParallel="true" />
+  </Target>
+</Project>
