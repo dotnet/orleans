@@ -523,13 +523,12 @@ public class ReferenceAssemblyModelExtractorTests
         var compilation = await TestCompilationHelper.CreateCompilation(
             """
             using Orleans;
-            [assembly: GenerateCodeForDeclaringAssembly(typeof(UnitTests.FSharpTypes.GenericDU<>))]
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(Orleans.CodeGenerator.Tests.FSharpModels.GenericDU<>))]
             """,
             additionalReferences:
             [
-                MetadataReference.CreateFromFile(typeof(UnitTests.FSharpTypes.GenericDU<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(FSharpModels.GenericDU<>).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(Microsoft.FSharp.Core.FSharpOption<>).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(UnitTests.GrainInterfaces.INonGenericBase).Assembly.Location),
             ]);
         var model = ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(
             compilation, new CodeGeneratorOptions(), TestContext.Current.CancellationToken, out var diagnostics, out var implementationDiagnostics);
@@ -538,13 +537,13 @@ public class ReferenceAssemblyModelExtractorTests
         Assert.Empty(implementationDiagnostics);
         var record = Assert.Single(model.ReferencedSerializableTypes,
             static type => type.Name == "GenericRecord");
-        Assert.Equal("UnitTests.FSharpTypes", record.Namespace);
+        Assert.Equal("Orleans.CodeGenerator.Tests.FSharpModels", record.Namespace);
         Assert.True(record.IsGenericType);
         Assert.Contains(record.Members, static member => member.FieldId == 1 && member.Name == "Value");
         Assert.Contains(model.ReferencedSerializableTypes,
             static type => type.Name == "GenericDU" && type.IsGenericType);
         Assert.Contains(model.ReferencedSerializableTypes,
-            static type => type.MetadataIdentity.MetadataName == "UnitTests.FSharpTypes.GenericDU`1+Case1");
+            static type => type.MetadataIdentity.MetadataName == "Orleans.CodeGenerator.Tests.FSharpModels.GenericDU`1+Case1");
     }
 
     [Theory]

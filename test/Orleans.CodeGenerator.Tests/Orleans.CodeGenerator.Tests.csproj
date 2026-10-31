@@ -30,6 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\FSharpCodeGenModels\FSharpCodeGenModels.fsproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestUtilities\TestUtilities.csproj" />
     <Compile Include="..\Orleans.NativeAotSmoke\FieldsPayloads.cs" Link="FieldAccess\Payloads.cs" />
     <Compile Include="..\Orleans.NativeAotSmoke\FieldsChecks.cs" Link="FieldAccess\FieldAccessChecks.cs" />
