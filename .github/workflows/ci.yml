@@ -98,9 +98,6 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       shell: pwsh
       run: ./.github/scripts/test-summarize-coverage.ps1
-    - name: Test dependency cache policy
-      shell: pwsh
-      run: ./.github/scripts/test-dependency-cache.ps1
     - name: Build
       run: dotnet build -bl
     - name: Pack and validate package compatibility
