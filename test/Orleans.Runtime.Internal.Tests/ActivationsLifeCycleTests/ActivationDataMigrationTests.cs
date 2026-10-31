@@ -1033,6 +1033,42 @@ public class ActivationDataMigrationTestsRuntimeMetrics
     }
 
     /// <summary>
+    /// A migration participant which forces disposal during rehydration stops rehydration: later participants, including the grain, do not
+    /// rehydrate into disposed services.
+    /// </summary>
+    [Fact]
+    public async Task Runtime_ParticipantForcingDisposal_StopsRehydration()
+    {
+        await using var fixture = new MetricsFixture("directory-rehydrate-dispose");
+        await fixture.InitializeAsync();
+        var services = fixture.PrimaryServices;
+        var control = services.GetRequiredService<LifecycleControl>();
+        var id = GetCall(fixture.GrainFactory, "ordinary", 709).Reference.GrainId;
+        var activation = Assert.IsType<ActivationData>(services.GetRequiredService<GrainContextActivator>().CreateInstance(
+            new GrainAddress { GrainId = id, ActivationId = ActivationId.NewId(), SiloAddress = fixture.HostedCluster.Primary!.SiloAddress }));
+        var context = new CountingRehydrationContext();
+        activation.Rehydrate(context);
+        activation.Activate(null, CancellationToken.None);
+        try
+        {
+            control.DirectoryResponse.TrySetResult(await control.DirectoryEntered.Task.WaitAsync(Timeout, TestCancellation));
+
+            // Rehydration and the setup boundary after it run in the activation's turn, which completes before this one.
+            await activation.RunOrQueueTask(() => Task.CompletedTask).WaitAsync(Timeout, TestCancellation);
+            await Assert.IsAssignableFrom<Task>(control.Disposal).WaitAsync(Timeout, TestCancellation);
+            Assert.Equal(ActivationState.Destroyed, activation.State);
+            Assert.Equal(["register", "rehydrate-participant"], control.Events);
+            Assert.Equal(1, context.Disposals);
+            Assert.Equal(0, control.ActivationInvocations);
+        }
+        finally
+        {
+            control.DirectoryResponse.TrySetResult(null);
+            await activation.DisposeAsync();
+        }
+    }
+
+    /// <summary>
     /// Only an activation which completed activation migrates. A migration requested during setup stops setup and is discarded, so the
     /// activation's partially initialized state does not reach the migration target.
     /// </summary>
@@ -1088,8 +1124,26 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         var services = fixture.PrimaryServices;
         var control = services.GetRequiredService<LifecycleControl>();
         var id = GetCall(fixture.GrainFactory, "ordinary", 704).Reference.GrainId;
+        var activationSpanStopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = static source => source.Name == ActivitySources.LifecycleActivitySourceName,
+            Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = stopped =>
+            {
+                if (stopped.OperationName == ActivityNames.ActivateGrain && Equals(stopped.GetTagItem(ActivityTagKeys.GrainId), id.ToString()))
+                {
+                    activationSpanStopped.TrySetResult();
+                }
+            },
+        };
+        ActivitySource.AddActivityListener(listener);
         var activation = Assert.IsType<ActivationData>(services.GetRequiredService<Catalog>().GetOrCreateActivation(id, null));
         await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
+
+        // The activation operation ends the activation span even though setup never started.
+        await activation.RunOrQueueTask(() => Task.CompletedTask).WaitAsync(Timeout, TestCancellation);
+        await activationSpanStopped.Task.WaitAsync(Timeout, TestCancellation);
 
         Assert.Equal(ActivationState.Destroyed, activation.State);
         Assert.Null(activation.GrainInstance);
@@ -1942,6 +1996,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         public TaskCompletionSource DisposalEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource DisposalRelease { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public SiloAddress? MigrationTarget;
+        public Task? Disposal;
         public bool? MigrationAccepted;
         public int CreateInvocations;
         public int ActivationInvocations;
@@ -2075,7 +2130,13 @@ public class ActivationDataMigrationTestsRuntimeMetrics
     {
         public IGrainContext GrainContext => context;
 
-        public void Participate(IGrainLifecycle lifecycle) =>
+        public void Participate(IGrainLifecycle lifecycle)
+        {
+            if (control.Mode == "directory-rehydrate-dispose")
+            {
+                lifecycle.AddMigrationParticipant(new DisposingMigrationParticipant(context, control));
+            }
+
             lifecycle.Subscribe<RehydrationProbe>(
                 GrainLifecycleStage.SetupState,
                 _ =>
@@ -2095,6 +2156,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
                     control.Events.Enqueue("stop");
                     return Task.CompletedTask;
                 });
+        }
 
         public Task OnActivateAsync(CancellationToken token)
         {
@@ -2119,6 +2181,19 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         }
 
         public void OnDehydrate(IDehydrationContext dehydrationContext) => control.Events.Enqueue("dehydrate");
+    }
+
+    private sealed class DisposingMigrationParticipant(IGrainContext context, LifecycleControl control) : IGrainMigrationParticipant
+    {
+        public void OnRehydrate(IRehydrationContext rehydrationContext)
+        {
+            control.Events.Enqueue("rehydrate-participant");
+            control.Disposal = ((ActivationData)context).DisposeAsync().AsTask();
+        }
+
+        public void OnDehydrate(IDehydrationContext dehydrationContext)
+        {
+        }
     }
 
     private sealed class ActivationProbe(IGrainContext context, LifecycleControl control) : IGrainBase

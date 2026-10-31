@@ -12,6 +12,10 @@ namespace Orleans.Runtime;
 /// states before <see cref="Active"/> set the activation up and states after it tear the activation down.
 /// </para>
 /// <para>
+/// The states are byte values spaced around <see cref="Active"/> at the center of the byte range, so that the state fits in a byte and a new
+/// pair of phases can be inserted at mirrored values without renumbering the other phases.
+/// </para>
+/// <para>
 /// Two ordering dependencies fix the positions of the directory and migration phases. Migrated state is installed only once the activation
 /// holds its directory registration, so <see cref="Registering"/> precedes <see cref="Rehydrating"/>. A migrating activation hands its
 /// registration to the migration target, and unregisters only if that handoff fails, so <see cref="Dehydrating"/> precedes
@@ -25,78 +29,78 @@ namespace Orleans.Runtime;
 /// skipping the phases which have not run.
 /// </para>
 /// </remarks>
-internal enum ActivationState
+internal enum ActivationState : byte
 {
     /// <summary>
     /// The activation context exists, but it has no grain instance.
     /// </summary>
-    None,
+    None = 0,
 
     /// <summary>
     /// The grain instance and its per-activation components are being created, and the previous registration is read from a migration context.
     /// Mirrored by <see cref="Disposing"/>.
     /// </summary>
-    Constructing,
+    Constructing = 20,
 
     /// <summary>
     /// The activation is being registered in the grain directory.
     /// Mirrored by <see cref="Unregistering"/>.
     /// </summary>
-    Registering,
+    Registering = 40,
 
     /// <summary>
     /// Migration participants are restoring state from a migration context.
     /// Mirrored by <see cref="Dehydrating"/>.
     /// </summary>
-    Rehydrating,
+    Rehydrating = 60,
 
     /// <summary>
     /// The grain lifecycle is starting.
     /// Mirrored by <see cref="Stopping"/>.
     /// </summary>
-    Starting,
+    Starting = 80,
 
     /// <summary>
     /// <see cref="IGrainBase.OnActivateAsync"/> is running.
     /// Mirrored by <see cref="Deactivating"/>.
     /// </summary>
-    Activating,
+    Activating = 100,
 
     /// <summary>
     /// The activation processes requests.
     /// </summary>
-    Active,
+    Active = 127,
 
     /// <summary>
     /// <see cref="IGrainBase.OnDeactivateAsync"/> is running.
     /// </summary>
-    Deactivating,
+    Deactivating = 154,
 
     /// <summary>
     /// The grain lifecycle is stopping. Stopping stops only the lifecycle stages which started, so it also undoes a partial start.
     /// </summary>
-    Stopping,
+    Stopping = 174,
 
     /// <summary>
     /// A migrating activation is dehydrating its state and sending it, with its queued requests, to the migration target.
     /// </summary>
-    Dehydrating,
+    Dehydrating = 194,
 
     /// <summary>
     /// The activation is being removed from the grain directory, unless its registration was handed to a migration target.
     /// </summary>
-    Unregistering,
+    Unregistering = 214,
 
     /// <summary>
     /// The grain instance and activation services are being disposed. Disposing also undoes a partial construction.
     /// When the deactivation operation runs teardown, the activation then leaves the catalog and rejects or forwards its queued requests.
     /// </summary>
-    Disposing,
+    Disposing = 234,
 
     /// <summary>
     /// The activation's resources are disposed. A deactivation operation which forced disposal preempted still leaves the catalog afterwards.
     /// </summary>
-    Destroyed,
+    Destroyed = 254,
 }
 
 /// <summary>
@@ -125,6 +129,26 @@ internal static class ActivationStateExtensions
     public static ActivationState GetMirror(this ActivationState state) => (ActivationState)(ActivationState.Destroyed - state);
 
     /// <summary>
+    /// Gets the state which follows <paramref name="state"/> in the chain.
+    /// </summary>
+    public static ActivationState GetNext(this ActivationState state) => state switch
+    {
+        ActivationState.None => ActivationState.Constructing,
+        ActivationState.Constructing => ActivationState.Registering,
+        ActivationState.Registering => ActivationState.Rehydrating,
+        ActivationState.Rehydrating => ActivationState.Starting,
+        ActivationState.Starting => ActivationState.Activating,
+        ActivationState.Activating => ActivationState.Active,
+        ActivationState.Active => ActivationState.Deactivating,
+        ActivationState.Deactivating => ActivationState.Stopping,
+        ActivationState.Stopping => ActivationState.Dehydrating,
+        ActivationState.Dehydrating => ActivationState.Unregistering,
+        ActivationState.Unregistering => ActivationState.Disposing,
+        ActivationState.Disposing => ActivationState.Destroyed,
+        _ => throw new ArgumentOutOfRangeException(nameof(state), state, "The state has no successor."),
+    };
+
+    /// <summary>
     /// Gets the teardown phase which starts teardown once <paramref name="lastCompleted"/> is the last completed setup phase.
     /// </summary>
     /// <remarks>
@@ -144,11 +168,13 @@ internal static class ActivationStateExtensions
     /// A failed phase leaves the previous phase as the last completed phase. <see cref="ActivationState.Stopping"/> stops only the
     /// lifecycle stages which started, so a failed <see cref="ActivationState.Starting"/> phase enters teardown there.
     /// </remarks>
-    public static ActivationState GetFailureTeardownEntry(this ActivationState failed)
+    public static ActivationState GetFailureTeardownEntry(this ActivationState failed) => failed switch
     {
-        Debug.Assert(failed is > ActivationState.None and < ActivationState.Active);
-        return failed is ActivationState.Starting ? ActivationState.Stopping : (failed - 1).GetTeardownEntry();
-    }
+        ActivationState.Constructing or ActivationState.Registering => ActivationState.Disposing,
+        ActivationState.Rehydrating => ActivationState.Unregistering,
+        ActivationState.Starting or ActivationState.Activating => ActivationState.Stopping,
+        _ => throw new ArgumentOutOfRangeException(nameof(failed), failed, "Only a setup phase can fail."),
+    };
 
     /// <summary>
     /// Gets whether an activation may transition from <paramref name="from"/> to <paramref name="to"/> without being forced.
@@ -159,7 +185,7 @@ internal static class ActivationStateExtensions
     public static bool IsValidTransition(ActivationState from, ActivationState to)
     {
         // Each phase advances to the next one, including Activating to Active and Active to Deactivating.
-        if (to == from + 1 && to <= ActivationState.Destroyed)
+        if (from is not ActivationState.Destroyed && to == from.GetNext())
         {
             return true;
         }

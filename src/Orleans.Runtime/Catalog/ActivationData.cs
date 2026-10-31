@@ -545,7 +545,7 @@ internal sealed partial class ActivationData :
                 return false;
             }
 
-            SetState(completed + 1);
+            SetState(completed.GetNext());
             if (State is ActivationState.Active)
             {
                 _idleDuration = CoarseStopwatch.StartNew();
@@ -572,7 +572,7 @@ internal sealed partial class ActivationData :
         {
             if (State == completed)
             {
-                SetState(completed + 1);
+                SetState(completed.GetNext());
             }
             else
             {
@@ -1726,22 +1726,18 @@ internal sealed partial class ActivationData :
 
             lock (_lock)
             {
-                // Forced disposal enters Disposing under this lock before it disposes the grain and its services, so participants
-                // rehydrate only while the activation is still Rehydrating. The context is released below either way.
-                if (State is not ActivationState.Rehydrating)
+                // Forced disposal enters Disposing under this lock before it disposes the grain and its services. The lock is reentrant, so a
+                // participant can also force disposal, and each participant rehydrates only while the activation is still Rehydrating.
+                // The context is released below either way.
+                foreach (var participant in GetMigrationParticipants(grainMigrationParticipant))
                 {
-                    return;
-                }
-
-                if (_lifecycle is { } lifecycle)
-                {
-                    foreach (var participant in lifecycle.GetMigrationParticipants())
+                    if (State is not ActivationState.Rehydrating)
                     {
-                        participant.OnRehydrate(context);
+                        return;
                     }
-                }
 
-                grainMigrationParticipant?.OnRehydrate(context);
+                    participant.OnRehydrate(context);
+                }
             }
 
             LogRehydratedGrain(_shared.Logger);
@@ -1764,6 +1760,25 @@ internal sealed partial class ActivationData :
                 // Releasing the context does not affect the outcome of rehydration.
                 LogErrorRehydratingActivation(_shared.Logger, exception);
             }
+        }
+    }
+
+    /// <summary>
+    /// Gets the migration participants in rehydration order: lifecycle participants, then the grain.
+    /// </summary>
+    private IEnumerable<IGrainMigrationParticipant> GetMigrationParticipants(IGrainMigrationParticipant? grainMigrationParticipant)
+    {
+        if (_lifecycle is { } lifecycle)
+        {
+            foreach (var participant in lifecycle.GetMigrationParticipants())
+            {
+                yield return participant;
+            }
+        }
+
+        if (grainMigrationParticipant is not null)
+        {
+            yield return grainMigrationParticipant;
         }
     }
 
@@ -2140,6 +2155,9 @@ internal sealed partial class ActivationData :
         if (!TryAdvanceSetup(ActivationState.Constructing))
         {
             LogIgnoringActivateAttempt(_shared.Logger, this, State);
+            SetActivityError(_activationActivity, ActivityErrorEvents.ActivationCancelled);
+            _activationActivity?.Dispose();
+            _activationActivity = null;
             return;
         }
 

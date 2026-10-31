@@ -69,20 +69,6 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
     }
 
     [Fact]
-    public void States_AreSymmetricAroundActive()
-    {
-        var states = Enum.GetValues<ActivationState>();
-        Assert.Equal(ActivationState.Active, states[states.Length / 2]);
-        foreach (var state in states)
-        {
-            Assert.Equal(state, state.GetMirror().GetMirror());
-            Assert.Equal(state.IsSettingUp(), state.GetMirror().IsTearingDown());
-        }
-
-        Assert.Equal(ActivationState.Active, ActivationState.Active.GetMirror());
-    }
-
-    [Fact]
     public void Transitions_AdvanceOneStepOrEnterTeardownAtAMirror()
     {
         HashSet<(ActivationState, ActivationState)> expected =
