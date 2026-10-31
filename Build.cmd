@@ -1,1 +1,1 @@
-powershell -NoProfile -ExecutionPolicy unrestricted -Command "./eng/build.ps1 %1"
+powershell -NoProfile -ExecutionPolicy unrestricted -Command "./build.ps1 %1"

@@ -2,9 +2,9 @@
 # Orleans build script
 # --------------------
 
-. (Join-Path $PSScriptRoot 'common.ps1')
+. (Join-Path $PSScriptRoot 'eng\common.ps1')
 
-$scriptDir = Split-Path $PSScriptRoot -Parent
+$scriptDir = $PSScriptRoot
 $solution = Join-Path $scriptDir "Orleans.slnx"
 
 # Define build flags & config
