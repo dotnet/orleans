@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <Compile Include="..\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
+    <Compile Include="..\Shared\Storage\SqsQueueName.cs" Link="Storage\SqsQueueName.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,4 +29,3 @@
     <InternalsVisibleTo Include="Orleans.AWS.Tests" />
   </ItemGroup>
 </Project>
-
