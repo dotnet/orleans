@@ -20,7 +20,7 @@ dotnet build Orleans.slnx -bl
 
 The `Orleans.slnx` solution includes the source projects under `src` and the test projects under `test`. On Windows, `Build.cmd` additionally restores, builds, and packs the solution, placing packages in `Artifacts/<Configuration>`.
 
-Contributor build, test, and validation tooling lives under `eng`. GitHub Actions workflows and CI-specific scripts live under `.github`.
+The PowerShell build and test implementations live under `eng`. Existing validation and CI scripts live under `.github/scripts`.
 
 ### Verify formatting
 
@@ -81,8 +81,8 @@ Artifacts\NativeAotSmoke\Orleans.NativeAotSmoke.exe
 Register each native scenario with a `<name>.smoke.json` manifest beside its source. The existing static analysis workflow discovers these manifests and runs one centralized matrix on Windows and Linux. The shared runner publishes the scenario, checks linker/AOT diagnostics, executes the native binary, and retains diagnostic logs and a binlog:
 
 ```powershell
-.\eng\run-native-aot-smoke.ps1 -List
-.\eng\run-native-aot-smoke.ps1 -Scenario DependencyInjection -RuntimeIdentifier win-x64
+.\.github\scripts\run-native-aot-smoke.ps1 -List
+.\.github\scripts\run-native-aot-smoke.ps1 -Scenario DependencyInjection -RuntimeIdentifier win-x64
 ```
 
 Each manifest declares `scenario`, `diagnostics`, and `rejectDiagnostics`. Use `strict` for warning-free native paths. A bounded compatibility rollout can use `legacy-visible` with nonempty diagnostic rejection patterns for the supported path; the runner retains the existing backlog visibly and rejects matching new-path warnings and errors. Feature PRs add scenario sources and manifests to this shared harness.

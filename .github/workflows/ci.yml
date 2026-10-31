@@ -95,7 +95,7 @@ jobs:
     - name: Test package consumers
       if: matrix.os == 'ubuntu-latest'
       shell: pwsh
-      run: ./eng/test-package-consumers.ps1 -Configuration Debug -SkipPack
+      run: ./.github/scripts/test-package-consumers.ps1 -Configuration Debug -SkipPack
     - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       continue-on-error: true
       with:

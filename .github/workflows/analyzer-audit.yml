@@ -79,7 +79,7 @@ jobs:
             -bl:$env:RESULTS_DIRECTORY/analyzer-audit.binlog `
             -p:AnalyzerAuditAnalysisLevel=$env:ANALYSIS_LEVEL `
             -p:AnalyzerAuditResultsDirectory="$env:GITHUB_WORKSPACE/$env:RESULTS_DIRECTORY/Sarif" `
-            -p:CustomBeforeMicrosoftCommonTargets="$env:GITHUB_WORKSPACE/eng/analyzer-audit.targets" `
+            -p:CustomBeforeMicrosoftCommonTargets="$env:GITHUB_WORKSPACE/.github/scripts/analyzer-audit.targets" `
             -p:TreatWarningsAsErrors=false `
             -p:WarningsAsErrors=
       - name: Prepare Roslyn analyzer results
@@ -144,7 +144,7 @@ jobs:
             -p:AnalysisLevel=11.0 `
             -p:EnableCompatibilityAnalyzerAudit=true `
             -p:AnalyzerAuditResultsDirectory="$env:GITHUB_WORKSPACE/$env:RESULTS_DIRECTORY/Sarif" `
-            -p:CustomBeforeMicrosoftCommonTargets="$env:GITHUB_WORKSPACE/eng/analyzer-audit.targets" `
+            -p:CustomBeforeMicrosoftCommonTargets="$env:GITHUB_WORKSPACE/.github/scripts/analyzer-audit.targets" `
             -p:TreatWarningsAsErrors=false `
             -p:WarningsAsErrors=
       - name: Prepare compatibility analyzer results
@@ -242,7 +242,7 @@ jobs:
         id: scenarios
         shell: pwsh
         run: |
-          $matrix = ./eng/run-native-aot-smoke.ps1 -List
+          $matrix = ./.github/scripts/run-native-aot-smoke.ps1 -List
           "matrix=$matrix" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8NoBOM
 
   native-aot-smoke:
@@ -264,7 +264,7 @@ jobs:
       - name: Publish, check diagnostics, and execute native scenario
         shell: pwsh
         run: |
-          ./eng/run-native-aot-smoke.ps1 `
+          ./.github/scripts/run-native-aot-smoke.ps1 `
             -Scenario '${{ matrix.scenario }}' `
             -RuntimeIdentifier '${{ matrix.runtime }}' `
             -ResultsDirectory $env:RESULTS_DIRECTORY
