@@ -21,9 +21,7 @@ internal sealed class OrleansBinaryDurableSetCommandCodec<T>(
     {
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
-        var payloadWriter = Writer.Create(output, session: null!);
-        payloadWriter.WriteVarUInt32(AddCommand);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(output, AddCommand);
         OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
         entry.Commit();
     }
@@ -33,9 +31,7 @@ internal sealed class OrleansBinaryDurableSetCommandCodec<T>(
     {
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
-        var payloadWriter = Writer.Create(output, session: null!);
-        payloadWriter.WriteVarUInt32(RemoveCommand);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(output, RemoveCommand);
         OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
         entry.Commit();
     }
@@ -44,9 +40,7 @@ internal sealed class OrleansBinaryDurableSetCommandCodec<T>(
     public void WriteClear(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var payloadWriter = Writer.Create(entry.Writer, session: null!);
-        payloadWriter.WriteVarUInt32(ClearCommand);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(entry.Writer, ClearCommand);
         entry.Commit();
     }
 
@@ -56,10 +50,7 @@ internal sealed class OrleansBinaryDurableSetCommandCodec<T>(
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
-        var payloadWriter = Writer.Create(output, session: null!);
-        payloadWriter.WriteVarUInt32(SnapshotCommand);
-        payloadWriter.WriteVarUInt32((uint)count);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(output, SnapshotCommand, (uint)count);
         var written = 0;
         foreach (var item in items)
         {

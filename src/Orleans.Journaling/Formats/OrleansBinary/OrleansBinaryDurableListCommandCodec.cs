@@ -23,9 +23,7 @@ internal sealed class OrleansBinaryDurableListCommandCodec<T>(
     {
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
-        var payloadWriter = Writer.Create(output, session: null!);
-        payloadWriter.WriteVarUInt32(AddCommand);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(output, AddCommand);
         OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
         entry.Commit();
     }
@@ -35,10 +33,7 @@ internal sealed class OrleansBinaryDurableListCommandCodec<T>(
     {
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
-        var payloadWriter = Writer.Create(output, session: null!);
-        payloadWriter.WriteVarUInt32(SetCommand);
-        payloadWriter.WriteVarUInt32((uint)index);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(output, SetCommand, (uint)index);
         OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
         entry.Commit();
     }
@@ -48,10 +43,7 @@ internal sealed class OrleansBinaryDurableListCommandCodec<T>(
     {
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
-        var payloadWriter = Writer.Create(output, session: null!);
-        payloadWriter.WriteVarUInt32(InsertCommand);
-        payloadWriter.WriteVarUInt32((uint)index);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(output, InsertCommand, (uint)index);
         OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
         entry.Commit();
     }
@@ -60,10 +52,7 @@ internal sealed class OrleansBinaryDurableListCommandCodec<T>(
     public void WriteRemoveAt(int index, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var payloadWriter = Writer.Create(entry.Writer, session: null!);
-        payloadWriter.WriteVarUInt32(RemoveCommand);
-        payloadWriter.WriteVarUInt32((uint)index);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(entry.Writer, RemoveCommand, (uint)index);
         entry.Commit();
     }
 
@@ -71,9 +60,7 @@ internal sealed class OrleansBinaryDurableListCommandCodec<T>(
     public void WriteClear(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var payloadWriter = Writer.Create(entry.Writer, session: null!);
-        payloadWriter.WriteVarUInt32(ClearCommand);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(entry.Writer, ClearCommand);
         entry.Commit();
     }
 
@@ -83,10 +70,7 @@ internal sealed class OrleansBinaryDurableListCommandCodec<T>(
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
-        var payloadWriter = Writer.Create(output, session: null!);
-        payloadWriter.WriteVarUInt32(SnapshotCommand);
-        payloadWriter.WriteVarUInt32((uint)count);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(output, SnapshotCommand, (uint)count);
         var written = 0;
         foreach (var item in items)
         {
