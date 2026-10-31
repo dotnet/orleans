@@ -240,6 +240,54 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
     }
 
     /// <summary>
+    /// Lifecycle observers run synchronously inside <c>Deactivate</c>. One which forces disposal there preempts teardown, and deactivation
+    /// still completes.
+    /// </summary>
+    [Fact]
+    public async Task ForcedDisposal_FromDeactivatingObserver_CompletesDeactivation()
+    {
+        await using var executor = new ActivationLifecycleExecutor(fixture);
+        await executor.Execute(ActivationLifecycleOperation.Activate);
+        await executor.Execute(ActivationLifecycleOperation.Release);
+        await executor.Execute(ActivationLifecycleOperation.Release);
+        var activation = executor.Activation!;
+        Assert.Equal(ActivationState.Active, activation.State);
+
+        Task? disposal = null;
+        using (GrainLifecycleEvents.AllEvents.Subscribe(new ForcedDisposalObserver(activation, task => disposal = task)))
+        {
+            activation.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Disposed while deactivating."), Cancellation);
+        }
+
+        Assert.NotNull(disposal);
+        await disposal.WaitAsync(Timeout, Cancellation);
+        await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+        Assert.Equal(ActivationState.Destroyed, activation.State);
+        Assert.Equal(ActivationState.Destroyed, await executor.Gate.ReadObservation());
+        executor.AssertQuiescent();
+        Assert.False(fixture.HostedCluster.TryGetGrainContext(activation.GrainId, out _));
+    }
+
+    private sealed class ForcedDisposalObserver(ActivationData target, Action<Task> onDisposal) : IObserver<GrainLifecycleEvents.LifecycleEvent>
+    {
+        public void OnCompleted()
+        {
+        }
+
+        public void OnError(Exception error)
+        {
+        }
+
+        public void OnNext(GrainLifecycleEvents.LifecycleEvent value)
+        {
+            if (value is GrainLifecycleEvents.Deactivating && ReferenceEquals(value.GrainContext, target))
+            {
+                onDisposal(target.DisposeAsync().AsTask());
+            }
+        }
+    }
+
+    /// <summary>
     /// A deactivation request which arrives after <c>OnActivateAsync</c> returns and passes its cancellation check, but before the activation
     /// becomes active, finds activation completed. Teardown therefore starts at Deactivating and runs <c>OnDeactivateAsync</c>.
     /// </summary>

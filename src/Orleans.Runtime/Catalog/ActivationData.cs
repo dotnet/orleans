@@ -924,7 +924,8 @@ internal sealed partial class ActivationData :
                     deactivateActivity?.Stop();
                 }
 
-                Debug.Assert(IsDeactivationRequested && !State.IsDisposingOrDestroyed(), "Deactivate should leave a deactivation request.");
+                // Lifecycle observers and diagnostic listeners run synchronously above and may force disposal, so the state is not asserted.
+                Debug.Assert(IsDeactivationRequested, "Deactivate should leave a deactivation request.");
             }
             catch (Exception ex)
             {
@@ -1178,8 +1179,6 @@ internal sealed partial class ActivationData :
             _shared.InternalRuntime.ActivationWorkingSet.OnDeactivated(this);
         }
 
-        // Setup stopped before rehydration consumed the migration context.
-        (TakeRehydrationContext() as IDisposable)?.Dispose();
         DisposeTimers();
 
         try
@@ -1212,6 +1211,12 @@ internal sealed partial class ActivationData :
             }
             finally
             {
+                // Setup stopped before rehydration consumed the migration context. Its disposal, like the scope's, cannot fail disposal.
+                if (TakeRehydrationContext() is { } rehydrationContext)
+                {
+                    await DisposeAsync(rehydrationContext);
+                }
+
                 await DisposeAsync(_serviceScope);
             }
         }

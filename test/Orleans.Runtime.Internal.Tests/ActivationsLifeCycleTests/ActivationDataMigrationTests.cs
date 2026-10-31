@@ -967,6 +967,70 @@ public class ActivationDataMigrationTestsRuntimeMetrics
     }
 
     /// <summary>
+    /// An activation which tears down before it consumes its migration context disposes the context, and a context whose disposal
+    /// throws does not prevent the grain instance and activation services from being disposed.
+    /// </summary>
+    [Fact]
+    public async Task Runtime_UnconsumedRehydrationContextDisposalFailure_StillDisposesActivation()
+    {
+        await using var fixture = new MetricsFixture("directory-rehydrate");
+        await fixture.InitializeAsync();
+        var services = fixture.PrimaryServices;
+        var control = services.GetRequiredService<LifecycleControl>();
+        var id = GetCall(fixture.GrainFactory, "ordinary", 706).Reference.GrainId;
+        var activation = Assert.IsType<ActivationData>(services.GetRequiredService<GrainContextActivator>().CreateInstance(
+            new GrainAddress { GrainId = id, ActivationId = ActivationId.NewId(), SiloAddress = fixture.HostedCluster.Primary!.SiloAddress }));
+        var context = new ThrowingRehydrationContext();
+        try
+        {
+            // The activation accepts the context while it is constructed, then stops at the registration boundary before rehydrating.
+            activation.Rehydrate(context);
+            activation.Activate(null, CancellationToken.None);
+            var registration = await control.DirectoryEntered.Task.WaitAsync(Timeout, TestCancellation);
+            activation.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Deactivated before rehydration."), TestCancellation);
+            control.DirectoryResponse.TrySetResult(registration);
+            await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
+
+            Assert.Equal(ActivationState.Destroyed, activation.State);
+            Assert.Equal(1, context.Disposals);
+            Assert.Equal(["register", "unregister"], control.Events);
+            Assert.Equal(1, control.DisposeInvocations);
+            Assert.Equal(1, control.ObserverDestroyed);
+            Assert.Equal(1, control.ScopeDisposed);
+        }
+        finally
+        {
+            control.DirectoryResponse.TrySetResult(null);
+            await activation.DisposeAsync();
+        }
+    }
+
+    private sealed class ThrowingRehydrationContext : IRehydrationContext, IDisposable
+    {
+        public int Disposals;
+
+        public IEnumerable<string> Keys => [];
+
+        public bool TryGetBytes(string key, out System.Buffers.ReadOnlySequence<byte> value)
+        {
+            value = default;
+            return false;
+        }
+
+        public bool TryGetValue<T>(string key, [NotNullWhen(true)] out T? value)
+        {
+            value = default;
+            return false;
+        }
+
+        public void Dispose()
+        {
+            Interlocked.Increment(ref Disposals);
+            throw new InvalidOperationException("Injected rehydration context disposal failure.");
+        }
+    }
+
+    /// <summary>
     /// A deactivation request before the activation starts leaves nothing to construct. Teardown starts at Disposing, whether the
     /// activation operation was queued before or after the deactivation operation.
     /// </summary>
