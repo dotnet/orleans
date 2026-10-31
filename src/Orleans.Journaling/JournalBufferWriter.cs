@@ -24,6 +24,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
 #endif
     private readonly ArcBufferWriter _buffer = new();
     private int _committedLength;
+    private long _stagedChangeCount;
     private bool _hasActiveEntry;
     private bool _disposed;
 
@@ -269,6 +270,28 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
         }
     }
 
+    /// <summary>
+    /// Gets or sets a count which advances whenever a state stages a change and never decreases between writes.
+    /// </summary>
+    /// <remarks>The manager restores it after a write captures pending changes, which stages nothing new.</remarks>
+    internal long StagedChangeCount
+    {
+        get
+        {
+            lock (_lock) return _stagedChangeCount;
+        }
+        set
+        {
+            lock (_lock) _stagedChangeCount = value;
+        }
+    }
+
+    /// <summary>Records a change which a state stages in memory and journals when a write captures it.</summary>
+    internal void MarkModified()
+    {
+        lock (_lock) _stagedChangeCount++;
+    }
+
     internal void CommitActiveEntry(JournalStreamId streamId)
     {
         lock (_lock)
@@ -279,6 +302,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             {
                 FinishEntry(streamId);
                 _committedLength = _buffer.Length;
+                _stagedChangeCount++;
             }
             catch
             {
