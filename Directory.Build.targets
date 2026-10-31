@@ -4,6 +4,11 @@
     <InformationalVersion>$(Version). Commit Hash: $(GitHeadSha)</InformationalVersion>
   </PropertyGroup>
 
+  <!-- Roslyn authoring projects enable extended analyzer rules in their project files. -->
+  <ItemGroup Condition="'$(EnforceExtendedAnalyzerRules)' != 'true'">
+    <EditorConfigFiles Include="$(MSBuildThisFileDirectory)eng\roslyn-non-authoring.globalconfig" />
+  </ItemGroup>
+
   <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.CodeGenerator/build/Microsoft.Orleans.CodeGenerator.props" />
   <Import
     Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and '$(IsOrleansFrameworkPart)' != 'false' and '$(PackageId)' != 'Microsoft.Orleans.Core.Abstractions' "
