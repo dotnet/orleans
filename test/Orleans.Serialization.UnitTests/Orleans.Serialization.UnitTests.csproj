@@ -41,6 +41,18 @@
     <Compile Include="..\Orleans.NativeAotSmoke\InterfaceCollections.Contracts.cs" Link="InterfaceCollections.Contracts.cs" />
   </ItemGroup>
 
+  <Target Name="UseExternalModelImplementationMetadata"
+          BeforeTargets="FindReferenceAssembliesForReferences"
+          DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <!-- External serializer generation reads private model members from this fixture's implementation. -->
+      <ReferencePath Update="@(ReferencePath)"
+                     Condition="'%(ReferencePath.ReferenceSourceTarget)' == 'ProjectReference' and '%(ReferencePath.Filename)' == 'SerializerExternalModels'">
+        <ReferenceAssembly>%(ReferencePath.FullPath)</ReferenceAssembly>
+      </ReferencePath>
+    </ItemGroup>
+  </Target>
+
   <Target
     Name="CopyNetStandardSerializationAsset"
     AfterTargets="Build"
