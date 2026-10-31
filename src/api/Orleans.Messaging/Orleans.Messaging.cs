@@ -504,6 +504,8 @@ namespace OrleansCodeGen.Orleans.Messaging
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
 
+        public override bool MayHaveGrainCancellationToken { get { throw null; } }
+
         public override void Dispose() { }
 
         public override string GetActivityName() { throw null; }
