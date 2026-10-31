@@ -273,6 +273,56 @@ jobs:
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
+  test-mysql:
+    name: MySQL 8.4 provider tests
+    runs-on: ubuntu-latest
+    env:
+      # MySQL 8.4 is the current LTS release and differs from MariaDB in ways the provider scripts rely on.
+      # Prefer Google's Docker Hub mirror, with Docker Hub as a fallback, and pin both references to the same digest.
+      MYSQL_IMAGE: mirror.gcr.io/library/mysql:8.4.10@sha256:8dbcf531a03aade657e181b9cf2f1d1803ce621a1d55610cb44cb531ab7d7db6
+      MYSQL_FALLBACK_IMAGE: docker.io/library/mysql:8.4.10@sha256:8dbcf531a03aade657e181b9cf2f1d1803ce621a1d55610cb44cb531ab7d7db6
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+      MYSQL_ROOT_PASSWORD: "mysql"
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: ["net8.0", "net10.0"]
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Start MySQL
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        mysql_image="$MYSQL_IMAGE"
+        if ! bash .github/scripts/docker-pull-with-retry.sh "$mysql_image"; then
+          echo "Pulling MySQL from Docker Hub after the mirror failed."
+          mysql_image="$MYSQL_FALLBACK_IMAGE"
+          bash .github/scripts/docker-pull-with-retry.sh "$mysql_image"
+        fi
+
+        docker run -d --pull=never --name mysql \
+          -p 3306:3306 \
+          -e MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" \
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -p${MYSQL_ROOT_PASSWORD} --silent" \
+          --health-interval 5s \
+          --health-timeout 5s \
+          --health-retries 24 \
+          "$mysql_image"
+
+        bash .github/scripts/docker-wait-for-health.sh mysql 120
+    - name: Test
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        framework: ${{ matrix.framework }}
+        provider: MySql
+      env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+        ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mysql;AllowPublicKeyRetrieval=true;SslMode=Disabled;"
+    - name: Clean up MySQL
+      if: always()
+      run: docker rm -f mysql || true
   test-sqlserver:
     name: Microsoft SQL Server provider tests
     runs-on: ubuntu-24.04
@@ -910,6 +960,7 @@ jobs:
       - test-cassandra
       - test-postgres
       - test-mariadb
+      - test-mysql
       - test-sqlserver
       - test-sqlite
       - test-azure-storage

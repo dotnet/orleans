@@ -1120,8 +1120,13 @@ exit 0
             '(?s)Verify tested commit.*?parents -notcontains \$env:HEAD_SHA.*?Download covered source' `
             'The trusted reporter must bind the recorded merge commit to the triggering pull request head.'
         Assert-Equal 0 ([regex]::Matches($workflow, 'name: Checkout covered source')).Count 'The privileged reporter must not check out untrusted pull request code.'
-        Assert-Equal 23 $expectedArtifacts.Count 'Expected coverage artifact count differs.'
-        Assert-Equal 23 (@($expectedArtifacts | Sort-Object -Unique)).Count 'Expected coverage artifact identities must be unique.'
+        Assert-Equal 24 $expectedArtifacts.Count 'Expected coverage artifact count differs.'
+        Assert-Equal 24 (@($expectedArtifacts | Sort-Object -Unique)).Count 'Expected coverage artifact identities must be unique.'
+        Assert-Matches `
+            (Get-Content -Raw -LiteralPath $workflowPath) `
+            '(?m)^  test-mysql:\r?$' `
+            'The MySQL 8.4 provider job must exist for its expected coverage artifact.'
+        Assert-Equal 1 (@($expectedArtifacts | Where-Object { $_ -eq 'test_output_test-mysql_net10.0' })).Count 'The MySQL 8.4 provider job must publish an expected coverage artifact.'
         Assert-Equal 0 (@($expectedArtifacts | Where-Object { $_ -notmatch 'net10\.0$' })).Count 'Coverage artifacts must target .NET 10.'
         Assert-Equal 0 (@($expectedArtifacts | Where-Object { $_ -match 'macos|windows' })).Count 'Coverage artifacts must target Linux.'
     }
@@ -1543,8 +1548,8 @@ exit 0
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
         $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
-        Assert-Equal 19 ([regex]::Matches($workflow, 'uses: \./\.github/actions/run-tests')).Count 'Test action count differs.'
-        Assert-Equal 17 ([regex]::Matches($workflow, '(?m)^\s{8}provider: [A-Za-z]')).Count 'Provider-discovered test partition count differs.'
+        Assert-Equal 20 ([regex]::Matches($workflow, 'uses: \./\.github/actions/run-tests')).Count 'Test action count differs.'
+        Assert-Equal 18 ([regex]::Matches($workflow, '(?m)^\s{8}provider: [A-Za-z]')).Count 'Provider-discovered test partition count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, 'uses: \./\.github/actions/dotnet-test')).Count 'Native test action invocation count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, "format\('/\[\(Provider=\{0\}\)")).Count 'Standard provider filter count differs.'
         $wrappedTestCommands = ([regex]::Matches($dotnetTestAction, 'invoke-test\.ps1')).Count

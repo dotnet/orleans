@@ -49,6 +49,63 @@ public sealed class AdoNetMembershipUpgradeTests
         VerifyInstallationAsync("MySQL", AdoNetInvariants.InvariantNameMySql, enhanced,
             "FD33B6AD41DDA95942F275857F27C7FD02A0DB433747DA4C3B92D677ACB6014E");
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [TestProvider("MySql")]
+    public async Task MySql_Setup_CreatesAndUpgradesWithoutChangingMembership(bool upgrade)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "MembershipUpgradeFixtures", "MySQL-Clustering.sql");
+        var fixture = await File.ReadAllTextAsync(fixturePath, cancellationToken);
+        Assert.Equal(
+            "FD33B6AD41DDA95942F275857F27C7FD02A0DB433747DA4C3B92D677ACB6014E",
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fixture.Replace("\r\n", "\n")))));
+        var mainPath = Path.Combine(AppContext.BaseDirectory, "MySQL-Main.sql");
+        var script = await File.ReadAllTextAsync(mainPath, cancellationToken)
+            + await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "MySQL-Clustering.sql"), cancellationToken);
+        var database = await RelationalStorageForTesting.SetupInstance(
+            AdoNetInvariants.InvariantNameMySql,
+            $"MembershipMigration_{Guid.NewGuid():N}",
+            cancellationToken: cancellationToken,
+            setupSqlScriptFileNames: upgrade ? [mainPath, fixturePath] : []);
+        if (!upgrade)
+        {
+            await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, script, cancellationToken);
+        }
+
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var table = new AdoNetClusteringTable(
+            services,
+            Options.Create(new ClusterOptions { ClusterId = ClusterId }),
+            Options.Create(new AdoNetClusteringSiloOptions { Invariant = AdoNetInvariants.InvariantNameMySql, ConnectionString = database.CurrentConnectionString }),
+            NullLogger<AdoNetClusteringTable>.Instance);
+        await table.InitializeMembershipTableAsync(true, cancellationToken);
+        var entry = Entry(1, SiloStatus.Active);
+        Assert.True(await table.InsertRowAsync(entry, new TableVersion(1, "0"), cancellationToken));
+        var inserted = await ReadSnapshotAsync(database.Storage, cancellationToken);
+
+        // Upgrade a populated legacy installation, then repeat the same script used for fresh installations.
+        await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, script, cancellationToken);
+        AssertUnchanged(inserted, await ReadSnapshotAsync(database.Storage, cancellationToken));
+        var upgradedQueries = await ReadQueriesAsync(database.Storage, cancellationToken);
+        Assert.Contains("CleanupDefunctSiloEntryKey", upgradedQueries.Keys);
+        Assert.Contains("INNER JOIN OrleansMembershipTable", upgradedQueries["UpdateMembershipKey"], StringComparison.Ordinal);
+        await MySqlStorageForTesting.ExecuteClientScriptAsync(database.CurrentConnectionString, script, cancellationToken);
+        AssertUnchanged(inserted, await ReadSnapshotAsync(database.Storage, cancellationToken));
+        Assert.Equal(upgradedQueries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(database.Storage, cancellationToken)).OrderBy(pair => pair.Key));
+
+        Assert.False(await table.InsertRowAsync(entry, new TableVersion(2, "1"), cancellationToken));
+
+        AssertUnchanged(inserted, await ReadSnapshotAsync(database.Storage, cancellationToken));
+        Assert.Equal(1, (await table.ReadAllAsync(cancellationToken)).Version.Version);
+
+        Assert.False(await table.InsertRowAsync(Entry(2, SiloStatus.Joining), new TableVersion(1, "0"), cancellationToken));
+        AssertUnchanged(inserted, await ReadSnapshotAsync(database.Storage, cancellationToken));
+        Assert.True(await table.InsertRowAsync(Entry(2, SiloStatus.Joining), new TableVersion(2, "1"), cancellationToken));
+        Assert.Equal(2, (await table.ReadAllAsync(cancellationToken)).Version.Version);
+    }
+
     private static async Task VerifyInstallationAsync(string engine, string invariant, bool enhanced, string fixtureHash)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
