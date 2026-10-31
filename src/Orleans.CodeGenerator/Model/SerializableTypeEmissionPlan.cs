@@ -320,3 +320,12 @@ internal sealed record ActivatorEmissionPlan(
     SerializableTypeEmissionPlan Type,
     string BaseInterface,
     EquatableArray<string> ConstructorParameters);
+
+internal sealed record SerializableTypeOutputPlan(
+    SerializerEmissionPlan Serializer,
+    CopierEmissionPlan? Copier,
+    ActivatorEmissionPlan? Activator,
+    string AssemblyName,
+    TypeMetadataIdentity MetadataIdentity,
+    string GeneratedNamespace,
+    string TypeSyntax);

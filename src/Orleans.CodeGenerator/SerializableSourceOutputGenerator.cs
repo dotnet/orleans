@@ -40,7 +40,35 @@ internal static class SerializableSourceOutputGenerator
             var model = ModelExtractor.ExtractSerializableTypeModel(typeDescription, sourceLocation);
             var enumPlan = EnumSerializerGenerator.CreateOutputPlan(
                 typeDescription, libraryTypes, compilation.AssemblyName ?? "assembly", metadataIdentity);
-            return SerializableTypeResult.FromModel(model, enumPlan);
+            if (typeDescription.GetType() != typeof(SerializableTypeDescription) || typeDescription.IsEnumType)
+            {
+                return SerializableTypeResult.FromModel(model, enumPlan);
+            }
+
+            var owner = symbol.GetAttributes().First(attribute =>
+                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, libraryTypes.GenerateSerializerAttribute)).ApplicationSyntaxReference!;
+            if (owner.SyntaxTree != context.TargetNode.SyntaxTree || !context.TargetNode.Span.Contains(owner.Span))
+            {
+                return default;
+            }
+
+            try
+            {
+                var services = new GeneratorServices(compilation, codeGeneratorOptions, libraryTypes);
+                var serializer = new SerializerGenerator(services).CreatePlan(typeDescription);
+                var copier = new CopierGenerator(services).CreatePlan(typeDescription, [], serializer.Type);
+                var activator = ActivatorGenerator.ShouldGenerateActivator(typeDescription)
+                    ? new ActivatorGenerator(services).CreatePlan(typeDescription, serializer.Type) : null;
+                cancellationToken.ThrowIfCancellationRequested();
+                return SerializableTypeResult.FromModel(model, serializerPlan: new(
+                    serializer, copier, activator, compilation.AssemblyName ?? "assembly",
+                    metadataIdentity, model.GeneratedNamespace, model.TypeSyntax.SyntaxString));
+            }
+            catch (OrleansGeneratorDiagnosticAnalysisException analysisException)
+            {
+                // Failed emission still contributes discovery metadata and current-tree diagnostics.
+                return SerializableTypeResult.FromModel(model, diagnostic: analysisException.Diagnostic);
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -55,6 +83,12 @@ internal static class SerializableSourceOutputGenerator
                 typeSyntax);
         }
     }
+
+    internal static SourceOutputResult GenerateSource(SerializableTypeOutputPlan plan)
+        => SourceOutputResult.FromSource(GeneratedSourceOutput.CreateSerializableSourceEntry(
+            plan.AssemblyName, plan.TypeSyntax, plan.MetadataIdentity, plan.GeneratedNamespace,
+            plan.Serializer.Type.TypeParameters.Count, plan.Serializer, plan.Copier, plan.Activator, plan.GeneratedNamespace),
+            new(plan.MetadataIdentity, plan.TypeSyntax));
 
     internal static ImmutableArray<SourceOutputResult> CreateSerializableSourceOutputs(
         Compilation compilation,
@@ -118,7 +152,7 @@ internal static class SerializableSourceOutputGenerator
             }
         }
 
-        return GeneratedSourceOutput.DeduplicateSourceOutputs(sourceEntries);
+        return sourceEntries.ToImmutable();
     }
 
     internal static ImmutableArray<SourceOutputResult> CreateReferencedSerializableSourceOutputs(
@@ -244,7 +278,7 @@ internal static class SerializableSourceOutputGenerator
                 serializerPlan,
                 copierPlan,
                 activatorPlan,
-                typeDescription.GeneratedNamespace));
+                typeDescription.GeneratedNamespace), new(metadataIdentity, typeSyntax));
     }
 
     internal static ISerializableTypeDescription? CreateSerializableTypeDescription(IGeneratorServices services, INamedTypeSymbol symbol)
@@ -470,4 +504,3 @@ internal static class SerializableSourceOutputGenerator
             && string.Equals(metadataIdentity.AssemblyName, assemblyIdentity.Name, StringComparison.Ordinal);
     }
 }
-

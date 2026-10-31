@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -137,6 +138,18 @@ internal static class GeneratedSourceOutput
         ImmutableArray<SourceOutputResult>.Builder sourceEntries)
         => DeduplicateSourceOutputs(sourceEntries.ToImmutable());
 
+    internal static ImmutableArray<SourceOutputResult> DeduplicateSerializableSourceOutputs(ImmutableArray<SourceOutputResult> outputs)
+    {
+        Debug.Assert(outputs.All(static output => output.SourceEntry is null || output.SerializableIdentity is not null));
+        // Canonical owners retain the original hint when different emission paths collide.
+        return DeduplicateSourceOutputs([.. outputs
+            .OrderBy(static output => output.SerializableIdentity is null ? 1 : 0)
+            .ThenBy(static output => output.SerializableIdentity?.MetadataIdentity.MetadataName, StringComparer.Ordinal)
+            .ThenBy(static output => output.SerializableIdentity?.MetadataIdentity.AssemblyIdentity, StringComparer.Ordinal)
+            .ThenBy(static output => output.SerializableIdentity?.MetadataIdentity.AssemblyName, StringComparer.Ordinal)
+            .ThenBy(static output => output.SerializableIdentity?.TypeSyntax, StringComparer.Ordinal)]);
+    }
+
     internal static ImmutableArray<SourceOutputResult> DeduplicateSourceOutputs(
         ImmutableArray<SourceOutputResult> sourceEntries)
     {
@@ -179,7 +192,7 @@ internal static class GeneratedSourceOutput
 
             var uniqueHintName = CreateDistinctSourceHintName(entry.HintName, source, emittedSourceByHintName);
             emittedSourceByHintName.Add(uniqueHintName, source);
-            result.Add(SourceOutputResult.FromSource(new GeneratedSourceEntry(uniqueHintName, source)));
+            result.Add(SourceOutputResult.FromSource(new GeneratedSourceEntry(uniqueHintName, source), sourceOutput.SerializableIdentity));
         }
 
         return NormalizeSourceOutputs(result.ToImmutable());
