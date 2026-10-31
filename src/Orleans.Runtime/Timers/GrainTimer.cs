@@ -18,6 +18,8 @@ internal abstract partial class GrainTimer : IGrainTimer
     private readonly IGrainContext _grainContext;
     private readonly TimerRegistry _shared;
     private readonly LocalRequestOptions _options;
+    [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "The reusable invocation adapter borrows this timer and owns no disposable resources; the activation owns timer disposal.")]
     private readonly TimerTickInvoker _invoker;
     private TimerState _state;
     // The timer owns one reference through cancellation; an admitted callback owns one through completion.
