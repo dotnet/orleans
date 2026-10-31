@@ -66,52 +66,60 @@ public sealed class SourceWriterTests
     }
 
     [Theory]
-    [InlineData("int")]
-    [InlineData("global::System.Collections.Generic.Dictionary<int,string>")]
-    [InlineData("global::System.Collections.Generic.Dictionary<int, global::System.Collections.Generic.List<string[]>>")]
-    [InlineData("global::Outer<T>.Inner<U,V>")]
-    [InlineData("global::@class.@namespace<@event>")]
-    [InlineData("int[,]")]
-    [InlineData("int[,,][]")]
-    [InlineData("int?")]
-    [InlineData("int?[]")]
-    [InlineData("int?[,][]")]
-    [InlineData("(int a,string b)")]
-    [InlineData("global::System.ValueTuple<(int, string),int?>")]
-    [InlineData("A<,,>")]
-    [InlineData("A<,>")]
-    [InlineData("A<>")]
-    [InlineData("global::A<>.B<,>")]
-    [InlineData("int*")]
-    [InlineData("delegate*<int,void>")]
-    [InlineData("dynamic")]
-    public void TypeSpellingMatchesNormalizedSyntax(string type)
+    [InlineData("int", "int")]
+    [InlineData("global::System.Collections.Generic.Dictionary<int,string>", "global::System.Collections.Generic.Dictionary<int, string>")]
+    [InlineData("global::System.Collections.Generic.Dictionary< int , global::System.Collections.Generic.List<string[]> >", "global::System.Collections.Generic.Dictionary<int, global::System.Collections.Generic.List<string[]>>")]
+    [InlineData("global::Outer<T>.Inner<U,V>", "global::Outer<T>.Inner<U, V>")]
+    [InlineData("global::@class.@namespace<@event>", "global::@class.@namespace<@event>")]
+    [InlineData("int[ , ]", "int[,]")]
+    [InlineData("int[,,][]", "int[,,][]")]
+    [InlineData("int ?", "int?")]
+    [InlineData("int? []", "int?[]")]
+    [InlineData("int?[,][]", "int?[,][]")]
+    [InlineData("(int a,string b)", "(int a, string b)")]
+    [InlineData("(int[]items,int?count,global::System.Collections.Generic.List<int>values,int[,]grid)", "(int[] items, int? count, global::System.Collections.Generic.List<int> values, int[,] grid)")]
+    [InlineData("global::System.ValueTuple<(int, string),int?>", "global::System.ValueTuple<(int, string), int?>")]
+    [InlineData("A<, , >", "A<,,>")]
+    [InlineData("A<,>", "A<,>")]
+    [InlineData("A<>", "A<>")]
+    [InlineData("global::A<>.B<,>", "global::A<>.B<,>")]
+    [InlineData("int *", "int*")]
+    [InlineData("delegate*<int,void>", "delegate*<int, void>")]
+    [InlineData("dynamic", "dynamic")]
+    public void TypeSpellingIsIdiomatic(string type, string expected)
     {
         var syntax = ParseTypeName(type);
-        Assert.Equal(syntax.NormalizeWhitespace().ToFullString(), CodeText.Type(syntax));
+        var spelled = CodeText.Type(syntax);
+        Assert.Equal(expected, spelled);
+        Assert.True(AreEquivalent(syntax, ParseTypeName(spelled), topLevel: false));
     }
 
     [Fact]
-    public void ComposedTypeSpellingMatchesNormalizedSyntax()
+    public void ComposedTypeSpellingIsIdiomatic()
     {
-        // Composed names have no trivia; their spelling must still separate arguments and omitted arguments as normalization does.
-        TypeSyntax[] types =
+        // Composed names have no trivia; their spelling still separates written arguments and joins omitted ones.
+        (TypeSyntax Type, string Expected)[] cases =
         [
-            QualifiedName(ParseName("global::N"), GenericName(Identifier("G"), TypeArgumentList(SeparatedList<TypeSyntax>(
+            (QualifiedName(ParseName("global::N"), GenericName(Identifier("G"), TypeArgumentList(SeparatedList<TypeSyntax>(
                 [IdentifierName("global::System.Int32"), PredefinedType(Token(SyntaxKind.StringKeyword)), IdentifierName("T")])))),
-            QualifiedName(ParseName("N"), GenericName(Identifier("Invokable_I"), TypeArgumentList(SeparatedList<TypeSyntax>(
+                "global::N.G<global::System.Int32, string, T>"),
+            (QualifiedName(ParseName("N"), GenericName(Identifier("Invokable_I"), TypeArgumentList(SeparatedList<TypeSyntax>(
                 [OmittedTypeArgument(), OmittedTypeArgument(), OmittedTypeArgument()])))),
-            NullableType(ParseTypeName("global::System.TimeSpan")),
-            ArrayType(PredefinedType(Token(SyntaxKind.IntKeyword)), SingletonList(ArrayRankSpecifier(SeparatedList<ExpressionSyntax>(
+                "N.Invokable_I<,,>"),
+            (NullableType(ParseTypeName("global::System.TimeSpan")), "global::System.TimeSpan?"),
+            (ArrayType(PredefinedType(Token(SyntaxKind.IntKeyword)), SingletonList(ArrayRankSpecifier(SeparatedList<ExpressionSyntax>(
                 [OmittedArraySizeExpression(), OmittedArraySizeExpression()])))),
+                "int[,]"),
+            (TupleType(SeparatedList([TupleElement(ArrayType(PredefinedType(Token(SyntaxKind.IntKeyword)), SingletonList(ArrayRankSpecifier())), Identifier("items")),
+                TupleElement(NullableType(PredefinedType(Token(SyntaxKind.IntKeyword))), Identifier("count"))])),
+                "(int[] items, int? count)"),
         ];
 
-        foreach (var type in types)
+        foreach (var (type, expected) in cases)
         {
-            Assert.Equal(type.NormalizeWhitespace().ToFullString(), CodeText.Type(type));
+            Assert.Equal(expected, CodeText.Type(type));
         }
     }
-
     [Theory]
     [InlineData("")]
     [InlineData("plain")]
@@ -170,14 +178,10 @@ public sealed class SourceWriterTests
     }
 
     [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(5)]
-    public void OpenGenericArgumentsMatchNormalizedSyntax(int arity)
-    {
-        var syntax = ParseTypeName($"G<{new string(',', arity - 1)}>");
-        Assert.Equal(syntax.NormalizeWhitespace().ToFullString(), string.Concat("G", CodeText.OpenGenericArguments(arity)));
-    }
-
+    [InlineData(1, "G<>")]
+    [InlineData(2, "G<,>")]
+    [InlineData(5, "G<,,,,>")]
+    public void OpenGenericArgumentsAreIdiomatic(int arity, string expected)
+        => Assert.Equal(expected, string.Concat("G", CodeText.OpenGenericArguments(arity)));
     private static string Normalize(string text, Func<string, SyntaxNode> parse) => parse(text).NormalizeWhitespace().ToFullString();
 }

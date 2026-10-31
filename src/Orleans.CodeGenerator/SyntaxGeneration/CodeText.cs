@@ -12,9 +12,9 @@ namespace Orleans.CodeGenerator.SyntaxGeneration;
 internal static class CodeText
 {
     /// <summary>
-    /// Spells a type, name, or type-argument fragment with the normalized token spacing used by generated files:
-    /// a space after each separating comma (none between omitted type arguments), between adjacent words, and
-    /// between a nullable annotation and an array rank (<c>T? [, ]</c>).
+    /// Spells a type, name, or type-argument fragment with idiomatic spacing: a space after each comma which separates
+    /// written elements (<c>Dictionary&lt;int, string&gt;</c>, but <c>G&lt;,,&gt;</c> and <c>int[,]</c>), between adjacent words,
+    /// and before a tuple element name (<c>(int[] items, int? count)</c>).
     /// </summary>
     /// <remarks>
     /// Type syntax holds only names, keywords, and punctuation, so token text is sufficient: no literal or trivia is significant.
@@ -45,9 +45,9 @@ internal static class CodeText
             }
 
             var kind = token.Kind();
-            if (previous == SyntaxKind.CommaToken && kind != SyntaxKind.CommaToken
+            if (previous == SyntaxKind.CommaToken && kind is not (SyntaxKind.CommaToken or SyntaxKind.GreaterThanToken or SyntaxKind.CloseBracketToken)
                 || IsWord(previous) && IsWord(kind)
-                || previous == SyntaxKind.QuestionToken && kind == SyntaxKind.OpenBracketToken)
+                || kind == SyntaxKind.IdentifierToken && token.Parent is TupleElementSyntax)
             {
                 builder.Append(' ');
             }
@@ -84,7 +84,6 @@ internal static class CodeText
     public static string OpenGenericArguments(int arity) => arity switch
     {
         <= 0 => string.Empty,
-        1 => "<>",
-        _ => "<" + new string(',', arity - 1) + " >",
+        _ => "<" + new string(',', arity - 1) + ">",
     };
 }

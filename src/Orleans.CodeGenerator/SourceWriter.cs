@@ -7,7 +7,7 @@ namespace Orleans.CodeGenerator;
 /// Writes generated C# directly from emission plans.
 /// </summary>
 /// <remarks>
-/// The layout is the one established by the former whole-file <c>NormalizeWhitespace</c> pass: four-space
+/// Generated files use four-space
 /// indentation, CRLF line separators, no terminator after the final line, and one blank line after a closing
 /// brace unless the next line closes the enclosing block or continues the same statement. Callers supply
 /// complete, already-spelled C# fragments; the writer owns only line structure and indentation.

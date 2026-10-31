@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -43,6 +44,7 @@ public sealed class GeneratedSourceLayoutTests
                 [Id(0)] public Dictionary<TKey, TValue[]> Values;
                 [Id(1)] public TValue?[,] Grid;
                 [Id(2)] public (int Count, string Name) Tuple;
+            [Id(3)] public (int[] Items, int? Count, List<int> Values) Shape;
             }
 
             public class Outer<T>
@@ -114,7 +116,7 @@ public sealed class GeneratedSourceLayoutTests
 
             public interface ILayoutObserver : IGrainObserver { void Notify(string message); }
 
-            [GenerateSerializerContext<ContextRoot>]
+            [GenerateSerializerContext<ContextRoot>, GenerateSerializerContext<int?[]>]
             public sealed partial class LayoutContext : Orleans.Serialization.SerializerContext { }
         }
         """;
@@ -161,12 +163,10 @@ public sealed class GeneratedSourceLayoutTests
                 body = body[Disable.Length..^Restore.Length];
             }
 
-            // The former normalization separated a nullable type's '?' from a following ')' (for example, "typeof(int? )"),
-            // and some compiler versions also separate a suppression from 'null' ("null !"). Direct output spells both canonically;
-            // these are the only intended layout differences.
-            var normalized = SyntaxFactory.ParseCompilationUnit(body).NormalizeWhitespace().ToFullString()
-                .Replace("? )", "?)", StringComparison.Ordinal)
-                .Replace("null !", "null!", StringComparison.Ordinal);
+            // Generated files use Roslyn's normalized statement layout with idiomatic token spelling, where normalization differs:
+            // "T?)" and "T?[]" rather than "T? )" and "T? []", "G<,>" and "int[,]" rather than "G<, >" and "int[, ]",
+            // "null!" rather than "null !", and every constraint clause on its declaration line.
+            var normalized = Idiomatic(SyntaxFactory.ParseCompilationUnit(body).NormalizeWhitespace().ToFullString());
             if (!string.Equals(normalized, body, StringComparison.Ordinal))
             {
                 var expectedLines = normalized.Split("\r\n");
@@ -187,5 +187,21 @@ public sealed class GeneratedSourceLayoutTests
         Assert.Contains("providers[(\"Silo\", \"Kind\\\\One\", \"Layout\\\"Provider\")]", metadata.Replace("Ünïcødé", "Silo", StringComparison.Ordinal), StringComparison.Ordinal);
         Assert.Contains("config.WellKnownTypeAliases.TryGetValue(\"layout-alias \\\"quoted\\\" \\\\ é\"", metadata, StringComparison.Ordinal);
         Assert.Contains("config.WellKnownTypeIds.TryGetValue(71U,", metadata, StringComparison.Ordinal);
+        Assert.Contains("typeof(global::Layout.Constrained<,>)", metadata, StringComparison.Ordinal);
+        Assert.Contains("typeof(global::Layout.Outer<>.Inner<>)", metadata, StringComparison.Ordinal);
+
+        var serializers = string.Concat(sources.Where(static source => source.HintName.Contains(".orleans.ser.", StringComparison.Ordinal))
+            .Select(static source => source.SourceText.ToString()));
+        Assert.Contains("(int[] Items, int? Count, global::System.Collections.Generic.List<int> Values)", serializers, StringComparison.Ordinal);
+        Assert.Contains("TValue?[,]", serializers, StringComparison.Ordinal);
+
+        var context = Assert.Single(sources, static source => source.HintName.Contains(".orleans.context.", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("options.AddSerializer<int?[]>(", context, StringComparison.Ordinal);
     }
+
+    private static string Idiomatic(string normalized)
+        => Regex.Replace(normalized.Replace("? )", "?)", StringComparison.Ordinal)
+                .Replace("? [", "?[", StringComparison.Ordinal)
+                .Replace("null !", "null!", StringComparison.Ordinal),
+            @", (?=[,>\]])|(?<=new\(\))\r\n *(?=where )", static match => match.Value.StartsWith(',') ? "," : " ");
 }

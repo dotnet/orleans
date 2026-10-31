@@ -71,14 +71,9 @@ internal sealed record GenericParameterEmissionPlan(string Name, EquatableArray<
         builder.Append('>');
     }
 
-    /// <summary>
-    /// Writes a declaration line followed by its constraint clauses. A clause following a <c>new()</c> constraint
-    /// begins a continuation line, indented once, as in the established normalized layout.
-    /// </summary>
+    /// <summary>Writes a declaration line followed by its constraint clauses on the same line.</summary>
     public static void WriteDeclarationLine(SourceWriter writer, StringBuilder declaration, EquatableArray<GenericParameterEmissionPlan> parameters)
     {
-        var continued = false;
-        var breakBeforeClause = false;
         foreach (var parameter in parameters)
         {
             if (parameter.Constraints.Count == 0)
@@ -86,22 +81,7 @@ internal sealed record GenericParameterEmissionPlan(string Name, EquatableArray<
                 continue;
             }
 
-            if (breakBeforeClause)
-            {
-                writer.WriteLine(declaration.ToString());
-                declaration.Clear();
-                if (!continued)
-                {
-                    writer.Indent();
-                    continued = true;
-                }
-            }
-            else
-            {
-                declaration.Append(' ');
-            }
-
-            declaration.Append("where ").Append(parameter.Name).Append(" : ");
+            declaration.Append(" where ").Append(parameter.Name).Append(" : ");
             for (var i = 0; i < parameter.Constraints.Count; i++)
             {
                 if (i > 0)
@@ -111,15 +91,9 @@ internal sealed record GenericParameterEmissionPlan(string Name, EquatableArray<
 
                 declaration.Append(parameter.Constraints[i]);
             }
-
-            breakBeforeClause = parameter.Constraints[parameter.Constraints.Count - 1] == "new()";
         }
 
         writer.WriteLine(declaration.ToString());
-        if (continued)
-        {
-            writer.Unindent();
-        }
     }
 }
 
