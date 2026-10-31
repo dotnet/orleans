@@ -38,7 +38,6 @@
 
   <ItemGroup>
     <Protobuf Include="protobuf-model.proto" GrpcServices="None" />
-    <Compile Include="..\Orleans.NativeAotSmoke\InterfaceCollections.Contracts.cs" Link="InterfaceCollections.Contracts.cs" />
   </ItemGroup>
 
   <Target
