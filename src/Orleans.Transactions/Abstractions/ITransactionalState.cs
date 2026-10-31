@@ -24,9 +24,14 @@ namespace Orleans.Transactions.Abstractions
         /// Performs a read operation with the specified isolation and returns the result.
         /// </summary>
         /// <typeparam name="TResult">The result type.</typeparam>
-        /// <param name="readFunction">A function that reads the state and returns the result.</param>
+        /// <param name="readFunction">A function that reads the state and returns the result. The function must leave the supplied state unchanged.</param>
         /// <param name="isolation">The read isolation.</param>
         /// <returns>A task whose result is the value returned by <paramref name="readFunction"/>.</returns>
+        /// <remarks>
+        /// The result is independently copied. <see cref="ReadIsolation.ReadCommitted"/> reads the latest locally
+        /// committed state in an empty ambient transaction context. Remotely coordinated writes become locally
+        /// visible after the participant receives and persists commit confirmation.
+        /// </remarks>
         Task<TResult> PerformRead<TResult>(Func<TState, TResult> readFunction, ReadIsolation isolation);
 
         /// <summary>

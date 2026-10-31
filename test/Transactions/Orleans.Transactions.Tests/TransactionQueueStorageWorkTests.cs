@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -28,6 +30,112 @@ namespace Orleans.Transactions.Tests;
 [TestCategory("BVT"), TestCategory("Transactions")]
 public class TransactionQueueStorageWorkTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReadCommitted_PendingWriterReturnsCommittedCopyBeforeAbort(bool prepareCommit)
+    {
+        var storage = new CoordinatedTransactionalStateStorage();
+        var abortStoreStarted = new TaskCompletionSource<CoordinatedTransactionalStateStorage.StoreCall>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishAbortStore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var committed = new TestState { Value = 7 };
+        storage.EnqueueLoad(() => Task.FromResult(new TransactionalStorageLoadResponse<TestState>(
+            "loaded-etag", committed, 1, new TransactionalStateMetaData(), Array.Empty<PendingTransactionState<TestState>>())));
+        var participant = new ParticipantId("state", null!, ParticipantId.Role.Resource | ParticipantId.Role.Manager);
+        var queue = CreateQueue(storage, static () => { }, participant, new NoOpTimerManager());
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var context = new TestGrainContext(services, new TestLifecycle());
+        var state = new TransactionalState<TestState>(
+            null!, new TestGrainContextAccessor(context), new TestStateCopier(), null!,
+            NullLogger<TransactionalState<TestState>>.Instance);
+        typeof(TransactionalState<TestState>).GetField("queue", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(state, queue);
+        var scheduler = new ControlledTaskScheduler();
+        var test = Task.Factory.StartNew(async () =>
+        {
+            await queue.NotifyOfRestore();
+            await queue.WaitForBackgroundWorkAsync();
+            var timestamp = DateTime.UtcNow;
+            var writer = new TransactionInfo(Guid.NewGuid(), timestamp, timestamp);
+            TransactionContext.SetTransactionInfo(writer);
+            try
+            {
+                await state.PerformUpdate(value =>
+                {
+                    value.Value = 99;
+                    return value;
+                });
+            }
+            finally
+            {
+                TransactionContext.Clear();
+            }
+
+            Assert.True(queue.RWLock.TryGetRecord(writer.TransactionId, out var record));
+            Assert.True(record.IsExclusiveLock);
+            Assert.Equal(99, record.State.Value);
+            Task<TransactionalStatus>? commit = null;
+            if (prepareCommit)
+            {
+                commit = new TransactionManager<TestState>(queue).PrepareAndCommit(
+                    writer.TransactionId, new AccessCounter { Writes = 1 }, record.Timestamp,
+                    new List<ParticipantId> { participant }, totalResources: 2);
+                await queue.WaitForLockWorkAsync();
+                queue.GetMostRecentState(out var tentative, out _);
+                Assert.Same(record.State, tentative);
+                Assert.False(commit.IsCompleted);
+            }
+
+            var read = state.PerformRead(value => value, ReadIsolation.ReadCommitted);
+            Assert.True(read.IsCompletedSuccessfully);
+            var result = await read;
+            Assert.Equal(7, result.Value);
+            Assert.NotSame(committed, result);
+            result.Value = 123;
+            Assert.Equal(7, committed.Value);
+            Assert.Equal(99, record.State.Value);
+            if (!prepareCommit)
+            {
+                Assert.True(queue.RWLock.TryGetRecord(writer.TransactionId, out var held));
+                Assert.Same(record, held);
+            }
+
+            if (prepareCommit)
+            {
+                storage.EnqueueStore(async call =>
+                {
+                    abortStoreStarted.SetResult(call);
+                    await finishAbortStore.Task.WaitAsync(TestContext.Current.CancellationToken);
+                    return "aborted-etag";
+                });
+            }
+
+            await queue.NotifyOfCancel(writer.TransactionId, record.Timestamp, TransactionalStatus.BrokenLock);
+            if (commit is not null)
+            {
+                Assert.Equal(TransactionalStatus.BrokenLock, await commit);
+                var abortStore = await abortStoreStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+                Assert.Equal("loaded-etag", abortStore.ExpectedETag);
+                Assert.Null(abortStore.AbortAfter);
+                Assert.Null(abortStore.CommitUpTo);
+                Assert.NotNull(abortStore.StatesToPrepare);
+                Assert.Empty(abortStore.StatesToPrepare);
+            }
+
+            var afterAbort = await state.PerformRead(value => value, ReadIsolation.ReadCommitted);
+            Assert.Equal(7, afterAbort.Value);
+            Assert.NotSame(result, afterAbort);
+            queue.GetMostRecentState(out var latest, out _);
+            Assert.Same(committed, latest);
+            var (lockStatus, _) = await queue.RWLock.ValidateLock(writer.TransactionId, new AccessCounter { Writes = 1 });
+            Assert.Equal(TransactionalStatus.BrokenLock, lockStatus);
+            finishAbortStore.SetResult();
+            await queue.WaitForBackgroundWorkAsync();
+            await queue.StopAsync(TestContext.Current.CancellationToken);
+        }, TestContext.Current.CancellationToken, TaskCreationOptions.None, scheduler).Unwrap();
+
+        await scheduler.RunUntilCompletedAsync(test, TestContext.Current.CancellationToken);
+    }
+
     [Theory]
     [InlineData(GrainLifecycleStage.SetupState)]
     [InlineData(GrainLifecycleStage.Last)]
@@ -820,6 +928,9 @@ public class TransactionQueueStorageWorkTests
             => (Task)AbortAndRestoreMethod.Invoke(this, new object?[] { status, exception, storageOutcomeInDoubt })!;
 
         public Task WaitForBackgroundWorkAsync() => ((BatchWorker)StorageWorkerField.GetValue(this)!).WaitForCurrentWorkToBeServiced();
+
+        public Task WaitForLockWorkAsync() => ((BatchWorker)typeof(ReadWriteLock<TestState>)
+            .GetField("lockWorker", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(RWLock)!).WaitForCurrentWorkToBeServiced();
     }
 
     private sealed class TestStorageFactory(ITransactionalStateStorage<TestState> storage) : INamedTransactionalStateStorageFactory
@@ -900,9 +1011,14 @@ public class TransactionQueueStorageWorkTests
 
     private sealed class ControlledTaskScheduler : TaskScheduler
     {
-        private readonly Queue<Task> tasks = new();
+        private readonly ConcurrentQueue<Task> tasks = new();
+        private readonly Channel<bool> taskQueued = Channel.CreateUnbounded<bool>();
 
-        protected override void QueueTask(Task task) => tasks.Enqueue(task);
+        protected override void QueueTask(Task task)
+        {
+            tasks.Enqueue(task);
+            taskQueued.Writer.TryWrite(true);
+        }
 
         protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued) => false;
 
@@ -914,6 +1030,17 @@ public class TransactionQueueStorageWorkTests
             {
                 TryExecuteTask(task);
             }
+        }
+
+        public async Task RunUntilCompletedAsync(Task completion, CancellationToken cancellationToken)
+        {
+            while (!completion.IsCompleted)
+            {
+                await taskQueued.Reader.ReadAsync(cancellationToken);
+                RunAll();
+            }
+
+            await completion;
         }
     }
 
@@ -1079,5 +1206,11 @@ public class TransactionQueueStorageWorkTests
 
     private sealed class TestState
     {
+        public int Value { get; set; }
+    }
+
+    private sealed class TestStateCopier : ITransactionDataCopier<TestState>
+    {
+        public TestState DeepCopy(TestState original) => new() { Value = original.Value };
     }
 }
