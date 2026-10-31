@@ -99,6 +99,49 @@ public sealed class DtoSerializerPlanTests(ITestOutputHelper output)
         AssertFreshParity(compilation, result);
     }
 
+    [Theory]
+    [InlineData("record")]
+    [InlineData("union")]
+    public async Task FSharpMappedSource_UsesCompilationAwareEmissionAndRefreshesMembers(string kind)
+    {
+        var flags = kind == "record" ? "RecordType" : "SumType";
+        var member = kind == "record"
+            ? "[Orleans.Id(7)] public int Value { get; set; }"
+            : "public int Value;";
+        var source = $$"""
+            [Orleans.GenerateSerializer]
+            [Microsoft.FSharp.Core.CompilationMapping(Microsoft.FSharp.Core.SourceConstructFlags.{{flags}})]
+            public sealed class Payload { {{member}} }
+            {{IndependentTypes}}
+            """;
+        var compilation = await TestCompilationHelper.CreateCompilation(source, additionalReferences:
+            [MetadataReference.CreateFromFile(typeof(Microsoft.FSharp.Core.FSharpOption<>).Assembly.Location)]);
+        var services = new GeneratorServices(compilation, new CodeGeneratorOptions());
+        var description = SerializableSourceOutputGenerator.CreateSerializableTypeDescription(
+            services, compilation.GetTypeByMetadataName("Payload")!);
+        if (kind == "record")
+        {
+            Assert.IsType<FSharpUtilities.FSharpRecordTypeDescription>(description);
+        }
+        else
+        {
+            Assert.IsType<FSharpUtilities.FSharpUnionCaseTypeDescription>(description);
+        }
+
+        var (driver, original) = Run(CreateDriver(), compilation);
+        Assert.Equal("Independent", Assert.Single(GetPlans(original)).MetadataIdentity.MetadataName);
+        Assert.Contains("Int32Codec.WriteField", GetOwnerEntry(original, "Payload").Source, StringComparison.Ordinal);
+
+        var updated = ReplaceSource(compilation, source.Replace("public int Value", "public long Value", StringComparison.Ordinal));
+        var (_, retained) = Run(driver, updated);
+        Assert.Equal("Independent", Assert.Single(GetPlans(retained)).MetadataIdentity.MetadataName);
+        Assert.Single(AssertCachedEmitters(retained));
+        AssertEnumCached(retained);
+        Assert.Contains("Int64Codec.WriteField", GetOwnerEntry(retained, "Payload").Source, StringComparison.Ordinal);
+        Assert.NotEqual(GetOwnerEntry(original, "Payload").Source, GetOwnerEntry(retained, "Payload").Source);
+        AssertFreshParity(updated, retained);
+    }
+
     [Fact]
     public async Task PrivateActivatorNamedField_UsesInjectedActivatorWithUnsafeAccessors()
     {

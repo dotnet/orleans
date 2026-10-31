@@ -40,7 +40,7 @@ internal static class SerializableSourceOutputGenerator
             var model = ModelExtractor.ExtractSerializableTypeModel(typeDescription, sourceLocation);
             var enumPlan = EnumSerializerGenerator.CreateOutputPlan(
                 typeDescription, libraryTypes, compilation.AssemblyName ?? "assembly", metadataIdentity);
-            if (typeDescription is not SerializableTypeDescription || typeDescription.IsEnumType)
+            if (typeDescription.GetType() != typeof(SerializableTypeDescription) || typeDescription.IsEnumType)
             {
                 return SerializableTypeResult.FromModel(model, enumPlan);
             }
