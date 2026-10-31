@@ -73,9 +73,8 @@ internal sealed partial class DurableTaskGrainRuntime
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // A poll is bounded, so only a wait which can block checks what the calling code holds; a completed one pays
-            // nothing, and a remote task's segments run on its own grain.
-            if (!ResponseTask.IsCompleted && RemoteTarget.IsDefault)
+            // A poll is bounded, so only a wait which can block checks what the calling code holds; a completed one pays nothing.
+            if (!ResponseTask.IsCompleted)
             {
                 await runtime.EnsureWaitCanEndAsync(TaskId, cancellationToken);
             }

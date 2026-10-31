@@ -10,23 +10,26 @@ internal sealed partial class DurableTaskGrainRuntime
 {
     /// <summary>
     /// Completes once the calling code's wait for <paramref name="taskId"/>, a task of this grain, can end, and throws when
-    /// the calling code's own request or exclusive section holds the task's segments back, so the wait could only end
-    /// when that request or section does.
+    /// its own activation, its own request, or its own exclusive section holds back what completes the task, so the wait
+    /// could only end when that activation, request, or section does.
     /// </summary>
     /// <remarks>
-    /// The activation decides by its own admission rules. A task whose terminal result is already staged completes once
-    /// its journal write commits, which needs no request, so a wait for it proceeds. Otherwise only an invoked task or
-    /// a local step completes by running its code as the grain's segments, and a subscription to, or a detached start of,
-    /// such a task of this grain completes once that task does; inbox delivery completes the other records,
-    /// such as a delay, a remote call's result, or a signal's value, alongside the waiting code. For such a task, a
-    /// reentrant grain, a waiting method marked <c>[AlwaysInterleave]</c>, and a <c>[MayInterleave]</c> predicate which
-    /// admits segments wait instead, unless the waiting code holds an open exclusive section, such as a transaction,
-    /// which admits segments only once it closes. Code which belongs to no running request and holds no section, or
-    /// whose request and section don't exclude segments, waits too.
-    /// A segment of the task's own attempt which already runs, other than the calling code's, continues regardless, so
-    /// the check waits for that segment to end and decides again: the segment can complete the task, or park it.
+    /// The activation decides by its own admission rules. A wait for a task which the grain doesn't hold proceeds, so its
+    /// lookup reports the missing task, and a task whose terminal result is already staged completes once its journal
+    /// write commits, which needs no request, so a wait for it proceeds too. The activation runs no request while it
+    /// activates, so otherwise a wait from its activation code, such as <c>OnActivateAsync</c>, throws for any of its
+    /// tasks. Once it has activated, only an invoked task or a local step completes by running its code as the grain's
+    /// segments, and a subscription to, or a detached start of, such a task of this grain completes once that task does;
+    /// inbox delivery completes the other records, such as a delay which
+    /// recorded its due time, a remote call's result, or a signal's value, alongside
+    /// the waiting code. A reentrant grain, a waiting method marked <c>[AlwaysInterleave]</c>, and a
+    /// <c>[MayInterleave]</c> predicate which admits segments wait for such a task, unless the waiting code holds an open
+    /// exclusive section, such as a transaction, which admits segments only once it closes. Code which belongs to no
+    /// running request and holds no section, or whose request and section don't exclude segments, waits too. A segment of
+    /// the task's own attempt which already runs, other than the calling code's, continues regardless, so the check waits
+    /// for that segment to end and decides again: the segment can complete the task, or park it.
     /// </remarks>
-    /// <exception cref="InvalidOperationException">The calling code's request or section holds the task's segments.</exception>
+    /// <exception cref="InvalidOperationException">The calling code's activation, request, or section holds back what completes the task.</exception>
     internal async ValueTask EnsureWaitCanEndAsync(TaskId taskId, CancellationToken cancellationToken)
     {
         while (GetRunningSegmentToAwait(taskId) is { } segment)
@@ -50,6 +53,13 @@ internal sealed partial class DurableTaskGrainRuntime
             || state.Result is not null)
         {
             return null;
+        }
+
+        if (admission.IsCurrentCodeActivating())
+        {
+            throw new InvalidOperationException(
+                $"Code of grain {GrainId} waits for its durable task '{taskId}' while the grain activates, such as from OnActivateAsync. The task's code runs as requests to the same grain, which the grain runs only once it has activated, so the wait can't end. "
+                + "Schedule the task without waiting for it, and wait for it from a grain method or from durable code once the grain has activated.");
         }
 
         var executionId = taskId;

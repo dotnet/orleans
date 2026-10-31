@@ -228,6 +228,68 @@ public abstract class DurableTaskSelfWaitTests(string journalFormatKey) : IAsync
     }
 
     [Fact]
+    public async Task WaitForAnOwnTaskFromOnActivateAsyncFailsAtOnce()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var key = Guid.NewGuid();
+        ActivationSelfWaitingGrain.WaitOnNextActivation(key);
+        var grain = _fixture.Client.GetGrain<IActivationSelfWaitingGrain>(key);
+
+        // The grain runs the task's segments only once it has activated, so a wait from its activation code can't end.
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.PingAsync().WaitAsync(Timeout, cancellationToken));
+        Assert.Contains("OnActivateAsync", exception.Message, StringComparison.Ordinal);
+
+        // The task itself runs once a later activation completes.
+        Assert.Equal(6, (await grain.GetDurableTask<int>("own").GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken)).GetResult<int>());
+    }
+
+    [Fact]
+    public async Task WaitForAnOwnTaskReferenceFromOnActivateAsyncFailsAtOnce()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var key = Guid.NewGuid();
+        var grain = _fixture.Client.GetGrain<IActivationSelfWaitingGrain>(key);
+        var waiting = await grain.WaitForCancellationAsync().WithId("wait").ScheduleAsync(cancellationToken);
+        await grain.DeactivateAsync().WaitAsync(Timeout, cancellationToken);
+        ActivationSelfWaitingGrain.WaitForReferenceOnNextActivation(key, "wait");
+
+        // The next activation's code awaits a reference to the existing task, whose segments run only once it activates.
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.PingAsync().WaitAsync(Timeout, cancellationToken));
+        Assert.Contains("OnActivateAsync", exception.Message, StringComparison.Ordinal);
+
+        await waiting.CancelAsync(cancellationToken);
+        Assert.Equal(DurableTaskStatus.Canceled, (await waiting.GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken)).Status);
+    }
+
+    [Fact]
+    public async Task WaitForAnOwnRemoteCallFromOnActivateAsyncFailsAtOnce()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var key = Guid.NewGuid();
+        var grain = _fixture.Client.GetGrain<IActivationSelfWaitingGrain>(key);
+        await grain.CallAnotherAsync(Guid.NewGuid()).WithId("workflow").ScheduleAsync(cancellationToken);
+        var callId = await ActivationSelfWaitingGrain.WaitUntilCallScheduledAsync(key).WaitAsync(Timeout, cancellationToken);
+        await grain.DeactivateAsync().WaitAsync(Timeout, cancellationToken);
+        ActivationSelfWaitingGrain.WaitForTaskOnNextActivation(key, callId);
+
+        // The next activation's code waits for the recovered call, whose result the grain's inbox delivers only once it activates.
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.PingAsync().WaitAsync(Timeout, cancellationToken));
+        Assert.Contains("OnActivateAsync", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WaitForAMissingOwnTaskFromOnActivateAsyncReportsItMissing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var key = Guid.NewGuid();
+        ActivationSelfWaitingGrain.WaitForReferenceOnNextActivation(key, "missing");
+        var grain = _fixture.Client.GetGrain<IActivationSelfWaitingGrain>(key);
+
+        // The grain holds no such task, so the reference's lookup reports it, which activation code can handle.
+        await Assert.ThrowsAsync<DurableTaskNotFoundException>(() => grain.PingAsync().WaitAsync(Timeout, cancellationToken));
+    }
+
+    [Fact]
     public async Task InterleavingWaitForAnOwnTaskInsideItsOwnExclusiveSectionFailsAtOnce()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -509,6 +571,19 @@ public interface ISelfWaitCallbackGrain : IGrainWithGuidKey
     Task<int> CallBackAsync(ISelfWaitingGrain grain);
 
     Task StartContinuationAsync(ISelfWaitingGrain grain);
+}
+
+public interface IActivationSelfWaitingGrain : IGrainWithGuidKey
+{
+    DurableTask<int> TripleAsync(int value);
+
+    DurableTask<int> WaitForCancellationAsync();
+
+    DurableTask CallAnotherAsync(Guid otherKey);
+
+    Task PingAsync();
+
+    Task DeactivateAsync();
 }
 
 public interface IReentrantSelfWaitingGrain : IGrainWithGuidKey
@@ -798,6 +873,69 @@ public sealed class SelfWaitCallbackGrain : Grain, ISelfWaitCallbackGrain
     public Task<int> CallBackAsync(ISelfWaitingGrain grain) => grain.InterleavingScheduleAndAwaitOwnTaskAsync(2);
 
     public Task StartContinuationAsync(ISelfWaitingGrain grain) => grain.InterleavingStartContinuationAsync();
+}
+
+[GrainType("durable-task-activation-self-waiting-test")]
+public sealed class ActivationSelfWaitingGrain(IDurableTaskManager tasks) : DurableGrain, IActivationSelfWaitingGrain
+{
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, bool> WaitingActivations = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, string> ReferenceWaitingActivations = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, TaskId> TaskWaitingActivations = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, TaskCompletionSource<TaskId>> ScheduledCalls = new();
+
+    public static void WaitOnNextActivation(Guid key) => WaitingActivations[key] = true;
+
+    /// <summary>Makes the grain's next activation await a reference to its existing task <paramref name="rootId"/>.</summary>
+    public static void WaitForReferenceOnNextActivation(Guid key, string rootId) => ReferenceWaitingActivations[key] = rootId;
+
+    /// <summary>Makes the grain's next activation wait for its task <paramref name="taskId"/> through the task manager.</summary>
+    public static void WaitForTaskOnNextActivation(Guid key, TaskId taskId) => TaskWaitingActivations[key] = taskId;
+
+    /// <summary>Completes with the identifier of the call which the grain's <c>CallAnotherAsync</c> scheduled.</summary>
+    public static Task<TaskId> WaitUntilCallScheduledAsync(Guid key) => GetScheduledCall(key).Task;
+
+    private static TaskCompletionSource<TaskId> GetScheduledCall(Guid key) =>
+        ScheduledCalls.GetOrAdd(key, _ => new(TaskCreationOptions.RunContinuationsAsynchronously));
+
+    public DurableTask<int> TripleAsync(int value) => DurableTask.FromResult(value * 3);
+
+    public DurableTask<int> WaitForCancellationAsync() => SelfWaiting.WaitForCancellationAsync();
+
+    // The call's target never completes it, so the call stays pending across activations.
+    public async DurableTask CallAnotherAsync(Guid otherKey)
+    {
+        var call = await GrainFactory.GetGrain<ISelfWaitingGrain>(otherKey).WaitForCancellationAsync().WithId("call").ScheduleAsync();
+        GetScheduledCall(this.GetPrimaryKey()).TrySetResult(call.Id);
+        await call;
+    }
+
+    public Task PingAsync() => Task.CompletedTask;
+
+    public Task DeactivateAsync()
+    {
+        DeactivateOnIdle();
+        return Task.CompletedTask;
+    }
+
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await base.OnActivateAsync(cancellationToken);
+        var key = this.GetPrimaryKey();
+        if (WaitingActivations.TryRemove(key, out _))
+        {
+            await SelfWaiting.ScheduleAndAwaitAsync(this.AsReference<IActivationSelfWaitingGrain>().TripleAsync(2));
+        }
+
+        if (ReferenceWaitingActivations.TryRemove(key, out var rootId))
+        {
+            await this.AsReference<IActivationSelfWaitingGrain>().GetDurableTask<int>(rootId);
+        }
+
+        if (TaskWaitingActivations.TryRemove(key, out var taskId))
+        {
+            await tasks.GetTask(taskId).GetResponseAsync(cancellationToken);
+        }
+    }
 }
 
 [Reentrant]

@@ -340,16 +340,19 @@ synchronously on the activation which makes them, when the runtime stages them: 
   from durable code, whose durable wait ends its segment. Code which holds the
   grain's exclusive section, such as a transaction, holds the segments back
   until it closes the section, even from an `[AlwaysInterleave]` method, so it
-  waits for its grain's tasks only outside the section. A request whose own
-  admission rules would hold the segments behind it throws
+  waits for its grain's tasks only outside the section. The grain runs no
+  segment until it has activated, so its activation code, such as
+  `OnActivateAsync`, schedules its tasks without waiting for them. A request
+  whose own admission rules would hold the segments behind it throws
   `InvalidOperationException` at once, naming the remedies, instead of waiting
   until the call times out, and so does a wait from code which holds the
-  section. A wait for an invoked task or a local step runs that check, since
-  the task's own code completes it; inbox delivery completes the grain's other
-  tasks, such as a delay, alongside the waiting code. The check runs only
-  before a wait which can block, and a grain which hosts durable tasks records
-  the request which each request's code belongs to, and the exclusive section
-  which code requests, which costs one `AsyncLocal` write each.
+  section or from activation code. Once the grain has activated, a wait for an
+  invoked task or a local step runs that check, since the task's own code
+  completes it; inbox delivery completes the grain's other tasks, such as a
+  delay, alongside the waiting code. The check runs only before a wait which
+  can block, and a grain which hosts durable tasks records the request which
+  each request's code belongs to, and the exclusive section which code
+  requests, which costs one `AsyncLocal` write each.
 - The runtime registers its wake-up delay with the inbox: while the grain holds a runnable
   execution, one whose segment runs or is about to run, Messaging keeps the
   grain's Durable Jobs wake-up, which a journal write ensures before it becomes
