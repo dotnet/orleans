@@ -142,6 +142,8 @@ public class TransactionCoordinatorInputValidationTests
 
         public Task<int[]> Get() => UnexpectedCall<int[]>(nameof(Get));
 
+        public Task<int[]> GetCommitted() => UnexpectedCall<int[]>(nameof(GetCommitted));
+
         public Task AddAndThrow(int numberToAdd) => UnexpectedCall(nameof(AddAndThrow));
 
         public Task SetAndThrow(int numberToSet) => UnexpectedCall(nameof(SetAndThrow));
