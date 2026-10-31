@@ -87,12 +87,15 @@ namespace Orleans.Runtime.Messaging
             if (targetAddress is null)
             {
                 // reroute via Dispatcher
-                msg.TargetSilo = null;
-
+                // A relocatable request retains its target silo, which is the client's location hint for the target grain.
                 if (SystemTargetGrainId.TryParse(msg.TargetGrain, out var systemTargetId))
                 {
                     msg.TargetSilo = this.myAddress;
                     msg.TargetGrain = systemTargetId.WithSiloAddress(this.myAddress).GrainId;
+                }
+                else if (msg.TargetSilo is not null && !msg.IsRelocatableRequest)
+                {
+                    msg.TargetSilo = null;
                 }
 
                 MessagingMetrics.OnMessageReRoute(msg);
