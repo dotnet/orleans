@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,7 +24,12 @@ public static class SiloMetadataHostingExtensions
     /// ORLEANS__METADATA__key1=value1
     /// </remarks>
     /// <returns>The provided silo builder.</returns>
-    public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder) => builder.UseSiloMetadata(builder.Configuration);
+    /// <exception cref="ArgumentNullException"><paramref name="builder"/> is <see langword="null"/>.</exception>
+    public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.UseSiloMetadata(builder.Configuration);
+    }
 
     /// <summary>
     /// Configures silo metadata from the provided configuration.
@@ -36,9 +42,10 @@ public static class SiloMetadataHostingExtensions
     /// ORLEANS__METADATA__key1=value1
     /// </remarks>
     /// <returns>The provided silo builder.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="configuration"/> is <see langword="null"/>.</exception>
     public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder, IConfiguration configuration)
     {
-
+        ArgumentNullException.ThrowIfNull(configuration);
         var metadataConfigSection = configuration.GetSection("Orleans").GetSection("Metadata");
 
         return builder.UseSiloMetadata(metadataConfigSection);
@@ -55,8 +62,10 @@ public static class SiloMetadataHostingExtensions
     /// ORLEANS__METADATA__key1=value1
     /// </remarks>
     /// <returns>The provided silo builder.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="configurationSection"/> is <see langword="null"/>.</exception>
     public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder, IConfigurationSection configurationSection)
     {
+        ArgumentNullException.ThrowIfNull(configurationSection);
         var dictionary = configurationSection.Get<Dictionary<string, string>>();
 
         return builder.UseSiloMetadata(dictionary ?? []);
@@ -68,8 +77,10 @@ public static class SiloMetadataHostingExtensions
     /// <param name="builder">The silo builder.</param>
     /// <param name="metadata">The metadata to publish for the local silo.</param>
     /// <returns>The provided silo builder.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="metadata"/> is <see langword="null"/>.</exception>
     public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder, Dictionary<string, string> metadata)
     {
+        ArgumentNullException.ThrowIfNull(metadata);
         builder.ConfigureServices(services =>
         {
             services
