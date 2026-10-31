@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -157,6 +158,8 @@ namespace Orleans.Runtime
             }
         }
 
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Health-check participants can throw arbitrary exceptions; the watchdog reports a failed check and continues checking other participants.")]
         private void CheckComponentHealth()
         {
             _watchdogInstruments.OnHealthCheck();
@@ -167,25 +170,29 @@ namespace Orleans.Runtime
             _componentWatchdogTimestamp = _timeProvider.GetTimestamp();
             foreach (var participant in _participants)
             {
+                bool healthy;
+                string? complaint;
                 try
                 {
-                    var ok = participant.CheckHealth(_lastComponentHealthCheckTime, out var complaint);
-                    if (!ok)
-                    {
-                        complaints ??= new StringBuilder();
-                        if (complaints.Length > 0)
-                        {
-                            complaints.Append(' ');
-                        }
-
-                        complaints.Append($"{participant.GetType()} failed health check with complaint \"{complaint}\".");
-                        ++numFailedChecks;
-                    }
+                    healthy = participant.CheckHealth(_lastComponentHealthCheckTime, out complaint);
                 }
                 catch (Exception exc)
                 {
+                    healthy = false;
+                    complaint = $"Health check threw {exc.GetType().Name}.";
                     LogWarningHealthCheckParticipantException(_logger, exc, participant.GetType());
                 }
+
+                if (healthy) continue;
+
+                complaints ??= new StringBuilder();
+                if (complaints.Length > 0)
+                {
+                    complaints.Append(' ');
+                }
+
+                complaints.Append($"{participant.GetType()} failed health check with complaint \"{complaint}\".");
+                ++numFailedChecks;
             }
 
             if (complaints != null)
