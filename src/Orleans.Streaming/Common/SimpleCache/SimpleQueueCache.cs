@@ -153,13 +153,22 @@ namespace Orleans.Providers.Streams.Common
                 throw cacheMiss.ToException();
             }
 
-            var cursor = new SimpleQueueCacheCursor(this, streamId, logger);
-            if (InitializeCursor(cursor, token) is { } racedCacheMiss)
+            SimpleQueueCacheCursor? cursor = new(this, streamId, logger);
+            try
             {
-                throw racedCacheMiss.ToException();
-            }
+                if (InitializeCursor(cursor, token) is { } racedCacheMiss)
+                {
+                    throw racedCacheMiss.ToException();
+                }
 
-            return cursor;
+                var result = cursor;
+                cursor = null;
+                return result;
+            }
+            finally
+            {
+                cursor?.Dispose();
+            }
         }
 
         QueueCacheCursorResult<IQueueCacheCursor> IQueueCache.TryGetCacheCursor(
@@ -186,13 +195,22 @@ namespace Orleans.Providers.Streams.Common
                 return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(cacheMiss);
             }
 
-            var cursor = new SimpleQueueCacheCursor(this, streamId, logger);
-            if (InitializeCursor(cursor, token) is { } racedCacheMiss)
+            SimpleQueueCacheCursor? cursor = new(this, streamId, logger);
+            try
             {
-                return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(racedCacheMiss);
-            }
+                if (InitializeCursor(cursor, token) is { } racedCacheMiss)
+                {
+                    return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(racedCacheMiss);
+                }
 
-            return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(cursor);
+                var result = QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(cursor);
+                cursor = null;
+                return result;
+            }
+            finally
+            {
+                cursor?.Dispose();
+            }
         }
 
         QueueCacheCursorResult<IQueueCacheCursor> IQueueCache.TryGetCacheCursorAtPosition(
@@ -239,9 +257,18 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException(nameof(startPosition), startPosition, "The subscription start position is not defined.");
             }
 
-            var cursor = new SimpleQueueCacheCursor(this, streamId, logger);
-            InitializeCursorAtEarliestAvailable(cursor);
-            return QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(cursor);
+            SimpleQueueCacheCursor? cursor = new(this, streamId, logger);
+            try
+            {
+                InitializeCursorAtEarliestAvailable(cursor);
+                var result = QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(cursor);
+                cursor = null;
+                return result;
+            }
+            finally
+            {
+                cursor?.Dispose();
+            }
         }
 
         private void InitializeCursorAtEarliestAvailable(SimpleQueueCacheCursor cursor)
