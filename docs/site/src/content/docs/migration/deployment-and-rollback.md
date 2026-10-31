@@ -13,6 +13,8 @@ Orleans 7 and later use a version-tolerant serializer, and Orleans grain version
 
 For a major-version upgrade, use a parallel or blue-green cluster by default. Treat a mixed-major rolling upgrade as unsupported until the exact runtime versions, providers, application contracts, and traffic patterns have passed your own qualification suite.
 
+For release-specific prerequisites, see [Upgrade Orleans 10.x to 11](10-to-11.md) or [Upgrade Orleans 9.x to 10.x](9-to-10.md). The Orleans 11 preview includes a default grain-directory transition and transport API changes; qualify those alongside provider data and application contracts.
+
 ## Rolling-upgrade prerequisites
 
 Before any rolling deployment, including an internally qualified cross-major deployment:
