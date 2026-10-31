@@ -87,6 +87,7 @@ Use <xref:Orleans.TestingHost.InProcessTestCluster> for most grain tests so acti
 Most grains only need a contract, an implementation, a stable key, and regular request-response calls. Add specialized behavior only when the workload requires it:
 
 - [Request scheduling and reentrancy](request-scheduling.md)
+- [Model collections of grains](../how-to/model-grain-collections.md)
 - [Response streaming with IAsyncEnumerable](response-streaming.md)
 - [Grain timers](timers.md)
 - [Reminders](reminders.md)
