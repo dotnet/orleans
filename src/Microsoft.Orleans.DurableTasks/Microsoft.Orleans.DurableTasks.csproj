@@ -41,9 +41,10 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Messaging\Orleans.Messaging.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.DurableTasks.Abstractions\Orleans.DurableTasks.Abstractions.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <!-- These packages share internals with this package, so it depends on their exact versions. -->
+    <ProjectReference Include="$(SourceRoot)src\Orleans.DurableTasks.Abstractions\Orleans.DurableTasks.Abstractions.csproj" PackExactVersion="true" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" PackExactVersion="true" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" PackExactVersion="true" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
   </ItemGroup>
 
