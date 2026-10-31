@@ -1,6 +1,6 @@
 ﻿#pragma warning disable
-[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.DependencyContract:OrleansCodeGen.TestProject.Codec_ComplexData", "1;0;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null23:TestProject.ComplexData0;0;0;")]
-[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.DependencyContract:OrleansCodeGen.TestProject.Copier_ComplexData", "1;0;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null23:TestProject.ComplexData0;0;0;")]
+[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.ReferenceVisibleContract:TestProject.ComplexData", "1:complete")]
+[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.ReferenceVisibleContract:TestProject.ComplexGrain", "1:opaque")]
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]

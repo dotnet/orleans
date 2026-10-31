@@ -1,7 +1,6 @@
 ﻿#pragma warning disable
-[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.DependencyContract:OrleansCodeGen.TestProject.Codec_ClassWithImplicitFieldIds", "1;0;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null37:TestProject.ClassWithImplicitFieldIds0;1;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null24:TestProject.MyCustomEnum0;0;")]
-[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.DependencyContract:OrleansCodeGen.TestProject.Copier_ClassWithImplicitFieldIds", "1;0;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null37:TestProject.ClassWithImplicitFieldIds0;0;0;")]
-[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.DependencyContract:OrleansCodeGen.TestProject.Codec_MyCustomEnum", "1;0;n66:TestProject, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null24:TestProject.MyCustomEnum0;0;0;")]
+[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.ReferenceVisibleContract:TestProject.ClassWithImplicitFieldIds", "1:complete")]
+[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.ReferenceVisibleContract:TestProject.MyCustomEnum", "1:complete")]
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]

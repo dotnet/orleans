@@ -277,7 +277,8 @@ internal sealed record SerializerEmissionPlan(
     ConstructionEmissionPlan Construction,
     EquatableArray<FieldEmissionPlan> Fields,
     EquatableArray<MemberEmissionPlan> Members,
-    EnumSerializerPlan? Enum);
+    EnumSerializerPlan? Enum,
+    string? ReferenceVisibleContract);
 
 internal sealed record CopierEmissionPlan(
     SerializableTypeEmissionPlan Type,
@@ -293,13 +294,11 @@ internal sealed record CopierEmissionPlan(
 // Project shared construction data without retaining the symbol-bearing service fields.
 internal sealed record ConstructionEmissionPlan(
     bool HasBaseContract,
-    EquatableArray<ConstructorParameterEmissionPlan> Parameters,
-    string? DependencyContract)
+    EquatableArray<ConstructorParameterEmissionPlan> Parameters)
 {
-    public static ConstructionEmissionPlan Create(GeneratedTypeConstruction construction, string? dependencyContract)
+    public static ConstructionEmissionPlan Create(GeneratedTypeConstruction construction)
         => new(construction.HasBaseContract, construction.Parameters.Select(static parameter =>
-            new ConstructorParameterEmissionPlan(CodeText.Type(parameter.Type), CodeText.Identifier(parameter.Name))).ToImmutableArray(),
-            dependencyContract);
+            new ConstructorParameterEmissionPlan(CodeText.Type(parameter.Type), CodeText.Identifier(parameter.Name))).ToImmutableArray());
 
     /// <summary>Appends <c>Type name, ...</c> for the constructor's parameter list.</summary>
     public void AppendParameters(StringBuilder builder)

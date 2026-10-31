@@ -194,6 +194,27 @@ public sealed class ReferencedSerializerContextTests
         await AssertAccepted(reference);
     }
 
+    [Fact]
+    public async Task FullModelAndReferenceImplementationsPreserveGenericArrayServiceSelection()
+    {
+        var references = await CompileProducer("[Id(0)] public T[] Value { get; set; }", generic: true,
+            frameworkVersion: "v10.0", hotReload: false, referenceAssembly: true, dynamicCodec: false, dynamicCopier: false);
+        var consumer = await TestCompilationHelper.CreateCompilation("""
+            [Orleans.GenerateSerializerContext<Producer.Payload<byte>>]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """, "ArrayConsumer", references);
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(new OrleansSerializationSourceGenerator().AsSourceGenerator());
+        driver = driver.RunGeneratorsAndUpdateCompilation(consumer, out var output, out _, TestContext.Current.CancellationToken);
+        Assert.Empty(driver.GetRunResult().Diagnostics);
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var generated = string.Join("\n", driver.GetRunResult().Results.SelectMany(static result => result.GeneratedSources)
+            .Select(static source => source.SourceText.ToString()));
+        Assert.Contains("ArrayCodec<byte>", generated, StringComparison.Ordinal);
+        Assert.Contains("ArrayCopier<byte>", generated, StringComparison.Ordinal);
+        Assert.Contains("ByteArrayCodec", generated, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("v8.0", false, true, false)]
     [InlineData("v8.0", false, true, true)]
@@ -336,13 +357,13 @@ public sealed class ReferencedSerializerContextTests
         var implementations = CSharpCompilation.Create("ReferencedContextProducer",
             compilation.SyntaxTrees.Skip(1), compilation.References.Append(contractsReference),
             (CSharpCompilationOptions)compilation.Options);
-        // This split fixture models legacy producers, before reference-visible dependency contracts.
+        // This split fixture supplies full model metadata alongside legacy reference-only implementations.
         foreach (var tree in implementations.SyntaxTrees.ToArray())
         {
             var root = (CompilationUnitSyntax)tree.GetRoot(TestContext.Current.CancellationToken);
             implementations = implementations.ReplaceSyntaxTree(tree, tree.WithRootAndOptions(
                 root.WithAttributeLists(SyntaxFactory.List(root.AttributeLists.Where(static attribute =>
-                    !attribute.ToString().Contains(SerializerDependencyContract.KeyPrefix, StringComparison.Ordinal)))), tree.Options));
+                    !attribute.ToString().Contains(ReferenceVisibleSerializationContract.KeyPrefix, StringComparison.Ordinal)))), tree.Options));
         }
 
         return [contractsReference, EmitReference(implementations, metadataOnly: true)];

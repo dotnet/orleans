@@ -210,19 +210,8 @@ internal static class GeneratedSourceOutput
             members.Add(writer => ActivatorGenerator.Write(writer, activator));
         }
 
-        var contracts = new List<string>(2);
-        if (serializer.Construction.DependencyContract is { } serializerContract)
-        {
-            contracts.Add(serializerContract);
-        }
-
-        if (copier?.Construction.DependencyContract is { } copierContract)
-        {
-            contracts.Add(copierContract);
-        }
-
         return CreateSerializableSourceEntry(assemblyName, typeName, metadataIdentity, hintGeneratedNamespace, genericArity,
-            generatedNamespace, contracts, [.. members]);
+            generatedNamespace, serializer.ReferenceVisibleContract is { } contract ? [contract] : null, [.. members]);
     }
 
     internal static GeneratedSourceEntry CreateSerializableSourceEntry(

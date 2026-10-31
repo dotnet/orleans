@@ -83,11 +83,10 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         return new(typePlan ?? SerializableTypeEmissionPlan.Create(type, LibraryTypes),
             CodeText.Type((type.IsAbstractType ? LibraryTypes.AbstractTypeSerializer : LibraryTypes.FieldCodec_1).ToTypeSyntax(type.TypeSyntax)),
             serializerInterface is not null ? CodeText.Type(serializerInterface.ToTypeSyntax(type.TypeSyntax)) : null,
-            ConstructionEmissionPlan.Create(construction,
-                SerializerDependencyContract.CreateAttribute(type,
-                    fieldDescriptions.OfType<CodecFieldDescription>().Select(static field => field.UnderlyingType), GetSimpleClassName(type.Name))),
+            ConstructionEmissionPlan.Create(construction),
             fieldDescriptions.Select(FieldEmissionPlan.Create).ToImmutableArray(), memberPlans,
-            type.IsEnumType ? EnumSerializerGenerator.CreatePlan(type, LibraryTypes) : null);
+            type.IsEnumType ? EnumSerializerGenerator.CreatePlan(type, LibraryTypes) : null,
+            ReferenceVisibleSerializationContract.CreateAttribute(type, LibraryTypes));
     }
 
     internal static void Write(SourceWriter writer, SerializerEmissionPlan plan)
