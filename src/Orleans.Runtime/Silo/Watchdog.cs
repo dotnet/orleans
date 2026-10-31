@@ -199,31 +199,23 @@ namespace Orleans.Runtime
 
         public void Dispose()
         {
-            try
+            lock (_cancellation)
             {
+                if (_cancellation.IsCancellationRequested) return;
+
                 _cancellation.Cancel();
-            }
-            catch
-            {
-                // Ignore.
-            }
+                // Startup can fail before either thread is started.
+                if (_componentWatchdogThread is { IsAlive: true } componentThread)
+                {
+                    componentThread.Join();
+                }
 
-            try
-            {
-                _componentWatchdogThread?.Join();
-            }
-            catch
-            {
-                // Ignore.
-            }
+                if (_platformWatchdogThread is { IsAlive: true } platformThread)
+                {
+                    platformThread.Join();
+                }
 
-            try
-            {
-                _platformWatchdogThread?.Join();
-            }
-            catch
-            {
-                // Ignore.
+                _cancellation.Dispose();
             }
         }
 
