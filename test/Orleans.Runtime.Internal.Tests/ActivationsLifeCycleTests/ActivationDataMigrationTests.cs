@@ -1,11 +1,13 @@
 #nullable enable
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
+using Orleans.Diagnostics;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Placement.Repartitioning;
@@ -902,12 +904,73 @@ public class ActivationDataMigrationTestsRuntimeMetrics
     }
 
     /// <summary>
-    /// A deactivation request before the activation starts leaves nothing to construct. Teardown starts at Disposing.
+    /// Forced disposal which preempts rehydration after the activation takes its migration context, but before migration participants run,
+    /// skips the participants and releases the context.
     /// </summary>
     [Fact]
-    public async Task Runtime_DeactivationBeforeStart_SkipsConstruction()
+    public async Task Runtime_ForcedDisposalDuringRehydration_SkipsParticipants()
     {
-        await using var fixture = new MetricsFixture("deactivate-before-start");
+        await using var fixture = new MetricsFixture("directory-rehydrate");
+        await fixture.InitializeAsync();
+        var services = fixture.PrimaryServices;
+        var control = services.GetRequiredService<LifecycleControl>();
+        var id = GetCall(fixture.GrainFactory, "ordinary", 705).Reference.GrainId;
+        var migrationContext = new MigrationContext(services.GetRequiredService<SerializerSessionPool>());
+        var disposal = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+        ActivationData? activation = null;
+
+        // The rehydrate span starts after the activation takes its migration context and before migration participants run.
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = static source => source.Name == ActivitySources.LifecycleActivitySourceName,
+            Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStarted = started =>
+            {
+                if (started.OperationName == ActivityNames.ActivationRehydrate && Volatile.Read(ref activation) is { } target)
+                {
+                    disposal.TrySetResult(target.DisposeAsync().AsTask());
+                }
+            },
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        Volatile.Write(ref activation, Assert.IsType<ActivationData>(services.GetRequiredService<Catalog>()
+            .GetOrCreateActivation(id, null, new GrainMigrationPackage { GrainId = id, MigrationContext = migrationContext })));
+        try
+        {
+            var registration = await control.DirectoryEntered.Task.WaitAsync(Timeout, TestCancellation);
+            control.DirectoryResponse.TrySetResult(registration);
+            await (await disposal.Task.WaitAsync(Timeout, TestCancellation)).WaitAsync(Timeout, TestCancellation);
+
+            // Setup stops in the same turn in which disposal preempted it.
+            await activation!.RunOrQueueTask(() => Task.CompletedTask).WaitAsync(Timeout, TestCancellation);
+            Assert.Equal(ActivationState.Destroyed, activation.State);
+            Assert.Equal(["register"], control.Events);
+            Assert.Equal(0, control.ActivationInvocations);
+            Assert.Equal(1, control.ScopeDisposed);
+        }
+        finally
+        {
+            control.DirectoryResponse.TrySetResult(null);
+            if (activation is not null)
+            {
+                // Forced disposal disposes resources only. Its caller removes the activation from the catalog.
+                await activation.DisposeAsync();
+                services.GetRequiredService<Catalog>().UnregisterMessageTarget(activation);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A deactivation request before the activation starts leaves nothing to construct. Teardown starts at Disposing, whether the
+    /// activation operation was queued before or after the deactivation operation.
+    /// </summary>
+    [Theory]
+    [InlineData("deactivate-before-start")]
+    [InlineData("activate-then-deactivate-before-start")]
+    public async Task Runtime_DeactivationBeforeStart_SkipsConstruction(string mode)
+    {
+        await using var fixture = new MetricsFixture(mode);
         await fixture.InitializeAsync();
         var services = fixture.PrimaryServices;
         var control = services.GetRequiredService<LifecycleControl>();
@@ -1805,8 +1868,14 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             context.SetComponent<IActivationLifecycleObserver>(control);
             _ = context.ActivationServices.GetRequiredService<ScopeSentinel>();
 
-            // Configuration runs before the context starts.
-            if (control.Mode == "deactivate-before-start")
+            // Configuration runs before the context starts. The catalog activates the context once it is created, so activating here queues
+            // the activation operation ahead of the deactivation operation.
+            if (control.Mode == "activate-then-deactivate-before-start")
+            {
+                context.Activate(null);
+            }
+
+            if (control.Mode is "deactivate-before-start" or "activate-then-deactivate-before-start")
             {
                 context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Deactivated before start."));
             }

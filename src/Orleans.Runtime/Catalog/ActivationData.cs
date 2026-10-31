@@ -539,8 +539,9 @@ internal sealed partial class ActivationData :
         Debug.Assert(completed is > ActivationState.None and < ActivationState.Active);
         lock (_lock)
         {
-            // Only forced disposal changes the state while setup runs.
-            Debug.Assert(State == completed || State.IsDisposingOrDestroyed());
+            // Only forced disposal changes the state while setup runs. A deactivation requested before the activation starts skips construction,
+            // so an activation operation which was queued before that request finds the activation in None.
+            Debug.Assert(State == completed || State.IsDisposingOrDestroyed() || State is ActivationState.None && IsDeactivationRequested);
             if (State != completed || IsDeactivationRequested)
             {
                 return false;
@@ -1724,6 +1725,13 @@ internal sealed partial class ActivationData :
 
             lock (_lock)
             {
+                // Forced disposal enters Disposing under this lock before it disposes the grain and its services, so participants
+                // rehydrate only while the activation is still Rehydrating. The context is released below either way.
+                if (State is not ActivationState.Rehydrating)
+                {
+                    return;
+                }
+
                 if (_lifecycle is { } lifecycle)
                 {
                     foreach (var participant in lifecycle.GetMigrationParticipants())

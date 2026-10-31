@@ -201,6 +201,11 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
         await activation.DisposeAsync().AsTask().WaitAsync(Timeout, Cancellation);
         Assert.Equal(ActivationState.Destroyed, activation.State);
 
+        // Forced disposal disposes resources only. Its caller removes the activation from the catalog, as ActivationDirectory disposal does.
+        Assert.False(activation.Deactivated.IsCompleted);
+        fixture.Catalog.UnregisterMessageTarget(activation);
+        Assert.False(fixture.HostedCluster.TryGetGrainContext(activation.GrainId, out _));
+
         // OnActivateAsync returns into a disposed activation, which neither becomes active nor stops its lifecycle.
         // Later callbacks are recorded without waiting, so a wrongly run lifecycle stop is observed rather than blocked.
         executor.Gate.ReleaseAll();
