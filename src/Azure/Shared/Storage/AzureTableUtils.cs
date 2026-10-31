@@ -83,7 +83,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             while (exc != null && exc is not RequestFailedException)
             {
-                exc = exc?.InnerException?.GetBaseException();
+                exc = exc.InnerException?.GetBaseException();
             }
 
             return (exc as RequestFailedException)?.ErrorCode;

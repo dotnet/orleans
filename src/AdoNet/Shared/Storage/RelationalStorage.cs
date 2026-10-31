@@ -320,17 +320,12 @@ namespace Orleans.Tests.SqlUtils
 
                     _databaseCommandInterceptor.Intercept(command);
 
-                    Task<Tuple<IEnumerable<TResult>, int>> ret;
                     if (_isSynchronousAdoNetImplementation)
                     {
-                        ret = Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), CancellationToken.None);
-                    }
-                    else
-                    {
-                        ret = executor(command, selector, commandBehavior, cancellationToken);
+                        return await Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), CancellationToken.None).ConfigureAwait(false);
                     }
 
-                    return await ret.ConfigureAwait(continueOnCapturedContext: false);
+                    return await executor(command, selector, commandBehavior, cancellationToken).ConfigureAwait(false);
                 }
             }
         }

@@ -602,7 +602,9 @@ namespace Orleans.Transactions.State
                     timeStamp,
                     confirmStatus,
                     queueEntryFound: true,
+#pragma warning disable CA1508 // The catch sets UnknownException before this finally executes when persistence fails.
                     succeeded: confirmStatus == TransactionalStatus.Ok,
+#pragma warning restore CA1508
                     identity: diagnosticIdentity);
             }
         }

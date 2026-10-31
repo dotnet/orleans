@@ -286,7 +286,7 @@ namespace Orleans
             }
             else
             {
-                this.TransactionInfo = transactionInfo?.Fork();
+                this.TransactionInfo = transactionInfo.Fork();
             }
 
             return transactionInfo;
