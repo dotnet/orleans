@@ -103,6 +103,55 @@ public class TestClusterPortAllocatorTests
         Assert.Equal(port, thirdAllocator.GetAvailableConsecutiveServerPorts([], port, port + 1, consecutivePortsToCheck: 1));
     }
 
+    [Fact]
+    public async Task ConcurrentReservations_StayExclusiveAndReleaseBeforeQueuedReacquisition()
+    {
+        var port = GetAvailablePort(30_001, 32_768);
+        var allocators = Enumerable.Range(0, 8).Select(_ => new TestClusterPortAllocator()).ToArray();
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reservations = allocators.Select(allocator => Task.Run(async () =>
+        {
+            await start.Task;
+            try
+            {
+                return allocator.GetAvailableConsecutiveServerPorts([], port, port + 1, consecutivePortsToCheck: 1) == port;
+            }
+            catch (InvalidOperationException exception)
+            {
+                Assert.Contains($"range [{port}, {port + 1}) after 100 attempts", exception.Message);
+                Assert.Contains("reservation held by another process=0", exception.Message);
+                Assert.Contains("reservation error=0", exception.Message);
+                return false;
+            }
+        })).ToArray();
+
+        try
+        {
+            start.SetResult();
+            var results = await Task.WhenAll(reservations).WaitAsync(TestContext.Current.CancellationToken);
+            var winner = Assert.Single(Enumerable.Range(0, results.Length), index => results[index]);
+            allocators[winner].Dispose();
+
+            using var verifier = new TestClusterPortAllocator();
+            Assert.Equal(port, verifier.GetAvailableConsecutiveServerPorts([], port, port + 1, consecutivePortsToCheck: 1));
+        }
+        finally
+        {
+            start.TrySetResult();
+            try
+            {
+                await Task.WhenAll(reservations);
+            }
+            finally
+            {
+                foreach (var allocator in allocators)
+                {
+                    allocator.Dispose();
+                }
+            }
+        }
+    }
+
     private static int GetAvailablePort(int rangeStart, int rangeEnd, int excludedPort = -1)
     {
         for (var port = rangeStart; port < rangeEnd; port++)

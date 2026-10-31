@@ -323,7 +323,7 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
         {
             var result = new[] { MutexAcquisitionResult.HeldByCurrentProcess };
             var acquiredByRequest = new[] { false };
-            var signal = new ManualResetEventSlim(initialState: false);
+            var signal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             ExceptionDispatchInfo? error = null;
             _workItems.Add(() =>
             {
@@ -387,11 +387,16 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
                 }
                 finally
                 {
-                    signal.Set();
+                    signal.SetResult();
                 }
             });
 
-            if (!signal.Wait(TimeSpan.FromSeconds(10)))
+            try
+            {
+                // Port allocation is synchronous; named mutex acquisition runs on its thread-affine worker.
+                signal.Task.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+            }
+            catch (TimeoutException)
             {
                 // The acquisition remains queued and can complete after this caller gives up.
                 // Queue conditional cleanup behind it so only a mutex acquired by this request is released.
