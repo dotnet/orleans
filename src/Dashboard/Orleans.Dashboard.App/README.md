@@ -37,7 +37,7 @@ Orleans.Dashboard.App/
 
 ```bash
 cd src/Dashboard/Orleans.Dashboard.App
-npm install
+npm run restore -- --prefer-offline --no-audit
 ```
 
 ### Development Server
@@ -81,13 +81,20 @@ npm run preview
 
 The frontend application is automatically built when you build the Orleans.Dashboard C# project. The build process is managed by `Orleans.Dashboard.Frontend.targets` which:
 
-1. Runs `npm ci` when dependency manifests, npm configuration, or Node.js/npm versions change, or when the installed dependency stamp is missing.
+1. Runs `npm run restore` to install the locked dependency tree when dependency manifests, the installer script, npm configuration, or Node.js/npm versions change, or when the installed dependency stamp is missing.
 2. Runs `npm run build` when source paths or content, build configuration, or dependencies change, or when a previously built asset is missing.
 3. Embeds every built asset as a resource in the Orleans.Dashboard assembly.
 
 Source edits reuse installed dependencies. Multi-framework builds share one frontend build. Clean and Rebuild refresh the compiled frontend while retaining the stamped `node_modules` dependency tree. Remove `node_modules` to request a fresh installation.
 
 Every outer build refreshes dependency identity and configuration using three discovery commands: `node --version`, `npm --version`, and a scoped `npm config get`. These commands run once across all target frameworks, including on unchanged builds, keeping tool and configuration changes visible while retaining their subprocess startup and execution cost.
+
+`npm run restore` uses the configured npm registry and cache. The .NET build supplies
+bounded request retries, and the installer makes up to three clean-install attempts
+when npm reports `ECONNRESET`, including resets while streaming a response body.
+Each failed attempt prints npm's error and debug log; persistent failures fail the
+build. Lifecycle scripts execute as part of the installation, and their failures
+are reported immediately. The installer regression tests run with `npm run test:install`.
 
 ## Migration from Browserify
 

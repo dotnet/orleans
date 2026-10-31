@@ -53,7 +53,7 @@ jobs:
       with:
         nuget: 'false'
         npm: 'true'
-    - run: npm ci --no-audit --no-fund
+    - run: npm run restore -- --no-audit --no-fund --prefer-offline --fetch-retries=5 --fetch-retry-factor=3 --fetch-retry-mintimeout=5000 --fetch-retry-maxtimeout=15000
     - run: npx playwright install --with-deps chromium
     - run: npm run test:ui
   whitespace:
@@ -101,6 +101,9 @@ jobs:
     - name: Test Dashboard frontend incrementality
       shell: pwsh
       run: ./.github/scripts/test-dashboard-frontend.ps1
+    - name: Test Dashboard npm installation
+      working-directory: src/Dashboard/Orleans.Dashboard.App
+      run: npm run test:install
     - name: Build
       run: dotnet build -bl
     - name: Pack and validate package compatibility

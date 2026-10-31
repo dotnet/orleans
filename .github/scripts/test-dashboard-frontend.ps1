@@ -36,7 +36,7 @@ function Set-ToolState {
 function Assert-Commands {
     param([int] $Installs, [int] $Builds)
     $commands = @(Get-Content (Join-Path $caseRoot 'commands.log'))
-    Assert-Equal "installs=$Installs;builds=$Builds" "installs=$(@($commands | Where-Object { $_ -eq 'ci' }).Count);builds=$(@($commands | Where-Object { $_ -eq 'run build' }).Count)"
+    Assert-Equal "installs=$Installs;builds=$Builds" "installs=$(@($commands | Where-Object { $_ -eq 'run restore' }).Count);builds=$(@($commands | Where-Object { $_ -eq 'run build' }).Count)"
 }
 
 function Assert-Discovery {
@@ -46,7 +46,7 @@ function Assert-Discovery {
         'npm --version'
         'npm config get userconfig globalconfig omit include ignore-scripts legacy-peer-deps install-links bin-links install-strategy'
     )
-    $probes = @(Get-Content (Join-Path $caseRoot 'probes.log') | Where-Object { $_ -notlike 'npm ci *' -and $_ -ne 'npm run build' })
+    $probes = @(Get-Content (Join-Path $caseRoot 'probes.log') | Where-Object { $_ -notlike 'npm run restore *' -and $_ -ne 'npm run build' })
     Assert-Equal (($expected * $Builds) -join '|') ($probes -join '|')
 }
 
@@ -87,6 +87,7 @@ function Test-Case {
     Set-ToolState @{}
     Write-TestFile (Join-Path $appRoot 'package.json') '{"name":"test","version":"1.0.0"}'
     Write-TestFile (Join-Path $appRoot 'package-lock.json') '{"lockfileVersion":3}'
+    Write-TestFile (Join-Path $appRoot 'scripts\install.mjs') '// installer fixture'
     Write-TestFile (Join-Path $appRoot '.npmrc') 'registry=https://example.invalid/'
     Write-TestFile (Join-Path $appRoot 'src\main.ts') 'console.log("dashboard")'
     Write-TestFile (Join-Path $appRoot 'src\removed.ts') 'export const removed = true'
@@ -148,13 +149,19 @@ switch (args[0]) {
         }
         break;
     }
-    case 'ci':
-        log('commands.log', 'ci');
-        fs.mkdirSync('node_modules', { recursive: true });
-        if (state.FailInstall) process.exit(17);
-        fs.writeFileSync('node_modules/.package-lock.json', '{}');
-        break;
     case 'run':
+        if (args[1] === 'restore') {
+            const expected = ['--', '--prefer-offline', '--no-audit', '--fetch-retries=5',
+                '--fetch-retry-factor=3', '--fetch-retry-mintimeout=5000', '--fetch-retry-maxtimeout=15000'];
+            if (JSON.stringify(args.slice(2)) !== JSON.stringify(expected)) {
+                throw new Error('Unexpected restore arguments: ' + args);
+            }
+            log('commands.log', 'run restore');
+            fs.mkdirSync('node_modules', { recursive: true });
+            if (state.FailInstall) process.exit(17);
+            fs.writeFileSync('node_modules/.package-lock.json', '{}');
+            break;
+        }
         if (args[1] !== 'build') throw new Error('Unexpected npm command: ' + args);
         log('commands.log', 'run build');
         fs.rmSync('dist', { recursive: true, force: true });
@@ -250,6 +257,15 @@ try {
         Set-ToolState @{ NpmVersion = '12.0.0' }
         Invoke-Build
         Assert-Commands 3 3
+    }
+
+    Test-Case 'InstallerScriptChangesReinstall' {
+        Invoke-Build
+        Write-TestFile (Join-Path $appRoot 'scripts\install.mjs') '// changed installer fixture'
+        Invoke-Build
+        Assert-Commands 2 2
+        Invoke-Build
+        Assert-Commands 2 2
     }
 
     Test-Case 'InstallStrategyEnvironmentChangeReinstalls' {

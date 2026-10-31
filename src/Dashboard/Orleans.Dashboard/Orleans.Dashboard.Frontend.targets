@@ -39,7 +39,7 @@
       <_NpmConfigPaths Include="@(_NpmInstallConfig)" Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(Identity)', '^(userconfig|globalconfig)='))">
         <ConfigPath>$([System.Text.RegularExpressions.Regex]::Replace('%(Identity)', '^[^=]*=', ''))</ConfigPath>
       </_NpmConfigPaths>
-      <_NpmInstallFiles Include="$(NpmAppRootDirectory)\package.json;$(NpmAppRootDirectory)\package-lock.json" />
+      <_NpmInstallFiles Include="$(NpmAppRootDirectory)\package.json;$(NpmAppRootDirectory)\package-lock.json;$(NpmAppRootDirectory)\scripts\install.mjs" />
       <_NpmInstallFiles Include="$(NpmAppRootDirectory)\.npmrc" Condition="Exists('$(NpmAppRootDirectory)\.npmrc')" />
       <_NpmInstallFiles Include="@(_NpmConfigPaths->'%(ConfigPath)')" Condition="Exists('%(_NpmConfigPaths.ConfigPath)')" />
     </ItemGroup>
@@ -66,26 +66,20 @@
       <NpmFetchRetryArgs>--fetch-retries=5 --fetch-retry-factor=3 --fetch-retry-mintimeout=5000 --fetch-retry-maxtimeout=15000</NpmFetchRetryArgs>
     </PropertyGroup>
 
-    <!-- npm's fetch retry settings apply only to idempotent registry reads which fail
-         because of network errors or HTTP 5xx responses. Increasing that bounded retry
-         budget makes CI resilient to brief registry interruptions without retrying
-         deterministic dependency, lockfile, authentication, or lifecycle-script failures.
-         Keep these options on this command so registry policy remains separate from
-         resiliency tuning. -->
+    <!-- Keep request retry tuning separate from registry policy. The installer also
+         handles ECONNRESET during response-body streaming and retains npm diagnostics.
+         Its exit code is authoritative: debug-log stack traces from a recovered
+         attempt must remain output instead of becoming MSBuild errors. -->
     <Exec
-      Command="npm ci --prefer-offline --no-audit $(NpmFetchRetryArgs)"
+      Command="npm run restore -- --prefer-offline --no-audit $(NpmFetchRetryArgs)"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true"
       StandardOutputImportance="High"
       StandardErrorImportance="High"
+      IgnoreStandardErrorWarningFormat="true"
       IgnoreExitCode="true">
       <Output TaskParameter="ExitCode" PropertyName="NpmInstallExitCode" />
     </Exec>
-
-    <Message
-      Condition="'$(NpmInstallExitCode)' == '152' and $([MSBuild]::IsOSPlatform('Linux'))"
-      Importance="High"
-      Text="npm ci exit code 152 can result from ECONNRESET (errno -104 modulo 256) or SIGXCPU (128 + signal 24) on Linux. Use the npm output and resource snapshot to investigate the cause." />
 
     <Exec
       Condition="'$(NpmInstallExitCode)' != '0' and $([MSBuild]::IsOSPlatform('Linux'))"
@@ -99,7 +93,7 @@
     <Error
       Condition="'$(NpmInstallExitCode)' != '0'"
       Code="MSB3073"
-      Text="The command &quot;npm ci --prefer-offline --no-audit $(NpmFetchRetryArgs)&quot; exited with code $(NpmInstallExitCode)." />
+      Text="The command &quot;npm run restore -- --prefer-offline --no-audit $(NpmFetchRetryArgs)&quot; exited with code $(NpmInstallExitCode). See the npm error and debug log above." />
 
     <WriteLinesToFile File="$(NpmAppInstallMarker)" Lines="$(_NpmInstallFingerprint)" Overwrite="true" />
   </Target>
