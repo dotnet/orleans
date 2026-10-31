@@ -23,14 +23,16 @@ public class LifecycleCallbackCancellationTests(LifecycleCallbackCancellationTes
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
     [Theory]
-    [InlineData(LifecycleCallback.OnActivateAsync)]
-    [InlineData(LifecycleCallback.LifecycleStart)]
-    public async Task CanceledActivation_AwaitsCallbackBeforeReleasingActivation(LifecycleCallback callback)
+    [InlineData(LifecycleCallback.OnActivateAsync, false)]
+    [InlineData(LifecycleCallback.OnActivateAsync, true)]
+    [InlineData(LifecycleCallback.LifecycleStart, false)]
+    public async Task CanceledActivation_AwaitsCallbackBeforeReleasingActivation(LifecycleCallback callback, bool cancelCallback)
     {
         var grain = fixture.GetGrain(callback);
         var call = grain.Ping();
         var probe = await fixture.ReadProbe(grain);
         await probe.Entered.Task.WaitAsync(Timeout, Cancellation);
+        probe.CancelCallback = cancelCallback;
 
         // Deactivating during activation cancels the activation token, which is the token canceled by ActivationTimeout.
         probe.Context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Canceled during activation."), Cancellation);
@@ -38,9 +40,101 @@ public class LifecycleCallbackCancellationTests(LifecycleCallbackCancellationTes
 
         await call.WaitAsync(Timeout, Cancellation);
         Assert.True(probe.ScopeDisposed);
+        var activationCompleted = callback == LifecycleCallback.OnActivateAsync && !cancelCallback;
+        Assert.Equal(activationCompleted ? 1 : 0, probe.DeactivationCalls);
         Assert.Equal(
-            ["Created", "Deactivating", "CallbackCompleted", "Deactivated", "Created", "Activated"],
+            activationCompleted
+                ? ["Created", "Deactivating", "CallbackCompleted", "OnDeactivateAsync", "Deactivated", "Created", "Activated"]
+                : new[] { "Created", "Deactivating", "CallbackCompleted", "Deactivated", "Created", "Activated" },
             fixture.GetTimeline(grain));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ActivationTimeout_UsesCallbackOutcome(bool cancelCallback)
+    {
+        var grain = fixture.GetGrain(LifecycleCallback.OnActivateAsync);
+        var services = fixture.HostedCluster.Silos[0].ServiceProvider;
+        var activation = Assert.IsType<ActivationData>(services.GetRequiredService<GrainContextActivator>().CreateInstance(
+            new GrainAddress
+            {
+                GrainId = grain.GetGrainId(),
+                ActivationId = ActivationId.NewId(),
+                SiloAddress = fixture.HostedCluster.Silos[0].SiloAddress,
+            }));
+        using var cancellation = new CancellationTokenSource();
+        activation.Activate(null, cancellation.Token);
+        var probe = await fixture.ReadProbe(grain);
+        try
+        {
+            await probe.Entered.Task.WaitAsync(Timeout, Cancellation);
+            probe.CancelCallback = cancelCallback;
+
+            // The activation timeout cancels the activation token without requesting deactivation.
+            using var events = new DiagnosticEventCollector(GrainLifecycleEvents.ListenerName);
+            var activated = cancelCallback
+                ? null
+                : events.WaitForEventAsync(
+                    nameof(GrainLifecycleEvents.Activated),
+                    evt => evt.Payload is GrainLifecycleEvents.Activated a && ReferenceEquals(a.GrainContext, activation),
+                    Timeout,
+                    Cancellation);
+            cancellation.Cancel();
+            await probe.Canceled.Task.WaitAsync(Timeout, Cancellation);
+            Assert.False(probe.ScopeDisposed);
+            Assert.False(activation.Deactivated.IsCompleted);
+            probe.Release.TrySetResult();
+
+            if (activated is null)
+            {
+                await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+                Assert.Equal(["Created", "CallbackCompleted", "Deactivating", "Deactivated"], fixture.GetTimeline(grain));
+            }
+            else
+            {
+                await activated;
+                Assert.Equal(ActivationState.Active, activation.State);
+                Assert.Equal(0, probe.DeactivationCalls);
+                activation.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Deactivate a timed-out activation."), Cancellation);
+                await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+                Assert.Equal(
+                    ["Created", "CallbackCompleted", "Activated", "Deactivating", "OnDeactivateAsync", "Deactivated"],
+                    fixture.GetTimeline(grain));
+            }
+
+            Assert.True(probe.ScopeDisposed);
+            Assert.Equal(cancelCallback ? 0 : 1, probe.DeactivationCalls);
+        }
+        finally
+        {
+            probe.Release.TrySetResult();
+            activation.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Test cleanup."), Cancellation);
+            await activation.Deactivated.WaitAsync(Timeout, Cancellation);
+        }
+    }
+
+    [Fact]
+    public async Task DeactivationTimeout_StartsWhenDeactivationCallbacksCanRun()
+    {
+        var deactivationTimeout = TimeSpan.FromSeconds(1);
+        await using var isolated = new Fixture { ConfiguredDeactivationTimeout = deactivationTimeout };
+        await isolated.InitializeAsync();
+        var grain = isolated.GetGrain(LifecycleCallback.OnActivateAsync);
+        var call = grain.Ping();
+        var probe = await isolated.ReadProbe(grain);
+        await probe.Entered.Task.WaitAsync(Timeout, Cancellation);
+        probe.Context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Deactivation requested during activation."), Cancellation);
+        await probe.Canceled.Task.WaitAsync(Timeout, Cancellation);
+
+        // The runtime timer uses wall-clock time, so activation deliberately outlasts the deactivation timeout measured from the request.
+        await Task.Delay(deactivationTimeout * 2, Cancellation);
+        probe.Release.SetResult();
+        await probe.Context.Deactivated.WaitAsync(Timeout, Cancellation);
+        await call.WaitAsync(Timeout, Cancellation);
+
+        Assert.Equal(1, probe.DeactivationCalls);
+        Assert.False(probe.DeactivationTokenCanceledOnEntry);
     }
 
     [Theory]
@@ -61,7 +155,7 @@ public class LifecycleCallbackCancellationTests(LifecycleCallbackCancellationTes
         await call.WaitAsync(Timeout, Cancellation);
         Assert.True(probe.ScopeDisposed);
         Assert.Equal(
-            ["Created", "Activated", "Deactivating", "CallbackCompleted", "Deactivated", "Created", "Activated"],
+            ["Created", "Activated", "Deactivating", "OnDeactivateAsync", "CallbackCompleted", "Deactivated", "Created", "Activated"],
             fixture.GetTimeline(grain));
     }
 
@@ -141,6 +235,7 @@ public class LifecycleCallbackCancellationTests(LifecycleCallbackCancellationTes
     public sealed class Fixture : BaseInProcessTestClusterFixture
     {
         public static readonly TimeSpan DeactivationTimeout = TimeSpan.FromMilliseconds(1);
+        public TimeSpan ConfiguredDeactivationTimeout { get; init; } = DeactivationTimeout;
         public FakeTimeProvider CollectionTime { get; } = new();
         private LifecycleCallbackRegistry Registry => HostedCluster.Silos[0].ServiceProvider.GetRequiredService<LifecycleCallbackRegistry>();
 
@@ -164,7 +259,7 @@ public class LifecycleCallbackCancellationTests(LifecycleCallbackCancellationTes
                 silo.Services.AddSingleton<LifecycleCallbackRegistry>();
                 silo.Services.AddScoped<LifecycleCallbackProbe>();
                 silo.Services.AddKeyedSingleton<TimeProvider>(TimeProviderNames.ActivationManagement, CollectionTime);
-                silo.Services.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = DeactivationTimeout);
+                silo.Services.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = ConfiguredDeactivationTimeout);
             });
         }
 
@@ -294,9 +389,21 @@ public sealed class LifecycleCallbackProbe : IDisposable
     public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public TaskCompletionSource<CallbackObservation> Observation { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public bool ScopeDisposed { get; private set; }
+    public bool CancelCallback { get; set; }
+    public int DeactivationCalls { get; private set; }
+    public bool? DeactivationTokenCanceledOnEntry { get; private set; }
 
-    public Task Run(LifecycleCallback callback, CancellationToken cancellationToken) =>
-        _isFirstActivation && callback == _blockingCallback ? RunPastCancellation(cancellationToken) : Task.CompletedTask;
+    public Task Run(LifecycleCallback callback, CancellationToken cancellationToken)
+    {
+        if (callback == LifecycleCallback.OnDeactivateAsync)
+        {
+            DeactivationCalls++;
+            DeactivationTokenCanceledOnEntry = cancellationToken.IsCancellationRequested;
+            _timeline.Add("OnDeactivateAsync");
+        }
+
+        return _isFirstActivation && callback == _blockingCallback ? RunPastCancellation(cancellationToken) : Task.CompletedTask;
+    }
 
     public void Dispose() => ScopeDisposed = true;
 
@@ -316,6 +423,10 @@ public sealed class LifecycleCallbackProbe : IDisposable
             ReferenceEquals(_activations.FindTarget(Context.GrainId), Context),
             Context.Deactivated.IsCompleted,
             _timeline.ActivationCount));
+        if (CancelCallback)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
     }
 }
 
