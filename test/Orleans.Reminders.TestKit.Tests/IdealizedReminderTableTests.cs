@@ -424,6 +424,34 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     }
 
     [Fact]
+    public async Task Oracle_FreezeReads_CanTargetOneReadKind()
+    {
+        var grainId = NewGrainId("selective-stale-snapshot");
+        var original = await UpsertAsync(
+            NewEntry(grainId, "selective-stale-snapshot", BaseTime, TimeSpan.FromMinutes(1)),
+            nameof(Oracle_FreezeReads_CanTargetOneReadKind),
+            TestContext.Current.CancellationToken);
+
+        using (_oracle.FreezeReads(ReminderTableOperationKind.ReadRange))
+        {
+            var updated = await UpsertAsync(
+                NewEntry(grainId, "selective-stale-snapshot", BaseTime.AddMinutes(20), TimeSpan.FromMinutes(9)),
+                nameof(Oracle_FreezeReads_CanTargetOneReadKind),
+                TestContext.Current.CancellationToken);
+
+            var live = await ReminderTable.ReadRow(
+                grainId,
+                "selective-stale-snapshot",
+                TestContext.Current.CancellationToken);
+            Assert.NotNull(live);
+            Assert.Equal(updated, live.ETag);
+
+            var stale = await ReminderTable.ReadRows(0, 0, TestContext.Current.CancellationToken);
+            Assert.Equal(original, Assert.Single(stale.Reminders).ETag);
+        }
+    }
+
+    [Fact]
     public async Task Oracle_StopAsync_WithCanceledToken_IsObservable()
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);

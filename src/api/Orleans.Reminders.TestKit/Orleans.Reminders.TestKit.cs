@@ -30,6 +30,8 @@ namespace Orleans.Reminders.TestKit
 
         public System.IDisposable FreezeReads() { throw null; }
 
+        public System.IDisposable FreezeReads(ReminderTableOperationKind kind) { throw null; }
+
         public void InjectFailure(ReminderTableOperationKind kind, int count = 1, System.Func<System.Exception>? exceptionFactory = null) { }
 
         public static bool InRange(uint hash, uint begin, uint end) { throw null; }
