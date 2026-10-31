@@ -421,7 +421,7 @@ internal sealed class OrleansQueries
         });
     }
 
-    public async ValueTask<IStatement> GatewaysQuery(string clusterIdentifier, int status)
+    public async ValueTask<IStatement> GatewaysQuery(string clusterIdentifier, int status, CancellationToken cancellationToken = default)
     {
         // Filtering is only for the `proxy_port` filtering. We're already hitting the partition
         // and secondary index on status which both don't need "ALLOW FILTERING"
@@ -438,7 +438,8 @@ internal sealed class OrleansQueries
                 AND proxy_port > 0
             ALLOW FILTERING;
             """,
-            ConsistencyLevel.Quorum);
+            ConsistencyLevel.Quorum,
+            cancellationToken);
         return _membershipGatewaysQueryPreparedStatement.Bind(new
         {
             partition_key = clusterIdentifier,

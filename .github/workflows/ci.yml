@@ -92,6 +92,10 @@ jobs:
     - name: Pack and validate package compatibility
       if: matrix.os == 'ubuntu-latest'
       run: dotnet pack Orleans.slnx --configuration Debug --no-build --no-restore -bl:package_validation.binlog
+    - name: Test package consumers
+      if: matrix.os == 'ubuntu-latest'
+      shell: pwsh
+      run: ./.github/scripts/test-package-consumers.ps1 -Configuration Debug -SkipPack
     - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       continue-on-error: true
       with:
@@ -101,7 +105,8 @@ jobs:
           **/*.binlog
   test-redis:
     name: Redis provider tests
-    runs-on: ubuntu-latest
+    # dotnet-coverage requires libxml2.so.2, supplied by the Ubuntu 24.04 image.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -137,7 +142,7 @@ jobs:
       run: docker rm -f redis || true
   test-cassandra:
     name: Cassandra provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       CASSANDRA_IMAGE: cassandra:${{ matrix.dbversion }}
     strategy:
@@ -164,7 +169,7 @@ jobs:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
   test-postgres:
     name: PostgreSQL provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       POSTGRES_PASSWORD: postgres
@@ -206,7 +211,7 @@ jobs:
       run: docker rm -f postgres || true
   test-mariadb:
     name: MariaDB/MySQL provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # The official MariaDB 10.6 image is not published to GHCR. Prefer Google's Docker Hub
       # mirror, with Docker Hub as a fallback, and pin both references to the same digest.
@@ -270,7 +275,7 @@ jobs:
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
   test-sqlserver:
     name: Microsoft SQL Server provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       ACCEPT_EULA: "Y"
       MSSQL_PID: "Developer"
@@ -322,7 +327,7 @@ jobs:
       run: docker rm -f mssql || true
   test-sqlite:
     name: SQLite provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -337,7 +342,7 @@ jobs:
         provider: Sqlite
   test-azure-storage:
     name: Azure Storage provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -377,7 +382,7 @@ jobs:
       run: docker rm -f azurite || true
   test-azure-eventhubs:
     name: Azure Event Hubs provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -441,7 +446,7 @@ jobs:
       run: docker rm -f azurite || true
   test-azure-cosmosdb:
     name: Azure Cosmos DB provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -497,7 +502,7 @@ jobs:
         fi
   test-consul:
     name: Consul provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -526,7 +531,7 @@ jobs:
         provider: Consul
   test-zookeeper:
     name: ZooKeeper provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -560,7 +565,7 @@ jobs:
       run: docker rm -f zookeeper || true
   test-dynamodb:
     name: AWS DynamoDB provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       AWS_ACCESS_KEY_ID: root
@@ -607,7 +612,7 @@ jobs:
       run: docker rm -f dynamodb || true
   test-s3:
     name: AWS S3 provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -629,7 +634,7 @@ jobs:
         provider: S3
   test-sqs:
     name: AWS SQS provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       AWS_ACCESS_KEY_ID: root
@@ -691,7 +696,7 @@ jobs:
       run: docker rm -f dynamodb || true
   test-nats:
     name: NATS stream provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -737,7 +742,7 @@ jobs:
       run: docker rm -f nats || true
   test-kinesis:
     name: AWS Kinesis provider tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
       AWS_ACCESS_KEY_ID: test
@@ -805,7 +810,7 @@ jobs:
       fail-fast: false
       matrix:
         suite: [BVT, SlowBVT, Functional]
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-24.04, windows-latest]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -827,7 +832,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-24.04, windows-latest]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -839,7 +844,7 @@ jobs:
         framework: ${{ matrix.framework }}
   test-google:
     name: Google Cloud providers tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:

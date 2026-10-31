@@ -18,6 +18,155 @@ namespace Tester.Cassandra.Clustering;
 [TestCategory("BVT")]
 public sealed class CassandraMembershipTableInitializationTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Gateway_PreCanceled_DoesNotCreateSessionOrBootstrap(bool initialize)
+    {
+        var backend = new InitializationBackend();
+        using var provider = backend.CreateGateway(ownsSession: true);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => initialize
+            ? provider.InitializeGatewayListProviderAsync(cancellation.Token)
+            : provider.GetGatewaysAsync(cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(0, backend.FactoryCalls);
+        Assert.Equal(0, backend.SchemaChecks);
+        backend.Cluster.DidNotReceive().Dispose();
+    }
+
+    [Fact]
+    public async Task Gateway_CanceledDuringFactory_DisposesLateOwnedSession()
+    {
+        var backend = new InitializationBackend();
+        var creation = new TaskCompletionSource<ISession>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var disposed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.Cluster.When(cluster => cluster.Dispose()).Do(_ => disposed.TrySetResult());
+        using var provider = backend.CreateGateway(ownsSession: true, () => creation.Task);
+        using var cancellation = new CancellationTokenSource();
+        var initialize = provider.InitializeGatewayListProviderAsync(cancellation.Token);
+        Assert.Equal(1, backend.FactoryCalls);
+
+        cancellation.Cancel();
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Await(initialize));
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.False(creation.Task.IsCompleted);
+        provider.Dispose();
+        creation.SetResult(backend.Session);
+        await Await(disposed.Task);
+
+        Assert.Equal(0, backend.SchemaChecks);
+        backend.Cluster.Received(1).Dispose();
+        backend.Session.DidNotReceive().Dispose();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Gateway_CanceledDuringBootstrap_DisposesOnlyOwnedSession(bool ownsSession)
+    {
+        var backend = new InitializationBackend();
+        var schema = new TaskCompletionSource<RowSet>(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.SchemaRead = () => schema.Task;
+        using var provider = backend.CreateGateway(ownsSession);
+        using var cancellation = new CancellationTokenSource();
+        var initialize = provider.InitializeGatewayListProviderAsync(cancellation.Token);
+        Assert.Equal(1, backend.FactoryCalls);
+        Assert.Equal(1, backend.SchemaChecks);
+
+        cancellation.Cancel();
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Await(initialize));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.False(schema.Task.IsCompleted);
+        backend.Cluster.Received(ownsSession ? 1 : 0).Dispose();
+        provider.Dispose();
+        backend.Cluster.Received(ownsSession ? 1 : 0).Dispose();
+        backend.Session.DidNotReceive().Dispose();
+        schema.SetException(new InvalidOperationException("Late tokenless Cassandra schema failure."));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Gateway_InitializeAndDispose_RespectsSessionOwnershipAndLegacyApi(bool ownsSession, bool legacy)
+    {
+        var backend = new InitializationBackend();
+        using var provider = backend.CreateGateway(ownsSession);
+
+        if (legacy)
+        {
+            await ((IGatewayListProvider)provider).InitializeGatewayListProvider();
+        }
+        else
+        {
+            await provider.InitializeGatewayListProviderAsync(TestContext.Current.CancellationToken);
+        }
+
+        Assert.Equal(1, backend.FactoryCalls);
+        Assert.Equal(1, backend.SchemaChecks);
+        backend.Cluster.DidNotReceive().Dispose();
+        provider.Dispose();
+        provider.Dispose();
+        backend.Cluster.Received(ownsSession ? 1 : 0).Dispose();
+        backend.Session.DidNotReceive().Dispose();
+    }
+
+    [Theory]
+    [InlineData("Prepare")]
+    [InlineData("Execute")]
+    public async Task Gateway_CancellationDuringLookup_BoundsTokenlessSdkWait(string stage)
+    {
+        var backend = new InitializationBackend();
+        using var provider = backend.CreateGateway(ownsSession: false);
+        await provider.InitializeGatewayListProviderAsync(TestContext.Current.CancellationToken);
+        var prepared = new TaskCompletionSource<PreparedStatement>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var rows = new TaskCompletionSource<RowSet>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (stage == "Prepare")
+        {
+            backend.GatewayPrepare = () =>
+            {
+                entered.SetResult();
+                return prepared.Task;
+            };
+        }
+        else
+        {
+            backend.GatewayRead = () =>
+            {
+                entered.SetResult();
+                return rows.Task;
+            };
+        }
+
+        using var cancellation = new CancellationTokenSource();
+        var lookup = provider.GetGatewaysAsync(cancellation.Token);
+        await Await(entered.Task);
+        cancellation.Cancel();
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Await(lookup));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.False(stage == "Prepare" ? prepared.Task.IsCompleted : rows.Task.IsCompleted);
+        backend.Cluster.DidNotReceive().Dispose();
+        var lateFailure = new InvalidOperationException("Late tokenless Cassandra lookup failure.");
+        if (stage == "Prepare")
+        {
+            prepared.SetException(lateFailure);
+        }
+        else
+        {
+            rows.SetException(lateFailure);
+        }
+    }
+
+    private static Task Await(Task task) => task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
     [Fact]
     public async Task PointReads_Uninitialized_DoNotCreateSession()
     {
@@ -282,6 +431,8 @@ public sealed class CassandraMembershipTableInitializationTests
         public int Deletes { get; private set; }
         public int? Version { get; set; }
         public Func<Task<RowSet>>? SchemaRead { get; set; }
+        public Func<Task<PreparedStatement>>? GatewayPrepare { get; set; }
+        public Func<Task<RowSet>>? GatewayRead { get; set; }
         public string? CreateTableQuery { get; private set; }
 
         public InitializationBackend()
@@ -291,6 +442,11 @@ public sealed class CassandraMembershipTableInitializationTests
             Session.PrepareAsync(Arg.Any<string>()).Returns(call =>
             {
                 var query = call.Arg<string>();
+                if (query.Contains("proxy_port > 0", StringComparison.Ordinal) && GatewayPrepare is { } gatewayPrepare)
+                {
+                    return gatewayPrepare();
+                }
+
                 var prepared = Substitute.For<PreparedStatement>();
                 prepared.Bind(Arg.Any<object[]>()).Returns(_ =>
                 {
@@ -341,6 +497,11 @@ public sealed class CassandraMembershipTableInitializationTests
                     return Task.FromResult<RowSet>(new BufferedRowSet());
                 }
 
+                if (query.Contains("proxy_port > 0", StringComparison.Ordinal))
+                {
+                    return GatewayRead?.Invoke() ?? Task.FromResult<RowSet>(new BufferedRowSet());
+                }
+
                 throw new InvalidOperationException($"Unexpected initialization query: {query}");
             });
         }
@@ -369,6 +530,35 @@ public sealed class CassandraMembershipTableInitializationTests
 
             return new CassandraClusteringTable(
                 Options.Create(new ClusterOptions { ServiceId = "service", ClusterId = "cluster" }),
+                Options.Create(options),
+                Options.Create(new ClusterMembershipOptions()),
+                Substitute.For<IServiceProvider>());
+        }
+
+        public CassandraGatewayListProvider CreateGateway(bool ownsSession, Func<Task<ISession>>? factory = null)
+        {
+            var options = new CassandraClusteringOptions();
+            Task<ISession> CreateSession(IServiceProvider _)
+            {
+                FactoryCalls++;
+                return factory?.Invoke() ?? Task.FromResult(Session);
+            }
+
+            if (ownsSession)
+            {
+                options.ConfigureClient("127.0.0.1");
+                typeof(CassandraClusteringOptions)
+                    .GetProperty("CreateSessionAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .SetValue(options, (Func<IServiceProvider, Task<ISession>>)CreateSession);
+            }
+            else
+            {
+                options.ConfigureClient(CreateSession);
+            }
+
+            return new CassandraGatewayListProvider(
+                Options.Create(new ClusterOptions { ServiceId = "service", ClusterId = "cluster" }),
+                Options.Create(new GatewayOptions()),
                 Options.Create(options),
                 Options.Create(new ClusterMembershipOptions()),
                 Substitute.For<IServiceProvider>());

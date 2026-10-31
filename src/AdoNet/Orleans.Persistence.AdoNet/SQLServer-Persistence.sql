@@ -1,3 +1,6 @@
+-- Apply this script for setup and repeatable upgrades after the shared Main script creates OrleansQuery.
+-- Stop all silos using this database before applying it, then restart them to reload the queries.
+--
 -- The design criteria for this table are:
 --
 -- 1. It can contain arbitrary content serialized as binary, XML or JSON. These formats
@@ -43,7 +46,13 @@
 --
 -- 7. In the storage operations queries the columns need to be in the exact same order
 -- since the storage table operations support optionally streaming.
+--
+-- 8. The next Version wraps from 2147483647 back to 1 so a frequently written grain never overflows
+-- the 32-bit Version. Orleans compares versions only for equality, so the version must change on
+-- every write but does not need to increase forever. A stale version can only match again after
+-- 2147483647 further writes to the same grain.
 IF OBJECT_ID(N'[OrleansStorage]', 'U') IS NULL
+BEGIN
 CREATE TABLE OrleansStorage
 (
     -- These are for the book keeping. Orleans calculates
@@ -94,10 +103,13 @@ IF EXISTS (SELECT 1 FROM sys.dm_db_persisted_sku_features WHERE feature_id = 100
 BEGIN
     ALTER TABLE OrleansStorage REBUILD PARTITION = ALL WITH(DATA_COMPRESSION = PAGE);
 END
+END;
 
-INSERT INTO OrleansQuery(QueryKey, QueryText)
+MERGE INTO OrleansQuery AS target
+USING
+(
 SELECT
-    'WriteToStorageKey',
+    'WriteToStorageKey' AS QueryKey,
     '-- When Orleans is running in normal, non-split state, there will
     -- be only one grain with the given ID and type combination only. This
     -- grain saves states mostly serially if Orleans guarantees are upheld. Even
@@ -127,9 +139,9 @@ SELECT
         SET
             PayloadBinary = @PayloadBinary,
             ModifiedOn = GETUTCDATE(),
-            Version = Version + 1,
-            @NewGrainStateVersion = Version + 1,
-            @GrainStateVersion = Version + 1
+            Version = Version % 2147483647 + 1,
+            @NewGrainStateVersion = Version % 2147483647 + 1,
+            @GrainStateVersion = Version % 2147483647 + 1
         WHERE
             GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
             AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
@@ -192,15 +204,9 @@ SELECT
     END
 
     SELECT @NewGrainStateVersion AS NewGrainStateVersion;
-    COMMIT TRANSACTION;'
-WHERE NOT EXISTS 
-( 
-    SELECT 1 
-    FROM OrleansQuery oqt
-    WHERE oqt.[QueryKey] = 'WriteToStorageKey'
-);
+    COMMIT TRANSACTION;' AS QueryText
 
-INSERT INTO OrleansQuery(QueryKey, QueryText)
+UNION ALL
 SELECT
     'ClearStorageKey',
     'BEGIN TRANSACTION;
@@ -210,8 +216,8 @@ SELECT
     SET
         PayloadBinary = NULL,
         ModifiedOn = GETUTCDATE(),
-        Version = Version + 1,
-        @NewGrainStateVersion = Version + 1
+        Version = Version % 2147483647 + 1,
+        @NewGrainStateVersion = Version % 2147483647 + 1
     WHERE
         GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
         AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
@@ -225,14 +231,8 @@ SELECT
 
     SELECT @NewGrainStateVersion;
     COMMIT TRANSACTION;'
-WHERE NOT EXISTS 
-( 
-    SELECT 1 
-    FROM OrleansQuery oqt
-    WHERE oqt.[QueryKey] = 'ClearStorageKey'
-);
 
-INSERT INTO OrleansQuery(QueryKey, QueryText)
+UNION ALL
 SELECT
     'ReadFromStorageKey',
     '-- The application code will deserialize the relevant result. Not that the query optimizer
@@ -256,19 +256,13 @@ SELECT
         AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
         AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         OPTION(FAST 1, OPTIMIZE FOR(@GrainIdHash UNKNOWN, @GrainTypeHash UNKNOWN));'
-WHERE NOT EXISTS 
-( 
-    SELECT 1 
-    FROM OrleansQuery oqt
-    WHERE oqt.[QueryKey] = 'ReadFromStorageKey'
-);
 
-INSERT INTO OrleansQuery(QueryKey, QueryText)
+UNION ALL
 SELECT
     'DeleteStorageKey',
     'BEGIN TRANSACTION;
     SET XACT_ABORT, NOCOUNT ON;
-    DELETE FROM OrleansStorage OUTPUT DELETED.Version + 1
+    DELETE FROM OrleansStorage OUTPUT DELETED.Version % 2147483647 + 1
     WHERE
         GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
         AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
@@ -281,9 +275,7 @@ SELECT
         OPTION(FAST 1, OPTIMIZE FOR(@GrainIdHash UNKNOWN, @GrainTypeHash UNKNOWN));
 
     COMMIT TRANSACTION;'
-WHERE NOT EXISTS
-(
-    SELECT 1
-    FROM OrleansQuery oqt
-    WHERE oqt.[QueryKey] = 'DeleteStorageKey'
-);
+) AS source
+ON target.QueryKey = source.QueryKey
+WHEN MATCHED THEN UPDATE SET QueryText = source.QueryText
+WHEN NOT MATCHED THEN INSERT (QueryKey, QueryText) VALUES (source.QueryKey, source.QueryText);

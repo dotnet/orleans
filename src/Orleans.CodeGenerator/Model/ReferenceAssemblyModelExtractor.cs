@@ -12,6 +12,7 @@ internal static class ReferenceAssemblyModelExtractor
     /// Extracts reference-assembly metadata from the compilation using the provided code generation options.
     /// This isolates reference-assembly scanning into a cacheable pipeline step so that
     /// downstream work can be skipped when references don't change.
+    /// Type syntax is formatted on demand and shared by each type's metadata registrations.
     /// </summary>
     internal static ReferenceAssemblyModel ExtractReferenceAssemblyData(
         Compilation compilation,
@@ -91,16 +92,18 @@ internal static class ReferenceAssemblyModelExtractor
                     referencedProxyInterfaces.Add(proxyInterfaceModel);
                 }
 
-                var typeRef = new TypeRef(symbol.ToOpenTypeSyntax().ToString());
+                string? typeSyntax = null;
+                TypeRef GetTypeRef() => new(typeSyntax ??= symbol.ToOpenTypeSyntax().ToString());
+
                 if (GeneratedCodeUtilities.GetId(libraryTypes, symbol) is uint wellKnownTypeId)
                 {
-                    wellKnownTypeIds.Add(new WellKnownTypeIdModel(typeRef, wellKnownTypeId));
+                    wellKnownTypeIds.Add(new WellKnownTypeIdModel(GetTypeRef(), wellKnownTypeId));
                 }
 
                 if (symbol.GetAttribute(libraryTypes.AliasAttribute) is { ConstructorArguments.Length: > 0 } aliasAttr
                     && aliasAttr.ConstructorArguments[0].Value is string alias)
                 {
-                    typeAliases.Add(new TypeAliasModel(typeRef, alias));
+                    typeAliases.Add(new TypeAliasModel(GetTypeRef(), alias));
                 }
 
                 foreach (var compoundAlias in symbol.GetAttributes().Where(attribute =>
@@ -119,7 +122,7 @@ internal static class ReferenceAssemblyModelExtractor
                         continue;
                     }
 
-                    compoundTypeAliases.Add(new CompoundTypeAliasModel(components, typeRef));
+                    compoundTypeAliases.Add(new CompoundTypeAliasModel(components, GetTypeRef()));
                 }
 
                 if ((symbol.TypeKind == TypeKind.Class || symbol.TypeKind == TypeKind.Struct)
@@ -150,7 +153,7 @@ internal static class ReferenceAssemblyModelExtractor
                     {
                         if (iface.GetAttribute(libraryTypes.GenerateMethodSerializersAttribute, inherited: true) is not null)
                         {
-                            interfaceImplementations.Add(new InterfaceImplementationModel(typeRef, SymbolSourceLocationExtractor.GetSourceLocation(symbol)));
+                            interfaceImplementations.Add(new InterfaceImplementationModel(GetTypeRef(), SymbolSourceLocationExtractor.GetSourceLocation(symbol)));
                             break;
                         }
                     }

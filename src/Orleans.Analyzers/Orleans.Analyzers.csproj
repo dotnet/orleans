@@ -18,6 +18,7 @@
   <ItemGroup>
     <Compile Remove="GrainInterfaceVersionAnalyzer.cs" />
     <Compile Remove="GrainInterfaceVersionCodeFix.cs" />
+    <Compile Include="..\Orleans.Serialization.Abstractions\IdentityNameValidator.cs" Link="IdentityNameValidator.cs" />
     <Compile Include="..\Orleans.CodeGenerator.Shared\InvokableBaseTypeResolver.cs" Link="InvokableBaseTypeResolver.cs" />
     <Compile Include="..\Orleans.CodeGenerator.Shared\MethodIdProvider.cs" Link="MethodIdProvider.cs" />
     <Compile Include="..\Orleans.CodeGenerator\Hashing\BitOperations.cs" Link="Hashing\BitOperations.cs" />

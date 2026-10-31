@@ -59,6 +59,14 @@ Simulated environment statistics make resource-based tests deterministic, but th
 
 These defaults are defined by <xref:Orleans.TestingHost.InProcessTestClusterBuilder> and <xref:Orleans.TestingHost.InProcessTestClusterOptions>; see their [builder](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcTestClusterBuilder.cs) and [options](https://github.com/dotnet/orleans/blob/main/src/Orleans.TestingHost/InProcTestClusterOptions.cs) implementations.
 
+### Directory selection
+
+Setting <xref:Orleans.TestingHost.InProcessTestClusterOptions.UseDistributedGrainDirectory> to `true` selects the distributed default after the silo configuration delegates run, replacing any default selected by those delegates. Named directory registrations remain available.
+
+With this option set to `false`, test membership and the enabled test grain directory select the shared in-process test directory. When that substitution is inapplicable, such as with an external membership provider, the silo keeps its configured directory. An unconfigured silo uses the runtime's distributed default.
+
+To select `LegacyGrainDirectory`, set the option to `false` and call <xref:Orleans.Hosting.CoreHostingExtensions.UseLegacyGrainDirectory*> in <xref:Orleans.TestingHost.InProcessTestClusterBuilder.ConfigureSilo*> while using external membership or disabling the test-directory substitution. Host configuration delegates run before the harness's final silo setup, so declarative providers read the configuration supplied by those delegates.
+
 ## Configuration layers <a name="configure-the-test-cluster"></a>
 
 The builder separates three scopes:
@@ -79,7 +87,7 @@ Stopping a host gracefully exercises shutdown. Disposing or terminating a handle
 
 ## Class-configurator test cluster and custom silo creation <a name="use-the-testcluster"></a>
 
-<xref:Orleans.TestingHost.TestClusterBuilder> is the class-configurator-based harness. It defaults to two silos, in-memory transport, generated cluster identity, test membership, client initialization, file logging, and homogeneous-silo assumptions. It also installs `ConfigureDistributedGrainDirectory`, so its silos opt into the experimental distributed grain directory instead of the production runtime's default `LocalGrainDirectory`.
+<xref:Orleans.TestingHost.TestClusterBuilder> is the class-configurator-based harness. It defaults to two silos, in-memory transport, generated cluster identity, test membership, client initialization, file logging, and homogeneous-silo assumptions. It also installs `ConfigureDistributedGrainDirectory`, configuring its silos with the distributed grain directory.
 
 <xref:Orleans.TestingHost.ISiloConfigurator>, <xref:Orleans.TestingHost.IHostConfigurator>, and <xref:Orleans.TestingHost.IClientBuilderConfigurator> are serializable configuration identities which can be applied to every host. Assigning <xref:Orleans.TestingHost.TestClusterBuilder.CreateSiloAsync?displayProperty=nameWithType> sets <xref:Orleans.TestingHost.TestClusterOptions.ConnectionTransport?displayProperty=nameWithType> to `TcpSocket`, so the built-in client uses its TCP transport instead of the harness's in-memory transport. The delegate bypasses <xref:Orleans.TestingHost.TestCluster.DefaultCreateSiloAsync*> and cannot access the harness's private in-memory transport hub, so it must configure the custom silo host with a compatible transport.
 

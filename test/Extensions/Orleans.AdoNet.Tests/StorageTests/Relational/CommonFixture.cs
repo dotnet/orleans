@@ -168,5 +168,34 @@ namespace UnitTests.StorageTests.Relational
             await siloLifeCycle.OnStart(cancellationToken);
             return storageProvider;
         }
+
+        /// <summary>
+        /// Creates an uncached storage provider over a database prepared by the caller.
+        /// </summary>
+        public async Task<AdoNetGrainStorage> CreateStorageProviderAsync(
+            string storageInvariant,
+            string connectionString,
+            string serviceId,
+            bool deleteStateOnClear,
+            CancellationToken cancellationToken)
+        {
+            var options = new AdoNetGrainStorageOptions()
+            {
+                ConnectionString = connectionString,
+                Invariant = storageInvariant,
+                GrainStorageSerializer = new JsonGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<OrleansJsonSerializer>()!),
+                DeleteStateOnClear = deleteStateOnClear,
+            };
+            var storageProvider = new AdoNetGrainStorage(
+                DefaultProviderRuntime.ServiceProvider.GetRequiredService<IActivatorProvider>(),
+                DefaultProviderRuntime.ServiceProvider.GetRequiredService<ILogger<AdoNetGrainStorage>>(),
+                Options.Create(options),
+                Options.Create(new ClusterOptions { ServiceId = serviceId }),
+                $"{storageInvariant}_Uncached_StorageProvider");
+            ISiloLifecycleSubject siloLifeCycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
+            storageProvider.Participate(siloLifeCycle);
+            await siloLifeCycle.OnStart(cancellationToken);
+            return storageProvider;
+        }
     }
 }

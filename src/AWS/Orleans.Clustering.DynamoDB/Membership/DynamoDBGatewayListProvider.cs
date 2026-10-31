@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Clustering.DynamoDB
@@ -34,8 +35,11 @@ namespace Orleans.Clustering.DynamoDB
             this.MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
-        public Task InitializeGatewayListProvider()
+        public Task InitializeGatewayListProvider() => InitializeGatewayListProviderAsync(CancellationToken.None);
+
+        public Task InitializeGatewayListProviderAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.storage = new DynamoDBStorage(
                 this.logger,
                 this.options.Service,
@@ -59,11 +63,15 @@ namespace Orleans.Clustering.DynamoDB
                 {
                     new AttributeDefinition { AttributeName = SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
-                });
+                },
+                cancellationToken: cancellationToken);
         }
 
-        public async Task<IList<Uri>> GetGateways()
+        public Task<IList<Uri>> GetGateways() => GetGatewaysAsync(CancellationToken.None);
+
+        public async Task<IList<Uri>> GetGatewaysAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var expressionValues = new Dictionary<string, AttributeValue>
             {
                 { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
@@ -83,7 +91,8 @@ namespace Orleans.Clustering.DynamoDB
                             IPAddress.Parse(gateway[SiloInstanceRecord.ADDRESS_PROPERTY_NAME].S),
                                 int.Parse(gateway[SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME].N, NumberStyles.Integer, CultureInfo.InvariantCulture),
                                 int.Parse(gateway[SiloInstanceRecord.GENERATION_PROPERTY_NAME].N, NumberStyles.Integer, CultureInfo.InvariantCulture)).ToGatewayUri();
-                });
+                },
+                cancellationToken);
 
             return records;
         }

@@ -12,6 +12,7 @@ using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using static Orleans.Internal.StandardExtensions;
@@ -152,7 +153,23 @@ namespace Orleans
         {
             // Deliberately avoid capturing the current synchronization context during startup and execute on the default scheduler.
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
-            await Task.Run(() => this.StartInternal(cancellationToken), CancellationToken.None).ConfigureAwait(false);
+            try
+            {
+                await Task.Run(() => this.StartInternal(cancellationToken), CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // The client lifecycle starts after this method, so cancellation here owns network cleanup.
+                await StopObserverInvocationsAsync().ConfigureAwait(false);
+                await ServiceProvider.GetRequiredService<ConnectionManager>().Close(CancellationToken.None).ConfigureAwait(false);
+                if (MessageCenter is null)
+                {
+                    await ServiceProvider.GetRequiredService<GatewayManager>().StopAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+
+                await StopAsync(CancellationToken.None).ConfigureAwait(false);
+                throw;
+            }
 
             LogStartedClient(logger, CurrentActivationAddress, _localClientDetails.ClientId);
         }
@@ -214,14 +231,15 @@ namespace Orleans
             this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver!);
 
             await ExecuteWithRetries(
-                _manifestProvider!.StartAsync,
+                () => _manifestProvider!.StartAsync(cancellationToken),
                 retryFilter,
                 cancellationToken);
 
             static async Task ExecuteWithRetries(Func<Task> task, IClientConnectionRetryFilter? retryFilter, CancellationToken cancellationToken)
             {
-                do
+                while (true)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     try
                     {
                         await task();
@@ -229,14 +247,16 @@ namespace Orleans
                     }
                     catch (Exception exception) when (retryFilter is not null && !cancellationToken.IsCancellationRequested)
                     {
-                        var shouldRetry = await retryFilter.ShouldRetryConnectionAttempt(exception, cancellationToken);
-                        if (cancellationToken.IsCancellationRequested || !shouldRetry)
+                        var retry = retryFilter.ShouldRetryConnectionAttempt(exception, cancellationToken);
+                        retry.Ignore();
+                        var shouldRetry = await retry.WaitAsync(cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (!shouldRetry)
                         {
                             throw;
                         }
                     }
                 }
-                while (!cancellationToken.IsCancellationRequested);
             }
         }
 

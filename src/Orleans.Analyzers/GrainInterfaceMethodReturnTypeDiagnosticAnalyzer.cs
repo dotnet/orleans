@@ -60,16 +60,17 @@ namespace Orleans.Analyzers
                     context.Compilation.Assembly.GlobalNamespace,
                     baseInterface,
                     generateMethodSerializersAttribute);
+                var methodContexts = IndexMethodContexts(proxyContexts);
                 var resolver = new InvokableBaseTypeResolver(context.Compilation);
                 context.RegisterSymbolAction(
-                    context => AnalyzeMethod(context, proxyContexts, resolver),
+                    context => AnalyzeMethod(context, methodContexts, resolver),
                     SymbolKind.Method);
             });
         }
 
         private static void AnalyzeMethod(
             SymbolAnalysisContext context,
-            ImmutableArray<ProxyContext> proxyContexts,
+            Dictionary<INamedTypeSymbol, List<MethodContext>> methodContexts,
             InvokableBaseTypeResolver resolver)
         {
             var symbol = (IMethodSymbol)context.Symbol;
@@ -78,18 +79,31 @@ namespace Orleans.Analyzers
                 return;
             }
 
-            ResolverDiagnostic? diagnostic = null;
-            foreach (var proxyContext in proxyContexts)
+            if (!methodContexts.TryGetValue(symbol.ContainingType.OriginalDefinition, out var contexts))
             {
-                if (!TryGetContextMethod(proxyContext.InterfaceType, symbol, out var contextMethod))
+                return;
+            }
+
+            ResolverDiagnostic? diagnostic = null;
+            ProxyContext? resolvedContext = null;
+            foreach (var methodContext in contexts)
+            {
+                // Each proxy's entries are contiguous; preserve its first matching constructed view.
+                if (ReferenceEquals(methodContext.ProxyContext, resolvedContext))
                 {
                     continue;
                 }
 
+                if (!TryGetContextMethod(methodContext, symbol, out var contextMethod))
+                {
+                    continue;
+                }
+
+                resolvedContext = methodContext.ProxyContext;
                 if (resolver.TryResolve(
-                    proxyContext.ProxyBaseType,
+                    methodContext.ProxyContext.ProxyBaseType,
                     contextMethod,
-                    proxyContext.InterfaceType,
+                    methodContext.ProxyContext.InterfaceType,
                     out _,
                     out diagnostic))
                 {
@@ -120,39 +134,60 @@ namespace Orleans.Analyzers
         }
 
         private static bool TryGetContextMethod(
-            INamedTypeSymbol proxyInterface,
+            MethodContext methodContext,
             IMethodSymbol method,
             out IMethodSymbol contextMethod)
         {
             if (SymbolEqualityComparer.Default.Equals(
-                proxyInterface.OriginalDefinition,
+                methodContext.ProxyContext.InterfaceType.OriginalDefinition,
                 method.ContainingType.OriginalDefinition))
             {
                 contextMethod = method;
                 return true;
             }
 
-            foreach (var inheritedInterface in proxyInterface.AllInterfaces)
+            foreach (var candidate in methodContext.DeclaringInterface.GetMembers(method.Name).OfType<IMethodSymbol>())
             {
                 if (!SymbolEqualityComparer.Default.Equals(
-                    inheritedInterface.OriginalDefinition,
-                    method.ContainingType.OriginalDefinition))
+                    candidate.OriginalDefinition,
+                    method.OriginalDefinition))
                 {
                     continue;
                 }
 
-                foreach (var candidate in inheritedInterface.GetMembers(method.Name).OfType<IMethodSymbol>())
-                {
-                    if (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, method.OriginalDefinition))
-                    {
-                        contextMethod = candidate;
-                        return true;
-                    }
-                }
+                contextMethod = candidate;
+                return true;
             }
 
             contextMethod = null!;
             return false;
+        }
+
+        private static Dictionary<INamedTypeSymbol, List<MethodContext>> IndexMethodContexts(
+            ImmutableArray<ProxyContext> proxyContexts)
+        {
+            var result = new Dictionary<INamedTypeSymbol, List<MethodContext>>(SymbolEqualityComparer.Default);
+            foreach (var proxyContext in proxyContexts)
+            {
+                Add(proxyContext.InterfaceType, proxyContext);
+                foreach (var inheritedInterface in proxyContext.InterfaceType.AllInterfaces)
+                {
+                    Add(inheritedInterface, proxyContext);
+                }
+            }
+
+            return result;
+
+            void Add(INamedTypeSymbol declaringInterface, ProxyContext proxyContext)
+            {
+                if (!result.TryGetValue(declaringInterface.OriginalDefinition, out var contexts))
+                {
+                    result.Add(declaringInterface.OriginalDefinition, contexts = []);
+                }
+
+                // Preserve proxy order and every constructed view: receiver and type arguments affect resolution.
+                contexts.Add(new MethodContext(declaringInterface, proxyContext));
+            }
         }
 
         private static ImmutableArray<ProxyContext> GetProxyContexts(
@@ -216,6 +251,10 @@ namespace Orleans.Analyzers
                 }
             }
         }
+
+        private readonly record struct MethodContext(
+            INamedTypeSymbol DeclaringInterface,
+            ProxyContext ProxyContext);
 
         private sealed record ProxyContext(
             INamedTypeSymbol InterfaceType,

@@ -73,12 +73,8 @@ public class ResponseCompletionSourceTests
         return continuation;
     }
 
-    private static async Task WaitForContinuation(Task continuation)
-    {
-        var completed = await Task.WhenAny(continuation, Task.Delay(TimeSpan.FromSeconds(5)));
-        Assert.Same(continuation, completed);
-        await continuation;
-    }
+    private static Task WaitForContinuation(Task continuation)
+        => continuation.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
     private sealed class ContinuationProbe
     {
