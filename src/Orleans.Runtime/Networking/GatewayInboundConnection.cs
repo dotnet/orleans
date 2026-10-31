@@ -19,6 +19,7 @@ namespace Orleans.Runtime.Messaging
         private readonly OverloadDetector overloadDetector;
         private readonly SiloAddress myAddress;
         private readonly string myClusterId;
+        private Action<Message, Connection?, Exception?>? sendMessage;
 
         public GatewayInboundConnection(
             MessageTransport transport,
@@ -62,6 +63,10 @@ namespace Orleans.Runtime.Messaging
 
         protected internal override void OnReceivedMessage(Message msg)
         {
+            msg.GatewayRequestAttempt = 0;
+            msg.GatewayForwardingSource = null;
+            msg.GatewayResponseRoutingHistory = null;
+
             // Don't process messages that have already timed out
             if (msg.IsExpired)
             {
@@ -96,7 +101,14 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 MessagingMetrics.OnMessageReRoute(msg);
-                this.messageCenter.RerouteMessage(msg);
+                if (ShouldTrackRequest(msg))
+                {
+                    this.messageCenter.RerouteMessage(msg, GetSendMessageCallback());
+                }
+                else
+                {
+                    this.messageCenter.RerouteMessage(msg);
+                }
             }
             else
             {
@@ -108,9 +120,23 @@ namespace Orleans.Runtime.Messaging
                     msg.TargetGrain = systemTargetId.WithSiloAddress(targetAddress).GrainId;
                 }
 
-                this.messageCenter.SendMessage(msg);
+                if (ShouldTrackRequest(msg))
+                {
+                    this.messageCenter.SendMessage(msg, GetSendMessageCallback());
+                }
+                else
+                {
+                    this.messageCenter.SendMessage(msg);
+                }
             }
         }
+
+        private static bool ShouldTrackRequest(Message message) =>
+            message.Direction == Message.Directions.Request && !message.TargetGrain.IsSystemTarget();
+
+        private Action<Message, Connection?, Exception?> GetSendMessageCallback() =>
+            this.sendMessage
+            ?? throw new InvalidOperationException("The gateway client state must be initialized before processing messages.");
 
         protected override async Task RunAsyncCore(CancellationToken cancellationToken)
         {
@@ -139,7 +165,8 @@ namespace Orleans.Runtime.Messaging
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                this.gateway.RecordOpenedConnection(this, clientId);
+                var clientState = this.gateway.RecordOpenedConnection(this, clientId);
+                this.sendMessage = clientState.SendMessage;
                 await base.RunAsyncCore(cancellationToken);
             }
             finally

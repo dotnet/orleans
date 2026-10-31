@@ -326,18 +326,8 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             int id = Random.Shared.Next();
             IDeactivatingWhileActivatingTestGrain grain = this.GrainFactory.GetGrain<IDeactivatingWhileActivatingTestGrain>(id);
 
-            try
-            {
-                string activation = await grain.DoSomething();
-                Assert.Fail("Should have thrown.");
-            }
-            catch (OrleansMessageRejectionException exc)
-            {
-                this.Logger.LogInformation(exc, "Thrown as expected");
-                Assert.True(
-                    exc.Message.Contains("Forwarding failed"),
-                    "Did not get expected exception message returned: " + exc.Message);
-            }
+            var exception = await Assert.ThrowsAsync<OrleansMessageRejectionException>(() => grain.DoSomething());
+            Assert.StartsWith("Forwarding failed:", exception.Message);
         }
 
         private async Task CheckNumActivateDeactivateCalls(
