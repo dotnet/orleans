@@ -120,7 +120,7 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
     {
         var spec = new ActivationLifecycleSpec();
         var initial = new ActivationLifecycleModelState();
-        var cases = spec.GenerateTests(
+        var generated = spec.GenerateTests(
             initial,
             spec.CreateInputSet(),
             new TestGenerationOptions
@@ -129,7 +129,11 @@ public class ActivationStateMachineTests(ActivationStateMachineTests.Fixture fix
                 SequentialTestCaseAlgorithm = SequentialTestCaseAlgorithms.CreateTransitionCoverage(maxSequenceLength: 10),
                 ShouldApply = (input, state) => ActivationLifecycleModel.CanApply(((ActivationLifecycleRequest)input.Request).Kind, (ActivationLifecycleModelState)state),
             });
+
+        // The generated sequences overlap heavily, so run a subset which still covers every model transition they cover.
+        var (cases, transitions) = ActivationLifecycleModel.SelectTransitionCover(generated);
         Assert.NotEmpty(cases);
+        TestContext.Current.TestOutputHelper?.WriteLine($"Running {cases.Count} of {generated.Count} generated cases, covering {transitions} model transitions.");
 
         var context = spec.CreateTestingContext();
         context.RequestPrinter = request => request?.ToString() ?? "<null>";
@@ -571,6 +575,50 @@ internal static class ActivationLifecycleModel
         state.DeactivationRequested = requested
             || requests
             || kind is ActivationLifecycleOperation.Fail && phase.IsSettingUp();
+    }
+
+    /// <summary>
+    /// Selects test cases which together cover every model transition which <paramref name="cases"/> cover, greedily taking the case which
+    /// covers the most uncovered transitions. The selection is deterministic for a given generation order.
+    /// </summary>
+    /// <returns>The selected cases and the number of distinct transitions they cover.</returns>
+    public static (IList<SequentialTestCase> Cases, int Transitions) SelectTransitionCover(IList<SequentialTestCase> cases)
+    {
+        var caseTransitions = cases.Select(static testCase =>
+        {
+            var transitions = new HashSet<(ActivationState, bool, ActivationLifecycleOperation)>();
+            var state = new ActivationLifecycleModelState();
+            foreach (var call in testCase.OperationCalls)
+            {
+                var kind = ((ActivationLifecycleRequest)call.OperationInput.Request).Kind;
+                transitions.Add((state.Phase, state.DeactivationRequested, kind));
+                Apply(kind, state);
+            }
+
+            return transitions;
+        }).ToList();
+
+        var uncovered = caseTransitions.SelectMany(static transitions => transitions).ToHashSet();
+        var total = uncovered.Count;
+        var selected = new List<SequentialTestCase>();
+        while (uncovered.Count > 0)
+        {
+            var best = 0;
+            var bestCount = -1;
+            for (var i = 0; i < cases.Count; i++)
+            {
+                var count = caseTransitions[i].Count(uncovered.Contains);
+                if (count > bestCount)
+                {
+                    (best, bestCount) = (i, count);
+                }
+            }
+
+            selected.Add(cases[best]);
+            uncovered.ExceptWith(caseTransitions[best]);
+        }
+
+        return (selected, total);
     }
 
     public static bool IsGated(ActivationState phase) => phase is ActivationState.Registering or ActivationState.Starting
