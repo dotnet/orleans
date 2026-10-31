@@ -158,6 +158,15 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             }
         });
 
+        // Diagnostics about the generated metadata are reported only when implementation outputs are emitted.
+        context.RegisterImplementationSourceOutput(refAssemblyDataResults, static (productionContext, result) =>
+        {
+            foreach (var diagnostic in result.ImplementationDiagnostics)
+            {
+                productionContext.ReportDiagnostic(diagnostic);
+            }
+        });
+
         var refAssemblyData = refAssemblyDataResults
             .Select(static (result, _) => result.Model);
 

@@ -40,7 +40,7 @@ internal readonly record struct TypeMetadataIdentity
             assembly?.Identity.GetDisplayName() ?? string.Empty);
     }
 
-    private static string GetMetadataName(INamedTypeSymbol symbol)
+    internal static string GetMetadataName(INamedTypeSymbol symbol)
     {
         var builder = new StringBuilder();
         var ns = symbol.ContainingNamespace;

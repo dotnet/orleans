@@ -139,9 +139,10 @@ public class ReferenceAssemblyModelExtractorTests
         var referenceData = GetTrackedOutput<ReferenceAssemblyDataResult>(
             result, OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName);
         var fullScan = ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(
-            compilation, new CodeGeneratorOptions(), TestContext.Current.CancellationToken, out var diagnostics);
+            compilation, new CodeGeneratorOptions(), TestContext.Current.CancellationToken, out var diagnostics, out var implementationDiagnostics);
 
         Assert.Empty(diagnostics);
+        Assert.Empty(implementationDiagnostics);
         Assert.Equal(fullScan, referenceData.Model);
         Assert.Equal(2, serializers.Length);
         Assert.Equal(2, proxies.Length);
@@ -229,7 +230,7 @@ public class ReferenceAssemblyModelExtractorTests
             $"Reuse allocated {reusedBytes:N0} bytes versus {scannedBytes:N0} bytes for full discovery.");
 
         ReferenceAssemblyModel Extract() => ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(
-            compilation, options, TestContext.Current.CancellationToken, out _, serializers, proxies);
+            compilation, options, TestContext.Current.CancellationToken, out _, out _, serializers, proxies);
     }
 
     [Fact]
@@ -421,9 +422,10 @@ public class ReferenceAssemblyModelExtractorTests
         }
 
         var model = ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(
-            compilation, new CodeGeneratorOptions(), TestContext.Current.CancellationToken, out var diagnostics);
+            compilation, new CodeGeneratorOptions(), TestContext.Current.CancellationToken, out var diagnostics, out var implementationDiagnostics);
 
         Assert.Empty(diagnostics);
+        Assert.Empty(implementationDiagnostics);
         const string nestedType = "global::MetadataTargets.Outer<>.@class<>";
         Assert.Equal(
             [
@@ -530,9 +532,10 @@ public class ReferenceAssemblyModelExtractorTests
                 MetadataReference.CreateFromFile(typeof(UnitTests.GrainInterfaces.INonGenericBase).Assembly.Location),
             ]);
         var model = ReferenceAssemblyModelExtractor.ExtractReferenceAssemblyData(
-            compilation, new CodeGeneratorOptions(), TestContext.Current.CancellationToken, out var diagnostics);
+            compilation, new CodeGeneratorOptions(), TestContext.Current.CancellationToken, out var diagnostics, out var implementationDiagnostics);
 
         Assert.Empty(diagnostics);
+        Assert.Empty(implementationDiagnostics);
         var record = Assert.Single(model.ReferencedSerializableTypes,
             static type => type.Name == "GenericRecord");
         Assert.Equal("UnitTests.FSharpTypes", record.Namespace);

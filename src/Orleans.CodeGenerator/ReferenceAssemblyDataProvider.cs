@@ -20,10 +20,11 @@ internal static class ReferenceAssemblyDataProvider
                 SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options),
                 cancellationToken,
                 out var diagnostics,
+                out var implementationDiagnostics,
                 sourceSerializableTypes,
                 sourceProxyInterfaces);
 
-            return ReferenceAssemblyDataResult.FromModelAndDiagnostics(model, diagnostics);
+            return ReferenceAssemblyDataResult.FromModelAndDiagnostics(model, diagnostics, implementationDiagnostics);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
