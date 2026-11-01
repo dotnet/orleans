@@ -17,6 +17,8 @@ public sealed class StreamQueueCheckpointer : IStreamQueueCheckpointer<string>
     private StreamCheckpointStoreState _persistedState = new(string.Empty, string.Empty);
     private Task _inProgressSave = Task.CompletedTask;
     private DateTime? _throttleSavesUntilUtc;
+    private int _pendingResetCount;
+    private long _updateGeneration;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="StreamQueueCheckpointer"/> class.
@@ -70,6 +72,143 @@ public sealed class StreamQueueCheckpointer : IStreamQueueCheckpointer<string>
 
     /// <inheritdoc />
     [Obsolete("Use the overload which accepts a CancellationToken.")]
+    public Task Reset() => Reset(CancellationToken.None);
+
+    /// <inheritdoc />
+    public Task Reset(CancellationToken cancellationToken)
+    {
+        var completion = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_lock)
+        {
+            _pendingResetCount++;
+            _throttleSavesUntilUtc = DateTime.MaxValue;
+            var inProgressSave = _inProgressSave;
+            _inProgressSave = completion.Task;
+            RunReset(
+                completion,
+                inProgressSave,
+                _inProgressSave,
+                _latestCheckpoint,
+                _updateGeneration,
+                cancellationToken).Ignore();
+            completion.Task.Ignore();
+        }
+
+        return completion.Task.WaitAsync(cancellationToken);
+    }
+
+    private async Task RunReset(
+        TaskCompletionSource completion,
+        Task inProgressSave,
+        Task resetTask,
+        string enqueuedCheckpoint,
+        long updateGeneration,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await ResetCore(
+                inProgressSave,
+                enqueuedCheckpoint,
+                updateGeneration,
+                cancellationToken);
+
+            while (true)
+            {
+                string checkpoint;
+                lock (_lock)
+                {
+                    if (!ReferenceEquals(resetTask, _inProgressSave)
+                        || string.Equals(_persistedState.Checkpoint, _latestCheckpoint, StringComparison.Ordinal))
+                    {
+                        CompleteReset();
+                        completion.TrySetResult();
+                        return;
+                    }
+
+                    checkpoint = _latestCheckpoint;
+                }
+
+                await Save(checkpoint, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException exception)
+        {
+            await CompleteFailedReset(
+                completion,
+                resetTask,
+                exception,
+                canceled: true);
+        }
+        catch (Exception exception)
+        {
+            await CompleteFailedReset(
+                completion,
+                resetTask,
+                exception,
+                canceled: false);
+        }
+    }
+
+    private async Task CompleteFailedReset(
+        TaskCompletionSource completion,
+        Task resetTask,
+        Exception resetFailure,
+        bool canceled)
+    {
+        try
+        {
+            while (true)
+            {
+                string checkpoint;
+                lock (_lock)
+                {
+                    if (!ReferenceEquals(resetTask, _inProgressSave)
+                        || string.Equals(_persistedState.Checkpoint, _latestCheckpoint, StringComparison.Ordinal))
+                    {
+                        CompleteReset();
+                        if (canceled)
+                        {
+                            completion.TrySetCanceled(
+                                ((OperationCanceledException)resetFailure).CancellationToken);
+                        }
+                        else
+                        {
+                            completion.TrySetException(resetFailure);
+                        }
+
+                        return;
+                    }
+
+                    checkpoint = _latestCheckpoint;
+                }
+
+                await Save(checkpoint, CancellationToken.None);
+            }
+        }
+        catch (Exception persistenceFailure)
+        {
+            lock (_lock)
+            {
+                CompleteReset();
+                completion.TrySetException(
+                    new AggregateException(resetFailure, persistenceFailure));
+            }
+        }
+    }
+
+    private void CompleteReset()
+    {
+        _pendingResetCount--;
+        if (_pendingResetCount == 0)
+        {
+            _throttleSavesUntilUtc = null;
+        }
+    }
+
+    /// <inheritdoc />
+    [Obsolete("Use the overload which accepts a CancellationToken.")]
     public void Update(string offset, DateTime utcNow)
         => Update(offset, utcNow, CancellationToken.None);
 
@@ -104,6 +243,7 @@ public sealed class StreamQueueCheckpointer : IStreamQueueCheckpointer<string>
             }
 
             _latestCheckpoint = offset;
+            _updateGeneration++;
             if (_throttleSavesUntilUtc.HasValue
                 && (_throttleSavesUntilUtc.Value > utcNow || !_inProgressSave.IsCompleted))
             {
@@ -159,6 +299,7 @@ public sealed class StreamQueueCheckpointer : IStreamQueueCheckpointer<string>
                 }
 
                 _inProgressSave = Save(_latestCheckpoint, cancellationToken);
+                _inProgressSave.Ignore();
                 retryingSave = true;
             }
         }
@@ -203,6 +344,107 @@ public sealed class StreamQueueCheckpointer : IStreamQueueCheckpointer<string>
                 expectedVersion = persistedState.Version;
             }
         }
+    }
+
+    private async Task ResetCore(
+        Task inProgressSave,
+        string enqueuedCheckpoint,
+        long updateGeneration,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await inProgressSave;
+        }
+        catch
+        {
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string rollbackCheckpoint;
+        string expectedVersion;
+        string persistedVersion;
+        lock (_lock)
+        {
+            persistedVersion = expectedVersion = _persistedState.Version;
+            if (_updateGeneration <= updateGeneration)
+            {
+                rollbackCheckpoint = _latestCheckpoint;
+                _latestCheckpoint = string.Empty;
+            }
+            else
+            {
+                rollbackCheckpoint = enqueuedCheckpoint;
+            }
+        }
+
+        try
+        {
+            while (true)
+            {
+                var persistedState = await _store.Update(string.Empty, expectedVersion, cancellationToken);
+                lock (_lock)
+                {
+                    _persistedState = persistedState;
+                }
+
+                if (string.IsNullOrEmpty(persistedState.Checkpoint))
+                {
+                    return;
+                }
+
+                expectedVersion = persistedState.Version;
+            }
+        }
+        catch
+        {
+            lock (_lock)
+            {
+                RestoreLatestCheckpoint(rollbackCheckpoint, persistedVersion);
+            }
+
+            throw;
+        }
+    }
+
+    private void RestoreLatestCheckpoint(string latestCheckpoint, string persistedVersion)
+    {
+        if (string.Equals(_persistedState.Version, persistedVersion, StringComparison.Ordinal))
+        {
+            if (_options.CheckpointComparer is { } checkpointComparer)
+            {
+                if (Compare(checkpointComparer, _latestCheckpoint, latestCheckpoint) < 0)
+                {
+                    _latestCheckpoint = latestCheckpoint;
+                }
+            }
+            else if (string.IsNullOrEmpty(_latestCheckpoint))
+            {
+                _latestCheckpoint = latestCheckpoint;
+            }
+
+            return;
+        }
+
+        if (_options.CheckpointComparer is not { } comparer)
+        {
+            _latestCheckpoint = _persistedState.Checkpoint;
+            return;
+        }
+
+        var candidate = _latestCheckpoint;
+        if (Compare(comparer, candidate, latestCheckpoint) < 0)
+        {
+            candidate = latestCheckpoint;
+        }
+
+        if (Compare(comparer, candidate, _persistedState.Checkpoint) < 0)
+        {
+            candidate = _persistedState.Checkpoint;
+        }
+
+        _latestCheckpoint = candidate;
     }
 
     private static int Compare(IComparer<string> comparer, string left, string right)
