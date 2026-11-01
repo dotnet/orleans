@@ -10,17 +10,23 @@ namespace Orleans.Journaling;
 /// </summary>
 /// <typeparam name="TKey">The type of keys in the dictionary.</typeparam>
 /// <typeparam name="TValue">The type of values in the dictionary.</typeparam>
+/// <remarks>
+/// The dictionary takes ownership of the keys and values passed to it, and the journal records each mutation when it is made. To change a value, assign a new instance.
+/// </remarks>
 public interface IDurableDictionary<TKey, TValue> : IDictionary<TKey, TValue> where TKey : notnull
 {
 }
 
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue>, IStateMachine, IDurableDictionaryCommandHandler<TKey, TValue> where TKey : notnull
+internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue>, IStateMachine, IDurableDictionaryCommandHandler<TKey, TValue>,
+    IResyncSource<DictionaryChange<TKey, TValue>> where TKey : notnull
 {
     private readonly IDurableDictionaryCommandCodec<TKey, TValue> _codec;
     private readonly Dictionary<TKey, TValue> _items = [];
+    private readonly JournaledStateManager? _manager;
     private JournalStreamWriter _writer;
+    private bool _hasStagedEntries;
 
     protected DurableDictionary(IDurableDictionaryCommandCodec<TKey, TValue> codec)
     {
@@ -36,12 +42,14 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         : this(JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<TKey, TValue>>(serviceProvider, shared.JournalFormatKey))
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _manager = manager as JournaledStateManager;
         manager.RegisterStateMachine(key, this);
     }
 
     internal DurableDictionary(string key, IJournaledStateManager manager, IDurableDictionaryCommandCodec<TKey, TValue> codec) : this(codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _manager = manager as JournaledStateManager;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -53,6 +61,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         {
             WriteSet(key, value);
             ApplySet(key, value);
+            PublishSet(key, value);
         }
     }
 
@@ -71,22 +80,34 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     {
         _items.Clear();
         _writer = writer;
+        _hasStagedEntries = false;
+        DurableStateObservation.PublishDurableResync<DurableDictionary<TKey, TValue>, DictionaryChange<TKey, TValue>>(_manager, this);
     }
+
+    void IStateMachine.OnRecoveryCompleted() => DurableStateObservation.PublishDurableResync<DurableDictionary<TKey, TValue>, DictionaryChange<TKey, TValue>>(_manager, this);
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
         // This state implementation appends journal entries as the data structure is modified, so there is no need to perform separate writing here.
+        // The write being captured contains every staged entry.
+        _hasStagedEntries = false;
     }
 
     void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter)
     {
         _codec.WriteSnapshot(_items, snapshotWriter);
+        _hasStagedEntries = false;
     }
 
     public void Clear()
     {
         _codec.WriteClear(GetWriter());
+        _hasStagedEntries = true;
         ApplyClear();
+        if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
+        {
+            topic.PublishStaged(new DictionaryChange<TKey, TValue> { Kind = DictionaryChangeKind.Cleared });
+        }
     }
 
     public bool Contains(TKey key) => _items.ContainsKey(key);
@@ -100,12 +121,14 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
         WriteRemove(key);
         ApplyRemove(key);
+        PublishRemove(key);
         return true;
     }
 
     private void WriteRemove(TKey key)
     {
         _codec.WriteRemove(key, GetWriter());
+        _hasStagedEntries = true;
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
@@ -113,6 +136,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     private void WriteSet(TKey key, TValue value)
     {
         _codec.WriteSet(key, value, GetWriter());
+        _hasStagedEntries = true;
     }
 
     protected virtual void OnSet(TKey key, TValue value) { }
@@ -150,6 +174,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         WriteSet(key, value);
         _items.Add(key, value);
         OnSet(key, value);
+        PublishSet(key, value);
     }
 
     public bool ContainsKey(TKey key) => _items.ContainsKey(key);
@@ -166,7 +191,32 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
         WriteRemove(item.Key);
         _ = ((ICollection<KeyValuePair<TKey, TValue>>)_items).Remove(item);
+        PublishRemove(item.Key);
         return true;
+    }
+
+    internal IAsyncEnumerable<DictionaryChange<TKey, TValue>> WatchAsync(DurableWatchMode mode, int capacity, CancellationToken cancellationToken) =>
+        DurableStateObservation.WatchChanges<DurableDictionary<TKey, TValue>, DictionaryChange<TKey, TValue>>(_manager, this, mode, capacity, cancellationToken);
+
+    bool IResyncSource<DictionaryChange<TKey, TValue>>.HasStagedEntries => _hasStagedEntries;
+
+    DictionaryChange<TKey, TValue> IResyncSource<DictionaryChange<TKey, TValue>>.CreateResync() =>
+        new() { Kind = DictionaryChangeKind.Resync, Snapshot = _items.ToArray() };
+
+    private void PublishSet(TKey key, TValue value)
+    {
+        if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
+        {
+            topic.PublishStaged(new DictionaryChange<TKey, TValue> { Kind = DictionaryChangeKind.Set, Key = key, Value = value });
+        }
+    }
+
+    private void PublishRemove(TKey key)
+    {
+        if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
+        {
+            topic.PublishStaged(new DictionaryChange<TKey, TValue> { Kind = DictionaryChangeKind.Removed, Key = key });
+        }
     }
 
     public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => ((IEnumerable<KeyValuePair<TKey, TValue>>)_items).GetEnumerator();
