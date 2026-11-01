@@ -102,6 +102,8 @@ items:
             href: grains/journaling/durable-jobs-migration.md
           - name: Use durable state
             href: grains/journaling/durable-state.md
+          - name: Observe state and stream drafts
+            href: grains/journaling/observe-state.md
           - name: Runtime behavior and consistency
             href: grains/journaling/runtime-behavior.md
           - name: Configuration and formats
@@ -114,6 +116,36 @@ items:
             href: grains/journaling/operations.md
           - name: Samples
             href: grains/journaling/samples.md
+      - name: Messaging
+        items:
+          - name: Runtime model and guarantees
+            href: grains/messaging.md
+          - name: Idempotency and hierarchical keys
+            href: grains/messaging-idempotency.md
+          - name: Practical recipes
+            href: grains/messaging-recipes.md
+          - name: Operations and throughput
+            href: grains/messaging-operations.md
+      - name: Durable tasks
+        items:
+          - name: Programming model and guarantees
+            href: grains/durable-tasks.md
+          - name: Task identity and references
+            href: grains/durable-tasks-identity.md
+          - name: Structured concurrency
+            href: grains/durable-tasks-structured-concurrency.md
+          - name: Idempotency
+            href: grains/durable-tasks-idempotency.md
+          - name: Replay-safety rules
+            href: grains/durable-tasks-replay-rules.md
+          - name: Versioning
+            href: grains/durable-tasks-versioning.md
+          - name: Integrate with other systems
+            href: grains/durable-tasks-integrations.md
+          - name: Practical recipes
+            href: grains/durable-tasks-recipes.md
+          - name: Operations and troubleshooting
+            href: grains/durable-tasks-operations.md
       - name: Transactions
         href: grains/transactions.md
   - name: Serialization and code generation
@@ -447,6 +479,64 @@ items:
             href: diagnostics/orleans0027.md
           - name: ORLEANS0028
             href: diagnostics/orleans0028.md
+          - name: ORLEANS0200
+            href: diagnostics/orleans0200.md
+          - name: ORLEANS0201
+            href: diagnostics/orleans0201.md
+          - name: ORLEANS0202
+            href: diagnostics/orleans0202.md
+          - name: ORLEANS0203
+            href: diagnostics/orleans0203.md
+          - name: ORLEANS0204
+            href: diagnostics/orleans0204.md
+          - name: ORLEANS0205
+            href: diagnostics/orleans0205.md
+          - name: ORLEANS0206
+            href: diagnostics/orleans0206.md
+          - name: ORLEANS0207
+            href: diagnostics/orleans0207.md
+          - name: ORLEANS0208
+            href: diagnostics/orleans0208.md
+          - name: ORLEANS0209
+            href: diagnostics/orleans0209.md
+          - name: ORLEANS0210
+            href: diagnostics/orleans0210.md
+          - name: ORLEANS0211
+            href: diagnostics/orleans0211.md
+          - name: ORLEANS0212
+            href: diagnostics/orleans0212.md
+          - name: ORLEANS0213
+            href: diagnostics/orleans0213.md
+          - name: ORLEANS0214
+            href: diagnostics/orleans0214.md
+          - name: ORLEANS0215
+            href: diagnostics/orleans0215.md
+          - name: ORLEANS0216
+            href: diagnostics/orleans0216.md
+          - name: ORLEANS0217
+            href: diagnostics/orleans0217.md
+          - name: ORLEANS0218
+            href: diagnostics/orleans0218.md
+          - name: ORLEANS0219
+            href: diagnostics/orleans0219.md
+          - name: ORLEANS0220
+            href: diagnostics/orleans0220.md
+          - name: ORLEANS0221
+            href: diagnostics/orleans0221.md
+          - name: ORLEANS0222
+            href: diagnostics/orleans0222.md
+          - name: ORLEANS0223
+            href: diagnostics/orleans0223.md
+          - name: ORLEANS0224
+            href: diagnostics/orleans0224.md
+          - name: ORLEANS0225
+            href: diagnostics/orleans0225.md
+          - name: ORLEANS0226
+            href: diagnostics/orleans0226.md
+          - name: ORLEANS0227
+            href: diagnostics/orleans0227.md
+          - name: ORLEANS0228
+            href: diagnostics/orleans0228.md
       - name: API context and examples
         href: resources/api-reference-guide.md
       - name: Best practices
