@@ -1,0 +1,663 @@
+using Orleans.DurableTasks;
+using Orleans.DurableTasks.Protocol;
+using Orleans.DurableTasks.Runtime;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Journaling;
+using Orleans.Messaging;
+using Orleans.Runtime;
+using Orleans.Serialization;
+using Orleans.Serialization.Cloning;
+using Xunit;
+
+namespace Microsoft.Orleans.DurableTasks.Tests;
+
+/// <summary>Cooperative cancellation and administrative abort of durable tasks.</summary>
+public sealed partial class DurableTaskRuntimeInvariantTests
+{
+    private static readonly TimeSpan CancellationTestTimeout = TimeSpan.FromSeconds(5);
+
+    [Theory]
+    [InlineData("timeout")]
+    [InlineData("when-any")]
+    [InlineData("race")]
+    public Task CancellationBeforeCompletionSelectionStartsPreservesTheCancellationOutcome(string operation) => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var rootId = TaskId.CreateRoot("root");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            started.SetResult();
+            await resume.Task;
+            try
+            {
+                DurableTask wait = operation switch
+                {
+                    "timeout" => DurableTask.Delay(TimeSpan.FromDays(1)).WaitAsync(TimeSpan.FromDays(2)),
+                    "when-any" => DurableTask.WhenAny([DurableTask.Delay(TimeSpan.FromDays(1)), DurableTask.Delay(TimeSpan.FromDays(2))]),
+                    "race" => DurableTask.Race([DurableTask.Delay(TimeSpan.FromDays(1)), DurableTask.Delay(TimeSpan.FromDays(2))]),
+                    _ => throw new ArgumentOutOfRangeException(nameof(operation)),
+                };
+                await wait.WithId("wait");
+                return "completed";
+            }
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
+            {
+                return $"compensated: {DurableTask.Current.TaskCancellationReason}";
+            }
+        }));
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        await ((IDurableTaskServer)runtime).CancelAsync(rootId, "buyer", TestContext.Current.CancellationToken);
+        resume.SetResult();
+
+        Assert.Equal("compensated: buyer", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
+        Assert.False(storage.Contains(rootId.Child("wait").Child("0")));
+        Assert.False(storage.Contains(rootId.Child("wait").Child("1")));
+    });
+
+    [Fact]
+    public Task CompletionSelectionRejectsAnUnscheduledCandidateWithoutAncestorCancellation() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, _, _, _) = CreateRuntime();
+        var decisionId = TaskId.Parse("root/selection");
+        var candidate = TaskId.Parse("root/missing");
+
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            runtime.SelectCompletionAsync(decisionId, [candidate], TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal($"A task with the identifier '{candidate}' was not found.", exception.Message);
+    });
+
+    [Fact]
+    public Task CanceledBodyWhichCatchesTheCancellationCompletesWithItsOwnResult() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            try
+            {
+                await BlockedChild(started).WithId("work");
+                return "completed";
+            }
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
+            {
+                return "compensated";
+            }
+        }));
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        await ((IDurableTaskServer)runtime).CancelAsync(rootId, TestContext.Current.CancellationToken);
+
+        Assert.Equal("compensated", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
+        Assert.NotNull(storage.Get(rootId).CancellationRequestedAt);
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(TaskId.Parse("root/work")).Result!.Status);
+    });
+
+    [Fact]
+    public Task ChildWhichEndsCanceledInTheCancellationsWriteWakesTheBodyWithItsCancellationRequested() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        manager.ResumesWritersAsynchronously = true;
+        var rootId = TaskId.Parse("root");
+        var waitId = TaskId.Parse("root/wait");
+        DurableTaskContext? rootContext = null;
+        var request = CreateRequest(1, () => DurableTask.Run(async cancellationToken =>
+        {
+            rootContext = DurableTask.Current;
+            try
+            {
+                var wait = await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("wait").ScheduleAsync(cancellationToken);
+                await wait;
+                return "completed";
+            }
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
+            {
+                return $"compensated: {DurableTask.Current.TaskCancellationReason}";
+            }
+        }));
+
+        // The child's attempt waits for the write which records its delay.
+        var delayWriteStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseDelayWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.AfterWriteStarted = async () =>
+        {
+            if (storage.Contains(waitId) && storage.Get(waitId).DueTime is not null && delayWriteStarted.TrySetResult())
+            {
+                await releaseDelayWrite.Task;
+            }
+        };
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await delayWriteStarted.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+
+        // Code which awaits the child observes its outcome no earlier than this continuation does.
+        var observed = runtime.GetScheduledTaskHandle(waitId).WaitAsync(TestContext.Current.CancellationToken).AsTask().ContinueWith(
+            _ => rootContext!.IsTaskCancellationRequested,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        // The cancellation's write waits to capture until the child's attempt, which observes the staged request, ends
+        // canceled, so one write commits both the request and the child's result.
+        var gate = new PrepareGate();
+        manager.RegisterStateMachine("prepare-gate", gate);
+        var cancellation = ((IDurableTaskServer)runtime).CancelAsync(rootId, "buyer", TestContext.Current.CancellationToken).AsTask();
+        releaseDelayWrite.SetResult();
+        await WaitUntilAsync(() => storage.Get(waitId).Result is { Status: DurableTaskStatus.Canceled });
+        gate.Open();
+        await cancellation.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+
+        // The owner's attempt observes its task's cancellation before the outcome which that cancellation caused.
+        Assert.True(await observed.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken));
+        Assert.Equal("compensated: buyer", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
+    });
+
+    /// <summary>Holds the preparation of writes, before they capture staged changes, until it opens.</summary>
+    private sealed class PrepareGate : IStateMachine
+    {
+        private readonly TaskCompletionSource _open = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void Open() => _open.SetResult();
+
+        ValueTask IStateMachine.PrepareWriteAsync(CancellationToken cancellationToken) => new(_open.Task);
+
+        void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) => throw new NotSupportedException();
+
+        void IStateMachine.Reset(JournalStreamWriter writer)
+        {
+        }
+
+        void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
+        {
+        }
+
+        void IStateMachine.WriteSnapshot(JournalStreamWriter writer)
+        {
+        }
+    }
+
+    [Fact]
+    public Task CancellationWhichEscapesTheBodyCancelsTheTask() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            await BlockedChild(started).WithId("work");
+            return "completed";
+        }));
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        await ((IDurableTaskServer)runtime).CancelAsync(rootId, TestContext.Current.CancellationToken);
+
+        Assert.Equal(DurableTaskStatus.Canceled, (await WaitForResponseAsync(runtime, rootId)).Status);
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(rootId).Result!.Status);
+    });
+
+    [Fact]
+    public Task CancellationReachesTheInputsOfANamedCombinator() => ActivationScheduler.RunAsync(async () =>
+    {
+        // The blocked input waits without a durable wait, so its segment runs until the cancellation reaches it.
+        var (runtime, storage, _, transport) = CreateRuntime(reentrant: true);
+        var rootId = TaskId.Parse("root");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            try
+            {
+                await DurableTask.WhenAll([BlockedChild(started), DurableTask.Delay(TimeSpan.FromDays(1))]).WithId("work");
+                return "completed";
+            }
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
+            {
+                return "canceled";
+            }
+        }));
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        await transport.ResumeSent.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        await ((IDurableTaskServer)runtime).CancelAsync(rootId, TestContext.Current.CancellationToken);
+
+        // The inputs' IDs are root/work/0 and root/work/1, beneath the combinator's operation ID rather than the root.
+        Assert.Equal("canceled", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(TaskId.Parse("root/work/0")).Result!.Status);
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(TaskId.Parse("root/work/1")).Result!.Status);
+    });
+
+    [Fact]
+    public Task AttachedChildScheduledAfterCancellationIsCanceledWithoutRunning() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var afterRuns = 0;
+        var request = CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            try
+            {
+                await BlockedChild(started).WithId("work");
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            try
+            {
+                await DurableTask.Run(_ => { Interlocked.Increment(ref afterRuns); }).WithId("after");
+                return "after-ran";
+            }
+            catch (OperationCanceledException)
+            {
+                return "after-canceled";
+            }
+        }));
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        await ((IDurableTaskServer)runtime).CancelAsync(rootId, TestContext.Current.CancellationToken);
+
+        Assert.Equal("after-canceled", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
+        Assert.Equal(0, Volatile.Read(ref afterRuns));
+        Assert.False(storage.Contains(TaskId.Parse("root/after")));
+    });
+
+    [Fact]
+    public Task DelayOfCanceledBodyTerminalizesPromptly() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var delayId = TaskId.Parse("root/wait");
+        var request = CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            try
+            {
+                await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("wait");
+                return "elapsed";
+            }
+            catch (OperationCanceledException)
+            {
+                return "stopped-waiting";
+            }
+        }));
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await transport.ResumeSent.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        await ((IDurableTaskServer)runtime).CancelAsync(rootId, TestContext.Current.CancellationToken);
+
+        Assert.Equal("stopped-waiting", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(delayId).Result!.Status);
+        Assert.Null(storage.Get(delayId).DueTime);
+    });
+
+    [Fact]
+    public Task RecoveryReplaysCanceledBodyWithItsCancellationRequested() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var attempts = 0;
+        var stepRuns = 0;
+        var afterRuns = 0;
+        var observedCancellation = new List<bool>();
+        var firstAttemptBlocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            var context = DurableTask.Current;
+            var step = await DurableTask.Run(_ => Interlocked.Increment(ref stepRuns)).WithId("step");
+            if (Interlocked.Increment(ref attempts) == 1)
+            {
+                // The first activation stops while the body waits, before cancellation is requested.
+                firstAttemptBlocked.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, context.CancellationToken);
+            }
+
+            lock (observedCancellation)
+            {
+                observedCancellation.Add(context.IsTaskCancellationRequested);
+            }
+
+            try
+            {
+                await DurableTask.Run(_ => Interlocked.Increment(ref afterRuns)).WithId("after");
+                return -1;
+            }
+            catch (OperationCanceledException)
+            {
+                return step * 10;
+            }
+        }));
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await firstAttemptBlocked.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+
+        // The cancellation request is durable, and the body's next attempt observes it.
+        storage.RequestCancellation(rootId, storage.Get(rootId));
+        var (replacement, _, _, _) = CreateRuntime(storage, manager);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(10, (await WaitForResponseAsync(replacement, rootId)).GetResult<int>());
+        Assert.Equal(2, Volatile.Read(ref attempts));
+        Assert.Equal(1, Volatile.Read(ref stepRuns));
+        Assert.Equal(0, Volatile.Read(ref afterRuns));
+        Assert.Equal([true], observedCancellation);
+    });
+
+    [Fact]
+    public Task RecoveryTerminalizesCanceledRequestWhoseBodyNeverStarted() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (_, storage, manager, _) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var request = CreateRequest(1);
+        var state = storage.GetOrCreateTask(rootId, DurableTaskRecordKind.Invocation, request);
+        storage.RequestCancellation(rootId, state);
+        var (recovered, _, _, _) = CreateRuntime(storage, manager);
+
+        await recovered.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(rootId).Result!.Status);
+        Assert.Equal(0, request.CreateTaskCallCount);
+    });
+
+    [Fact]
+    public Task InvokedTaskCanceledThroughInboxSendsItsBodysOutcomeToTheCaller() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var caller = GrainId.Create("caller", "one");
+        var taskId = TaskId.Parse("invoked");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async cancellationToken =>
+        {
+            started.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return 0;
+            }
+            catch (OperationCanceledException)
+            {
+                return 3;
+            }
+        }));
+        runtime.ScheduleFromInbox(taskId, request);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+
+        Accept(CreateHandler(runtime), CancellationMessage(caller, runtime.GrainId, taskId));
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, (await WaitForResponseAsync(runtime, taskId)).GetResult<int>());
+        Assert.Equal(3, storage.Get(taskId).Result!.GetResult<int>());
+        var completion = Assert.Single(transport.Completions);
+        Assert.Equal(caller, completion.Target);
+        Assert.Equal(3, completion.Materialize(runtime).Response.GetResult<int>());
+    });
+
+    [Fact]
+    public Task CanceledParentsRemoteChildAwaitsItsCalleeOutcome() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var childId = TaskId.Parse("root/remote");
+        var request = CreateRemoteRequest(1);
+        storage.AddInvoked(rootId);
+        var handle = await runtime.ScheduleChildAsync(childId, new TestStateManager.TestRemoteDurableTask(request), TestContext.Current.CancellationToken);
+
+        await runtime.SignalCancellationAsync(rootId, TestContext.Current.CancellationToken);
+
+        var cancellation = Assert.Single(transport.Cancellations);
+        Assert.Equal(runtime.GetWireId(childId), cancellation.TaskId);
+        Assert.False((await handle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, TestContext.Current.CancellationToken)).IsCompleted);
+        runtime.AcceptResponseFromInbox(childId, DurableTaskResponse.FromResult(4), request.Context!.TargetId);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(4, (await handle.WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
+    });
+
+    [Fact]
+    public Task AbortTerminalizesTreeInOneWriteAndStopsRunningAttempts() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        TaskId[] treeIds = [rootId, TaskId.Parse("root/delay"), TaskId.Parse("root/remote"), TaskId.Parse("root/work")];
+        var remoteTarget = CreateRemoteRequest(2).Context!.TargetId;
+        var workStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var workEnded = new TaskCompletionSource<(bool TokenCanceled, bool CancellationRequested)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async cancellationToken =>
+        {
+            _ = await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("delay").ScheduleAsync(cancellationToken);
+            _ = new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(2)).WithId("remote").Post();
+            try
+            {
+                return await DurableTask.Run(async cancellationToken =>
+                {
+                    var context = DurableTask.Current;
+                    workStarted.TrySetResult();
+                    try
+                    {
+                        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        workEnded.TrySetResult((cancellationToken.IsCancellationRequested, context.IsTaskCancellationRequested));
+                    }
+
+                    return 5;
+                }).WithId("work");
+            }
+            catch (Exception)
+            {
+                return 99;
+            }
+        }));
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await workStarted.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        var resume = Assert.Single(transport.Resumes);
+        DurableTaskResponse?[]? resultsAtWrite = null;
+        var abortsAtWrite = -1;
+        manager.BeforeWrite = () =>
+        {
+            manager.BeforeWrite = null;
+            resultsAtWrite = [.. treeIds.Select(id => storage.Get(id).Result)];
+            abortsAtWrite = transport.Aborts.Count;
+        };
+
+        await ((IDurableTaskManager)runtime).AbortAsync(rootId, "operator", TestContext.Current.CancellationToken);
+
+        Assert.All(resultsAtWrite!, result => AssertAborted(result, "operator"));
+        Assert.Equal(1, abortsAtWrite);
+        Assert.Equal((treeIds[2], remoteTarget, "operator"), transport.Aborts.Select(static abort => (GetNodeId(abort.TaskId), abort.Target, abort.Reason)).Single());
+        AssertAborted(await WaitForResponseAsync(runtime, rootId), "operator");
+
+        // The running attempt observes host abort, not durable cancellation, and its result is discarded.
+        Assert.Equal((true, false), await workEnded.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken));
+        await HandleAsync(CreateHandler(runtime), ResumeContext(runtime, treeIds[1], resume.Generation, resume.DueTime));
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        Assert.All(treeIds, id => AssertAborted(storage.Get(id).Result, "operator"));
+        Assert.All(treeIds, id => Assert.Null(storage.Get(id).CancellationRequestedAt));
+        Assert.Empty(transport.Cancellations);
+    });
+
+    [Fact]
+    public Task AbortOfCancelingTaskWhichIgnoresCancellationFaultsItAndDiscardsItsResult() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            started.TrySetResult();
+            await release.Task;
+            return 1;
+        }));
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        await ((IDurableTaskServer)runtime).CancelAsync(rootId, TestContext.Current.CancellationToken);
+        Assert.Equal("Canceling", (await GetDiagnosticsAsync(runtime, rootId)).Status);
+
+        await ((IDurableTaskManager)runtime).GetTask<int>(rootId).AbortAsync("stuck cleanup", TestContext.Current.CancellationToken);
+
+        var diagnostics = await GetDiagnosticsAsync(runtime, rootId);
+        Assert.Equal("Faulted", diagnostics.Status);
+        Assert.Equal("DurableTaskAbortedException: stuck cleanup", diagnostics.Response);
+        Assert.NotNull(diagnostics.CompletedAt);
+        release.SetResult();
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        AssertAborted(storage.Get(rootId).Result, "stuck cleanup");
+    });
+
+    [Fact]
+    public Task AbortLeavesTerminalAndUnknownTasksUnchanged() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, CreateRequest(1), TestContext.Current.CancellationToken);
+        await WaitForResponseAsync(runtime, rootId);
+        var result = storage.Get(rootId).Result;
+        var writes = manager.WriteCount;
+
+        await ((IDurableTaskServer)runtime).AbortAsync(rootId, "late", TestContext.Current.CancellationToken);
+        await ((IDurableTaskServer)runtime).AbortAsync(TaskId.Parse("missing"), "unknown", TestContext.Current.CancellationToken);
+
+        Assert.Same(result, storage.Get(rootId).Result);
+        Assert.False(storage.Contains(TaskId.Parse("missing")));
+        Assert.Equal(writes, manager.WriteCount);
+        Assert.Empty(transport.Aborts);
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => runtime.AbortTaskAsync(rootId, " ", TestContext.Current.CancellationToken).AsTask());
+    });
+
+    [Fact]
+    public Task InboxAbortFaultsRunningInvokedTaskAndCompletesItsCaller() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var caller = GrainId.Create("caller", "one");
+        var taskId = TaskId.Parse("invoked");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async cancellationToken =>
+        {
+            started.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }));
+        runtime.ScheduleFromInbox(taskId, request);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        var writes = manager.WriteCount;
+
+        Accept(CreateHandler(runtime), AbortMessage(caller, runtime.GrainId, taskId, "caller aborted"));
+
+        // The abort and the caller's completion are staged with the inbox batch, which commits them together.
+        Assert.Equal(writes, manager.WriteCount);
+        var completion = Assert.Single(transport.Completions);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(caller, completion.Target);
+        AssertAborted(completion.Materialize(runtime).Response, "caller aborted");
+        AssertAborted(storage.Get(taskId).Result, "caller aborted");
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+    });
+
+    [Fact]
+    public Task InboxAbortWhichPrecedesItsInvocationCancelsTheInvocation() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var caller = GrainId.Create("caller", "one");
+        var taskId = TaskId.Parse("early");
+        var request = CreateRequest(1);
+
+        Accept(CreateHandler(runtime), AbortMessage(caller, runtime.GrainId, taskId, "caller aborted"));
+        Assert.NotNull(storage.Get(taskId).CancellationRequestedAt);
+        var response = runtime.ScheduleFromInbox(taskId, request);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(DurableTaskStatus.Canceled, response.Status);
+        Assert.Equal(0, request.CreateTaskCallCount);
+    });
+
+    [Fact]
+    public void AbortMessageCarriesReasonUnderItsOwnIdentity()
+    {
+        var outbox = new RecordingOutbox();
+        var transport = MessagingTestHelpers.CreateTransport(outbox);
+        var sender = GrainId.Create("caller", "one");
+        var target = GrainId.Create("target", "one");
+        var taskId = TaskId.Parse("root");
+
+        transport.SendCancellation(sender, target, taskId);
+        transport.SendAbort(sender, target, taskId, "operator");
+        transport.SendAbort(sender, target, taskId, "operator");
+
+        var messages = outbox.Messages.ToArray();
+        Assert.Equal(3, messages.Length);
+        Assert.NotEqual(messages[0].Envelope.MessageId, messages[1].Envelope.MessageId);
+        Assert.Equal(messages[1].Envelope.MessageId, messages[2].Envelope.MessageId);
+        Assert.All(messages, static message => Assert.Equal(DurableTaskMessageTypes.CancellationSubject, message.Envelope.Subject));
+        Assert.Null(MessagingTestHelpers.MessageTypes.Cancellation.Decode(messages[0].Envelope).AbortReason);
+        var abort = MessagingTestHelpers.MessageTypes.Cancellation.Decode(messages[1].Envelope);
+        Assert.Equal((taskId, sender, "operator"), (abort.TaskId, abort.Sender, abort.AbortReason));
+    }
+
+    [Fact]
+    public void AbortedResponseRoundTripsThroughSerializationAndCopy()
+    {
+        var original = DurableTaskResponse.FromException(new DurableTaskAbortedException("operator"));
+        using var services = new ServiceCollection()
+            .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskMessageTransport).Assembly))
+            .BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+
+        var deserialized = serializer.Deserialize<DurableTaskResponse>(serializer.SerializeToArray(original));
+        var copied = services.GetRequiredService<DeepCopier<DurableTaskResponse>>().Copy(original);
+
+        AssertAborted(deserialized, "operator");
+        AssertAborted(copied, "operator");
+    }
+
+    private static DurableTask<int> BlockedChild(TaskCompletionSource started) => DurableTask.Run(async cancellationToken =>
+    {
+        started.TrySetResult();
+        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        return 0;
+    });
+
+    private static async Task<DurableTaskResponse> WaitForResponseAsync(DurableTaskGrainRuntime runtime, TaskId taskId) =>
+        await runtime.GetScheduledTaskHandle(taskId)
+            .WaitAsync(TestContext.Current.CancellationToken)
+            .AsTask()
+            .WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+
+    private static async Task<DurableTaskDiagnosticState> GetDiagnosticsAsync(DurableTaskGrainRuntime runtime, TaskId taskId)
+    {
+        await foreach (var (id, state) in ((IDurableTaskGrainExtension)runtime).GetTasksAsync(TestContext.Current.CancellationToken))
+        {
+            if (id == taskId)
+            {
+                return state;
+            }
+        }
+
+        throw new Xunit.Sdk.XunitException($"Task '{taskId}' has no diagnostics.");
+    }
+
+    private static void AssertAborted(DurableTaskResponse? response, string reason)
+    {
+        Assert.NotNull(response);
+        Assert.Equal(DurableTaskStatus.Failed, response.Status);
+        var exception = Assert.IsType<DurableTaskAbortedException>(response.Exception);
+        Assert.Equal(reason, exception.Message);
+    }
+
+    private static InboxMessage AbortMessage(GrainId sender, GrainId receiver, TaskId taskId, string reason) =>
+        MessagingTestHelpers.CreateMessage(
+            MessagingTestHelpers.MessageTypes.Cancellation,
+            sender,
+            receiver,
+            taskId,
+            new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender, AbortReason = reason });
+}

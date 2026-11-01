@@ -1,0 +1,155 @@
+using System;
+using System.Collections.Generic;
+using Orleans.DurableTasks;
+using Orleans.Runtime;
+
+namespace Orleans.DurableTasks.Protocol;
+
+internal interface IDurableTaskState
+{
+    /// <summary>
+    /// Gets the kind of operation which the task records, which the runtime sets when it creates the record.
+    /// </summary>
+    public DurableTaskRecordKind Kind { get; }
+
+    /// <summary>
+    /// The result of the task, which will be <see langword="null"/> if the task has not yet completed.
+    /// </summary>
+    public DurableTaskResponse? Result { get; }
+
+    /// <summary>
+    /// The tasks of other grains, or of this grain, which must receive the result of this task.
+    /// </summary>
+    /// <remarks>
+    /// The invoker subscribes under the identifier which it addresses this task by, and a durable execution which awaits
+    /// this task with <c>GetDurableTask</c> subscribes under its own child's identifier; a subscriber on another grain
+    /// names its task by its wire identifier. Each subscriber of a terminal task on another
+    /// grain has a completion pending in the outbox until the outbox retires it, and the task is retained until then;
+    /// a subscriber on this grain receives the result in the write which stores it. Local nested tasks have no
+    /// subscribers.
+    /// </remarks>
+    public IReadOnlySet<DurableTaskSubscriber> CompletionDestinations { get; }
+
+    /// <summary>
+    /// The invokable request.
+    /// </summary>
+    /// <exception cref="Exception">The stored request no longer decodes, for example because its type was removed.</exception>
+    public IDurableTaskRequest? Request { get; }
+
+    /// <summary>
+    /// Gets whether the task stores a request, without decoding it.
+    /// </summary>
+    /// <remarks>
+    /// The runtime classifies tasks by this and by their kind, so a stored request which no longer decodes affects only
+    /// the operations which decode it, such as starting its task.
+    /// </remarks>
+    public bool HasRequest { get; }
+
+    /// <summary>
+    /// The time at which the task completed.
+    /// </summary>
+    public DateTimeOffset? CompletedAt { get; }
+
+    /// <summary>
+    /// The time at which cancellation was requested.
+    /// </summary>
+    public DateTimeOffset? CancellationRequestedAt { get; }
+
+    /// <summary>
+    /// The reason which the task's cancellation request carries, or <see langword="null"/> when cancellation hasn't been
+    /// requested or its request carries no reason.
+    /// </summary>
+    /// <remarks>The first cancellation request determines the reason.</remarks>
+    public string? CancellationReason { get; }
+
+    /// <summary>
+    /// Gets whether the task's parent started it shielded, so its ancestors' durable cancellation doesn't reach it.
+    /// </summary>
+    /// <remarks>Its own cancellation, an abort of its tree, and deletion of its tree still reach it.</remarks>
+    public bool Shielded { get; }
+
+    /// <summary>
+    /// The time at which the task was created.
+    /// </summary>
+    public DateTimeOffset CreatedAt { get; }
+
+    public DateTimeOffset? DueTime { get; }
+
+    public long ResumeGeneration { get; }
+
+    /// <summary>
+    /// Gets the fingerprint which the record stores: a hash of an invoked request's invokable type and serialized
+    /// arguments, or, for a record of an execution's own operation, its kind and identity, such as a detached start's
+    /// target and root task.
+    /// </summary>
+    /// <remarks>
+    /// A request's argument hash is a diagnostic: it changes with the arguments' serialized form, so the runtime never
+    /// compares it to decide whether a replay or a retry is the same operation. <see cref="Method"/> decides that.
+    /// </remarks>
+    public string? RequestFingerprint { get; }
+
+    /// <summary>
+    /// Gets the identity of the interface method which the task invokes, which its call to another grain invokes, or which
+    /// its detached start invokes, or <see langword="null"/> for a record which invokes no method.
+    /// </summary>
+    /// <remarks>
+    /// The identity is the formatted type of the method's invokable. A replay which reaches the record, or a retry which
+    /// schedules a root task under its identifier, is the same operation when it has the record's kind, target, and
+    /// method; the arguments aren't compared.
+    /// </remarks>
+    public string? Method { get; }
+
+    /// <summary>
+    /// Gets when the terminal result's retention restarted because its completion was dead-lettered, or
+    /// <see langword="null"/> when retention starts at <see cref="CompletedAt"/>.
+    /// </summary>
+    public DateTimeOffset? RetainedSince { get; }
+
+    public GrainId RemoteTarget { get; }
+
+    /// <summary>
+    /// Gets the hash of the invokable type and serialized arguments of the record's call to <see cref="RemoteTarget"/>,
+    /// which diagnostics report.
+    /// </summary>
+    /// <remarks>The call's identity is its target and <see cref="Method"/>, not this hash.</remarks>
+    public string? RemoteRequestFingerprint { get; }
+
+    /// <summary>
+    /// Gets whether the grain of the task which this record starts on another grain durably accepted the task,
+    /// <see langword="true"/>, or the start failed, <see langword="false"/>, or <see langword="null"/> until either is known.
+    /// </summary>
+    /// <remarks>
+    /// A record of a durable call or of a detached task records the acceptance when its invocation retires as delivered, or
+    /// when the task's result reaches it first. An invocation which its target rejected, such as a start whose identifier
+    /// already identifies another request, or which the outbox dead-lettered, fails the start, and stores the failure as
+    /// the record's result unless the record already holds its own outcome, such as its cancellation.
+    /// </remarks>
+    public bool? Accepted { get; }
+
+    /// <summary>
+    /// Gets the grain which created this task through durable messaging.
+    /// </summary>
+    public GrainId CallerId { get; }
+
+    /// <summary>
+    /// Gets the nonce which identifies this run of an invoked task, which the host minted when it first stored the task's
+    /// invocation, or <see cref="System.Guid.Empty"/> for a task which isn't invoked.
+    /// </summary>
+    /// <remarks>
+    /// Every execution in the task's tree reports it as <see cref="DurableTaskContext.Incarnation"/>. A later run of the
+    /// same identifier, after this one is deleted, has another.
+    /// </remarks>
+    public System.Guid Incarnation { get; }
+
+    /// <summary>
+    /// Gets the grain-wide completion sequence which stamped the task's terminal result when it was staged, or zero when
+    /// the task has no result or its storage doesn't order completions.
+    /// </summary>
+    /// <remarks>
+    /// Storage stamps each stored result with a sequence higher than every stored task's, in the same journal write as the
+    /// result, so results staged later have higher sequences. A combinator which selects the earliest completion, such as
+    /// <c>WhenAny</c> or <c>WhenEach</c>, selects the completed candidate with the lowest sequence, which is the same in
+    /// every replay. Candidates without a sequence are selected by a recorded decision.
+    /// </remarks>
+    public long CompletionSequence { get; }
+}
