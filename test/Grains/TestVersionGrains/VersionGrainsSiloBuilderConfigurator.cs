@@ -17,7 +17,11 @@ namespace TestVersionGrains
             var siloCount = int.Parse(cfg["SiloCount"]!);
             hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
-                siloBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
+                siloBuilder.Configure<SiloMessagingOptions>(options =>
+                {
+                    options.AssumeHomogenousSilosForTesting = false;
+                    options.WaitForCancellationAcknowledgement = bool.Parse(cfg["WaitForCancellationAcknowledgement"]!);
+                });
                 siloBuilder.Configure<GrainVersioningOptions>(options =>
                 {
                     options.DefaultCompatibilityStrategy = cfg["CompatibilityStrategy"]!;
