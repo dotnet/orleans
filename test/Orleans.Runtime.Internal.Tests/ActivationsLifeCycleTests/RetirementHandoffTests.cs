@@ -1657,7 +1657,7 @@ public sealed class RetirementHandoffTests
 
             // Once activated, the activation has no request to run.
             state.ReleaseActivation.TrySetResult();
-            await WaitUntilAsync(() => activation.State is ActivationState.Valid);
+            await WaitUntilAsync(() => activation.State is ActivationState.Active);
             await activation.RunOrQueueTask(() => Task.CompletedTask);
             Assert.False(state.HoldEntered.Task.IsCompleted);
             Assert.Equal(0, activation.GetRequestCount());
@@ -2064,8 +2064,10 @@ public sealed class RetirementHandoffTests
         };
     }
 
-    [Fact]
-    public async Task ActivationInterruptedByRetirement_DoesNotMigrate()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ActivationInterruptedByRetirement_MigratesOnlyCompletedActivation(bool throwOnCancellation)
     {
         var migrationsReceived = 0;
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
@@ -2085,6 +2087,7 @@ public sealed class RetirementHandoffTests
 
         // The activation is held in OnActivateAsync, with a request queued behind it.
         state.HoldActivationOn = retiring.SiloAddress;
+        state.ThrowWhenActivationCanceled = throwOnCancellation;
         RequestContext.Set(IPlacementDirector.PlacementHintKey, retiring.SiloAddress);
         Task call;
         try
@@ -2100,13 +2103,65 @@ public sealed class RetirementHandoffTests
         var activation = Assert.IsType<ActivationData>(FindActivation(retiring, grain.GetGrainId()));
         await WaitUntilAsync(() => activation.WaitingCount == 1);
 
-        // Retirement interrupts the activation. Its state may be partially initialized, so it does not migrate, and its queued request is forwarded or rejected as before.
+        // Retirement cancels the activation token. A normal return completes activation, so the activation migrates with its queued request.
+        // Throwing on cancellation interrupts activation, which may hold partially initialized state, so its request is forwarded or rejected.
         var stopping = cluster.StopSiloAsync(retiring, Cancellation);
-        await WaitUntilAsync(() => activation.State is ActivationState.Deactivating or ActivationState.Invalid);
+        await WaitUntilAsync(() => activation.IsDeactivationRequested);
         state.ReleaseActivation.TrySetResult();
         await stopping.WaitAsync(Timeout, Cancellation);
-        await call.WaitAsync(Timeout, Cancellation).ContinueWith(static _ => { }, TaskScheduler.Default);
-        Assert.Equal(0, Volatile.Read(ref migrationsReceived));
+        if (throwOnCancellation)
+        {
+            await call.WaitAsync(Timeout, Cancellation).ContinueWith(static _ => { }, TaskScheduler.Default);
+            Assert.Equal(0, Volatile.Read(ref migrationsReceived));
+        }
+        else
+        {
+            await call.WaitAsync(Timeout, Cancellation);
+            Assert.Equal(1, Volatile.Read(ref migrationsReceived));
+            Assert.Equal(["queued"], state.Calls);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MigrationRequestedDuringActivation_MigratesOnlyCompletedActivation(bool throwOnCancellation)
+    {
+        var migrationsReceived = 0;
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) => silo.AddIncomingGrainCallFilter(async context =>
+        {
+            if (context.Request.GetMethodName() == nameof(IActivationMigrationManagerSystemTarget.AcceptMigratingGrains))
+            {
+                Interlocked.Increment(ref migrationsReceived);
+            }
+
+            await context.Invoke();
+        })));
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+
+        // The first activation requests migration from OnActivateAsync, which cancels its activation token.
+        state.MigrateDuringActivationTo = target.SiloAddress;
+        state.ThrowWhenActivationCanceled = throwOnCancellation;
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, source.SiloAddress);
+        SiloAddress location;
+        try
+        {
+            location = await grain.GetLocation().AsTask().WaitAsync(Timeout, Cancellation);
+        }
+        finally
+        {
+            RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+        }
+
+        // A normal return completes activation, so the activation migrates with its request. Throwing on cancellation interrupts
+        // activation, which may hold partially initialized state, so its request is forwarded to a new activation.
+        Assert.Equal(throwOnCancellation ? source.SiloAddress : target.SiloAddress, location);
+        Assert.Equal(throwOnCancellation ? 0 : 1, Volatile.Read(ref migrationsReceived));
     }
 
     private static Message CreateRequest(InProcessTestCluster cluster, GrainId grainId, long id, object body) => new()
@@ -2475,7 +2530,7 @@ public sealed class RetirementHandoffTests
             Assert.Equal(rejectResponseFails ? 2 : 3, ownedCount);
             Assert.Equal(bodies.Take(ownedCount), ownedBodies);
             await activation!.Deactivated.WaitAsync(Timeout, Cancellation);
-            Assert.Equal(ActivationState.Invalid, activation.State);
+            Assert.Equal(ActivationState.Destroyed, activation.State);
             Assert.Equal(0, activation.WaitingCount);
             Assert.Null(FindActivation(silo, grainId));
             Assert.Empty(package.Requests!);
@@ -2965,6 +3020,17 @@ public class RetirementHandoffGrain : Grain, IRetirementHandoffGrain
             State.ActivationHeld.TrySetResult();
             await State.ReleaseActivation.Task;
         }
+
+        if (Interlocked.Exchange(ref State.MigrateDuringActivationTo, null) is { } target)
+        {
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, target);
+            MigrateOnIdle();
+        }
+
+        if (State.ThrowWhenActivationCanceled)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
     }
 
     public ValueTask<SiloAddress> GetLocation() => new(GrainContext.Address.SiloAddress!);
@@ -3064,6 +3130,8 @@ public sealed class RetirementHandoffState
     public ConcurrentQueue<string> Calls { get; } = new();
     public SiloAddress? HoldActivationOn { get; set; }
     public SiloAddress? FailActivationOn { get; set; }
+    public SiloAddress? MigrateDuringActivationTo;
+    public bool ThrowWhenActivationCanceled { get; set; }
     public int HoldCount;
 
     public static RetirementHandoffState Create(Guid key) => States[key] = new();
