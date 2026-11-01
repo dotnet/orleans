@@ -215,12 +215,24 @@ namespace Orleans.Storage
                     }
                     catch (RequestFailedException ex) when (IsWriteConflict(ex))
                     {
+                        var attemptedETag = grainState.ETag;
                         if (!ex.IsPreconditionFailed()
                             || !options.EnableIdempotentWrites
                             || !await TryHandleIdempotentRetryAsync(blob, grainState, emptyHashBase64, cancellationToken))
                         {
                             throw CreateInconsistentStateException(blob, grainState.ETag, ex);
                         }
+
+                        LogWarningIdempotentRetryResolved(
+                            "clear",
+                            ex.Status,
+                            ex.ErrorCode,
+                            grainType,
+                            grainId,
+                            blob.Name,
+                            container.Name,
+                            attemptedETag,
+                            grainState.ETag);
                     }
                 }
 
@@ -261,10 +273,21 @@ namespace Orleans.Storage
                 }
                 catch (RequestFailedException ex) when (IsWriteConflict(ex))
                 {
+                    var attemptedETag = grainState.ETag;
                     if (ex.IsPreconditionFailed()
                         && this.options.EnableIdempotentWrites
                         && await TryHandleIdempotentRetryAsync(blob, grainState, localHashBase64, cancellationToken))
                     {
+                        LogWarningIdempotentRetryResolved(
+                            "write",
+                            ex.Status,
+                            ex.ErrorCode,
+                            grainType,
+                            grainId,
+                            blob.Name,
+                            container.Name,
+                            attemptedETag,
+                            grainState.ETag);
                         return;
                     }
 
@@ -317,10 +340,21 @@ namespace Orleans.Storage
                     }
                     catch (RequestFailedException ex) when (IsWriteConflict(ex))
                     {
+                        var attemptedETag = grainState.ETag;
                         if (ex.IsPreconditionFailed()
                             && this.options.EnableIdempotentWrites
                             && await TryHandleIdempotentRetryAsync(blob, grainState, localHashBase64, cancellationToken))
                         {
+                            LogWarningIdempotentRetryResolved(
+                                "write",
+                                ex.Status,
+                                ex.ErrorCode,
+                                grainType,
+                                grainId,
+                                blob.Name,
+                                container.Name,
+                                attemptedETag,
+                                grainState.ETag);
                             return;
                         }
 
@@ -596,6 +630,22 @@ namespace Orleans.Storage
             Message = "Cleared: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName} in Container={ContainerName}"
         )]
         private partial void LogTraceCleared(string grainType, GrainId grainId, string? eTag, string blobName, string containerName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)AzureProviderErrorCode.AzureBlobProvider_IdempotentRetryResolved,
+            Message = "Resolved an Azure Blob {Operation} conflict as a successful idempotent retry. Status={Status} ErrorCode={ErrorCode} GrainType={GrainType} GrainId={GrainId} BlobName={BlobName} Container={ContainerName} AttemptedETag={AttemptedETag} CurrentETag={CurrentETag}"
+        )]
+        private partial void LogWarningIdempotentRetryResolved(
+            string operation,
+            int status,
+            string? errorCode,
+            string grainType,
+            GrainId grainId,
+            string blobName,
+            string containerName,
+            string? attemptedETag,
+            string? currentETag);
 
         [LoggerMessage(
             Level = LogLevel.Error,
