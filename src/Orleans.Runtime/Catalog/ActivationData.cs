@@ -36,6 +36,7 @@ internal sealed partial class ActivationData :
     IGrainManagementExtension,
     IGrainCallCancellationExtension,
     ICallChainReentrantGrainContext,
+    IGrainRequestAdmission,
     IAsyncDisposable,
     IDisposable
 {
@@ -56,6 +57,10 @@ internal sealed partial class ActivationData :
     private Message? _blockingRequest;
     private int _runningNonAlwaysInterleaveCount;
     private int _runningNonAlwaysInterleaveWritableCount;
+
+    // Whether an exclusive section is open: only requests which always interleave, and requests on the section holder's call
+    // chain, start. See IGrainRequestAdmission.EnterExclusiveSectionAsync.
+    private bool _exclusiveSectionOpen;
     private bool _isInWorkingSet = true;
     private CoarseStopwatch _busyDuration;
     private CoarseStopwatch _idleDuration;
@@ -218,7 +223,9 @@ internal sealed partial class ActivationData :
         lock (_lock)
         {
             var waitingCount = _waitingRequests.Count;
-            return (waitingCount, waitingCount == 0 && _runningRequests.Count == 0);
+
+            // An open exclusive section runs code, such as a transaction, which needn't be a request.
+            return (waitingCount, waitingCount == 0 && _runningRequests.Count == 0 && !_exclusiveSectionOpen);
         }
     }
 
@@ -1338,6 +1345,19 @@ internal sealed partial class ActivationData :
 
         bool MayInvokeRequest(Message incoming)
         {
+            if (_exclusiveSectionOpen)
+            {
+                // Only requests which always interleave and requests on the section holder's call chain start while an
+                // exclusive section is open.
+                if (incoming.IsAlwaysInterleave)
+                {
+                    return true;
+                }
+
+                var reentrancyId = incoming.GetReentrancyId();
+                return reentrancyId != Guid.Empty && reentrancyId == _extras?.ExclusiveSectionReentrancyId;
+            }
+
             if (!IsCurrentlyExecuting)
             {
                 return true;
@@ -1688,6 +1708,146 @@ internal sealed partial class ActivationData :
 
         // Signal the message pump to see if there is another request which can be processed now that this one has completed
         _workSignal.Signal();
+    }
+
+    // The holder's call chain is read here, synchronously in the caller's flow.
+    ValueTask<IDisposable> IGrainRequestAdmission.EnterExclusiveSectionAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var reentrancyId = RequestContext.ReentrancyId;
+        ExclusiveSectionWaiter waiter;
+        lock (_lock)
+        {
+            if (!_exclusiveSectionOpen)
+            {
+                Debug.Assert(_extras?.ExclusiveSectionWaiters is not { Count: > 0 }, "Sections wait only while one is open.");
+                Debug.Assert(_extras is not { } extras || extras.ExclusiveSectionReentrancyId == Guid.Empty, "Only an open section has a call chain.");
+                _exclusiveSectionOpen = true;
+                if (reentrancyId != Guid.Empty)
+                {
+                    (_extras ??= new()).ExclusiveSectionReentrancyId = reentrancyId;
+                }
+
+                return new(new ExclusiveSection(this));
+            }
+
+            var waiters = (_extras ??= new()).ExclusiveSectionWaiters ??= new();
+            if (waiters.Closed is { } closed)
+            {
+                return ValueTask.FromException<IDisposable>(closed);
+            }
+
+            waiter = new(reentrancyId);
+            waiters.Enqueue(waiter);
+        }
+
+        return WaitAsync(this, waiter, cancellationToken);
+
+        static async ValueTask<IDisposable> WaitAsync(ActivationData activation, ExclusiveSectionWaiter waiter, CancellationToken cancellationToken)
+        {
+            // A canceled waiter stays queued, and the next exit skips it.
+            using (cancellationToken.UnsafeRegister(static (state, token) => ((ExclusiveSectionWaiter)state!).TrySetCanceled(token), waiter))
+            {
+                await waiter.Task;
+            }
+
+            return new ExclusiveSection(activation);
+        }
+    }
+
+    // Closes the open section, or hands it, with its holder's call chain, to the next waiting section, which keeps it open.
+    private void ExitExclusiveSection()
+    {
+        bool signal;
+        lock (_lock)
+        {
+            Debug.Assert(_exclusiveSectionOpen);
+            var next = HandOffExclusiveSection();
+            if (_extras is { } extras)
+            {
+                extras.ExclusiveSectionReentrancyId = next?.ReentrancyId ?? Guid.Empty;
+            }
+
+            _exclusiveSectionOpen = next is not null;
+
+            // Requests which waited for the section, or which are on the next holder's call chain, can start now.
+            signal = _waitingRequests.Count > 0 && (next is null || next.ReentrancyId != Guid.Empty);
+        }
+
+        if (signal)
+        {
+            _workSignal.Signal();
+        }
+    }
+
+    // Returns the first waiting section which accepts the open section, or null when none waits. Must be called under _lock.
+    private ExclusiveSectionWaiter? HandOffExclusiveSection()
+    {
+        if (_extras?.ExclusiveSectionWaiters is not { } waiters)
+        {
+            return null;
+        }
+
+        while (waiters.TryDequeue(out var next))
+        {
+            if (next.TrySetResult())
+            {
+                return next;
+            }
+        }
+
+        if (waiters.Closed is null)
+        {
+            _extras.ExclusiveSectionWaiters = null;
+        }
+
+        return null;
+    }
+
+    // Faults the sections which wait once the activation finishes deactivating: the open section's code may never end, since
+    // deactivation doesn't wait for code which isn't a request, and later sections can't open.
+    private void CloseExclusiveSections()
+    {
+        lock (_lock)
+        {
+            if (!_exclusiveSectionOpen)
+            {
+                return;
+            }
+
+            var waiters = (_extras ??= new()).ExclusiveSectionWaiters ??= new();
+            var closed = waiters.Closed ??= new InvalidOperationException($"Activation {this} is deactivating, so it opens no more exclusive sections.");
+            while (waiters.TryDequeue(out var waiter))
+            {
+                waiter.TrySetException(closed);
+            }
+        }
+    }
+
+    // An open exclusive section of an activation, which disposing closes once.
+    private sealed class ExclusiveSection(ActivationData activation) : IDisposable
+    {
+        private ActivationData? _activation = activation;
+
+        public void Dispose()
+        {
+            var activation = _activation;
+            _activation = null;
+            activation?.ExitExclusiveSection();
+        }
+    }
+
+    // A section which waits for the open section to close, with the call-chain reentrancy ID of the code which requested it.
+    private sealed class ExclusiveSectionWaiter(Guid reentrancyId) : TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)
+    {
+        public Guid ReentrancyId { get; } = reentrancyId;
+    }
+
+    // The sections which wait for the open section to close, in the order in which they were requested.
+    private sealed class ExclusiveSectionWaiters : Queue<ExclusiveSectionWaiter>
+    {
+        // Set once the activation finishes deactivating, after which sections which would wait fault.
+        public Exception? Closed { get; set; }
     }
 
     /// <summary>
@@ -2194,6 +2354,9 @@ internal sealed partial class ActivationData :
                 // Stop timers from firing.
                 DisposeTimers();
 
+                // Code which waits to run exclusively won't run on this activation.
+                CloseExclusiveSections();
+
                 // If the grain was valid when deactivation started, call OnDeactivateAsync.
                 if (deactivateCommand.PreviousState == ActivationState.Valid)
                 {
@@ -2676,6 +2839,21 @@ internal sealed partial class ActivationData :
         /// When migrating to another location, this contains the information to preserve across activations.
         /// </summary>
         public DehydrationContextHolder? DehydrationContext { get => GetValueOrDefault<DehydrationContextHolder>(nameof(DehydrationContext)); set => SetOrRemoveValue(nameof(DehydrationContext), value); }
+
+        /// <summary>
+        /// The exclusive sections which wait for the open exclusive section to close.
+        /// </summary>
+        public ExclusiveSectionWaiters? ExclusiveSectionWaiters { get => GetValueOrDefault<ExclusiveSectionWaiters>(nameof(ExclusiveSectionWaiters)); set => SetOrRemoveValue(nameof(ExclusiveSectionWaiters), value); }
+
+        /// <summary>
+        /// The call-chain reentrancy ID of the open exclusive section's holder, which is <see cref="Guid.Empty"/> when no section
+        /// is open or its holder has no call chain. Only a non-empty ID is stored.
+        /// </summary>
+        public Guid ExclusiveSectionReentrancyId
+        {
+            get => TryGetValue(nameof(ExclusiveSectionReentrancyId), out var id) ? (Guid)id : Guid.Empty;
+            set => SetOrRemoveValue(nameof(ExclusiveSectionReentrancyId), value == Guid.Empty ? null : value);
+        }
 
         private DeactivationInfo? GetDeactivationInfoOrDefault() => GetValueOrDefault<DeactivationInfo>(nameof(DeactivationInfo));
         private DeactivationInfo EnsureDeactivationInfo()

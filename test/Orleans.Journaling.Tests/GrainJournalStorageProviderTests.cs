@@ -36,14 +36,14 @@ public sealed class GrainJournalStorageProviderTests(JournalCompositionFixture f
         var token = TestContext.Current.CancellationToken;
         for (var i = 0; i < grains.Length; i++)
         {
-            Assert.Equal(new int[7], await grains[i].GetActivationValues());
+            Assert.Equal(new int[8], await grains[i].GetActivationValues());
             await grains[i].SetValues(i + 1);
         }
 
         for (var i = 0; i < grains.Length; i++)
         {
             var grain = grains[i];
-            var expected = Enumerable.Repeat(i + 1, 7).ToArray();
+            var expected = Enumerable.Repeat(i + 1, 8).ToArray();
             Assert.Equal(expected, await grain.GetValues());
             Assert.True(fixture.Cluster.TryGetGrainContext(grain.GetGrainId(), out var context));
             var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
@@ -61,6 +61,7 @@ public sealed class GrainJournalStorageProviderTests(JournalCompositionFixture f
             await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), token);
             await Assert.ThrowsAsync<ObjectDisposedException>(() => manager.InitializeAsync(token).AsTask());
             Assert.Equal(expected, await grain.GetActivationValues());
+            Assert.Equal([i + 1], await grain.ReadLog());
             Assert.Equal(expected, await grain.GetValues());
             Assert.True(fixture.Cluster.TryGetGrainContext(grain.GetGrainId(), out var replacement));
             Assert.NotSame(manager, replacement.ActivationServices.GetRequiredService<IJournaledStateManager>());
@@ -218,6 +219,7 @@ public interface IProviderSelectionGrain : IGrainWithGuidKey
     Task SetValues(int value);
     Task<int[]> GetValues();
     Task<int[]> GetActivationValues();
+    Task<int[]> ReadLog();
 }
 
 public abstract class ProviderSelectionGrain : DurableGrain, IProviderSelectionGrain
@@ -229,6 +231,7 @@ public abstract class ProviderSelectionGrain : DurableGrain, IProviderSelectionG
     private readonly IDurableSet<int> _set;
     private readonly IPersistentState<int> _persistent;
     private readonly IDurableValue<int> _programmatic;
+    private readonly IDurableLog<int> _log;
     private int[] _activationValues = [];
 
     protected ProviderSelectionGrain(
@@ -246,6 +249,8 @@ public abstract class ProviderSelectionGrain : DurableGrain, IProviderSelectionG
         _set = set;
         _persistent = persistent;
         _programmatic = StateManager.GetOrAddValue<int>("programmatic");
+        _log = ServiceProvider.GetRequiredKeyedService<IDurableLog<int>>("log");
+        Assert.Same(_log, StateManager.GetOrAddLog<int>("log"));
         Assert.Same(StateManager, ServiceProvider.GetRequiredService<IJournaledStateManager>());
         Assert.Same(value, StateManager.GetOrAddValue<int>("value"));
         Assert.Same(list, StateManager.GetOrAddList<int>("list"));
@@ -270,14 +275,31 @@ public abstract class ProviderSelectionGrain : DurableGrain, IProviderSelectionG
         _set.Add(value);
         _persistent.State = value;
         _programmatic.Value = value;
+        _log.Append(value);
         await WriteStateAsync();
     }
 
     public Task<int[]> GetValues() => Task.FromResult(Read());
     public Task<int[]> GetActivationValues() => Task.FromResult(_activationValues);
+
+    public async Task<int[]> ReadLog()
+    {
+        var entries = new List<int>();
+        await foreach (var logEvent in _log.ReadAsync())
+        {
+            if (logEvent.Kind is LogEventKind.CaughtUp)
+            {
+                return [.. entries];
+            }
+
+            entries.Add(logEvent.Item);
+        }
+
+        throw new InvalidOperationException("The log read ended before it caught up.");
+    }
     private int[] Read() =>
         [_value.Value, _list.FirstOrDefault(), _dictionary.TryGetValue("value", out var value) ? value : 0, _queue.FirstOrDefault(),
-            _set.SingleOrDefault(), _persistent.RecordExists ? _persistent.State : 0, _programmatic.Value];
+            _set.SingleOrDefault(), _persistent.RecordExists ? _persistent.State : 0, _programmatic.Value, _log.LastOrDefault()];
 }
 
 public sealed class DefaultProviderSelectionGrain(

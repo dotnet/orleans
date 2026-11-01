@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <NoWarn>$(NoWarn);ORLEANSEXP003;ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)playground\DurableOrderProcessing\DurableOrderProcessing.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+</Project>
