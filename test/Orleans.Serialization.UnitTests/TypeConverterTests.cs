@@ -33,7 +33,7 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal("System.Int32[]", Assert.Single(options.AllowedTypes));
 
             var registrations = new ServiceCollection().AddSerializer();
-            if (withContext) registrations.AddSerializerContext(new AllowedArrayContext());
+            if (withContext) registrations.AddGeneratedContext(new AllowedArrayContext());
             registrations.Configure<TypeManifestOptions>(AllowArrays);
             using var services = registrations.BuildServiceProvider();
             var resolver = services.GetRequiredService<TypeResolver>();
@@ -860,8 +860,8 @@ namespace Orleans.Serialization.UnitTests
         }
     }
 
-    [GenerateSerializerContext<int[]>]
-    internal partial class AllowedArrayContext : SerializerContext;
+    [GeneratedContextType<int[]>]
+    internal partial class AllowedArrayContext : GeneratedContext;
 
     internal sealed class TypeConverterTestsUnconfiguredType
     {

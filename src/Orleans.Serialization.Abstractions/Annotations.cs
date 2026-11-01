@@ -557,6 +557,10 @@ namespace Orleans
     /// <summary>
     /// Indicates that the source generator should also inspect and generate code for the assembly containing the specified type.
     /// </summary>
+    /// <remarks>
+    /// Serializable types and their member types must be accessible to the generated code.
+    /// Internal types can grant access using <see cref="System.Runtime.CompilerServices.InternalsVisibleToAttribute"/>.
+    /// </remarks>
     /// <seealso cref="System.Attribute" />
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
     public sealed class GenerateCodeForDeclaringAssemblyAttribute : Attribute

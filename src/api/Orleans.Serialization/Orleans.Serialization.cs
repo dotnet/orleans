@@ -128,6 +128,13 @@ namespace Orleans.Serialization
         public FieldTypeMissingException(System.Type type) { }
     }
 
+    public abstract partial class GeneratedContext : Configuration.TypeManifestProviderBase
+    {
+        protected static Codecs.IFieldCodec<T> CreateCodecHolder<T>(Serializers.ICodecProvider provider) { throw null; }
+
+        protected static Cloning.IDeepCopier<T> CreateCopierHolder<T>(Serializers.ICodecProvider provider) { throw null; }
+    }
+
     [GenerateSerializer]
     public sealed partial class IllegalTypeException : SerializerException
     {
@@ -353,7 +360,7 @@ namespace Orleans.Serialization
     {
         public static ISerializerBuilder AddAssembly(this ISerializerBuilder builder, System.Reflection.Assembly assembly) { throw null; }
 
-        public static ISerializerBuilder AddSerializerContext(this ISerializerBuilder builder, SerializerContext context) { throw null; }
+        public static ISerializerBuilder AddGeneratedContext(this ISerializerBuilder builder, GeneratedContext context) { throw null; }
 
         public static ISerializerBuilder Configure(this ISerializerBuilder builder, Microsoft.Extensions.Options.IConfigureOptions<Configuration.TypeManifestOptions> configure) { throw null; }
 
@@ -374,13 +381,6 @@ namespace Orleans.Serialization
 
             public System.Collections.Generic.Dictionary<System.Type, System.Collections.Generic.HashSet<System.Reflection.MethodInfo>> Methods { get { throw null; } }
         }
-    }
-
-    public abstract partial class SerializerContext : Configuration.TypeManifestProviderBase
-    {
-        protected static Codecs.IFieldCodec<T> CreateCodecHolder<T>(Serializers.ICodecProvider provider) { throw null; }
-
-        protected static Cloning.IDeepCopier<T> CreateCopierHolder<T>(Serializers.ICodecProvider provider) { throw null; }
     }
 
     [GenerateSerializer]
@@ -466,9 +466,9 @@ namespace Orleans.Serialization
 
     public static partial class ServiceCollectionExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddSerializer(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<ISerializerBuilder>? configure = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddGeneratedContext(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, GeneratedContext context) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddSerializerContext(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, SerializerContext context) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddSerializer(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<ISerializerBuilder>? configure = null) { throw null; }
     }
 
     [GenerateSerializer]

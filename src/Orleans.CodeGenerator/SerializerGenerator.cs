@@ -975,6 +975,11 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
                 location ??= Member.Symbol.Locations.FirstOrDefault();
 
+                if (!SymbolEqualityComparer.Default.Equals(ContainingType.ContainingAssembly, Compilation.Assembly))
+                {
+                    location = Location.None;
+                }
+
                 throw new OrleansGeneratorDiagnosticAnalysisException(InaccessibleSetterDiagnostic.CreateDiagnostic(location, Member.Symbol?.ToDisplayString() ?? $"{ContainingType.ToDisplayString()}.{MemberName}"));
             }
 

@@ -44,9 +44,9 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             .Select(static (compilation, _) => compilation.AssemblyName ?? "assembly")
             .WithTrackingName(AssemblyNameTrackingName);
 
-        var serializerContextOutputs = context.SyntaxProvider
+        var generatedContextOutputs = context.SyntaxProvider
             .ForAttributeWithMetadataName(
-                "Orleans.GenerateSerializerContextAttribute`1",
+                "Orleans.GeneratedContextTypeAttribute`1",
                 predicate: static (node, _) => node is ClassDeclarationSyntax,
                 transform: static (ctx, _) => ctx)
             .Where(static ctx =>
@@ -62,7 +62,29 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             .Combine(generatorOptions)
             .SelectMany(static (input, ct) => SerializerContextGenerator.Generate(input.Left, input.Right, ct))
             .WithTrackingName(SerializerContextResultsTrackingName)
-            .Collect()
+            .Collect();
+        var includedContextOutputs = context.SyntaxProvider
+            .ForAttributeWithMetadataName(
+                "Orleans.GeneratedContextImportAttribute`1",
+                predicate: static (node, _) => node is ClassDeclarationSyntax,
+                transform: static (ctx, _) => ctx)
+            .Where(static ctx =>
+            {
+                var rootAttribute = ctx.SemanticModel.Compilation.GetTypeByMetadataName("Orleans.GeneratedContextTypeAttribute`1");
+                if (ctx.TargetSymbol.GetAttributes().Any(attribute =>
+                    SymbolEqualityComparer.Default.Equals(attribute.AttributeClass?.OriginalDefinition, rootAttribute)))
+                    return false;
+                var attribute = ctx.TargetSymbol.GetAttributes().First(attribute =>
+                    SymbolEqualityComparer.Default.Equals(attribute.AttributeClass?.OriginalDefinition, ctx.Attributes[0].AttributeClass!.OriginalDefinition));
+                var reference = attribute.ApplicationSyntaxReference!;
+                return reference.SyntaxTree == ctx.TargetNode.SyntaxTree && ctx.TargetNode.Span.Contains(reference.Span);
+            })
+            .Combine(generatorOptions)
+            .SelectMany(static (input, ct) => SerializerContextGenerator.Generate(input.Left, input.Right, ct))
+            .WithTrackingName("IncludedSerializerContextResults")
+            .Collect();
+        var serializerContextOutputs = generatedContextOutputs.Combine(includedContextOutputs)
+            .Select(static (outputs, _) => outputs.Left.AddRange(outputs.Right))
             .WithComparer(ImmutableArrayComparer<SerializerContextOutput>.Instance)
             .WithTrackingName(SerializerContextOutputsTrackingName);
         var serializerContextEntries = serializerContextOutputs.SelectMany(static (outputs, _) => outputs);

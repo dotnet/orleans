@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
 namespace Orleans.CodeGenerator;
@@ -12,9 +13,10 @@ internal static class SerializerFactoryGenerator
     // Configuration statements are written inside the context's partial class and configuration method.
     private const int ContextStatementIndentation = 2;
 
-    internal sealed class Registration(ITypeSymbol type)
+    internal sealed class Registration(ITypeSymbol type, bool isProvided = false)
     {
         public ITypeSymbol Type { get; } = type;
+        public bool IsProvided { get; } = isProvided;
         public string Codec { get; set; } = "";
         public string Copier { get; set; } = "";
         public string CodecConstruction { get; set; } = "";
@@ -36,9 +38,13 @@ internal static class SerializerFactoryGenerator
 
     internal sealed record Failure(ITypeSymbol Type, string Reason, bool RequiresImplementation = false);
 
+    internal static bool HasSupportedModelConstruction(ISerializableTypeDescription model)
+        => !model.HasComplexBaseType && !model.UseActivator && model.SerializationHooks.Count == 0;
+
     internal static bool TryCreate(
         IGeneratorServices services,
         IEnumerable<ITypeSymbol> roots,
+        IReadOnlyCollection<ITypeSymbol> providedRoots,
         CancellationToken cancellationToken,
         [NotNullWhen(true)] out Graph? graph,
         [NotNullWhen(false)] out Failure? failure)
@@ -49,6 +55,18 @@ internal static class SerializerFactoryGenerator
             ? csharp.WithOptions(csharp.Options.WithMetadataImportOptions(MetadataImportOptions.All))
             : services.Compilation;
         var registrations = new Dictionary<ITypeSymbol, Registration>(SymbolEqualityComparer.Default);
+        foreach (var root in providedRoots)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var type = root.WithNullableAnnotation(NullableAnnotation.None);
+            if (registrations.ContainsKey(type)) continue;
+            if (registrations.Count >= 1024)
+            {
+                failure = new(type, "the dependency graph exceeds 1024 closed types; declare a finite serialization graph");
+                return false;
+            }
+            registrations.Add(type, new Registration(type, isProvided: true));
+        }
         var pending = new Queue<ITypeSymbol>(roots);
         while (pending.Count > 0)
         {
@@ -79,7 +97,7 @@ internal static class SerializerFactoryGenerator
         if (failure is not null)
         {
             var metadata = new SourceWriter(initialIndentation: ContextStatementIndentation);
-            var visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+            var visited = new HashSet<ITypeSymbol>(providedRoots, SymbolEqualityComparer.Default);
             foreach (var type in registrations.Keys)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -94,11 +112,12 @@ internal static class SerializerFactoryGenerator
         }
 
         var result = new SourceWriter(initialIndentation: ContextStatementIndentation);
-        var metadataTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+        var metadataTypes = new HashSet<ITypeSymbol>(providedRoots, SymbolEqualityComparer.Default);
         var auxiliaryServices = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var registration in registrations.Values.OrderBy(value => Name(value.Type), StringComparer.Ordinal))
         {
+            if (registration.IsProvided) continue;
             var typeName = Name(registration.Type);
             var hasBaseCodec = registration.HasBaseCodec;
             var hasBaseCopier = registration.HasBaseCopier;
@@ -121,7 +140,7 @@ internal static class SerializerFactoryGenerator
                 foreach (var dependency in registration.Dependencies)
                 {
                     var target = registrations[dependency.WithNullableAnnotation(NullableAnnotation.None)];
-                    var cyclic = Reaches(target, registration.Type, registrations, new(SymbolEqualityComparer.Default));
+                    var cyclic = MayReach(target, registration.Type, registrations, new(SymbolEqualityComparer.Default));
                     codecArguments.Add(cyclic
                         ? $"CreateCodecHolder<{Name(dependency)}>(provider)"
                         : $"provider.GetCodec<{Name(dependency)}>()");
@@ -156,7 +175,7 @@ internal static class SerializerFactoryGenerator
                 var element = registrations[array.ElementType.WithNullableAnnotation(NullableAnnotation.None)];
                 var canonicalCodec = Name(services.LibraryTypes.ArrayCodec.Construct(array.ElementType));
                 var canonicalCopier = Name(services.LibraryTypes.ArrayCopier.Construct(array.ElementType));
-                var cyclic = Reaches(element, registration.Type, registrations, new(SymbolEqualityComparer.Default));
+                var cyclic = MayReach(element, registration.Type, registrations, new(SymbolEqualityComparer.Default));
                 if (arrayRegistration.Codec != canonicalCodec && auxiliaryServices.Add(canonicalCodec))
                 {
                     var codecDependency = cyclic ? $"CreateCodecHolder<{Name(array.ElementType)}>(provider)" : $"provider.GetCodec<{Name(array.ElementType)}>()";
@@ -252,7 +271,7 @@ internal static class SerializerFactoryGenerator
             return exception.Diagnostic.GetMessage();
         }
         if (model is null) return "the model has no generated serialization implementation";
-        if (model.HasComplexBaseType || model.UseActivator || model.SerializationHooks.Count > 0)
+        if (!HasSupportedModelConstruction(model))
             return "this context supports models with default construction, an object base, and generated member serialization";
         foreach (var member in model.Members)
         {
@@ -285,6 +304,14 @@ internal static class SerializerFactoryGenerator
         registration.CopierConstruction = ConstructGenerated(registration.Copier, copierConstruction);
         registration.HasBaseCodec = codecConstruction.HasBaseContract;
         registration.HasBaseCopier = copierConstruction.HasBaseContract;
+        return AddCanonicalArrays(registration, named, definitionModel, codecConstruction, copierConstruction, services, cancellationToken);
+    }
+
+    private static string? AddCanonicalArrays(
+        Registration registration, INamedTypeSymbol named, ISerializableTypeDescription definitionModel,
+        GeneratedTypeConstruction codecConstruction, GeneratedTypeConstruction copierConstruction,
+        IGeneratorServices services, CancellationToken cancellationToken)
+    {
         var substitutions = new Dictionary<ITypeParameterSymbol, ITypeSymbol>(SymbolEqualityComparer.Default);
         foreach (var (parameter, argument) in definitionModel.TypeParameters.Zip(named.GetAllTypeArguments(),
             static (parameter, argument) => (parameter.Parameter, argument)))
@@ -292,7 +319,13 @@ internal static class SerializerFactoryGenerator
         foreach (var request in codecConstruction.CanonicalArrays.Concat(copierConstruction.CanonicalArrays))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var canonicalArray = (IArrayTypeSymbol)CloseType(request);
+            var binding = services.Compilation.GetSemanticModel(services.Compilation.SyntaxTrees.First());
+            var canonicalArray = binding.GetSpeculativeTypeInfo(0, CloseType(request).ToTypeSyntax(),
+                SpeculativeBindingOption.BindAsTypeOrNamespace).Type as IArrayTypeSymbol;
+            if (canonicalArray is null)
+            {
+                return "provide complete model metadata for its canonical array service requests";
+            }
             if (!registration.CanonicalArrays.Any(existing => SymbolEqualityComparer.Default.Equals(existing, canonicalArray)))
                 registration.CanonicalArrays.Add(canonicalArray);
             registration.Dependencies.Add(canonicalArray);
@@ -325,7 +358,8 @@ internal static class SerializerFactoryGenerator
 
     private static string? DescribeReferenced(
         Registration registration, INamedTypeSymbol named, IGeneratorServices services,
-        Compilation implementationCompilation, CancellationToken cancellationToken, out bool requiresImplementation)
+        Compilation implementationCompilation,
+        CancellationToken cancellationToken, out bool requiresImplementation)
     {
         requiresImplementation = false;
         var binding = implementationCompilation.GetSemanticModel(implementationCompilation.SyntaxTrees.First());
@@ -336,10 +370,22 @@ internal static class SerializerFactoryGenerator
             requiresImplementation = true;
             return "provide the referenced model's implementation metadata";
         }
+        if (TypeMetadataIdentity.Create(implementationType) != TypeMetadataIdentity.Create(named))
+        {
+            return $"type '{named}' cannot be named unambiguously from generated code";
+        }
         var library = LibraryTypes.FromCompilation(implementationCompilation, services.Options);
+        // Contexts inspect only retained model header/base facts; all serialized dependencies below
+        // come from complete generated C# services. This also covers F# model reference images,
+        // whose compiler omits ReferenceAssemblyAttribute while retaining these declaration facts.
+        if (SerializableSourceOutputGenerator.HasReferenceAssemblyAttribute(named.ContainingAssembly))
+        {
+            return "provide full implementation metadata for external serializer-context generation";
+        }
+
         var model = new SerializableTypeDescription(implementationCompilation, implementationType,
             SerializableSourceOutputGenerator.ShouldIncludePrimaryConstructorParameters(implementationType, library), [], library);
-        if (model.HasComplexBaseType || model.UseActivator || model.SerializationHooks.Count > 0)
+        if (!HasSupportedModelConstruction(model))
             return "this context supports models with default construction, an object base, and generated member serialization";
         registration.Model = model;
         registration.ReferencedCodec = ResolveImplementation(SerializerGenerator.GetSimpleClassName(named.Name));
@@ -378,20 +424,7 @@ internal static class SerializerFactoryGenerator
             cancellationToken.ThrowIfCancellationRequested();
             if (SerializableSourceOutputGenerator.HasReferenceAssemblyAttribute(implementation.ContainingAssembly))
             {
-                var options = new CodeGeneratorOptions();
-                try
-                {
-                    var declared = SerializableSourceOutputGenerator.CreateSerializableTypeDescription(
-                        services.Compilation, services.LibraryTypes, options, named);
-                    if (declared is not null)
-                        registration.Dependencies.AddRange(declared.Members.Where(static member => member.IsSerializable || member.IsCopyable)
-                            .Select(static member => member.Type));
-                }
-                catch (OrleansGeneratorDiagnosticAnalysisException)
-                {
-                    requiresImplementation = true;
-                    return "provide complete generated implementation metadata to discover the producer's serialization dependencies";
-                }
+                return "provide full generated codec and copier implementation metadata for external serializer-context generation";
             }
 
             foreach (var member in implementation.GetMembers())
@@ -550,13 +583,15 @@ internal static class SerializerFactoryGenerator
         return null;
     }
 
-    private static bool Reaches(Registration current, ITypeSymbol target,
+    private static bool MayReach(Registration current, ITypeSymbol target,
         Dictionary<ITypeSymbol, Registration> registrations, HashSet<ITypeSymbol> visited)
     {
         if (SymbolEqualityComparer.Default.Equals(current.Type, target)) return true;
+        // Linked graphs are opaque. A closed holder preserves construction safety across hidden back-edges.
+        if (current.IsProvided) return true;
         if (!visited.Add(current.Type)) return false;
         return current.Dependencies.Any(dependency =>
-            Reaches(registrations[dependency.WithNullableAnnotation(NullableAnnotation.None)], target, registrations, visited));
+            MayReach(registrations[dependency.WithNullableAnnotation(NullableAnnotation.None)], target, registrations, visited));
     }
 
     private static bool ContainsTypeParameter(ITypeSymbol type)

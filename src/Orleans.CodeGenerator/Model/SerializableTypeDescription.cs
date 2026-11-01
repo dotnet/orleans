@@ -1,4 +1,5 @@
 using Orleans.CodeGenerator.SyntaxGeneration;
+using Orleans.CodeGenerator.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -16,6 +17,20 @@ internal class SerializableTypeDescription : ISerializableTypeDescription
         Members = [.. members];
         Compilation = compilation;
         _libraryTypes = libraryTypes;
+
+        if (!SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, compilation.Assembly))
+        {
+            // Supported accessors can reach private storage, but external code must be able to name its types.
+            foreach (var member in Members)
+            {
+                if ((member.IsSerializable || member.IsCopyable)
+                    && !compilation.IsSymbolAccessibleWithin(member.Type, compilation.Assembly))
+                {
+                    throw new OrleansGeneratorDiagnosticAnalysisException(
+                        InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(member.Type, Location.None));
+                }
+            }
+        }
 
         var t = type;
         Accessibility accessibility = t.DeclaredAccessibility;

@@ -1,22 +1,42 @@
 ---
-title: Compile-time serializer contexts
+title: Compile-time generated contexts
 description: Register a closed graph of Orleans serialization types for NativeAOT.
 ms.topic: how-to
 ---
 
-# Compile-time serializer contexts
+# Compile-time generated contexts
 
-A <xref:Orleans.Serialization.SerializerContext> registers a closed graph of types with statically constructed Orleans codecs and deep copiers. Use a context when publishing a serialization component with NativeAOT on .NET 10 and later, so the native compiler can compile each required generic implementation.
+A <xref:Orleans.Serialization.GeneratedContext> registers a closed graph of types with statically constructed Orleans codecs and deep copiers. Use a context when publishing a serialization component with NativeAOT on .NET 10 and later, so the native compiler can compile each required generic implementation.
 
 ## Declare the type graph
 
-Apply <xref:Orleans.GenerateSerializerContextAttribute`1> to a top-level, non-generic partial class derived from `SerializerContext`. The attribute's type argument declares one closed root type, using C# 11 or later. The compiler enforces closed attribute type arguments. The generator follows serialized model members and collection elements, registering every supported dependency. A root such as `List<Dictionary<string, int>>` includes the list, dictionary, string, and integer implementations.
+Apply <xref:Orleans.GeneratedContextTypeAttribute`1> to a top-level, non-generic partial class derived from `GeneratedContext`. The attribute's type argument declares one closed root type, using C# 11 or later. The compiler enforces closed attribute type arguments. The generator follows serialized model members and collection elements, registering every supported dependency. A root such as `List<Dictionary<string, int>>` includes the list, dictionary, string, and integer implementations.
+
+Declare a context alongside the models whose closed graphs it provides. A model library exports that context, and applications register it using `AddGeneratedContext`. The library generates its factories with complete source information; consumers compile against its normal reference assembly and execute those factories from its implementation assembly. Applications can combine library contexts with their own contexts.
 
 :::code language="csharp" source="snippets/serializer-contexts/SerializerContextExample.cs" id="serializer_context_declaration":::
 
-Models use the existing <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> member identifiers. Referenced assemblies provide generated codecs and copiers whose actual constructor and service-member metadata determine the closed dependency graph. NativeAOT implementations use direct member access or static accessors for each serialized member; JIT applications also support generated dynamic accessors. For traversal of referenced models, provide complete implementation metadata to the compiler, for example by setting `ProduceReferenceAssembly=false` on the model project. This preserves the member information consumed by the existing Orleans model generator.
+Models use <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> member identifiers. Referenced assemblies provide generated codecs and copiers whose actual constructor metadata determines service construction. NativeAOT implementations use direct member access or static accessors; JIT applications also support generated dynamic accessors.
 
-Referenced dependency discovery follows the producer's emitted codec and copier service contracts, including private implementation fields and generated service properties. The producer's selected members and field identifiers therefore determine serialization and copying even when the consumer uses different field-ID settings. Provide complete implementation metadata for models using assembly-level implicit member selection.
+## Link library contexts
+
+Apply <xref:Orleans.GeneratedContextImportAttribute`1> to include a library's context. The included context supplies its declared model roots and their complete serialization dependencies. A consumer can generate a local envelope or collection graph containing those roots while compiling against the library's normal reference assembly.
+
+:::code language="csharp" source="snippets/serializer-contexts/ConsumerSerializerContextExample.cs" id="serializer_context_link":::
+
+Register the consumer context. Its generated configuration includes the library context before registering the local graph:
+
+:::code language="csharp" source="snippets/serializer-contexts/ConsumerSerializerContextExample.cs" id="serializer_context_link_usage":::
+
+Included contexts declare exact closed roots, such as `DocumentationPayload<int>`. Add another root to the library context when consumers need another closed graph. Includes form an acyclic graph so that each supplied root has an owning context. Link chains supply roots transitively, and shared links configure each type-manifest provider key once. Model dependency cycles retain their serialization and copying support. Contexts require accessible parameterless construction. The generator reports `ORLEANS0115` for include cycles, invalid links, or graphs exceeding 1,024 contexts or 128 nested links.
+
+The producer owns the complete dependency knowledge and generated factories. Private member IDs, copy policies, and service fields stay in that owning assembly. Local collection dependencies crossing an opaque link use statically closed holders to preserve recursive construction.
+
+## Models requiring external code generation
+
+Generating serializers for another assembly's raw models reads their implementation metadata, including private storage and record construction facts. Such model assemblies use `ProduceReferenceAssembly=false`, allowing normal project references to provide the required full metadata. Assemblies which generate and export their own contexts can produce reference assemblies.
+
+An external model graph supplied without a linked context also requires full generated model, codec, and copier metadata. `ORLEANS0115` identifies an insufficient reference-only input. Prefer declaring that graph in the owning assembly and including its context.
 
 Metadata discovery also follows generic arguments, array elements, implemented interfaces, and declaring types. It preserves accessible alias metadata independently of codec registration. This traversal has separate limits of 1,024 closed metadata types and 128 nested dependencies; expanding generic-interface shapes produce `ORLEANS0115` with guidance to declare finite type metadata. Already visited types terminate finite metadata cycles.
 
@@ -24,7 +44,7 @@ The supported graph includes primitive leaf codecs with parameterless constructi
 
 ## Register and use the context
 
-<xref:Orleans.Serialization.ServiceCollectionExtensions.AddSerializerContext*> registers the normal <xref:Orleans.Serialization.Serializer> and <xref:Orleans.Serialization.DeepCopier> services. Resolution uses closed factories first, then registered implementation metadata and dependency injection. Repeated calls combine contexts. Duplicate closed registrations use the first registered implementation.
+<xref:Orleans.Serialization.ServiceCollectionExtensions.AddGeneratedContext*> registers the normal <xref:Orleans.Serialization.Serializer> and <xref:Orleans.Serialization.DeepCopier> services. Resolution uses closed factories first, then registered implementation metadata and dependency injection. Repeated calls combine contexts. Duplicate closed registrations use the first registered implementation.
 
 :::code language="csharp" source="snippets/serializer-contexts/SerializerContextExample.cs" id="serializer_context_usage":::
 
@@ -48,7 +68,7 @@ Reflection-based activation uses constructors preserved by generated manifests, 
 
 ### Serializer initialization and interface collections
 
-For strict NativeAOT publication, initialize the serializer using `AddSerializerContext` with the supported closed type graph described above. <xref:Orleans.Serialization.ServiceCollectionExtensions.AddSerializer*> enables automatic assembly discovery and generalized codecs; native publication analyzes those additional paths, including their runtime activation and metadata requirements. Calling both registration methods combines those paths with the context's closed factories.
+For strict NativeAOT publication, initialize the serializer using `AddGeneratedContext` with the supported closed type graph described above. <xref:Orleans.Serialization.ServiceCollectionExtensions.AddSerializer*> enables automatic assembly discovery and generalized codecs; native publication analyzes those additional paths, including their runtime activation and metadata requirements. Calling both registration methods combines those paths with the context's closed factories.
 
 The interface collection resolver maps a recognized codec type to the closed collection interface already present in its base-type metadata. NativeAOT can resolve this metadata for rooted codec types while preserving the existing collection aliases and wire representation. A context root or model member declared as an interface collection produces `ORLEANS0115`, identifying that dependency and listing the supported concrete collection shapes. Declare supported concrete collections in the context graph and register every concrete type used at runtime.
 
@@ -64,6 +84,6 @@ For a NativeAOT executable, enable native publication:
 
 :::code language="xml" source="snippets/serializer-contexts/NativeContextPublish.props" id="serializer_context_native_publish":::
 
-Import these properties into the executable project and register a context using `AddSerializerContext`. JIT and NativeAOT applications use the same generated-first resolution pipeline. Register the complete graph used by the application so each required codec, copier, and native generic implementation is available.
+Import these properties into the executable project and register a context using `AddGeneratedContext`. JIT and NativeAOT applications use the same generated-first resolution pipeline. Register the complete graph used by the application so each required codec, copier, and native generic implementation is available.
 
 Keep trim and AOT warnings as errors. The repository's centralized native smoke matrix exercises the strict `Contexts`, `Factories`, and `InterfaceCollections` scenarios on .NET 10, including closed metadata activation, rooted generic materialization, interface collection codec metadata, and reflection type lookup alongside generated registrations.

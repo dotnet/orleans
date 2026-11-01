@@ -17,9 +17,9 @@ namespace Orleans.Serialization
         /// Adds the context's closed type graph to serializer resolution.
         /// </summary>
         /// <param name="builder">The builder.</param>
-        /// <param name="context">The generated serializer context.</param>
+        /// <param name="context">The generated context.</param>
         /// <returns>The serialization builder.</returns>
-        public static ISerializerBuilder AddSerializerContext(this ISerializerBuilder builder, SerializerContext context)
+        public static ISerializerBuilder AddGeneratedContext(this ISerializerBuilder builder, GeneratedContext context)
         {
             if (builder is null) throw new ArgumentNullException(nameof(builder));
             if (context is null) throw new ArgumentNullException(nameof(context));

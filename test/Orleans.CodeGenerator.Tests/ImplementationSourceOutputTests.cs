@@ -38,8 +38,8 @@ public sealed class ImplementationSourceOutputTests
         var source = includeContext
             ? Source + """
 
-                [GenerateSerializerContext<Payload>]
-                public partial class TestContext : Orleans.Serialization.SerializerContext { }
+                [GeneratedContextType<Payload>]
+                public partial class TestContext : Orleans.Serialization.GeneratedContext { }
                 """
             : Source;
         var compilation = await TestCompilationHelper.CreateCompilation(source);
@@ -138,9 +138,9 @@ public sealed class ImplementationSourceOutputTests
 
         var consumer = await TestCompilationHelper.CreateCompilation(
             """
-            [Orleans.GenerateSerializerContext<Producer.Payload>]
-            public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
-            [Orleans.GenerateSerializerContext<int>]
+            [Orleans.GeneratedContextType<Producer.Payload>]
+            public partial class ConsumerContext : Orleans.Serialization.GeneratedContext { }
+            [Orleans.GeneratedContextType<int>]
             public partial class ConsumerContext { }
             """,
             "Consumer",
@@ -200,8 +200,8 @@ public sealed class ImplementationSourceOutputTests
         Assert.Empty(producerResult.GeneratedSources);
 
         var attributes = unsupportedRootFirst
-            ? $"[Orleans.GenerateSerializerContext<{unsupportedRoot}>][Orleans.GenerateSerializerContext<Producer.Payload>]"
-            : $"[Orleans.GenerateSerializerContext<Producer.Payload>][Orleans.GenerateSerializerContext<{unsupportedRoot}>]";
+            ? $"[Orleans.GeneratedContextType<{unsupportedRoot}>][Orleans.GeneratedContextType<Producer.Payload>]"
+            : $"[Orleans.GeneratedContextType<Producer.Payload>][Orleans.GeneratedContextType<{unsupportedRoot}>]";
         var consumer = await TestCompilationHelper.CreateCompilation(
             $$"""
             [Orleans.GenerateSerializer]
@@ -212,7 +212,7 @@ public sealed class ImplementationSourceOutputTests
             }
 
             {{attributes}}
-            public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
+            public partial class ConsumerContext : Orleans.Serialization.GeneratedContext { }
             """,
             "Consumer",
             producerOutput.ToMetadataReference());
@@ -243,8 +243,8 @@ public sealed class ImplementationSourceOutputTests
 
         var consumer = await TestCompilationHelper.CreateCompilation(
             """
-            [Orleans.GenerateSerializerContext<Producer.Payload>]
-            public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<Producer.Payload>]
+            public partial class ConsumerContext : Orleans.Serialization.GeneratedContext { }
             """,
             "Consumer",
             producerOutput.ToMetadataReference());
@@ -286,8 +286,8 @@ public sealed class ImplementationSourceOutputTests
 
         var consumer = await TestCompilationHelper.CreateCompilation(
             $$"""
-            [Orleans.GenerateSerializerContext<Producer.Payload<{{memberType}}>>]
-            public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<Producer.Payload<{{memberType}}>>]
+            public partial class ConsumerContext : Orleans.Serialization.GeneratedContext { }
             """,
             "Consumer",
             MetadataReference.CreateFromImage(image.ToArray()));
@@ -340,8 +340,8 @@ public sealed class ImplementationSourceOutputTests
         Assert.Empty(producerResult.GeneratedSources);
         var consumer = await TestCompilationHelper.CreateCompilation(
             """
-            [Orleans.GenerateSerializerContext<Producer.Payload>]
-            public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<Producer.Payload>]
+            public partial class ConsumerContext : Orleans.Serialization.GeneratedContext { }
             """,
             "Consumer",
             producerOutput.ToMetadataReference());
@@ -388,8 +388,8 @@ public sealed class ImplementationSourceOutputTests
                 string GetValue();
             }
 
-            [GenerateSerializerContext<System.IO.Stream>]
-            public partial class UnsupportedContext : Orleans.Serialization.SerializerContext { }
+            [GeneratedContextType<System.IO.Stream>]
+            public partial class UnsupportedContext : Orleans.Serialization.GeneratedContext { }
             """);
         var (completeCompilation, complete) = Generate(compilation, IncrementalGeneratorOutputKind.None);
         var (omittedCompilation, omitted) = Generate(compilation, IncrementalGeneratorOutputKind.Implementation);
