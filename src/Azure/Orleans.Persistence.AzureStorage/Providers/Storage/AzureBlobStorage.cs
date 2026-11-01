@@ -130,10 +130,6 @@ namespace Orleans.Storage
 
             var blobName = GetBlobName(grainType, grainId);
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
-            var enableIdempotentWrites = options.EnableIdempotentWrites;
-            var streamingSerializer = this.grainStorageSerializer as IGrainStorageStreamingSerializer;
-            var contents = streamingSerializer is null ? ConvertToStorageFormat(grainState.State) : null;
-            var localHashBase64 = enableIdempotentWrites && contents is not null ? ComputeHashBase64(contents) : null;
 
             try
             {
@@ -141,13 +137,15 @@ namespace Orleans.Storage
 
                 var blob = container.GetBlobClient(blobName);
 
-                if (streamingSerializer is not null)
+                if (this.grainStorageSerializer is IGrainStorageStreamingSerializer streamingSerializer)
                 {
                     await WriteStateBufferedStreamAndCreateContainerIfNotExists(streamingSerializer, grainType, grainId, grainState, "application/octet-stream", blob, cancellationToken);
                 }
                 else
                 {
-                    await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents!, localHashBase64, "application/octet-stream", blob, cancellationToken);
+                    var contents = ConvertToStorageFormat(grainState.State);
+                    var localHashBase64 = options.EnableIdempotentWrites ? ComputeHashBase64(contents) : null;
+                    await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, localHashBase64, "application/octet-stream", blob, cancellationToken);
                 }
 
                 LogTraceDataWritten(grainType, grainId, grainState.ETag, blobName, container.Name);
