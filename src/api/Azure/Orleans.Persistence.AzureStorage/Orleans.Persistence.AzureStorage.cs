@@ -22,6 +22,8 @@ namespace Orleans.Configuration
 
         public bool DeleteStateOnClear { get { throw null; } set { } }
 
+        public bool EnableIdempotentWrites { get { throw null; } set { } }
+
         public Storage.IGrainStorageSerializer GrainStorageSerializer { get { throw null; } set { } }
 
         public int InitStage { get { throw null; } set { } }
