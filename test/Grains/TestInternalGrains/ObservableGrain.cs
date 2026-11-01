@@ -4,6 +4,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
+
     public class ObservableGrain : Grain, IObservableGrain, IIncomingGrainCallFilter
     {
         private readonly List<(string InterfaceName, string MethodName)> _localCalls = new();
@@ -32,7 +33,6 @@ namespace UnitTests.Grains
 
         public async IAsyncEnumerable<int> GetValuesWithError(int errorIndex, bool waitAfterYield, string errorMessage, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            await Task.Yield();
             for (var i = 0; i < int.MaxValue; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -47,7 +47,11 @@ namespace UnitTests.Grains
                 }
 
                 yield return i;
-                await Task.Yield();
+
+                if (waitAfterYield)
+                {
+                    await Task.Yield();
+                }
             }
         }
 
