@@ -19,6 +19,9 @@ public static partial class ContextContracts
         .AddSerializerContext(new SmokeContext())
         .AddSerializerContext(new DuplicateContext())
         .AddSerializerContext(new AliasRegistrationContext())
+#if NET10_0_OR_GREATER
+        .AddSerializerContext(new ApplicationSerializerContext())
+#endif
         .BuildServiceProvider();
 
     public static void NonSealedModelBaseServicesAliasCanonicalInstances()
@@ -624,11 +627,6 @@ public static partial class ContextContracts
 [GenerateSerializerContext<InterfaceTaggedPayload>]
 [GenerateSerializerContext<AliasedContainer.Payload>]
 [GenerateSerializerContext<IncidentalPrivateInterfacePayload>]
-#if NET10_0_OR_GREATER
-[GenerateSerializerContext<DocumentationPayload<int>>]
-[GenerateSerializerContext<DocumentationPrimitivePayload>]
-[GenerateSerializerContext<DocumentationImplicitPayload<byte>>]
-#endif
 internal partial class SmokeContext : SerializerContext;
 
 [GenerateSerializerContext<List<Dictionary<string, int>>>]

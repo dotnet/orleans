@@ -12,9 +12,13 @@ A <xref:Orleans.Serialization.SerializerContext> registers a closed graph of typ
 
 Apply <xref:Orleans.GenerateSerializerContextAttribute`1> to a top-level, non-generic partial class derived from `SerializerContext`. The attribute's type argument declares one closed root type, using C# 11 or later. The compiler enforces closed attribute type arguments. The generator follows serialized model members and collection elements, registering every supported dependency. A root such as `List<Dictionary<string, int>>` includes the list, dictionary, string, and integer implementations.
 
+Declare a context alongside the models whose closed graphs it provides. A model library exports that context, and applications register it using `AddSerializerContext`. The library generates its factories with complete source information; consumers compile against its normal reference assembly and execute those factories from its implementation assembly. Applications can combine library contexts with their own contexts.
+
 :::code language="csharp" source="snippets/serializer-contexts/SerializerContextExample.cs" id="serializer_context_declaration":::
 
 Models use <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> member identifiers. Referenced assemblies provide generated codecs and copiers whose actual constructor metadata determines service construction. NativeAOT implementations use direct member access or static accessors; JIT applications also support generated dynamic accessors.
+
+## Generate a new context over external models
 
 External serializer-context generation consumes full implementation metadata for models and their generated codecs and copiers. The generator discovers dependencies from the producer's complete service-member and constructor metadata, including private state, get-only or init-only properties, and assembly-level member selection. This preserves the producer's serialization and copying contract.
 
