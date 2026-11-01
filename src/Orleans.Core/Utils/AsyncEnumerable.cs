@@ -201,8 +201,10 @@ namespace Orleans.Runtime.Utilities
             public static Element CreateDisposed()
             {
                 var tcs = new TaskCompletionSource<Element>(TaskCreationOptions.RunContinuationsAsynchronously);
-                tcs.SetException(new ObjectDisposedException("This instance has been disposed"));
-                return new Element(AsyncEnumerable.DisposedValue, tcs);
+                var disposed = new Element(AsyncEnumerable.DisposedValue, tcs);
+                // The terminal element has no next reader, so its task completes without a fault.
+                tcs.SetResult(disposed);
+                return disposed;
             }
 
             public bool IsValid => !IsInitial && !IsDisposed;
