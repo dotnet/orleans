@@ -16,6 +16,8 @@ For clusters already using the distributed directory, follow [Upgrade existing d
 
 Qualify the exact runtime and application versions using the [deployment compatibility guidance](deployment-and-rollback.md#compatibility-boundary) before choosing a rolling runtime upgrade.
 
+For the complete set of application and provider upgrade requirements, see [Upgrade Orleans 10.x to 11](10-to-11.md).
+
 ## Prepare and defer migration
 
 1. Inventory the default and named directories selected by every grain type. Keep named-provider selections and cluster identity unchanged during this procedure.
