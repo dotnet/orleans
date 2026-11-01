@@ -51,6 +51,17 @@ await host.WaitForShutdownAsync();
 
 `UseDynamoDBReminderService` configures reminder storage independently from the cluster membership provider. The AWS SDK credential and profile resolution chain supplies credentials when the reminder options omit explicit keys. This example uses on-demand capacity and an infrastructure-managed table.
 
+## Strongly consistent schema migration
+
+The provider defaults to the legacy schema. Before upgrading, grant `dynamodb:GetItem` on the configured V2 table name (default `${TableName}-v2`), including before that table is provisioned. Legacy startup uses this permission to reject a Legacy configuration after cutover and reports access denial as a configuration error. Legacy reads strongly point-validate GSI candidates and locally known omissions, and completed mutations send a bounded owner notification followed by a point read.
+
+V2 migration supplies the complete guarantee and is an explicit two-stage rollout:
+
+1. Deploy every silo with `TableMode=Migrate` to create/backfill `${TableName}-v2` while retaining V1 reads and transactional dual writes.
+2. After all silos are upgraded and migration reports `Ready`, restrict deployment admission to migration-enabled processes and deploy `TableMode=V2`. Keep old-image restarts and autoscaling disabled through cutover and retirement. Cutover verifies the copies and checks markers for observed nonterminal silos; deployment admission protects the interval between the membership snapshot and the DynamoDB state transaction.
+
+V2 point, grain, and hash-range reads query the sharded base table with strong consistency. V1 remains transactionally maintained for rollback. After the rollback window, `TableMode=V2Only` performs an irreversible fenced transition before operators retire V1; the provider never deletes it. See [Configure Amazon DynamoDB reminders](https://dotnet.github.io/orleans/docs/grains/reminders/dynamodb/) for prerequisites, recovery, rollback, capacity, and compatibility details.
+
 ## Example - Using Reminders in a Grain
 ```csharp
 using System;
