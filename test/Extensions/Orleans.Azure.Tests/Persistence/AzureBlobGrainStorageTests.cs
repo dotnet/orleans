@@ -102,7 +102,7 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
     }
 
     [Fact, TestCategory("Functional")]
-    public async Task WriteStateAsync_ShouldSucceed_WhenRetryMatchesProviderTokenAndContentHash_WhenIdempotentWritesOptionIsEnabled()
+    public async Task WriteStateAsync_RetryWithMatchingTokenAndHash_WhenIdempotentWritesOptionIsEnabled()
     {
         var serializer = CreateSetupSerializer();
         var storage = await CreateStorageAsync(serializer, enableIdempotentWrites: true);
@@ -140,7 +140,7 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
     }
 
     [Fact, TestCategory("Functional")]
-    public async Task WriteStateAsync_ShouldThrowInconsistentState_WhenRetryTokenBelongsToAnotherProvider_WhenIdempotentWritesOptionIsEnabled()
+    public async Task WriteStateAsync_RetryFromAnotherProvider_ThrowsInconsistentState_WhenIdempotentWritesOptionIsEnabled()
     {
         var serializer = CreateSetupSerializer();
         var firstStorage = await CreateStorageAsync(serializer, enableIdempotentWrites: true);
@@ -173,7 +173,7 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
     }
 
     [Fact, TestCategory("Functional")]
-    public async Task WriteStateAsync_ShouldHashStreamSerializedContent_WhenIdempotentWritesOptionIsEnabled()
+    public async Task WriteStateAsync_HashesStreamingOutput_WhenIdempotentWritesOptionIsEnabled()
     {
         var serializer = new StreamingOnlyGrainStorageSerializer();
         var storage = await CreateStorageAsync(serializer, enableIdempotentWrites: true);
@@ -190,7 +190,7 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
     }
 
     [Fact, TestCategory("Functional")]
-    public async Task WriteStateAsync_ShouldThrowInconsistentState_WhenProviderTokenMatchesButContentHashDiffers_WhenIdempotentWritesOptionIsEnabled()
+    public async Task WriteStateAsync_RetryWithDifferentHash_ThrowsInconsistentState_WhenIdempotentWritesOptionIsEnabled()
     {
         var serializer = CreateSetupSerializer();
         var storage = await CreateStorageAsync(serializer, enableIdempotentWrites: true);
@@ -231,7 +231,7 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
     }
 
     [Fact, TestCategory("Functional")]
-    public async Task WriteStateAsync_ShouldThrowInconsistentState_WhenIdempotentWritesOptionIsDisabled()
+    public async Task WriteStateAsync_ThrowsInconsistentState_WhenIdempotentWritesOptionIsDisabled()
     {
         var serializer = CreateSetupSerializer();
         var storage = await CreateStorageAsync(serializer);
