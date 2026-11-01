@@ -1,10 +1,13 @@
 #nullable enable
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
+using Orleans.Diagnostics;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Placement.Repartitioning;
@@ -15,6 +18,7 @@ using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Session;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
@@ -40,7 +44,9 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
 
         Assert.True(activation.TryStartMigration(requestContext: null, cancellationToken));
 
-        Assert.Equal(ActivationState.Deactivating, activation.State);
+        // The activation enters teardown immediately and remains in it until it disposes.
+        Assert.True(activation.IsDeactivationRequested);
+        Assert.InRange(activation.State, ActivationState.Deactivating, ActivationState.Destroyed);
 
         await activation.Deactivated.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
     }
@@ -54,7 +60,7 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
         activation.Deactivate(new DeactivationReason(DeactivationReasonCode.RuntimeRequested, "test"), cancellationToken);
         await originalDeactivated.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
 
-        Assert.Equal(ActivationState.Invalid, activation.State);
+        Assert.Equal(ActivationState.Destroyed, activation.State);
         Assert.False(activation.TryStartMigration(requestContext: null, cancellationToken));
     }
 
@@ -75,7 +81,7 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
 
         Assert.Equal(ActivationCollectionAction.StartedDeactivation, result.Action);
         await deactivated.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
-        Assert.Equal(ActivationState.Invalid, activation.State);
+        Assert.Equal(ActivationState.Destroyed, activation.State);
     }
 
     [Fact]
@@ -106,7 +112,7 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
                 cancellationToken);
 
             Assert.Equal(ActivationCollectionResult.Reschedule(activation.CollectionAgeLimit), result);
-            Assert.Equal(ActivationState.Valid, activation.State);
+            Assert.Equal(ActivationState.Active, activation.State);
             Assert.False(activation.Deactivated.IsCompleted);
         }
         finally
@@ -132,7 +138,7 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
             },
             activation).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
         await deactivated.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
-        Assert.Equal(ActivationState.Invalid, activation.State);
+        Assert.Equal(ActivationState.Destroyed, activation.State);
     }
 
     [Fact]
@@ -184,7 +190,7 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
         // Lifecycle readiness establishes the idle precondition for this request-free activation.
         var activation = Assert.IsType<ActivationData>(catalog.GetOrCreateActivation(grainId, null, null));
         await activation.WaitForActivationReadyAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
-        Assert.Equal(ActivationState.Valid, activation.State);
+        Assert.Equal(ActivationState.Active, activation.State);
         Assert.True(activation.IsInactive);
         return activation;
     }
@@ -387,7 +393,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(DeactivationReasonCode.ActivationFailed, reason.ReasonCode);
         Assert.Same(control.Failure, reason.Exception);
-        Assert.Equal(ActivationState.Invalid, activation.State);
+        Assert.Equal(ActivationState.Destroyed, activation.State);
         AssertActivationLatencies(metrics, activation.Shared, "error");
         AssertActivationEvents(metrics, activation.Shared, created: 1, destroyed: 1, failed: 1, instances: [1, -1]);
         AssertDeactivationMetrics(metrics, activation.Shared, "deactivateOnIdle");
@@ -426,7 +432,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
 
             Assert.True(control.ActivationToken.IsCancellationRequested);
-            Assert.Equal(ActivationState.Invalid, activation.State);
+            Assert.Equal(ActivationState.Destroyed, activation.State);
             AssertActivationLatencies(metrics, activation.Shared, "canceled");
             AssertActivationEvents(metrics, activation.Shared, created: 0, destroyed: 0, failed: 1, instances: [1, -1]);
             AssertDeactivationMetrics(metrics, activation.Shared, "deactivateOnIdle");
@@ -460,7 +466,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
 
         Assert.Same(activation, control.Captured);
         Assert.Null(activation.GrainInstance);
-        Assert.Equal(ActivationState.Invalid, activation.State);
+        Assert.Equal(ActivationState.Destroyed, activation.State);
         Assert.Equal(0, control.ObserverCreated);
         Assert.Equal(1, control.ObserverDestroyed);
         Assert.Equal(0, control.DisposeInvocations);
@@ -544,7 +550,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         Assert.Equal(1, control.ObserverCreated);
         Assert.Equal(1, control.ObserverDestroyed);
         Assert.Equal(1, control.ScopeDisposed);
-        Assert.Equal(ActivationState.Invalid, activation.State);
+        Assert.Equal(ActivationState.Destroyed, activation.State);
         if (lifecycle)
         {
             AssertDeactivationMetrics(metrics, activation.Shared, "deactivateOnIdle");
@@ -599,8 +605,8 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         var destination = Assert.IsType<ActivationData>(Assert.IsType<GrainLifecycleEvents.Activated>((await destinationReady).Payload).GrainContext);
         await destinationRecorded;
 
-        Assert.Equal(ActivationState.Invalid, source.State);
-        Assert.Equal(ActivationState.Valid, destination.State);
+        Assert.Equal(ActivationState.Destroyed, source.State);
+        Assert.Equal(ActivationState.Active, destination.State);
         Assert.NotEqual(source.ActivationId, destination.ActivationId);
         Assert.Equal(source.GrainId, destination.GrainId);
         Assert.Equal(silos[destinationIndex].SiloAddress, await ((IGuidTestGrain)call.Reference).GetSiloAddress());
@@ -658,11 +664,11 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             Assert.NotEqual(source.ActivationId, activation.ActivationId);
         }
 
-        Assert.Equal(ActivationState.Valid, activation.State);
+        Assert.Equal(ActivationState.Active, activation.State);
         Assert.True(activation.IsInactive);
         var collector = services.GetRequiredService<ActivationCollector>();
         await collector.CollectActivations(TimeSpan.MaxValue, TestCancellation).WaitAsync(Timeout, TestCancellation);
-        Assert.Equal(ActivationState.Valid, activation.State);
+        Assert.Equal(ActivationState.Active, activation.State);
 
         // Idle duration uses Environment.TickCount64, so cross a clock tick before collecting.
         var timestamp = CoarseStopwatch.GetTimestamp();
@@ -672,7 +678,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             e => e.Payload is GrainLifecycleEvents.Deactivated d && ReferenceEquals(d.GrainContext, activation), Timeout, TestCancellation);
         await collector.CollectActivations(TimeSpan.FromMilliseconds(1), TestCancellation).WaitAsync(Timeout, TestCancellation);
 
-        Assert.Equal(ActivationState.Invalid, activation.State);
+        Assert.Equal(ActivationState.Destroyed, activation.State);
         Assert.Equal(DeactivationReasonCode.ActivationIdle,
             Assert.IsType<GrainLifecycleEvents.Deactivated>((await collected).Payload).Reason.ReasonCode);
         Assert.True(activation.Deactivated.IsCompletedSuccessfully);
@@ -694,7 +700,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         Assert.True(activation.TryStartMigration(null, TestCancellation));
         await completed.WaitAsync(Timeout, TestCancellation);
 
-        Assert.Equal(ActivationState.Invalid, activation.State);
+        Assert.Equal(ActivationState.Destroyed, activation.State);
         Assert.False(activation.TryStartMigration(null, TestCancellation));
         Assert.Null(activation.ForwardingAddress);
         AssertDeactivationMetrics(metrics, activation.Shared, "deactivateOnIdle");
@@ -761,7 +767,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             await recorded;
             await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
             Assert.Equal(1, control.DirectoryRegistrations);
-            Assert.Equal(ActivationState.Invalid, activation.State);
+            Assert.Equal(ActivationState.Destroyed, activation.State);
             Assert.Equal(existing?.SiloAddress, activation.ForwardingAddress);
             AssertActivationLatencies(metrics, activation.Shared, status);
             AssertActivationEvents(metrics, activation.Shared, created: 0, destroyed: 0, failed: 0,
@@ -771,11 +777,412 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             Assert.Equal(1, control.ObserverDestroyed);
             Assert.Equal(1, control.ScopeDisposed);
             Assert.DoesNotContain(events.Events, e => e.Payload is GrainLifecycleEvents.Activated a && a.GrainContext.GrainId == id);
+
+            // A competing registration enters teardown at Disposing, leaving the directory unchanged. A registration which threw may have
+            // committed, so teardown enters at Unregistering and removes it.
+            Assert.Equal(existing is null ? new[] { "register", "unregister" } : ["register"], control.Events);
         }
         finally
         {
             control.DirectoryResponse.TrySetResult(null);
             cancellation.Cancel();
+            await activation.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// A migrating activation reads its previous registration while it is constructed, so registration replaces that registration.
+    /// Migration participants rehydrate only once the activation is registered.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Runtime_RehydratesOnlyAfterRegistration(bool registered)
+    {
+        await using var fixture = new MetricsFixture("directory-rehydrate", siloCount: registered ? (short)1 : (short)2);
+        await fixture.InitializeAsync();
+        var services = fixture.PrimaryServices;
+        var control = services.GetRequiredService<LifecycleControl>();
+        var id = GetCall(fixture.GrainFactory, "ordinary", 701).Reference.GrainId;
+        var previous = new GrainAddress
+        {
+            GrainId = id,
+            ActivationId = ActivationId.NewId(),
+            SiloAddress = fixture.HostedCluster.Primary!.SiloAddress,
+            MembershipVersion = MembershipVersion.MinValue,
+        };
+        var migrationContext = new MigrationContext(services.GetRequiredService<SerializerSessionPool>());
+        Assert.True(migrationContext.TryAddValue(ActivationData.GrainAddressMigrationContextKey, previous));
+        var activation = Assert.IsType<ActivationData>(services.GetRequiredService<Catalog>()
+            .GetOrCreateActivation(id, null, new GrainMigrationPackage { GrainId = id, MigrationContext = migrationContext }));
+        try
+        {
+            var registration = await control.DirectoryEntered.Task.WaitAsync(Timeout, TestCancellation);
+            Assert.Equal(previous, control.DirectoryPreviousAddress);
+            Assert.Equal(previous, activation.PreviousRegistration);
+            Assert.Equal(ActivationState.Registering, activation.State);
+            Assert.Equal(["register"], control.Events);
+
+            if (registered)
+            {
+                control.DirectoryResponse.TrySetResult(registration);
+                await activation.WaitForActivationReadyAsync(TestCancellation).AsTask().WaitAsync(Timeout, TestCancellation);
+                Assert.Equal(ActivationState.Active, activation.State);
+                Assert.Equal(["register", "rehydrate", "start", "activate"], control.Events);
+                await Deactivate(activation);
+                Assert.Equal(["register", "rehydrate", "start", "activate", "deactivate", "stop", "unregister"], control.Events);
+            }
+            else
+            {
+                // A competing registration means this activation's rehydrated state would be discarded, so it does not rehydrate.
+                control.DirectoryResponse.TrySetResult(new GrainAddress
+                {
+                    GrainId = id,
+                    ActivationId = ActivationId.NewId(),
+                    SiloAddress = Assert.Single(fixture.HostedCluster.SecondarySilos).SiloAddress,
+                    MembershipVersion = registration.MembershipVersion,
+                });
+                await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
+                Assert.Equal(["register"], control.Events);
+            }
+
+            Assert.Equal(ActivationState.Destroyed, activation.State);
+            Assert.Equal(1, control.ScopeDisposed);
+        }
+        finally
+        {
+            control.DirectoryResponse.TrySetResult(null);
+            await activation.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// A deactivation request during registration is recorded intent. Setup diverts into teardown once registration completes and
+    /// never starts the grain lifecycle. A registration which throws may have committed, so teardown unregisters after it, too.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Runtime_DeactivationDuringRegistration_EntersTeardownAtRegistrationBoundary(bool registered)
+    {
+        await using var fixture = new MetricsFixture("directory-rehydrate");
+        await fixture.InitializeAsync();
+        var services = fixture.PrimaryServices;
+        var control = services.GetRequiredService<LifecycleControl>();
+        var id = GetCall(fixture.GrainFactory, "ordinary", 702).Reference.GrainId;
+        var activation = Assert.IsType<ActivationData>(services.GetRequiredService<Catalog>().GetOrCreateActivation(id, null));
+        try
+        {
+            var registration = await control.DirectoryEntered.Task.WaitAsync(Timeout, TestCancellation);
+            activation.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Deactivated while registering."), TestCancellation);
+            Assert.True(control.DirectoryToken.IsCancellationRequested);
+            Assert.True(activation.IsDeactivationRequested);
+            Assert.Equal(ActivationState.Registering, activation.State);
+
+            // An activation which has not registered cannot migrate.
+            Assert.False(activation.TryStartMigration(null, TestCancellation));
+
+            if (registered)
+            {
+                control.DirectoryResponse.TrySetResult(registration);
+            }
+            else
+            {
+                control.DirectoryResponse.TrySetException(control.Failure);
+            }
+
+            await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
+            Assert.Equal(ActivationState.Destroyed, activation.State);
+            Assert.Equal(["register", "unregister"], control.Events);
+            Assert.Equal(0, control.ActivationInvocations);
+            Assert.Equal(1, control.ScopeDisposed);
+        }
+        finally
+        {
+            control.DirectoryResponse.TrySetResult(null);
+            await activation.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Forced disposal which preempts rehydration after the activation takes its migration context, but before migration participants run,
+    /// skips the participants and releases the context.
+    /// </summary>
+    [Fact]
+    public async Task Runtime_ForcedDisposalDuringRehydration_SkipsParticipants()
+    {
+        await using var fixture = new MetricsFixture("directory-rehydrate");
+        await fixture.InitializeAsync();
+        var services = fixture.PrimaryServices;
+        var control = services.GetRequiredService<LifecycleControl>();
+        var id = GetCall(fixture.GrainFactory, "ordinary", 705).Reference.GrainId;
+        var context = new CountingRehydrationContext();
+        var disposal = new TaskCompletionSource<(ActivationState State, Task Disposed)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        ActivationData? activation = null;
+
+        // The rehydrate span starts after the activation takes its migration context and before migration participants run.
+        // The listener is process-wide, so it reacts only to the target activation's rehydration, which runs on that activation's scheduler.
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = static source => source.Name == ActivitySources.LifecycleActivitySourceName,
+            Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStarted = started =>
+            {
+                if (started.OperationName == ActivityNames.ActivationRehydrate
+                    && Volatile.Read(ref activation) is { } target
+                    && ReferenceEquals(RuntimeContext.Current, target))
+                {
+                    disposal.TrySetResult((target.State, target.DisposeAsync().AsTask()));
+                }
+            },
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        Volatile.Write(ref activation, Assert.IsType<ActivationData>(services.GetRequiredService<GrainContextActivator>().CreateInstance(
+            new GrainAddress { GrainId = id, ActivationId = ActivationId.NewId(), SiloAddress = fixture.HostedCluster.Primary!.SiloAddress })));
+        activation!.Rehydrate(context);
+        activation.Activate(null, CancellationToken.None);
+        try
+        {
+            var registration = await control.DirectoryEntered.Task.WaitAsync(Timeout, TestCancellation);
+            control.DirectoryResponse.TrySetResult(registration);
+            var (stateWhenDisposed, disposed) = await disposal.Task.WaitAsync(Timeout, TestCancellation);
+            await disposed.WaitAsync(Timeout, TestCancellation);
+            Assert.Equal(ActivationState.Rehydrating, stateWhenDisposed);
+
+            // Setup stops in the same turn in which disposal preempted it.
+            await activation!.RunOrQueueTask(() => Task.CompletedTask).WaitAsync(Timeout, TestCancellation);
+            Assert.Equal(ActivationState.Destroyed, activation.State);
+            Assert.Equal(["register"], control.Events);
+            Assert.Equal(0, control.ActivationInvocations);
+            Assert.Equal(1, control.ScopeDisposed);
+            Assert.Equal(1, context.Disposals);
+        }
+        finally
+        {
+            control.DirectoryResponse.TrySetResult(null);
+            await activation.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// An activation which tears down before it consumes its migration context disposes the context, and a context whose disposal
+    /// throws does not prevent the grain instance and activation services from being disposed.
+    /// </summary>
+    [Fact]
+    public async Task Runtime_UnconsumedRehydrationContextDisposalFailure_StillDisposesActivation()
+    {
+        await using var fixture = new MetricsFixture("directory-rehydrate");
+        await fixture.InitializeAsync();
+        var services = fixture.PrimaryServices;
+        var control = services.GetRequiredService<LifecycleControl>();
+        var id = GetCall(fixture.GrainFactory, "ordinary", 706).Reference.GrainId;
+        var activation = Assert.IsType<ActivationData>(services.GetRequiredService<GrainContextActivator>().CreateInstance(
+            new GrainAddress { GrainId = id, ActivationId = ActivationId.NewId(), SiloAddress = fixture.HostedCluster.Primary!.SiloAddress }));
+        var context = new CountingRehydrationContext(throwOnDispose: true);
+        try
+        {
+            // The activation accepts the context while it is constructed, then stops at the registration boundary before rehydrating.
+            activation.Rehydrate(context);
+            activation.Activate(null, CancellationToken.None);
+            var registration = await control.DirectoryEntered.Task.WaitAsync(Timeout, TestCancellation);
+            activation.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Deactivated before rehydration."), TestCancellation);
+            control.DirectoryResponse.TrySetResult(registration);
+            await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
+
+            Assert.Equal(ActivationState.Destroyed, activation.State);
+            Assert.Equal(1, context.Disposals);
+            Assert.Equal(["register", "unregister"], control.Events);
+            Assert.Equal(1, control.DisposeInvocations);
+            Assert.Equal(1, control.ObserverDestroyed);
+            Assert.Equal(1, control.ScopeDisposed);
+        }
+        finally
+        {
+            control.DirectoryResponse.TrySetResult(null);
+            await activation.DisposeAsync();
+        }
+    }
+
+    private sealed class CountingRehydrationContext(bool throwOnDispose = false) : IRehydrationContext, IDisposable
+    {
+        public int Disposals;
+
+        public IEnumerable<string> Keys => [];
+
+        public bool TryGetBytes(string key, out System.Buffers.ReadOnlySequence<byte> value)
+        {
+            value = default;
+            return false;
+        }
+
+        public bool TryGetValue<T>(string key, [NotNullWhen(true)] out T? value)
+        {
+            value = default;
+            return false;
+        }
+
+        public void Dispose()
+        {
+            Interlocked.Increment(ref Disposals);
+            if (throwOnDispose)
+            {
+                throw new InvalidOperationException("Injected rehydration context disposal failure.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A migration participant which forces disposal during rehydration stops rehydration: later participants, including the grain, do not
+    /// rehydrate into disposed services.
+    /// </summary>
+    [Fact]
+    public async Task Runtime_ParticipantForcingDisposal_StopsRehydration()
+    {
+        await using var fixture = new MetricsFixture("directory-rehydrate-dispose");
+        await fixture.InitializeAsync();
+        var services = fixture.PrimaryServices;
+        var control = services.GetRequiredService<LifecycleControl>();
+        var id = GetCall(fixture.GrainFactory, "ordinary", 709).Reference.GrainId;
+        var activation = Assert.IsType<ActivationData>(services.GetRequiredService<GrainContextActivator>().CreateInstance(
+            new GrainAddress { GrainId = id, ActivationId = ActivationId.NewId(), SiloAddress = fixture.HostedCluster.Primary!.SiloAddress }));
+        var context = new CountingRehydrationContext();
+        activation.Rehydrate(context);
+        activation.Activate(null, CancellationToken.None);
+        try
+        {
+            control.DirectoryResponse.TrySetResult(await control.DirectoryEntered.Task.WaitAsync(Timeout, TestCancellation));
+
+            // Rehydration and the setup boundary after it run in the activation's turn, which completes before this one.
+            await activation.RunOrQueueTask(() => Task.CompletedTask).WaitAsync(Timeout, TestCancellation);
+            await Assert.IsAssignableFrom<Task>(control.Disposal).WaitAsync(Timeout, TestCancellation);
+            Assert.Equal(ActivationState.Destroyed, activation.State);
+            Assert.Equal(["register", "rehydrate-participant"], control.Events);
+            Assert.Equal(1, context.Disposals);
+            Assert.Equal(0, control.ActivationInvocations);
+        }
+        finally
+        {
+            control.DirectoryResponse.TrySetResult(null);
+            await activation.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Only an activation which completed activation migrates. A migration requested during setup stops setup and is discarded, so the
+    /// activation's partially initialized state does not reach the migration target.
+    /// </summary>
+    [Fact]
+    public async Task Runtime_MigrationRequestedDuringSetup_IsDiscarded()
+    {
+        await using var fixture = new MetricsFixture("directory-rehydrate-migrate-during-start", siloCount: 2);
+        await fixture.InitializeAsync();
+        var services = fixture.PrimaryServices;
+        var control = services.GetRequiredService<LifecycleControl>();
+        control.MigrationTarget = Assert.Single(fixture.HostedCluster.SecondarySilos).SiloAddress;
+        var id = GetCall(fixture.GrainFactory, "ordinary", 707).Reference.GrainId;
+        var activation = Assert.IsType<ActivationData>(services.GetRequiredService<Catalog>().GetOrCreateActivation(id, null));
+        try
+        {
+            var registration = await control.DirectoryEntered.Task.WaitAsync(Timeout, TestCancellation);
+            control.DirectoryResponse.TrySetResult(registration);
+
+            // A migration which was wrongly sent waits for the target's directory registration, which this test never completes.
+            try
+            {
+                await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
+            }
+            catch (TimeoutException exception)
+            {
+                throw new TimeoutException($"Deactivation did not complete. Events: [{string.Join(", ", control.Events)}]", exception);
+            }
+
+            // The grain lifecycle requested migration while it was starting.
+            Assert.True(control.MigrationAccepted);
+            Assert.Equal(ActivationState.Destroyed, activation.State);
+            Assert.Equal(["register", "start", "stop", "unregister"], control.Events);
+            Assert.Equal(0, control.ActivationInvocations);
+        }
+        finally
+        {
+            control.DirectoryResponse.TrySetResult(null);
+            await activation.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// A deactivation request before the activation starts leaves nothing to construct. Teardown starts at Disposing, whether the
+    /// activation operation was queued before or after the deactivation operation.
+    /// </summary>
+    [Theory]
+    [InlineData("directory-deactivate-before-start")]
+    [InlineData("directory-activate-then-deactivate-before-start")]
+    public async Task Runtime_DeactivationBeforeStart_SkipsConstruction(string mode)
+    {
+        await using var fixture = new MetricsFixture(mode);
+        await fixture.InitializeAsync();
+        var services = fixture.PrimaryServices;
+        var control = services.GetRequiredService<LifecycleControl>();
+        var id = GetCall(fixture.GrainFactory, "ordinary", 704).Reference.GrainId;
+        var activationSpanStopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = static source => source.Name == ActivitySources.LifecycleActivitySourceName,
+            Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = stopped =>
+            {
+                if (stopped.OperationName == ActivityNames.ActivateGrain && Equals(stopped.GetTagItem(ActivityTagKeys.GrainId), id.ToString()))
+                {
+                    activationSpanStopped.TrySetResult();
+                }
+            },
+        };
+        ActivitySource.AddActivityListener(listener);
+        var activation = Assert.IsType<ActivationData>(services.GetRequiredService<Catalog>().GetOrCreateActivation(id, null));
+        await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
+
+        // The activation operation ends the activation span even though setup never started.
+        await activation.RunOrQueueTask(() => Task.CompletedTask).WaitAsync(Timeout, TestCancellation);
+        await activationSpanStopped.Task.WaitAsync(Timeout, TestCancellation);
+
+        Assert.Equal(ActivationState.Destroyed, activation.State);
+        Assert.Null(activation.GrainInstance);
+        Assert.Equal(0, control.CreateInvocations);
+        Assert.Equal(0, control.ObserverCreated);
+        Assert.Equal(1, control.ObserverDestroyed);
+        Assert.Equal(1, control.ScopeDisposed);
+        Assert.Empty(control.Events);
+        Assert.Null(services.GetRequiredService<ActivationDirectory>().FindTarget(id));
+    }
+
+    /// <summary>
+    /// A deactivation request during rehydration diverts setup at the next boundary. Teardown starts at Dehydrating, the mirror of
+    /// Rehydrating, and removes the completed registration without running activation callbacks.
+    /// </summary>
+    [Fact]
+    public async Task Runtime_DeactivationDuringRehydration_EntersTeardownAtDehydrating()
+    {
+        await using var fixture = new MetricsFixture("directory-rehydrate-deactivate");
+        await fixture.InitializeAsync();
+        var services = fixture.PrimaryServices;
+        var control = services.GetRequiredService<LifecycleControl>();
+        var id = GetCall(fixture.GrainFactory, "ordinary", 703).Reference.GrainId;
+        var migrationContext = new MigrationContext(services.GetRequiredService<SerializerSessionPool>());
+        var activation = Assert.IsType<ActivationData>(services.GetRequiredService<Catalog>()
+            .GetOrCreateActivation(id, null, new GrainMigrationPackage { GrainId = id, MigrationContext = migrationContext }));
+        try
+        {
+            var registration = await control.DirectoryEntered.Task.WaitAsync(Timeout, TestCancellation);
+            control.DirectoryResponse.TrySetResult(registration);
+            await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
+
+            Assert.Equal(ActivationState.Destroyed, activation.State);
+            Assert.Equal(["register", "rehydrate", "unregister"], control.Events);
+            Assert.Equal(1, control.ScopeDisposed);
+        }
+        finally
+        {
+            control.DirectoryResponse.TrySetResult(null);
             await activation.DisposeAsync();
         }
     }
@@ -1233,7 +1640,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         await ready;
         await recorded;
         var activation = Assert.IsType<ActivationData>(services.GetRequiredService<ActivationDirectory>().FindTarget(call.Reference.GrainId));
-        Assert.Equal(ActivationState.Valid, activation.State);
+        Assert.Equal(ActivationState.Active, activation.State);
         return activation;
     }
 
@@ -1456,10 +1863,12 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             }
 
             await base.DisposeAsync();
+            ActivationAssertionRecorder.AssertNone();
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
+            ActivationAssertionRecorder.Install();
             builder.Options.InitialSilosCount = siloCount;
             builder.Properties["RuntimeMetricsMode"] = mode;
             builder.AddSiloBuilderConfigurator<MetricsConfigurator>();
@@ -1586,14 +1995,25 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         public TaskCompletionSource ActivationExited { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource DisposalEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource DisposalRelease { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public SiloAddress? MigrationTarget;
+        public Task? Disposal;
+        public bool? MigrationAccepted;
+        public int CreateInvocations;
+        public int ActivationInvocations;
         public int ObserverCreated;
         public int ObserverDestroyed;
         public int DisposeInvocations;
         public int ScopeDisposed;
         public int DirectoryRegistrations;
         public CancellationToken DirectoryToken;
+        public GrainAddress? DirectoryPreviousAddress;
         public TaskCompletionSource<GrainAddress> DirectoryEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource<GrainAddress?> DirectoryResponse { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>
+        /// Directory and grain callbacks, in the order the activation invoked them.
+        /// </summary>
+        public ConcurrentQueue<string> Events { get; } = new();
 
         public void OnCreateActivation(IGrainContext grainContext) => Interlocked.Increment(ref ObserverCreated);
         public void OnDestroyActivation(IGrainContext grainContext) => Interlocked.Increment(ref ObserverDestroyed);
@@ -1620,6 +2040,18 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             control.Captured = Assert.IsType<ActivationData>(context);
             context.SetComponent<IActivationLifecycleObserver>(control);
             _ = context.ActivationServices.GetRequiredService<ScopeSentinel>();
+
+            // Configuration runs before the context starts. The catalog activates the context once it is created, so activating here queues
+            // the activation operation ahead of the deactivation operation.
+            if (control.Mode == "directory-activate-then-deactivate-before-start")
+            {
+                context.Activate(null);
+            }
+
+            if (control.Mode is "directory-deactivate-before-start" or "directory-activate-then-deactivate-before-start")
+            {
+                context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Deactivated before start."));
+            }
         }
 
         public void Configure(GrainType grainType, GrainProperties properties, GrainTypeSharedContext shared)
@@ -1635,7 +2067,9 @@ public class ActivationDataMigrationTestsRuntimeMetrics
     {
         public object CreateInstance(IGrainContext context)
         {
+            Interlocked.Increment(ref control.CreateInvocations);
             if (control.Mode == "constructor-error") throw control.Failure;
+            if (control.Mode.StartsWith("directory-rehydrate", StringComparison.Ordinal)) return new RehydrationProbe(context, control);
             return control.Mode.StartsWith("activation-", StringComparison.Ordinal) ? new ActivationProbe(context, control) : inner.CreateInstance(context);
         }
 
@@ -1648,7 +2082,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
                 await control.DisposalRelease.Task;
             }
 
-            if (instance is not ActivationProbe) await inner.DisposeInstance(context, instance);
+            if (instance is not ActivationProbe and not RehydrationProbe) await inner.DisposeInstance(context, instance);
             if (control.Mode == "dispose-object-disposed") throw new ObjectDisposedException("test grain");
             if (control.Mode == "dispose-error") throw control.Failure;
         }
@@ -1675,13 +2109,91 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         {
             Interlocked.Increment(ref control.DirectoryRegistrations);
             control.DirectoryToken = cancellationToken;
+            control.DirectoryPreviousAddress = previousAddress;
+            control.Events.Enqueue("register");
             control.DirectoryEntered.TrySetResult(address);
             return control.DirectoryResponse.Task;
         }
 
         public Task<GrainAddress?> Lookup(GrainId grainId) => Task.FromResult<GrainAddress?>(null);
-        public Task Unregister(GrainAddress address) => Task.CompletedTask;
+        public Task Unregister(GrainAddress address)
+        {
+            control.Events.Enqueue("unregister");
+            return Task.CompletedTask;
+        }
+
         public Task UnregisterSilos(List<SiloAddress> siloAddresses) => Task.CompletedTask;
+    }
+
+    private sealed class RehydrationProbe(IGrainContext context, LifecycleControl control)
+        : IGrainBase, IGrainMigrationParticipant, ILifecycleParticipant<IGrainLifecycle>
+    {
+        public IGrainContext GrainContext => context;
+
+        public void Participate(IGrainLifecycle lifecycle)
+        {
+            if (control.Mode == "directory-rehydrate-dispose")
+            {
+                lifecycle.AddMigrationParticipant(new DisposingMigrationParticipant(context, control));
+            }
+
+            lifecycle.Subscribe<RehydrationProbe>(
+                GrainLifecycleStage.SetupState,
+                _ =>
+                {
+                    control.Events.Enqueue("start");
+                    if (control.Mode == "directory-rehydrate-migrate-during-start")
+                    {
+                        var activation = (ActivationData)context;
+                        activation.ForwardingAddress = control.MigrationTarget;
+                        control.MigrationAccepted = activation.TryStartMigration(requestContext: null, CancellationToken.None);
+                    }
+
+                    return Task.CompletedTask;
+                },
+                _ =>
+                {
+                    control.Events.Enqueue("stop");
+                    return Task.CompletedTask;
+                });
+        }
+
+        public Task OnActivateAsync(CancellationToken token)
+        {
+            Interlocked.Increment(ref control.ActivationInvocations);
+            control.Events.Enqueue("activate");
+            return Task.CompletedTask;
+        }
+
+        public Task OnDeactivateAsync(DeactivationReason reason, CancellationToken token)
+        {
+            control.Events.Enqueue("deactivate");
+            return Task.CompletedTask;
+        }
+
+        public void OnRehydrate(IRehydrationContext rehydrationContext)
+        {
+            control.Events.Enqueue("rehydrate");
+            if (control.Mode == "directory-rehydrate-deactivate")
+            {
+                context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Deactivated while rehydrating."));
+            }
+        }
+
+        public void OnDehydrate(IDehydrationContext dehydrationContext) => control.Events.Enqueue("dehydrate");
+    }
+
+    private sealed class DisposingMigrationParticipant(IGrainContext context, LifecycleControl control) : IGrainMigrationParticipant
+    {
+        public void OnRehydrate(IRehydrationContext rehydrationContext)
+        {
+            control.Events.Enqueue("rehydrate-participant");
+            control.Disposal = ((ActivationData)context).DisposeAsync().AsTask();
+        }
+
+        public void OnDehydrate(IDehydrationContext dehydrationContext)
+        {
+        }
     }
 
     private sealed class ActivationProbe(IGrainContext context, LifecycleControl control) : IGrainBase
