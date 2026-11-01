@@ -2456,7 +2456,7 @@ internal sealed partial class ActivationData :
         try
         {
             var placementService = _shared.Runtime.ServiceProvider.GetRequiredService<PlacementService>();
-            var selectedAddress = await placementService.PlaceGrainAsync(GrainId, requestContextData, PlacementStrategy)
+            var selectedAddress = await placementService.PlaceGrainAsync(GrainId, requestContextData, PlacementStrategy, cancellationToken)
                 .WaitAsync(cancellationToken);
 
             if (selectedAddress is null)

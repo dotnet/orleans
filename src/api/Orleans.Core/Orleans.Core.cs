@@ -1342,7 +1342,7 @@ namespace Orleans.Placement
 {
     public partial interface IPlacementFilterDirector
     {
-        System.Collections.Generic.IEnumerable<Runtime.SiloAddress> Filter(PlacementFilterStrategy filterStrategy, Runtime.Placement.PlacementTarget target, System.Collections.Generic.IEnumerable<Runtime.SiloAddress> silos);
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Runtime.SiloAddress>> FilterAsync(PlacementFilterStrategy filterStrategy, Runtime.Placement.PlacementTarget target, System.Collections.Generic.IReadOnlyList<Runtime.SiloAddress> silos, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public static partial class PlacementFilterExtensions
@@ -1981,7 +1981,7 @@ namespace Orleans.Runtime.Placement
 
         SiloStatus LocalSiloStatus { get; }
 
-        SiloAddress[] GetCompatibleSilos(PlacementTarget target);
+        System.Threading.Tasks.Task<SiloAddress[]> GetCompatibleSilosAsync(PlacementTarget target, System.Threading.CancellationToken cancellationToken = default);
         System.Collections.Generic.IReadOnlyDictionary<ushort, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target);
     }
 

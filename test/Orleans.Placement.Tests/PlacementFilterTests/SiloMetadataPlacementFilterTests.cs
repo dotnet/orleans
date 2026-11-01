@@ -61,7 +61,7 @@ public class SiloMetadataPlacementFilterTests(SiloMetadataPlacementFilterTests.F
     }
 
     [Fact, TestCategory("Functional")]
-    public void PlacementFilter_CandidatesMatchCallingSilo()
+    public async Task PlacementFilter_CandidatesMatchCallingSilo()
     {
         var uniqueValues = new HashSet<string>();
         foreach (var silo in fixture.Cluster.Silos)
@@ -77,7 +77,7 @@ public class SiloMetadataPlacementFilterTests(SiloMetadataPlacementFilterTests.F
             foreach (var grainId in new[] { requiredGrain.GetGrainId(), preferredGrain.GetGrainId() })
             {
                 var target = new PlacementTarget(grainId, new Dictionary<string, object>(), default, 0);
-                Assert.Equal(silo.SiloAddress, Assert.Single(placement.GetCompatibleSilos(target)));
+                Assert.Equal(silo.SiloAddress, Assert.Single(await placement.GetCompatibleSilosAsync(target, TestContext.Current.CancellationToken)));
             }
         }
     }
