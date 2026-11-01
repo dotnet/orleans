@@ -21,7 +21,7 @@ public static partial class StaticFactoryContracts
             var attempts = 0;
             FactoryCycleLeaf? failedLeaf = null;
             InvalidOperationException? caught = null;
-            var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+            var services = new ServiceCollection().AddGeneratedContext(new ConstructionContext());
             services.Configure<TypeManifestOptions>(options =>
             {
                 options.AddSerializerService<FactoryCycleLeaf>(_ => new FactoryCycleLeaf(++leaves));
@@ -91,7 +91,7 @@ public static partial class StaticFactoryContracts
     {
         foreach (var tupleRoot in new[] { false, true })
         {
-            var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+            var services = new ServiceCollection().AddGeneratedContext(new ConstructionContext());
 #if NATIVE_AOT_SMOKE
             // Both value-type forward edges are statically closed before the ordinary metadata constructors allocate their callers.
             var nullableHolderConstructions = 0;
@@ -194,7 +194,7 @@ public static partial class StaticFactoryContracts
     {
         foreach (var collectionRoot in new[] { false, true })
         {
-            var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+            var services = new ServiceCollection().AddGeneratedContext(new ConstructionContext());
             services.Configure<TypeManifestOptions>(options =>
             {
                 options.AddSerializer(typeof(ListCodec<>));
@@ -249,7 +249,7 @@ public static partial class StaticFactoryContracts
 
     public static void GeneratedMetadataCollectionsComposeWithClosedFactories()
     {
-        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        var services = new ServiceCollection().AddGeneratedContext(new ConstructionContext());
         services.Configure<TypeManifestOptions>(options =>
         {
             options.AddSerializer(typeof(ListCodec<>));
@@ -309,7 +309,7 @@ public static partial class StaticFactoryContracts
     {
         var unkeyed = new KeyedDependency<int>();
         var keyed = new KeyedDependency<int>();
-        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        var services = new ServiceCollection().AddGeneratedContext(new ConstructionContext());
         services.AddSingleton<IKeyedDependency<int>>(unkeyed);
         services.AddKeyedSingleton<IKeyedDependency<int>>("instance", keyed);
         var constructions = 0;
@@ -344,7 +344,7 @@ public static partial class StaticFactoryContracts
 
     public static void CapturedKeyedFacadeGuardsPendingConstruction()
     {
-        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        var services = new ServiceCollection().AddGeneratedContext(new ConstructionContext());
         var instance = new KeyedDependency<int>();
         services.AddSingleton<IKeyedDependency<int>>(instance);
         var keyedConstructions = 0;
@@ -424,7 +424,7 @@ public static partial class StaticFactoryContracts
     {
         var unkeyed = new KeyedDependency<int>();
         var keyed = new KeyedDependency<int>();
-        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        var services = new ServiceCollection().AddGeneratedContext(new ConstructionContext());
         services.AddSingleton<IKeyedDependency<int>>(unkeyed);
         services.AddKeyedSingleton<IKeyedDependency<int>>("keyed", keyed);
         services.AddKeyedSingleton(typeof(IKeyedDependency<>), "open-keyed", typeof(KeyedDependency<>));
@@ -449,7 +449,7 @@ public static partial class StaticFactoryContracts
 
     public static void KeyedOnlyDescriptorsDoNotSelectDependencyConstructors()
     {
-        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        var services = new ServiceCollection().AddGeneratedContext(new ConstructionContext());
         services.AddKeyedSingleton<IKeyedDependency<int>>("exact-keyed", new KeyedDependency<int>());
         services.AddKeyedSingleton(typeof(IKeyedDependency<>), "open-keyed", typeof(KeyedDependency<>));
         services.Configure<TypeManifestOptions>(options =>
@@ -490,7 +490,7 @@ public static partial class StaticFactoryContracts
     public static void DirectProviderServicesRemainGraphOwned()
     {
         using var gate = new ConstructionGate();
-        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        var services = new ServiceCollection().AddGeneratedContext(new ConstructionContext());
         services.Configure<TypeManifestOptions>(options =>
         {
             options.AddSerializerService<ServiceProbe>(_ => new ServiceProbe(gate));
