@@ -468,6 +468,7 @@ async function evaluatePackageProject(file) {
       file,
       '-nologo',
       '-getProperty:IsPackable',
+      '-getProperty:PackageInventoryPackable',
       '-getProperty:PackageId',
       '-getProperty:VersionSuffix',
     ],
@@ -509,7 +510,10 @@ export async function collectPackageProjects(
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index];
     const properties = evaluations[index];
-    if (String(properties.IsPackable).toLowerCase() !== 'true') {
+    if (
+      String(properties.IsPackable).toLowerCase() !== 'true' &&
+      String(properties.PackageInventoryPackable).toLowerCase() !== 'true'
+    ) {
       continue;
     }
     const packageId = String(properties.PackageId);
