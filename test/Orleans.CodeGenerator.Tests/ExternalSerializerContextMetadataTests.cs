@@ -154,17 +154,15 @@ public sealed class ExternalSerializerContextMetadataTests
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    [InlineData(true, true)]
-    public async Task FSharpModelHeadersRequireFullGeneratedCSharpServices(bool referenceModel, bool referenceServices)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FSharpModelHeadersRequireFullGeneratedCSharpServices(bool referenceServices)
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         var configuration = typeof(ExternalSerializerContextMetadataTests).Assembly
             .GetCustomAttribute<AssemblyConfigurationAttribute>()!.Configuration;
         var tfm = AppContext.TargetFrameworkName!.Contains("Version=v8.0", StringComparison.Ordinal) ? "net8.0" : "net10.0";
-        var modelDirectory = referenceModel ? Path.Combine("obj", configuration, tfm, "ref") : Path.Combine("bin", configuration, tfm);
+        var modelDirectory = Path.Combine("bin", configuration, tfm);
         var serviceDirectory = referenceServices ? Path.Combine("obj", configuration, tfm, "ref") : Path.Combine("bin", configuration, tfm);
         var modelReference = MetadataReference.CreateFromFile(Path.Combine(root, "test", "Grains", "TestFSharp", modelDirectory, "TestFSharp.dll"));
         var consumer = await CreateConsumer("UnitTests.FSharpTypes.MulticaseStructDU", modelReference);

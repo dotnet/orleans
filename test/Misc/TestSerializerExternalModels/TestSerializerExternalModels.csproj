@@ -4,6 +4,7 @@
     <AssemblyName>SerializerExternalModels</AssemblyName>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <Nullable>enable</Nullable>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Orleans.Serialization.Abstractions\Orleans.Serialization.Abstractions.csproj" />

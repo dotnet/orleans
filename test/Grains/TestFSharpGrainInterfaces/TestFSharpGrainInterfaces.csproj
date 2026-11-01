@@ -25,16 +25,5 @@
     <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
   </ItemGroup>
-
-  <Target Name="UseFSharpModelImplementationMetadata"
-          BeforeTargets="FindReferenceAssembliesForReferences"
-          DependsOnTargets="ResolveReferences">
-    <ItemGroup>
-      <!-- External F# serializer generation consumes the complete model, including private storage. -->
-      <ReferencePath Update="@(ReferencePath)"
-                     Condition="'%(ReferencePath.ReferenceSourceTarget)' == 'ProjectReference' and '%(ReferencePath.Filename)' == 'TestFSharp'">
-        <ReferenceAssembly>%(ReferencePath.FullPath)</ReferenceAssembly>
-      </ReferencePath>
-    </ItemGroup>
-  </Target>
 </Project>
+
