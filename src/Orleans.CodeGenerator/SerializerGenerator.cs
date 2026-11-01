@@ -85,8 +85,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             serializerInterface is not null ? CodeText.Type(serializerInterface.ToTypeSyntax(type.TypeSyntax)) : null,
             ConstructionEmissionPlan.Create(construction),
             fieldDescriptions.Select(FieldEmissionPlan.Create).ToImmutableArray(), memberPlans,
-            type.IsEnumType ? EnumSerializerGenerator.CreatePlan(type, LibraryTypes) : null,
-            ReferenceVisibleSerializationContract.CreateAttribute(type, LibraryTypes));
+            type.IsEnumType ? EnumSerializerGenerator.CreatePlan(type, LibraryTypes) : null);
     }
 
     internal static void Write(SourceWriter writer, SerializerEmissionPlan plan)

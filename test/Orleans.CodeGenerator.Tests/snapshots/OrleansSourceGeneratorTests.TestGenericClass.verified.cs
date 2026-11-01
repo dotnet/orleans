@@ -1,6 +1,4 @@
 ﻿#pragma warning disable
-[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.ReferenceVisibleContract:TestProject.ConcreteUsage", "1:complete")]
-[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.ReferenceVisibleContract:TestProject.GenericData`1", "1:complete")]
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]

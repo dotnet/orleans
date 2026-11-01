@@ -38,9 +38,7 @@ internal static class EnumSerializerGenerator
             return null;
         }
 
-        var referenceVisibleContract = ReferenceVisibleSerializationContract.CreateAttribute(type, libraryTypes);
-        return new(CreatePlan(type, libraryTypes), assemblyName, metadataIdentity, type.GeneratedNamespace, type.TypeSyntax.ToString(),
-            referenceVisibleContract);
+        return new(CreatePlan(type, libraryTypes), assemblyName, metadataIdentity, type.GeneratedNamespace, type.TypeSyntax.ToString());
     }
 
     internal static SourceOutputResult GenerateSource(EnumSerializerOutputPlan output)
@@ -48,7 +46,7 @@ internal static class EnumSerializerGenerator
         var plan = output.Serializer;
         return SourceOutputResult.FromSource(GeneratedSourceOutput.CreateSerializableSourceEntry(
             output.AssemblyName, output.TypeSyntax, output.MetadataIdentity, output.GeneratedNamespace, 0,
-            output.GeneratedNamespace, output.ReferenceVisibleContract is { } contract ? [contract] : null, writer => Write(writer, plan)));
+            output.GeneratedNamespace, writer => Write(writer, plan)));
     }
 
     private static void Write(SourceWriter writer, EnumSerializerPlan plan)

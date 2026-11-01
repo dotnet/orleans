@@ -43,4 +43,17 @@
 
 
 
+  <Target Name="UseContextModelImplementationMetadata"
+          BeforeTargets="FindReferenceAssembliesForReferences"
+          DependsOnTargets="ResolveReferences"
+          Condition="'$(TargetFramework)' == 'net10.0'">
+    <ItemGroup>
+      <!-- Linked context tests inspect the complete external documentation model and generated services. -->
+      <ReferencePath Update="@(ReferencePath)"
+                     Condition="'%(ReferencePath.ReferenceSourceTarget)' == 'ProjectReference' and '%(ReferencePath.Filename)' == 'SerializerContexts'">
+        <ReferenceAssembly>%(ReferencePath.FullPath)</ReferenceAssembly>
+      </ReferencePath>
+    </ItemGroup>
+  </Target>
+
 </Project>

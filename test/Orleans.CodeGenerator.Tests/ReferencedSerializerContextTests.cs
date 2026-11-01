@@ -191,14 +191,14 @@ public sealed class ReferencedSerializerContextTests
         var reference = await CompileProducer("[Id(0)] public readonly T Value;", generic: true,
             frameworkVersion: "v8.0", hotReload: false, referenceAssembly,
             dynamicCodec: true, dynamicCopier: true);
-        await AssertAccepted(reference);
+        await AssertMetadataRequirement(reference, referenceAssembly);
     }
 
     [Fact]
-    public async Task FullModelAndReferenceImplementationsPreserveGenericArrayServiceSelection()
+    public async Task FullModelAndImplementationsPreserveGenericArrayServiceSelection()
     {
         var references = await CompileProducer("[Id(0)] public T[] Value { get; set; }", generic: true,
-            frameworkVersion: "v10.0", hotReload: false, referenceAssembly: true, dynamicCodec: false, dynamicCopier: false);
+            frameworkVersion: "v10.0", hotReload: false, referenceAssembly: false, dynamicCodec: false, dynamicCopier: false);
         var consumer = await TestCompilationHelper.CreateCompilation("""
             [Orleans.GenerateSerializerContext<Producer.Payload<byte>>]
             public partial class DemoContext : Orleans.Serialization.SerializerContext { }
@@ -229,7 +229,7 @@ public sealed class ReferencedSerializerContextTests
         var reference = await CompileProducer(
             $"[Id(0)] private {memberType} _value; public {memberType} Value => _value;",
             generic, frameworkVersion, hotReload, referenceAssembly, dynamicCodec: true, dynamicCopier: true);
-        await AssertAccepted(reference, generic);
+        await AssertMetadataRequirement(reference, referenceAssembly, generic);
     }
 
     [Theory]
@@ -242,7 +242,7 @@ public sealed class ReferencedSerializerContextTests
         var reference = await CompileProducer($"[Id(0)] public readonly {(generic ? "T" : "int")} Value;",
             generic, frameworkVersion: "v10.0", hotReload: true, referenceAssembly,
             dynamicCodec: true, dynamicCopier: true);
-        await AssertAccepted(reference, generic);
+        await AssertMetadataRequirement(reference, referenceAssembly, generic);
     }
 
     [Theory]
@@ -253,7 +253,7 @@ public sealed class ReferencedSerializerContextTests
         var reference = await CompileProducer("[Id(0)] public readonly T Value;",
             generic: true, frameworkVersion: "v8.0", hotReload: false, referenceAssembly,
             dynamicCodec: false, dynamicCopier: true, codecFrameworkVersion: "v10.0");
-        await AssertAccepted(reference);
+        await AssertMetadataRequirement(reference, referenceAssembly);
     }
 
     [Theory]
@@ -269,6 +269,12 @@ public sealed class ReferencedSerializerContextTests
         var member = readOnly ? "[Id(0)] public readonly T Value;" : "[Id(0)] public T Value;";
         var reference = await CompileProducer(member, generic: true, producerFramework, hotReload: false, referenceAssembly);
         var (compilation, result) = await GenerateConsumer(reference, generic: true, consumerFramework, consumerHotReload);
+
+        if (referenceAssembly)
+        {
+            AssertFullMetadataDiagnostic(result);
+            return;
+        }
 
         Assert.Empty(result.Diagnostics);
         AssertNoCompilationErrors(compilation);
@@ -288,6 +294,12 @@ public sealed class ReferencedSerializerContextTests
     {
         var reference = await CompileProducer("[Id(0)] public T Value;", generic: true,
             frameworkVersion: "v10.0", hotReload: false, referenceAssembly);
+        if (referenceAssembly)
+        {
+            await AssertMetadataRequirement(reference, referenceAssembly);
+            return;
+        }
+
         var compilation = await AssertAccepted(reference);
         var symbol = compilation.GetTypeByMetadataName($"OrleansCodeGen.Producer.{implementation}`1");
         Assert.NotNull(symbol);
@@ -307,6 +319,25 @@ public sealed class ReferencedSerializerContextTests
         Assert.Contains($"new global::OrleansCodeGen.Producer.Copier_Payload{typeArguments}", context, StringComparison.Ordinal);
         EmitReference(compilation);
         return compilation;
+    }
+
+    private static async Task AssertMetadataRequirement(MetadataReference[] references, bool referenceOnly, bool generic = true)
+    {
+        if (!referenceOnly)
+        {
+            await AssertAccepted(references, generic);
+            return;
+        }
+
+        var (_, result) = await GenerateConsumer(references, generic, "v10.0", hotReload: false);
+        AssertFullMetadataDiagnostic(result);
+    }
+
+    private static void AssertFullMetadataDiagnostic(GeneratorDriverRunResult result)
+    {
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("ORLEANS0115", diagnostic.Id);
+        Assert.Contains("full generated codec and copier implementation metadata", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
     private static async Task<MetadataReference[]> CompileProducer(
@@ -357,15 +388,6 @@ public sealed class ReferencedSerializerContextTests
         var implementations = CSharpCompilation.Create("ReferencedContextProducer",
             compilation.SyntaxTrees.Skip(1), compilation.References.Append(contractsReference),
             (CSharpCompilationOptions)compilation.Options);
-        // This split fixture supplies full model metadata alongside legacy reference-only implementations.
-        foreach (var tree in implementations.SyntaxTrees.ToArray())
-        {
-            var root = (CompilationUnitSyntax)tree.GetRoot(TestContext.Current.CancellationToken);
-            implementations = implementations.ReplaceSyntaxTree(tree, tree.WithRootAndOptions(
-                root.WithAttributeLists(SyntaxFactory.List(root.AttributeLists.Where(static attribute =>
-                    !attribute.ToString().Contains(ReferenceVisibleSerializationContract.KeyPrefix, StringComparison.Ordinal)))), tree.Options));
-        }
-
         return [contractsReference, EmitReference(implementations, metadataOnly: true)];
     }
 

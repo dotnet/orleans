@@ -40,4 +40,17 @@
              Condition="'$(NativeAotSmokeScenario)' == 'GrainReferences'" />
   </ItemGroup>
 
+  <Target Name="UseContextModelImplementationMetadata"
+          BeforeTargets="FindReferenceAssembliesForReferences"
+          DependsOnTargets="ResolveReferences"
+          Condition="'$(NativeAotSmokeScenario)' == 'Contexts'">
+    <ItemGroup>
+      <!-- External context generation inspects the complete documentation model and generated services. -->
+      <ReferencePath Update="@(ReferencePath)"
+                     Condition="'%(ReferencePath.ReferenceSourceTarget)' == 'ProjectReference' and '%(ReferencePath.Filename)' == 'SerializerContexts'">
+        <ReferenceAssembly>%(ReferencePath.FullPath)</ReferenceAssembly>
+      </ReferencePath>
+    </ItemGroup>
+  </Target>
+
 </Project>

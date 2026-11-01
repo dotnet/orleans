@@ -1,7 +1,4 @@
 ﻿#pragma warning disable
-[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.ReferenceVisibleContract:TestProject.RecordStructWithParameterId", "1:opaque")]
-[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.ReferenceVisibleContract:TestProject.RecordWithExtraProperty", "1:opaque")]
-[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.ReferenceVisibleContract:TestProject.SimpleRecord", "1:opaque")]
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]

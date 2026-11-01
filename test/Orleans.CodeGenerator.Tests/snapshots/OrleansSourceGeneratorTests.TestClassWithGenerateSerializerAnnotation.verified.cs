@@ -1,6 +1,4 @@
 ﻿#pragma warning disable
-[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.ReferenceVisibleContract:TestProject.ClassWithImplicitFieldIds", "1:complete")]
-[assembly: global::System.Reflection.AssemblyMetadataAttribute("Orleans.CodeGenerator.ReferenceVisibleContract:TestProject.MyCustomEnum", "1:complete")]
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]

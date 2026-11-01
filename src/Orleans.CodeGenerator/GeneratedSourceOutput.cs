@@ -210,8 +210,7 @@ internal static class GeneratedSourceOutput
             members.Add(writer => ActivatorGenerator.Write(writer, activator));
         }
 
-        return CreateSerializableSourceEntry(assemblyName, typeName, metadataIdentity, hintGeneratedNamespace, genericArity,
-            generatedNamespace, serializer.ReferenceVisibleContract is { } contract ? [contract] : null, [.. members]);
+        return CreateSerializableSourceEntry(assemblyName, typeName, metadataIdentity, hintGeneratedNamespace, genericArity, generatedNamespace, [.. members]);
     }
 
     internal static GeneratedSourceEntry CreateSerializableSourceEntry(
@@ -221,7 +220,6 @@ internal static class GeneratedSourceOutput
         string hintGeneratedNamespace,
         int genericArity,
         string generatedNamespace,
-        IReadOnlyList<string>? assemblyAttributes,
         params Action<SourceWriter>[] members)
     {
         var namespacedMembers = new Dictionary<string, List<Action<SourceWriter>>>(StringComparer.Ordinal);
@@ -232,7 +230,7 @@ internal static class GeneratedSourceOutput
 
         return new GeneratedSourceEntry(
             CreateSerializableHintName(assemblyName, typeName, metadataIdentity, hintGeneratedNamespace, genericArity),
-            CreateSourceString(namespacedMembers, assemblyAttributes));
+            CreateSourceString(namespacedMembers));
     }
 
     internal static void AddMember(

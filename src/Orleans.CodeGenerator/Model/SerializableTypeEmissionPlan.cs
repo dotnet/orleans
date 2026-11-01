@@ -277,8 +277,7 @@ internal sealed record SerializerEmissionPlan(
     ConstructionEmissionPlan Construction,
     EquatableArray<FieldEmissionPlan> Fields,
     EquatableArray<MemberEmissionPlan> Members,
-    EnumSerializerPlan? Enum,
-    string? ReferenceVisibleContract);
+    EnumSerializerPlan? Enum);
 
 internal sealed record CopierEmissionPlan(
     SerializableTypeEmissionPlan Type,

@@ -2295,7 +2295,7 @@ public class DemoClass
             .ThenBy(static item => item.Index))
         {
             var root = CSharpSyntaxTree.ParseText(item.Source.SourceText.ToString().TrimStart('\uFEFF').TrimEnd()).GetCompilationUnitRoot();
-            assemblyAttributes.AddRange(root.AttributeLists.Select(static list => list.WithoutLeadingTrivia()));
+            assemblyAttributes.AddRange(root.AttributeLists);
 
             foreach (var member in root.Members)
             {
@@ -2330,11 +2330,6 @@ public class DemoClass
         var unit = SyntaxFactory.CompilationUnit()
             .WithAttributeLists(SyntaxFactory.List(assemblyAttributes))
             .WithMembers(SyntaxFactory.List(combinedMembers));
-        if (assemblyAttributes.Count > 0)
-        {
-            unit = unit.WithLeadingTrivia(SyntaxFactory.ParseLeadingTrivia("#pragma warning disable\n"));
-        }
-
         var resultText = unit.NormalizeWhitespace().ToFullString();
         resultText = resultText.Replace(".Add(typeof(int));", ".Add(typeof( int ));", StringComparison.Ordinal);
         if (assemblyAttributes.Count > 0)
