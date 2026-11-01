@@ -215,4 +215,4 @@ internal sealed class TestCustomStorageAdaptor(
     DeterministicCustomStorageHost host,
     TestLogView initialState,
     RecordingProtocolServices services)
-    : CustomStorageAdaptor(host, initialState, services, primaryCluster: null);
+    : CustomStorageAdaptor(host, initialState, services, primaryCluster: null, host);

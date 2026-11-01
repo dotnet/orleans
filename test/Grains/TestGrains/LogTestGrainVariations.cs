@@ -1,4 +1,6 @@
+using Orleans.EventSourcing.CustomStorage;
 using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
 
@@ -132,5 +134,95 @@ namespace TestGrains
         }
     }
 
+    // use the explicitly specified "CustomStorage" log-consistency provider with a separate ICustomStorageInterface implementation
+    [LogConsistencyProvider(ProviderName = "CustomStorage")]
+    public class LogTestGrainSeparateCustomStorage : LogTestGrain
+    {
+    }
+
+    public sealed class SeparateCustomStorageFactory : ICustomStorageFactory
+    {
+        private readonly DeepCopier deepCopier;
+
+        public SeparateCustomStorageFactory(DeepCopier deepCopier)
+        {
+            this.deepCopier = deepCopier;
+        }
+
+        public ICustomStorageInterface<TState, TDelta> CreateCustomStorage<TState, TDelta>(GrainId grainId)
+        {
+            return new SeparateCustomStorage<TState, TDelta>(deepCopier);
+        }
+    }
+
+    public sealed class SeparateCustomStorage<TState, TDelta> : ICustomStorageInterface<TState, TDelta>
+    {
+        private readonly DeepCopier copier;
+        private readonly List<TDelta> events = [];
+
+        // We use fake in-memory state as the storage.
+        private TState? state;
+        private int version;
+
+        public SeparateCustomStorage(DeepCopier copier)
+        {
+            this.copier = copier;
+        }
+
+        public Task<KeyValuePair<int, TState>> ReadStateFromStorage()
+        {
+            if (state == null)
+            {
+                state = Activator.CreateInstance<TState>();
+                version = 0;
+            }
+            return Task.FromResult(new KeyValuePair<int, TState>(version, this.copier.Copy(state)!));
+        }
+
+        public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<TDelta> updates, int expectedVersion)
+        {
+            if (state == null)
+            {
+                state = Activator.CreateInstance<TState>();
+                version = 0;
+            }
+
+            if (expectedVersion != version)
+                return Task.FromResult(false);
+
+            foreach (var update in updates)
+            {
+                TransitionState(state, update);
+                events.Add(copier.Copy(update)!);
+                version++;
+            }
+
+            return Task.FromResult(true);
+        }
+
+        public Task<IReadOnlyList<TDelta>> RetrieveLogSegment(int fromVersion, int toVersion)
+        {
+            IReadOnlyList<TDelta> result = events
+                .GetRange(fromVersion, toVersion - fromVersion)
+                .Select(copier.Copy)
+                .ToList();
+            return Task.FromResult(result);
+        }
+
+        public Task ClearStoredState()
+        {
+            state = default;
+            version = 0;
+            events.Clear();
+            return Task.CompletedTask;
+        }
+
+        private static void TransitionState(TState state, TDelta @event)
+        {
+            dynamic dynamicState = state!;
+            dynamic dynamicEvent = @event!;
+            dynamicState.Apply(dynamicEvent);
+        }
+    }
 
 }
