@@ -159,7 +159,7 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
 
         private IFieldCodec<IEqualityComparer<TKey>> GetComparerCodec()
-            => _comparerCodec ?? throw new NotSupportedException($"The serializer context registration for {typeof(Dictionary<TKey, TValue>)} supports EqualityComparer<{typeof(TKey)}>.Default. Register a codec with comparer support to serialize a custom comparer.");
+            => _comparerCodec ?? throw new NotSupportedException($"The generated context registration for {typeof(Dictionary<TKey, TValue>)} supports EqualityComparer<{typeof(TKey)}>.Default. Register a codec with comparer support to serialize a custom comparer.");
     }
 
     /// <summary>

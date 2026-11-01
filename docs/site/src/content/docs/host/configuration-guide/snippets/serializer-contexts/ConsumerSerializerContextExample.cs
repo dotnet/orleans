@@ -5,9 +5,9 @@ using Orleans.Serialization;
 namespace Documentation.SerializerContexts;
 
 #region serializer_context_link
-[SerializerContextImport<ApplicationSerializerContext>]
-[OrleansSerializable<ApplicationEnvelope>]
-public partial class ConsumerSerializerContext : SerializerContext;
+[GeneratedContextImport<ApplicationSerializerContext>]
+[GeneratedContextType<ApplicationEnvelope>]
+public partial class ConsumerSerializerContext : GeneratedContext;
 
 [GenerateSerializer]
 public sealed class ApplicationEnvelope
@@ -23,7 +23,7 @@ public static class ConsumerSerializerContextExample
     {
         #region serializer_context_link_usage
         using var services = new ServiceCollection()
-            .AddSerializerContext(new ConsumerSerializerContext())
+            .AddGeneratedContext(new ConsumerSerializerContext())
             .BuildServiceProvider();
 
         var serializer = services.GetRequiredService<Serializer>();

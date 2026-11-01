@@ -67,6 +67,16 @@ namespace Orleans
     {
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    public sealed partial class GeneratedContextImportAttribute<TContext> : System.Attribute
+    {
+    }
+
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    public sealed partial class GeneratedContextTypeAttribute<T> : System.Attribute
+    {
+    }
+
     public enum GenerateFieldIds
     {
         None = 0,
@@ -174,11 +184,6 @@ namespace Orleans
     {
     }
 
-    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
-    public sealed partial class OrleansSerializableAttribute<T> : System.Attribute
-    {
-    }
-
     [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct)]
     public sealed partial class RegisterActivatorAttribute : System.Attribute
     {
@@ -227,11 +232,6 @@ namespace Orleans
         public SerializationCallbacksAttribute(System.Type hookType) { }
 
         public System.Type HookType { get { throw null; } }
-    }
-
-    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
-    public sealed partial class SerializerContextImportAttribute<TContext> : System.Attribute
-    {
     }
 
     [System.AttributeUsage(System.AttributeTargets.Class, Inherited = false)]

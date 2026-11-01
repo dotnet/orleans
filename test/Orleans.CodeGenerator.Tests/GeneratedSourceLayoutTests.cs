@@ -116,8 +116,8 @@ public sealed class GeneratedSourceLayoutTests
 
             public interface ILayoutObserver : IGrainObserver { void Notify(string message); }
 
-            [OrleansSerializable<ContextRoot>, OrleansSerializable<int?[]>]
-            public sealed partial class LayoutContext : Orleans.Serialization.SerializerContext { }
+            [GeneratedContextType<ContextRoot>, GeneratedContextType<int?[]>]
+            public sealed partial class LayoutContext : Orleans.Serialization.GeneratedContext { }
         }
         """;
 

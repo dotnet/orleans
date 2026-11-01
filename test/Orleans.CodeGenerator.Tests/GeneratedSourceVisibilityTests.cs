@@ -300,9 +300,9 @@ public sealed class GeneratedSourceVisibilityTests
                 public int Value { get; set; }
             }
 
-            /// <summary>An authored serializer context.</summary>
-            [OrleansSerializable<int>]
-            public partial class VisibilityContext : Orleans.Serialization.SerializerContext { }
+            /// <summary>An authored generated context.</summary>
+            [GeneratedContextType<int>]
+            public partial class VisibilityContext : Orleans.Serialization.GeneratedContext { }
             """;
         var parseOptions = CSharpParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose);
         var compilation = await TestCompilationHelper.CreateCompilation(source);

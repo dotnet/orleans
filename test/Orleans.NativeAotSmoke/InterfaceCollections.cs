@@ -6,7 +6,7 @@ using Orleans.Serialization.InterfaceCollectionSmoke;
 using Orleans.Serialization.Serializers;
 
 using var services = new ServiceCollection()
-    .AddSerializerContext(new InterfaceCollectionSmokeContext())
+    .AddGeneratedContext(new InterfaceCollectionSmokeContext())
     .AddSingleton<IGeneralizedCodec, InterfaceCollectionCodecResolver>()
     .BuildServiceProvider();
 var resolver = services.GetRequiredService<IGeneralizedCodec>();
@@ -32,5 +32,5 @@ foreach (var type in InterfaceCollectionContracts.UnsupportedTypes)
 
 Console.WriteLine("Interface collection codec metadata resolution passed: value, reference, nested, and rejected type shapes.");
 
-[OrleansSerializable<int>]
-internal partial class InterfaceCollectionSmokeContext : SerializerContext;
+[GeneratedContextType<int>]
+internal partial class InterfaceCollectionSmokeContext : GeneratedContext;

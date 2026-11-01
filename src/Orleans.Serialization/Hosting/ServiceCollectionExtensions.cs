@@ -55,14 +55,14 @@ namespace Orleans.Serialization
         /// Adds the Orleans serializer and deep copier using an explicit, compile-time type graph.
         /// </summary>
         /// <param name="services">The service collection.</param>
-        /// <param name="context">The generated serializer context.</param>
+        /// <param name="context">The generated context.</param>
         /// <returns>The service collection.</returns>
         /// <remarks>Repeated calls combine the registered contexts. Closed factories take priority over metadata-based resolution.</remarks>
-        public static IServiceCollection AddSerializerContext(this IServiceCollection services, SerializerContext context)
+        public static IServiceCollection AddGeneratedContext(this IServiceCollection services, GeneratedContext context)
         {
             if (services is null) throw new ArgumentNullException(nameof(services));
             if (context is null) throw new ArgumentNullException(nameof(context));
-            GetOrCreateConfigurationContext(services, initialize: null).Builder.AddSerializerContext(context);
+            GetOrCreateConfigurationContext(services, initialize: null).Builder.AddGeneratedContext(context);
             return services;
         }
 

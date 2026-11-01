@@ -145,8 +145,8 @@ public sealed class ExternalSerializerContextMetadataTests
     public async Task PrimitiveAndFrameworkCollectionRootsUseTheirExistingContracts()
     {
         var consumer = await TestCompilationHelper.CreateCompilation("""
-            [Orleans.OrleansSerializable<System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, int>>>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, int>>>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """);
         var (output, result) = Generate(consumer);
         AssertAccepted(output, result);
@@ -192,7 +192,7 @@ public sealed class ExternalSerializerContextMetadataTests
                 public static (int, int, bool, bool) Run()
                 {
                     using var services = Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(
-                        Orleans.Serialization.ServiceCollectionExtensions.AddSerializerContext(
+                        Orleans.Serialization.ServiceCollectionExtensions.AddGeneratedContext(
                             new Microsoft.Extensions.DependencyInjection.ServiceCollection(), new DemoContext()));
                     var serializer = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.Serializer>(services);
                     var copier = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.DeepCopier>(services);
@@ -229,8 +229,8 @@ public sealed class ExternalSerializerContextMetadataTests
 
     private static async Task<CSharpCompilation> CreateConsumer(string type, MetadataReference reference, string proof = "", string? assemblyName = null)
         => await TestCompilationHelper.CreateCompilation($$"""
-            [Orleans.OrleansSerializable<{{type}}>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<{{type}}>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             {{proof}}
             """, assemblyName ?? $"MetadataConsumer{Guid.NewGuid():N}", reference);
 

@@ -23,23 +23,23 @@ public sealed class ProducerSerializerContextTests
             {
                 [Orleans.Id(0)] public System.Collections.Generic.List<int> Values { get; set; }
             }
-            [Orleans.OrleansSerializable<Payload>]
-            public partial class ExportedContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<Payload>]
+            public partial class ExportedContext : Orleans.Serialization.GeneratedContext { }
             """, $"ContextProducer{Guid.NewGuid():N}");
         var (producerOutput, producerResult) = Generate(producer);
         AssertAccepted(producerOutput, producerResult);
         var consumer = await TestCompilationHelper.CreateCompilation("""
             [Orleans.GenerateSerializer]
             public sealed class LocalPayload { [Orleans.Id(0)] public int Value { get; set; } }
-            [Orleans.OrleansSerializable<LocalPayload>]
-            public partial class LocalContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<LocalPayload>]
+            public partial class LocalContext : Orleans.Serialization.GeneratedContext { }
             public static class RuntimeProof
             {
                 public static (int, int, int, bool) Run()
                 {
-                    var registrations = Orleans.Serialization.ServiceCollectionExtensions.AddSerializerContext(
+                    var registrations = Orleans.Serialization.ServiceCollectionExtensions.AddGeneratedContext(
                         new Microsoft.Extensions.DependencyInjection.ServiceCollection(), new Producer.ExportedContext());
-                    Orleans.Serialization.ServiceCollectionExtensions.AddSerializerContext(registrations, new LocalContext());
+                    Orleans.Serialization.ServiceCollectionExtensions.AddGeneratedContext(registrations, new LocalContext());
                     using var services = Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(registrations);
                     var serializer = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.Serializer>(services);
                     var copier = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.DeepCopier>(services);

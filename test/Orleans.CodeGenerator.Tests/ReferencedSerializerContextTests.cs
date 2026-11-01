@@ -32,14 +32,14 @@ public sealed class ReferencedSerializerContextTests
             producerResult.Results.SelectMany(static result => result.GeneratedSources)
                 .Select(static source => source.SourceText.ToString())), StringComparison.Ordinal);
         var consumer = await TestCompilationHelper.CreateCompilation("""
-            [Orleans.OrleansSerializable<DynamicPayload<System.Collections.Generic.List<int>>>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<DynamicPayload<System.Collections.Generic.List<int>>>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             public static class DynamicProducerProof
             {
                 public static bool Run()
                 {
                     using var services = Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(
-                        Orleans.Serialization.ServiceCollectionExtensions.AddSerializerContext(
+                        Orleans.Serialization.ServiceCollectionExtensions.AddGeneratedContext(
                             new Microsoft.Extensions.DependencyInjection.ServiceCollection(), new DemoContext()));
                     var serializer = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.Serializer>(services);
                     var copier = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.DeepCopier>(services);
@@ -123,8 +123,8 @@ public sealed class ReferencedSerializerContextTests
         AssertNoCompilationErrors(producerOutput);
         var reference = EmitReference(producerOutput);
         var consumer = await TestCompilationHelper.CreateCompilation($$"""
-            [Orleans.OrleansSerializable<{{closedType}}>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<{{closedType}}>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """, $"ImplicitConsumer{Guid.NewGuid():N}", reference);
         consumer = consumer.WithOptions(consumer.Options.WithMetadataImportOptions(metadataImport));
         var (output, result) = Generate(consumer, frameworkVersion, hotReload: false);
@@ -147,7 +147,7 @@ public sealed class ReferencedSerializerContextTests
                 public static bool Run()
                 {
                     using var services = Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(
-                        Orleans.Serialization.ServiceCollectionExtensions.AddSerializerContext(
+                        Orleans.Serialization.ServiceCollectionExtensions.AddGeneratedContext(
                             new Microsoft.Extensions.DependencyInjection.ServiceCollection(), new DemoContext()));
                     var serializer = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.Serializer>(services);
                     var copier = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.DeepCopier>(services);
@@ -200,8 +200,8 @@ public sealed class ReferencedSerializerContextTests
         var references = await CompileProducer("[Id(0)] public T[] Value { get; set; }", generic: true,
             frameworkVersion: "v10.0", hotReload: false, referenceAssembly: false, dynamicCodec: false, dynamicCopier: false);
         var consumer = await TestCompilationHelper.CreateCompilation("""
-            [Orleans.OrleansSerializable<Producer.Payload<byte>>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<Producer.Payload<byte>>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """, "ArrayConsumer", references);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(new OrleansSerializationSourceGenerator().AsSourceGenerator());
         driver = driver.RunGeneratorsAndUpdateCompilation(consumer, out var output, out _, TestContext.Current.CancellationToken);
@@ -418,8 +418,8 @@ public sealed class ReferencedSerializerContextTests
     private static async Task<(Compilation Compilation, GeneratorDriverRunResult Result)> GenerateConsumer(
         MetadataReference[] reference, bool generic, string frameworkVersion, bool hotReload)
         => Generate(await TestCompilationHelper.CreateCompilation($$"""
-            [Orleans.OrleansSerializable<Producer.Payload{{(generic ? "<int>" : "")}}>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<Producer.Payload{{(generic ? "<int>" : "")}}>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """, "ReferencedContextConsumer", reference), frameworkVersion, hotReload);
 
     private static (Compilation Compilation, GeneratorDriverRunResult Result) Generate(

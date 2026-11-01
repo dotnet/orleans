@@ -46,7 +46,7 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
 
         var generatedContextOutputs = context.SyntaxProvider
             .ForAttributeWithMetadataName(
-                "Orleans.OrleansSerializableAttribute`1",
+                "Orleans.GeneratedContextTypeAttribute`1",
                 predicate: static (node, _) => node is ClassDeclarationSyntax,
                 transform: static (ctx, _) => ctx)
             .Where(static ctx =>
@@ -65,12 +65,12 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             .Collect();
         var includedContextOutputs = context.SyntaxProvider
             .ForAttributeWithMetadataName(
-                "Orleans.SerializerContextImportAttribute`1",
+                "Orleans.GeneratedContextImportAttribute`1",
                 predicate: static (node, _) => node is ClassDeclarationSyntax,
                 transform: static (ctx, _) => ctx)
             .Where(static ctx =>
             {
-                var rootAttribute = ctx.SemanticModel.Compilation.GetTypeByMetadataName("Orleans.OrleansSerializableAttribute`1");
+                var rootAttribute = ctx.SemanticModel.Compilation.GetTypeByMetadataName("Orleans.GeneratedContextTypeAttribute`1");
                 if (ctx.TargetSymbol.GetAttributes().Any(attribute =>
                     SymbolEqualityComparer.Default.Equals(attribute.AttributeClass?.OriginalDefinition, rootAttribute)))
                     return false;

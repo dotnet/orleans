@@ -1343,7 +1343,7 @@ namespace Orleans.Serialization.Serializers
             catch (NotSupportedException exception) when (!RuntimeFeature.IsDynamicCodeSupported)
             {
                 throw new NotSupportedException(
-                    $"The runtime cannot materialize serialization implementation {implementation} for [{string.Join<Type>(", ", arguments)}]. Register its closed codec/copier and dependencies using a serializer context or closed factories.",
+                    $"The runtime cannot materialize serialization implementation {implementation} for [{string.Join<Type>(", ", arguments)}]. Register its closed codec/copier and dependencies using a generated context or closed factories.",
                     exception);
             }
         }

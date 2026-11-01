@@ -5,11 +5,11 @@ using Orleans.Serialization;
 namespace Documentation.SerializerContexts;
 
 #region serializer_context_declaration
-[OrleansSerializable<List<Dictionary<string, int>>>]
-[OrleansSerializable<DocumentationPayload<int>>]
-[OrleansSerializable<DocumentationPrimitivePayload>]
-[OrleansSerializable<DocumentationImplicitPayload<byte>>]
-public partial class ApplicationSerializerContext : SerializerContext;
+[GeneratedContextType<List<Dictionary<string, int>>>]
+[GeneratedContextType<DocumentationPayload<int>>]
+[GeneratedContextType<DocumentationPrimitivePayload>]
+[GeneratedContextType<DocumentationImplicitPayload<byte>>]
+public partial class ApplicationSerializerContext : GeneratedContext;
 
 [GenerateSerializer]
 public sealed class DocumentationPayload<T>
@@ -43,7 +43,7 @@ public static class SerializerContextExample
     {
         #region serializer_context_usage
         using var services = new ServiceCollection()
-            .AddSerializerContext(new ApplicationSerializerContext())
+            .AddGeneratedContext(new ApplicationSerializerContext())
             .BuildServiceProvider();
 
         var serializer = services.GetRequiredService<Serializer>();

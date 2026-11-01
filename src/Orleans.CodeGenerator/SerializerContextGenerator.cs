@@ -11,13 +11,13 @@ namespace Orleans.CodeGenerator;
 internal static class SerializerContextGenerator
 {
     private static readonly DiagnosticDescriptor InvalidContext = new(
-        DiagnosticRuleId.InvalidSerializerContext, "Invalid serializer context",
-        "Serializer context '{0}' must be a non-generic, top-level partial class directly derived from Orleans.Serialization.SerializerContext",
+        DiagnosticRuleId.InvalidSerializerContext, "Invalid generated context",
+        "Generated context '{0}' must be a non-generic, top-level partial class directly derived from Orleans.Serialization.GeneratedContext",
         "Usage", DiagnosticSeverity.Error, isEnabledByDefault: true);
 
     private static readonly DiagnosticDescriptor UnsupportedType = new(
-        DiagnosticRuleId.UnsupportedSerializerContextType, "Unsupported serializer context dependency",
-        "Serializer context '{0}' cannot register '{1}': {2}",
+        DiagnosticRuleId.UnsupportedSerializerContextType, "Unsupported generated context dependency",
+        "Generated context '{0}' cannot register '{1}': {2}",
         "Usage", DiagnosticSeverity.Error, isEnabledByDefault: true);
 
     internal static ImmutableArray<SerializerContextOutput> Generate(
@@ -26,7 +26,7 @@ internal static class SerializerContextGenerator
         var symbol = (INamedTypeSymbol)context.TargetSymbol;
         var location = symbol.Locations.FirstOrDefault();
         if (symbol.IsFileLocal || symbol.IsGenericType || symbol.ContainingType is not null
-            || symbol.BaseType?.ToDisplayString() != "Orleans.Serialization.SerializerContext"
+            || symbol.BaseType?.ToDisplayString() != "Orleans.Serialization.GeneratedContext"
             || symbol.IsAbstract || symbol.IsStatic
             || symbol.DeclaringSyntaxReferences.Any(reference =>
                 reference.GetSyntax(cancellationToken) is not ClassDeclarationSyntax declaration
@@ -37,8 +37,8 @@ internal static class SerializerContextGenerator
 
         var compilation = context.SemanticModel.Compilation;
         var declaration = CreateDeclaration(symbol, compilation.AssemblyName);
-        var attributeDefinition = compilation.GetTypeByMetadataName("Orleans.OrleansSerializableAttribute`1");
-        var includeDefinition = compilation.GetTypeByMetadataName("Orleans.SerializerContextImportAttribute`1");
+        var attributeDefinition = compilation.GetTypeByMetadataName("Orleans.GeneratedContextTypeAttribute`1");
+        var includeDefinition = compilation.GetTypeByMetadataName("Orleans.GeneratedContextImportAttribute`1");
         var roots = new List<ITypeSymbol>();
         var linkedContexts = new List<INamedTypeSymbol>();
         var providedRoots = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
@@ -54,7 +54,7 @@ internal static class SerializerContextGenerator
             {
                 var diagnostic = Diagnostic.Create(UnsupportedType, location, symbol.Name,
                     named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                    "use SerializerContextImportAttribute to link a context; OrleansSerializableAttribute declares model roots");
+                    "use GeneratedContextImportAttribute to link a context; GeneratedContextTypeAttribute declares model roots");
                 return [new(new SourceOutputResult(declaration, diagnostic), default)];
             }
             roots.Add(type);
@@ -68,7 +68,7 @@ internal static class SerializerContextGenerator
             if (type is not INamedTypeSymbol named || !IsContext(named))
             {
                 var diagnostic = Diagnostic.Create(UnsupportedType, location, symbol.Name,
-                    type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), "include a generated serializer context");
+                    type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), "include a generated context");
                 return [new(new SourceOutputResult(declaration, diagnostic), default)];
             }
             var alreadyVisited = visitedContexts.Contains(named);
@@ -124,7 +124,7 @@ internal static class SerializerContextGenerator
                 SymbolEqualityComparer.Default.Equals(attribute.AttributeClass?.OriginalDefinition, attributeDefinition)
                 || includeDefinition is not null && SymbolEqualityComparer.Default.Equals(attribute.AttributeClass?.OriginalDefinition, includeDefinition)).ToArray();
             if (attributes.Length == 0)
-                return new(linked, "the linked context must declare roots using OrleansSerializableAttribute or links using SerializerContextImportAttribute");
+                return new(linked, "the linked context must declare roots using GeneratedContextTypeAttribute or links using GeneratedContextImportAttribute");
             visitedContexts.Add(linked);
             activeContexts.Add(linked);
             foreach (var attribute in attributes)
@@ -135,13 +135,13 @@ internal static class SerializerContextGenerator
                 if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass.OriginalDefinition, includeDefinition))
                 {
                     if (type is not INamedTypeSymbol nested || !IsContext(nested))
-                        return new(linked, "include a generated serializer context");
+                        return new(linked, "include a generated context");
                     if (VisitContext(nested, depth + 1) is { } nestedFailure) return nestedFailure;
                 }
                 else
                 {
                     if (type is INamedTypeSymbol named && IsContext(named))
-                        return new(linked, "use SerializerContextImportAttribute to link a context; OrleansSerializableAttribute declares model roots");
+                        return new(linked, "use GeneratedContextImportAttribute to link a context; GeneratedContextTypeAttribute declares model roots");
                     providedRoots.Add(type.WithNullableAnnotation(NullableAnnotation.None));
                 }
             }

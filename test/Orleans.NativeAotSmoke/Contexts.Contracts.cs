@@ -15,17 +15,17 @@ namespace Orleans.Serialization.ContextSmoke;
 public static partial class ContextContracts
 {
     private static ServiceProvider CreateServices() => new ServiceCollection()
-        .AddSerializerContext(new SmokeContext())
-        .AddSerializerContext(new SmokeContext())
-        .AddSerializerContext(new DuplicateContext())
-        .AddSerializerContext(new AliasRegistrationContext())
+        .AddGeneratedContext(new SmokeContext())
+        .AddGeneratedContext(new SmokeContext())
+        .AddGeneratedContext(new DuplicateContext())
+        .AddGeneratedContext(new AliasRegistrationContext())
         .BuildServiceProvider();
 
     public static void NonSealedModelBaseServicesAliasCanonicalInstances()
     {
         foreach (var baseFirst in new[] { false, true })
         {
-            using var services = new ServiceCollection().AddSerializerContext(new BaseServiceContext()).BuildServiceProvider();
+            using var services = new ServiceCollection().AddGeneratedContext(new BaseServiceContext()).BuildServiceProvider();
             var provider = services.GetRequiredService<CodecProvider>();
             if (baseFirst)
             {
@@ -86,7 +86,7 @@ public static partial class ContextContracts
 
     public static void GeneratedFactoriesComposeWithMetadataAndReflection()
     {
-        var registrations = new ServiceCollection().AddSerializerContext(new DuplicateContext());
+        var registrations = new ServiceCollection().AddGeneratedContext(new DuplicateContext());
         var integerCodec = new UInt32Codec();
         var elementCopier = new ShallowCopier<uint>();
         var rootedArrayCodec = new ArrayCodec<uint>(integerCodec);
@@ -235,7 +235,7 @@ public static partial class ContextContracts
                     options.WellKnownTypeAliases.TryAdd("StringComparer", typeof(WellKnownStringComparerCodec));
                 });
             if (customFirst) RegisterCustom();
-            registrations.AddSerializerContext(new DuplicateContext());
+            registrations.AddGeneratedContext(new DuplicateContext());
             if (!customFirst) RegisterCustom();
             using var services = registrations.BuildServiceProvider();
             var provider = services.GetRequiredService<CodecProvider>();
@@ -283,7 +283,7 @@ public static partial class ContextContracts
 
     public static void NullableRootCyclesPreserveCopyIdentity()
     {
-        using var services = new ServiceCollection().AddSerializerContext(new NullableCycleContext()).BuildServiceProvider();
+        using var services = new ServiceCollection().AddGeneratedContext(new NullableCycleContext()).BuildServiceProvider();
         var children = new RecursiveValue?[2];
         RecursiveValue? original = new RecursiveValue { Value = 31, Children = children, Other = children };
         children[0] = original;
@@ -309,7 +309,7 @@ public static partial class ContextContracts
 
     public static void NullableRootFailureRollsBackAndRetriesCanonically()
     {
-        var registrations = new ServiceCollection().AddSerializerContext(new NullableCycleContext());
+        var registrations = new ServiceCollection().AddGeneratedContext(new NullableCycleContext());
         var attempts = 0;
         NullableCopier<RecursiveValue>? failedCopier = null;
         ArrayCopier<RecursiveValue?>? failedArray = null;
@@ -530,16 +530,16 @@ public static partial class ContextContracts
             "Accessible open-interface alias metadata is preserved while its private argument remains incidental.");
         Ensure(resolver.ResolveType(typeof(IIncidentalMetadataTag<>).FullName!) == typeof(IIncidentalMetadataTag<>),
             "Open interface metadata names retain their canonical definition independently of codecs.");
-        using (var separate = new ServiceCollection().AddSerializerContext(new PrefixContext())
-            .AddSerializerContext(new MultipleAliasContext()).BuildServiceProvider())
+        using (var separate = new ServiceCollection().AddGeneratedContext(new PrefixContext())
+            .AddGeneratedContext(new MultipleAliasContext()).BuildServiceProvider())
         {
             Ensure(RoundTrip(separate, new List<MultipleAliasPayload> { new() { Value = 83 } })[0].Value == 83, "Multiple aliases remain registered when contexts are combined.");
         }
         foreach (var split in new[] { false, true })
         {
             var registrations = new ServiceCollection();
-            if (split) registrations.AddSerializerContext(new PrefixContext()).AddSerializerContext(new ChildAliasContext());
-            else registrations.AddSerializerContext(new PrefixAndChildContext());
+            if (split) registrations.AddGeneratedContext(new PrefixContext()).AddGeneratedContext(new ChildAliasContext());
+            else registrations.AddGeneratedContext(new PrefixAndChildContext());
             using var prefixes = registrations.BuildServiceProvider();
             Ensure(RoundTrip(prefixes, new List<PrefixPayload> { new() { Value = 71 } })[0].Value == 71, "Compound prefix survives traversal through intermediate alias nodes.");
             Ensure(RoundTrip(prefixes, new List<ChildAliasPayload> { new() { Value = 73 } })[0].Value == 73, "Compound child survives combined or separate contexts.");
@@ -552,8 +552,8 @@ public static partial class ContextContracts
         foreach (var contextFirst in new[] { true, false })
         {
             var registrations = new ServiceCollection();
-            if (contextFirst) registrations.AddSerializerContext(new AliasRegistrationContext()).AddSerializer();
-            else registrations.AddSerializer().AddSerializerContext(new AliasRegistrationContext());
+            if (contextFirst) registrations.AddGeneratedContext(new AliasRegistrationContext()).AddSerializer();
+            else registrations.AddSerializer().AddGeneratedContext(new AliasRegistrationContext());
             using var services = registrations.BuildServiceProvider();
             Ensure(RoundTrip(services, new AliasedPayload<int> { Value = 109 }).Value == 109,
                 "Identical alias mappings compose in either context/ordinary registration order.");
@@ -617,49 +617,49 @@ public static partial class ContextContracts
     }
 }
 
-[OrleansSerializable<List<Dictionary<string, int>>>]
-[OrleansSerializable<Dictionary<int, List<long>>>]
-[OrleansSerializable<Payload<int>>]
-[OrleansSerializable<int?[]>]
-[OrleansSerializable<byte[]>]
-[OrleansSerializable<Flavor>]
-[OrleansSerializable<List<int>>]
-[OrleansSerializable<Node>]
-[OrleansSerializable<Left>]
-[OrleansSerializable<List<Branch>>]
-[OrleansSerializable<List<AliasedPayload<int>>>]
-[OrleansSerializable<IdentifiedPayload>]
-[OrleansSerializable<List<CompoundPayload>>]
-[OrleansSerializable<ValuePayload<int>>]
-[OrleansSerializable<Box<byte>>]
-[OrleansSerializable<Box<int>>]
-[OrleansSerializable<NamespaceBox<byte>>]
-[OrleansSerializable<GenericArrayNode>]
-[OrleansSerializable<List<MultipleAliasPayload>>]
-[OrleansSerializable<List<NestedAliasPayload>>]
-[OrleansSerializable<MetadataEnvelope<UnusedAliasMarker>>]
-[OrleansSerializable<MetadataEnvelope<UnusedAliasMarker[]>>]
-[OrleansSerializable<InterfaceTaggedPayload>]
-[OrleansSerializable<AliasedContainer.Payload>]
-[OrleansSerializable<IncidentalPrivateInterfacePayload>]
+[GeneratedContextType<List<Dictionary<string, int>>>]
+[GeneratedContextType<Dictionary<int, List<long>>>]
+[GeneratedContextType<Payload<int>>]
+[GeneratedContextType<int?[]>]
+[GeneratedContextType<byte[]>]
+[GeneratedContextType<Flavor>]
+[GeneratedContextType<List<int>>]
+[GeneratedContextType<Node>]
+[GeneratedContextType<Left>]
+[GeneratedContextType<List<Branch>>]
+[GeneratedContextType<List<AliasedPayload<int>>>]
+[GeneratedContextType<IdentifiedPayload>]
+[GeneratedContextType<List<CompoundPayload>>]
+[GeneratedContextType<ValuePayload<int>>]
+[GeneratedContextType<Box<byte>>]
+[GeneratedContextType<Box<int>>]
+[GeneratedContextType<NamespaceBox<byte>>]
+[GeneratedContextType<GenericArrayNode>]
+[GeneratedContextType<List<MultipleAliasPayload>>]
+[GeneratedContextType<List<NestedAliasPayload>>]
+[GeneratedContextType<MetadataEnvelope<UnusedAliasMarker>>]
+[GeneratedContextType<MetadataEnvelope<UnusedAliasMarker[]>>]
+[GeneratedContextType<InterfaceTaggedPayload>]
+[GeneratedContextType<AliasedContainer.Payload>]
+[GeneratedContextType<IncidentalPrivateInterfacePayload>]
 #if NET10_0_OR_GREATER
-[OrleansSerializable<ContextContracts.DocumentationEnvelope>]
-[SerializerContextImport<ApplicationSerializerContext>]
+[GeneratedContextType<ContextContracts.DocumentationEnvelope>]
+[GeneratedContextImport<ApplicationSerializerContext>]
 #endif
-internal partial class SmokeContext : SerializerContext;
+internal partial class SmokeContext : GeneratedContext;
 
-[OrleansSerializable<List<Dictionary<string, int>>>]
-internal partial class DuplicateContext : SerializerContext;
+[GeneratedContextType<List<Dictionary<string, int>>>]
+internal partial class DuplicateContext : GeneratedContext;
 
-[OrleansSerializable<AliasedPayload<int>>]
-[OrleansSerializable<IdentifiedPayload>]
-internal partial class AliasRegistrationContext : SerializerContext;
+[GeneratedContextType<AliasedPayload<int>>]
+[GeneratedContextType<IdentifiedPayload>]
+internal partial class AliasRegistrationContext : GeneratedContext;
 
-[OrleansSerializable<RecursiveValue?>]
-internal partial class NullableCycleContext : SerializerContext;
+[GeneratedContextType<RecursiveValue?>]
+internal partial class NullableCycleContext : GeneratedContext;
 
-[OrleansSerializable<BaseServiceModel>]
-internal partial class BaseServiceContext : SerializerContext;
+[GeneratedContextType<BaseServiceModel>]
+internal partial class BaseServiceContext : GeneratedContext;
 
 [GenerateSerializer]
 public class BaseServiceModel
@@ -769,15 +769,15 @@ public sealed class GenericArrayNode
     [Id(0)] public Box<GenericArrayNode> Children { get; set; } = null!;
 }
 
-[OrleansSerializable<List<PrefixPayload>>]
-[OrleansSerializable<List<ChildAliasPayload>>]
-internal partial class PrefixAndChildContext : SerializerContext;
+[GeneratedContextType<List<PrefixPayload>>]
+[GeneratedContextType<List<ChildAliasPayload>>]
+internal partial class PrefixAndChildContext : GeneratedContext;
 
-[OrleansSerializable<List<PrefixPayload>>]
-internal partial class PrefixContext : SerializerContext;
+[GeneratedContextType<List<PrefixPayload>>]
+internal partial class PrefixContext : GeneratedContext;
 
-[OrleansSerializable<List<ChildAliasPayload>>]
-internal partial class ChildAliasContext : SerializerContext;
+[GeneratedContextType<List<ChildAliasPayload>>]
+internal partial class ChildAliasContext : GeneratedContext;
 
 [GenerateSerializer, CompoundTypeAlias("shared")]
 public sealed class PrefixPayload { [Id(0)] public int Value { get; set; } }
@@ -788,8 +788,8 @@ public sealed class ChildAliasPayload { [Id(0)] public int Value { get; set; } }
 [GenerateSerializer, CompoundTypeAlias("multiple", "2"), CompoundTypeAlias("multiple", "1")]
 public sealed class MultipleAliasPayload { [Id(0)] public int Value { get; set; } }
 
-[OrleansSerializable<List<MultipleAliasPayload>>]
-internal partial class MultipleAliasContext : SerializerContext;
+[GeneratedContextType<List<MultipleAliasPayload>>]
+internal partial class MultipleAliasContext : GeneratedContext;
 
 [CompoundTypeAlias("metadata-marker")]
 public sealed class NestedAliasMarker;

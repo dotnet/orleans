@@ -57,8 +57,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
     public void UnsupportedRootsProduceGeneratorErrors(string root, string reason)
     {
         var (_, result) = Generate($$"""
-            [Orleans.OrleansSerializable<{{root}}>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<{{root}}>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """);
         var diagnostic = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Id == "ORLEANS0115");
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
@@ -82,8 +82,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
             var (_, result) = Generate($$"""
                 [Orleans.GenerateSerializer]
                 public sealed class Payload { [Orleans.Id(0)] public {{interfaceType}} Values { get; set; } }
-                [Orleans.OrleansSerializable<{{root}}>]
-                public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+                [Orleans.GeneratedContextType<{{root}}>]
+                public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
                 """);
             var diagnostic = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Id == "ORLEANS0115");
             Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
@@ -100,8 +100,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
     public void InvalidAttributeArgumentsProduceCompilerErrorsBeforeGeneration(string root, string declaration, string diagnosticId)
     {
         var compilation = CreateCompilation($$"""
-            [Orleans.OrleansSerializable<{{root}}>]
-            public partial class {{declaration}} : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<{{root}}>]
+            public partial class {{declaration}} : Orleans.Serialization.GeneratedContext { }
             """);
         var errors = compilation.GetDiagnostics(TestContext.Current.CancellationToken)
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
@@ -120,10 +120,10 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
     [Fact]
     public void GenericAttributeExposesOnlyParameterlessConstruction()
     {
-        var attribute = typeof(OrleansSerializableAttribute<int>);
+        var attribute = typeof(GeneratedContextTypeAttribute<int>);
         Assert.Empty(Assert.Single(attribute.GetConstructors()).GetParameters());
         Assert.Null(attribute.GetProperty("Type"));
-        Assert.Null(attribute.Assembly.GetType("Orleans.OrleansSerializableAttribute"));
+        Assert.Null(attribute.Assembly.GetType("Orleans.GeneratedContextTypeAttribute"));
     }
 
     [Fact]
@@ -132,12 +132,12 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
         var (compilation, result) = Generate(CreateCompilation("""
             [Orleans.GenerateSerializer] public struct Value { [Orleans.Id(0)] public int Number; }
             [Orleans.GenerateSerializer] public enum Flavor { First, Second }
-            [Orleans.OrleansSerializable<int>]
-            [Orleans.OrleansSerializable<int?>]
-            [Orleans.OrleansSerializable<int[]>]
-            [Orleans.OrleansSerializable<Value>]
-            [Orleans.OrleansSerializable<Flavor>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<int>]
+            [Orleans.GeneratedContextType<int?>]
+            [Orleans.GeneratedContextType<int[]>]
+            [Orleans.GeneratedContextType<Value>]
+            [Orleans.GeneratedContextType<Flavor>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """, LanguageVersion.CSharp11));
         Assert.Empty(result.Diagnostics);
         Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
@@ -154,13 +154,13 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
         var (compilation, result) = Generate("""
             namespace First
             {
-                [Orleans.OrleansSerializable<int>]
-                public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+                [Orleans.GeneratedContextType<int>]
+                public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             }
             namespace Second
             {
-                [Orleans.OrleansSerializable<string>]
-                public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+                [Orleans.GeneratedContextType<string>]
+                public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             }
             """);
         Assert.Empty(result.Diagnostics);
@@ -178,13 +178,13 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData("public class DemoContext : Orleans.Serialization.SerializerContext { }")]
-    [InlineData("public partial class DemoContext<T> : Orleans.Serialization.SerializerContext { }")]
+    [InlineData("public class DemoContext : Orleans.Serialization.GeneratedContext { }")]
+    [InlineData("public partial class DemoContext<T> : Orleans.Serialization.GeneratedContext { }")]
     [InlineData("public partial class DemoContext { }")]
-    [InlineData("file partial class DemoContext : Orleans.Serialization.SerializerContext { }")]
+    [InlineData("file partial class DemoContext : Orleans.Serialization.GeneratedContext { }")]
     public void InvalidContextsProduceGeneratorErrors(string declaration)
     {
-        var (_, result) = Generate($"[Orleans.OrleansSerializable<int>] {declaration}");
+        var (_, result) = Generate($"[Orleans.GeneratedContextType<int>] {declaration}");
         var diagnostic = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Id == "ORLEANS0114");
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
     }
@@ -194,11 +194,11 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
     {
         var (compilation, result) = Generate("""
             using System.Collections.Generic;
-            [Orleans.OrleansSerializable<List<Dictionary<string, int>>>]
-            [Orleans.OrleansSerializable<int?>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
-            [Orleans.OrleansSerializable<List<Dictionary<string, int>>>]
-            [Orleans.OrleansSerializable<byte[]>]
+            [Orleans.GeneratedContextType<List<Dictionary<string, int>>>]
+            [Orleans.GeneratedContextType<int?>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
+            [Orleans.GeneratedContextType<List<Dictionary<string, int>>>]
+            [Orleans.GeneratedContextType<byte[]>]
             public partial class DemoContext { }
             """);
         Assert.Empty(result.Diagnostics);
@@ -222,10 +222,10 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
     [InlineData(8, true)]
     public void PartialContextsConstructOneGraphWithAllRoots(int attributedDeclarations, bool separateFiles)
     {
-        const string declaration = "public partial class DemoContext : Orleans.Serialization.SerializerContext { }";
+        const string declaration = "public partial class DemoContext : Orleans.Serialization.GeneratedContext { }";
         string[] roots = ["int?", "byte[]", "System.Collections.Generic.List<int>"];
         var attributes = Enumerable.Range(0, attributedDeclarations)
-            .Select(index => $"[Orleans.OrleansSerializable<{roots[index % roots.Length]}>]").ToArray();
+            .Select(index => $"[Orleans.GeneratedContextType<{roots[index % roots.Length]}>]").ToArray();
         var partials = attributes.Select(attribute => $"{attribute} public partial class DemoContext {{ }}");
         var sources = new[] { declaration }.Concat(partials).ToArray();
         var compilation = CreateCompilation(separateFiles ? sources : [string.Join(Environment.NewLine, sources)]);
@@ -245,9 +245,9 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
     public void PartialContextDiagnosticsKeepTheFirstDeclarationLocation(bool invalidContext, string root, string diagnosticId)
     {
         var compilation = CreateCompilation([
-            $"public {(invalidContext ? "" : "partial")} class DemoContext : Orleans.Serialization.SerializerContext {{ }}",
-            $"[Orleans.OrleansSerializable<{root}>] public partial class DemoContext {{ }}",
-            "[Orleans.OrleansSerializable<byte[]>] public partial class DemoContext { }"
+            $"public {(invalidContext ? "" : "partial")} class DemoContext : Orleans.Serialization.GeneratedContext {{ }}",
+            $"[Orleans.GeneratedContextType<{root}>] public partial class DemoContext {{ }}",
+            "[Orleans.GeneratedContextType<byte[]>] public partial class DemoContext { }"
         ]);
         var (_, result) = Generate(compilation);
         var diagnostic = Assert.Single(result.Diagnostics);
@@ -261,7 +261,7 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
 
         var (_, consolidated) = Generate(compilation.RemoveSyntaxTrees(compilation.SyntaxTrees.Skip(1))
             .AddSyntaxTrees(CSharpSyntaxTree.ParseText(
-                $"[Orleans.OrleansSerializable<{root}>][Orleans.OrleansSerializable<byte[]>] public partial class DemoContext {{ }}",
+                $"[Orleans.GeneratedContextType<{root}>][Orleans.GeneratedContextType<byte[]>] public partial class DemoContext {{ }}",
                 (CSharpParseOptions)firstDeclaration.SyntaxTree.Options,
                 cancellationToken: TestContext.Current.CancellationToken)));
         var expected = Assert.Single(consolidated.Diagnostics);
@@ -273,10 +273,10 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
     public void PartialContextEditsKeepAllRootsWhenOwnershipMoves()
     {
         var compilation = CreateCompilation([
-            "public partial class DemoContext : Orleans.Serialization.SerializerContext { }",
-            "[Orleans.OrleansSerializable<int>] public partial class DemoContext { }",
+            "public partial class DemoContext : Orleans.Serialization.GeneratedContext { }",
+            "[Orleans.GeneratedContextType<int>] public partial class DemoContext { }",
             """
-            using Root = Orleans.OrleansSerializableAttribute<string>;
+            using Root = Orleans.GeneratedContextTypeAttribute<string>;
             [Root] public partial class DemoContext { }
             """
         ]);
@@ -286,13 +286,13 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
         var owner = compilation.SyntaxTrees.ElementAt(1);
         var other = compilation.SyntaxTrees.Last();
         var changed = CSharpSyntaxTree.ParseText(
-            "[Orleans.OrleansSerializable<bool>] public partial class DemoContext { }",
+            "[Orleans.GeneratedContextType<bool>] public partial class DemoContext { }",
             (CSharpParseOptions)other.Options,
             cancellationToken: TestContext.Current.CancellationToken);
         compilation = compilation.ReplaceSyntaxTree(other, changed);
         AssertMatchesConsolidated("int", "bool");
         var added = CSharpSyntaxTree.ParseText(
-            "[Orleans.OrleansSerializable<byte[]>] public partial class DemoContext { }",
+            "[Orleans.GeneratedContextType<byte[]>] public partial class DemoContext { }",
             (CSharpParseOptions)other.Options,
             cancellationToken: TestContext.Current.CancellationToken);
         compilation = compilation.AddSyntaxTrees(added);
@@ -310,8 +310,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
             Assert.Empty(generated.GetDiagnostics(TestContext.Current.CancellationToken)
                 .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
             Assert.Single(GetContextResults(result));
-            var attributes = string.Join(Environment.NewLine, roots.Select(root => $"[Orleans.OrleansSerializable<{root}>]"));
-            var (_, expected) = Generate($"{attributes} public partial class DemoContext : Orleans.Serialization.SerializerContext {{ }}");
+            var attributes = string.Join(Environment.NewLine, roots.Select(root => $"[Orleans.GeneratedContextType<{root}>]"));
+            var (_, expected) = Generate($"{attributes} public partial class DemoContext : Orleans.Serialization.GeneratedContext {{ }}");
             Assert.Equal(GetContextSources(expected), GetContextSources(result));
         }
     }
@@ -320,8 +320,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
     public void PartialContextCancellationLeavesTheDriverReusable()
     {
         var compilation = CreateCompilation([
-            "[Orleans.OrleansSerializable<int[]>] public partial class DemoContext : Orleans.Serialization.SerializerContext { }",
-            "[Orleans.OrleansSerializable<string>] public partial class DemoContext { }"
+            "[Orleans.GeneratedContextType<int[]>] public partial class DemoContext : Orleans.Serialization.GeneratedContext { }",
+            "[Orleans.GeneratedContextType<string>] public partial class DemoContext { }"
         ]);
         var driver = CreateDriver(compilation);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
@@ -334,9 +334,9 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
         Assert.Single(GetContextResults(result));
         var (_, expected) = Generate("""
-            [Orleans.OrleansSerializable<int[]>]
-            [Orleans.OrleansSerializable<string>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<int[]>]
+            [Orleans.GeneratedContextType<string>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """);
         Assert.Equal(GetContextSources(expected), GetContextSources(result));
     }
@@ -358,11 +358,11 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
             }
             """;
         const string first = """
-            [Orleans.OrleansSerializable<Node>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<Node>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """;
         const string second = """
-            [Orleans.OrleansSerializable<Branch[]>]
+            [Orleans.GeneratedContextType<Branch[]>]
             public partial class DemoContext { }
             """;
         var (generated, result) = Generate(CreateCompilation([models, first, second]));
@@ -372,7 +372,7 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
         Assert.Single(GetContextResults(result));
         var (_, expected) = Generate($"""
             {models}
-            [Orleans.OrleansSerializable<Branch[]>]
+            [Orleans.GeneratedContextType<Branch[]>]
             {first}
             """);
         Assert.Equal(GetContextSources(expected), GetContextSources(result));
@@ -393,10 +393,10 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
         var arrays = string.Concat(Enumerable.Repeat("[]", 127));
         var roots = Enumerable.Range(0, 8).Select(index => $"Payload{index}{arrays}").ToList();
         if (exceedsLimit) roots.Add("Payload8");
-        var attributes = roots.Select(static root => $"[Orleans.OrleansSerializable<{root}>]").ToArray();
+        var attributes = roots.Select(static root => $"[Orleans.GeneratedContextType<{root}>]").ToArray();
         var (_, result) = Generate(CreateCompilation([
             models,
-            $"{string.Join(Environment.NewLine, attributes.Take(4))} public partial class DemoContext : Orleans.Serialization.SerializerContext {{ }}",
+            $"{string.Join(Environment.NewLine, attributes.Take(4))} public partial class DemoContext : Orleans.Serialization.GeneratedContext {{ }}",
             $"{string.Join(Environment.NewLine, attributes.Skip(4))} public partial class DemoContext {{ }}"
         ]));
         Assert.Single(GetContextResults(result));
@@ -433,8 +433,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
             {
                 [Id(0)] public List<Dictionary<string, int>> Items { get; set; } = new();
             }
-            [OrleansSerializable<Payload>]
-            public partial class DemoContext : SerializerContext { }
+            [GeneratedContextType<Payload>]
+            public partial class DemoContext : GeneratedContext { }
             """);
         Assert.Empty(result.Diagnostics);
         Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken).Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
@@ -460,10 +460,10 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
             public struct ValuePayload<T> { [Id(0)] public T Value { get; set; } }
             [GenerateSerializer]
             public sealed class Box<T> { [Id(0)] public T[] Values { get; set; } }
-            [OrleansSerializable<ValuePayload<int>>]
-            [OrleansSerializable<Box<byte>>]
-            [OrleansSerializable<Box<int>>]
-            public partial class DemoContext : SerializerContext { }
+            [GeneratedContextType<ValuePayload<int>>]
+            [GeneratedContextType<Box<byte>>]
+            [GeneratedContextType<Box<int>>]
+            public partial class DemoContext : GeneratedContext { }
             """);
         Assert.Empty(result.Diagnostics);
         Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken).Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
@@ -495,8 +495,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
             {
                 [Orleans.Id(0)] public System.Collections.Generic.List<int> Values { get; set; } = new();
             }
-            [Orleans.OrleansSerializable<Payload>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<Payload>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """);
         Assert.Empty(result.Diagnostics);
         Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
@@ -532,8 +532,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
                 [global::Orleans.Id(0)] public {{parameter}}[] Values { get; set; }
                 [global::Orleans.Id(1)] public {{parameter}}[][] Nested { get; set; }
             }
-            [global::Orleans.OrleansSerializable<Box<byte>>]
-            public partial class DemoContext : global::Orleans.Serialization.SerializerContext { }
+            [global::Orleans.GeneratedContextType<Box<byte>>]
+            public partial class DemoContext : global::Orleans.Serialization.GeneratedContext { }
             """);
         Assert.Empty(result.Diagnostics);
         Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
@@ -562,8 +562,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
                 [Orleans.GenerateSerializer]
                 public sealed class Item<T> { [Orleans.Id(0)] public T Value { get; set; } }
             }
-            [Orleans.OrleansSerializable<Box<byte>>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<Box<byte>>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """);
         Assert.Empty(result.Diagnostics);
         Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
@@ -594,8 +594,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
                 private sealed class Hidden { }
                 [Orleans.Id(0)] public int Value { get; set; }
             }
-            [Orleans.OrleansSerializable<Payload>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<Payload>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """);
         Assert.Empty(result.Diagnostics);
         Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
@@ -619,8 +619,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
                 private sealed class Hidden { }
                 [Orleans.Id(0)] public int Value { get; set; }
             }
-            [Orleans.OrleansSerializable<Payload>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<Payload>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """);
         Assert.DoesNotContain(compilation.GetDiagnostics(TestContext.Current.CancellationToken),
             static diagnostic => diagnostic.Id == "CS0122");
@@ -854,8 +854,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
             {
                 [Orleans.Id(0)] public int Value { get; set; }
             }
-            [Orleans.OrleansSerializable<Payload<int>>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<Payload<int>>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """);
         var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0115");
         Assert.Contains("metadata dependency graph", diagnostic.GetMessage(), StringComparison.Ordinal);
@@ -875,8 +875,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
             {
                 [Orleans.Id(0)] public int Value { get; set; }
             }
-            [Orleans.OrleansSerializable<Payload<int>>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<Payload<int>>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """);
         Assert.Empty(result.Diagnostics);
         Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
@@ -899,8 +899,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
             {
                 [Id(0)] public List<Node> Children { get; set; } = new();
             }
-            [OrleansSerializable<List<Node>>]
-            public partial class DemoContext : SerializerContext { }
+            [GeneratedContextType<List<Node>>]
+            public partial class DemoContext : GeneratedContext { }
             """);
         Assert.Empty(result.Diagnostics);
         var sources = result.Results.SelectMany(result => result.GeneratedSources).ToArray();
@@ -919,8 +919,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
             using Orleans;
             [GenerateSerializer]
             public sealed class Payload { {{member}} }
-            [OrleansSerializable<Payload>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [GeneratedContextType<Payload>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """);
         var diagnostic = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Id == "ORLEANS0115");
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
@@ -936,8 +936,8 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
             using Orleans;
             [GenerateSerializer]
             public sealed class Payload { {{member}} }
-            [OrleansSerializable<Payload>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [GeneratedContextType<Payload>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """);
         var diagnostics = result.Diagnostics.Where(diagnostic => diagnostic.Id == "ORLEANS0115").ToArray();
         if (diagnostics.Length > 0)
