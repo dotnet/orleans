@@ -19,9 +19,6 @@ public static partial class ContextContracts
         .AddSerializerContext(new SmokeContext())
         .AddSerializerContext(new DuplicateContext())
         .AddSerializerContext(new AliasRegistrationContext())
-#if NET10_0_OR_GREATER
-        .AddSerializerContext(new ApplicationSerializerContext())
-#endif
         .BuildServiceProvider();
 
     public static void NonSealedModelBaseServicesAliasCanonicalInstances()
@@ -386,6 +383,24 @@ public static partial class ContextContracts
         Ensure(implicitInput.Values[0] == 13 && implicitInput.Flat[0] == 13
             && implicitCopy.Flat[0] == 29 && implicitCopy.Nested[1][0] == 29,
             "Referenced producer-selected implicit members preserve copying identity and source isolation.");
+        var envelope = new DocumentationEnvelope { Items = [input, input] };
+        var restoredEnvelope = RoundTrip(services, envelope);
+        var copiedEnvelope = services.GetRequiredService<DeepCopier>().Copy(envelope);
+        Ensure(restoredEnvelope.Items[0].Value == 19
+            && ReferenceEquals(restoredEnvelope.Items[0], restoredEnvelope.Items[1])
+            && ReferenceEquals(copiedEnvelope.Items[0], copiedEnvelope.Items[1]),
+            "A local collection graph composes the linked producer model and preserves shared identity.");
+        copiedEnvelope.Items[0].Items[0]["referenced"] = 41;
+        Ensure(input.Items[0]["referenced"] == 23 && copiedEnvelope.Items[1].Items[0]["referenced"] == 41,
+            "The linked model's copier preserves local-envelope sharing and source isolation.");
+        Ensure(ConsumerSerializerContextExample.SerializeAndCopy().Items[0].Value == 13,
+            "Compiled linked-context documentation example outcome.");
+    }
+
+    [GenerateSerializer]
+    public sealed class DocumentationEnvelope
+    {
+        [Id(0)] public List<DocumentationPayload<int>> Items { get; set; } = [];
     }
 #endif
 
@@ -627,6 +642,10 @@ public static partial class ContextContracts
 [GenerateSerializerContext<InterfaceTaggedPayload>]
 [GenerateSerializerContext<AliasedContainer.Payload>]
 [GenerateSerializerContext<IncidentalPrivateInterfacePayload>]
+#if NET10_0_OR_GREATER
+[GenerateSerializerContext<ContextContracts.DocumentationEnvelope>]
+[IncludeSerializerContext<ApplicationSerializerContext>]
+#endif
 internal partial class SmokeContext : SerializerContext;
 
 [GenerateSerializerContext<List<Dictionary<string, int>>>]

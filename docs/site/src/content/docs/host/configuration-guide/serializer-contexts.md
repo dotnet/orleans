@@ -18,15 +18,25 @@ Declare a context alongside the models whose closed graphs it provides. A model 
 
 Models use <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> member identifiers. Referenced assemblies provide generated codecs and copiers whose actual constructor metadata determines service construction. NativeAOT implementations use direct member access or static accessors; JIT applications also support generated dynamic accessors.
 
-## Generate a new context over external models
+## Link library contexts
 
-External serializer-context generation consumes full implementation metadata for models and their generated codecs and copiers. The generator discovers dependencies from the producer's complete service-member and constructor metadata, including private state, get-only or init-only properties, and assembly-level member selection. This preserves the producer's serialization and copying contract.
+Apply <xref:Orleans.IncludeSerializerContextAttribute`1> to include a library's context. The included context supplies its declared model roots and their complete serialization dependencies. A consumer can generate a local envelope or collection graph containing those roots while compiling against the library's normal reference assembly.
 
-Supply implementation assemblies to context-generating consumers using an explicit implementation-metadata reference. The producer continues emitting reference assemblies for ordinary consumers. Context-generating consumers rebuild when implementation metadata changes; ordinary consumers retain implementation-edit build isolation. `ORLEANS0115` identifies an external reference-only input which requires full implementation metadata.
+:::code language="csharp" source="snippets/serializer-contexts/ConsumerSerializerContextExample.cs" id="serializer_context_link":::
 
-For SDK-style project references, update `ReferencePath.ReferenceAssembly` to the SDK-resolved `ReferencePath.FullPath` before `FindReferenceAssembliesForReferences`, after `ResolveReferences`. Scope that update to the model and generated-service `ProjectReference` inputs consumed by the context.
+Register the consumer context. Its generated configuration includes the library context before registering the local graph:
 
-F# model declarations supply the retained type, constructor, and base facts used by a context. Their serialization dependencies come exclusively from full generated C# codec and copier metadata. This permits F# model reference images with complete generated services; a reference-only generated service produces `ORLEANS0115`. External F# serializer generation, which reads model storage, consumes full model metadata.
+:::code language="csharp" source="snippets/serializer-contexts/ConsumerSerializerContextExample.cs" id="serializer_context_link_usage":::
+
+Included contexts declare exact closed roots, such as `DocumentationPayload<int>`. Add another root to the library context when consumers need another closed graph. Includes form an acyclic graph so that each supplied root has an owning context. Link chains supply roots transitively, and shared links configure each type-manifest provider key once. Model dependency cycles retain their serialization and copying support. Contexts require accessible parameterless construction. The generator reports `ORLEANS0115` for include cycles, invalid links, or graphs exceeding 1,024 contexts or 128 nested links.
+
+The producer owns the complete dependency knowledge and generated factories. Private member IDs, copy policies, and service fields stay in that owning assembly. Local collection dependencies crossing an opaque link use statically closed holders to preserve recursive construction.
+
+## Models requiring external code generation
+
+Generating serializers for another assembly's raw models reads their implementation metadata, including private storage and record construction facts. Such model assemblies use `ProduceReferenceAssembly=false`, allowing normal project references to provide the required full metadata. Assemblies which generate and export their own contexts can produce reference assemblies.
+
+An external model graph supplied without a linked context also requires full generated model, codec, and copier metadata. `ORLEANS0115` identifies an insufficient reference-only input. Prefer declaring that graph in the owning assembly and including its context.
 
 Metadata discovery also follows generic arguments, array elements, implemented interfaces, and declaring types. It preserves accessible alias metadata independently of codec registration. This traversal has separate limits of 1,024 closed metadata types and 128 nested dependencies; expanding generic-interface shapes produce `ORLEANS0115` with guidance to declare finite type metadata. Already visited types terminate finite metadata cycles.
 

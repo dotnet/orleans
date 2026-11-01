@@ -124,6 +124,11 @@ namespace Orleans
     {
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    public sealed partial class IncludeSerializerContextAttribute<TContext> : System.Attribute
+    {
+    }
+
     [System.AttributeUsage(System.AttributeTargets.Assembly | System.AttributeTargets.Class | System.AttributeTargets.Struct | System.AttributeTargets.Interface, AllowMultiple = true)]
     public sealed partial class InvokableBaseTypeAttribute : System.Attribute
     {

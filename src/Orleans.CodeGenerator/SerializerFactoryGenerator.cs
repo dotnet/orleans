@@ -13,9 +13,10 @@ internal static class SerializerFactoryGenerator
     // Configuration statements are written inside the context's partial class and configuration method.
     private const int ContextStatementIndentation = 2;
 
-    internal sealed class Registration(ITypeSymbol type)
+    internal sealed class Registration(ITypeSymbol type, bool isProvided = false)
     {
         public ITypeSymbol Type { get; } = type;
+        public bool IsProvided { get; } = isProvided;
         public string Codec { get; set; } = "";
         public string Copier { get; set; } = "";
         public string CodecConstruction { get; set; } = "";
@@ -43,6 +44,7 @@ internal static class SerializerFactoryGenerator
     internal static bool TryCreate(
         IGeneratorServices services,
         IEnumerable<ITypeSymbol> roots,
+        IReadOnlyCollection<ITypeSymbol> providedRoots,
         CancellationToken cancellationToken,
         [NotNullWhen(true)] out Graph? graph,
         [NotNullWhen(false)] out Failure? failure)
@@ -53,6 +55,18 @@ internal static class SerializerFactoryGenerator
             ? csharp.WithOptions(csharp.Options.WithMetadataImportOptions(MetadataImportOptions.All))
             : services.Compilation;
         var registrations = new Dictionary<ITypeSymbol, Registration>(SymbolEqualityComparer.Default);
+        foreach (var root in providedRoots)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var type = root.WithNullableAnnotation(NullableAnnotation.None);
+            if (registrations.ContainsKey(type)) continue;
+            if (registrations.Count >= 1024)
+            {
+                failure = new(type, "the dependency graph exceeds 1024 closed types; declare a finite serialization graph");
+                return false;
+            }
+            registrations.Add(type, new Registration(type, isProvided: true));
+        }
         var pending = new Queue<ITypeSymbol>(roots);
         while (pending.Count > 0)
         {
@@ -83,7 +97,7 @@ internal static class SerializerFactoryGenerator
         if (failure is not null)
         {
             var metadata = new SourceWriter(initialIndentation: ContextStatementIndentation);
-            var visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+            var visited = new HashSet<ITypeSymbol>(providedRoots, SymbolEqualityComparer.Default);
             foreach (var type in registrations.Keys)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -98,11 +112,12 @@ internal static class SerializerFactoryGenerator
         }
 
         var result = new SourceWriter(initialIndentation: ContextStatementIndentation);
-        var metadataTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+        var metadataTypes = new HashSet<ITypeSymbol>(providedRoots, SymbolEqualityComparer.Default);
         var auxiliaryServices = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var registration in registrations.Values.OrderBy(value => Name(value.Type), StringComparer.Ordinal))
         {
+            if (registration.IsProvided) continue;
             var typeName = Name(registration.Type);
             var hasBaseCodec = registration.HasBaseCodec;
             var hasBaseCopier = registration.HasBaseCopier;
@@ -125,7 +140,7 @@ internal static class SerializerFactoryGenerator
                 foreach (var dependency in registration.Dependencies)
                 {
                     var target = registrations[dependency.WithNullableAnnotation(NullableAnnotation.None)];
-                    var cyclic = Reaches(target, registration.Type, registrations, new(SymbolEqualityComparer.Default));
+                    var cyclic = MayReach(target, registration.Type, registrations, new(SymbolEqualityComparer.Default));
                     codecArguments.Add(cyclic
                         ? $"CreateCodecHolder<{Name(dependency)}>(provider)"
                         : $"provider.GetCodec<{Name(dependency)}>()");
@@ -160,7 +175,7 @@ internal static class SerializerFactoryGenerator
                 var element = registrations[array.ElementType.WithNullableAnnotation(NullableAnnotation.None)];
                 var canonicalCodec = Name(services.LibraryTypes.ArrayCodec.Construct(array.ElementType));
                 var canonicalCopier = Name(services.LibraryTypes.ArrayCopier.Construct(array.ElementType));
-                var cyclic = Reaches(element, registration.Type, registrations, new(SymbolEqualityComparer.Default));
+                var cyclic = MayReach(element, registration.Type, registrations, new(SymbolEqualityComparer.Default));
                 if (arrayRegistration.Codec != canonicalCodec && auxiliaryServices.Add(canonicalCodec))
                 {
                     var codecDependency = cyclic ? $"CreateCodecHolder<{Name(array.ElementType)}>(provider)" : $"provider.GetCodec<{Name(array.ElementType)}>()";
@@ -568,13 +583,15 @@ internal static class SerializerFactoryGenerator
         return null;
     }
 
-    private static bool Reaches(Registration current, ITypeSymbol target,
+    private static bool MayReach(Registration current, ITypeSymbol target,
         Dictionary<ITypeSymbol, Registration> registrations, HashSet<ITypeSymbol> visited)
     {
         if (SymbolEqualityComparer.Default.Equals(current.Type, target)) return true;
+        // Linked graphs are opaque. A closed holder preserves construction safety across hidden back-edges.
+        if (current.IsProvided) return true;
         if (!visited.Add(current.Type)) return false;
         return current.Dependencies.Any(dependency =>
-            Reaches(registrations[dependency.WithNullableAnnotation(NullableAnnotation.None)], target, registrations, visited));
+            MayReach(registrations[dependency.WithNullableAnnotation(NullableAnnotation.None)], target, registrations, visited));
     }
 
     private static bool ContainsTypeParameter(ITypeSymbol type)

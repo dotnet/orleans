@@ -108,7 +108,7 @@ public sealed class SerializerConstructionPlanningTests
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         var services = new GeneratorServices(compilation, new CodeGeneratorOptions());
         var root = compilation.GetTypeByMetadataName("Payload`1")!.Construct(compilation.GetSpecialType(SpecialType.System_Int32));
-        Assert.False(SerializerFactoryGenerator.TryCreate(services, [root], TestContext.Current.CancellationToken, out var graph, out var failure));
+        Assert.False(SerializerFactoryGenerator.TryCreate(services, [root], [], TestContext.Current.CancellationToken, out var graph, out var failure));
         Assert.Null(graph);
         Assert.Contains("Missing", failure!.Type.ToDisplayString(), StringComparison.Ordinal);
         Assert.False(failure.RequiresImplementation);
@@ -124,7 +124,7 @@ public sealed class SerializerConstructionPlanningTests
         var compilation = await TestCompilationHelper.CreateCompilation(source);
         var services = new GeneratorServices(compilation, new CodeGeneratorOptions());
         var roots = compilation.Assembly.GlobalNamespace.GetTypeMembers();
-        Assert.Equal(accepted, SerializerFactoryGenerator.TryCreate(services, roots, TestContext.Current.CancellationToken, out var graph, out var failure));
+        Assert.Equal(accepted, SerializerFactoryGenerator.TryCreate(services, roots, [], TestContext.Current.CancellationToken, out var graph, out var failure));
         if (accepted)
         {
             Assert.Null(failure);
