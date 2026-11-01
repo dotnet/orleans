@@ -91,11 +91,6 @@ namespace Orleans
         public bool IncludePrimaryConstructorParameters { get { throw null; } init { } }
     }
 
-    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
-    public sealed partial class GenerateSerializerContextAttribute<T> : System.Attribute
-    {
-    }
-
     [System.AttributeUsage(System.AttributeTargets.Class)]
     public sealed partial class GetCompletionSourceMethodNameAttribute : System.Attribute
     {
@@ -121,11 +116,6 @@ namespace Orleans
 
     [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct | System.AttributeTargets.Property | System.AttributeTargets.Field | System.AttributeTargets.Parameter | System.AttributeTargets.ReturnValue, Inherited = false)]
     public sealed partial class ImmutableAttribute : System.Attribute
-    {
-    }
-
-    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
-    public sealed partial class IncludeSerializerContextAttribute<TContext> : System.Attribute
     {
     }
 
@@ -184,6 +174,11 @@ namespace Orleans
     {
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    public sealed partial class OrleansSerializableAttribute<T> : System.Attribute
+    {
+    }
+
     [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct)]
     public sealed partial class RegisterActivatorAttribute : System.Attribute
     {
@@ -232,6 +227,11 @@ namespace Orleans
         public SerializationCallbacksAttribute(System.Type hookType) { }
 
         public System.Type HookType { get { throw null; } }
+    }
+
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    public sealed partial class SerializerContextImportAttribute<TContext> : System.Attribute
+    {
     }
 
     [System.AttributeUsage(System.AttributeTargets.Class, Inherited = false)]

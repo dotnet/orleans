@@ -32,5 +32,5 @@ foreach (var type in InterfaceCollectionContracts.UnsupportedTypes)
 
 Console.WriteLine("Interface collection codec metadata resolution passed: value, reference, nested, and rejected type shapes.");
 
-[GenerateSerializerContext<int>]
+[OrleansSerializable<int>]
 internal partial class InterfaceCollectionSmokeContext : SerializerContext;

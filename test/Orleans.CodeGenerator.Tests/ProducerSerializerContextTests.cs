@@ -23,7 +23,7 @@ public sealed class ProducerSerializerContextTests
             {
                 [Orleans.Id(0)] public System.Collections.Generic.List<int> Values { get; set; }
             }
-            [Orleans.GenerateSerializerContext<Payload>]
+            [Orleans.OrleansSerializable<Payload>]
             public partial class ExportedContext : Orleans.Serialization.SerializerContext { }
             """, $"ContextProducer{Guid.NewGuid():N}");
         var (producerOutput, producerResult) = Generate(producer);
@@ -31,7 +31,7 @@ public sealed class ProducerSerializerContextTests
         var consumer = await TestCompilationHelper.CreateCompilation("""
             [Orleans.GenerateSerializer]
             public sealed class LocalPayload { [Orleans.Id(0)] public int Value { get; set; } }
-            [Orleans.GenerateSerializerContext<LocalPayload>]
+            [Orleans.OrleansSerializable<LocalPayload>]
             public partial class LocalContext : Orleans.Serialization.SerializerContext { }
             public static class RuntimeProof
             {

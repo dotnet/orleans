@@ -10,7 +10,7 @@ A <xref:Orleans.Serialization.SerializerContext> registers a closed graph of typ
 
 ## Declare the type graph
 
-Apply <xref:Orleans.GenerateSerializerContextAttribute`1> to a top-level, non-generic partial class derived from `SerializerContext`. The attribute's type argument declares one closed root type, using C# 11 or later. The compiler enforces closed attribute type arguments. The generator follows serialized model members and collection elements, registering every supported dependency. A root such as `List<Dictionary<string, int>>` includes the list, dictionary, string, and integer implementations.
+Apply <xref:Orleans.OrleansSerializableAttribute`1> to a top-level, non-generic partial class derived from `SerializerContext`. The attribute's type argument declares one closed root type, using C# 11 or later. The compiler enforces closed attribute type arguments. The generator follows serialized model members and collection elements, registering every supported dependency. A root such as `List<Dictionary<string, int>>` includes the list, dictionary, string, and integer implementations.
 
 Declare a context alongside the models whose closed graphs it provides. A model library exports that context, and applications register it using `AddSerializerContext`. The library generates its factories with complete source information; consumers compile against its normal reference assembly and execute those factories from its implementation assembly. Applications can combine library contexts with their own contexts.
 
@@ -20,7 +20,7 @@ Models use <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.I
 
 ## Link library contexts
 
-Apply <xref:Orleans.IncludeSerializerContextAttribute`1> to include a library's context. The included context supplies its declared model roots and their complete serialization dependencies. A consumer can generate a local envelope or collection graph containing those roots while compiling against the library's normal reference assembly.
+Apply <xref:Orleans.SerializerContextImportAttribute`1> to include a library's context. The included context supplies its declared model roots and their complete serialization dependencies. A consumer can generate a local envelope or collection graph containing those roots while compiling against the library's normal reference assembly.
 
 :::code language="csharp" source="snippets/serializer-contexts/ConsumerSerializerContextExample.cs" id="serializer_context_link":::
 

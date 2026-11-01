@@ -37,8 +37,8 @@ internal static class SerializerContextGenerator
 
         var compilation = context.SemanticModel.Compilation;
         var declaration = CreateDeclaration(symbol, compilation.AssemblyName);
-        var attributeDefinition = compilation.GetTypeByMetadataName("Orleans.GenerateSerializerContextAttribute`1");
-        var includeDefinition = compilation.GetTypeByMetadataName("Orleans.IncludeSerializerContextAttribute`1");
+        var attributeDefinition = compilation.GetTypeByMetadataName("Orleans.OrleansSerializableAttribute`1");
+        var includeDefinition = compilation.GetTypeByMetadataName("Orleans.SerializerContextImportAttribute`1");
         var roots = new List<ITypeSymbol>();
         var linkedContexts = new List<INamedTypeSymbol>();
         var providedRoots = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
@@ -54,7 +54,7 @@ internal static class SerializerContextGenerator
             {
                 var diagnostic = Diagnostic.Create(UnsupportedType, location, symbol.Name,
                     named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                    "use IncludeSerializerContextAttribute to link a context; GenerateSerializerContextAttribute declares model roots");
+                    "use SerializerContextImportAttribute to link a context; OrleansSerializableAttribute declares model roots");
                 return [new(new SourceOutputResult(declaration, diagnostic), default)];
             }
             roots.Add(type);
@@ -124,7 +124,7 @@ internal static class SerializerContextGenerator
                 SymbolEqualityComparer.Default.Equals(attribute.AttributeClass?.OriginalDefinition, attributeDefinition)
                 || includeDefinition is not null && SymbolEqualityComparer.Default.Equals(attribute.AttributeClass?.OriginalDefinition, includeDefinition)).ToArray();
             if (attributes.Length == 0)
-                return new(linked, "the linked context must declare roots using GenerateSerializerContextAttribute or links using IncludeSerializerContextAttribute");
+                return new(linked, "the linked context must declare roots using OrleansSerializableAttribute or links using SerializerContextImportAttribute");
             visitedContexts.Add(linked);
             activeContexts.Add(linked);
             foreach (var attribute in attributes)
@@ -141,7 +141,7 @@ internal static class SerializerContextGenerator
                 else
                 {
                     if (type is INamedTypeSymbol named && IsContext(named))
-                        return new(linked, "use IncludeSerializerContextAttribute to link a context; GenerateSerializerContextAttribute declares model roots");
+                        return new(linked, "use SerializerContextImportAttribute to link a context; OrleansSerializableAttribute declares model roots");
                     providedRoots.Add(type.WithNullableAnnotation(NullableAnnotation.None));
                 }
             }

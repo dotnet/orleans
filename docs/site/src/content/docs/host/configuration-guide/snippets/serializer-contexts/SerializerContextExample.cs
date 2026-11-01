@@ -5,10 +5,10 @@ using Orleans.Serialization;
 namespace Documentation.SerializerContexts;
 
 #region serializer_context_declaration
-[GenerateSerializerContext<List<Dictionary<string, int>>>]
-[GenerateSerializerContext<DocumentationPayload<int>>]
-[GenerateSerializerContext<DocumentationPrimitivePayload>]
-[GenerateSerializerContext<DocumentationImplicitPayload<byte>>]
+[OrleansSerializable<List<Dictionary<string, int>>>]
+[OrleansSerializable<DocumentationPayload<int>>]
+[OrleansSerializable<DocumentationPrimitivePayload>]
+[OrleansSerializable<DocumentationImplicitPayload<byte>>]
 public partial class ApplicationSerializerContext : SerializerContext;
 
 [GenerateSerializer]

@@ -301,7 +301,7 @@ public sealed class GeneratedSourceVisibilityTests
             }
 
             /// <summary>An authored serializer context.</summary>
-            [GenerateSerializerContext<int>]
+            [OrleansSerializable<int>]
             public partial class VisibilityContext : Orleans.Serialization.SerializerContext { }
             """;
         var parseOptions = CSharpParseOptions.Default.WithDocumentationMode(DocumentationMode.Diagnose);

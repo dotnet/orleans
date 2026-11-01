@@ -5,8 +5,8 @@ using Orleans.Serialization;
 namespace Documentation.SerializerContexts;
 
 #region serializer_context_link
-[IncludeSerializerContext<ApplicationSerializerContext>]
-[GenerateSerializerContext<ApplicationEnvelope>]
+[SerializerContextImport<ApplicationSerializerContext>]
+[OrleansSerializable<ApplicationEnvelope>]
 public partial class ConsumerSerializerContext : SerializerContext;
 
 [GenerateSerializer]

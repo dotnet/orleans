@@ -145,7 +145,7 @@ public sealed class ExternalSerializerContextMetadataTests
     public async Task PrimitiveAndFrameworkCollectionRootsUseTheirExistingContracts()
     {
         var consumer = await TestCompilationHelper.CreateCompilation("""
-            [Orleans.GenerateSerializerContext<System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, int>>>]
+            [Orleans.OrleansSerializable<System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, int>>>]
             public partial class DemoContext : Orleans.Serialization.SerializerContext { }
             """);
         var (output, result) = Generate(consumer);
@@ -229,7 +229,7 @@ public sealed class ExternalSerializerContextMetadataTests
 
     private static async Task<CSharpCompilation> CreateConsumer(string type, MetadataReference reference, string proof = "", string? assemblyName = null)
         => await TestCompilationHelper.CreateCompilation($$"""
-            [Orleans.GenerateSerializerContext<{{type}}>]
+            [Orleans.OrleansSerializable<{{type}}>]
             public partial class DemoContext : Orleans.Serialization.SerializerContext { }
             {{proof}}
             """, assemblyName ?? $"MetadataConsumer{Guid.NewGuid():N}", reference);

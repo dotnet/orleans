@@ -860,7 +860,7 @@ namespace Orleans.Serialization.UnitTests
         }
     }
 
-    [GenerateSerializerContext<int[]>]
+    [OrleansSerializable<int[]>]
     internal partial class AllowedArrayContext : SerializerContext;
 
     internal sealed class TypeConverterTestsUnconfiguredType

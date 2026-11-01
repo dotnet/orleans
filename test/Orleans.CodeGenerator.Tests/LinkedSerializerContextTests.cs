@@ -31,8 +31,8 @@ public sealed class LinkedSerializerContextTests
         {
             [field: Orleans.Id(0)] public int Value { get; set; }
         }
-        [Orleans.GenerateSerializerContext<Payload<int>>]
-        [Orleans.GenerateSerializerContext<Identified>]
+        [Orleans.OrleansSerializable<Payload<int>>]
+        [Orleans.OrleansSerializable<Identified>]
         public partial class ExportedContext : Orleans.Serialization.SerializerContext { }
         """;
 
@@ -45,8 +45,8 @@ public sealed class LinkedSerializerContextTests
             [Orleans.Id(2)] public System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, Producer.Payload<int>[]>> Rows { get; set; }
             [Orleans.Id(3)] public Producer.Identified Identified { get; set; }
         }
-        [Orleans.GenerateSerializerContext<Envelope>]
-        [Orleans.IncludeSerializerContext<Producer.ExportedContext>]
+        [Orleans.OrleansSerializable<Envelope>]
+        [Orleans.SerializerContextImport<Producer.ExportedContext>]
         public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
         """;
 
@@ -61,16 +61,16 @@ public sealed class LinkedSerializerContextTests
     [Fact]
     public async Task IncludeAttributeIsDistinctAndLeavesContextValidationToGenerator()
     {
-        var include = typeof(IncludeSerializerContextAttribute<int>);
-        Assert.NotEqual(typeof(GenerateSerializerContextAttribute<int>), include);
+        var include = typeof(SerializerContextImportAttribute<int>);
+        Assert.NotEqual(typeof(OrleansSerializableAttribute<int>), include);
         Assert.Equal(typeof(Attribute), include.BaseType);
         Assert.Empty(include.GetGenericTypeDefinition().GetGenericArguments()[0].GetGenericParameterConstraints());
         Assert.Empty(Assert.Single(include.GetConstructors()).GetParameters());
         Assert.Null(include.GetProperty("Type"));
-        Assert.Null(include.Assembly.GetType("Orleans.IncludeSerializerContextAttribute"));
+        Assert.Null(include.Assembly.GetType("Orleans.SerializerContextImportAttribute"));
 
         var input = await Compile("""
-            [Orleans.IncludeSerializerContext<int>]
+            [Orleans.SerializerContextImport<int>]
             public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
             """);
         // The ungenerated partial still lacks ConfigureInner, but C# accepts the
@@ -174,7 +174,7 @@ public sealed class LinkedSerializerContextTests
     {
         var producer = await GenerateAccepted(ProducerSource);
         var (consumer, result) = Generate(await Compile(RuntimeUsings + """
-            [Orleans.IncludeSerializerContext<Producer.ExportedContext>]
+            [Orleans.SerializerContextImport<Producer.ExportedContext>]
             public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
             public static class RuntimeProof
             {
@@ -201,15 +201,15 @@ public sealed class LinkedSerializerContextTests
         // Bridge also declares the root, but its included context owns the implementation.
         // Declaring that same external root in the consumer must not trigger ref inspection.
         var (producer, producerResult) = Generate(await Compile(ProducerSource + """
-            [Orleans.GenerateSerializerContext<Producer.Payload<int>>]
-            [Orleans.IncludeSerializerContext<Producer.ExportedContext>]
+            [Orleans.OrleansSerializable<Producer.Payload<int>>]
+            [Orleans.SerializerContextImport<Producer.ExportedContext>]
             public partial class BridgeContext : Orleans.Serialization.SerializerContext { }
             """));
         AssertAccepted(producer, producerResult);
         AssertOpaqueConsumer(producerResult, "BridgeContext", ("Payload", "Payload<int>"));
         var (consumer, result) = Generate(await Compile(RuntimeUsings + """
-            [Orleans.GenerateSerializerContext<Producer.Payload<int>>]
-            [Orleans.IncludeSerializerContext<Producer.BridgeContext>]
+            [Orleans.OrleansSerializable<Producer.Payload<int>>]
+            [Orleans.SerializerContextImport<Producer.BridgeContext>]
             public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
             public static class RuntimeProof
             {
@@ -243,24 +243,24 @@ public sealed class LinkedSerializerContextTests
     public async Task MixedAndIncludeOnlyPartialsGenerateEachContextExactlyOnce(bool includeFirst)
     {
         var root = """
-            [Orleans.GenerateSerializerContext<string>]
-            [Orleans.GenerateSerializerContext<string>]
+            [Orleans.OrleansSerializable<string>]
+            [Orleans.OrleansSerializable<string>]
             public partial class MixedContext : Orleans.Serialization.SerializerContext { }
             """;
         var links = """
-            [Orleans.IncludeSerializerContext<LeafContext>]
-            [Orleans.IncludeSerializerContext<LeafContext>]
+            [Orleans.SerializerContextImport<LeafContext>]
+            [Orleans.SerializerContextImport<LeafContext>]
             public partial class MixedContext { }
-            [Orleans.IncludeSerializerContext<LeafContext>]
+            [Orleans.SerializerContextImport<LeafContext>]
             public partial class OnlyContext : Orleans.Serialization.SerializerContext { }
             """;
         var input = await Compile("""
-            [Orleans.GenerateSerializerContext<int>]
+            [Orleans.OrleansSerializable<int>]
             public partial class LeafContext : Orleans.Serialization.SerializerContext { }
             """);
         input = input.AddSyntaxTrees(CSharpSyntaxTree.ParseText(includeFirst ? links : root, cancellationToken: TestContext.Current.CancellationToken),
             CSharpSyntaxTree.ParseText(includeFirst ? root : links, cancellationToken: TestContext.Current.CancellationToken), CSharpSyntaxTree.ParseText("""
-            [Orleans.IncludeSerializerContext<LeafContext>]
+            [Orleans.SerializerContextImport<LeafContext>]
             public partial class OnlyContext { }
             """, cancellationToken: TestContext.Current.CancellationToken));
         var (output, result) = Generate(input);
@@ -280,7 +280,7 @@ public sealed class LinkedSerializerContextTests
     {
         var (output, result) = Generate(await Compile("""
             [Orleans.GenerateSerializer] public sealed class Model { [Orleans.Id(0)] public int Value { get; set; } }
-            [Orleans.GenerateSerializerContext<Model>]
+            [Orleans.OrleansSerializable<Model>]
             public partial class ModelContext : Orleans.Serialization.SerializerContext { }
             """));
         AssertAccepted(output, result);
@@ -297,33 +297,33 @@ public sealed class LinkedSerializerContextTests
     public async Task ContextTypesCannotBeDeclaredAsModelRoots(bool transitive)
     {
         var source = """
-            [Orleans.GenerateSerializerContext<int>]
+            [Orleans.OrleansSerializable<int>]
             public partial class LeafContext : Orleans.Serialization.SerializerContext { }
             """;
         if (transitive)
         {
             // Invalid linked metadata is deliberately emitted without running its generator.
             var producer = await Compile("""
-                [Orleans.GenerateSerializerContext<LeafContext>]
+                [Orleans.OrleansSerializable<LeafContext>]
                 public class BadContext : Orleans.Serialization.SerializerContext
                 { protected override void ConfigureInner(Orleans.Serialization.Configuration.TypeManifestOptions options) { } }
-                [Orleans.GenerateSerializerContext<int>]
+                [Orleans.OrleansSerializable<int>]
                 public class LeafContext : Orleans.Serialization.SerializerContext
                 { protected override void ConfigureInner(Orleans.Serialization.Configuration.TypeManifestOptions options) { } }
                 """);
             var (_, result) = Generate(await Compile("""
-                [Orleans.IncludeSerializerContext<BadContext>]
+                [Orleans.SerializerContextImport<BadContext>]
                 public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
                 """, Reference(producer, "ref")));
-            AssertRejected(result, "ORLEANS0115", "GenerateSerializerContextAttribute declares model roots");
+            AssertRejected(result, "ORLEANS0115", "OrleansSerializableAttribute declares model roots");
         }
         else
         {
             var (_, result) = Generate(await Compile(source + """
-                [Orleans.GenerateSerializerContext<LeafContext>]
+                [Orleans.OrleansSerializable<LeafContext>]
                 public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
                 """));
-            AssertRejected(result, "ORLEANS0115", "use IncludeSerializerContextAttribute");
+            AssertRejected(result, "ORLEANS0115", "use SerializerContextImportAttribute");
         }
     }
 
@@ -332,13 +332,13 @@ public sealed class LinkedSerializerContextTests
     [InlineData("generic", "public partial class ConsumerContext<T> : Orleans.Serialization.SerializerContext { }")]
     [InlineData("abstract", "public abstract partial class ConsumerContext : Orleans.Serialization.SerializerContext { }")]
     [InlineData("unrelated", "public partial class ConsumerContext { }")]
-    [InlineData("nested", "public class Outer { [Orleans.IncludeSerializerContext<LeafContext>] public partial class ConsumerContext : Orleans.Serialization.SerializerContext { } }")]
+    [InlineData("nested", "public class Outer { [Orleans.SerializerContextImport<LeafContext>] public partial class ConsumerContext : Orleans.Serialization.SerializerContext { } }")]
     public async Task InvalidIncludeOnlyDeclarationsReportConsumerDiagnostic(string caseId, string declaration)
     {
         var input = await Compile("""
-            [Orleans.GenerateSerializerContext<int>]
+            [Orleans.OrleansSerializable<int>]
             public partial class LeafContext : Orleans.Serialization.SerializerContext { }
-            """ + (caseId == "nested" ? declaration : "[Orleans.IncludeSerializerContext<LeafContext>] " + declaration));
+            """ + (caseId == "nested" ? declaration : "[Orleans.SerializerContextImport<LeafContext>] " + declaration));
         var (_, result) = Generate(input);
         AssertRejected(result, "ORLEANS0114", "top-level partial class");
     }
@@ -355,7 +355,7 @@ public sealed class LinkedSerializerContextTests
     public async Task LinkedTypesRequireConcreteTopLevelDefaultConstruction(string caseId, string declaration, string constructor, string argument)
     {
         var body = $$"""
-            [Orleans.GenerateSerializerContext<int>]
+            [Orleans.OrleansSerializable<int>]
             {{declaration}}
             {
                 {{constructor}}
@@ -368,7 +368,7 @@ public sealed class LinkedSerializerContextTests
             """;
         var producer = await Compile(body);
         var (_, result) = Generate(await Compile($$"""
-            [Orleans.IncludeSerializerContext<{{argument}}>]
+            [Orleans.SerializerContextImport<{{argument}}>]
             public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
             """, Reference(producer, "ref")));
         AssertRejected(result, "ORLEANS0115", "accessible parameterless construction");
@@ -388,8 +388,8 @@ public sealed class LinkedSerializerContextTests
             { protected override void ConfigureInner(Orleans.Serialization.Configuration.TypeManifestOptions options) { } }
             public class GenericContext<T> : Orleans.Serialization.SerializerContext
             { protected override void ConfigureInner(Orleans.Serialization.Configuration.TypeManifestOptions options) { } }
-            [Orleans.GenerateSerializerContext<int>]
-            [Orleans.IncludeSerializerContext<Model>]
+            [Orleans.OrleansSerializable<int>]
+            [Orleans.SerializerContextImport<Model>]
             public class InvalidLinkContext : Orleans.Serialization.SerializerContext
             { protected override void ConfigureInner(Orleans.Serialization.Configuration.TypeManifestOptions options) { } }
             """);
@@ -403,7 +403,7 @@ public sealed class LinkedSerializerContextTests
             _ => throw new ArgumentOutOfRangeException(nameof(caseId))
         };
         var (output, result) = Generate(await Compile($$"""
-            [Orleans.IncludeSerializerContext<{{argument}}>]
+            [Orleans.SerializerContextImport<{{argument}}>]
             public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
             """, Reference(producer, "ref")));
         if (caseId is "none" or "model" or "nested-model")
@@ -429,12 +429,12 @@ public sealed class LinkedSerializerContextTests
         var producer = await GenerateAccepted($$"""
             [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("{{consumerName}}")]
             namespace Producer;
-            [Orleans.GenerateSerializerContext<int>]
+            [Orleans.OrleansSerializable<int>]
             internal partial class InternalContext : Orleans.Serialization.SerializerContext
             { {{(accessibleConstructor ? "internal" : "private")}} InternalContext() { } }
             """);
         var input = await TestCompilationHelper.CreateCompilation(RuntimeUsings + """
-            [Orleans.IncludeSerializerContext<Producer.InternalContext>]
+            [Orleans.SerializerContextImport<Producer.InternalContext>]
             public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
             public static class RuntimeProof
             {
@@ -471,14 +471,14 @@ public sealed class LinkedSerializerContextTests
     public async Task ReferenceModelsRequireAnIncludeProvidingTheExactClosedRoot(string caseId)
     {
         var producer = await GenerateAccepted(ProducerSource + """
-            [Orleans.GenerateSerializerContext<int>]
+            [Orleans.OrleansSerializable<int>]
             public partial class OtherContext : Orleans.Serialization.SerializerContext { }
             """);
         var included = caseId switch
         {
             "missing-link" => "",
-            "unprovided-root" => "[Orleans.IncludeSerializerContext<Producer.OtherContext>]",
-            "different-closed-generic" => "[Orleans.IncludeSerializerContext<Producer.ExportedContext>]",
+            "unprovided-root" => "[Orleans.SerializerContextImport<Producer.OtherContext>]",
+            "different-closed-generic" => "[Orleans.SerializerContextImport<Producer.ExportedContext>]",
             _ => throw new ArgumentOutOfRangeException(nameof(caseId))
         };
         var argument = caseId == "different-closed-generic" ? "string" : "int";
@@ -486,7 +486,7 @@ public sealed class LinkedSerializerContextTests
             [Orleans.GenerateSerializer]
             public sealed class Local
             { [Orleans.Id(0)] public Producer.Payload<{{argument}}> Value { get; set; } }
-            [Orleans.GenerateSerializerContext<Local>]
+            [Orleans.OrleansSerializable<Local>]
             {{included}}
             public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
             """, Reference(producer, "ref")));
@@ -512,7 +512,7 @@ public sealed class LinkedSerializerContextTests
                 [field: Orleans.Id(2)] public Node[] Flat { get; set; }
                 [field: Orleans.Id(3)] public Node[][] Nested { get; set; }
             }
-            [Orleans.GenerateSerializerContext<Node>]
+            [Orleans.OrleansSerializable<Node>]
             public partial class NodeContext : Orleans.Serialization.SerializerContext { }
             """);
         var (output, result) = Generate(await Compile(RuntimeUsings + $$"""
@@ -523,9 +523,9 @@ public sealed class LinkedSerializerContextTests
                 [Orleans.Id(1)] public T[] Flat { get; set; }
                 [Orleans.Id(2)] public T[][] Nested { get; set; }
             }
-            [Orleans.GenerateSerializerContext<System.Collections.Generic.List<Producer.Node>>]
-            [Orleans.GenerateSerializerContext<Box<Producer.Node>>]
-            [Orleans.IncludeSerializerContext<Producer.NodeContext>]
+            [Orleans.OrleansSerializable<System.Collections.Generic.List<Producer.Node>>]
+            [Orleans.OrleansSerializable<Box<Producer.Node>>]
+            [Orleans.SerializerContextImport<Producer.NodeContext>]
             public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
             public static class RuntimeProof
             {
@@ -585,20 +585,20 @@ public sealed class LinkedSerializerContextTests
             public sealed class Left { [Orleans.Id(0)] public Leaf Value { get; set; } }
             [Orleans.GenerateSerializer, Orleans.Alias("linked-right")]
             public sealed class Right { [Orleans.Id(0)] public Leaf Value { get; set; } }
-            [Orleans.GenerateSerializerContext<Leaf>]
+            [Orleans.OrleansSerializable<Leaf>]
             public partial class LeafContext : Orleans.Serialization.SerializerContext
             { public override object Key => Visits.Key(typeof(LeafContext)); }
-            [Orleans.GenerateSerializerContext<Left>]
-            [Orleans.IncludeSerializerContext<LeafContext>]
+            [Orleans.OrleansSerializable<Left>]
+            [Orleans.SerializerContextImport<LeafContext>]
             public partial class LeftContext : Orleans.Serialization.SerializerContext
             { public override object Key => Visits.Key(typeof(LeftContext)); }
-            [Orleans.GenerateSerializerContext<Right>]
-            [Orleans.IncludeSerializerContext<LeafContext>]
+            [Orleans.OrleansSerializable<Right>]
+            [Orleans.SerializerContextImport<LeafContext>]
             public partial class RightContext : Orleans.Serialization.SerializerContext
             { public override object Key => Visits.Key(typeof(RightContext)); }
-            [Orleans.IncludeSerializerContext<LeftContext>]
-            [Orleans.IncludeSerializerContext<RightContext>]
-            [Orleans.IncludeSerializerContext<LeftContext>]
+            [Orleans.SerializerContextImport<LeftContext>]
+            [Orleans.SerializerContextImport<RightContext>]
+            [Orleans.SerializerContextImport<LeftContext>]
             public partial class EntryContext : Orleans.Serialization.SerializerContext
             { public override object Key => Visits.Key(typeof(EntryContext)); }
             public static class RuntimeProof
@@ -643,8 +643,8 @@ public sealed class LinkedSerializerContextTests
         if (caseId == "self")
         {
             var (_, result) = Generate(await Compile("""
-                [Orleans.GenerateSerializerContext<int>]
-                [Orleans.IncludeSerializerContext<ConsumerContext>]
+                [Orleans.OrleansSerializable<int>]
+                [Orleans.SerializerContextImport<ConsumerContext>]
                 public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
                 """));
             AssertRejected(result, "ORLEANS0115", "includes must be acyclic");
@@ -655,17 +655,17 @@ public sealed class LinkedSerializerContextTests
         // must diagnose the cycle itself, including the ownerless A/B case with identical roots.
         var producer = await Compile($$"""
             namespace Producer;
-            [Orleans.GenerateSerializerContext<int>]
-            [Orleans.IncludeSerializerContext<B>]
+            [Orleans.OrleansSerializable<int>]
+            [Orleans.SerializerContextImport<B>]
             public class A : Orleans.Serialization.SerializerContext
             { protected override void ConfigureInner(Orleans.Serialization.Configuration.TypeManifestOptions options) { } }
-            [Orleans.GenerateSerializerContext<{{(caseId == "same-root" ? "int" : "string")}}>]
-            [Orleans.IncludeSerializerContext<A>]
+            [Orleans.OrleansSerializable<{{(caseId == "same-root" ? "int" : "string")}}>]
+            [Orleans.SerializerContextImport<A>]
             public class B : Orleans.Serialization.SerializerContext
             { protected override void ConfigureInner(Orleans.Serialization.Configuration.TypeManifestOptions options) { } }
             """);
         var (_, rejected) = Generate(await Compile("""
-            [Orleans.IncludeSerializerContext<Producer.A>]
+            [Orleans.SerializerContextImport<Producer.A>]
             public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
             """, Reference(producer, "ref")));
         AssertRejected(rejected, "ORLEANS0115", "includes must be acyclic");
@@ -701,13 +701,13 @@ public sealed class LinkedSerializerContextTests
         for (var index = 0; index < links; index++)
         {
             source.AppendLine(index == links - 1
-                ? "[Orleans.GenerateSerializerContext<int>]"
-                : $"[Orleans.IncludeSerializerContext<C{index + 1}>]");
+                ? "[Orleans.OrleansSerializable<int>]"
+                : $"[Orleans.SerializerContextImport<C{index + 1}>]");
             source.AppendLine($"public partial class C{index} : Orleans.Serialization.SerializerContext {{ }}");
         }
         var producer = await GenerateAccepted(source.ToString());
         var (output, result) = Generate(await Compile("""
-            [Orleans.IncludeSerializerContext<Producer.C0>]
+            [Orleans.SerializerContextImport<Producer.C0>]
             public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
             """, Reference(producer, "ref")));
         if (accepted)
@@ -726,21 +726,21 @@ public sealed class LinkedSerializerContextTests
         // All leaves supply the same int root, so the closed-type graph cannot mask this boundary.
         var source = new StringBuilder("namespace Producer;\n");
         for (var index = 0; index < 1024; index++)
-            source.AppendLine($"[Orleans.GenerateSerializerContext<int>] public partial class C{index} : Orleans.Serialization.SerializerContext {{ }}");
+            source.AppendLine($"[Orleans.OrleansSerializable<int>] public partial class C{index} : Orleans.Serialization.SerializerContext {{ }}");
         var producer = await GenerateAccepted(source.ToString());
         var reference = Reference(producer, "ref");
         var includes = new StringBuilder();
         for (var index = 0; index < 1023; index++)
-            includes.AppendLine($"[Orleans.IncludeSerializerContext<Producer.C{index}>]");
+            includes.AppendLine($"[Orleans.SerializerContextImport<Producer.C{index}>]");
         var declaration = "public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }";
         var (output, result) = Generate(await Compile(includes + declaration, reference));
         AssertAccepted(output, result);
         Assert.Equal(1023, Occurrences(ContextSource(result, "ConsumerContext"), ").Configure(options);"));
         Emit(output);
-        var (duplicateOutput, duplicateResult) = Generate(await Compile(includes + "[Orleans.IncludeSerializerContext<Producer.C0>]" + declaration, reference));
+        var (duplicateOutput, duplicateResult) = Generate(await Compile(includes + "[Orleans.SerializerContextImport<Producer.C0>]" + declaration, reference));
         AssertAccepted(duplicateOutput, duplicateResult);
         Assert.Equal(1023, Occurrences(ContextSource(duplicateResult, "ConsumerContext"), ").Configure(options);"));
-        var (_, rejected) = Generate(await Compile(includes + "[Orleans.IncludeSerializerContext<Producer.C1023>]" + declaration, reference));
+        var (_, rejected) = Generate(await Compile(includes + "[Orleans.SerializerContextImport<Producer.C1023>]" + declaration, reference));
         AssertRejected(rejected, "ORLEANS0115", "128 nested dependencies or 1024 contexts");
     }
 

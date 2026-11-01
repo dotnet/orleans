@@ -617,48 +617,48 @@ public static partial class ContextContracts
     }
 }
 
-[GenerateSerializerContext<List<Dictionary<string, int>>>]
-[GenerateSerializerContext<Dictionary<int, List<long>>>]
-[GenerateSerializerContext<Payload<int>>]
-[GenerateSerializerContext<int?[]>]
-[GenerateSerializerContext<byte[]>]
-[GenerateSerializerContext<Flavor>]
-[GenerateSerializerContext<List<int>>]
-[GenerateSerializerContext<Node>]
-[GenerateSerializerContext<Left>]
-[GenerateSerializerContext<List<Branch>>]
-[GenerateSerializerContext<List<AliasedPayload<int>>>]
-[GenerateSerializerContext<IdentifiedPayload>]
-[GenerateSerializerContext<List<CompoundPayload>>]
-[GenerateSerializerContext<ValuePayload<int>>]
-[GenerateSerializerContext<Box<byte>>]
-[GenerateSerializerContext<Box<int>>]
-[GenerateSerializerContext<NamespaceBox<byte>>]
-[GenerateSerializerContext<GenericArrayNode>]
-[GenerateSerializerContext<List<MultipleAliasPayload>>]
-[GenerateSerializerContext<List<NestedAliasPayload>>]
-[GenerateSerializerContext<MetadataEnvelope<UnusedAliasMarker>>]
-[GenerateSerializerContext<MetadataEnvelope<UnusedAliasMarker[]>>]
-[GenerateSerializerContext<InterfaceTaggedPayload>]
-[GenerateSerializerContext<AliasedContainer.Payload>]
-[GenerateSerializerContext<IncidentalPrivateInterfacePayload>]
+[OrleansSerializable<List<Dictionary<string, int>>>]
+[OrleansSerializable<Dictionary<int, List<long>>>]
+[OrleansSerializable<Payload<int>>]
+[OrleansSerializable<int?[]>]
+[OrleansSerializable<byte[]>]
+[OrleansSerializable<Flavor>]
+[OrleansSerializable<List<int>>]
+[OrleansSerializable<Node>]
+[OrleansSerializable<Left>]
+[OrleansSerializable<List<Branch>>]
+[OrleansSerializable<List<AliasedPayload<int>>>]
+[OrleansSerializable<IdentifiedPayload>]
+[OrleansSerializable<List<CompoundPayload>>]
+[OrleansSerializable<ValuePayload<int>>]
+[OrleansSerializable<Box<byte>>]
+[OrleansSerializable<Box<int>>]
+[OrleansSerializable<NamespaceBox<byte>>]
+[OrleansSerializable<GenericArrayNode>]
+[OrleansSerializable<List<MultipleAliasPayload>>]
+[OrleansSerializable<List<NestedAliasPayload>>]
+[OrleansSerializable<MetadataEnvelope<UnusedAliasMarker>>]
+[OrleansSerializable<MetadataEnvelope<UnusedAliasMarker[]>>]
+[OrleansSerializable<InterfaceTaggedPayload>]
+[OrleansSerializable<AliasedContainer.Payload>]
+[OrleansSerializable<IncidentalPrivateInterfacePayload>]
 #if NET10_0_OR_GREATER
-[GenerateSerializerContext<ContextContracts.DocumentationEnvelope>]
-[IncludeSerializerContext<ApplicationSerializerContext>]
+[OrleansSerializable<ContextContracts.DocumentationEnvelope>]
+[SerializerContextImport<ApplicationSerializerContext>]
 #endif
 internal partial class SmokeContext : SerializerContext;
 
-[GenerateSerializerContext<List<Dictionary<string, int>>>]
+[OrleansSerializable<List<Dictionary<string, int>>>]
 internal partial class DuplicateContext : SerializerContext;
 
-[GenerateSerializerContext<AliasedPayload<int>>]
-[GenerateSerializerContext<IdentifiedPayload>]
+[OrleansSerializable<AliasedPayload<int>>]
+[OrleansSerializable<IdentifiedPayload>]
 internal partial class AliasRegistrationContext : SerializerContext;
 
-[GenerateSerializerContext<RecursiveValue?>]
+[OrleansSerializable<RecursiveValue?>]
 internal partial class NullableCycleContext : SerializerContext;
 
-[GenerateSerializerContext<BaseServiceModel>]
+[OrleansSerializable<BaseServiceModel>]
 internal partial class BaseServiceContext : SerializerContext;
 
 [GenerateSerializer]
@@ -769,14 +769,14 @@ public sealed class GenericArrayNode
     [Id(0)] public Box<GenericArrayNode> Children { get; set; } = null!;
 }
 
-[GenerateSerializerContext<List<PrefixPayload>>]
-[GenerateSerializerContext<List<ChildAliasPayload>>]
+[OrleansSerializable<List<PrefixPayload>>]
+[OrleansSerializable<List<ChildAliasPayload>>]
 internal partial class PrefixAndChildContext : SerializerContext;
 
-[GenerateSerializerContext<List<PrefixPayload>>]
+[OrleansSerializable<List<PrefixPayload>>]
 internal partial class PrefixContext : SerializerContext;
 
-[GenerateSerializerContext<List<ChildAliasPayload>>]
+[OrleansSerializable<List<ChildAliasPayload>>]
 internal partial class ChildAliasContext : SerializerContext;
 
 [GenerateSerializer, CompoundTypeAlias("shared")]
@@ -788,7 +788,7 @@ public sealed class ChildAliasPayload { [Id(0)] public int Value { get; set; } }
 [GenerateSerializer, CompoundTypeAlias("multiple", "2"), CompoundTypeAlias("multiple", "1")]
 public sealed class MultipleAliasPayload { [Id(0)] public int Value { get; set; } }
 
-[GenerateSerializerContext<List<MultipleAliasPayload>>]
+[OrleansSerializable<List<MultipleAliasPayload>>]
 internal partial class MultipleAliasContext : SerializerContext;
 
 [CompoundTypeAlias("metadata-marker")]
