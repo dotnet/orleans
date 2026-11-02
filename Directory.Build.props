@@ -32,6 +32,7 @@
     <IncludeSource>false</IncludeSource>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>

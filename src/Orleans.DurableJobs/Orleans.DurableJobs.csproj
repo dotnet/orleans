@@ -6,7 +6,6 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <DefineConstants>$(DefineConstants)</DefineConstants>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>

@@ -67,6 +67,16 @@ namespace Orleans
     {
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    public sealed partial class GeneratedContextImportAttribute<TContext> : System.Attribute
+    {
+    }
+
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    public sealed partial class GeneratedContextTypeAttribute<T> : System.Attribute
+    {
+    }
+
     public enum GenerateFieldIds
     {
         None = 0,
@@ -89,11 +99,6 @@ namespace Orleans
         public GenerateFieldIds GenerateFieldIds { get { throw null; } init { } }
 
         public bool IncludePrimaryConstructorParameters { get { throw null; } init { } }
-    }
-
-    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
-    public sealed partial class GenerateSerializerContextAttribute<T> : System.Attribute
-    {
     }
 
     [System.AttributeUsage(System.AttributeTargets.Class)]

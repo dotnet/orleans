@@ -20,7 +20,7 @@ public sealed class SerializerInitializationTests
     public void AddingAutomaticServicesAfterContextInitializesThemOnce()
     {
         var services = new ServiceCollection()
-            .AddSerializerContext(new ManualContext())
+            .AddGeneratedContext(new ManualContext())
             .AddSerializer()
             .AddSerializer();
         Assert.Equal(3, services.Count(descriptor => descriptor.ServiceType == typeof(IGeneralizedCodec)));
@@ -32,7 +32,7 @@ public sealed class SerializerInitializationTests
     [Fact]
     public void ContextServicesUseTheCommonTypeResolver()
     {
-        using var provider = new ServiceCollection().AddSerializerContext(new ManualContext()).BuildServiceProvider();
+        using var provider = new ServiceCollection().AddGeneratedContext(new ManualContext()).BuildServiceProvider();
         var resolver = provider.GetRequiredService<TypeResolver>();
         Assert.IsType<CachedTypeResolver>(resolver);
         Assert.Equal(typeof(int), resolver.ResolveType("System.Int32"));
@@ -79,7 +79,7 @@ public sealed class SerializerInitializationTests
         Assert.Contains(alias ? "conflict-key" : "1042", message, StringComparison.Ordinal);
     }
 
-    private sealed class ManualContext : SerializerContext
+    private sealed class ManualContext : GeneratedContext
     {
         protected override void ConfigureInner(TypeManifestOptions options)
             => options.AddSerializer<int>(static _ => new Int32Codec(), static _ => new ShallowCopier<int>());

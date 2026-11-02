@@ -80,8 +80,10 @@ jobs:
           framework: net10.0
           provider: Cosmos
           retry: ${{ matrix.retry }}
+          solution: .github/solutions/CodeGenerator.slnf
         env:
           TEST_RETRY_FAILURE_MODE: ${{ matrix.failure-mode }}
+          TEST_RETRY_SOLUTION: .github/solutions/CodeGenerator.slnf
       - name: Assert retry outcome and diagnostics
         if: ${{ !cancelled() }}
         shell: pwsh

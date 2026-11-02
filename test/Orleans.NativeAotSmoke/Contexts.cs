@@ -29,4 +29,4 @@ StaticFactoryContracts.MixedCyclesPublishCompletedGraphs();
 StaticFactoryContracts.FailedMixedCyclesRollBackFromBothRoots();
 StaticFactoryContracts.GeneratedMixedCyclesPreserveObjectGraphsFromBothRoots();
 StaticFactoryContracts.MixedNullableTupleCyclesDeferOptionalQueries();
-Console.WriteLine("Serializer context contracts passed: nested collections, generated models, value types, cycles, identity, concurrency, and diagnostics.");
+Console.WriteLine("Generated context contracts passed: nested collections, generated models, value types, cycles, identity, concurrency, and diagnostics.");

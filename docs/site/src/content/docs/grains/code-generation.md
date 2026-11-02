@@ -67,7 +67,7 @@ Roslyn honors type-level `EditorBrowsable` for type completion from referenced a
 
 The generator registers serializers, copiers, activators, proxies, invocation helpers, runtime metadata, and serializer-context registration bodies with Roslyn's `RegisterImplementationSourceOutput`. Minimal serializer-context declarations use regular source output to complete authored partial types for editor type checking, including consumers of projects whose implementation outputs are omitted. Hosts choose whether to include implementation outputs in their compilations; ordinary builds include the complete generated implementation. Context-shape and supported-contract diagnostics use regular output. Diagnostics which require a producer's generated codec or copier metadata accompany implementation output.
 
-XML documentation contains authored API comments. The documentation site's API reference filters generated implementation types and members using their generated-code attributes, preserving authored partial types such as serializer contexts.
+XML documentation contains authored API comments. The documentation site's API reference filters generated implementation types and members using their generated-code attributes, preserving authored partial types such as generated contexts.
 
 The optional [Orleans contract compatibility analyzer](grain-versioning/contract-compatibility-analyzer.md) records grain RPC identities and signatures in `OrleansContracts.txt` so contract drift can be reviewed before a rolling upgrade.
 

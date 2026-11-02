@@ -185,10 +185,10 @@ public class IncrementalCachingTests
     public async Task GenericContext_UnrelatedChange_PreservesOneCachedGraph()
     {
         const string source = """
-            [Orleans.GenerateSerializerContext<System.Collections.Generic.List<int>>]
-            [Orleans.GenerateSerializerContext<int?>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
-            [Orleans.GenerateSerializerContext<System.Collections.Generic.List<int>>]
+            [Orleans.GeneratedContextType<System.Collections.Generic.List<int>>]
+            [Orleans.GeneratedContextType<int?>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
+            [Orleans.GeneratedContextType<System.Collections.Generic.List<int>>]
             public partial class DemoContext { }
             """;
         var compilation = await CreateCompilation(source);
@@ -207,8 +207,8 @@ public class IncrementalCachingTests
     public async Task GenericContext_ChangedRoot_InvalidatesGraph()
     {
         const string source = """
-            [Orleans.GenerateSerializerContext<System.Collections.Generic.List<int>>]
-            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            [Orleans.GeneratedContextType<System.Collections.Generic.List<int>>]
+            public partial class DemoContext : Orleans.Serialization.GeneratedContext { }
             """;
         var compilation = await CreateCompilation(source);
         var updated = ReplaceSource(compilation, source.Replace("List<int>", "List<long>", StringComparison.Ordinal));
