@@ -1,741 +1,281 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
-using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans
+namespace Orleans;
+
+internal sealed partial class InvokableObjectManager
 {
-    internal sealed partial class InvokableObjectManager
+    private readonly ConcurrentDictionary<ObserverGrainId, LocalObjectData> localObjects = new ConcurrentDictionary<ObserverGrainId, LocalObjectData>();
+
+    private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
+    private readonly IGrainContext rootGrainContext;
+    private readonly IRuntimeClient runtimeClient;
+    private readonly ILogger logger;
+    private readonly DeepCopier deepCopier;
+    private readonly DeepCopier<Response> _responseCopier;
+    private readonly MessagingTrace messagingTrace;
+    private readonly AdmissionGate _invocations = new();
+    private readonly AdmissionGate _cancellations = new();
+    private List<IIncomingGrainCallFilter>? _grainCallFilters;
+
+#if NET10_0_OR_GREATER
+    // This lock serializes lifecycle transitions such as: register, deregister, stopping, so that
+    // _isStopping and _observerDisposals stay consistent with localObjects across multi-step sequences
+    // such as: TryDeregister's remove-then-track, or StopAsync's drain-and-snapshot.
+    // Note that it does NOT guard the dictionary itself: localObjects remains a CDict because Dispatch reads it on the
+    // hot path *without* this lock, relying on CDict's lock-free TryGetValue for concurrent writers.
+    private readonly Lock _observerLifecycleLock = new();
+#else
+    private readonly object _observerLifecycleLock = new();
+#endif
+
+    private readonly HashSet<Task> _observerDisposals = [];
+    private bool _isStopping;
+
+    private List<IIncomingGrainCallFilter> GrainCallFilters
+        => _grainCallFilters ??= [.. runtimeClient.ServiceProvider.GetServices<IIncomingGrainCallFilter>()];
+
+    public InvokableObjectManager(
+        IGrainContext rootGrainContext,
+        IRuntimeClient runtimeClient,
+        DeepCopier deepCopier,
+        MessagingTrace messagingTrace,
+        DeepCopier<Response> responseCopier,
+        InterfaceToImplementationMappingCache interfaceToImplementationMapping,
+        ILogger logger)
     {
-        private readonly ConcurrentDictionary<ObserverGrainId, LocalObjectData> localObjects = new ConcurrentDictionary<ObserverGrainId, LocalObjectData>();
+        this.rootGrainContext = rootGrainContext;
+        this.runtimeClient = runtimeClient;
+        this.deepCopier = deepCopier;
+        this.messagingTrace = messagingTrace;
+        _responseCopier = responseCopier;
+        _interfaceToImplementationMapping = interfaceToImplementationMapping;
+        this.logger = logger;
+    }
 
-        private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
-        private readonly IGrainContext rootGrainContext;
-        private readonly IRuntimeClient runtimeClient;
-        private readonly ILogger logger;
-        private readonly DeepCopier deepCopier;
-        private readonly DeepCopier<Response> _responseCopier;
-        private readonly MessagingTrace messagingTrace;
-        private readonly AdmissionGate _invocations = new();
-        private readonly AdmissionGate _cancellations = new();
-        private List<IIncomingGrainCallFilter>? _grainCallFilters;
-
-        private List<IIncomingGrainCallFilter> GrainCallFilters
-            => _grainCallFilters ??= [.. runtimeClient.ServiceProvider.GetServices<IIncomingGrainCallFilter>()];
-
-        public InvokableObjectManager(
-            IGrainContext rootGrainContext,
-            IRuntimeClient runtimeClient,
-            DeepCopier deepCopier,
-            MessagingTrace messagingTrace,
-            DeepCopier<Response> responseCopier,
-            InterfaceToImplementationMappingCache interfaceToImplementationMapping,
-            ILogger logger)
+    public bool TryRegister(IAddressable obj, ObserverGrainId objectId)
+    {
+        lock (_observerLifecycleLock)
         {
-            this.rootGrainContext = rootGrainContext;
-            this.runtimeClient = runtimeClient;
-            this.deepCopier = deepCopier;
-            this.messagingTrace = messagingTrace;
-            _responseCopier = responseCopier;
-            _interfaceToImplementationMapping = interfaceToImplementationMapping;
-            this.logger = logger;
+            return !_isStopping && localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this));
         }
+    }
 
-        public bool TryRegister(IAddressable obj, ObserverGrainId objectId)
+    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+        Justification = "Disposal is fired and tracked instead of performing it inline." +
+        "This ensures we have a gated way to ensure disposal is handled if the manager itself starts shutdown while an existing" +
+        "dispoal is going on, triggered likely by the deregistration itself.")]
+    public bool TryDeregister(ObserverGrainId objectId)
+    {
+        lock (_observerLifecycleLock)
         {
-            return this.localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this));
-        }
-
-        public bool TryDeregister(ObserverGrainId objectId)
-        {
-            if (!this.localObjects.TryRemove(objectId, out var objectData))
+            if (!localObjects.TryRemove(objectId, out var objectData))
             {
                 return false;
             }
 
-            objectData.OnDeregistered();
+            TrackObserverDisposal(objectData);
+
             return true;
         }
+    }
 
-        /// <summary>
-        /// Closes observer admission and drains invocation processing, including cancellation controls and response handling.
-        /// </summary>
-        public async Task StopAsync()
+    /// <remarks>Always call this under the lifecycle lock!</remarks>
+    private void TrackObserverDisposal(LocalObjectData objectData)
+    {
+        var task = objectData.DisposeAsync().AsTask();
+        if (task.IsCompleted)
         {
-            // Cancellation controls can release admitted work while application admission is closed.
-            await _invocations.CloseAsync().ConfigureAwait(false);
-            await _cancellations.CloseAsync().ConfigureAwait(false);
+            if (task.Exception is { } exception)
+            {
+                LogErrorDisposingObservers(logger, exception);
+            }
+
+            return;
         }
 
-        internal static bool IsCancellationRequest(Message message) =>
-            message.BodyObject is IInvokable request && request.GetInterfaceType() == typeof(IGrainCallCancellationExtension);
+        _observerDisposals.Add(task);
 
-        private AdmissionGate GetAdmissionGate(Message message) =>
-            IsCancellationRequest(message) ? _cancellations : _invocations;
-
-        internal void RejectMessage(Message message)
+        _ = task.ContinueWith(static (completedTask, state) =>
         {
-            LogRejectingMessageDuringShutdown(logger, message);
+            var manager = (InvokableObjectManager)state!;
+
+            lock (manager._observerLifecycleLock) // This is fine as due to lock reentracy.
+            {
+                manager._observerDisposals.Remove(completedTask);
+            }
+
+            if (completedTask.Exception is { } exception)
+            {
+                LogErrorDisposingObservers(manager.logger, exception);
+            }
+        },
+        // 'ExecuteSynchronously' is an optimization because when 'DisposeAsync' completes synchronously (which it will if
+        // the observer does not have any IAE-returning methods), then removal from the tracked disposals can occur inline
+        // without requiring a thread pool thread hop.
+        this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+    }
+
+    /// <summary>
+    /// Closes observer admission and drains invocation processing, including cancellation controls and response handling.
+    /// </summary>
+    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Symmetric reasoning as with TryTryDeregister.")]
+    public async Task StopAsync()
+    {
+        lock (_observerLifecycleLock)
+        {
+            _isStopping = true;
+        }
+
+        // Cancellation controls can release admitted work while application admission is closed.
+        await _invocations.CloseAsync().ConfigureAwait(false);
+        await _cancellations.CloseAsync().ConfigureAwait(false);
+
+        Task[] disposalTasks;
+
+        lock (_observerLifecycleLock)
+        {
+            // We dispose all registered observers, also cancelling any outstanding enumerators.
+            // This will include disposals initiated by concurrent TryDeregister calls as well.
+            foreach (var entry in localObjects.ToArray())
+            {
+                if (localObjects.TryRemove(entry.Key, out var objectData))
+                {
+                    TrackObserverDisposal(objectData);
+                }
+            }
+
+            disposalTasks = [.. _observerDisposals];
+        }
+
+        try
+        {
+            await Task.WhenAll(disposalTasks).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            LogErrorDisposingObservers(logger, exception);
+        }
+    }
+
+    internal static bool IsCancellationRequest(Message message) =>
+        message.BodyObject is IInvokable request && request.GetInterfaceType() == typeof(IGrainCallCancellationExtension);
+
+    private AdmissionGate GetAdmissionGate(Message message) =>
+        IsCancellationRequest(message) ? _cancellations : _invocations;
+
+    internal void RejectMessage(Message message)
+    {
+        LogRejectingMessageDuringShutdown(logger, message);
+        if (message.Direction == Message.Directions.Request)
+        {
+            runtimeClient.SendResponse(message, Response.FromException(
+                new SiloUnavailableException("The local Orleans host is shutting down and can no longer accept observer invocations.")));
+        }
+    }
+
+    public void Dispatch(Message message)
+    {
+        if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
+        {
+            LogNotAddressedToAnObserver(logger, message);
+            return;
+        }
+
+        if (this.localObjects.TryGetValue(observerId, out var objectData))
+        {
+            objectData.ReceiveMessage(message);
+        }
+        else
+        {
+            LogUnexpectedTargetInRequest(logger, message.TargetGrain, message);
             if (message.Direction == Message.Directions.Request)
             {
+
                 runtimeClient.SendResponse(message, Response.FromException(
-                    new SiloUnavailableException("The local Orleans host is shutting down and can no longer accept observer invocations.")));
+                    new ObserverNotReachableException($"The target observer = '{observerId}' is not registered.")));
             }
         }
-
-        public void Dispatch(Message message)
-        {
-            if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
-            {
-                LogNotAddressedToAnObserver(logger, message);
-                return;
-            }
-
-            if (this.localObjects.TryGetValue(observerId, out var objectData))
-            {
-                objectData.ReceiveMessage(message);
-            }
-            else
-            {
-                LogUnexpectedTargetInRequest(logger, message.TargetGrain, message);
-            }
-        }
-
-        public sealed partial class LocalObjectData : IGrainContext, IGrainCallCancellationExtension
-        {
-            private const int MaxPendingCancellations = 1_024;
-            private static readonly Func<object?, Task> HandleFunc = self => ((LocalObjectData)self!).LocalObjectMessagePumpAsync();
-            private readonly InvokableObjectManager _manager;
-            private readonly Dictionary<(GrainId SenderGrainId, CorrelationId MessageId), LinkedListNode<(GrainId, CorrelationId)>> _pendingCancellations = [];
-            private readonly LinkedList<(GrainId SenderGrainId, CorrelationId MessageId)> _pendingCancellationOrder = [];
-            private readonly Dictionary<Message, Task?> _runningRequests = [];
-            private Task? _messagePumpTask;
-
-            internal LocalObjectData(IAddressable obj, ObserverGrainId observerId, InvokableObjectManager manager)
-            {
-                this.LocalObject = new WeakReference(obj);
-                this.ObserverId = observerId;
-                this.Messages = new Queue<Message>();
-                this.Running = false;
-                _manager = manager;
-            }
-
-            internal WeakReference LocalObject { get; }
-            internal ObserverGrainId ObserverId { get; }
-            internal Queue<Message> Messages { get; }
-            internal bool Running { get; set; }
-
-            GrainId IGrainContext.GrainId => this.ObserverId.GrainId;
-
-            GrainReference IGrainContext.GrainReference =>
-                _manager.runtimeClient.InternalGrainFactory.GetGrain(ObserverId.GrainId).AsReference();
-
-            object? IGrainContext.GrainInstance => this.LocalObject.Target;
-
-            ActivationId IGrainContext.ActivationId => throw new NotImplementedException();
-
-            GrainAddress IGrainContext.Address => throw new NotImplementedException();
-
-            IServiceProvider IGrainContext.ActivationServices => throw new NotSupportedException();
-
-            IGrainLifecycle IGrainContext.ObservableLifecycle => throw new NotImplementedException();
-
-            public IWorkItemScheduler Scheduler => throw new NotImplementedException();
-
-            void IGrainContext.SetComponent<TComponent>(TComponent? value) where TComponent : class
-            {
-                if (this.LocalObject.Target is TComponent)
-                {
-                    throw new ArgumentException("Cannot override a component which is implemented by this grain");
-                }
-
-                _manager.rootGrainContext.SetComponent(value);
-            }
-
-            public object? GetComponent(Type componentType)
-            {
-                if (componentType.IsAssignableFrom(this.LocalObject.Target?.GetType()))
-                {
-                    return LocalObject.Target;
-                }
-                else if (componentType.IsAssignableFrom(GetType()))
-                {
-                    return this;
-                }
-
-                return _manager.rootGrainContext.GetComponent(componentType);
-            }
-
-            public object? GetTarget() => this.LocalObject.Target;
-
-            bool IEquatable<IGrainContext>.Equals(IGrainContext? other) => ReferenceEquals(this, other);
-
-            public void ReceiveMessage(object msg)
-            {
-                var message = (Message)msg;
-                var gate = _manager.GetAdmissionGate(message);
-                if (!gate.TryEnterUnscoped())
-                {
-                    _manager.RejectMessage(message);
-                    return;
-                }
-
-                var ownsAdmission = true;
-                try
-                {
-                    // Queue publication transfers admission ownership to the pump or interleaved invocation.
-                    ReceiveMessage(message, ref ownsAdmission);
-                }
-                finally
-                {
-                    if (ownsAdmission)
-                    {
-                        gate.Exit();
-                    }
-                }
-            }
-
-            private void ReceiveMessage(Message message, ref bool ownsAdmission)
-            {
-                var obj = this.LocalObject.Target;
-                if (obj is null)
-                {
-                    // Remove from the dictionary record for the garbage collected object? But now we won't be able to detect invalid dispatch IDs anymore.
-                    LogObserverGarbageCollected(_manager.logger, this.ObserverId, message);
-                    // Try to remove. If it's not there, we don't care.
-                    _manager.TryDeregister(this.ObserverId);
-                    message.Dispose();
-                    return;
-                }
-
-                // Handle AlwaysInterleave messages (like cancellation requests) immediately without queueing.
-                // These messages need to be processed right away, even if another request is currently running.
-                if (message.IsAlwaysInterleave)
-                {
-                    bool wasCancelled;
-                    lock (Messages)
-                    {
-                        wasCancelled = RemovePendingCancellation((message.SendingGrain, message.Id));
-                        if (!wasCancelled)
-                        {
-                            // Track the running request so it can be cancelled.
-                            var task = Task.Factory.StartNew(
-                                static state =>
-                                {
-                                    var (self, msg) = ((LocalObjectData, Message))state!;
-                                    return self.ProcessMessageAsync(msg);
-                                },
-                                (this, message),
-                                CancellationToken.None,
-                                TaskCreationOptions.DenyChildAttach,
-                                TaskScheduler.Default).Unwrap();
-                            ownsAdmission = false;
-                            _runningRequests.Add(message, task);
-                        }
-                    }
-
-                    if (wasCancelled)
-                    {
-                        SendCanceledResponse(message);
-                    }
-
-                    return;
-                }
-
-                bool start;
-                bool wasWaitingCancellation;
-                lock (this.Messages)
-                {
-                    wasWaitingCancellation = RemovePendingCancellation((message.SendingGrain, message.Id));
-                    if (wasWaitingCancellation)
-                    {
-                        start = false;
-                    }
-                    else
-                    {
-                        this.Messages.Enqueue(message);
-                        ownsAdmission = false;
-                        start = !this.Running;
-                        this.Running = true;
-                    }
-                }
-
-                if (wasWaitingCancellation)
-                {
-                    SendCanceledResponse(message);
-                    return;
-                }
-
-                LogInvokeLocalObjectAsync(_manager.logger, message, start);
-
-                if (start)
-                {
-                    // we want to ensure that the message pump operates asynchronously
-                    // with respect to the current thread. see
-                    // http://channel9.msdn.com/Events/TechEd/Europe/2013/DEV-B317#fbid=aIWUq0ssW74
-                    // at position 54:45.
-                    //
-                    // according to the information posted at:
-                    // http://stackoverflow.com/questions/12245935/is-task-factory-startnew-guaranteed-to-use-another-thread-than-the-calling-thr
-                    // this idiom is dependent upon the a TaskScheduler not implementing the
-                    // override QueueTask as task inlining (as opposed to queueing). this seems
-                    // implausible to the author, since none of the .NET schedulers do this and
-                    // it is considered bad form (the OrleansTaskScheduler does not do this).
-                    //
-                    // if, for some reason this doesn't hold true, we can guarantee what we
-                    // want by passing a placeholder continuation token into Task.StartNew()
-                    // instead. i.e.:
-                    //
-                    // return Task.StartNew(() => ..., new CancellationToken());
-                    // We pass these options to Task.Factory.StartNew as they make the call identical
-                    // to Task.Run. See: https://blogs.msdn.microsoft.com/pfxteam/2011/10/24/task-run-vs-task-factory-startnew/
-                    _messagePumpTask = Task.Factory.StartNew(
-                            HandleFunc,
-                            this,
-                            CancellationToken.None,
-                            TaskCreationOptions.DenyChildAttach,
-                            TaskScheduler.Default).Unwrap();
-                }
-            }
-
-            [System.Diagnostics.CodeAnalysis.SuppressMessage(
-                "Reliability",
-                "CA2000:Dispose objects before losing scope",
-                Justification = "Each dequeued message is transferred to ProcessMessageAsync, which completes or rejects the request.")]
-            private async Task LocalObjectMessagePumpAsync()
-            {
-                while (TryDequeueMessage(out var message))
-                {
-                    await ProcessMessageAsync(message);
-                }
-
-                bool TryDequeueMessage([NotNullWhen(true)] out Message? message)
-                {
-                    lock (Messages)
-                    {
-                        var result = Messages.TryDequeue(out message);
-                        if (!result)
-                        {
-                            Running = false;
-                        }
-                        else
-                        {
-                            _runningRequests.Add(message!, _messagePumpTask);
-                        }
-
-                        return result;
-                    }
-                }
-            }
-
-            private async Task ProcessMessageAsync(Message message)
-            {
-                try
-                {
-                    if (message.IsExpired)
-                    {
-                        _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
-                        message.Dispose();
-                        return;
-                    }
-
-                    if (message.RequestContextData is { Count: > 0 })
-                    {
-                        RequestContextExtensions.Import(message.RequestContextData);
-                    }
-
-                    IInvokable? request;
-                    try
-                    {
-                        if (message.BodyObject is not IInvokable invokableBody)
-                        {
-                            _manager.runtimeClient.SendResponse(
-                                message,
-                                Response.FromException(new InvalidOperationException("Message body is not an invokable request")));
-                            return;
-                        }
-
-                        request = invokableBody;
-                    }
-                    catch (Exception deserializationException)
-                    {
-                        LogErrorDeserializingMessageBody(_manager.logger, deserializationException, message);
-                        _manager.runtimeClient.SendResponse(message, Response.FromException(deserializationException));
-                        return;
-                    }
-
-                    try
-                    {
-                        request.SetTarget(this);
-                        if (TryTakePendingCancellation(message))
-                        {
-                            TryCancelInvokable(request);
-                        }
-
-                        var filters = _manager.GrainCallFilters;
-                        Response response;
-                        if (filters is { Count: > 0 } || LocalObject.Target is IIncomingGrainCallFilter)
-                        {
-                            var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping, _manager._responseCopier);
-                            await invoker.Invoke();
-                            response = invoker.Response!;
-                        }
-                        else
-                        {
-                            response = await request.Invoke();
-                            // The copier preserves the null state of its input.
-                            response = _manager._responseCopier.Copy(response)!;
-                        }
-
-                        if (message.Direction != Message.Directions.OneWay)
-                        {
-                            this.SendResponseAsync(message, response);
-                        }
-                    }
-                    catch (Exception exc)
-                    {
-                        this.ReportException(message, exc);
-                    }
-                }
-                catch (Exception outerException)
-                {
-                    // Ignore and keep looping.
-                    LogErrorProcessingMessage(_manager.logger, outerException, message);
-                }
-                finally
-                {
-                    lock (Messages)
-                    {
-                        _runningRequests.Remove(message);
-                    }
-
-                    // Generated interface metadata is stable throughout the request's lifetime.
-                    _manager.GetAdmissionGate(message).Exit();
-                }
-            }
-
-            internal void OnDeregistered()
-            {
-                lock (Messages)
-                {
-                    _pendingCancellations.Clear();
-                    _pendingCancellationOrder.Clear();
-                }
-            }
-
-            private bool TryTakePendingCancellation(Message message)
-            {
-                lock (Messages)
-                {
-                    return RemovePendingCancellation((message.SendingGrain, message.Id));
-                }
-            }
-
-            private bool TryCancelInvokable(IInvokable request)
-            {
-                try
-                {
-                    return request.TryCancel();
-                }
-                catch (Exception exception)
-                {
-                    LogErrorCancellationCallbackFailed(_manager.logger, exception);
-                    return true;
-                }
-            }
-
-            private void SendCanceledResponse(Message message) =>
-                _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
-
-            private void SendResponseAsync(Message message, Response resultObject)
-            {
-                if (message.IsExpired)
-                {
-                    _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Respond);
-                    return;
-                }
-
-                Response deepCopy;
-                try
-                {
-                    // we're expected to notify the caller if the deep copy failed.
-                    // The copier preserves the null state of its input.
-                    deepCopy = _manager.deepCopier.Copy(resultObject)!;
-                }
-                catch (Exception exc2)
-                {
-                    _manager.runtimeClient.SendResponse(message, Response.FromException(exc2));
-                    LogErrorSendingResponse(_manager.logger, exc2);
-                    return;
-                }
-
-                // the deep-copy succeeded.
-                _manager.runtimeClient.SendResponse(message, deepCopy);
-                return;
-            }
-
-            private void ReportException(Message message, Exception exception)
-            {
-                switch (message.Direction)
-                {
-                    case Message.Directions.OneWay:
-                        LogErrorInvokingOneWayRequest(_manager.logger, exception, message.BodyObject?.ToString(), message.InterfaceType);
-                        break;
-
-                    case Message.Directions.Request:
-                        Exception deepCopy;
-                        try
-                        {
-                            // we're expected to notify the caller if the deep copy failed.
-                            // The copier preserves the null state of its input.
-                            deepCopy = _manager.deepCopier.Copy(exception)!;
-                        }
-                        catch (Exception ex2)
-                        {
-                            _manager.runtimeClient.SendResponse(message, Response.FromException(ex2));
-                            LogErrorSendingExceptionResponse(_manager.logger, ex2);
-                            return;
-                        }
-
-                        // the deep-copy succeeded.
-                        var response = Response.FromException(deepCopy);
-                        _manager.runtimeClient.SendResponse(message, response);
-                        break;
-
-                    default:
-                        throw new InvalidOperationException($"Unrecognized direction for message {message}, which resulted in exception: {exception}");
-                }
-            }
-
-            public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
-            public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
-
-            public void Rehydrate(IRehydrationContext context)
-            {
-                // Migration is not supported, but we need to dispose of the context if it's provided
-                (context as IDisposable)?.Dispose();
-            }
-
-            public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
-            {
-                // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
-            }
-
-            ValueTask IGrainCallCancellationExtension.CancelRequestAsync(
-                GrainId senderGrainId,
-                CorrelationId messageId,
-                CancellationToken cancellationToken)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                TryCancelRequest();
-                return ValueTask.CompletedTask;
-
-                void TryCancelRequest()
-                {
-                    Message? message = null;
-                    var wasWaiting = false;
-                    var key = (senderGrainId, messageId);
-                    lock (Messages)
-                    {
-                        // Check the running requests.
-                        foreach (var runningRequest in _runningRequests.Keys)
-                        {
-                            if (runningRequest.Id == messageId && runningRequest.SendingGrain == senderGrainId)
-                            {
-                                message = runningRequest;
-                                break;
-                            }
-                        }
-
-                        if (message is null)
-                        {
-                            // Check the waiting requests.
-                            foreach (var waitingRequest in Messages)
-                            {
-                                var waiting = waitingRequest;
-                                if (waiting.Id == messageId && waiting.SendingGrain == senderGrainId)
-                                {
-                                    message = waiting;
-                                    wasWaiting = true;
-
-                                    // Remove the message, since it will be rejected immediately (outside the lock) without being executed.
-                                    var initialCount = Messages.Count;
-                                    for (var i = 0; i < initialCount; i++)
-                                    {
-                                        var current = Messages.Dequeue();
-                                        if (!ReferenceEquals(current, message))
-                                        {
-                                            Messages.Enqueue(current);
-                                        }
-                                    }
-
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (!wasWaiting)
-                        {
-                            // Cancellation and invocation are delivered independently. Retain cancellation
-                            // until the matching invocation is admitted or has initialized its local token.
-                            RetainPendingCancellation(key);
-                        }
-                    }
-
-                    var didCancel = false;
-                    if (message is not null)
-                    {
-                        // The message never began executing, so send a canceled response immediately.
-                        // If the message did begin executing, wait for it to observe the cancellation token and respond itself.
-                        if (wasWaiting)
-                        {
-                            try
-                            {
-                                SendCanceledResponse(message);
-                            }
-                            finally
-                            {
-                                _manager.GetAdmissionGate(message).Exit();
-                            }
-
-                            didCancel = true;
-                        }
-                        else if (message.BodyObject is IInvokable invokableRequest)
-                        {
-                            didCancel = TryCancelInvokable(invokableRequest) || !invokableRequest.IsCancellable;
-                        }
-                        else
-                        {
-                            // Assume the request is not cancellable.
-                            didCancel = true;
-                        }
-                    }
-
-                    if (didCancel)
-                    {
-                        lock (Messages)
-                        {
-                            RemovePendingCancellation(key);
-                        }
-                    }
-                }
-            }
-
-            private void RetainPendingCancellation((GrainId SenderGrainId, CorrelationId MessageId) key)
-            {
-                if (_pendingCancellations.ContainsKey(key))
-                {
-                    return;
-                }
-
-                if (_pendingCancellations.Count >= MaxPendingCancellations)
-                {
-                    var oldest = _pendingCancellationOrder.First!;
-                    _pendingCancellationOrder.RemoveFirst();
-                    _pendingCancellations.Remove(oldest.Value);
-                }
-
-                _pendingCancellations.Add(key, _pendingCancellationOrder.AddLast(key));
-            }
-
-            private bool RemovePendingCancellation((GrainId SenderGrainId, CorrelationId MessageId) key)
-            {
-                if (!_pendingCancellations.Remove(key, out var node))
-                {
-                    return false;
-                }
-
-                _pendingCancellationOrder.Remove(node);
-                return true;
-            }
-
-            [LoggerMessage(
-                Level = LogLevel.Warning,
-                Message = "One or more cancellation callbacks failed."
-            )]
-            private static partial void LogErrorCancellationCallbackFailed(ILogger logger, Exception exception);
-
-            public Task Deactivated => Task.CompletedTask;
-        }
-
-        private readonly struct ObserverGrainIdLogValue(ObserverGrainId observerId)
-        {
-            public override string ToString() => observerId.ToString();
-        }
-
-        [LoggerMessage(
-            Level = LogLevel.Debug,
-            Message = "Rejecting observer invocation during shutdown: '{Message}'."
-        )]
-        private static partial void LogRejectingMessageDuringShutdown(ILogger logger, Message message);
-
-        [LoggerMessage(
-            EventId = (int)ErrorCode.ProxyClient_OGC_TargetNotFound_2,
-            Level = LogLevel.Error,
-            Message = "Message is not addressed to an observer. Message: '{Message}'."
-        )]
-        private static partial void LogNotAddressedToAnObserver(ILogger logger, Message message);
-
-        [LoggerMessage(
-            EventId = (int)ErrorCode.ProxyClient_OGC_TargetNotFound,
-            Level = LogLevel.Error,
-            Message = "Unexpected target grain in request: {TargetGrain}. Message: '{Message}'."
-        )]
-        private static partial void LogUnexpectedTargetInRequest(ILogger logger, GrainId targetGrain, Message message);
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            EventId = (int)ErrorCode.Runtime_Error_100162,
-            Message = "Object associated with id '{ObserverId}' has been garbage collected. Deleting object reference and unregistering it. Message: '{Message}'."
-        )]
-        private static partial void LogObserverGarbageCollected(ILogger logger, ObserverGrainId observerId, Message message);
-
-        [LoggerMessage(
-            Level = LogLevel.Trace,
-            Message = "InvokeLocalObjectAsync '{Message}' start '{Start}'."
-        )]
-        private static partial void LogInvokeLocalObjectAsync(ILogger logger, Message message, bool start);
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            EventId = (int)ErrorCode.ProxyClient_OGC_SendResponseFailed,
-            Message = "Error sending a response."
-        )]
-        private static partial void LogErrorSendingResponse(ILogger logger, Exception exc);
-
-        [LoggerMessage(
-            Level = LogLevel.Error,
-            EventId = (int)ErrorCode.ProxyClient_OGC_UnhandledExceptionInOneWayInvoke,
-            Message = "Exception during invocation of notification '{Request}', interface '{Interface}'. Ignoring exception because this is a one way request."
-        )]
-        private static partial void LogErrorInvokingOneWayRequest(ILogger logger, Exception exception, string? request, GrainInterfaceType @interface);
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            EventId = (int)ErrorCode.ProxyClient_OGC_SendExceptionResponseFailed,
-            Message = "Error sending an exception response."
-        )]
-        private static partial void LogErrorSendingExceptionResponse(ILogger logger, Exception exception);
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            Message = "Exception during message body deserialization for message: '{Message}'."
-        )]
-        private static partial void LogErrorDeserializingMessageBody(ILogger logger, Exception exception, Message message);
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            Message = "Exception processing message '{Message}'."
-        )]
-        private static partial void LogErrorProcessingMessage(ILogger logger, Exception exception, Message message);
     }
+
+    private readonly struct ObserverGrainIdLogValue(ObserverGrainId observerId)
+    {
+        public override string ToString() => observerId.ToString();
+    }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Error disposing an observer during shutdown.")]
+    private static partial void LogErrorDisposingObservers(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Rejecting observer invocation during shutdown: '{Message}'."
+    )]
+    private static partial void LogRejectingMessageDuringShutdown(ILogger logger, Message message);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.ProxyClient_OGC_TargetNotFound_2,
+        Level = LogLevel.Error,
+        Message = "Message is not addressed to an observer. Message: '{Message}'."
+    )]
+    private static partial void LogNotAddressedToAnObserver(ILogger logger, Message message);
+
+    [LoggerMessage(
+        EventId = (int)ErrorCode.ProxyClient_OGC_TargetNotFound,
+        Level = LogLevel.Error,
+        Message = "Unexpected target grain in request: {TargetGrain}. Message: '{Message}'."
+    )]
+    private static partial void LogUnexpectedTargetInRequest(ILogger logger, GrainId targetGrain, Message message);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        EventId = (int)ErrorCode.Runtime_Error_100162,
+        Message = "Object associated with id '{ObserverId}' has been garbage collected. Deleting object reference and unregistering it. Message: '{Message}'."
+    )]
+    private static partial void LogObserverGarbageCollected(ILogger logger, ObserverGrainId observerId, Message message);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "InvokeLocalObjectAsync '{Message}' start '{Start}'."
+    )]
+    private static partial void LogInvokeLocalObjectAsync(ILogger logger, Message message, bool start);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        EventId = (int)ErrorCode.ProxyClient_OGC_SendResponseFailed,
+        Message = "Error sending a response."
+    )]
+    private static partial void LogErrorSendingResponse(ILogger logger, Exception exc);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        EventId = (int)ErrorCode.ProxyClient_OGC_UnhandledExceptionInOneWayInvoke,
+        Message = "Exception during invocation of notification '{Request}', interface '{Interface}'. Ignoring exception because this is a one way request."
+    )]
+    private static partial void LogErrorInvokingOneWayRequest(ILogger logger, Exception exception, string? request, GrainInterfaceType @interface);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        EventId = (int)ErrorCode.ProxyClient_OGC_SendExceptionResponseFailed,
+        Message = "Error sending an exception response."
+    )]
+    private static partial void LogErrorSendingExceptionResponse(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Exception during message body deserialization for message: '{Message}'."
+    )]
+    private static partial void LogErrorDeserializingMessageBody(ILogger logger, Exception exception, Message message);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Exception processing message '{Message}'."
+    )]
+    private static partial void LogErrorProcessingMessage(ILogger logger, Exception exception, Message message);
 }
