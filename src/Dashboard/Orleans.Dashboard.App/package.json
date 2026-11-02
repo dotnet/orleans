@@ -13,8 +13,6 @@
     "dev": "vite",
     "restore": "node scripts/install.mjs",
     "build": "vite build",
-    "assets:generate": "node build/generate-assets.mjs",
-    "assets:check": "node build/generate-assets.mjs --check",
     "preview": "vite preview",
     "lint": "eslint .",
     "test:ui": "playwright test",

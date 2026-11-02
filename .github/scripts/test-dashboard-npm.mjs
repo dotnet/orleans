@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -33,19 +33,11 @@ function run(args, cwd) {
   });
 }
 
-async function fixture(t, resetCount, scripts = {}, status = 200, canonical = false) {
+async function fixture(t, resetCount, scripts = {}, status = 200) {
   const directory = await mkdtemp(join(tmpdir(), 'orleans-npm-test-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  const name = canonical ? 'vite' : 'download-fixture';
+  const name = 'download-fixture';
   await writeFile(join(directory, 'package.json'), JSON.stringify({ name, version: '1.0.0' }));
-  if (canonical) {
-    await mkdir(join(directory, 'bin'));
-    await writeFile(join(directory, 'bin', 'vite.js'), `
-const fs = require('node:fs');
-fs.mkdirSync('dist', { recursive: true });
-for (const name of ['index.html', 'index.min.js', 'index.css']) fs.writeFileSync('dist/' + name, 'asset');
-`);
-  }
   const packed = await run([npmCli, 'pack', '--ignore-scripts', '--json'], directory);
   assert.equal(packed.code, 0, packed.stderr);
   const tarball = await readFile(join(directory, JSON.parse(packed.stdout)[0].filename));
@@ -159,52 +151,3 @@ test('an integrity failure is left to npm and fails without a clean-install retr
   assert.doesNotMatch(result.stderr, /Retrying npm ci/);
 });
 
-async function runCanonicalGeneration(f) {
-  await mkdir(join(f.directory, 'build'));
-  await copyFile(join(appRoot, 'build', 'generate-assets.mjs'), join(f.directory, 'build', 'generate-assets.mjs'));
-  await copyFile(join(appRoot, 'build', 'VerifyDashboardFrontendAssets.cs'), join(f.directory, 'build', 'VerifyDashboardFrontendAssets.cs'));
-  await copyFile(join(appRoot, 'build', 'Orleans.Dashboard.Frontend.targets'), join(f.directory, 'build', 'Orleans.Dashboard.Frontend.targets'));
-  await mkdir(join(f.directory, 'scripts'));
-  await copyFile(installScript, join(f.directory, 'scripts', 'install.mjs'));
-  const package_ = JSON.parse(await readFile(join(f.directory, 'package.json'), 'utf8'));
-  const pinned = JSON.parse(await readFile(join(appRoot, 'package.json'), 'utf8'));
-  Object.assign(package_, { engines: pinned.engines, packageManager: pinned.packageManager });
-  await writeFile(join(f.directory, 'package.json'), JSON.stringify(package_));
-  await writeFile(join(f.directory, '.node-version'), pinned.engines.node);
-  await mkdir(join(f.directory, 'dist'));
-  await writeFile(join(f.directory, 'dist', 'index.min.js'), 'previous deployable output');
-  await writeFile(join(f.directory, 'build', 'assets.inputs.sha256'), 'previous inputs');
-  await writeFile(join(f.directory, 'build', 'assets.outputs.sha256'), 'previous outputs');
-  return run([join(f.directory, 'build', 'generate-assets.mjs')], f.directory);
-}
-
-test('canonical generation publishes complete assets after reset recovery', async t => {
-  const f = await fixture(t, 1, {}, 200, true);
-  const result = await runCanonicalGeneration(f);
-  assert.equal(result.code, 0, result.stderr);
-  assert.equal(f.requests(), 2);
-  assert.equal(await readFile(join(f.directory, 'dist', 'index.min.js'), 'utf8'), 'asset');
-  const inputs = await readFile(join(f.directory, 'build', 'assets.inputs.sha256'), 'utf8');
-  assert.match(inputs, /  scripts\/install\.mjs/);
-  assert.match(inputs, /  build\/VerifyDashboardFrontendAssets\.cs/);
-  assert.match(inputs, /  build\/Orleans\.Dashboard\.Frontend\.targets/);
-  assert.match(inputs, /  build\/generate-assets\.mjs/);
-  assert.doesNotMatch(inputs, /  build\/assets\.(?:inputs|outputs)\.sha256/);
-  const outputs = await readFile(join(f.directory, 'build', 'assets.outputs.sha256'), 'utf8');
-  for (const file of ['index.html', 'index.min.js', 'index.css', 'THIRD-PARTY-NOTICES.txt']) {
-    assert.ok(outputs.includes('  ' + file), `Missing complete generated output: ${file}`);
-  }
-  assert.match(result.stderr, /ECONNRESET/);
-});
-
-test('canonical generation preserves prior deployable outputs and identities after install failure', async t => {
-  const f = await fixture(t, 0, { postinstall: 'node -e "console.error(\'ECONNRESET\'); process.exit(152)"' }, 200, true);
-  const result = await runCanonicalGeneration(f);
-  assert.notEqual(result.code, 0);
-  assert.equal(f.requests(), 1);
-  assert.equal(await readFile(join(f.directory, 'dist', 'index.min.js'), 'utf8'), 'previous deployable output');
-  assert.equal(await readFile(join(f.directory, 'build', 'assets.inputs.sha256'), 'utf8'), 'previous inputs');
-  assert.equal(await readFile(join(f.directory, 'build', 'assets.outputs.sha256'), 'utf8'), 'previous outputs');
-  assert.match(result.stderr, /command failed/);
-  assert.doesNotMatch(result.stderr, /Retrying npm ci|SIGXCPU/);
-});

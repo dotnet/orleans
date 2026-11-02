@@ -10,7 +10,7 @@
     <RootNamespace>Orleans.Dashboard</RootNamespace>
   </PropertyGroup>
 
-  <Import Project="..\Orleans.Dashboard.App\build\Orleans.Dashboard.Frontend.targets" />
+  <Import Project="Orleans.Dashboard.Frontend.targets" />
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

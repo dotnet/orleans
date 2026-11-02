@@ -1,0 +1,12 @@
+<Project>
+  <!-- The frontend is built with `npm run build` and committed under dist/. CI rebuilds it and verifies that
+       the committed files match, so ordinary .NET builds embed the assets without Node.js or npm. -->
+  <PropertyGroup>
+    <DashboardFrontendOutput>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', 'Orleans.Dashboard.App', 'dist'))</DashboardFrontendOutput>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="$(DashboardFrontendOutput)**\*" Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)" />
+    <None Include="$(DashboardFrontendOutput)THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

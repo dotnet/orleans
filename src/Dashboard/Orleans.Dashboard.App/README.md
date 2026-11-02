@@ -1,51 +1,56 @@
 # Orleans Dashboard App
 
-The Orleans Dashboard frontend uses React and Vite. Its deployable assets are committed under `dist/`. The `build/` directory holds the generation script, MSBuild targets, `VerifyDashboardFrontendAssets.cs` task, and SHA manifests. Building or packing `Orleans.Dashboard` validates source and output content hashes and embeds every asset in the assembly using the .NET SDK.
+This directory contains the frontend web application for the Orleans Dashboard, built with React and Vite. The production build is committed under `dist/`, and building the Orleans.Dashboard C# project embeds every file in `dist/` as a resource. .NET builds do not require Node.js or npm.
+
+## Structure
+
+```
+Orleans.Dashboard.App/
+├── src/              # React application source code
+├── public/           # Static assets copied to the build output
+├── scripts/          # npm installation helper
+├── dist/             # Committed production build, embedded by Orleans.Dashboard
+├── screenshots/      # Dashboard screenshots for documentation
+├── tests/            # Playwright navigation tests
+├── index.html        # HTML template
+├── package.json      # npm dependencies and scripts
+├── vite.config.ts    # Vite build configuration
+└── tsconfig.json     # TypeScript configuration
+```
 
 ## Development
 
-Use the exact Node.js version in `.node-version` and npm version in `package.json`. From this directory:
+Use the Node.js version in `.node-version` with the npm version in `package.json`. From this directory:
 
 ```shell
 npm run restore
 npm run dev
 ```
 
-The development server provides hot module replacement at `http://localhost:5173`. `npm run build` produces a local production preview in `dist/`, and `npm run preview` serves it. Regenerate canonical assets before building the .NET project after frontend changes.
+`npm run restore` runs `npm ci` and restarts the clean installation, up to three attempts, when npm reports a connection reset while downloading a package. Other failures are reported immediately.
 
-## Regenerating committed assets
+The development server provides hot module replacement at `http://localhost:5173`.
 
-```shell
-npm run assets:generate
-```
+## Updating the committed build
 
-The generator checks the pinned Node/npm versions, snapshots the inputs into a temporary directory, installs the locked dependencies with the `scripts/install.mjs` clean-install helper, and builds in production mode. It uses an explicit environment, isolated npm configuration, and a fresh dependency tree. Registry fetches use bounded retries and the local npm download cache. The helper restarts `npm ci` after an npm-reported `ECONNRESET` during a tarball response body, for at most three clean-install attempts with five seconds between attempts. Lockfile, authentication, integrity, lifecycle, and signal failures propagate with npm diagnostics. A failed installation/build preserves the previous deployable assets and manifests; the next generation starts a fresh dependency tree.
-
-Commit `dist/`, `build/assets.inputs.sha256`, and `build/assets.outputs.sha256` together with the source change. Generation preserves source maps and adds `THIRD-PARTY-NOTICES.txt` containing the installed production dependencies' license notices. The .NET package also includes the notices as a standalone file.
-
-Inputs comprise every file in `src/`, `public/`, `scripts/`, and `build/` except the two generated manifests, plus every frontend-root file except this README and `.gitignore`. This includes the HTML entry point, dependency manifests, lockfile, build configuration, generation and verification scripts, and toolchain pins. Keep build helpers within these boundaries so canonical generation can copy their complete inputs. Documentation screenshots and browser tests live outside the generation inputs.
-
-Source text with JavaScript, TypeScript, C#, MSBuild targets, CSS, JSON, HTML, SVG, or TXT extensions, `.npmrc`, `.node-version`, and `.env*` files is hashed and copied with LF line endings. Binary source assets retain their bytes. Generated files are hashed byte-for-byte; Git attributes preserve their exact output bytes. Paths use case-sensitive relative names with `/` separators. File contents and the complete path sets determine freshness, including additions, removals, and renames.
-
-Canonical generation uses production mode, UTC, and the `C` locale. Move `.env.local` and `.env.*.local` overrides out of this directory for regeneration. Add shared environment files to source control when the build uses them.
-
-## Reproducibility
+After changing the frontend or its dependencies, rebuild and commit `dist/` with the source change:
 
 ```shell
-npm run assets:check
+npm run restore
+npm run build
 ```
 
-This independently installs and regenerates in a fresh temporary directory, then compares every generated file and both manifests with the committed files. The Windows and Linux CI build jobs run this check when the complete tested PR delta affects frontend files, .NET Dashboard integration, CI/bootstrap configuration, or the repository line-ending policy. The selector compares the immutable synthetic merge with its event-identified base parent, covering changes from every PR commit and both paths of renames. Node setup and npm download caching follow the same selection; NuGet caching and every .NET build/pack manifest check remain active.
+The build writes the bundle, source map, fonts, images, and `THIRD-PARTY-NOTICES.md`, which Vite generates from the licenses of the bundled dependencies. The NuGet package also includes the notices as a standalone file.
 
-Pushes, manual runs, merge queues, and comparisons with unavailable or inconsistent commit identities run full reproduction with an explicit reason. A proven unrelated PR, including frontend README, screenshot, or browser-test-only edits, proceeds directly to the SDK validation. An actionable .NET build error identifies stale source or output paths and directs contributors to explicit regeneration.
-
-Framework discovery and Clean operate on the .NET project graph and intermediate outputs. The committed frontend files remain available across target frameworks and clean builds.
+CI runs the same commands and fails if the output differs from the committed `dist/`. Frontend sources use LF line endings on every platform, so builds on Windows, Linux, and macOS produce identical files.
 
 ## Navigation tests
 
-The Playwright tests exercise the production bundle's counter refresh, slow requests, route changes, narrow-screen navigation, keyboard dismissal, and desktop breakpoint:
+The browser tests exercise the production bundle's counter refresh, slow requests, route changes, narrow-screen navigation, keyboard dismissal, and desktop breakpoint:
 
 ```shell
 npx playwright install chromium
 npm run test:ui
 ```
+
+`npm run preview` serves the production build locally.
