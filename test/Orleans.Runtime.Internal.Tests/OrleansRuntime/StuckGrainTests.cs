@@ -137,7 +137,7 @@ namespace UnitTests.StuckGrainTests
             var id = Guid.NewGuid();
             var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
 
-            // The cancellation token passed to OnActivateAsync becomes cancelled, and activation fails once OnActivateAsync returns.
+            // The cancellation token passed to OnActivateAsync becomes cancelled, and activation fails when OnActivateAsync throws.
             RequestContext.Set("block_activation_seconds", 30);
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stuckGrain.NonBlockingCall());
 
