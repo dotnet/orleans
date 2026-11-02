@@ -566,3 +566,41 @@ public sealed class RecordingTcsState<T> : IStateMachine, IDurableTaskCompletion
     public void WriteSnapshot(JournalStreamWriter writer) { }
 
 }
+
+public sealed class RecordingLogState<T> : IStateMachine, IDurableLogCommandHandler<T>
+{
+    private readonly IDurableLogCommandCodec<T> _codec;
+    private readonly List<string> _commands = [];
+
+    public RecordingLogState(IDurableLogCommandCodec<T> codec)
+    {
+        ArgumentNullException.ThrowIfNull(codec);
+        _codec = codec;
+    }
+
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
+
+    public IReadOnlyList<string> Commands => _commands;
+
+    public void ApplyEpoch(long epoch) => _commands.Add($"epoch:{epoch}");
+
+    public void ApplyAppend(T item) => _commands.Add($"append:{item}");
+
+    public void ApplyDraftCommit(LogDraftCommit commit) => _commands.Add($"commitDraft:{commit.DraftId}:{commit.Sequence}:{commit.Count}");
+
+    public void ApplyTrimBefore(long sequence) => _commands.Add($"trimBefore:{sequence}");
+
+    public void ApplyClear() => _commands.Add("clear");
+
+    public void ApplySeal() => _commands.Add("seal");
+
+    public void Reset(long epoch, long firstSequence, long resetSequence, int capacityHint) =>
+        _commands.Add($"snapshot:{epoch}:{firstSequence}:{resetSequence}:{capacityHint}");
+
+    public void Reset(JournalStreamWriter writer) { }
+
+    public void WritePendingEntries(JournalStreamWriter writer) { }
+
+    public void WriteSnapshot(JournalStreamWriter writer) { }
+}

@@ -284,6 +284,18 @@ public sealed class GrainTypeSharedContext
     internal IActivationMigrationManager? MigrationManager { get; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether activations of this type record, for the code which each request runs,
+    /// the request it belongs to, so <see cref="IGrainRequestAdmission.IsBlockedByCurrentRequest"/> can answer.
+    /// </summary>
+    /// <remarks>
+    /// Components which wait for work that the activation runs as its own requests, such as durable task segments, set it
+    /// as each activation is created, before it invokes requests. It only ever becomes <see langword="true"/>, so
+    /// activations of other types pay one branch per request, and activations of this type pay one
+    /// <see cref="AsyncLocal{T}"/> write per request.
+    /// </remarks>
+    internal bool TracksCurrentRequest { get; set; }
+
+    /// <summary>
     /// Gets the internal grain runtime.
     /// </summary>
     internal InternalGrainRuntime InternalRuntime => field ??= _serviceProvider.GetRequiredService<InternalGrainRuntime>();
