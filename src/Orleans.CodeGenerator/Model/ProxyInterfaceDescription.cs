@@ -38,11 +38,7 @@ internal class ProxyInterfaceDescription : IEquatable<ProxyInterfaceDescription>
             }
         }
 
-        GeneratedNamespace = InterfaceType.GetNamespaceAndNesting() switch
-        {
-            { Length: > 0 } ns => $"{GeneratedCodeUtilities.CodeGeneratorName}.{ns}",
-            _ => GeneratedCodeUtilities.CodeGeneratorName
-        };
+        GeneratedNamespace = GeneratedCodeUtilities.GetGeneratedNamespaceName(InterfaceType);
 
         var names = new HashSet<string>(StringComparer.Ordinal);
         TypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
