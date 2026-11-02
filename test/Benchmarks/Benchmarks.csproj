@@ -53,7 +53,7 @@
 
   <ItemGroup>
     <Compile Include="..\..\playground\DurableJobsJournaling\StorageBackend.cs" Link="Journaling\Azure\StorageBackend.cs" />
-    <Protobuf Include="Serialization\Models\ProtoIntClass.proto" />
+    <Protobuf Include="Serialization\Models\ProtoIntClass.proto" GrpcServices="None" />
   </ItemGroup>
 
 </Project>
