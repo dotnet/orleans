@@ -167,6 +167,8 @@ namespace Orleans.Configuration
 
         public System.TimeSpan MaxEventDeliveryTime { get { throw null; } set { } }
 
+        public bool RetryFailedDeliveries { get { throw null; } set { } }
+
         public System.TimeSpan StreamInactivityPeriod { get { throw null; } set { } }
     }
 
@@ -786,6 +788,7 @@ namespace Orleans.Providers.Streams.Common
         CachedMessage? Oldest { get; }
 
         void RemoveOldestMessage();
+        bool TryRemoveOldestMessage();
     }
 
     public partial interface IQueueAdapterReceiverMonitor

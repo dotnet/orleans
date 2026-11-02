@@ -12,9 +12,11 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         public EventHubQueueCacheForTesting(IObjectPool<FixedSizeBuffer> bufferPool, IEventHubDataAdapter dataAdapter, IEvictionStrategy evictionStrategy, IStreamQueueCheckpointer<string> checkpointer,
             ILogger logger)
             : base("test", EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, null!, null!, null!)
-        { }
+        {
+        }
 
         public int ItemCount => this.cache.ItemCount;
+        public long NextSequenceNumber { get; set; }
     }
     public class EHEvictionStrategyForTesting : ChronologicalEvictionStrategy
     {
