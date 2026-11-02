@@ -1,5 +1,4 @@
 using System.IO;
-using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -158,18 +157,19 @@ public sealed class ExternalSerializerContextMetadataTests
     [InlineData(true)]
     public async Task FSharpModelHeadersRequireFullGeneratedCSharpServices(bool referenceServices)
     {
-        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
-        var configuration = typeof(ExternalSerializerContextMetadataTests).Assembly
-            .GetCustomAttribute<AssemblyConfigurationAttribute>()!.Configuration;
-        var tfm = AppContext.TargetFrameworkName!.Contains("Version=v8.0", StringComparison.Ordinal) ? "net8.0" : "net10.0";
-        var modelDirectory = Path.Combine("bin", configuration, tfm);
-        var serviceDirectory = referenceServices ? Path.Combine("obj", configuration, tfm, "ref") : Path.Combine("bin", configuration, tfm);
-        var modelReference = MetadataReference.CreateFromFile(Path.Combine(root, "test", "Grains", "TestFSharp", modelDirectory, "TestFSharp.dll"));
-        var consumer = await CreateConsumer("UnitTests.FSharpTypes.MulticaseStructDU", modelReference);
+        var modelReference = MetadataReference.CreateFromFile(typeof(FSharpModels.MulticaseStructDU).Assembly.Location);
+        var fsharpReference = MetadataReference.CreateFromFile(typeof(Microsoft.FSharp.Core.Unit).Assembly.Location);
+        var serializationReference = MetadataReference.CreateFromFile(Path.Combine(AppContext.BaseDirectory, "Orleans.Serialization.FSharp.dll"));
+        var services = await TestCompilationHelper.CreateCompilation("""
+            [assembly: Orleans.GenerateCodeForDeclaringAssembly(typeof(Orleans.CodeGenerator.Tests.FSharpModels.MulticaseStructDU))]
+            """, "FSharpCodeGenServices", modelReference, fsharpReference, serializationReference);
+        var (serviceOutput, serviceResult) = Generate(services);
+        AssertAccepted(serviceOutput, serviceResult);
+        var consumer = await CreateConsumer("Orleans.CodeGenerator.Tests.FSharpModels.MulticaseStructDU", modelReference);
         consumer = consumer.AddReferences(
-            MetadataReference.CreateFromFile(Path.Combine(root, "test", "Grains", "TestFSharpGrainInterfaces", serviceDirectory, "TestFSharpGrainInterfaces.dll")),
-            MetadataReference.CreateFromFile(typeof(Microsoft.FSharp.Core.Unit).Assembly.Location),
-            MetadataReference.CreateFromFile(Path.Combine(AppContext.BaseDirectory, "Orleans.Serialization.FSharp.dll")));
+            Emit(serviceOutput, referenceServices),
+            fsharpReference,
+            serializationReference);
         var assembly = Assert.IsAssignableFrom<IAssemblySymbol>(consumer.GetAssemblyOrModuleSymbol(modelReference));
         Assert.DoesNotContain(assembly.GetAttributes(), static attribute =>
             attribute.AttributeClass?.Name == "ReferenceAssemblyAttribute");
