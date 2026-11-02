@@ -10,7 +10,7 @@ import { test } from 'node:test';
 
 const npmCli = process.env.npm_execpath;
 assert.ok(npmCli, 'Run through npm run test:install so the test uses the selected npm CLI.');
-const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'Dashboard', 'Orleans.Dashboard.App');
+const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const installScript = join(appRoot, 'scripts', 'install.mjs');
 const fetchArgs = [
   '--prefer-offline', '--no-audit', '--no-fund',

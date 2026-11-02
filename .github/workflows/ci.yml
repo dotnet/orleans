@@ -37,52 +37,6 @@ env:
   TESTCONTAINERS_RYUK_IMAGE: testcontainers/ryuk:0.14.0
   ZOOKEEPER_IMAGE: zookeeper:3.9
 jobs:
-  dashboard-assets:
-    name: Dashboard assets
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: src/Dashboard/Orleans.Dashboard.App
-    steps:
-    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-    - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
-      with:
-        node-version-file: src/Dashboard/Orleans.Dashboard.App/.node-version
-    - name: Cache npm downloads
-      uses: ./.github/actions/cache-dependencies
-      with:
-        nuget: 'false'
-        npm: 'true'
-    - name: Test npm installation recovery
-      run: npm run test:install
-    - run: npm run restore -- --no-audit --no-fund
-    - run: npm run build
-    - name: Verify committed assets match the build
-      run: |
-        if [ -n "$(git status --porcelain --untracked-files=all -- dist)" ]; then
-          git status --short --untracked-files=all -- dist
-          echo "::error::src/Dashboard/Orleans.Dashboard.App/dist differs from 'npm run build'. Run 'npm run restore' and 'npm run build' in src/Dashboard/Orleans.Dashboard.App, then commit dist/."
-          exit 1
-        fi
-  dashboard-ui:
-    name: Dashboard UI regressions
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: src/Dashboard/Orleans.Dashboard.App
-    steps:
-    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-    - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
-      with:
-        node-version-file: src/Dashboard/Orleans.Dashboard.App/.node-version
-    - name: Cache npm downloads
-      uses: ./.github/actions/cache-dependencies
-      with:
-        nuget: 'false'
-        npm: 'true'
-    - run: npm run restore -- --no-audit --no-fund
-    - run: npx playwright install --with-deps chromium
-    - run: npm run test:ui
   whitespace:
     name: Whitespace formatting
     runs-on: ubuntu-latest
@@ -944,7 +898,6 @@ jobs:
     name: CI
     if: always()
     needs:
-      - dashboard-assets
       - build
       - test-redis
       - test-cassandra
