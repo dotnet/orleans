@@ -31,7 +31,7 @@ function files(directory, recursive = true) {
 
 function inputs() {
   return [...files(root, false).filter(file => !excluded.has(path.basename(file))),
-    ...files(path.join(root, 'src')), ...files(path.join(root, 'public'))];
+    ...files(path.join(root, 'src')), ...files(path.join(root, 'public')), ...files(path.join(root, 'scripts'))];
 }
 
 function manifest(directory, paths, normalizeText) {
@@ -94,12 +94,12 @@ try {
     'home', 'userprofile', 'appdata', 'localappdata', 'http_proxy', 'https_proxy', 'no_proxy', 'all_proxy',
     'ssl_cert_file', 'ssl_cert_dir', 'node_extra_ca_certs']);
   const environment = Object.fromEntries(Object.entries(process.env).filter(([key]) => allowed.has(key.toLowerCase())));
-  Object.assign(environment, { NODE_ENV: 'production', TZ: 'UTC', LANG: 'C', LC_ALL: 'C' });
+  Object.assign(environment, { NODE_ENV: 'production', TZ: 'UTC', LANG: 'C', LC_ALL: 'C', npm_execpath: npmCli });
   const userConfig = path.join(temporary, 'user.npmrc');
   const globalConfig = path.join(temporary, 'global.npmrc');
   writeFileSync(userConfig, '');
   writeFileSync(globalConfig, '');
-  run([npmCli, 'ci', '--include=dev', '--ignore-scripts=false', '--legacy-peer-deps=false',
+  run([path.join(app, 'scripts', 'install.mjs'), '--include=dev', '--ignore-scripts=false', '--legacy-peer-deps=false',
     '--install-links=false', '--bin-links=true', '--install-strategy=hoisted',
     `--userconfig=${userConfig}`, `--globalconfig=${globalConfig}`, '--prefer-offline', '--no-audit', '--no-fund',
     '--fetch-retries=5', '--fetch-retry-factor=3', '--fetch-retry-mintimeout=5000', '--fetch-retry-maxtimeout=15000'], app, environment);

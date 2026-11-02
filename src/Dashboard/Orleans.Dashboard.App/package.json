@@ -11,12 +11,14 @@
   },
   "scripts": {
     "dev": "vite",
+    "restore": "node scripts/install.mjs",
     "build": "vite build",
     "assets:generate": "node generate-assets.mjs",
     "assets:check": "node generate-assets.mjs --check",
     "preview": "vite preview",
     "lint": "eslint .",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test",
+    "test:install": "node --test ../../../.github/scripts/test-dashboard-npm.mjs"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.1.0",

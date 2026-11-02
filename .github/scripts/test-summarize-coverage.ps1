@@ -1574,11 +1574,15 @@ exit 0
             $reportingWorkflow `
             '(?s)Download covered source.*?Verify trusted coverage inputs.*?get-coverage-input-fingerprint\.ps1.*?Summarize coverage' `
             'Pull request coverage inputs must match the pinned trusted reporter before aggregation.'
-        Assert-Equal 15 (@(Get-Content -LiteralPath $coverageInputsPath)).Count 'Trusted coverage input count differs.'
+        Assert-Equal 16 (@(Get-Content -LiteralPath $coverageInputsPath)).Count 'Trusted coverage input count differs.'
         Assert-Equal `
             $true `
             (@(Get-Content -LiteralPath $coverageInputsPath) -contains '.github/actions/cache-dependencies/action.yml') `
             'Trusted coverage inputs must include the cache action executed before coverage setup.'
+        Assert-Equal `
+            $true `
+            (@(Get-Content -LiteralPath $coverageInputsPath) -contains '.github/scripts/select-dashboard-frontend-check.ps1') `
+            'Trusted coverage inputs must include the frontend selector controlling pre-build execution.'
         Assert-Matches `
             $reportingWorkflow `
             'github\.event\.workflow_run\.conclusion == ''success''' `

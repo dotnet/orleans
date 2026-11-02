@@ -139,6 +139,9 @@ try {
             '.github/actions/new-bootstrap/action.yml',
             '.github/scripts/select-dashboard-frontend-check.ps1',
             '.github/scripts/test-dashboard-frontend-selection.ps1',
+            'src/Dashboard/Orleans.Dashboard.App/scripts/install.mjs',
+            'src/Dashboard/Orleans.Dashboard.App/scripts/new-helper.mjs',
+            'eng/common.ps1',
             '.azure/pipelines/templates/build.yaml',
             '.gitattributes', 'global.json', 'Directory.Build.props',
             'Directory.Build.targets', 'Directory.Packages.props',
@@ -271,7 +274,7 @@ try {
         if ($select -match '(?m)^      if:|continue-on-error:' -or $build.IndexOf('Select Dashboard asset reproduction') -ge $build.IndexOf('Setup frontend generation toolchain')) {
             throw 'Selection must be an unconditional failing step before Node setup.'
         }
-        foreach ($step in @('Setup frontend generation toolchain', 'Check committed Dashboard assets')) {
+        foreach ($step in @('Setup frontend generation toolchain', 'Check committed Dashboard assets', 'Test Dashboard npm recovery')) {
             $body = [regex]::Match($build, "(?ms)^    - name: $step\r?\n.*?(?=^    - |\z)").Value
             if ($body -notmatch "if: steps\.dashboard-assets\.outputs\.required != 'false'" -or $body -match 'continue-on-error:') {
                 throw "$step must fail closed with the selector boolean and propagate failures."
@@ -281,9 +284,12 @@ try {
         if (-not $cache.Contains('npm: ${{ steps.dashboard-assets.outputs.required != ''false'' }}') -or $cache -match '(?m)^      if:|nuget:') {
             throw 'Only the npm portion of the combined cache may be conditional.'
         }
-        foreach ($step in @('Setup .NET', 'Test dependency cache policy', 'Test Dashboard asset validation', 'Test Dashboard reproduction selection', 'Build', 'Check CodeGen graph inventory', 'Test versioned grain deployments')) {
+        foreach ($step in @('Setup .NET', 'Test Dashboard asset validation', 'Test Dashboard reproduction selection', 'Build', 'Check CodeGen graph inventory')) {
             $body = [regex]::Match($build, "(?ms)^    - name: $([regex]::Escape($step))\r?\n.*?(?=^    - |\z)").Value
             if (-not $body -or $body -match '(?m)^      if:') { throw "$step must remain unconditional." }
+        }
+        if ($build -match 'test-dependency-cache|test-versioned-grain-build') {
+            throw 'Withdrawn cache/deployment harness gates must remain absent.'
         }
         foreach ($step in @('Test coverage reporting', 'Pack and validate package compatibility', 'Test package consumers')) {
             $body = [regex]::Match($build, "(?ms)^    - name: $step\r?\n.*?(?=^    - |\z)").Value
@@ -305,6 +311,10 @@ try {
         $targets = [IO.File]::ReadAllText((Join-Path $repository 'src/Dashboard/Orleans.Dashboard/Orleans.Dashboard.Frontend.targets'))
         if ($targets -notmatch 'BeforeTargets="BeforeBuild;GenerateNuspec"' -or $targets -match 'dashboard-assets|required|GITHUB_EVENT') {
             throw 'SDK build/pack verification must stay independent of CI selection.'
+        }
+        $trustedInputs = [IO.File]::ReadAllLines((Join-Path $repository '.github/coverage-inputs.txt'))
+        foreach ($input in @('.github/actions/cache-dependencies/action.yml', '.github/solutions/CodeGenerator.slnf', '.github/scripts/select-dashboard-frontend-check.ps1')) {
+            if ($trustedInputs -cnotcontains $input) { throw "Missing coverage trust input: $input" }
         }
     }
 

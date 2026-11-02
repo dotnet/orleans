@@ -41,7 +41,7 @@ function Test-AffectedPath {
 
     # These directories own generation, SDK integration, and CI/bootstrap policy.
     # Broad directory scopes also cover new configuration/helpers and renamed files.
-    if ($Path -match '^(?i:\.github/|\.azure/|src/Dashboard/)') {
+    if ($Path -match '^(?i:\.github/|\.azure/|eng/|src/Dashboard/)') {
         return $Path -cnotmatch '^src/Dashboard/Orleans\.Dashboard\.App/(README\.md|screenshots/.*|tests/.*)$' -and
             $Path -cne 'src/Dashboard/Orleans.Dashboard/README.md' -and
             $Path -cne 'src/Dashboard/Orleans.Dashboard.Abstractions/README.md'

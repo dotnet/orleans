@@ -7,7 +7,7 @@ The Orleans Dashboard frontend uses React and Vite. Its deployable assets are co
 Use the exact Node.js version in `.node-version` and npm version in `package.json`. From this directory:
 
 ```shell
-npm ci
+npm run restore
 npm run dev
 ```
 
@@ -19,11 +19,11 @@ The development server provides hot module replacement at `http://localhost:5173
 npm run assets:generate
 ```
 
-The generator checks the pinned Node/npm versions, snapshots the inputs into a temporary directory, installs the locked dependencies with `npm ci`, and builds in production mode. It uses an explicit environment, isolated npm configuration, and a fresh dependency tree. Registry fetches use bounded retries and the local npm download cache.
+The generator checks the pinned Node/npm versions, snapshots the inputs into a temporary directory, installs the locked dependencies with the `scripts/install.mjs` clean-install helper, and builds in production mode. It uses an explicit environment, isolated npm configuration, and a fresh dependency tree. Registry fetches use bounded retries and the local npm download cache. The helper restarts `npm ci` after an npm-reported `ECONNRESET` during a tarball response body, for at most three clean-install attempts with five seconds between attempts. Lockfile, authentication, integrity, lifecycle, and signal failures propagate with npm diagnostics. A failed installation/build preserves the previous deployable assets and manifests; the next generation starts a fresh dependency tree.
 
 Commit `dist/`, `assets.inputs.sha256`, and `assets.outputs.sha256` together with the source change. Generation preserves source maps and adds `THIRD-PARTY-NOTICES.txt` containing the installed production dependencies' license notices. The .NET package also includes the notices as a standalone file.
 
-Inputs comprise every file in `src/` and `public/`, plus every frontend-root file except this README, `.gitignore`, and the two generated manifests. This includes the HTML entry point, dependency manifests, lockfile, build configuration, generation and verification scripts, and toolchain pins. Keep build helpers within these boundaries so canonical generation can copy their complete inputs. Documentation screenshots and browser tests live outside the generation inputs.
+Inputs comprise every file in `src/`, `public/`, and `scripts/`, plus every frontend-root file except this README, `.gitignore`, and the two generated manifests. This includes the HTML entry point, dependency manifests, lockfile, build configuration, generation and verification scripts, and toolchain pins. Keep build helpers within these boundaries so canonical generation can copy their complete inputs. Documentation screenshots and browser tests live outside the generation inputs.
 
 Source text with JavaScript, TypeScript, C#, CSS, JSON, HTML, SVG, or TXT extensions, `.npmrc`, `.node-version`, and `.env*` files is hashed and copied with LF line endings. Binary source assets retain their bytes. Generated files are hashed byte-for-byte; Git attributes preserve their exact output bytes. Paths use case-sensitive relative names with `/` separators. File contents and the complete path sets determine freshness, including additions, removals, and renames.
 

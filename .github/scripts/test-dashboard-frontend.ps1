@@ -58,6 +58,7 @@ function Test-Case {
     Write-TestFile (Join-Path $appRoot 'package-lock.json') "{}`n"
     Write-TestFile (Join-Path $appRoot 'vite.config.ts') "export default {}`n"
     Write-TestFile (Join-Path $appRoot 'generate-assets.mjs') "// generator`n"
+    Write-TestFile (Join-Path $appRoot 'scripts\install.mjs') "// installer`n"
     Write-TestFile (Join-Path $appRoot '.node-version') "24.22.2`n"
     Write-TestFile (Join-Path $appRoot '.npmrc') "registry=https://example.invalid/`n"
     Write-TestFile (Join-Path $appRoot 'index.html') "<html/>`n"
@@ -120,7 +121,7 @@ try {
         Invoke-Build -Properties '-p:TargetFramework=net10.0'
     }
 
-    foreach ($file in @('src\main.ts', 'public\image.svg', 'package.json', 'package-lock.json', '.npmrc', '.node-version', 'vite.config.ts', 'generate-assets.mjs', 'verify-assets.cs', 'index.html')) {
+    foreach ($file in @('src\main.ts', 'public\image.svg', 'package.json', 'package-lock.json', '.npmrc', '.node-version', 'vite.config.ts', 'generate-assets.mjs', 'scripts\install.mjs', 'verify-assets.cs', 'index.html')) {
         Test-Case "ChangedInput-$($file.Replace('\', '-'))" {
             $path = Join-Path $appRoot $file
             $timestamp = [IO.File]::GetLastWriteTimeUtc($path)
@@ -231,6 +232,30 @@ try {
         Remove-Item -LiteralPath (Join-Path $appRoot 'assets.inputs.sha256')
         Invoke-Build -Properties '-p:BuildExternalAssets=false'
         Invoke-Build -Target Pack -Properties '-p:BuildExternalAssets=false'
+    }
+
+    Test-Case 'RepeatedBuildCleanAndRebuildPreserveAllAssetBytes' {
+        $before = [IO.File]::ReadAllText((Join-Path $appRoot 'assets.outputs.sha256'))
+        Invoke-Build
+        Invoke-Build
+        Invoke-Build -Target Clean
+        Invoke-Build -Target Rebuild
+        $actual = @(Get-ChildItem $outputRoot -File -Recurse | ForEach-Object FullName)
+        Write-Manifest 'assets.outputs.sha256' $outputRoot $actual
+        if ([IO.File]::ReadAllText((Join-Path $appRoot 'assets.outputs.sha256')) -cne $before) {
+            throw 'Build/Clean/Rebuild changed the complete asset path set or bytes.'
+        }
+    }
+
+    Test-Case 'StaleSourceAndOutputRecoverySucceedsAfterExactRestoration' {
+        foreach ($path in @((Join-Path $appRoot 'src\main.ts'), (Join-Path $outputRoot 'index.min.js'))) {
+            $original = [IO.File]::ReadAllBytes($path)
+            [IO.File]::AppendAllText($path, '// changed')
+            Invoke-Build -ExpectStale
+            Invoke-Build -ExpectStale
+            [IO.File]::WriteAllBytes($path, $original)
+            Invoke-Build
+        }
     }
 
     if (Test-Path $toolLog) { throw "A .NET asset operation invoked Node/npm: $([IO.File]::ReadAllText($toolLog))" }

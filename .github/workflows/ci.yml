@@ -53,7 +53,7 @@ jobs:
       with:
         nuget: 'false'
         npm: 'true'
-    - run: npm ci --no-audit --no-fund
+    - run: npm run restore -- --no-audit --no-fund
     - run: npx playwright install --with-deps chromium
     - run: npm run test:ui
   whitespace:
@@ -106,6 +106,10 @@ jobs:
       if: steps.dashboard-assets.outputs.required != 'false'
       working-directory: src/Dashboard/Orleans.Dashboard.App
       run: npm run assets:check
+    - name: Test Dashboard npm recovery
+      if: steps.dashboard-assets.outputs.required != 'false'
+      working-directory: src/Dashboard/Orleans.Dashboard.App
+      run: npm run test:install
     - name: Test coverage reporting
       if: matrix.os == 'ubuntu-latest'
       shell: pwsh

@@ -17,7 +17,8 @@ public sealed class VerifyDashboardFrontendAssets : Task
         var inputs = Directory.EnumerateFiles(Root)
             .Where(path => !IsExcluded(Path.GetFileName(path)))
             .Concat(EnumerateTree(Path.Combine(Root, "src")))
-            .Concat(EnumerateTree(Path.Combine(Root, "public")));
+            .Concat(EnumerateTree(Path.Combine(Root, "public")))
+            .Concat(EnumerateTree(Path.Combine(Root, "scripts")));
         var sourcesMatch = Verify("assets.inputs.sha256", inputs, Root, normalizeText: true);
         var outputsMatch = Verify("assets.outputs.sha256", EnumerateTree(Path.Combine(Root, "dist")), Path.Combine(Root, "dist"), normalizeText: false);
         return sourcesMatch && outputsMatch;
