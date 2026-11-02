@@ -27,7 +27,7 @@ function Write-Manifest {
         "$hash  $([IO.Path]::GetRelativePath($Root, $file).Replace('\', '/'))"
     }
     [Array]::Sort($lines, [StringComparer]::Ordinal)
-    [IO.File]::WriteAllLines((Join-Path $appRoot $Name), $lines)
+    [IO.File]::WriteAllLines((Join-Path $buildRoot $Name), $lines)
 }
 
 function Invoke-Build {
@@ -47,22 +47,24 @@ function Test-Case {
     param([string] $Name, [scriptblock] $Action)
     $caseRoot = Join-Path $temporaryRoot $Name
     $script:appRoot = Join-Path $caseRoot 'Orleans.Dashboard.App'
+    $script:buildRoot = Join-Path $appRoot 'build'
     $projectRoot = Join-Path $caseRoot 'Orleans.Dashboard'
     $script:projectPath = Join-Path $projectRoot 'Dashboard.proj'
     $script:outputRoot = Join-Path $appRoot 'dist'
     [void] [IO.Directory]::CreateDirectory($projectRoot)
-    Copy-Item (Join-Path $repository 'src\Dashboard\Orleans.Dashboard\Orleans.Dashboard.Frontend.targets') (Join-Path $projectRoot 'Frontend.targets')
+    [void] [IO.Directory]::CreateDirectory($buildRoot)
+    Copy-Item (Join-Path $repository 'src\Dashboard\Orleans.Dashboard.App\build\Orleans.Dashboard.Frontend.targets') (Join-Path $buildRoot 'Orleans.Dashboard.Frontend.targets')
     Write-TestFile (Join-Path $appRoot 'src\main.ts') "console.log('dashboard');`n"
     Write-TestFile (Join-Path $appRoot 'public\image.svg') "<svg/>`n"
     Write-TestFile (Join-Path $appRoot 'package.json') "{}`n"
     Write-TestFile (Join-Path $appRoot 'package-lock.json') "{}`n"
     Write-TestFile (Join-Path $appRoot 'vite.config.ts') "export default {}`n"
-    Write-TestFile (Join-Path $appRoot 'generate-assets.mjs') "// generator`n"
+    Write-TestFile (Join-Path $buildRoot 'generate-assets.mjs') "// generator`n"
     Write-TestFile (Join-Path $appRoot 'scripts\install.mjs') "// installer`n"
     Write-TestFile (Join-Path $appRoot '.node-version') "24.22.2`n"
     Write-TestFile (Join-Path $appRoot '.npmrc') "registry=https://example.invalid/`n"
     Write-TestFile (Join-Path $appRoot 'index.html') "<html/>`n"
-    Copy-Item (Join-Path $repository 'src\Dashboard\Orleans.Dashboard.App\verify-assets.cs') (Join-Path $appRoot 'verify-assets.cs')
+    Copy-Item (Join-Path $repository 'src\Dashboard\Orleans.Dashboard.App\build\VerifyDashboardFrontendAssets.cs') (Join-Path $buildRoot 'VerifyDashboardFrontendAssets.cs')
     $inputs = @(Get-ChildItem $appRoot -File -Recurse -Force | ForEach-Object FullName)
     Write-Manifest 'assets.inputs.sha256' $appRoot $inputs -NormalizeText
     foreach ($asset in @('index.html', 'index.min.js', 'index.min.js.map', 'index.css', 'img\image.png', 'fonts\font.woff2', 'THIRD-PARTY-NOTICES.txt')) {
@@ -75,7 +77,7 @@ function Test-Case {
     <_BuildDependsOn Condition="'$(TargetFramework)' == ''">DispatchToInnerBuilds</_BuildDependsOn>
     <_BuildDependsOn Condition="'$(TargetFramework)' != ''">BeforeBuild</_BuildDependsOn>
   </PropertyGroup>
-  <Import Project="Frontend.targets" />
+  <Import Project="..\Orleans.Dashboard.App\build\Orleans.Dashboard.Frontend.targets" />
   <Target Name="DispatchToInnerBuilds">
     <ItemGroup><_Framework Include="net8.0;net10.0" /></ItemGroup>
     <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="TargetFramework=%(_Framework.Identity)" BuildInParallel="true" />
@@ -127,11 +129,12 @@ try {
         Invoke-Build -Properties '-p:TargetFramework=net10.0'
     }
 
-    foreach ($file in @('src\main.ts', 'public\image.svg', 'package.json', 'package-lock.json', '.npmrc', '.node-version', 'vite.config.ts', 'generate-assets.mjs', 'scripts\install.mjs', 'verify-assets.cs', 'index.html')) {
+    foreach ($file in @('src\main.ts', 'public\image.svg', 'package.json', 'package-lock.json', '.npmrc', '.node-version', 'vite.config.ts', 'build\generate-assets.mjs', 'scripts\install.mjs', 'build\VerifyDashboardFrontendAssets.cs', 'build\Orleans.Dashboard.Frontend.targets', 'index.html')) {
         Test-Case "ChangedInput-$($file.Replace('\', '-'))" {
             $path = Join-Path $appRoot $file
             $timestamp = [IO.File]::GetLastWriteTimeUtc($path)
-            [IO.File]::AppendAllText($path, "`n// changed")
+            $change = if ([IO.Path]::GetExtension($path) -eq '.targets') { "`n<!-- changed -->" } else { "`n// changed" }
+            [IO.File]::AppendAllText($path, $change)
             [IO.File]::SetLastWriteTimeUtc($path, $timestamp)
             Invoke-Build -ExpectStale
         }
@@ -168,11 +171,11 @@ try {
     Test-Case 'BinarySourceBytesArePreserved' {
         $path = Join-Path $appRoot 'public\binary.png'
         [IO.File]::WriteAllBytes($path, [byte[]] (0, 13, 10, 255))
-        $lines = @([IO.File]::ReadAllLines((Join-Path $appRoot 'assets.inputs.sha256')))
+        $lines = @([IO.File]::ReadAllLines((Join-Path $buildRoot 'assets.inputs.sha256')))
         $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([IO.File]::ReadAllBytes($path)))
         [string[]] $lines = $lines + "$hash  public/binary.png"
         [Array]::Sort($lines, [StringComparer]::Ordinal)
-        [IO.File]::WriteAllLines((Join-Path $appRoot 'assets.inputs.sha256'), $lines)
+        [IO.File]::WriteAllLines((Join-Path $buildRoot 'assets.inputs.sha256'), $lines)
         Invoke-Build
         [IO.File]::WriteAllBytes($path, [byte[]] (0, 10, 255))
         Invoke-Build -ExpectStale
@@ -201,25 +204,25 @@ try {
     }
 
     Test-Case 'MissingAndEmptyManifestsFail' {
-        $path = Join-Path $appRoot 'assets.inputs.sha256'
+        $path = Join-Path $buildRoot 'assets.inputs.sha256'
         $original = [IO.File]::ReadAllText($path)
         Remove-Item -LiteralPath $path
         Invoke-Build -ExpectStale
         [IO.File]::WriteAllText($path, '')
         Invoke-Build -ExpectStale
         [IO.File]::WriteAllText($path, $original)
-        Remove-Item -LiteralPath (Join-Path $appRoot 'assets.outputs.sha256')
+        Remove-Item -LiteralPath (Join-Path $buildRoot 'assets.outputs.sha256')
         Invoke-Build -ExpectStale
     }
 
     Test-Case 'DuplicateManifestEntriesFail' {
-        $path = Join-Path $appRoot 'assets.outputs.sha256'
+        $path = Join-Path $buildRoot 'assets.outputs.sha256'
         [IO.File]::AppendAllText($path, [IO.File]::ReadAllLines($path)[0] + "`n")
         Invoke-Build -ExpectStale
     }
 
     Test-Case 'DiscoveryAndCleanAreIndependentOfFrontendState' {
-        Remove-Item -LiteralPath (Join-Path $appRoot 'assets.inputs.sha256')
+        Remove-Item -LiteralPath (Join-Path $buildRoot 'assets.inputs.sha256')
         Invoke-Build -Target GetTargetFrameworks
         Invoke-Build -Target Clean
         if (-not (Test-Path (Join-Path $outputRoot 'index.min.js'))) { throw 'Clean removed committed assets.' }
@@ -235,20 +238,20 @@ try {
     }
 
     Test-Case 'ExplicitExternalAssetsOptOutIsPreserved' {
-        Remove-Item -LiteralPath (Join-Path $appRoot 'assets.inputs.sha256')
+        Remove-Item -LiteralPath (Join-Path $buildRoot 'assets.inputs.sha256')
         Invoke-Build -Properties '-p:BuildExternalAssets=false'
         Invoke-Build -Target Pack -Properties '-p:BuildExternalAssets=false'
     }
 
     Test-Case 'RepeatedBuildCleanAndRebuildPreserveAllAssetBytes' {
-        $before = [IO.File]::ReadAllText((Join-Path $appRoot 'assets.outputs.sha256'))
+        $before = [IO.File]::ReadAllText((Join-Path $buildRoot 'assets.outputs.sha256'))
         Invoke-Build
         Invoke-Build
         Invoke-Build -Target Clean
         Invoke-Build -Target Rebuild
         $actual = @(Get-ChildItem $outputRoot -File -Recurse -Force | ForEach-Object FullName)
         Write-Manifest 'assets.outputs.sha256' $outputRoot $actual
-        if ([IO.File]::ReadAllText((Join-Path $appRoot 'assets.outputs.sha256')) -cne $before) {
+        if ([IO.File]::ReadAllText((Join-Path $buildRoot 'assets.outputs.sha256')) -cne $before) {
             throw 'Build/Clean/Rebuild changed the complete asset path set or bytes.'
         }
     }

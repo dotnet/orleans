@@ -5,14 +5,16 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const buildRoot = path.join(root, 'build');
 const check = process.argv[2] === '--check';
 if (process.argv.length > 2 && !(check && process.argv.length === 3)) {
   throw new Error('Usage: npm run assets:generate OR npm run assets:check');
 }
 
-const excluded = new Set(['README.md', '.gitignore', 'assets.inputs.sha256', 'assets.outputs.sha256']);
-const textExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.cs', '.css', '.json', '.html', '.svg', '.txt']);
+const excluded = new Set(['README.md', '.gitignore']);
+const manifests = new Set([path.join(buildRoot, 'assets.inputs.sha256'), path.join(buildRoot, 'assets.outputs.sha256')]);
+const textExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.cs', '.css', '.json', '.html', '.svg', '.txt', '.targets']);
 const ordinal = (left, right) => left < right ? -1 : left > right ? 1 : 0;
 const relative = (directory, file) => path.relative(directory, file).split(path.sep).join('/');
 const isText = file => textExtensions.has(path.extname(file).toLowerCase())
@@ -31,7 +33,8 @@ function files(directory, recursive = true) {
 
 function inputs() {
   return [...files(root, false).filter(file => !excluded.has(path.basename(file))),
-    ...files(path.join(root, 'src')), ...files(path.join(root, 'public')), ...files(path.join(root, 'scripts'))];
+    ...files(path.join(root, 'src')), ...files(path.join(root, 'public')), ...files(path.join(root, 'scripts')),
+    ...files(buildRoot).filter(file => !manifests.has(file))];
 }
 
 function manifest(directory, paths, normalizeText) {
@@ -112,17 +115,17 @@ try {
   if (check) {
     // Compare actual files, not just the committed manifest, to establish source/output correspondence.
     if (manifest(path.join(root, 'dist'), files(path.join(root, 'dist')), false) !== outputManifest
-      || readFileSync(path.join(root, 'assets.inputs.sha256'), 'utf8') !== inputManifest
-      || readFileSync(path.join(root, 'assets.outputs.sha256'), 'utf8') !== outputManifest) {
-      throw new Error('Committed Dashboard assets differ from clean regeneration. Run npm run assets:generate and commit dist/ and both assets.*.sha256 manifests.');
+      || readFileSync(path.join(buildRoot, 'assets.inputs.sha256'), 'utf8') !== inputManifest
+      || readFileSync(path.join(buildRoot, 'assets.outputs.sha256'), 'utf8') !== outputManifest) {
+      throw new Error('Committed Dashboard assets differ from clean regeneration. Run npm run assets:generate and commit dist/ and both build/assets.*.sha256 manifests.');
     }
     console.log('Committed Dashboard assets match independent clean regeneration.');
   } else {
     rmSync(path.join(root, 'dist'), { recursive: true, force: true });
     cpSync(output, path.join(root, 'dist'), { recursive: true });
-    writeFileSync(path.join(root, 'assets.inputs.sha256'), inputManifest);
-    writeFileSync(path.join(root, 'assets.outputs.sha256'), outputManifest);
-    console.log('Updated dist/ and both assets.*.sha256 manifests.');
+    writeFileSync(path.join(buildRoot, 'assets.inputs.sha256'), inputManifest);
+    writeFileSync(path.join(buildRoot, 'assets.outputs.sha256'), outputManifest);
+    console.log('Updated dist/ and both build/assets.*.sha256 manifests.');
   }
 } finally {
   rmSync(temporary, { recursive: true, force: true });

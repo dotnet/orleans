@@ -28,4 +28,4 @@
 src/Dashboard/Orleans.Dashboard.App/** text=auto eol=lf
 # Minified literals and upstream notices retain their generated whitespace.
 src/Dashboard/Orleans.Dashboard.App/dist/** -text -whitespace linguist-generated=true
-src/Dashboard/Orleans.Dashboard.App/assets.*.sha256 text eol=lf linguist-generated=true
+src/Dashboard/Orleans.Dashboard.App/build/assets.*.sha256 text eol=lf linguist-generated=true

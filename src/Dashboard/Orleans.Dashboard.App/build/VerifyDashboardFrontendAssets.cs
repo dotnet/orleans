@@ -18,7 +18,8 @@ public sealed class VerifyDashboardFrontendAssets : Task
             .Where(path => !IsExcluded(Path.GetFileName(path)))
             .Concat(EnumerateTree(Path.Combine(Root, "src")))
             .Concat(EnumerateTree(Path.Combine(Root, "public")))
-            .Concat(EnumerateTree(Path.Combine(Root, "scripts")));
+            .Concat(EnumerateTree(Path.Combine(Root, "scripts")))
+            .Concat(EnumerateTree(Path.Combine(Root, "build")).Where(path => !IsManifest(path)));
         var sourcesMatch = Verify("assets.inputs.sha256", inputs, Root, normalizeText: true);
         var outputsMatch = Verify("assets.outputs.sha256", EnumerateTree(Path.Combine(Root, "dist")), Path.Combine(Root, "dist"), normalizeText: false);
         return sourcesMatch && outputsMatch;
@@ -26,7 +27,7 @@ public sealed class VerifyDashboardFrontendAssets : Task
 
     private bool Verify(string manifest, IEnumerable<string> files, string root, bool normalizeText)
     {
-        var manifestPath = Path.Combine(Root, manifest);
+        var manifestPath = Path.Combine(Root, "build", manifest);
         if (!File.Exists(manifestPath))
         {
             return Stale($"Missing {manifest}.");
@@ -62,7 +63,7 @@ public sealed class VerifyDashboardFrontendAssets : Task
     private bool Stale(string reason)
     {
         Log.LogError("", "ORLEANSDASHBOARD001", "", Root, 0, 0, 0, 0,
-            "Dashboard frontend assets are stale. {0} In src/Dashboard/Orleans.Dashboard.App, use the pinned Node/npm toolchain and run 'npm run assets:generate', then commit dist/ and both assets.*.sha256 manifests.",
+            "Dashboard frontend assets are stale. {0} In src/Dashboard/Orleans.Dashboard.App, use the pinned Node/npm toolchain and run 'npm run assets:generate', then commit dist/ and both build/assets.*.sha256 manifests.",
             reason);
         return false;
     }
@@ -71,13 +72,16 @@ public sealed class VerifyDashboardFrontendAssets : Task
         Directory.Exists(path) ? Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories) : Enumerable.Empty<string>();
 
     private static bool IsExcluded(string name) =>
-        name == "README.md" || name == ".gitignore" || name == "assets.inputs.sha256" || name == "assets.outputs.sha256";
+        name == "README.md" || name == ".gitignore";
+
+    private bool IsManifest(string path) =>
+        path == Path.Combine(Root, "build", "assets.inputs.sha256") || path == Path.Combine(Root, "build", "assets.outputs.sha256");
 
     private static bool IsText(string path)
     {
         var name = Path.GetFileName(path);
         return name == ".npmrc" || name == ".node-version" || name.StartsWith(".env", StringComparison.Ordinal)
-            || new[] { ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".cs", ".css", ".json", ".html", ".svg", ".txt" }
+            || new[] { ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".cs", ".css", ".json", ".html", ".svg", ".txt", ".targets" }
                 .Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
     }
 }

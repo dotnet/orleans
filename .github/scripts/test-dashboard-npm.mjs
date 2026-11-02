@@ -160,7 +160,10 @@ test('an integrity failure is left to npm and fails without a clean-install retr
 });
 
 async function runCanonicalGeneration(f) {
-  await copyFile(join(appRoot, 'generate-assets.mjs'), join(f.directory, 'generate-assets.mjs'));
+  await mkdir(join(f.directory, 'build'));
+  await copyFile(join(appRoot, 'build', 'generate-assets.mjs'), join(f.directory, 'build', 'generate-assets.mjs'));
+  await copyFile(join(appRoot, 'build', 'VerifyDashboardFrontendAssets.cs'), join(f.directory, 'build', 'VerifyDashboardFrontendAssets.cs'));
+  await copyFile(join(appRoot, 'build', 'Orleans.Dashboard.Frontend.targets'), join(f.directory, 'build', 'Orleans.Dashboard.Frontend.targets'));
   await mkdir(join(f.directory, 'scripts'));
   await copyFile(installScript, join(f.directory, 'scripts', 'install.mjs'));
   const package_ = JSON.parse(await readFile(join(f.directory, 'package.json'), 'utf8'));
@@ -170,9 +173,9 @@ async function runCanonicalGeneration(f) {
   await writeFile(join(f.directory, '.node-version'), pinned.engines.node);
   await mkdir(join(f.directory, 'dist'));
   await writeFile(join(f.directory, 'dist', 'index.min.js'), 'previous deployable output');
-  await writeFile(join(f.directory, 'assets.inputs.sha256'), 'previous inputs');
-  await writeFile(join(f.directory, 'assets.outputs.sha256'), 'previous outputs');
-  return run([join(f.directory, 'generate-assets.mjs')], f.directory);
+  await writeFile(join(f.directory, 'build', 'assets.inputs.sha256'), 'previous inputs');
+  await writeFile(join(f.directory, 'build', 'assets.outputs.sha256'), 'previous outputs');
+  return run([join(f.directory, 'build', 'generate-assets.mjs')], f.directory);
 }
 
 test('canonical generation publishes complete assets after reset recovery', async t => {
@@ -181,9 +184,13 @@ test('canonical generation publishes complete assets after reset recovery', asyn
   assert.equal(result.code, 0, result.stderr);
   assert.equal(f.requests(), 2);
   assert.equal(await readFile(join(f.directory, 'dist', 'index.min.js'), 'utf8'), 'asset');
-  const inputs = await readFile(join(f.directory, 'assets.inputs.sha256'), 'utf8');
+  const inputs = await readFile(join(f.directory, 'build', 'assets.inputs.sha256'), 'utf8');
   assert.match(inputs, /  scripts\/install\.mjs/);
-  const outputs = await readFile(join(f.directory, 'assets.outputs.sha256'), 'utf8');
+  assert.match(inputs, /  build\/VerifyDashboardFrontendAssets\.cs/);
+  assert.match(inputs, /  build\/Orleans\.Dashboard\.Frontend\.targets/);
+  assert.match(inputs, /  build\/generate-assets\.mjs/);
+  assert.doesNotMatch(inputs, /  build\/assets\.(?:inputs|outputs)\.sha256/);
+  const outputs = await readFile(join(f.directory, 'build', 'assets.outputs.sha256'), 'utf8');
   for (const file of ['index.html', 'index.min.js', 'index.css', 'THIRD-PARTY-NOTICES.txt']) {
     assert.ok(outputs.includes('  ' + file), `Missing complete generated output: ${file}`);
   }
@@ -196,8 +203,8 @@ test('canonical generation preserves prior deployable outputs and identities aft
   assert.notEqual(result.code, 0);
   assert.equal(f.requests(), 1);
   assert.equal(await readFile(join(f.directory, 'dist', 'index.min.js'), 'utf8'), 'previous deployable output');
-  assert.equal(await readFile(join(f.directory, 'assets.inputs.sha256'), 'utf8'), 'previous inputs');
-  assert.equal(await readFile(join(f.directory, 'assets.outputs.sha256'), 'utf8'), 'previous outputs');
+  assert.equal(await readFile(join(f.directory, 'build', 'assets.inputs.sha256'), 'utf8'), 'previous inputs');
+  assert.equal(await readFile(join(f.directory, 'build', 'assets.outputs.sha256'), 'utf8'), 'previous outputs');
   assert.match(result.stderr, /command failed/);
   assert.doesNotMatch(result.stderr, /Retrying npm ci|SIGXCPU/);
 });

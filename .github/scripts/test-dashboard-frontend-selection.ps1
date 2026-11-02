@@ -110,7 +110,7 @@ try {
         $app = 'src/Dashboard/Orleans.Dashboard.App/'
         $paths = @(
             foreach ($name in 'assets.inputs.sha256', 'assets.outputs.sha256') {
-                foreach ($line in [IO.File]::ReadAllLines((Join-Path $repository "$app$name"))) {
+                foreach ($line in [IO.File]::ReadAllLines((Join-Path $repository "${app}build/$name"))) {
                     if ($line.Length -lt 67) { throw "Invalid manifest entry in $name." }
                     $prefix = if ($name -eq 'assets.outputs.sha256') { 'dist/' } else { '' }
                     "$app$prefix$($line.Substring(66))"
@@ -125,15 +125,17 @@ try {
 
     Test-Case 'IntegrationPolicyAndNewInputsSelectReproduction' {
         $paths = @(
-            'src/Dashboard/Orleans.Dashboard.App/assets.inputs.sha256',
-            'src/Dashboard/Orleans.Dashboard.App/assets.outputs.sha256',
+            'src/Dashboard/Orleans.Dashboard.App/build/assets.inputs.sha256',
+            'src/Dashboard/Orleans.Dashboard.App/build/assets.outputs.sha256',
             'src/Dashboard/Orleans.Dashboard.App/.env.production',
             'src/Dashboard/Orleans.Dashboard.App/new-build.config',
             'src/Dashboard/Orleans.Dashboard.App/src/new-component.tsx',
             'src/Dashboard/Orleans.Dashboard.App/public/new-asset.bin',
             'src/Dashboard/Orleans.Dashboard.App/dist/new-output.js',
             'src/Dashboard/Orleans.Dashboard/Orleans.Dashboard.csproj',
-            'src/Dashboard/Orleans.Dashboard/Orleans.Dashboard.Frontend.targets',
+            'src/Dashboard/Orleans.Dashboard.App/build/Orleans.Dashboard.Frontend.targets',
+            'src/Dashboard/Orleans.Dashboard.App/build/VerifyDashboardFrontendAssets.cs',
+            'src/Dashboard/Orleans.Dashboard.App/build/new-task.cs',
             '.github/workflows/ci.yml', '.github/workflows/new-bootstrap.yml',
             '.github/actions/cache-dependencies/action.yml',
             '.github/actions/new-bootstrap/action.yml',
@@ -155,7 +157,7 @@ try {
     }
 
     Test-Case 'ForgedOutputAndManifestPairSelectsReproduction' {
-        $sha = New-Pr -Add @('src/Dashboard/Orleans.Dashboard.App/dist/index.min.js', 'src/Dashboard/Orleans.Dashboard.App/assets.outputs.sha256')
+        $sha = New-Pr -Add @('src/Dashboard/Orleans.Dashboard.App/dist/index.min.js', 'src/Dashboard/Orleans.Dashboard.App/build/assets.outputs.sha256')
         $selection = Assert-Selection $sha $true
         if ($selection.affected_paths.Count -ne 2) { throw 'Both forged paths must select independent reproduction.' }
     }
@@ -308,7 +310,7 @@ try {
         }
         $ui = [regex]::Match($workflow, '(?ms)^  dashboard-ui:\r?\n.*?(?=^  [\w-]+:|\z)').Value
         if ($ui -match 'dashboard-assets.outputs' -or $ui -notmatch 'npm run test:ui') { throw 'UI regression behavior must remain independent.' }
-        $targets = [IO.File]::ReadAllText((Join-Path $repository 'src/Dashboard/Orleans.Dashboard/Orleans.Dashboard.Frontend.targets'))
+        $targets = [IO.File]::ReadAllText((Join-Path $repository 'src/Dashboard/Orleans.Dashboard.App/build/Orleans.Dashboard.Frontend.targets'))
         if ($targets -notmatch 'BeforeTargets="BeforeBuild;GenerateNuspec"' -or $targets -match 'dashboard-assets|required|GITHUB_EVENT') {
             throw 'SDK build/pack verification must stay independent of CI selection.'
         }

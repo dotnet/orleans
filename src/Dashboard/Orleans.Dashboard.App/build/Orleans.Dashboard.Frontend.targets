@@ -1,14 +1,14 @@
 <Project>
   <PropertyGroup>
     <BuildExternalAssets Condition="'$(BuildExternalAssets)' == ''">true</BuildExternalAssets>
-    <DashboardFrontendRoot>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', 'Orleans.Dashboard.App'))</DashboardFrontendRoot>
+    <DashboardFrontendRoot>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..'))</DashboardFrontendRoot>
   </PropertyGroup>
 
   <UsingTask TaskName="VerifyDashboardFrontendAssets"
              TaskFactory="RoslynCodeTaskFactory"
              AssemblyFile="$([MSBuild]::NormalizePath('$(MSBuildToolsPath)', 'Microsoft.Build.Tasks.Core.dll'))">
     <Task>
-      <Code Type="Class" Language="cs" Source="$([MSBuild]::NormalizePath('$(DashboardFrontendRoot)', 'verify-assets.cs'))" />
+      <Code Type="Class" Language="cs" Source="$([MSBuild]::NormalizePath('$(DashboardFrontendRoot)', 'build', 'VerifyDashboardFrontendAssets.cs'))" />
     </Task>
   </UsingTask>
 

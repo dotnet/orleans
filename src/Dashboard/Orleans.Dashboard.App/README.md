@@ -1,6 +1,6 @@
 # Orleans Dashboard App
 
-The Orleans Dashboard frontend uses React and Vite. Its deployable assets are committed under `dist/`. Building or packing `Orleans.Dashboard` validates their source and output content hashes and embeds every asset in the assembly using the .NET SDK.
+The Orleans Dashboard frontend uses React and Vite. Its deployable assets are committed under `dist/`. The `build/` directory holds the generation script, MSBuild targets, `VerifyDashboardFrontendAssets.cs` task, and SHA manifests. Building or packing `Orleans.Dashboard` validates source and output content hashes and embeds every asset in the assembly using the .NET SDK.
 
 ## Development
 
@@ -21,11 +21,11 @@ npm run assets:generate
 
 The generator checks the pinned Node/npm versions, snapshots the inputs into a temporary directory, installs the locked dependencies with the `scripts/install.mjs` clean-install helper, and builds in production mode. It uses an explicit environment, isolated npm configuration, and a fresh dependency tree. Registry fetches use bounded retries and the local npm download cache. The helper restarts `npm ci` after an npm-reported `ECONNRESET` during a tarball response body, for at most three clean-install attempts with five seconds between attempts. Lockfile, authentication, integrity, lifecycle, and signal failures propagate with npm diagnostics. A failed installation/build preserves the previous deployable assets and manifests; the next generation starts a fresh dependency tree.
 
-Commit `dist/`, `assets.inputs.sha256`, and `assets.outputs.sha256` together with the source change. Generation preserves source maps and adds `THIRD-PARTY-NOTICES.txt` containing the installed production dependencies' license notices. The .NET package also includes the notices as a standalone file.
+Commit `dist/`, `build/assets.inputs.sha256`, and `build/assets.outputs.sha256` together with the source change. Generation preserves source maps and adds `THIRD-PARTY-NOTICES.txt` containing the installed production dependencies' license notices. The .NET package also includes the notices as a standalone file.
 
-Inputs comprise every file in `src/`, `public/`, and `scripts/`, plus every frontend-root file except this README, `.gitignore`, and the two generated manifests. This includes the HTML entry point, dependency manifests, lockfile, build configuration, generation and verification scripts, and toolchain pins. Keep build helpers within these boundaries so canonical generation can copy their complete inputs. Documentation screenshots and browser tests live outside the generation inputs.
+Inputs comprise every file in `src/`, `public/`, `scripts/`, and `build/` except the two generated manifests, plus every frontend-root file except this README and `.gitignore`. This includes the HTML entry point, dependency manifests, lockfile, build configuration, generation and verification scripts, and toolchain pins. Keep build helpers within these boundaries so canonical generation can copy their complete inputs. Documentation screenshots and browser tests live outside the generation inputs.
 
-Source text with JavaScript, TypeScript, C#, CSS, JSON, HTML, SVG, or TXT extensions, `.npmrc`, `.node-version`, and `.env*` files is hashed and copied with LF line endings. Binary source assets retain their bytes. Generated files are hashed byte-for-byte; Git attributes preserve their exact output bytes. Paths use case-sensitive relative names with `/` separators. File contents and the complete path sets determine freshness, including additions, removals, and renames.
+Source text with JavaScript, TypeScript, C#, MSBuild targets, CSS, JSON, HTML, SVG, or TXT extensions, `.npmrc`, `.node-version`, and `.env*` files is hashed and copied with LF line endings. Binary source assets retain their bytes. Generated files are hashed byte-for-byte; Git attributes preserve their exact output bytes. Paths use case-sensitive relative names with `/` separators. File contents and the complete path sets determine freshness, including additions, removals, and renames.
 
 Canonical generation uses production mode, UTC, and the `C` locale. Move `.env.local` and `.env.*.local` overrides out of this directory for regeneration. Add shared environment files to source control when the build uses them.
 
