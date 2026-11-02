@@ -108,7 +108,7 @@ public class ActivationDataLifecycleTests(ActivationDataLifecycleTests.Fixture f
         var error = await Assert.ThrowsAnyAsync<Exception>(() => call.WaitAsync(Timeout, Cancellation));
         Assert.Contains("Injected failure", error.ToString());
         await state.Context.Deactivated.WaitAsync(Timeout, Cancellation);
-        Assert.Equal(ActivationState.Invalid, state.Context.State);
+        Assert.Equal(ActivationState.Destroyed, state.Context.State);
         Assert.Equal(grainConstructed ? 1 : 0, state.GrainDisposals);
         Assert.Equal(1, state.ScopeDisposals);
         if (grainConstructed)
