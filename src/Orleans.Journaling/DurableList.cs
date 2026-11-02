@@ -27,7 +27,7 @@ public interface IDurableList<T> : IList<T>
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableListCommandHandler<T>
+internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IReportsStagedChanges, IDurableListCommandHandler<T>
 {
     private readonly IDurableListCommandCodec<T> _codec;
     private readonly List<T> _items = [];
