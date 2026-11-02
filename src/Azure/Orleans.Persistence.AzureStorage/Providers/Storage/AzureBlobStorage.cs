@@ -188,12 +188,18 @@ namespace Orleans.Storage
 
                 if (options.DeleteStateOnClear)
                 {
-                    await DoOptimisticUpdate(
-                        static (state, cancellationToken) => state.blob.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: state.conditions, cancellationToken: cancellationToken),
-                        (blob, conditions),
-                        blob,
-                        grainState.ETag,
-                        cancellationToken).ConfigureAwait(false);
+                    try
+                    {
+                        await blob.DeleteIfExistsAsync(
+                            DeleteSnapshotsOption.None,
+                            conditions: conditions,
+                            cancellationToken: cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (RequestFailedException ex) when (IsWriteConflict(ex))
+                    {
+                        throw CreateInconsistentStateException(blob, grainState.ETag, ex);
+                    }
+
                     grainState.ETag = null;
                 }
                 else
@@ -431,19 +437,6 @@ namespace Orleans.Storage
             LogTraceDataRead(grainType, grainId, eTag, blobName, containerName);
             grainState.ETag = eTag;
             return loadedState;
-        }
-
-        private static async Task<TResult> DoOptimisticUpdate<TState, TResult>(Func<TState, CancellationToken, Task<TResult>> updateOperation, TState state, BlobClient blob, string? currentETag, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                return await updateOperation(state, cancellationToken).ConfigureAwait(false);
-            }
-            catch (RequestFailedException ex) when (ex.IsPreconditionFailed() || ex.IsConflict() || ex.IsNotFound() && !ex.IsContainerNotFound())
-            {
-                throw new InconsistentStateException($"Blob storage condition not Satisfied. BlobName: {blob.Name}, Container: {blob.BlobContainerName}, CurrentETag: {currentETag}", "Unknown", currentETag, ex);
-            }
         }
 
         private static bool IsWriteConflict(RequestFailedException exception)
