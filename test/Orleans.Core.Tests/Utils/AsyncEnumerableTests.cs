@@ -17,6 +17,47 @@ public sealed class AsyncEnumerableDisposalCollection
 public sealed class AsyncEnumerableTests
 {
     [Fact]
+    public async Task DisposePreservesBufferedValuesForSlowReaders()
+    {
+        var source = new AsyncEnumerable<int>(0, static (_, _) => true, static _ => { });
+        await using var reader = source.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        source.Publish(1);
+        source.Publish(2);
+        source.Dispose();
+
+        for (var expected = 0; expected <= 2; expected++)
+        {
+            Assert.True(await reader.MoveNextAsync());
+            Assert.Equal(expected, reader.Current);
+        }
+
+        Assert.False(await reader.MoveNextAsync());
+        Assert.False(await reader.MoveNextAsync());
+    }
+
+    [Fact]
+    public void DisposeRefusesFunctionalUpdatesWithoutInvokingUserCallbacks()
+    {
+        var published = new List<int>();
+        var updates = 0;
+        var source = new AsyncEnumerable<int>(0, static (_, _) => true, published.Add);
+        int Update(int current, int delta)
+        {
+            updates++;
+            return current + delta;
+        }
+
+        Assert.True(source.TryPublish(Update, 1));
+        source.Publish(Update, 1);
+        source.Dispose();
+
+        Assert.False(source.TryPublish(Update, 1));
+        Assert.Throws<ObjectDisposedException>(() => source.Publish(Update, 1));
+        Assert.Equal(2, updates);
+        Assert.Equal([0, 1, 2], published);
+    }
+
+    [Fact]
     public async Task DisposeCompletesPendingAndFutureReadersWithoutPublishingAnotherValue()
     {
         var published = new List<int>();
