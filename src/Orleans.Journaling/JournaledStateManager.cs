@@ -8,7 +8,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal partial class JournaledStateManager : IJournaledStateManager, IJournaledStateContextHost, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const uint MinApplicationJournalStreamId = 8u;
 #if NET9_0_OR_GREATER
@@ -18,6 +18,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 #endif
     private readonly Dictionary<string, IStateMachine> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, IStateMachine> _statesMap = [];
+
+    // Whether a registered state journals changes which StagedChangeCount can't observe.
+    private bool _hasUnreportedChanges;
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
     private readonly IGrainContext? _grainContext;
@@ -27,6 +30,47 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private readonly CancellationTokenSource _shutdownCancellation = new();
     private readonly StateDirectory _journalStreamDirectory;
     private readonly RetiredStateTracker _retirementTracker;
+
+    /// <summary>
+    /// Gets or sets the provider of the context in which code accesses this manager's states, which a host installs, or
+    /// <see langword="null"/> when every access runs against the state directly.
+    /// </summary>
+    public JournaledStateContextProvider? ContextProvider { get; set; }
+
+    /// <summary>Gets the depth of the host's work which <see cref="EnterHostAccess"/> marked.</summary>
+    internal int HostAccessDepth { get; private set; }
+
+    /// <inheritdoc/>
+    public void EnterHostAccess() => HostAccessDepth++;
+
+    /// <inheritdoc/>
+    public void ExitHostAccess()
+    {
+        Debug.Assert(HostAccessDepth > 0, "The host exits only the work which it entered.");
+        HostAccessDepth--;
+    }
+
+    // The names of the states whose accesses run through a context, by identifier, which records of accesses store.
+    private Dictionary<int, string>? _accessTargetNames;
+
+    /// <summary>
+    /// Registers a state whose accesses run through this manager's context, which identifies the state by
+    /// <see cref="JournaledStateAccessTarget.Id"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Another state of this manager has the same identifier.</exception>
+    internal void RegisterAccessTarget(JournaledStateAccessTarget target)
+    {
+        _accessTargetNames ??= [];
+        if (_accessTargetNames.TryAdd(target.Id, target.Name)
+            || string.Equals(_accessTargetNames[target.Id], target.Name, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"The journaled states '{_accessTargetNames[target.Id]}' and '{target.Name}' have the same identifier, #{target.Id:x8}, "
+            + "which identifies a state in the records of durable task bodies' accesses. Rename one of the states.");
+    }
     private Task? _workLoop;
     private ManagerState _state;
     private long _deletionGeneration;
@@ -147,6 +191,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             }
 
             _states.Add(name, stateMachine);
+            if (stateMachine is not IReportsStagedChanges) _hasUnreportedChanges = true;
             _workQueue.Enqueue(new RegisterStateWorkItem(name));
         }
 
@@ -282,6 +327,31 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                 "The journaled state operation was queued before deletion reset its state.");
                         }
 
+                        if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem)
+                        {
+                            try
+                            {
+                                for (var prepared = false; !prepared;)
+                                {
+                                    await PrepareStates(ref prepared, _shutdownCancellation.Token).ConfigureAwait(true);
+                                }
+
+                                _shutdownCancellation.Token.ThrowIfCancellationRequested();
+                            }
+                            catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+                            {
+                                workItem.TrySetCanceled(_shutdownCancellation.Token);
+                                return;
+                            }
+                            catch (Exception exception)
+                            {
+                                LogStatePreparationFailed(_shared.Logger, exception);
+                                storageActivity?.SetStatus(ActivityStatusCode.Error, "Journal state preparation failed.");
+                                workItem.SetException(new JournaledStatePreCommitException(exception));
+                                continue;
+                            }
+                        }
+
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
                         // We are ok sacrificing some code organization for performance in the inner loop.
                         switch (workItem)
@@ -314,55 +384,62 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                     var hasCommittedBuffer = false;
                                     var hasBufferToConsume = false;
                                     var bufferToConsumeIsCommittedBuffer = false;
+                                    var writeVersion = 0L;
 
-                                    lock (_lock)
+                                    // Each write captures every state, including a change which another thread is writing into an entry
+                                    // which it opened before the write. The write waits for that entry to close, whether it appends or
+                                    // replaces the journal, so that it captures the change.
+                                    while (true)
                                     {
-                                        if (isSnapshot)
+                                        Task? activeEntryClosed;
+                                        lock (_lock)
                                         {
-                                            using var snapshotWriter = _shared.JournalFormat.CreateWriter();
-                                            if (_retirementTracker.Count > 0)
+                                            // Capture journals changes which states already staged, so it doesn't count as staging.
+                                            var stagedChangeCount = _journalWriter.StagedChangeCount;
+                                            activeEntryClosed = _journalWriter.GetActiveEntryClosedTask();
+                                            if (activeEntryClosed is null && isSnapshot)
                                             {
-                                                RetireOrResurectStates();
-                                            }
-
-                                            if (_migrationSnapshotRequired)
-                                            {
-                                                ThrowIfMigrationBlockedByRetiredStates();
-                                            }
-
-                                            // The map of state ids is itself stored as a durable state with the id 0.
-                                            // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
-                                            // If we removed retired states, this snapshot will persist that change.
-                                            AppendUpdatesOrSnapshotState(snapshotWriter, isSnapshot: true, StateDirectory.Id, _journalStreamDirectory);
-                                            statesScanned++;
-
-                                            foreach (var (id, state) in _statesMap)
-                                            {
-                                                if (id is 0 || state is null)
+                                                using var snapshotWriter = _shared.JournalFormat.CreateWriter();
+                                                if (_retirementTracker.Count > 0)
                                                 {
-                                                    continue;
+                                                    RetireOrResurectStates();
                                                 }
 
-                                                AppendUpdatesOrSnapshotState(snapshotWriter, isSnapshot: true, id, state);
+                                                if (_migrationSnapshotRequired)
+                                                {
+                                                    ThrowIfMigrationBlockedByRetiredStates();
+                                                }
+
+                                                // The map of state ids is itself stored as a durable state with the id 0.
+                                                // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
+                                                // If we removed retired states, this snapshot will persist that change.
+                                                AppendUpdatesOrSnapshotState(snapshotWriter, isSnapshot: true, StateDirectory.Id, _journalStreamDirectory);
                                                 statesScanned++;
-                                            }
 
-                                            bufferToConsume = _journalWriter.GetCommittedBuffer();
-                                            if (bufferToConsume.Length > 0)
-                                            {
-                                                hasBufferToConsume = true;
-                                            }
-                                            else
-                                            {
-                                                bufferToConsume.Dispose();
-                                            }
+                                                foreach (var (id, state) in _statesMap)
+                                                {
+                                                    if (id is 0 || state is null)
+                                                    {
+                                                        continue;
+                                                    }
 
-                                            committedBuffer = snapshotWriter.GetCommittedBuffer();
-                                        }
-                                        else
-                                        {
-                                            var flushCommittedOnly = _journalWriter.HasActiveEntry;
-                                            if (!flushCommittedOnly)
+                                                    AppendUpdatesOrSnapshotState(snapshotWriter, isSnapshot: true, id, state);
+                                                    statesScanned++;
+                                                }
+
+                                                bufferToConsume = _journalWriter.GetCommittedBuffer();
+                                                if (bufferToConsume.Length > 0)
+                                                {
+                                                    hasBufferToConsume = true;
+                                                }
+                                                else
+                                                {
+                                                    bufferToConsume.Dispose();
+                                                }
+
+                                                committedBuffer = snapshotWriter.GetCommittedBuffer();
+                                            }
+                                            else if (activeEntryClosed is null)
                                             {
                                                 // The map of state ids is itself stored as a durable state with the id 0.
                                                 // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
@@ -379,29 +456,44 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                                     AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot: false, id, state);
                                                     statesScanned++;
                                                 }
+
+                                                committedBuffer = _journalWriter.GetCommittedBuffer();
+                                                bufferToConsume = committedBuffer;
+                                                bufferToConsumeIsCommittedBuffer = true;
                                             }
 
-                                            committedBuffer = _journalWriter.GetCommittedBuffer();
-                                            bufferToConsume = committedBuffer;
-                                            bufferToConsumeIsCommittedBuffer = true;
+                                            if (activeEntryClosed is null)
+                                            {
+                                                if (committedBuffer.Length == 0)
+                                                {
+                                                    // Nothing was staged, so the write captured nothing which awaits acknowledgement.
+                                                    committedBuffer.Dispose();
+                                                    if (bufferToConsumeIsCommittedBuffer)
+                                                    {
+                                                        bufferToConsume = default;
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    hasCommittedBuffer = true;
+                                                    if (!isSnapshot)
+                                                    {
+                                                        hasBufferToConsume = true;
+                                                    }
+
+                                                    writeVersion = OnWriteCaptured();
+                                                }
+                                            }
+
+                                            _journalWriter.StagedChangeCount = stagedChangeCount;
                                         }
 
-                                        if (committedBuffer.Length == 0)
+                                        if (activeEntryClosed is null)
                                         {
-                                            committedBuffer.Dispose();
-                                            if (bufferToConsumeIsCommittedBuffer)
-                                            {
-                                                bufferToConsume = default;
-                                            }
+                                            break;
                                         }
-                                        else
-                                        {
-                                            hasCommittedBuffer = true;
-                                            if (!isSnapshot)
-                                            {
-                                                hasBufferToConsume = true;
-                                            }
-                                        }
+
+                                        await activeEntryClosed.WaitAsync(_shutdownCancellation.Token).ConfigureAwait(true);
                                     }
 
                                     _shared.Instruments.OnGather(
@@ -462,8 +554,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                             ArrayPool<byte>.Shared.Return(debugPoisonBuffer);
 #endif
                                         }
+                                    }
 
-                                        // Notify all states that the operation completed.
+                                    if (writeVersion != 0)
+                                    {
+                                        // Acknowledge only after every state's pending entries were captured.
                                         lock (_lock)
                                         {
                                             foreach (var state in _states.Values)
@@ -471,6 +566,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                                 state.OnWriteCompleted();
                                             }
 
+                                            OnWriteAcknowledged(writeVersion);
                                             if (isSnapshot)
                                             {
                                                 _migrationSnapshotRequired = false;
@@ -599,6 +695,28 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
     }
 
+    // Completes when every state is synchronously ready; otherwise returns the first incomplete preparation.
+    private ValueTask PrepareStates(ref bool prepared, CancellationToken cancellationToken)
+    {
+        prepared = true;
+        lock (_lock)
+        {
+            foreach (var state in _states.Values)
+            {
+                var preparation = state.PrepareWriteAsync(cancellationToken);
+                if (!preparation.IsCompletedSuccessfully)
+                {
+                    prepared = false;
+                    return preparation;
+                }
+
+                preparation.GetAwaiter().GetResult();
+            }
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
     private void Fence(Exception exception)
     {
         lock (_lock)
@@ -623,6 +741,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
         finally
         {
+            // Watchers complete cleanly only when shutdown canceled the operation. Any other failure leaves staged changes uncertain.
+            CompleteObservers(exception is OperationCanceledException && _shutdownCancellation.IsCancellationRequested ? null : exception);
             lock (_lock)
             {
                 FaultQueuedWorkItemsUnderLock(exception);
@@ -1057,6 +1177,18 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public long PendingWriteByteCount => _journalWriter.CommittedLength;
 
+    /// <summary>
+    /// Gets a count which advances whenever a registered state stages a change and never decreases, or a negative value
+    /// when a registered state doesn't report its changes.
+    /// </summary>
+    /// <remarks>
+    /// Every state which implements <see cref="IReportsStagedChanges"/> advances it when it is modified. A write captures
+    /// changes without advancing it. Comparing two readings taken on the activation's scheduler shows whether any state
+    /// staged a change between them. Orleans.Messaging uses it to tell whether a failed handler attempt staged changes,
+    /// and treats a negative value as staged.
+    /// </remarks>
+    internal long StagedChangeCount => _hasUnreportedChanges ? -1 : _journalWriter.StagedChangeCount;
+
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer)
         => observer.Subscribe(GrainLifecycleStage.SetupState, this);
 
@@ -1081,6 +1213,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         finally
         {
             CancelQueuedWorkItems(_shutdownCancellation.Token);
+            CompleteObservers(failure: null);
         }
     }
 
@@ -1327,7 +1460,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     /// This keeps buffering entries and dumps them back into the journal upon compaction.
     /// </summary>
     [DebuggerDisplay("RetiredStateMachine Id = {StreamId.Value}")]
-    private sealed class RetiredStateMachine(JournalStreamId streamId) : IStateMachine
+    private sealed class RetiredStateMachine(JournalStreamId streamId) : IStateMachine, IReportsStagedChanges
     {
         private readonly List<IPreservedJournalEntry> _preservedEntries = [];
 
@@ -1354,6 +1487,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journal state preparation failed; pending changes remain staged.")]
+    private static partial void LogStatePreparationFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Information,

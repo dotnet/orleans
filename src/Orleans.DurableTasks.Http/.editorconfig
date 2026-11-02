@@ -1,0 +1,3 @@
+[*.cs]
+# Extension methods live in the namespaces of the builders which they extend, such as Microsoft.AspNetCore.Builder.
+dotnet_diagnostic.IDE0130.severity = none
