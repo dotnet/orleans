@@ -104,14 +104,14 @@ jobs:
           ./samples/Validate-Samples.ps1 -NoBuild
 
       - name: Build and test documentation projects
-        run: dotnet test --solution docs/Docs.slnx --configuration Release --framework net10.0 -p:BuildExternalAssets=false -bl:docs-projects.binlog --minimum-expected-tests 1 --max-parallel-test-modules 1
+        run: dotnet test --solution docs/Docs.slnx --configuration Release --framework net10.0 -bl:docs-projects.binlog --minimum-expected-tests 1 --max-parallel-test-modules 1
 
       - name: Build samples against local Orleans packages
         shell: pwsh
         # Keep sample compiler processes isolated through .NET runtime 10.0.12. After the
         # SDK carries 10.0.13+, validate shared compilation in repeated runs before removal.
         # See #11235, dotnet/roslyn#85656, and dotnet/runtime#132631.
-        run: ./samples/Build-Samples.ps1 -Configuration Release -NoIncremental -SkipExternalAssets -DisableSharedCompilation
+        run: ./samples/Build-Samples.ps1 -Configuration Release -NoIncremental -DisableSharedCompilation
 
       - name: Upload build diagnostics
         if: always()
