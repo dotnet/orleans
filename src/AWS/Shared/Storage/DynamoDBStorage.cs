@@ -116,6 +116,8 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="ttlAttributeName">(optional) The name of the item attribute that indicates the item TTL (if null, ttl won't be enabled)</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
+        [SuppressMessage("Design", "CA1002:Do not expose generic lists",
+            Justification = "Retains the shipped signature and AWS SDK List<KeySchemaElement>, List<AttributeDefinition>, and List<GlobalSecondaryIndex> request contracts.")]
         public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex>? secondaryIndexes = null, string? ttlAttributeName = null, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -1130,6 +1132,8 @@ namespace Orleans.Transactions.DynamoDB
         /// </summary>
         /// <param name="transactItems">Transact write items to be performed</param>
         /// <returns></returns>
+        [SuppressMessage("Design", "CA1002:Do not expose generic lists",
+            Justification = "Retains the shipped List<TransactWriteItem> signature and passes the AWS SDK request collection unchanged.")]
         public Task WriteTxAsync(List<TransactWriteItem> transactItems)
         {
             try
