@@ -25,6 +25,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     private readonly ArcBufferWriter _buffer = new();
     private int _committedLength;
     private bool _hasActiveEntry;
+    private TaskCompletionSource? _activeEntryClosed;
     private bool _disposed;
 
     /// <summary>
@@ -180,6 +181,20 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
                 ThrowIfDisposed();
                 return _hasActiveEntry;
             }
+        }
+    }
+
+    /// <summary>
+    /// Gets a task which completes when the active entry closes, or <see langword="null"/> when no entry is active.
+    /// </summary>
+    internal Task? GetActiveEntryClosedTask()
+    {
+        lock (_lock)
+        {
+            ThrowIfDisposed();
+            return _hasActiveEntry
+                ? (_activeEntryClosed ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task
+                : null;
         }
     }
 
@@ -341,6 +356,11 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     private void ClearActiveEntry()
     {
         _hasActiveEntry = false;
+        if (_activeEntryClosed is { } activeEntryClosed)
+        {
+            _activeEntryClosed = null;
+            activeEntryClosed.SetResult();
+        }
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
