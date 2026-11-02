@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\..\'))</RepositoryRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.MongoDB.Driver" Version="13.2.4" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\MongoDB\Orleans.Clustering.MongoDB\Orleans.Clustering.MongoDB.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\MongoDB\Orleans.Persistence.MongoDB\Orleans.Persistence.MongoDB.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\MongoDB\Orleans.Reminders.MongoDB\Orleans.Reminders.MongoDB.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="AppHost\**\*.cs" />
+  </ItemGroup>
+</Project>
