@@ -137,9 +137,9 @@ namespace Orleans.Storage
 
                 var blob = container.GetBlobClient(blobName);
 
-                if (this.grainStorageSerializer is IGrainStorageStreamingSerializer streamingSerializer)
+                if (this.grainStorageSerializer is IGrainStorageStreamingSerializer serializer)
                 {
-                    await WriteStateBufferedStreamAndCreateContainerIfNotExists(streamingSerializer, grainType, grainId, grainState, "application/octet-stream", blob, cancellationToken);
+                    await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, "application/octet-stream", blob, cancellationToken);
                 }
                 else
                 {
@@ -216,7 +216,7 @@ namespace Orleans.Storage
                         var attemptedETag = grainState.ETag;
                         if (!ex.IsPreconditionFailed()
                             || !options.EnableIdempotentWrites
-                            || !await TryHandleIdempotentRetryAsync(blob, grainState, emptyHashBase64, cancellationToken))
+                            || !await TryHandleIdempotentRetryAsync(blob, grainState, emptyHashBase64, cancellationToken).ConfigureAwait(false))
                         {
                             throw CreateInconsistentStateException(blob, grainState.ETag, ex);
                         }
@@ -274,7 +274,7 @@ namespace Orleans.Storage
                     var attemptedETag = grainState.ETag;
                     if (ex.IsPreconditionFailed()
                         && this.options.EnableIdempotentWrites
-                        && await TryHandleIdempotentRetryAsync(blob, grainState, localHashBase64, cancellationToken))
+                        && await TryHandleIdempotentRetryAsync(blob, grainState, localHashBase64, cancellationToken).ConfigureAwait(false))
                     {
                         LogWarningIdempotentRetryResolved(
                             "write",
@@ -341,7 +341,7 @@ namespace Orleans.Storage
                         var attemptedETag = grainState.ETag;
                         if (ex.IsPreconditionFailed()
                             && this.options.EnableIdempotentWrites
-                            && await TryHandleIdempotentRetryAsync(blob, grainState, localHashBase64, cancellationToken))
+                            && await TryHandleIdempotentRetryAsync(blob, grainState, localHashBase64, cancellationToken).ConfigureAwait(false))
                         {
                             LogWarningIdempotentRetryResolved(
                                 "write",
