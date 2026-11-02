@@ -467,6 +467,8 @@ items:
     items:
       - name: Migration overview
         href: migration-guide.md
+      - name: Upgrade from Orleans 10
+        href: migration/10-to-11.md
       - name: Migrate contract identities
         href: migration/contract-identities.md
       - name: Grain directory migration
