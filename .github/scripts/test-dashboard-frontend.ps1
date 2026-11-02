@@ -63,12 +63,12 @@ function Test-Case {
     Write-TestFile (Join-Path $appRoot '.npmrc') "registry=https://example.invalid/`n"
     Write-TestFile (Join-Path $appRoot 'index.html') "<html/>`n"
     Copy-Item (Join-Path $repository 'src\Dashboard\Orleans.Dashboard.App\verify-assets.cs') (Join-Path $appRoot 'verify-assets.cs')
-    $inputs = @(Get-ChildItem $appRoot -File -Recurse | ForEach-Object FullName)
+    $inputs = @(Get-ChildItem $appRoot -File -Recurse -Force | ForEach-Object FullName)
     Write-Manifest 'assets.inputs.sha256' $appRoot $inputs -NormalizeText
     foreach ($asset in @('index.html', 'index.min.js', 'index.min.js.map', 'index.css', 'img\image.png', 'fonts\font.woff2', 'THIRD-PARTY-NOTICES.txt')) {
         Write-TestFile (Join-Path $outputRoot $asset) "asset $asset`n"
     }
-    Write-Manifest 'assets.outputs.sha256' $outputRoot @(Get-ChildItem $outputRoot -File -Recurse | ForEach-Object FullName)
+    Write-Manifest 'assets.outputs.sha256' $outputRoot @(Get-ChildItem $outputRoot -File -Recurse -Force | ForEach-Object FullName)
     Write-TestFile $projectPath @'
 <Project DefaultTargets="Build">
   <PropertyGroup>
@@ -109,6 +109,12 @@ try {
         }
     }
     $env:PATH = "$bin$([IO.Path]::PathSeparator)$savedPath"
+
+    Test-Case 'NativeSdkResolvesInlineTaskSourceAndRejectsStaleAssets' {
+        Invoke-Build -Target VerifyFrontendAssets
+        [IO.File]::AppendAllText((Join-Path $appRoot 'src\main.ts'), '// changed')
+        Invoke-Build -Target VerifyFrontendAssets -ExpectStale
+    }
 
     Test-Case 'ParallelFrameworkBuildsEmbedCompleteVerifiedOutputs' {
         Invoke-Build
@@ -153,7 +159,7 @@ try {
     }
 
     Test-Case 'SourceLineEndingsAreCanonical' {
-        foreach ($path in @(Get-ChildItem $appRoot -File -Recurse | Where-Object FullName -NotLike "$outputRoot*" | Where-Object Name -NotLike 'assets.*.sha256' | ForEach-Object FullName)) {
+        foreach ($path in @(Get-ChildItem $appRoot -File -Recurse -Force | Where-Object FullName -NotLike "$outputRoot*" | Where-Object Name -NotLike 'assets.*.sha256' | ForEach-Object FullName)) {
             [IO.File]::WriteAllText($path, [IO.File]::ReadAllText($path).Replace("`r`n", "`n").Replace("`n", "`r`n"))
         }
         Invoke-Build
@@ -240,7 +246,7 @@ try {
         Invoke-Build
         Invoke-Build -Target Clean
         Invoke-Build -Target Rebuild
-        $actual = @(Get-ChildItem $outputRoot -File -Recurse | ForEach-Object FullName)
+        $actual = @(Get-ChildItem $outputRoot -File -Recurse -Force | ForEach-Object FullName)
         Write-Manifest 'assets.outputs.sha256' $outputRoot $actual
         if ([IO.File]::ReadAllText((Join-Path $appRoot 'assets.outputs.sha256')) -cne $before) {
             throw 'Build/Clean/Rebuild changed the complete asset path set or bytes.'
