@@ -73,6 +73,13 @@ namespace Orleans.Configuration
         public bool DeleteStateOnClear { get; set; } = true;
 
         /// <summary>
+        /// Gets or sets a value indicating whether to enable idempotent writes using metadata tokens and SHA-256 content hashing.
+        /// When set to <c>true</c>, transient network failures that occur after Azure Blob Storage commits a write can be validated and treated as successful instead of surfacing false-positive HTTP 412 (Precondition Failed) exceptions.
+        /// Idempotent writes are disabled by default.
+        /// </summary>
+        public bool EnableIdempotentWrites { get; set; } = false;
+
+        /// <summary>
         /// A function for building container factory instances
         /// </summary>
         public Func<IServiceProvider, AzureBlobStorageOptions, IBlobContainerFactory> BuildContainerFactory { get; set; }
