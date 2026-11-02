@@ -29,6 +29,17 @@ if ($LASTEXITCODE -ne 0) {
     throw "Orleans package build failed with exit code $LASTEXITCODE."
 }
 
+# The incubating durable task adapter packs only on request. The DurableWorkflows sample restores it from the local feed.
+& dotnet pack (Join-Path $repositoryRoot 'src/Microsoft.Orleans.DurableTasks/Microsoft.Orleans.DurableTasks.csproj') `
+    --configuration $Configuration `
+    --output $packageSource `
+    -p:Version=$packageVersion `
+    -p:PackDurableTaskAdapter=true `
+    --nologo
+if ($LASTEXITCODE -ne 0) {
+    throw "Durable task adapter package build failed with exit code $LASTEXITCODE."
+}
+
 $buildArguments = @(
     'build'
     $sampleSolution
