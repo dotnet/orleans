@@ -208,8 +208,10 @@
     <Project Path="test/Misc/TestSerializerExternalModels/TestSerializerExternalModels.csproj" />
   </Folder>
   <Folder Name="/test/TestInfrastructure/">
+    <Project Path="test/TestInfrastructure/FSharpCodeGenModels/FSharpCodeGenModels.fsproj" />
     <Project Path="test/TestInfrastructure/Orleans.TestingHost.Tests/Orleans.TestingHost.Tests.csproj" />
     <Project Path="test/TestInfrastructure/TestExtensions/TestExtensions.csproj" />
+    <Project Path="test/TestInfrastructure/TestUtilities/TestUtilities.csproj" />
   </Folder>
   <Folder Name="/test/Transactions/">
     <Project Path="test/Transactions/Orleans.Transactions.Azure.Test/Orleans.Transactions.Azure.Test.csproj" />

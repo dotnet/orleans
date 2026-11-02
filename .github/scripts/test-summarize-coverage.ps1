@@ -797,7 +797,7 @@ try {
             'Coverage collection must reject empty reports from successful test runs.'
         Assert-Matches `
             $dotnetTestAction `
-            "(?s)'test'\s*'--solution'\s*'Orleans\.slnx'" `
+            "(?s)'test'\s*'--solution'\s*'\$\{\{ inputs\.solution \}\}'" `
             'Test partitions must use native solution discovery.'
         Assert-Equal 3 ([regex]::Matches($dotnetTestAction, "github\.event_name == 'push'.*?github\.event\.repository\.default_branch")).Count 'Current-main coverage condition count differs.'
         Assert-Matches `
@@ -824,7 +824,8 @@ param(
     [string[]] $Command
 )
 
-if (($Command -join ' ') -cne 'restore Orleans.slnx') {
+$solution = if ($env:ORLEANS_RESTORE_SOLUTION) { $env:ORLEANS_RESTORE_SOLUTION } else { 'Orleans.slnx' }
+if (($Command -join ' ') -cne "restore $solution") {
     Write-Output "Unexpected restore command: $Command"
     exit 2
 }
@@ -860,13 +861,14 @@ exit 0
 
         Assert-Matches `
             $dotnetTestAction `
-            '(?ms)^  - name: Restore\r?\n    shell: pwsh\r?\n    run: \./\.github/scripts/invoke-restore\.ps1\r?\n  - name: Prepare coverage report' `
+            '(?ms)^  - name: Restore\r?\n    shell: pwsh\r?\n    run: \./\.github/scripts/invoke-restore\.ps1 -Solution ''\$\{\{ inputs\.solution \}\}''\r?\n  - name: Prepare coverage report' `
             'Restore must run inside the replaceable test action before coverage preparation.'
         Assert-Equal 0 ([regex]::Matches($runTestsAction, '(?m)^  - name: Restore\r?$')).Count 'The test coordinator must not restore outside the replaceable test action.'
         Assert-Equal 2 ([regex]::Matches($dotnetTestAction, '''--no-restore''| --no-restore ')).Count 'Both test launch paths must reuse the explicit restore.'
 
         $previousAttemptFile = $env:ORLEANS_RESTORE_ATTEMPT_FILE
         $previousFailure = $env:ORLEANS_RESTORE_FAILURE
+        $previousSolution = $env:ORLEANS_RESTORE_SOLUTION
         try {
             $env:ORLEANS_RESTORE_ATTEMPT_FILE = $attemptFile
             foreach ($failure in 'metadata-remote-source', 'metadata-configured-feed') {
@@ -881,9 +883,108 @@ exit 0
             & $invokeRestoreScriptPath -RestoreCommand $fakeRestore
             Assert-Equal 1 $LASTEXITCODE 'A deterministic restore failure should be preserved.'
             Assert-Equal 1 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The deterministic restore attempt count differs.'
+            Remove-Item -LiteralPath $attemptFile
+
+            $env:ORLEANS_RESTORE_SOLUTION = '.github/solutions/CodeGenerator.slnf'
+            $env:ORLEANS_RESTORE_FAILURE = 'metadata-remote-source'
+            & $invokeRestoreScriptPath -RestoreCommand $fakeRestore -Solution $env:ORLEANS_RESTORE_SOLUTION
+            Assert-Equal 0 $LASTEXITCODE 'Focused restore should succeed on retry.'
+            Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'Both restore attempts must use the selected graph.'
         } finally {
             $env:ORLEANS_RESTORE_ATTEMPT_FILE = $previousAttemptFile
             $env:ORLEANS_RESTORE_FAILURE = $previousFailure
+            $env:ORLEANS_RESTORE_SOLUTION = $previousSolution
+        }
+    }
+
+    Invoke-Test 'uses the selected graph throughout each test attempt' {
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
+        foreach ($action in $dotnetTestAction, $runTestsAction) {
+            Assert-Matches $action '(?m)^  solution:\r?\n' 'Both test action boundaries must declare the solution input.'
+            Assert-Matches $action '(?m)^    default: Orleans\.slnx\r?$' 'Other partitions must retain full-solution discovery.'
+        }
+        Assert-Equal 2 ([regex]::Matches($runTestsAction, 'solution: \$\{\{ inputs\.solution \}\}')).Count 'Both attempts must forward the selected graph.'
+        Assert-Equal 2 ([regex]::Matches($dotnetTestAction, "'--solution'\s*'\$\{\{ inputs\.solution \}\}'")).Count 'Covered and uncovered tests must build and discover the selected graph.'
+
+        $repositoryRoot = Join-Path $PSScriptRoot '../..'
+        $filter = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot '.github/solutions/CodeGenerator.slnf') | ConvertFrom-Json
+        Assert-Equal '../../Orleans.slnx' $filter.solution.path 'The focused graph must use the canonical solution.'
+        Assert-Equal 2 $filter.solution.projects.Count 'CodeGen discovery root count differs.'
+        Assert-Equal 'test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj' $filter.solution.projects[0] 'Generator unit tests must be discovered.'
+        Assert-Equal 'test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj' $filter.solution.projects[1] 'Default-cluster CodeGen tests must be discovered.'
+        [xml] $solution = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'Orleans.slnx')
+        $solutionProjects = @($solution.SelectNodes('//Project') | ForEach-Object { $_.Path.Replace('\', '/') })
+        foreach ($project in $filter.solution.projects) {
+            Assert-Equal $true ($project -cin $solutionProjects) "$project must belong to the canonical solution."
+        }
+        foreach ($workflowFile in 'ci.yml', 'macos-tests.yml') {
+            $workflow = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "../workflows/$workflowFile")
+            Assert-Equal 1 ([regex]::Matches($workflow, 'solution: \.github/solutions/CodeGenerator\.slnf')).Count 'Only the CodeGen partition should select the focused graph.'
+            Assert-Matches $workflow '(?s)filter-query: /\[\(Provider=None\)&\(Area=CodeGen\).*?solution: \.github/solutions/CodeGenerator\.slnf' 'The existing CodeGen trait filter must select the focused graph.'
+        }
+        Assert-Equal $true (@(Get-Content -LiteralPath $coverageInputsPath) -ccontains '.github/solutions/CodeGenerator.slnf') 'Trusted coverage inputs must include the selected graph.'
+    }
+
+    Invoke-Test 'compares CodeGen inventories across all identity fields' {
+        $testCase = New-TestCase
+        $validator = Join-Path $PSScriptRoot 'test-codegenerator-graph.ps1'
+        $fakeDotnet = Join-Path $testCase.Root 'fake-dotnet.ps1'
+        $fullFile = Join-Path $testCase.Root 'full.json'
+        $focusedFile = Join-Path $testCase.Root 'focused.json'
+        [IO.File]::WriteAllText($fakeDotnet, @'
+param([Parameter(ValueFromRemainingArguments)] [string[]] $Command)
+if ($env:ORLEANS_GRAPH_FAILURE -eq 'true') { exit 5 }
+if (($Command -join ' ') -notmatch '^test --solution (Orleans.slnx|.github/solutions/CodeGenerator.slnf) --framework net(8|10).0 --no-build --filter-query /\[\(Provider=None\)&\(Area=CodeGen\)&\(\(Suite=BVT\)\|\(Suite=SlowBVT\)\|\(Suite=Functional\)\)\] --list-tests json --max-parallel-test-modules 1$') {
+    throw "Unexpected discovery command: $Command"
+}
+$file = if ($Command[2] -eq 'Orleans.slnx') { $env:ORLEANS_GRAPH_FULL } else { $env:ORLEANS_GRAPH_FOCUSED }
+Get-Content -Raw -LiteralPath $file
+exit 0
+'@)
+        $previousFull = $env:ORLEANS_GRAPH_FULL
+        $previousFocused = $env:ORLEANS_GRAPH_FOCUSED
+        $previousFailure = $env:ORLEANS_GRAPH_FAILURE
+        try {
+            $env:ORLEANS_GRAPH_FULL = $fullFile
+            $env:ORLEANS_GRAPH_FOCUSED = $focusedFile
+            $env:ORLEANS_GRAPH_FAILURE = 'false'
+            foreach ($framework in 'net8.0', 'net10.0') {
+                $baseline = @{
+                    version = '1.0'
+                    testContainers = @(@{
+                        assemblyPath = 'CodeGen.Tests.dll'
+                        targetFramework = $framework
+                        architecture = 'x64'
+                        tests = @(@{ uid = 'test-1'; displayName = 'GeneratorTest'; traits = @(@{ name = 'Area'; value = 'CodeGen' }) })
+                    })
+                }
+                $json = $baseline | ConvertTo-Json -Depth 20
+                Set-Content -LiteralPath $fullFile -Value $json
+                Set-Content -LiteralPath $focusedFile -Value $json
+                & $validator -Framework $framework -DotnetCommand $fakeDotnet
+                foreach ($field in 'assemblyPath', 'targetFramework', 'architecture', 'uid', 'displayName', 'traits') {
+                    $changed = $json | ConvertFrom-Json
+                    if ($field -eq 'traits') {
+                        $changed.testContainers[0].tests[0].traits = @()
+                    } elseif ($field -in 'uid', 'displayName') {
+                        $changed.testContainers[0].tests[0].$field = 'different'
+                    } else {
+                        $changed.testContainers[0].$field = 'different'
+                    }
+                    $changed | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $focusedFile
+                    Assert-Throws { & $validator -Framework $framework -DotnetCommand $fakeDotnet } 'inventories differ'
+                }
+                $baseline.testContainers[0].tests = @()
+                $baseline | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $focusedFile
+                Assert-Throws { & $validator -Framework $framework -DotnetCommand $fakeDotnet } 'empty CodeGen inventory'
+            }
+            $env:ORLEANS_GRAPH_FAILURE = 'true'
+            Assert-Throws { & $validator -Framework net10.0 -DotnetCommand $fakeDotnet } 'Test discovery failed.*exit code 5'
+        } finally {
+            $env:ORLEANS_GRAPH_FULL = $previousFull
+            $env:ORLEANS_GRAPH_FOCUSED = $previousFocused
+            $env:ORLEANS_GRAPH_FAILURE = $previousFailure
         }
     }
 
@@ -1473,7 +1574,7 @@ exit 0
             $reportingWorkflow `
             '(?s)Download covered source.*?Verify trusted coverage inputs.*?get-coverage-input-fingerprint\.ps1.*?Summarize coverage' `
             'Pull request coverage inputs must match the pinned trusted reporter before aggregation.'
-        Assert-Equal 13 (@(Get-Content -LiteralPath $coverageInputsPath)).Count 'Trusted coverage input count differs.'
+        Assert-Equal 15 (@(Get-Content -LiteralPath $coverageInputsPath)).Count 'Trusted coverage input count differs.'
         Assert-Equal `
             $true `
             (@(Get-Content -LiteralPath $coverageInputsPath) -contains '.github/actions/cache-dependencies/action.yml') `
@@ -1552,7 +1653,7 @@ exit 0
         Assert-Equal 2 ([regex]::Matches($runTestsAction, 'uses: \./\.github/actions/dotnet-test')).Count 'Native test action invocation count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, "format\('/\[\(Provider=\{0\}\)")).Count 'Standard provider filter count differs.'
         $wrappedTestCommands = ([regex]::Matches($dotnetTestAction, 'invoke-test\.ps1')).Count
-        $coveredTestCommands = ([regex]::Matches($dotnetTestAction, "(?s)'dotnet'\s*'test'\s*'--solution'\s*'Orleans\.slnx'")).Count
+        $coveredTestCommands = ([regex]::Matches($dotnetTestAction, "(?s)'dotnet'\s*'test'\s*'--solution'\s*'\$\{\{ inputs\.solution \}\}'")).Count
         Assert-Equal 2 ($wrappedTestCommands + $coveredTestCommands) 'Native test command count differs.'
         Assert-Equal 4 ([regex]::Matches($runTestsAction, "runner\.os == 'Linux' && inputs\.framework == 'net10\.0'")).Count 'Coverage selection boundary count differs.'
         Assert-Equal 0 ([regex]::Matches($workflow + $runTestsAction + $dotnetTestAction, 'static-instrumentation|coverage\.static\.config\.xml|IncludeFiles')).Count 'GitHub coverage must not use static instrumentation.'

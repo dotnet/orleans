@@ -100,6 +100,12 @@ jobs:
       run: ./.github/scripts/test-summarize-coverage.ps1
     - name: Build
       run: dotnet build -bl
+    - name: Check CodeGen graph inventory
+      shell: pwsh
+      run: |
+        foreach ($framework in 'net8.0', 'net10.0') {
+          ./.github/scripts/test-codegenerator-graph.ps1 -Framework $framework
+        }
     - name: Pack and validate package compatibility
       if: matrix.os == 'ubuntu-latest'
       run: dotnet pack Orleans.slnx --configuration Debug --no-build --no-restore -bl:package_validation.binlog
@@ -859,6 +865,7 @@ jobs:
         artifact-name: test_output_${{ github.job }}_${{ matrix.os }}_${{ matrix.framework }}
         filter-query: /[(Provider=None)&(Area=CodeGen)&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))]
         framework: ${{ matrix.framework }}
+        solution: .github/solutions/CodeGenerator.slnf
   test-google:
     name: Google Cloud providers tests
     runs-on: ubuntu-24.04
