@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Concurrency;
@@ -11,7 +12,7 @@ using Xunit;
 
 namespace UnitTests.ActivationsLifeCycleTests;
 
-// Timer.ActiveCount is process-wide, so this collection runs without other test collections.
+// Keep lifecycle probes out of parallel test collections.
 [CollectionDefinition(Name, DisableParallelization = true)]
 public sealed class StatelessWorkerActivationTimerCollection
 {
@@ -20,12 +21,23 @@ public sealed class StatelessWorkerActivationTimerCollection
 
 [TestSuite("BVT"), TestProvider("None"), TestCategory("BVT")]
 [Collection(StatelessWorkerActivationTimerCollection.Name)]
-public sealed class StatelessWorkerActivationTimerTests(StatelessWorkerActivationTimerTests.Fixture fixture)
-    : IClassFixture<StatelessWorkerActivationTimerTests.Fixture>
+public sealed class StatelessWorkerActivationTimerTests
 {
+    private const string TimerInventoryChild = "ORLEANS_STATELESS_WORKER_TIMER_INVENTORY_CHILD";
+
     [Fact]
     public async Task CompletedActivationsReleaseTheirTimeoutTimers()
     {
+        // Nonparallel collections still share timers left over by earlier collections.
+        // A fresh process makes the exact inventory independent of those timers expiring.
+        if (Environment.GetEnvironmentVariable(TimerInventoryChild) != "1")
+        {
+            await RunTimerInventoryInIsolatedProcess();
+            return;
+        }
+
+        await using var fixture = new Fixture();
+        await fixture.InitializeAsync();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var token = timeout.Token;
         var services = fixture.HostedCluster.Silos[0].ServiceProvider;
@@ -48,6 +60,55 @@ public sealed class StatelessWorkerActivationTimerTests(StatelessWorkerActivatio
         }
         Assert.Equal(101, tracker.Current);
         Assert.Equal(timers, Timer.ActiveCount);
+    }
+
+    private static async Task RunTimerInventoryInIsolatedProcess()
+    {
+        var assemblyPath = typeof(StatelessWorkerActivationTimerTests).Assembly.Location;
+        var startInfo = new ProcessStartInfo(Environment.ProcessPath!)
+        {
+            ArgumentList =
+            {
+                "--filter-method", $"{typeof(StatelessWorkerActivationTimerTests).FullName}.{nameof(CompletedActivationsReleaseTheirTimeoutTimers)}",
+                "--minimum-expected-tests", "1",
+                "--progress", "off", "--ansi", "off", "--output", "Minimal",
+            },
+            WorkingDirectory = Path.GetDirectoryName(assemblyPath)!,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        // Match the existing isolated hot-reload test's host selection on both apphost and dotnet launches.
+        if (string.Equals(Path.GetFileNameWithoutExtension(startInfo.FileName), "dotnet", StringComparison.OrdinalIgnoreCase))
+        {
+            startInfo.ArgumentList.Insert(0, assemblyPath);
+        }
+
+        startInfo.Environment[TimerInventoryChild] = "1";
+        using var process = Process.Start(startInfo)!;
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        try
+        {
+            await process.WaitForExitAsync(TestContext.Current.CancellationToken)
+                .WaitAsync(TimeSpan.FromMinutes(2), TestContext.Current.CancellationToken);
+            var output = await outputTask;
+            var error = await errorTask;
+            Assert.True(process.ExitCode == 0,
+                $"Isolated timer inventory failed with exit code {process.ExitCode}.{Environment.NewLine}"
+                + output[^Math.Min(output.Length, 4000)..] + Environment.NewLine
+                + error[^Math.Min(error.Length, 4000)..]);
+        }
+        finally
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync();
+            }
+
+            await Task.WhenAll(outputTask, errorTask);
+        }
     }
 
     [Fact]
