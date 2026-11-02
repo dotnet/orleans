@@ -1,0 +1,5 @@
+{
+  "scenario": "Messaging",
+  "diagnostics": "strict",
+  "rejectDiagnostics": []
+}
