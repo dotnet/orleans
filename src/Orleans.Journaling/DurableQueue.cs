@@ -65,7 +65,7 @@ public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 
 [DebuggerTypeProxy(typeof(DurableQueueDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurableQueueCommandHandler<T>
+internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReportsStagedChanges, IDurableQueueCommandHandler<T>
 {
     private readonly IDurableQueueCommandCodec<T> _codec;
     private readonly Queue<T> _items = new();

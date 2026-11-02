@@ -307,6 +307,7 @@ namespace Orleans.Journaling
     {
         void OnRecoveryCompleted();
         void OnWriteCompleted();
+        System.Threading.Tasks.ValueTask PrepareWriteAsync(System.Threading.CancellationToken cancellationToken = default);
         void ReplayEntry(JournalEntry entry, JournalReplayContext context);
         void Reset(JournalStreamWriter writer);
         void WritePendingEntries(JournalStreamWriter writer);
@@ -422,6 +423,12 @@ namespace Orleans.Journaling
         public string JournalFormatKey { get { throw null; } set { } }
 
         public System.TimeSpan RetirementGracePeriod { get { throw null; } set { } }
+    }
+
+    [GenerateSerializer]
+    public sealed partial class JournaledStatePreCommitException : System.Exception
+    {
+        public JournaledStatePreCommitException(System.Exception innerException) { }
     }
 
     public readonly ref partial struct JournalEntry
@@ -803,7 +810,33 @@ namespace OrleansCodeGen.Orleans.Journaling
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_JournaledStatePreCommitException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.JournaledStatePreCommitException>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_JournaledStatePreCommitException(global::Orleans.Serialization.Serializers.IBaseCodec<System.Exception> _baseTypeSerializer, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Journaling.JournaledStatePreCommitException> _activator) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Journaling.JournaledStatePreCommitException instance) { }
+
+        public global::Orleans.Journaling.JournaledStatePreCommitException ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Journaling.JournaledStatePreCommitException instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.JournaledStatePreCommitException value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_DurableTaskCompletionSourceState<T> : global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Journaling.DurableTaskCompletionSourceState<T>>
     {
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_JournaledStatePreCommitException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Journaling.JournaledStatePreCommitException, System.Exception>
+    {
+        public Copier_JournaledStatePreCommitException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 }
