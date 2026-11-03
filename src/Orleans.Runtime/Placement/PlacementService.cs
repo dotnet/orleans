@@ -116,7 +116,14 @@ namespace Orleans.Runtime.Placement
         {
             if (!_shutdownCts.IsCancellationRequested)
             {
-                _shutdownCts.Cancel();
+                try
+                {
+                    _shutdownCts.Cancel();
+                }
+                catch (AggregateException exception)
+                {
+                    LogErrorCancellationCallbackFailed(_logger, exception);
+                }
             }
 
             foreach (var worker in _workers)
@@ -166,9 +173,37 @@ namespace Orleans.Runtime.Placement
             LogTraceAddressMessageSelectTarget(message);
         }
 
-        public SiloAddress[] GetCompatibleSilos(PlacementTarget target)
+        public Task<SiloAddress[]> GetCompatibleSilosAsync(PlacementTarget target, CancellationToken cancellationToken = default)
+        {
+            return GetCompatibleSilosWithCancellationAsync(target, _shutdownCts.Token, cancellationToken);
+        }
+
+        private Task<SiloAddress[]> GetCompatibleSilosWithCancellationAsync(
+            PlacementTarget target,
+            CancellationToken operationToken,
+            CancellationToken queryToken)
+        {
+            if (!queryToken.CanBeCanceled || queryToken == operationToken)
+            {
+                return GetCompatibleSilosCoreAsync(target, operationToken);
+            }
+
+            return WithLinkedCancellationAsync(target, operationToken, queryToken);
+
+            async Task<SiloAddress[]> WithLinkedCancellationAsync(
+                PlacementTarget placementTarget,
+                CancellationToken placementToken,
+                CancellationToken additionalToken)
+            {
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(placementToken, additionalToken);
+                return await GetCompatibleSilosCoreAsync(placementTarget, linked.Token);
+            }
+        }
+
+        private async Task<SiloAddress[]> GetCompatibleSilosCoreAsync(PlacementTarget target, CancellationToken cancellationToken)
         {
             ThrowIfStopping();
+            cancellationToken.ThrowIfCancellationRequested();
 
             var grainType = target.GrainIdentity.Type;
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
@@ -185,28 +220,50 @@ namespace Orleans.Runtime.Placement
                 var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
                 if (filters.Length > 0)
                 {
-                    // Capture the parent activity context now so each filter span is parented to the
-                    // current activity (e.g. PlaceGrain) rather than to sibling filter spans that may
-                    // be active during deferred enumeration.
                     var parentActivityContext = Activity.Current?.Context;
 
-                    IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
+                    // Filters must not receive an array owned by the compatibility cache.
+                    compatibleSilos = compatibleSilos.ToArray();
                     foreach (var placementFilter in filters)
                     {
                         ThrowIfStopping();
+                        cancellationToken.ThrowIfCancellationRequested();
                         var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
-                        filteredSilos = InstrumentFilteredSilos(
-                            director.Filter(placementFilter, target, filteredSilos),
-                            placementFilter,
-                            grainType,
-                            parentActivityContext);
-                    }
+                        using var filterSpan = parentActivityContext is { } parentContext
+                            ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates, ActivityKind.Internal, parentContext)
+                            : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates);
+                        filterSpan?.SetTag(ActivityTagKeys.PlacementFilterType, placementFilter.GetType().Name);
+                        filterSpan?.SetTag(ActivityTagKeys.GrainType, grainType.ToString());
 
-                    ThrowIfStopping();
-                    compatibleSilos = filteredSilos.ToArray();
+                        var pending = director.FilterAsync(placementFilter, target, compatibleSilos, cancellationToken)
+                            ?? throw new InvalidOperationException($"Placement filter '{placementFilter.GetType().Name}' returned a null task.");
+                        var result = pending.IsCompletedSuccessfully
+                            ? pending.Result
+                            : await pending.WaitAsync(cancellationToken);
+                        ThrowIfStopping();
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (result is null)
+                        {
+                            throw new InvalidOperationException($"Placement filter '{placementFilter.GetType().Name}' returned a null candidate collection.");
+                        }
+
+                        if (!ReferenceEquals(result, compatibleSilos))
+                        {
+                            var snapshot = new SiloAddress[result.Count];
+                            for (var i = 0; i < snapshot.Length; i++)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                snapshot[i] = result[i];
+                            }
+
+                            compatibleSilos = snapshot;
+                        }
+                    }
                 }
             }
 
+            ThrowIfStopping();
+            cancellationToken.ThrowIfCancellationRequested();
             if (compatibleSilos.Length == 0)
             {
                 if (_assumeHomogeneousSilosForTesting)
@@ -298,14 +355,44 @@ namespace Orleans.Runtime.Placement
         /// <param name="grainId">The grain id of the grain being placed.</param>
         /// <param name="requestContextData">The request context, which will be available to the placement strategy.</param>
         /// <param name="placementStrategy">The placement strategy to use.</param>
+        /// <param name="cancellationToken">A token which cancels destination selection.</param>
         /// <returns>A location for the new activation.</returns>
-        public async Task<SiloAddress> PlaceGrainAsync(GrainId grainId, Dictionary<string, object>? requestContextData, PlacementStrategy placementStrategy)
+        public async Task<SiloAddress> PlaceGrainAsync(
+            GrainId grainId,
+            Dictionary<string, object>? requestContextData,
+            PlacementStrategy placementStrategy,
+            CancellationToken cancellationToken = default)
         {
             using var _ = TryRestoreActivityContext(requestContextData, ActivityNames.PlaceGrain);
+            using var linked = cancellationToken.CanBeCanceled && cancellationToken != _shutdownCts.Token
+                ? CancellationTokenSource.CreateLinkedTokenSource(_shutdownCts.Token, cancellationToken)
+                : null;
+            var operationToken = linked?.Token ?? _shutdownCts.Token;
             var target = new PlacementTarget(grainId, requestContextData!, default, 0);
             ThrowIfStopping();
+            operationToken.ThrowIfCancellationRequested();
             var director = _directorResolver.GetPlacementDirector(placementStrategy);
-            return await director.OnAddActivation(placementStrategy, target, this);
+            var result = await director.OnAddActivation(placementStrategy, target, new OperationPlacementContext(this, operationToken))
+                .WaitAsync(operationToken);
+            ThrowIfStopping();
+            operationToken.ThrowIfCancellationRequested();
+            return result;
+        }
+
+        private sealed class OperationPlacementContext(PlacementService service, CancellationToken cancellationToken) : IPlacementContext
+        {
+            public SiloAddress LocalSilo => service.LocalSilo;
+
+            public SiloStatus LocalSiloStatus => service.LocalSiloStatus;
+
+            public Task<SiloAddress[]> GetCompatibleSilosAsync(PlacementTarget target, CancellationToken queryToken = default) =>
+                service.GetCompatibleSilosWithCancellationAsync(target, cancellationToken, queryToken);
+
+            public IReadOnlyDictionary<ushort, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return service.GetCompatibleSilosWithVersions(target);
+            }
         }
 
         private void ThrowIfStopping()
@@ -610,7 +697,10 @@ namespace Orleans.Runtime.Placement
                 _placementService.ThrowIfStopping();
                 var strategy = _placementService._strategyResolver.GetPlacementStrategy(target.GrainIdentity.Type);
                 var director = _placementService._directorResolver.GetPlacementDirector(strategy);
-                var siloAddress = await director.OnAddActivation(strategy, target, _placementService).WaitAsync(cancellationToken);
+                var siloAddress = await director.OnAddActivation(
+                    strategy, target, new OperationPlacementContext(_placementService, cancellationToken)).WaitAsync(cancellationToken);
+                _placementService.ThrowIfStopping();
+                cancellationToken.ThrowIfCancellationRequested();
 
                 // Give the grain locator one last chance to tell us that the grain has already been placed
                 if (_placementService._grainLocator.TryLookupInCache(targetGrain, out result) && _placementService.CachedAddressIsValid(firstMessage, result))
@@ -643,31 +733,6 @@ namespace Orleans.Runtime.Placement
                 public List<(Message Message, TaskCompletionSource Completion)> Messages { get; } = new();
 
                 public Task<SiloAddress> Result { get; set; } = null!;
-            }
-        }
-
-        /// <summary>
-        /// Wraps a filter's output enumerable so that an Activity span is created when the
-        /// sequence is actually enumerated, not when the filter is composed. This avoids
-        /// per-filter array materialization while still giving accurate span timings.
-        /// </summary>
-        private IEnumerable<SiloAddress> InstrumentFilteredSilos(
-            IEnumerable<SiloAddress> silos,
-            PlacementFilterStrategy filter,
-            GrainType grainType,
-            ActivityContext? parentActivityContext)
-        {
-            ThrowIfStopping();
-            using var filterSpan = parentActivityContext is { } parentContext
-                ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates, ActivityKind.Internal, parentContext)
-                : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates);
-            filterSpan?.SetTag(ActivityTagKeys.PlacementFilterType, filter.GetType().Name);
-            filterSpan?.SetTag(ActivityTagKeys.GrainType, grainType.ToString());
-
-            foreach (var silo in silos)
-            {
-                ThrowIfStopping();
-                yield return silo;
             }
         }
 
@@ -721,6 +786,12 @@ namespace Orleans.Runtime.Placement
             Message = "Error in placement worker."
         )]
         private static partial void LogWarnInPlacementWorker(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "One or more placement cancellation callbacks failed."
+        )]
+        private static partial void LogErrorCancellationCallbackFailed(ILogger logger, Exception exception);
 
     }
 }

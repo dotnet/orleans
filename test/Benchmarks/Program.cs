@@ -138,6 +138,10 @@ internal class Program
         {
             BenchmarkRunner.Run<PlacementResilienceBenchmark>(args: args);
         },
+        ["Placement.Filtering"] = args =>
+        {
+            BenchmarkRunner.Run<PlacementFilteringBenchmark>(args: args);
+        },
         ["ConcurrentPing_OneSilo"] = _ =>
         {
             new PingBenchmark(numSilos: 1, startClient: true).PingConcurrent().GetAwaiter().GetResult();

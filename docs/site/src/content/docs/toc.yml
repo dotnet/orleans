@@ -481,3 +481,7 @@ items:
         href: migration/7-to-10.md
       - name: Archive - Orleans 3 to 7
         href: migration/3-to-7-archive.md
+  - name: Placement extension migration
+    items:
+      - name: Async placement filters
+        href: migration/async-placement-filters.md
