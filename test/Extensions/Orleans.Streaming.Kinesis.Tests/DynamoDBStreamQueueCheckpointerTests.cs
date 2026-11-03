@@ -59,6 +59,20 @@ public sealed class DynamoDBStreamQueueCheckpointerTests : StreamQueueCheckpoint
 public sealed class DynamoDBStreamCheckpointStoreTests
 {
     [Fact]
+    public async Task LoadTreatsPersistedEmptyCheckpointAsNoCheckpoint()
+    {
+        var client = Substitute.For<IAmazonDynamoDB>();
+        client.GetItemAsync(Arg.Any<GetItemRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(CreateReadResponse(string.Empty, 7)));
+        var checkpointer = new DynamoDBStreamQueueCheckpointer(
+            CreateStore(client),
+            new DynamoDBStreamQueueCheckpointerOptions());
+
+        Assert.Equal(string.Empty, await checkpointer.Load(TestContext.Current.CancellationToken));
+        Assert.False(checkpointer.CheckpointExists);
+    }
+
+    [Fact]
     public async Task UpdatePersistsArbitrarySizeSequenceNumberAsString()
     {
         const string checkpoint = "123456789012345678901234567890123456789";

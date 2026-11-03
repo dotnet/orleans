@@ -32,12 +32,13 @@ public class PersistentStreamCancellationCompatibilityTests
         Assert.True(((LegacyQueueAdapterReceiver)receiver).MessagesDelivered);
         Assert.True(((LegacyQueueAdapterReceiver)receiver).ShutdownCalled);
 
+        var cancellationToken = CancellationToken.None;
         IStreamQueueCheckpointer<string> checkpointer = new LegacyStreamQueueCheckpointer();
         IStreamQueueCheckpointerFactory checkpointerFactory = new LegacyStreamQueueCheckpointerFactory(checkpointer);
-        Assert.Same(checkpointer, await checkpointerFactory.Create("partition", cancellation.Token));
-        Assert.Equal("10", await checkpointer.Load(cancellation.Token));
+        Assert.Same(checkpointer, await checkpointerFactory.Create("partition", cancellationToken));
+        Assert.Equal("10", await checkpointer.Load(cancellationToken));
 
-        checkpointer.Update("20", DateTime.UtcNow, cancellation.Token);
+        checkpointer.Update("20", DateTime.UtcNow, cancellationToken);
         Assert.Equal("20", ((LegacyStreamQueueCheckpointer)checkpointer).Checkpoint);
     }
 
@@ -94,6 +95,28 @@ public class PersistentStreamCancellationCompatibilityTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => receiver.Shutdown(TimeSpan.FromSeconds(1), cancellation.Token));
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public async Task CheckpointerCompatibilityOverloads_HonorPreCanceledOperations()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        IStreamQueueCheckpointer<string> checkpointer = new LegacyStreamQueueCheckpointer();
+        IStreamQueueCheckpointerFactory checkpointerFactory = new LegacyStreamQueueCheckpointerFactory(checkpointer);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => checkpointerFactory.Create("partition", cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => checkpointer.Load(cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => checkpointer.Reset(cancellation.Token));
+        Assert.ThrowsAny<OperationCanceledException>(
+            () => checkpointer.Update("20", DateTime.UtcNow, cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => checkpointer.FlushAsync(cancellation.Token));
+        Assert.Equal("10", ((LegacyStreamQueueCheckpointer)checkpointer).Checkpoint);
     }
 
     private sealed class LegacyQueueAdapterFactory(IQueueAdapter adapter) : IQueueAdapterFactory
@@ -153,6 +176,5 @@ public class PersistentStreamCancellationCompatibilityTests
 
         public void Update(string offset, DateTime utcNow) => Checkpoint = offset;
 
-        public Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }
