@@ -117,6 +117,7 @@ namespace DefaultCluster.Tests.General
             var cancellationToken = TestContext.Current.CancellationToken;
             var client = _host.Services.GetRequiredService<IClusterClient>();
             var runtimeClient = _host.Services.GetRequiredService<IRuntimeClient>();
+            var runtimeClientTestAccessor = (IRuntimeClientTestAccessor)runtimeClient;
             var typeResolver = _host.Services.GetRequiredService<GrainInterfaceTypeResolver>();
 
             var stuckGrainType = typeResolver.GetGrainInterfaceType(typeof(IStuckGrain));
@@ -135,13 +136,13 @@ namespace DefaultCluster.Tests.General
                     });
 
                 Assert.False(assertionTask.IsCompleted);
-                Assert.Equal(expected: 1, actual: runtimeClient.GetRunningRequestsCount(stuckGrainType));
+                Assert.Equal(expected: 1, actual: runtimeClientTestAccessor.GetRunningRequestCount(stuckGrainType));
 
                 // Callback expiry is checked at least once per second.
                 _messagingTimeProvider.Advance(timeout + TimeSpan.FromSeconds(1));
                 await assertionTask.WaitAsync(cancellationToken);
 
-                Assert.Equal(expected: 0, actual: runtimeClient.GetRunningRequestsCount(stuckGrainType));
+                Assert.Equal(expected: 0, actual: runtimeClientTestAccessor.GetRunningRequestCount(stuckGrainType));
             }
             finally
             {
