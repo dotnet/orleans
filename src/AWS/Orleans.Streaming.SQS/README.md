@@ -28,6 +28,12 @@ clientBuilder.AddSqsStreams("Orders", options =>
 
 When explicit credentials aren't present in the connection string, the provider uses the AWS SDK credential resolution chain. Prefer workload credentials such as an IAM role.
 
+For .NET Aspire AppHost projects, install `Microsoft.Orleans.Streaming.SQS.Aspire` to provision the partition queues through AWS CDK and emit the matching silo/client configuration from one options object.
+
+## Queue cleanup
+
+Stop the provider before deleting its queues. `SQSStreamProviderUtils.DeleteAllUsedQueues` deletes a provider's queues using its name, service ID, connection string, partition count, and FIFO setting. Pass the same partition count and FIFO setting used by the provider to scope cleanup to its configured topology. The overloads without a partition count use the default eight partitions.
+
 ## Documentation
 
 See [Stream with Amazon SQS](https://dotnet.github.io/orleans/docs/streaming/sqs-streaming/) for FIFO queues, custom data adapters, delivery semantics, permissions, tuning, and operational guidance.

@@ -64,6 +64,13 @@ namespace Orleans.Hosting
 
         public SiloSqsStreamConfigurator UseDataAdapter(System.Func<System.IServiceProvider, string, Streaming.SQS.Streams.ISQSDataAdapter> factory) { throw null; }
     }
+
+    public sealed partial class SqsStreamProviderBuilder : Providers.IProviderBuilder<ISiloBuilder>, Providers.IProviderBuilder<IClientBuilder>
+    {
+        public void Configure(IClientBuilder builder, string? name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) { }
+
+        public void Configure(ISiloBuilder builder, string? name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) { }
+    }
 }
 
 namespace Orleans.Streaming.SQS.Streams
@@ -146,6 +153,8 @@ namespace OrleansAWSUtils.Streams
     public partial class SQSStreamProviderUtils
     {
         public static System.Threading.Tasks.Task DeleteAllUsedQueues(string providerName, string clusterId, string storageConnectionString, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, bool fifoQueue) { throw null; }
+
+        public static System.Threading.Tasks.Task DeleteAllUsedQueues(string providerName, string clusterId, string storageConnectionString, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, int partitionCount, bool fifoQueue) { throw null; }
 
         public static System.Threading.Tasks.Task DeleteAllUsedQueues(string providerName, string clusterId, string storageConnectionString, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { throw null; }
     }

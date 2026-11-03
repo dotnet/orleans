@@ -33,6 +33,7 @@ namespace AWSUtils.Tests.Streaming
         private const int NumMessagesPerBatch = 20;
         private readonly string clusterId;
         private bool usesFifoQueue;
+        private readonly HashRingStreamQueueMapperOptions queueMapperOptions = new();
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSAdapterTests";
         private readonly TimeSpan QueuePollRate = TimeSpan.FromSeconds(1);
 
@@ -59,6 +60,7 @@ namespace AWSUtils.Tests.Streaming
                     this.clusterId,
                     AWSTestConstants.SqsConnectionString,
                     NullLoggerFactory.Instance,
+                    queueMapperOptions.TotalQueueCount,
                     usesFifoQueue);
             }
         }
@@ -72,7 +74,7 @@ namespace AWSUtils.Tests.Streaming
             };
             var clusterOptions = new ClusterOptions { ServiceId = this.clusterId };
             var dataAdapter = new SQSDataAdapter(fixture.Serializer);
-            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(clusterOptions), dataAdapter, NullLoggerFactory.Instance);
+            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, queueMapperOptions, new SimpleQueueCacheOptions(), Options.Create(clusterOptions), dataAdapter, NullLoggerFactory.Instance);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory, TestContext.Current.CancellationToken);
         }
@@ -88,7 +90,7 @@ namespace AWSUtils.Tests.Streaming
                 VisibilityTimeoutSeconds = 60,
             };
             var clusterOptions = new ClusterOptions { ServiceId = this.clusterId };
-            var queueMapperOptions = new HashRingStreamQueueMapperOptions { TotalQueueCount = 1 };
+            queueMapperOptions.TotalQueueCount = 1;
             var dataAdapter = new SQSDataAdapter(fixture.Serializer);
             var adapterFactory = new SQSAdapterFactory(
                 SQS_STREAM_PROVIDER_NAME,
