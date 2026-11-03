@@ -1,0 +1,89 @@
+---
+title: Model collections of grains
+description: Model bounded catalogs, partitioned indexes, query stores, paging, and bulk operations over Orleans grains.
+ms.date: 09/05/2026
+ms.topic: how-to
+---
+
+# Model collections of grains
+
+Orleans virtualizes individually addressed grains. Applications define collection membership explicitly and choose the storage and consistency model which matches each collection's access patterns.
+
+A grain's logical identity combines its grain type and key. <xref:Orleans.IGrainFactory.GetGrain*> can create a typed reference for any valid key. Therefore, a domain catalog or query store determines which keys currently represent application members. Callers select a logical member or shard key; Orleans places activations and routes calls to their current locations. Persisted application catalogs retain membership across deactivation and cluster restarts.
+
+## Choose a collection shape
+
+| Requirement | Model |
+|---|---|
+| A bounded aggregate owned by one domain entity | Store member keys in the owning grain's state |
+| Lookup by a known partition key, such as tenant or category | Use one registry or index grain per partition |
+| A large hash-partitioned map or set | Route each member to a shard using an application-defined stable hash |
+| Ordered paging or range scans | Use range-partitioned index grains or an external query store |
+| Ad hoc filtering, sorting, reporting, or full-text search | Query an external read model and resolve the returned grain keys |
+| Incremental delivery of one query result | Return <xref:System.Collections.Generic.IAsyncEnumerable`1> from the registry, index, or query grain |
+
+Collection state usually stores grain keys and the minimum fields needed for routing, filtering, or ordering. Resolve typed [grain references](../grains/grain-references.md) from those keys when invoking members. Persist a grain reference when retaining its interface relationship is useful.
+
+## Choose grains or stored values
+
+Model each member as a grain when it has an independent identity, behavior, concurrency boundary, or lifecycle. The collection retains member keys and routes operations to those grains.
+
+Store ordinary serializable objects in an owning grain's state when they form a bounded aggregate whose operations run through that owner. This provides one activation and persistence boundary for the collection and its values. For large collections of data-oriented records, an external database provides scalable storage and query execution; grains can coordinate domain operations using the returned record identifiers.
+
+## Keep bounded catalogs in one grain
+
+An owning grain or registry grain is a direct model for a collection with a known operational bound. A non-reentrant owner processes one request at a time. An awaited state write persists the updated catalog as one record. Providers apply record-level optimistic concurrency where the backend supports it.
+
+Return pages or streamed results so each response stays within the caller's size and timeout budget. Set the collection's operational bound using:
+
+- The storage provider's record-size and request limits.
+- The activation memory required to deserialize and index the collection.
+- The time required to read, write, and serialize the full state record.
+- The response size and timeout budget for callers.
+
+For continuously growing membership, partition the catalog at a threshold derived from those limits.
+
+## Partition membership and indexes
+
+Partitioned registry grains distribute collection state and request load. Select a routing rule which every caller can reproduce:
+
+- **Domain partitioning** uses a stable value such as tenant, region, or product category.
+- **Hash partitioning** spreads point lookups and unordered membership evenly.
+- **Range partitioning** supports ordered traversal and range queries.
+
+Each membership entry has one owning shard. Keep the shard count and hash algorithm stable, or include a routing version in the shard identity. For resharding, use one application migration owner and an authoritative active routing version at an application write-admission boundary covering all shards. Pause write admission and drain accepted operations, then copy and reconcile the stable source into new-version shards. While writes remain paused, durably publish the new active version for readers and writers. Resume writes through that boundary using the new version, rejecting requests for older versions. Retire old-version shards once all readers and continuation tokens using them have completed or expired.
+
+For a query spanning known shards, use a coordinator service or grain to issue calls with bounded concurrency and merge the results. Apply limits for shard fan-out, returned items, elapsed time, and per-call concurrency so every query has a bounded execution budget.
+
+Treat a bulk operation as a set of shard operations. Make each shard operation idempotent or durably deduplicate it by an operation identifier recorded atomically with the shard's state changes. Collect per-shard outcomes and retry incomplete shards with the same identifier so retries after timeouts preserve committed outcomes. Use Orleans transactions when the participant count and contention fit the transaction limits and the operation requires one atomic outcome.
+
+## Define the consistency boundary
+
+Collection membership and member state often occupy different records. Choose the authority and completion contract before implementing updates:
+
+| Update model | Completion contract |
+|---|---|
+| Member data and membership share one grain state record | The completed state write stores both changes in one record |
+| Member and index use Orleans transactional state | An [Orleans transaction](../grains/transactions.md) commits both changes atomically |
+| One external database owns member data and indexes | A database transaction commits the data and queryable index together |
+| Grain state is authoritative and a separate read model is updated asynchronously | A durable event or outbox drives an idempotent projector; queries expose the documented projection lag |
+
+For uniqueness, route every candidate value to one deterministic index shard that reserves it for one member key. When member creation or updates accompany a reservation, use Orleans transactional state for both the index and member, and commit both changes in one transaction before reporting success. Record the operation identifier and result in that transaction so retries can return the committed outcome. An abort discards both changes. Handle timeouts and in-doubt outcomes using the [transaction recovery guidance](../grains/transactions.md#commit-and-abort-semantics).
+
+For asynchronous indexes, retain enough information to replay updates and reconcile the index against its authority. Metrics should report projection lag, failed updates, and reconciliation differences.
+
+## Query and page results
+
+Use a database or search service as the query authority when the workload needs ad hoc predicates, sorting, aggregation, or reporting. Query for grain keys and the fields needed to order the result, then resolve grain references for commands or current domain behavior. The [grain persistence](../grains/grain-persistence/index.md) abstraction reads and writes records by grain identity; a grain or application service can access a query-oriented database model directly.
+
+Use continuation tokens for resumable paging. A token can carry the routing version, shard or partition, last ordering value, and last grain key. Bind each token to the query's filters, ordering, data set, tenant, and authorization scope, and reject reuse when those inputs differ. Treat tokens as opaque application contracts and version their encoded form.
+
+Define whether paging observes a query snapshot or a live data set. For snapshot paging, use a query store that can reproduce the same snapshot for the token's entire validity period, using retained snapshots, supported as-of reads, or materialized results. Include the store's snapshot identifier or supported read timestamp and an expiry within its retention window in the token. Require a new query when the token expires or the snapshot becomes unavailable. For live paging, concurrent updates can produce repeated or omitted items; define that behavior and make page processing idempotent. Validate each client-supplied token's structure and integrity, and authorize its routing and ordering values before use.
+
+[Response streaming](../grains/response-streaming.md) progressively delivers one live query result with pull-based flow control. A page with a continuation token provides an explicit resume boundary which a caller can persist before cancellation, timeout, grain deactivation, or process failure.
+
+## Examples
+
+- The [Journaled Todo List registry grain](https://github.com/dotnet/orleans/blob/main/samples/JournaledTodoList/JournaledTodoList.WebApp/Grains/TodoListRegistryGrain.cs) maintains a single-owner catalog of list identities and display names and returns the complete array. Apply an application-enforced operational bound when adapting this pattern.
+- The [Shopping Cart inventory grains](https://github.com/dotnet/orleans/blob/main/samples/ShoppingCart/Grains/InventoryGrain.cs) partition product membership by category, and the [inventory service](https://github.com/dotnet/orleans/blob/main/samples/ShoppingCart/Silo/Services/InventoryService.cs) merges the known partitions.
+- The [Azure App Service inventory grain](https://github.com/dotnet/orleans/blob/main/samples/Deployment/AzureAppService/Grains/InventoryGrain.cs) returns inventory incrementally using response streaming.
