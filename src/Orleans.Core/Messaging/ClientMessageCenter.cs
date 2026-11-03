@@ -235,8 +235,8 @@ namespace Orleans.Messaging
 
         private ValueTask<Connection?> GetGatewayConnection(Message msg)
         {
-            // If there's a specific gateway specified, use it
-            if (msg.TargetSilo != null && gatewayManager.IsGatewayAvailable(msg.TargetSilo))
+            // If there's a specific gateway specified, use it. A relocatable request's target silo is a location hint, not a gateway.
+            if (msg.TargetSilo != null && !msg.IsRelocatableRequest && gatewayManager.IsGatewayAvailable(msg.TargetSilo))
             {
                 var siloAddress = SiloAddress.New(msg.TargetSilo.Endpoint, 0);
                 var connectionTask = this.connectionManager.GetConnection(siloAddress);
