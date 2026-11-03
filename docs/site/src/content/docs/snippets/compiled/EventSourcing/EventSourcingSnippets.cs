@@ -6,7 +6,9 @@ using Orleans.EventSourcing;
 using Orleans.EventSourcing.CustomStorage;
 using Orleans.Hosting;
 using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Serialization;
+using Documentation.EventSourcing.Configuration.Custom;
 
 namespace Documentation.EventSourcing.Configuration
 {
@@ -28,7 +30,8 @@ builder.UseOrleans(siloBuilder =>
                 new BlobServiceClient(connectionString);
         })
         .AddStateStorageBasedLogConsistencyProvider("snapshots")
-        .AddLogStorageBasedLogConsistencyProvider("shortLogs");
+        .AddLogStorageBasedLogConsistencyProvider("shortLogs")
+        .AddCustomStorageBasedLogConsistencyProvider<AccountStorageFactory>("custom");
 });
             // </register_log_consistency>
         }
@@ -61,24 +64,43 @@ namespace Documentation.EventSourcing.Configuration.Custom
     // <custom_storage_grain>
 [LogConsistencyProvider(ProviderName = "custom")]
 public sealed class AccountGrain
-    : JournaledGrain<AccountState, AccountEvent>,
-      IAccountGrain,
-      ICustomStorageInterface<AccountState, AccountEvent>
+    : JournaledGrain<AccountState, AccountEvent>, IAccountGrain
 {
+}
+    // </custom_storage_grain>
+
+    // <custom_storage_factory>
+public sealed class AccountStorageFactory : ICustomStorageFactory
+{
+    public ICustomStorageInterface<TState, TDelta> CreateCustomStorage<TState, TDelta>(
+        GrainId grainId) =>
+        new AccountStorage<TState, TDelta>(grainId);
+}
+    // </custom_storage_factory>
+
+    public sealed class AccountStorage<TState, TDelta>(GrainId grainId)
+        : ICustomStorageInterface<TState, TDelta>
+    {
+    public GrainId GrainId { get; } = grainId;
+
     // <custom_storage_operations>
-    public Task<KeyValuePair<int, AccountState>> ReadStateFromStorage() =>
+    public Task<KeyValuePair<int, TState>> ReadStateFromStorage() =>
         throw new NotImplementedException();
 
     public Task<bool> ApplyUpdatesToStorage(
-        IReadOnlyList<AccountEvent> updates,
+        IReadOnlyList<TDelta> updates,
         int expectedVersion) =>
+        throw new NotImplementedException();
+
+    public Task<IReadOnlyList<TDelta>> RetrieveLogSegment(
+        int fromVersion,
+        int toVersion) =>
         throw new NotImplementedException();
 
     public Task ClearStoredState() =>
         throw new NotImplementedException();
     // </custom_storage_operations>
-}
-    // </custom_storage_grain>
+    }
 }
 
 namespace Documentation.EventSourcing.Basics
