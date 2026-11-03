@@ -55,6 +55,29 @@ public class ReminderCancellationCompatibilityTests
         Assert.True(((LegacyReminderTable)table).ClearCalled);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT"), TestCategory("Reminders")]
+    public async Task IReminderService_ReconciliationDefault_ReportsIncompleteForLegacyImplementation()
+    {
+        IReminderService service = new LegacyReminderService();
+
+        var reconciled = await service.ReconcileReminder(GrainId.Create("legacy", "reminder"), "test", 3);
+
+        Assert.False(reconciled);
+    }
+
+    private sealed class LegacyReminderService : IReminderService
+    {
+        public Task Start() => Task.CompletedTask;
+        public Task Stop() => Task.CompletedTask;
+        public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period)
+            => throw new NotSupportedException();
+        public Task UnregisterReminder(IGrainReminder reminder) => Task.CompletedTask;
+        public Task<IGrainReminder?> GetReminder(GrainId grainId, string reminderName) => Task.FromResult<IGrainReminder?>(null);
+        public Task<List<IGrainReminder>> GetReminders(GrainId grainId) => Task.FromResult(new List<IGrainReminder>());
+    }
+
     private sealed class LegacyRemindable : IRemindable
     {
         public (string Name, TickStatus Status)? Received { get; private set; }

@@ -54,6 +54,14 @@ internal sealed class DynamoDBRemindersProviderBuilder : IProviderBuilder<ISiloB
                 options.UseProvisionedThroughput = configurationSection.GetValue(nameof(options.UseProvisionedThroughput), options.UseProvisionedThroughput);
                 options.CreateIfNotExists = configurationSection.GetValue(nameof(options.CreateIfNotExists), options.CreateIfNotExists);
                 options.UpdateIfExists = configurationSection.GetValue(nameof(options.UpdateIfExists), options.UpdateIfExists);
+                var v2TableName = configurationSection[nameof(options.V2TableName)];
+                if (!string.IsNullOrEmpty(v2TableName))
+                {
+                    options.V2TableName = v2TableName;
+                }
+
+                options.TableMode = configurationSection.GetValue(nameof(options.TableMode), options.TableMode);
+                options.MigrationPageSize = configurationSection.GetValue(nameof(options.MigrationPageSize), options.MigrationPageSize);
             });
     }
 }

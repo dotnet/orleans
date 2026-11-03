@@ -63,5 +63,12 @@ namespace AWSUtils.Tests.StorageTests
 
         public static bool IsDynamoDbAvailable => _isDynamoDbAvailable.Value;
         public static bool IsSqsAvailable => !string.IsNullOrWhiteSpace(SqsConnectionString);
+
+        public static AmazonDynamoDBClient CreateDynamoDbClient()
+            => new DynamoDBStorage(
+                NullLogger<DynamoDBStorage>.Instance,
+                DynamoDbService,
+                accessKey: DynamoDbAccessKey,
+                secretKey: DynamoDbSecretKey).ClientForTest;
     }
 }

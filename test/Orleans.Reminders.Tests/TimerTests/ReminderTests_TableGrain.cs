@@ -480,6 +480,92 @@ namespace UnitTests.TimerTests
         }
 
         [Fact]
+        public async Task Rem_Grain_MissingDiscoveryCandidateRequiresStrongPointAbsenceBeforeRemoval()
+        {
+            const string reminderName = "missing_discovery_candidate";
+            var grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var grainId = grain.GetGrainId();
+            var silo = Assert.Single(HostedCluster.Silos);
+            var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
+            var reminderTable = silo.ServiceProvider.GetRequiredService<ControllableReminderTable>();
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cancellation.CancelAfter(TestConstants.InitTimeout);
+
+            var activated = observer.WaitForActiveReminderCountAsync(grainId, 1, cancellation.Token, reminderName);
+            await grain.StartReminder(reminderName, ReminderLoadingWindow, TimeSpan.FromMinutes(2)).WaitAsync(cancellation.Token);
+            await activated;
+
+            _readController.OmitFromNextRangeRead(grainId, reminderName);
+            await reminderService.TestOnlyRefresh().WaitAsync(cancellation.Token);
+            Assert.Equal(1, observer.GetActiveReminderCount(grainId, reminderName));
+            Assert.NotNull(await grain.GetReminderObject(reminderName).WaitAsync(cancellation.Token));
+
+            var persisted = Assert.IsType<ReminderEntry>(await reminderTable.ReadRow(grainId, reminderName));
+            Assert.True(await reminderTable.RemoveRow(grainId, reminderName, persisted.ETag!));
+            var quiesced = observer.WaitForReminderQuiescenceAsync(grainId, reminderName, cancellation.Token);
+            _readController.OmitFromNextRangeRead(grainId, reminderName);
+            await reminderService.TestOnlyRefresh().WaitAsync(cancellation.Token);
+            await quiesced;
+
+            Assert.Equal(0, observer.GetActiveReminderCount(grainId, reminderName));
+            Assert.Null(await grain.GetReminderObject(reminderName).WaitAsync(cancellation.Token));
+        }
+
+        [Fact]
+        public async Task RegisterAndUnregisterReconcileThroughPointReadsBeforeReturning()
+        {
+            const string reminderName = "immediate_point_reconciliation";
+            var grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var silo = Assert.Single(HostedCluster.Silos);
+            var reminderTable = silo.ServiceProvider.GetRequiredService<ControllableReminderTable>();
+            var initialPointReads = reminderTable.PointReadCount;
+
+            await grain.StartReminder(reminderName, ReminderLoadingWindow, TimeSpan.FromMinutes(2))
+                .WaitAsync(TestContext.Current.CancellationToken);
+            var afterRegistration = reminderTable.PointReadCount;
+            Assert.True(afterRegistration > initialPointReads);
+
+            await grain.StopReminder(reminderName).WaitAsync(TestContext.Current.CancellationToken);
+            Assert.True(reminderTable.PointReadCount > afterRegistration);
+        }
+
+        [Fact]
+        public async Task ConcurrentMutationPointReadsCannotRestoreAnOlderSchedule()
+        {
+            const string reminderName = "out_of_order_point_reads";
+            var grainId = GrainId.Create("point-read-race", Guid.NewGuid().ToString("N"));
+            var silo = Assert.Single(HostedCluster.Silos);
+            var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cancellation.CancelAfter(TestConstants.InitTimeout);
+            await using var olderRead = _readController.BlockNextPointRead(grainId, reminderName, cancellation.Token);
+
+            var olderMutation = reminderService.TestOnlyRegisterOrUpdateReminder(
+                grainId,
+                reminderName,
+                TimeSpan.FromMinutes(1),
+                TimeSpan.FromMinutes(2));
+            await olderRead.WaitUntilBlockedAsync(cancellation.Token);
+
+            var newerReminder = await reminderService.TestOnlyRegisterOrUpdateReminder(
+                grainId,
+                reminderName,
+                TimeSpan.FromMinutes(3),
+                TimeSpan.FromMinutes(4));
+            var afterNewerMutation = Assert.IsType<ReminderEntry>(
+                await reminderService.TestOnlyGetLocalReminder(grainId, reminderName));
+            Assert.Equal(TimeSpan.FromMinutes(4), afterNewerMutation.Period);
+
+            olderRead.Release();
+            await olderMutation.WaitAsync(cancellation.Token);
+            var afterOlderReadCompletes = Assert.IsType<ReminderEntry>(
+                await reminderService.TestOnlyGetLocalReminder(grainId, reminderName));
+            Assert.Equal(TimeSpan.FromMinutes(4), afterOlderReadCompletes.Period);
+
+            await reminderService.TestOnlyUnregisterReminder(newerReminder).WaitAsync(cancellation.Token);
+        }
+
+        [Fact]
         public async Task Rem_Grain_StaleRefreshCannotReloadStorageOnlyScheduleAfterDistantUpdate()
         {
             const string reminderName = "stale_refresh_storage_only_update";

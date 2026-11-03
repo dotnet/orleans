@@ -175,11 +175,23 @@ internal sealed partial class SiloStatusListenerManager : ILifecycleParticipant<
 
     internal string TestOnlyDescribeMembershipState()
     {
-        var (currentVersion, processedVersion) = TestOnlyGetMembershipVersions();
+        var (currentVersion, processedVersion) = GetMembershipVersions();
         return $"currentMembership={currentVersion}, processedMembership={processedVersion}";
     }
 
-    internal (MembershipVersion Current, MembershipVersion Processed) TestOnlyGetMembershipVersions()
+    internal bool HasProcessedCurrentMembershipVersion
+    {
+        get
+        {
+            var (currentVersion, processedVersion) = GetMembershipVersions();
+            return processedVersion >= currentVersion;
+        }
+    }
+
+    internal (MembershipVersion Current, MembershipVersion Processed) TestOnlyGetMembershipVersions() =>
+        GetMembershipVersions();
+
+    private (MembershipVersion Current, MembershipVersion Processed) GetMembershipVersions()
     {
         while (true)
         {
