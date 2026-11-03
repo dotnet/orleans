@@ -1,6 +1,7 @@
 using Azure;
 using Azure.Core;
 using Azure.Messaging.EventHubs;
+using Azure.Messaging.EventHubs.Producer;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -28,10 +29,24 @@ namespace Orleans.Configuration
         /// </summary>
         internal string EventHubName { get; private set; } = null!;
 
+        internal bool OwnsConnection { get; private set; }
+
         /// <summary>
         /// Connection options used when creating a connection to an Azure Event Hub.
         /// </summary>
         public EventHubConnectionOptions ConnectionOptions { get; set; } = new EventHubConnectionOptions { TransportType = EventHubsTransportType.AmqpTcp };
+
+        /// <summary>
+        /// Gets or sets the options used for buffered event publishing.
+        /// </summary>
+        /// <remarks>
+        /// When this value is <see langword="null"/>, events are published directly and each call results in a separate
+        /// Event Hubs send operation. When configured, events are buffered into batches, and a stream publication completes
+        /// only after Event Hubs acknowledges the batch containing its event.
+        /// The Azure SDK may map a partition key to a different partition for buffered and direct producers. Avoid switching
+        /// publishing modes while preserving strict ordering for an active stream.
+        /// </remarks>
+        public EventHubBufferedProducerClientOptions? BufferedProducerOptions { get; set; }
 
         /// <summary>
         /// Creates an Azure Event Hub connection.
@@ -58,6 +73,7 @@ namespace Orleans.Configuration
 
             ValidateValues(eventHubName, consumerGroup);
 
+            OwnsConnection = true;
             CreateConnection = connectionOptions => new EventHubConnection(connectionString, EventHubName, connectionOptions);
         }
 
@@ -85,6 +101,7 @@ namespace Orleans.Configuration
                 throw new ArgumentNullException(nameof(credential));
             }
 
+            OwnsConnection = true;
             CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
         }
 
@@ -112,6 +129,7 @@ namespace Orleans.Configuration
                 throw new ArgumentNullException(nameof(credential));
             }
 
+            OwnsConnection = true;
             CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
         }
 
@@ -136,28 +154,31 @@ namespace Orleans.Configuration
             {
                 throw new ArgumentNullException(nameof(credential));
             }
-
+            OwnsConnection = true;
             CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
         }
 
         /// <summary>
         /// Configures the Azure Event Hub connection using the provided connection instance.
         /// </summary>
+        /// <remarks>The caller owns this connection and closes it after all providers using it have stopped.</remarks>
         /// <param name="connection">The Event Hub connection.</param>
         /// <param name="consumerGroup">The consumer group name.</param>
         public void ConfigureEventHubConnection(EventHubConnection connection, string consumerGroup)
         {
+            if (connection is null) throw new ArgumentNullException(nameof(connection));
             EventHubName = connection.EventHubName;
             ConsumerGroup = consumerGroup;
             ValidateValues(connection.EventHubName, consumerGroup);
-            if (connection is null) throw new ArgumentNullException(nameof(connection));
+            OwnsConnection = false;
             CreateConnection = _ => connection;
         }
 
         /// <summary>
         /// Configures the Azure Event Hub connection using the provided delegate.
         /// </summary>
-        /// <param name="createConnection">The delegate used to create Event Hub connections.</param>
+        /// <remarks>Orleans owns each connection returned by the delegate. Use the connection-instance overload for a caller-owned shared connection.</remarks>
+        /// <param name="createConnection">The delegate which creates a new, provider-owned Event Hub connection for each invocation.</param>
         /// <param name="eventHubName">The Event Hub name.</param>
         /// <param name="consumerGroup">The consumer group name.</param>
         public void ConfigureEventHubConnection(CreateConnectionDelegate createConnection, string eventHubName, string consumerGroup)
@@ -165,6 +186,7 @@ namespace Orleans.Configuration
             EventHubName = eventHubName;
             ConsumerGroup = consumerGroup;
             ValidateValues(eventHubName, consumerGroup);
+            OwnsConnection = true;
             CreateConnection = createConnection ?? throw new ArgumentNullException(nameof(createConnection));
         }
 

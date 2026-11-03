@@ -25,6 +25,13 @@ namespace Orleans.Streams
 #pragma warning restore CS0618
 
         /// <summary>
+        /// Drains pending publications and releases resources owned by the factory after its receivers have stopped.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel the shutdown operation.</param>
+        /// <returns>A task representing completion of the factory's shutdown.</returns>
+        Task ShutdownAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        /// <summary>
         /// Creates queue message cache adapter.
         /// </summary>
         /// <returns>The queue adapter cache.</returns>

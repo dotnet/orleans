@@ -152,8 +152,11 @@ namespace Orleans.Hosting
            : base(name, builder, EventHubAdapterFactory.Create)
         {
             builder
-                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
-                .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name)));
+                .ConfigureServices(services =>
+                {
+                    services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
+                        .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name));
+                });
         }
     }
 }
