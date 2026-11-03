@@ -1,11 +1,13 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Client for communicating with clusters of Orleans silos.
     /// </summary>
-    internal class InternalClusterClient : IInternalClusterClient
+    internal class InternalClusterClient : IInternalClusterClient, IGrainTypeAvailability
     {
         private readonly IRuntimeClient runtimeClient;
         private readonly IInternalGrainFactory grainFactory;
@@ -24,6 +26,13 @@ namespace Orleans.Runtime
 
         /// <inheritdoc />
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
+
+        ValueTask<GrainType> IGrainTypeAvailability.WaitForGrainTypeAsync(
+            Type grainInterfaceType,
+            string? grainClassNamePrefix,
+            CancellationToken cancellationToken)
+            => ((IGrainTypeAvailability)this.grainFactory)
+                .WaitForGrainTypeAsync(grainInterfaceType, grainClassNamePrefix, cancellationToken);
 
         /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string? grainClassNamePrefix = null)

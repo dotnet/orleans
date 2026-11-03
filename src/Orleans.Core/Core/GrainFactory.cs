@@ -9,7 +9,7 @@ namespace Orleans
     /// <summary>
     /// Factory for accessing grains.
     /// </summary>
-    internal class GrainFactory : IInternalGrainFactory
+    internal class GrainFactory : IInternalGrainFactory, IGrainTypeAvailability
     {
         private GrainReferenceRuntime? grainReferenceRuntime;
 
@@ -21,21 +21,30 @@ namespace Orleans
         private readonly GrainReferenceActivator referenceActivator;
         private readonly GrainInterfaceTypeResolver interfaceTypeResolver;
         private readonly GrainInterfaceTypeToGrainTypeResolver interfaceTypeToGrainTypeResolver;
+        private readonly GrainTypeAvailability grainTypeAvailability;
         private readonly IRuntimeClient runtimeClient;
 
         public GrainFactory(
             IRuntimeClient runtimeClient,
             GrainReferenceActivator referenceActivator,
             GrainInterfaceTypeResolver interfaceTypeResolver,
-            GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver)
+            GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
+            GrainTypeAvailability grainTypeAvailability)
         {
             this.runtimeClient = runtimeClient;
             this.referenceActivator = referenceActivator;
             this.interfaceTypeResolver = interfaceTypeResolver;
             this.interfaceTypeToGrainTypeResolver = interfaceToTypeResolver;
+            this.grainTypeAvailability = grainTypeAvailability;
         }
 
         private GrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ??= (GrainReferenceRuntime)this.runtimeClient.GrainReferenceRuntime;
+
+        ValueTask<GrainType> IGrainTypeAvailability.WaitForGrainTypeAsync(
+            Type grainInterfaceType,
+            string? grainClassNamePrefix,
+            CancellationToken cancellationToken)
+            => this.grainTypeAvailability.WaitForGrainTypeAsync(grainInterfaceType, grainClassNamePrefix, cancellationToken);
 
         /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string? grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey
