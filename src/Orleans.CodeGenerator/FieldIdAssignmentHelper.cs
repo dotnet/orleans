@@ -26,7 +26,8 @@ internal class FieldIdAssignmentHelper
         GenerateFieldIds implicitMemberSelectionStrategy, LibraryTypes libraryTypes)
     {
         _constructorParameters = constructorParameters;
-        _implicitMemberSelectionStrategy = implicitMemberSelectionStrategy;
+        // Enums use the codec of their underlying type, so there are no members to select.
+        _implicitMemberSelectionStrategy = typeSymbol.TypeKind == TypeKind.Enum ? GenerateFieldIds.None : implicitMemberSelectionStrategy;
         _libraryTypes = libraryTypes;
         _memberSymbols = [.. GetMembers(typeSymbol)];
 
