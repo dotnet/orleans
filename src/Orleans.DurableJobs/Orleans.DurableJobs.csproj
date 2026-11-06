@@ -32,5 +32,6 @@
     <InternalsVisibleTo Include="Orleans.DurableJobs.Tests" />
     <InternalsVisibleTo Include="Orleans.DurableJobs.AzureStorage" />
     <InternalsVisibleTo Include="Orleans.Runtime.Tests" />
+    <InternalsVisibleTo Include="Orleans.DurableJobs.AzureStorage.Tests" />
   </ItemGroup>
 </Project>

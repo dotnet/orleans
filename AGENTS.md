@@ -9,6 +9,10 @@
 - When reviewing changes, check whether corresponding documentation or sample updates are needed in the `/docs` and `/samples` directories.
 - Keep PR descriptions focused on the problem, solution, and rationale; omit test-command sections.
 
+# Prostir native runtime delivery
+
+- For Prostir runtime binary repairs, work on the existing `remainders-v2` branch, preserve its complete native repair batch, commit and push the changes there, then rebuild and hand off the matching runtime DLL/PDB/XML family. Do not create a separate branch or rebuild an older fork revision for this bundle, because Prostir must receive all approved reminder patches together.
+
 # Package compatibility
 
 - Packable source projects validate their produced packages against the released baseline configured in `src/Directory.Build.props`. Treat `CP*` and `PKV*` failures as compatibility findings, not warnings to disable globally.
