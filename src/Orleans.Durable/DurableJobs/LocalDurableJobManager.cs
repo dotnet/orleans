@@ -76,6 +76,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         _durableJobsInstruments = durableJobsInstruments ?? DurableJobsInstruments.CreateForDirectConstruction();
         _logger = logger;
         _options = options.Value;
+        shared.ActivationDirectory.RecordNewTarget(this);
     }
 
     /// <inheritdoc/>
