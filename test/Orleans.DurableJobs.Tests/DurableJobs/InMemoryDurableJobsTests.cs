@@ -8,6 +8,7 @@ using Orleans.TestingHost;
 using Tester.DurableJobs;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 using Xunit;
 
 namespace DefaultCluster.Tests;
@@ -46,6 +47,41 @@ public class InMemoryDurableJobsTests : IClassFixture<InMemoryDurableJobsTests.F
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         await _runner.DurableJobGrain(cts.Token);
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("DurableJobs")]
+    public async Task DurableJobOwnerTurnSerializesWritesAndRetainsAttemptAcrossSteps()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        var grain = GrainFactory.GetGrain<IDurableJobOwnerTurnGrain>(Guid.NewGuid());
+        await grain.ScheduleAsync().WaitAsync(cts.Token);
+        await grain.WaitForFirstStepAsync().WaitAsync(cts.Token);
+        Task write;
+        try
+        {
+            Assert.True(HostedCluster.TryGetGrainContext(grain.GetGrainId(), out var context));
+            var owner = Assert.IsType<DurableJobOwnerTurnGrain>(context.GrainInstance);
+            write = grain.WriteAsync();
+            await owner.WriteQueued.WaitAsync(cts.Token);
+            Assert.False(write.IsCompleted);
+        }
+        finally
+        {
+            await grain.ReleaseFirstStepAsync().WaitAsync(cts.Token);
+        }
+
+        await write.WaitAsync(cts.Token);
+        await grain.WaitForCompletionEffectAsync().WaitAsync(cts.Token);
+        try
+        {
+            // The post-commit effect can await another owner which reads this grain.
+            await grain.WriteAsync().WaitAsync(cts.Token);
+        }
+        finally
+        {
+            await grain.ReleaseCompletionEffectAsync().WaitAsync(cts.Token);
+        }
+        Assert.Equal(2, await grain.WaitForCompletionAsync().WaitAsync(cts.Token));
     }
 
     [Fact, TestCategory("BVT"), TestCategory("DurableJobs")]
