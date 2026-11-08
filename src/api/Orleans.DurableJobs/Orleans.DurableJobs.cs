@@ -51,6 +51,8 @@ namespace Orleans.DurableJobs
 
         public static DurableJobRunResult Completed { get { throw null; } }
 
+        public static DurableJobRunResult ContinueOnOwnerTurn { get { throw null; } }
+
         [Id(2)]
         public System.Exception? Exception { get { throw null; } }
 
@@ -106,6 +108,16 @@ namespace Orleans.DurableJobs
     public partial interface IDurableJobHandlerRegistry
     {
         void Register(IDurableJobFeatureHandler handler);
+    }
+
+    public partial interface IDurableJobTurnCompletionHandler : IDurableJobTurnHandler
+    {
+        System.Threading.Tasks.Task CompleteJobTurnAsync(IJobRunContext context, System.Threading.CancellationToken attemptCancellationToken);
+    }
+
+    public partial interface IDurableJobTurnHandler
+    {
+        System.Threading.Tasks.ValueTask<DurableJobRunResult> ExecuteJobTurnAsync(IJobRunContext context, System.Threading.CancellationToken attemptCancellationToken);
     }
 
     public partial interface IJobRunContext

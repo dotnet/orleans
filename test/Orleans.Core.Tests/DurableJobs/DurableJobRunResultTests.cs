@@ -110,6 +110,6 @@ public class DurableJobRunResultTests
             typeof(DurableJobRunResult),
             BindingFlags.Instance | BindingFlags.NonPublic,
             binder: null,
-            args: [status, null, null, null],
+            args: [status, null, null, null, DurableJobTurnDispatch.None],
             culture: null)!;
 }

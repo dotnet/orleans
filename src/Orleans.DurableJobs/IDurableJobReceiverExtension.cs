@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
+using Orleans.Internal;
 
 namespace Orleans.DurableJobs;
 
@@ -22,11 +23,24 @@ internal interface IDurableJobReceiverExtension : IGrainExtension
     /// <returns>A task that represents the asynchronous operation and contains the job execution result.</returns>
     [AlwaysInterleave]
     ValueTask<DurableJobRunResult> HandleDurableJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken);
+
+    /// <summary>
+    /// Executes one bounded job step as an ordinary request on the owner.
+    /// </summary>
+    ValueTask<DurableJobRunResult> ExecuteDurableJobTurnAsync(IJobRunContext context, CancellationToken attemptCancellationToken);
+
+    /// <summary>
+    /// Starts or observes a post-commit effect outside the ordinary owner turn.
+    /// </summary>
+    [AlwaysInterleave]
+    ValueTask<DurableJobRunResult> CompleteDurableJobTurnAsync(IJobRunContext context, CancellationToken attemptCancellationToken);
 }
 
 /// <inheritdoc />
 internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverExtension
 {
+    private static readonly TimeSpan LegacyExecutorDeferral = TimeSpan.FromMinutes(1);
+
     private readonly IGrainContext _grain;
     private readonly DurableJobReceiverExtensionShared _shared;
     private readonly IDurableJobHandlerLookup _featureHandlers;
@@ -49,37 +63,88 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
     public ValueTask<DurableJobRunResult> HandleDurableJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (_grain.GrainInstance is IDurableJobTurnHandler && !_featureHandlers.TryGetHandler(context.Job.Name, out _))
+        {
+            // Old executors understand durable rescheduling and release the concurrency slot.
+            return new(context is JobRunContext { SupportsOwnerTurns: true }
+                ? DurableJobRunResult.ContinueOnOwnerTurn
+                : DurableJobRunResult.RescheduleAt(_shared.TimeProvider.GetUtcNow().UtcDateTime.AddClamped(LegacyExecutorDeferral)));
+        }
+
+        return ObserveJobAttemptAsync(context, attemptCancellationToken, completionHandler: null);
+    }
+
+    private ValueTask<DurableJobRunResult> ObserveJobAttemptAsync(
+        IJobRunContext context, CancellationToken attemptCancellationToken, IDurableJobTurnCompletionHandler? completionHandler)
+    {
         var key = GetExecutionKey(context);
-        var newJob = false;
-        if (!_jobAttempts.TryGetValue(key, out var state))
+        var newJob = !_jobAttempts.TryGetValue(key, out var state)
+            || (state.Task.IsCanceled && !attemptCancellationToken.IsCancellationRequested)
+            || IsReadyToPoll(state);
+        if (newJob)
         {
-            state = new JobAttemptState(StartJob(context, attemptCancellationToken));
-            _jobAttempts.Add(key, state);
-            newJob = true;
-        }
-        else if (state.Task.IsCanceled && !attemptCancellationToken.IsCancellationRequested)
-        {
-            state = new JobAttemptState(StartJob(context, attemptCancellationToken));
+            state = new JobAttemptState(StartJob(context, attemptCancellationToken, completionHandler));
             _jobAttempts[key] = state;
-            newJob = true;
-        }
-        else if (IsReadyToPoll(state))
-        {
-            state = new JobAttemptState(StartJob(context, attemptCancellationToken));
-            _jobAttempts[key] = state;
-            newJob = true;
         }
 
         Debug.Assert(state is not null);
         return GetJobStatusAsync(key, context, state, newJob, attemptCancellationToken);
     }
 
+    /// <inheritdoc />
+    public ValueTask<DurableJobRunResult> ExecuteDurableJobTurnAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        attemptCancellationToken.ThrowIfCancellationRequested();
+        if (context.Job.TargetGrainId != _grain.GrainId ||
+            _grain.GrainInstance is not IDurableJobTurnHandler handler ||
+            _featureHandlers.TryGetHandler(context.Job.Name, out _))
+        {
+            return new(DurableJobRunResult.Failed(new InvalidOperationException(
+                $"Grain {_grain.GrainId} cannot execute durable job '{context.Job.Name}' on its owner turn.")));
+        }
+
+        return new(ExecuteHandlerAsync(context, attemptCancellationToken, async () =>
+        {
+            var result = await handler.ExecuteJobTurnAsync(context, attemptCancellationToken);
+            return result.Status == DurableJobRunStatus.Completed && handler is IDurableJobTurnCompletionHandler
+                ? DurableJobRunResult.RequestTurn(DurableJobTurnDispatch.Completion)
+                : result;
+        }));
+    }
+
+    /// <inheritdoc />
+    public ValueTask<DurableJobRunResult> CompleteDurableJobTurnAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        attemptCancellationToken.ThrowIfCancellationRequested();
+        if (context.Job.TargetGrainId != _grain.GrainId ||
+            _grain.GrainInstance is not IDurableJobTurnCompletionHandler handler ||
+            _featureHandlers.TryGetHandler(context.Job.Name, out _))
+        {
+            return new(DurableJobRunResult.Failed(new InvalidOperationException(
+                $"Grain {_grain.GrainId} cannot complete durable job '{context.Job.Name}' outside its owner turn.")));
+        }
+
+        return ObserveJobAttemptAsync(context, attemptCancellationToken, handler);
+    }
+
     private bool IsReadyToPoll(JobAttemptState state) =>
         state.PollRequested
         && _shared.TimeProvider.GetElapsedTime(state.PollTimestamp, _shared.TimeProvider.GetTimestamp()) >= state.PollAfterDelay;
 
-    private Task<DurableJobRunResult> StartJob(IJobRunContext context, CancellationToken attemptCancellationToken)
+    private Task<DurableJobRunResult> StartJob(
+        IJobRunContext context, CancellationToken attemptCancellationToken, IDurableJobTurnCompletionHandler? completionHandler)
     {
+        if (completionHandler is not null)
+        {
+            return ExecuteHandlerAsync(context, attemptCancellationToken, async () =>
+            {
+                await completionHandler.CompleteJobTurnAsync(context, attemptCancellationToken);
+                return DurableJobRunResult.Completed;
+            });
+        }
+
         if (_featureHandlers.TryGetHandler(context.Job.Name, out var featureHandler))
         {
             return ExecuteFeatureHandlerAsync(featureHandler, context, attemptCancellationToken);

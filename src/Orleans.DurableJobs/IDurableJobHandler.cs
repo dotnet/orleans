@@ -20,7 +20,8 @@ public interface IJobRunContext
     string RunId { get; }
 
     /// <summary>
-    /// Gets the number of times this job has been dequeued for execution, including retries.
+    /// Gets the attempt number used by the handler retry policy.
+    /// An owner-turn delivery timeout can be deferred without increasing this number.
     /// </summary>
     int DequeueCount { get; }
 }
@@ -49,6 +50,9 @@ internal class JobRunContext : IJobRunContext
     /// </summary>
     [Id(2)]
     public int DequeueCount { get; }
+
+    [Id(3)]
+    internal bool SupportsOwnerTurns { get; set; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JobRunContext"/> class.

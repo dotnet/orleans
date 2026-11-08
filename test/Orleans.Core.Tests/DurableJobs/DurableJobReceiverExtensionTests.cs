@@ -12,6 +12,7 @@ using Orleans.Diagnostics;
 using Orleans.DurableJobs;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Xunit;
 
 namespace NonSilo.Tests.ScheduledJobs;
@@ -31,6 +32,39 @@ public class DurableJobReceiverExtensionTests
             () => extension.HandleDurableJobAsync(null!, CancellationToken.None));
 
         Assert.Equal("context", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task HandleDurableJobAsync_OnlyDispatchesOwnerTurnsToSupportingExecutors(bool supportsOwnerTurns)
+    {
+        var time = new FakeTimeProvider();
+        var handler = Substitute.For<IDurableJobTurnHandler>();
+        var extension = CreateExtension(handler, timeProvider: time);
+        var job = CreateJobContext("run-1").Job;
+        var context = new JobRunContext(job, "run-1", retryCount: 3) { SupportsOwnerTurns = supportsOwnerTurns };
+        var services = new ServiceCollection();
+        services.AddSerializer(builder => builder.AddAssembly(typeof(JobRunContext).Assembly));
+        using var provider = services.BuildServiceProvider();
+        var serializer = provider.GetRequiredService<Serializer>();
+        var delivered = Assert.IsType<JobRunContext>(
+            serializer.Deserialize<IJobRunContext>(serializer.SerializeToArray<IJobRunContext>(context)));
+
+        var result = await extension.HandleDurableJobAsync(delivered, TestContext.Current.CancellationToken);
+
+        if (supportsOwnerTurns)
+        {
+            Assert.Equal(DurableJobTurnDispatch.Owner, result.TurnDispatch);
+        }
+        else
+        {
+            Assert.Equal(DurableJobTurnDispatch.None, result.TurnDispatch);
+            Assert.True(result.IsRescheduleRequested);
+            Assert.Equal(time.GetUtcNow().AddMinutes(1), result.RescheduleTime);
+        }
+
+        await handler.DidNotReceive().ExecuteJobTurnAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

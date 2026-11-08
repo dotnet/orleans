@@ -31,12 +31,14 @@ public sealed class DurableJobRunResult
         DurableJobRunStatus status,
         TimeSpan? pollAfterDelay,
         Exception? exception,
-        DateTimeOffset? rescheduleTime)
+        DateTimeOffset? rescheduleTime,
+        DurableJobTurnDispatch turnDispatch = DurableJobTurnDispatch.None)
     {
         Status = status;
         PollAfterDelay = pollAfterDelay;
         Exception = exception;
         RescheduleTime = rescheduleTime;
+        TurnDispatch = turnDispatch;
     }
 
     /// <summary>
@@ -63,12 +65,23 @@ public sealed class DurableJobRunResult
     [Id(3)]
     public DateTimeOffset? RescheduleTime { get; }
 
+    [Id(4)]
+    internal DurableJobTurnDispatch TurnDispatch { get; }
+
+    internal static DurableJobRunResult RequestTurn(DurableJobTurnDispatch dispatch) =>
+        new(DurableJobRunStatus.InProgress, TimeSpan.Zero, null, null, dispatch);
+
     private static readonly DurableJobRunResult CompletedInstance = new(DurableJobRunStatus.Completed, null, null, null);
 
     /// <summary>
     /// Gets a result indicating the job completed successfully.
     /// </summary>
     public static DurableJobRunResult Completed => CompletedInstance;
+
+    /// <summary>
+    /// Requests the next bounded step of this attempt in another ordinary turn on its owner.
+    /// </summary>
+    public static DurableJobRunResult ContinueOnOwnerTurn { get; } = RequestTurn(DurableJobTurnDispatch.Owner);
 
     /// <summary>
     /// Creates a result indicating the job execution remains in progress and should be polled after the specified delay.
@@ -115,6 +128,13 @@ public sealed class DurableJobRunResult
         ArgumentNullException.ThrowIfNull(exception);
         return new(DurableJobRunStatus.Failed, null, exception, null);
     }
+}
+
+internal enum DurableJobTurnDispatch : byte
+{
+    None,
+    Owner,
+    Completion
 }
 
 /// <summary>

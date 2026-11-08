@@ -27,3 +27,24 @@ public interface IDurableJobGrain : IGrainWithStringKey
 
     Task<string> GetJobTraceId(string jobId);
 }
+
+public interface IDurableJobOwnerTurnGrain : IGrainWithGuidKey
+{
+    Task ScheduleAsync();
+    Task WriteAsync();
+
+    [AlwaysInterleave]
+    Task WaitForFirstStepAsync();
+
+    [AlwaysInterleave]
+    Task ReleaseFirstStepAsync();
+
+    [AlwaysInterleave]
+    Task WaitForCompletionEffectAsync();
+
+    [AlwaysInterleave]
+    Task ReleaseCompletionEffectAsync();
+
+    [AlwaysInterleave]
+    Task<int> WaitForCompletionAsync();
+}

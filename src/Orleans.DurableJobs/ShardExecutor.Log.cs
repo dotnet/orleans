@@ -65,6 +65,9 @@ internal sealed partial class ShardExecutor
     )]
     private static partial void LogPollingJob(ILogger logger, string jobId, string jobName, TimeSpan pollDelay);
 
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Deferred owner turn delivery for job {JobId} until {DueTime}")]
+    private static partial void LogOwnerTurnDeferred(ILogger logger, Exception exception, string jobId, DateTimeOffset dueTime);
+
     [LoggerMessage(
         Level = LogLevel.Warning,
         Message = "Job {JobId} (Name: '{JobName}') returned Failed status"

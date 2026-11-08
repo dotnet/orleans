@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Diagnostics;
 using Orleans.Hosting;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 namespace Orleans.DurableJobs;
@@ -323,24 +324,41 @@ internal sealed partial class ShardExecutor
         using var activity = DurableJobsDiagnostics.StartExecuteActivity(jobContext.Job, jobContext.DequeueCount, jobContext.RunId);
         try
         {
+            var awaitingOwnerTurn = false;
             try
             {
                 attemptCancellationToken.ThrowIfCancellationRequested();
                 LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
 
                 var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
+                if (jobContext is JobRunContext dispatchContext)
+                {
+                    dispatchContext.SupportsOwnerTurns = true;
+                }
 
                 var result = await target.HandleDurableJobAsync(jobContext, attemptCancellationToken);
 
-                // Handle the result based on status
+                var turnDispatch = DurableJobTurnDispatch.None;
                 while (result.IsInProgress)
                 {
-                    // Enter polling loop
-                    LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
+                    if (result.TurnDispatch == DurableJobTurnDispatch.None)
+                    {
+                        LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
+                        await Task.Delay(result.PollAfterDelay.Value, _timeProvider, attemptCancellationToken);
+                    }
+                    else
+                    {
+                        turnDispatch = result.TurnDispatch;
+                    }
 
-                    await Task.Delay(result.PollAfterDelay.Value, _timeProvider, attemptCancellationToken);
-
-                    result = await target.HandleDurableJobAsync(jobContext, attemptCancellationToken);
+                    awaitingOwnerTurn = turnDispatch == DurableJobTurnDispatch.Owner;
+                    result = turnDispatch switch
+                    {
+                        DurableJobTurnDispatch.Owner => await target.ExecuteDurableJobTurnAsync(jobContext, attemptCancellationToken),
+                        DurableJobTurnDispatch.Completion => await target.CompleteDurableJobTurnAsync(jobContext, attemptCancellationToken),
+                        _ => await target.HandleDurableJobAsync(jobContext, attemptCancellationToken)
+                    };
+                    awaitingOwnerTurn = false;
                 }
 
                 switch (result.Status)
@@ -428,6 +446,30 @@ internal sealed partial class ShardExecutor
             catch (OperationCanceledException) when (attemptCancellationToken.IsCancellationRequested)
             {
                 throw;
+            }
+            catch (TimeoutException exception) when (awaitingOwnerTurn)
+            {
+                // A response timeout can expire in the grain queue. The handler reports its own
+                // failures in DurableJobRunResult, so only an RPC timeout takes this path.
+                var dueTime = _timeProvider.GetUtcNow().UtcDateTime.AddClamped(_options.JobStatusPollInterval);
+                var deferredContext = new JobRunContext(jobContext.Job, jobContext.RunId, jobContext.DequeueCount - 1);
+                var mutation = await shard.RetryJobLaterAsync(deferredContext, dueTime, attemptCancellationToken);
+                if (mutation == DurableJobMutationResult.Applied)
+                {
+                    LogOwnerTurnDeferred(_logger, exception, jobContext.Job.Id, dueTime);
+                    activity?.SetTag(ActivityTagKeys.DurableJobStatus, "delivery_deferred");
+                }
+                else
+                {
+                    LogJobMutationNotApplied(_logger, jobContext.Job.Id, jobContext.Job.Name, "delivery deferral", mutation);
+                    activity?.SetTag(ActivityTagKeys.DurableJobStatus, mutation == DurableJobMutationResult.JobNotFound
+                        ? "cancellation_requested"
+                        : "ownership_lost");
+                    if (mutation == DurableJobMutationResult.OwnershipLost)
+                    {
+                        notifyOwnershipLost();
+                    }
+                }
             }
             catch (Exception ex)
             {
