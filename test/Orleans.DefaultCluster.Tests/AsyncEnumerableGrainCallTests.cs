@@ -42,7 +42,11 @@ public sealed class AsyncEnumerableTestFixture : BaseInProcessTestClusterFixture
             siloBuilder.UseFakeTimeProviderForGrainTimers(_timeProvider);
         });
 
-        builder.ConfigureClient(clientBuilder => clientBuilder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(_timeProvider)));
+        builder.ConfigureClient(clientBuilder =>
+        {
+            clientBuilder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(_timeProvider));
+            clientBuilder.Services.UseTimeProviderForBackgroundAreas(TimeProvider.System);
+        });
     }
 
     public Task AdvanceTimeByResponseTimeoutAsync() =>
@@ -212,9 +216,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// Verifies that values are correctly transmitted and the enumerator is properly disposed after use.
     /// This demonstrates Orleans' support for streaming data from grains without keeping all data in memory.
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task ObservableGrain_AsyncEnumerable()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -251,9 +253,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// the operation properly throws OperationCanceledException and no values are returned.
     /// This test ensures Orleans handles early cancellation gracefully in distributed streaming scenarios.
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task ObservableGrain_AsyncEnumerable_CancelBeforeYield()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -316,9 +316,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// The errorIndex parameter determines when the error occurs, testing both immediate and delayed errors.
     /// The waitAfterYield parameter tests error handling with and without async delays after yielding values.
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Theory, TestCategory("BVT"), TestCategory("Observable")]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(0, true)]
     [InlineData(1, false)]
@@ -361,9 +359,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// Verifies that OperationCanceledException is properly propagated and resources are cleaned up.
     /// This tests Orleans' ability to handle cooperative cancellation in distributed streaming scenarios.
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Theory, TestCategory("BVT"), TestCategory("Observable")]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(0, true)]
     [InlineData(1, false)]
@@ -412,9 +408,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// - Mid-stream cancellation (during enumeration)
     /// - Proper cleanup and disposal of server-side resources
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Theory, TestCategory("BVT"), TestCategory("Observable")]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(0, true)]
     [InlineData(1, false)]
@@ -481,9 +475,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// Similar to CancellationToken test but uses the extension method approach for cancellation.
     /// Verifies that the WithCancellation extension properly integrates with Orleans' async enumerable support.
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Theory, TestCategory("BVT"), TestCategory("Observable")]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(0, true)]
     [InlineData(1, false)]
@@ -550,9 +542,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// Verifies that Orleans automatically batches multiple values to reduce network round-trips.
     /// This optimization is crucial for performance when streaming many small values.
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task ObservableGrain_AsyncEnumerable_Batch()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -589,9 +579,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// Verifies that the WithBatchSize extension method correctly controls the number of items per batch.
     /// This allows clients to tune the trade-off between latency and throughput.
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task ObservableGrain_AsyncEnumerable_SplitBatch()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -628,9 +616,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// Verifies that each value results in a separate network call when batching is disabled.
     /// This mode provides lowest latency but highest overhead for streaming scenarios.
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task ObservableGrain_AsyncEnumerable_NoBatching()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -669,9 +655,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// Verifies that cancelling mid-stream properly stops enumeration and cleans up resources.
     /// This simulates real-world scenarios where clients need to stop consuming data early.
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task ObservableGrain_AsyncEnumerable_WithCancellation()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -723,9 +707,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// Verifies that the client can stop consuming before all values are produced.
     /// This tests Orleans' ability to handle backpressure and early termination in streaming scenarios.
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task ObservableGrain_AsyncEnumerable_SlowProducer()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -773,9 +755,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// Verifies that the enumerator is not prematurely cleaned up when the client consumes slowly.
     /// Uses diagnostic listeners to monitor the cleanup timer behavior.
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task ObservableGrain_AsyncEnumerable_SlowConsumer()
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
@@ -815,9 +795,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// This prevents resource leaks when clients fail to complete enumeration.
     /// The test ensures proper error handling when trying to continue after eviction.
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task ObservableGrain_AsyncEnumerable_SlowConsumer_Evicted()
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
@@ -870,9 +848,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
     /// Verifies that grain deactivation properly terminates active enumerations with an appropriate error.
     /// This ensures clean shutdown and prevents hanging clients when grains are deactivated.
     /// </summary>
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task ObservableGrain_AsyncEnumerable_Deactivate()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -920,9 +896,7 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
         Assert.Equal(2, values.Count);
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task ObservableGrain_AsyncEnumerable_Fail()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -975,6 +949,8 @@ public class AsyncEnumerableGrainCallTests(AsyncEnumerableTestFixture fixture)
 /// </summary>
 [TestSuite("BVT")]
 [TestProvider("None")]
+[TestCategory("BVT")]
+[TestCategory("Observable")]
 [Collection(AsyncEnumerableGrainCallTestCollection.Name)]
 public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture)
 {
@@ -982,9 +958,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
 
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(10);
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable()
     {
         await RunObserverTestAsync(async (observerRef, _) =>
@@ -1020,9 +994,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_Batch()
     {
         await RunObserverTestAsync(async (observerRef, _) =>
@@ -1052,9 +1024,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_SplitBatch()
     {
         await RunObserverTestAsync(async (observerRef, _) =>
@@ -1082,9 +1052,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_NoBatching()
     {
         await RunObserverTestAsync(async (observerRef, _) =>
@@ -1112,9 +1080,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Theory, TestCategory("BVT"), TestCategory("Observable")]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(0, true)]
     [InlineData(1, false)]
@@ -1155,9 +1121,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Theory, TestCategory("BVT"), TestCategory("Observable")]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(0, true)]
     [InlineData(1, false)]
@@ -1218,9 +1182,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_CancelBeforeYield()
     {
         await RunObserverTestAsync(async (observerRef, _) =>
@@ -1262,9 +1224,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Theory, TestCategory("BVT"), TestCategory("Observable")]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(0, true)]
     [InlineData(1, false)]
@@ -1302,9 +1262,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Theory, TestCategory("BVT"), TestCategory("Observable")]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(0, true)]
     [InlineData(1, false)]
@@ -1364,59 +1322,67 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_WithCancellation()
     {
         await RunObserverTestAsync(async (observerRef, _) =>
         {
             var cancellationToken = TestContext.Current.CancellationToken;
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-
+            using var testCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            using var producerCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var producer = Task.Run(async () =>
             {
                 try
                 {
                     foreach (var value in Enumerable.Range(0, 5))
                     {
-                        await Task.Delay(200, cancellationToken);
+                        await Task.Delay(200, producerCts.Token);
                         await observerRef.OnNext(value.ToString());
                     }
 
                     await observerRef.Complete();
                 }
+                catch (OperationCanceledException) when (producerCts.IsCancellationRequested)
+                {
+                    // Expected: the test cancelled us before the producer finished.
+                }
                 catch (ObserverNotReachableException)
                 {
                     // Expected: RunObserverTestAsync deregisters the observer in its finally block,
-                    // so this task would keep writing to the (now missing) observer.
+                    // so the trailing OnNext/Complete calls fail against a missing observer.
                 }
-            }, cancellationToken);
+            }, producerCts.Token);
 
-            var values = new List<string>();
-            var exception = await Record.ExceptionAsync(async () =>
+            try
             {
-                await foreach (var value in observerRef.GetValues(cancellationToken).WithCancellation(cts.Token))
+                var values = new List<string>();
+                var exception = await Record.ExceptionAsync(async () =>
                 {
-                    values.Add(value);
-                    if (values.Count == 3)
+                    await foreach (var value in observerRef.GetValues(cancellationToken).WithCancellation(testCts.Token))
                     {
-                        cts.Cancel();
+                        values.Add(value);
+                        if (values.Count == 3)
+                        {
+                            testCts.Cancel();
+                        }
                     }
-                }
-            });
+                });
 
-            Assert.IsType<OperationCanceledException>(exception);
-            Assert.Equal(3, values.Count);
+                Assert.IsType<OperationCanceledException>(exception);
+                Assert.Equal(3, values.Count);
 
-            var calls = await observerRef.GetIncomingCalls();
-            Assert.Contains(calls, IsDisposeCall);
+                var calls = await observerRef.GetIncomingCalls();
+                Assert.Contains(calls, IsDisposeCall);
+            }
+            finally
+            {
+                await producerCts.CancelAsync();
+                await producer.WaitAsync(TestTimeout, CancellationToken.None);
+            }
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_EnumeratorDisposed_WhileMoveNextIsPending()
     {
         await RunObserverTestAsync(async (observerRef, observerImpl) =>
@@ -1436,24 +1402,17 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
             var completedTask = await Task.WhenAny(pendingMoveNext).WaitAsync(TestTimeout, cancellationToken);
             Assert.Same(pendingMoveNext, completedTask);
 
-            // Disposal may surface as cancellation or a terminal enumeration error, depending on timing.
-            try
-            {
-                await pendingMoveNext;
-            }
-            catch (Exception)
-            {
-                // Completion is what matters here: the pending move must not remain stuck behind disposal.
-            }
+            var exception = await Record.ExceptionAsync(async () => await pendingMoveNext.WaitAsync(TestTimeout, cancellationToken));
+
+            Assert.True(exception is OperationCanceledException or EnumerationAbortedException or ObserverNotReachableException,
+                $"Expected a terminal exception on the pending MoveNext after disposal, but it threw {exception?.GetType().Name ?? "nothing"}.");
 
             var calls = await observerRef.GetIncomingCalls();
             Assert.Contains(calls, IsDisposeCall);
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_ObserverDeregistration_DisposesWholeExtension()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -1465,7 +1424,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
 
         // The first MoveNextAsync yields "first" and server-side the batching loop starts
         // the enumerator's second MoveNextAsync, which parks on an infinite delay.
-        // Note: This is also what lazily creates the observer-side extension.
+        // This is also what lazily creates the extension.
         Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TestTimeout, cancellationToken));
         Assert.Equal("first", enumerator.Current);
 
@@ -1484,7 +1443,6 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
 
         // We wait for the extension's disposal.
         await listener.WaitForExtensionDisposedAsync(cancellationToken);
-
         // Which in turn should cancel the enumerator which is running.
         await observerImpl.BlockingEnumeratorFinished.WaitAsync(TestTimeout, cancellationToken);
 
@@ -1493,22 +1451,21 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         // MoveNext reached the extension before deregistration of the observer) or Dispatch rejects it
         // and returns a ObserverNotReachableException-baked response, because deregistration won the race).
         // Both are terminal responses, as this tests is about NOT leaving the client waiting.
-        var completedTask = await Task.WhenAny(pendingMoveNext).WaitAsync(TestTimeout, cancellationToken);
-        Assert.Same(pendingMoveNext, completedTask);
 
-        try
+        var exception = await Record.ExceptionAsync(async () => await pendingMoveNext.WaitAsync(TestTimeout, cancellationToken));
+
+        if (exception is OperationCanceledException oce)
         {
-            await pendingMoveNext;
+            // The inner MoveNextAsync's cancellation token is ClientTokenSource, not the test token.
+            // If the OCE carries the test token, it came from WaitAsync, not from the extension.
+            Assert.NotEqual(cancellationToken, oce.CancellationToken);
         }
-        catch (Exception)
-        {
-            // Cancellation or a terminal error response is expected after owner deregistration.
-        }
+
+        Assert.True(exception is OperationCanceledException or EnumerationAbortedException or ObserverNotReachableException,
+            $"Expected a terminal exception on the pending MoveNext after owner deregistration, but it threw {exception?.GetType().Name ?? "nothing"}.");
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_MoveNextCall_AfterDeregistration_Fails()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -1523,20 +1480,30 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         await listener.WaitForExtensionCreatedAsync(cancellationToken);
         await observerImpl.BlockingMoveNextStarted.WaitAsync(TestTimeout, cancellationToken);
 
+        // Now we start a pending MoveNext to keep the gate active and proceed to deregister the observer.
+        var pendingMoveNext = enumerator.MoveNextAsync().AsTask();
+
         GrainFactory.DeleteObjectReference<IObservableGrainObserver>(observerRef);
 
         await listener.WaitForExtensionDisposedAsync(cancellationToken);
         await observerImpl.BlockingEnumeratorFinished.WaitAsync(TestTimeout, cancellationToken);
 
-        // By now the object manager has removed the observer from localObjects.
-        // The next MoveNext should hit the Dispatch message path, and must return an exception response.
-        await Assert.ThrowsAnyAsync<ObserverNotReachableException>(
-            async () => await enumerator.MoveNextAsync().AsTask().WaitAsync(TestTimeout, cancellationToken));
+        // By now the manager has removed the observer from localObjects on the client.
+        // The client-side enumerator serializes MoveNextAsync calls: the next call does not
+        // dispatch until the pending one returns. Awaiting the pending exception first ensures
+        // the new call below is not queued behind it, which would otherwise inherit the pending
+        // call's latency under full-suite load.
+        var pendingException = await Record.ExceptionAsync(async () =>
+            await pendingMoveNext.WaitAsync(TestTimeout, cancellationToken));
+
+        Assert.True(pendingException is OperationCanceledException or EnumerationAbortedException or ObserverNotReachableException,
+            $"Unexpected exception from pending MoveNext: {pendingException}");
+
+        // Now we issue a new MoveNext after the previous one has completed.
+        await Assert.ThrowsAsync<ObserverNotReachableException>(async () => await enumerator.MoveNextAsync().AsTask());
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_SingleValue()
     {
         await RunObserverTestAsync(async (observerRef, _) =>
@@ -1562,9 +1529,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_BatchOnce()
     {
         await RunObserverTestAsync(async (observerRef, _) =>
@@ -1594,9 +1559,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_SlowConsumer()
     {
         await RunObserverTestAsync(async (observerRef, observerImpl) =>
@@ -1637,9 +1600,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_SlowConsumer_Evicted()
     {
         await RunObserverTestAsync(async (observerRef, observerImpl) =>
@@ -1688,9 +1649,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_SlowProducer()
     {
         await RunObserverTestAsync(async (observerRef, _) =>
@@ -1732,9 +1691,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         });
     }
 
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    [Fact]
     public async Task Observer_AsyncEnumerable_Fail()
     {
         await RunObserverTestAsync(async (observerRef, _) =>
@@ -1763,6 +1720,82 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
 
             var calls = await observerRef.GetIncomingCalls();
             Assert.Contains(calls, IsDisposeCall);
+        });
+    }
+
+    [Fact]
+    public async Task Observer_AsyncEnumerable_HeartbeatNoLoss()
+    {
+        await RunObserverTestAsync(async (observerRef, _) =>
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(30));
+
+            // Queue one value. Do NOT complete — the producer parks waiting for the next.
+            await observerRef.OnNext("0");
+
+            var enumerator = observerRef.GetValues(cts.Token).WithBatchSize(1).GetAsyncEnumerator(cts.Token);
+            try
+            {
+                // Pull "0". The server-side producer now parks on the empty queue.
+                Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TestTimeout, cts.Token));
+                Assert.Equal("0", enumerator.Current);
+
+                // Start the next pull — it long-polls against the parked producer.
+                var pending = enumerator.MoveNextAsync().AsTask();
+
+                // Advance the fake silo clock so the long-poll (CRT/2) fires a heartbeat.
+                // The pull must NOT complete: nothing has been produced yet.
+                await fixture.AdvanceTimeByResponseTimeoutAsync().WaitAsync(TestTimeout, cts.Token);
+                Assert.False(pending.IsCompleted, "The heartbeat must not deliver a value.");
+
+                // Now release the next value. Whatever pull is in-flight (the original or the
+                // one re-issued by the heartbeat) must complete with exactly "1", not skip it
+                // and not deliver anything else.
+                await observerRef.OnNext("1");
+
+                Assert.True(await pending.WaitAsync(TestTimeout, cts.Token));
+                Assert.Equal("1", enumerator.Current);
+
+                await observerRef.Complete();
+                Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TestTimeout, cts.Token));
+            }
+            finally
+            {
+                await enumerator.DisposeAsync().AsTask().WaitAsync(TestTimeout, cts.Token);
+            }
+
+            var calls = await observerRef.GetIncomingCalls();
+            Assert.True(CountPullCalls(calls) >= 3, $"Expected at least 3 pulls (0, heartbeat, 1); got {CountPullCalls(calls)}.");
+            Assert.Contains(calls, IsDisposeCall);
+        });
+    }
+
+    [Fact]
+    public async Task Observer_AsyncEnumerable_DisposeJoinsTeardown()
+    {
+        await RunObserverTestAsync(async (observerRef, observerImpl) =>
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var enumerator = observerRef.GetGatedEnumerable(cancellationToken).GetAsyncEnumerator(cancellationToken);
+
+            Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TestTimeout));
+
+            // Start DisposeAsync. It will cancel the token, but the finally block is gated.
+            var disposeTask = enumerator.DisposeAsync().AsTask();
+
+            // Wait for the producer's finally block to run.
+            await observerImpl.GatedFinallyStarted.Task.WaitAsync(TestTimeout);
+
+            // DisposeAsync must NOT complete yet because teardown is gated.
+            Assert.False(disposeTask.IsCompleted);
+
+            // Release the gate.
+            observerImpl.GatedFinallyFinished.TrySetResult();
+
+            // Now DisposeAsync should complete.
+            await disposeTask.WaitAsync(TestTimeout);
         });
     }
 
