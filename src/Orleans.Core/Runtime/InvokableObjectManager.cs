@@ -35,7 +35,7 @@ internal sealed partial class InvokableObjectManager
 #endif
 
     private readonly HashSet<Task> _observerDisposals = [];
-    private bool _isStopping;
+    private volatile bool _isStopping;
 
     private List<IIncomingGrainCallFilter> GrainCallFilters
         => _grainCallFilters ??= [.. runtimeClient.ServiceProvider.GetServices<IIncomingGrainCallFilter>()];
@@ -58,11 +58,16 @@ internal sealed partial class InvokableObjectManager
         this.logger = logger;
     }
 
+    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+        Justification = "LocalObjectData acquires no resources in its constructor." +
+        "The async-enumerable extension is created lazily on first use, not here.")]
     public bool TryRegister(IAddressable obj, ObserverGrainId objectId)
     {
+        var data = new LocalObjectData(obj, objectId, this);
+
         lock (_observerLifecycleLock)
         {
-            return !_isStopping && localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this));
+            return !_isStopping && localObjects.TryAdd(objectId, data);
         }
     }
 
@@ -124,43 +129,53 @@ internal sealed partial class InvokableObjectManager
     /// <summary>
     /// Closes observer admission and drains invocation processing, including cancellation controls and response handling.
     /// </summary>
-    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Symmetric reasoning as with TryTryDeregister.")]
-    public async Task StopAsync()
+    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Symmetric reasoning as with TryDeregister.")]
+    public async Task StopAsync(CancellationToken cancellationToken = default)
     {
+        Task drainInvocations;
+        Task[] disposalTasks;
+        LocalObjectData[] snapshotData;
+
         lock (_observerLifecycleLock)
         {
             _isStopping = true;
-        }
 
-        // Cancellation controls can release admitted work while application admission is closed.
-        await _invocations.CloseAsync().ConfigureAwait(false);
-        await _cancellations.CloseAsync().ConfigureAwait(false);
+            // We close the application gate synchronously so no new normal invocations are admitted.
+            // Doing this under the lock makes the transition running -> stopping atomic.
+            drainInvocations = _invocations.CloseAsync();
 
-        Task[] disposalTasks;
+            // We do NOT remove them from localObjects yet as we need them there so that
+            // cancellation requests can still be routed to them during the drain.
+            snapshotData = [.. localObjects.Values];
 
-        lock (_observerLifecycleLock)
-        {
-            // We dispose all registered observers, also cancelling any outstanding enumerators.
-            // This will include disposals initiated by concurrent TryDeregister calls as well.
-            foreach (var entry in localObjects.ToArray())
+            foreach (var objectData in snapshotData)
             {
-                if (localObjects.TryRemove(entry.Key, out var objectData))
-                {
-                    TrackObserverDisposal(objectData);
-                }
+                TrackObserverDisposal(objectData);
             }
 
             disposalTasks = [.. _observerDisposals];
         }
 
-        try
+        // We wait for disposals to finalize before we await the admissions.
+        await Task.WhenAll(disposalTasks).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+
+        // Next, we wait for the application invocations to drain.
+        // We do NOT close the cancellations gate yet. Cancellation requests are allowed to flow
+        // through Dispatch during shutdown so they can cancel any lingering application 
+        // work which should also help this drain complete.
+        await drainInvocations.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+
+        // Now that the drain is complete, we can safely remove the observers, they all have been disposed.
+        lock (_observerLifecycleLock)
         {
-            await Task.WhenAll(disposalTasks).ConfigureAwait(false);
+            foreach (var objectData in snapshotData)
+            {
+                localObjects.TryRemove(objectData.ObserverId, out _);
+            }
         }
-        catch (Exception exception)
-        {
-            LogErrorDisposingObservers(logger, exception);
-        }
+
+        // Now that all application work is drained, we can safely close the cancellation gate.
+        await _cancellations.CloseAsync().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
     }
 
     internal static bool IsCancellationRequest(Message message) =>
@@ -181,6 +196,14 @@ internal sealed partial class InvokableObjectManager
 
     public void Dispatch(Message message)
     {
+        // We allow cancellation requests only so they can cancel in-flight work during shutdown.
+        // Besides that we dont allow invocations!
+        if (_isStopping && !IsCancellationRequest(message))
+        {
+            RejectMessage(message);
+            return;
+        }
+
         if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
         {
             LogNotAddressedToAnObserver(logger, message);
@@ -196,7 +219,6 @@ internal sealed partial class InvokableObjectManager
             LogUnexpectedTargetInRequest(logger, message.TargetGrain, message);
             if (message.Direction == Message.Directions.Request)
             {
-
                 runtimeClient.SendResponse(message, Response.FromException(
                     new ObserverNotReachableException($"The target observer = '{observerId}' is not registered.")));
             }

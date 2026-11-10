@@ -17,6 +17,9 @@ public sealed class ObservableGrainObserver : IObservableGrainObserver, IIncomin
     private readonly TaskCompletionSource _blockingMoveNextStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _blockingEnumeratorFinished = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    public TaskCompletionSource GatedFinallyStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource GatedFinallyFinished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     public Task BlockingMoveNextStarted => _blockingMoveNextStarted.Task;
     public Task BlockingEnumeratorFinished => _blockingEnumeratorFinished.Task;
 
@@ -115,6 +118,20 @@ public sealed class ObservableGrainObserver : IObservableGrainObserver, IIncomin
         finally
         {
             _blockingEnumeratorFinished.TrySetResult();
+        }
+    }
+
+    public async IAsyncEnumerable<string> GetGatedEnumerable([EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        try
+        {
+            yield return "first";
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+        finally
+        {
+            GatedFinallyStarted.TrySetResult();
+            await GatedFinallyFinished.Task; // The tests control when teardown finishes.
         }
     }
 }

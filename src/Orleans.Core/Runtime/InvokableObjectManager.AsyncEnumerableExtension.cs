@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.Internal;
 
 namespace Orleans;
 
@@ -28,7 +28,11 @@ internal partial class InvokableObjectManager
 
         private readonly ILogger<AsyncEnumerableGrainObserverExtension> _logger;
 
-        private readonly Task _cleanupTask;
+        private Task? _cleanupTask;
+#pragma warning disable CA2213 // Disposable fields should be disposed
+        // Will be auto-disposed by the cleanup timer loop breaking out
+        private CancellationTokenSource? _cleanupCts;
+#pragma warning restore CA2213 // Disposable fields should be disposed
         private readonly CancellationTokenSource _shutdownCts = new();
 
         /// <summary>
@@ -52,7 +56,6 @@ internal partial class InvokableObjectManager
             _logger = logger;
             _timeProvider = timeProvider;
             _messagingOptions = messagingOptions.Value;
-            _cleanupTask = RunCleanupLoopAsync(_shutdownCts.Token);
 
             OnAsyncEnumeratorGrainObserverExtensionCreated(this);
         }
@@ -81,108 +84,102 @@ internal partial class InvokableObjectManager
             }
         }
 
-        private async Task RunCleanupLoopAsync(CancellationToken cancellationToken)
+        private async Task RunCleanupLoopAsync(CancellationTokenSource cancellationTokenSource)
         {
-            using var timer = new PeriodicTimer(_messagingOptions.ResponseTimeout, _timeProvider);
-
-            try
+            using (cancellationTokenSource)
             {
-                while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+                using var timer = new PeriodicTimer(_messagingOptions.ResponseTimeout, _timeProvider);
+
+                try
                 {
-                    try
+                    while (await timer.WaitForNextTickAsync(cancellationTokenSource.Token).ConfigureAwait(false))
                     {
-                        List<(Guid RequestId, EnumeratorState State)>? expired = null;
-                        List<DisposalWork>? workItems = null;
-                        List<Task>? disposalTasks = null;
-
-                        lock (_lock)
+                        try
                         {
-                            if (_disposeTask is not null)
-                            {
-                                return;
-                            }
+                            List<EnumeratorState>? expiredStates = null;
 
-                            foreach (var (requestId, state) in _enumerators)
+                            lock (_lock)
                             {
-                                if (state.IsDisposing || !state.TryEnterGate())
+                                if (_disposeTask is not null)
                                 {
-                                    // We must not allow a stuck/slow producer to result in us holding the lock for an unbounded time.
-                                    // So just skip those that currently have an in-flight MoveNextAsync call.
-                                    continue;
+                                    return;
                                 }
 
-                                try
+                                if (_enumerators.Count == 0)
                                 {
-                                    if (state.Seen)
+                                    _cleanupTask = null;
+                                    return;
+                                }
+
+                                foreach (var state in _enumerators.Values)
+                                {
+                                    if (state.IsDisposing || !state.TryEnterGate())
                                     {
-                                        state.Seen = false;
+                                        // We must not allow a stuck/slow producer to result in us holding the lock for an unbounded time.
+                                        // So just skip those that currently have an in-flight MoveNextAsync call.
+                                        continue;
                                     }
-                                    else
+
+                                    try
                                     {
-                                        expired ??= [];
-                                        expired.Add((requestId, state));
+                                        if (state.Seen)
+                                        {
+                                            state.Seen = false;
+                                        }
+                                        else
+                                        {
+                                            expiredStates ??= [];
+                                            expiredStates.Add(state);
+                                        }
                                     }
-                                }
-                                finally
-                                {
-                                    state.ExitGate();
-                                }
-                            }
-
-                            if (expired is not null)
-                            {
-                                foreach (var (requestId, state) in expired)
-                                {
-                                    // Note: we do not remove the state from _enumerators here.
-                                    // It remains until StartDisposal's finally block removes it, allowing
-                                    // any racing MoveNext to observe state.DisposalTask != null and bail out cleanly.
-                                    GetOrCreateDisposalTask(state, cancel: true, out var disposalTask, out var disposalWork);
-
-                                    (disposalTasks ??= []).Add(disposalTask);
-
-                                    if (disposalWork is { } work)
+                                    finally
                                     {
-                                        (workItems ??= []).Add(work);
+                                        state.ExitGate();
                                     }
                                 }
-                            }
-                        }
 
-                        if (workItems is not null)
-                        {
-                            foreach (var work in workItems)
+                                // Note: we do not remove the state from _enumerators here.
+                                // It remains until CompleteDisposalWorkAsync's finally block removes it, allowing
+                                // any racing MoveNext to observe state.DisposalTask != null and bail out cleanly.
+                            }
+
+                            if (expiredStates is not null)
                             {
-                                StartDisposal(work);
+                                foreach (var state in expiredStates)
+                                {
+                                    // Sequential await is fine here as DisposalStartedTask completes as soon as the disposal work
+                                    // is scheduled and CancelAsync is initiated (before user callbacks run or the gate is entered),
+                                    // so this does NOT serialize actual teardown. This way we avoid also allocating a Task array!
+                                    await StartEnumeratorDisposal(state).ConfigureAwait(false);
+                                }
                             }
-                        }
 
-                        if (disposalTasks is { Count: > 0 })
+                            OnObserverEnumeratorCleanupCompleted(this); // Yes we report even if there are no disposal to do.
+                        }
+                        catch (Exception exception)
                         {
-                            await Task.WhenAll(disposalTasks).ConfigureAwait(false);
+                            LogWarningErrorCleaningUpEnumerators(_logger, exception);
                         }
-
-                        OnObserverEnumeratorCleanupCompleted(this); // Yes we report even if there are no disposal to do.
-                    }
-                    catch (Exception exception)
-                    {
-                        LogWarningErrorCleaningUpEnumerators(_logger, exception);
                     }
                 }
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                // Ignore; we are shutting down.
-            }
-            catch (Exception exception)
-            {
-                LogWarningErrorCleaningUpEnumerators(_logger, exception);
+                catch (OperationCanceledException) when (cancellationTokenSource.Token.IsCancellationRequested)
+                {
+                    // Ignore; we are shutting down.
+                }
+                catch (Exception exception)
+                {
+                    LogWarningErrorCleaningUpEnumerators(_logger, exception);
+                }
             }
         }
 
         public async ValueTask<(EnumerationResult Status, object? Value)> StartEnumeration<T>(
             Guid requestId, IAsyncEnumerableRequest<T> request, CancellationToken cancellationToken)
         {
-            Debug.Assert(request.MaxBatchSize > 0, "Max batch size must be positive.");
+            if (request.MaxBatchSize <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(request), request.MaxBatchSize, "Max batch size must be positive.");
+            }
 
             var cts = CancellationTokenSource.CreateLinkedTokenSource(request.GetCancellationToken());
             var state = new EnumeratorState
@@ -196,26 +193,39 @@ internal partial class InvokableObjectManager
             // We enter the gate to prevent a concurrent DisposeAsync/MoveNextAsync from using a partially inited enumerator.
             await state.WaitToEnterGateAsync(CancellationToken.None).ConfigureAwait(false);
 
-            Exception? exception = null;
+            Exception? validationException = null;
 
             lock (_lock)
             {
                 if (_disposeTask is not null)
                 {
-                    exception = new ObjectDisposedException(nameof(AsyncEnumerableGrainObserverExtension));
+                    // The extension was disposed while the caller was starting enumeration.
+                    // This is not a caller error but rather a runtime race.
+                    // The disposal of the extension means the disposal of the observer as well.
+                    validationException = new ObserverNotReachableException($"The observer extension '{nameof(AsyncEnumerableGrainObserverExtension)}' has been disposed.");
                 }
                 else if (!_enumerators.TryAdd(requestId, state))
                 {
-                    exception = new InvalidOperationException("An enumerator with the same id already exists.");
+                    // Otherwise its a caller-side programming error: duplicate request GUID so we throw.
+                    validationException = new InvalidOperationException("An enumerator with the same id already exists.");
+                }
+                else if (_enumerators.Count == 1)
+                {
+                    _cleanupCts = CancellationTokenSource.CreateLinkedTokenSource(_shutdownCts.Token);
+
+                    using (new ExecutionContextSuppressor())
+                    {
+                        _cleanupTask = RunCleanupLoopAsync(_cleanupCts);
+                    }
                 }
             }
 
-            if (exception is not null)
+            if (validationException is { } exception)
             {
                 state.ExitGate();
                 cts.Dispose();
 
-                return (EnumerationResult.Error, exception);
+                throw exception;
             }
 
             try
@@ -229,11 +239,11 @@ internal partial class InvokableObjectManager
                 // Remove and claim cleanup while still holding the gate. The cleanup worker will
                 // cancel the token and wait for this initialization path to release the gate.
 
-                var disposalTask = RequestDisposal(requestId, state, cancel: true);
+                var disposalTask = StartEnumeratorDisposal(state);
 
                 state.ExitGate();
 
-                await WaitWithTimeoutAsync(disposalTask).ConfigureAwait(false);
+                await WaitWithTimeoutAsync(disposalTask, "the enumerator's disposal to initiate").ConfigureAwait(false);
 
                 return (EnumerationResult.Error, ex);
             }
@@ -266,8 +276,9 @@ internal partial class InvokableObjectManager
             // First we try to acquire exclusive access to this enumerator. On the fast-path TryEnterGate avoids
             // allocating a linked CTS when uncontended. On the slow-path we link the caller's cancellation token with
             // the state's removal token so a stuck producer holding the gate during teardown can not keep us here,
-            // because RequestDisposal fires SignalRemoval *before* teardown starts. A stale call that observes removal
+            // because StartEnumeratorDisposal fires removal signal *before* teardown starts. A stale call that observes removal
             // returns MissingEnumeratorError without entering the gate, releasing its invocation admission so StopAsync can drain.
+            // Note that we cant use two chained WaitAsync() calls here as that open a race window (see below)
 
             try
             {
@@ -279,15 +290,16 @@ internal partial class InvokableObjectManager
                     await state.WaitToEnterGateAsync(linkedCts.Token).ConfigureAwait(false);
                 }
             }
-            catch (OperationCanceledException) when (state.RemovalTokenSource.Token.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (state.RemovalTokenSource.Token.IsCancellationRequested)
             {
                 return (EnumerationResult.MissingEnumeratorError, default);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                var disposalTask = RequestDisposal(requestId, state, cancel: true);
+                // This is a caller/client cancellation case.
+                var disposalTask = StartEnumeratorDisposal(state);
 
-                await WaitWithTimeoutAsync(disposalTask).ConfigureAwait(false);
+                await WaitWithTimeoutAsync(disposalTask, "the enumerator's disposal to initiate").ConfigureAwait(false);
 
                 return (EnumerationResult.Canceled, default);
             }
@@ -399,45 +411,71 @@ internal partial class InvokableObjectManager
                 // Otherwise we await the pending producer task with a long-poll timeout, after that we classify the outcome.
                 var longPollTimeout = _messagingOptions.ConfiguredResponseTimeout / 2;
 
-                try
-                {
-                    await moveNextTask.WaitAsync(longPollTimeout, _timeProvider, cancellationToken).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                // We use SuppressThrowing so that we do not rely on catching exceptions to determine the outcome.
+                // If WaitAsync throws synchronously or the inner task faults/cancels, the await returns normally.
+                // We classify the result directly below.
+
+                // Contrary to the entry point, we chain two WaitAsync calls here instead of allocating a linked CTS.
+                // That is safe because we already hold the gate: the outer wait acquires nothing, so cancelling it just
+                // returns from this method, which releases the gate in the finally. The abandoned inner wrapper observes
+                // `moveNextTask` in the background and completes unobserved once the producer finishes as state.MoveNextTask
+                // still references the real producer task, so teardown waits for it as before.
+
+                // At the entry point this is not possible because the inner wait is `_gate.WaitAsync(...)`, which acquires
+                // the semaphore. If the outer wait cancelled and we returned, the inner wait could still take the gate with
+                // nobody left to release it, hence the single linked CTS there.
+                await ((Task)moveNextTask
+                    .WaitAsync(longPollTimeout, _timeProvider, cancellationToken)
+                    .WaitAsync(state.RemovalTokenSource.Token))
+                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+
+                if (cancellationToken.IsCancellationRequested)
                 {
                     // Regardless of the task's state, we surface cancellation as the caller is the one who cancelled it.
-                    result = (EnumerationResult.Canceled, null);
+                    // If the caller cancelled *before* the producer finished, the producer is still running.
+                    // By leaving MoveNextTask non-null, the teardown worker will correctly wait for the producer to finish before calling DisposeAsync.
+                    result = (EnumerationResult.Canceled, default);
                     goto Done;
                 }
-                catch (TimeoutException)
+
+                if (state.RemovalTokenSource.IsCancellationRequested)
                 {
-                    // Long-poll elapsed, or the task itself was cancelled.
-                    // If the task is still in flight, we report a heartbeat; otherwise fall through and classify its outcome.
-                    if (!moveNextTask.IsCompleted)
-                    {
-                        result = (EnumerationResult.Heartbeat, null);
-                        goto Done;
-                    }
-                }
-                catch
-                {
-                    // Ignore; the task faulted! We will classify the error from the task itself.
+                    // Otherwise RemovalTokenSource fired while we were parked on the long-poll: StopAsync's observer
+                    // disposal, an explicit DisposeAsync RPC, the extension's own DisposeAsync, or the cleanup loop
+                    // evicting this state. In every case the enumerator is being (or has already been) torn down and
+                    // no further elements may be delivered to the client. We surface MissingEnumeratorError rather
+                    // than Canceled because the termination is runtime-initiated, not caller-initiated.
+                    // We leave MoveNextTask set as teardown still needs to wait for the producer (which may still
+                    // be running) before calling DisposeAsync. The terminated branch below calls StartEnumeratorDisposal(cancel: true),
+                    // which joins the disposal task that removal already created, or creates one if it somehow does not exist.
+                    result = (EnumerationResult.MissingEnumeratorError, default);
+                    goto Done;
                 }
 
-                Debug.Assert(moveNextTask.IsCompleted);
+                if (!moveNextTask.IsCompleted)
+                {
+                    // Long-poll elapsed; the producer task is still in flight. Again not nulling MoveNextTask
+                    result = (EnumerationResult.Heartbeat, default);
+                    goto Done;
+                }
+
+                //  We are about to consume the result (Element, Completed, Canceled, or Error).
+                //  Since the task is finished, teardown no longer needs to wait for it, so we clear it.
                 state.MoveNextTask = null;
 
                 if (moveNextTask.IsCompletedSuccessfully)
                 {
 #pragma warning disable CA1849 // It won't be faulted if we reach this point!
-                    result = moveNextTask.Result ? (EnumerationResult.Element, typedEnumerator.Current) : (EnumerationResult.Completed, null);
+                    result = moveNextTask.Result ? (EnumerationResult.Element, typedEnumerator.Current) : (EnumerationResult.Completed, default);
 #pragma warning restore CA1849
                     goto Done;
                 }
 
                 if (moveNextTask.IsCanceled)
                 {
-                    result = (EnumerationResult.Canceled, null);
+                    // This looks redundant maybe but it catches cases where the producer's token was
+                    // canceled (via ClientTokenSource), independent of the caller's token (cancellationToken).
+                    result = (EnumerationResult.Canceled, default);
                     goto Done;
                 }
 
@@ -465,265 +503,203 @@ Done:;
                 const int CancelMask = (int)(EnumerationResult.MissingEnumeratorError | EnumerationResult.Error | EnumerationResult.Canceled);
 
                 // In case of abnormal terminations must cancel the producer because it may still have work outstanding.
-                var cancel = ((int)result.Status & CancelMask) != 0;
-                var disposalTask = RequestDisposal(requestId, state, cancel);
+                var disposalTask = StartEnumeratorDisposal(state, cancelClientToken: ((int)result.Status & CancelMask) != 0);
 
-                await WaitWithTimeoutAsync(disposalTask).ConfigureAwait(false);
+                await WaitWithTimeoutAsync(disposalTask, "the enumerator's disposal to initiate").ConfigureAwait(false);
             }
 
             return result;
         }
 
-        ValueTask IAsyncEnumerableGrainExtension.DisposeAsync(Guid requestId) =>
-            ((IAsyncEnumerableGrainExtension)this).DisposeAsync(requestId, CancellationToken.None);
+        public ValueTask DisposeAsync(Guid requestId) => DisposeAsync(requestId, CancellationToken.None);
 
-        async ValueTask IAsyncEnumerableGrainExtension.DisposeAsync(Guid requestId, CancellationToken cancellationToken)
+        public async ValueTask DisposeAsync(Guid requestId, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            DisposalWork? disposalWork = null;
-            var teardownTask = Task.CompletedTask;
+            EnumeratorState? enumerator;
 
             lock (_lock)
             {
-                if (_enumerators.TryGetValue(requestId, out var state))
-                {
-                    // This RPC is the first to initiate teardown, or it joins existing teardown.
-                    // GetOrCreateDisposalTask returns the fast-path completion signal, which we discard here
-                    // as we want to await the actual teardown, not just cancellation acknowledgement.
-                    GetOrCreateDisposalTask(state, cancel: true, out _, out disposalWork);
-
-                    // GetOrCreateDisposalTask creates the disposal task AND the teardown one together under the lock, so it must not be null!
-                    Debug.Assert(state.TeardownTask is not null);
-
-                    teardownTask = state.TeardownTask!;
-                }
-                else
-                {
-                    // Enumerator was never started or is already fully torn down, nothing to do.
-                }
+                _enumerators.TryGetValue(requestId, out enumerator);
             }
 
-            if (disposalWork is { } work)
+            if (enumerator is not null)
             {
-                StartDisposal(work);
-            }
+                // This is an RPC disposal call which may be the first to initiate teardown (or it joins an existing teardown).
+                // StartEnumeratorDisposal returns the fast-path completion signal, which we discard here
+                // as we want to await the actual teardown, not just cancellation acknowledgement.
+                _ = StartEnumeratorDisposal(enumerator);
 
-            if (!teardownTask.IsCompletedSuccessfully)
+                Debug.Assert(enumerator.TeardownTask is not null, "Expected TeardownTask to be set when enumerator disposal has been initiated.");
+
+                if (!enumerator.TeardownTask.IsCompletedSuccessfully)
+                {
+                    await WaitWithTimeoutAsync(enumerator.TeardownTask, "the enumerator's teardown to complete").ConfigureAwait(false);
+                }
+            }
+            else
             {
-                await WaitWithTimeoutAsync(teardownTask).ConfigureAwait(false);
+                // Enumerator was never started or is already fully torn down, nothing to do.
             }
         }
 
-        private Task RequestDisposal(Guid requestId, EnumeratorState? expectedState, bool cancel)
+        private Task StartEnumeratorDisposal(EnumeratorState enumerator, bool cancelClientToken = true)
         {
-            DisposalWork? disposalWork;
-            var disposalTask = Task.CompletedTask;
+            Task disposalStartedTask;
 
             lock (_lock)
             {
-                EnumeratorState state;
-
-                if (expectedState is null)
+                if (enumerator.DisposalStartedTask is null)
                 {
-                    if (!_enumerators.TryGetValue(requestId, out var current))
-                    {
-                        return disposalTask;
-                    }
+                    var startedCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var teardownCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-                    state = current;
-                }
-                else
-                {
-                    state = expectedState;
+                    enumerator.DisposalStartedTask = startedCompletion.Task;
+                    enumerator.TeardownTask = teardownCompletion.Task;
+                    enumerator.DisposalWork = new DisposalWork(enumerator, cancelClientToken, startedCompletion, teardownCompletion);
                 }
 
-                GetOrCreateDisposalTask(state, cancel, out disposalTask, out disposalWork);
+                disposalStartedTask = enumerator.DisposalStartedTask;
             }
 
-            if (disposalWork is { } work)
+            // Outside the lock, see comment in DisposeAsync on why.
+            // Cancellation is idempontant in case multiple sources request disposal of this enumerator.
+            enumerator.SignalRemoval();
+
+            // We atomically claim the work! If another thread got here first,
+            // the Exchange result is null, which means another thread (maybe from DisposeAsync) grabbed the work!
+            if (Interlocked.Exchange(ref enumerator.DisposalWork, null) is { } disposalWork)
             {
-                StartDisposal(work);
+                CompleteDisposalWorkAsync(disposalWork).Ignore();
             }
 
-            return disposalTask;
+            return disposalStartedTask;
         }
 
-        private static void GetOrCreateDisposalTask(EnumeratorState state, bool cancel, out Task disposalTask, out DisposalWork? work)
+        private async Task CompleteDisposalWorkAsync(DisposalWork work)
         {
-            // We signal removal before teardown is created/queued. Every path that disposes a state
-            // (RequestDisposal, an explicit dispose RPC, the extension's own DisposeAsync, and the cleanup loop)
-            // goes through this method and they all acquire the lock. This token is never exposed to user code,
-            // so the only registrations are internal linked-CTS continuations from MoveNextCoreAsync's slow-path gate acquisition.
-            // Note: Cancel() is idempotent, so a concurrent caller that arrives after the first one is a no-op and simply observes the early-return below.
-            // Note also: Cancel() must run synchronously (contrary to the client token) under _lock, to NOT break the ordering invariant expected.
-            // This is the main reason why this method signature is void(... out Task disposalTask), so nobody awaits it!
+            // We want to yield control to the caller and NOT capture the context.
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
 
-            state.RemovalTokenSource.Cancel();
+            var state = work.State;
+            var cancellationTask = Task.CompletedTask;
 
-            if (state.DisposalTask is { } existingTask)
+            // We signal cancellation *before* waiting for the gate. An in-flight MoveNextAsync may be
+            // waiting for the producer, and cancellation is what gives it a chance to finish, because
+            // it will notice the cancellation and fault thereby releasing the gate itself.
+            if (work.CancelClientToken)
             {
-                disposalTask = existingTask;
-                work = null;
-
-                return;
-            }
-
-            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            state.DisposalTask = completion.Task;
-
-            var teardownCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            state.TeardownTask = teardownCompletion.Task;
-
-            disposalTask = completion.Task;
-            work = new DisposalWork(state, cancel, completion, teardownCompletion);
-        }
-
-        private void StartDisposal(DisposalWork work)
-        {
-            RunDisposalAsync().Ignore();
-
-            async Task RunDisposalAsync()
-            {
-                // We want to yield control to the caller and NOT capture the context.
-                await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
-
-                var state = work.State;
-                var cancellationTask = Task.CompletedTask;
-
-                // We signal cancellation *before* waiting for the gate. An in-flight MoveNextAsync may be
-                // waiting for the producer, and cancellation is what gives it a chance to finish, because
-                // it will notice the cancellation and fault thereby releasing the gate itself.
-                if (work.Cancel)
-                {
-                    try
-                    {
-                        // Contrary to the grain extension's cancellation semantics, which require cancellation
-                        // to happen synchronously with the justification that callbacks need to run synchronously
-                        // on the grain scheduler before awaiting move completion, here we dont have a grain scheduler
-                        // so we can invoke cancellation asynchronously, and the worker can track completion of the callbacks separately.
-                        cancellationTask = state.ClientTokenSource.CancelAsync();
-                    }
-                    catch (Exception exception)
-                    {
-                        LogWarningErrorCancelingEnumerator(_logger, exception);
-                    }
-                }
-
-                // Then we complete the response-facing task. In-flight MoveNextAsync / StartEnumeration invocations
-                // await this *before* returning their response, and they must NOT be gated on the teardown below.
-                work.Completion.TrySetResult();
-
-                // Now we start the teardown, this is serialized against in-flight invocations by the gate.
-                var gateEntered = false;
-
                 try
                 {
-                    // The cancellation signalling above ensures that we wont get stuck
-                    // waiting here for the full ResponseTimeout duration.
-                    await state.WaitToEnterGateAsync(CancellationToken.None).ConfigureAwait(false);
-
-                    gateEntered = true;
-
-                    // DisposeAsync must not overlap a running MoveNextAsync, so we wait until a running MoveNextAsync completes fully.
-                    if (state.MoveNextTask is { } pendingMoveNextTask)
-                    {
-                        await WaitUntilCompletedAsync(pendingMoveNextTask).ConfigureAwait(false);
-                    }
-
-                    // Then we finalize cancellation
-                    await WaitUntilCompletedAsync(cancellationTask).ConfigureAwait(false);
-
-                    if (state.Enumerator is { } enumerator)
-                    {
-                        try
-                        {
-                            var enumeratorDisposeTask = enumerator.DisposeAsync().AsTask();
-                            await WaitUntilCompletedAsync(enumeratorDisposeTask).ConfigureAwait(false);
-                        }
-                        catch (Exception exception)
-                        {
-                            LogWarningErrorDisposingEnumerator(_logger, exception);
-                        }
-                    }
-
-                    state.ClientTokenSource.Dispose();
+                    // Contrary to the grain extension's cancellation semantics, which require cancellation
+                    // to happen synchronously with the justification that callbacks need to run synchronously
+                    // on the grain scheduler before awaiting move completion, here we dont have a grain scheduler
+                    // so we can invoke cancellation asynchronously, and the worker can track completion of the callbacks separately.
+                    cancellationTask = state.ClientTokenSource.CancelAsync();
                 }
                 catch (Exception exception)
                 {
-                    // Teardown is best-effort since the per-enumerator gate is never disposed,
-                    // since a stale request may already be waiting to acquire it.
-                    LogWarningErrorDisposingEnumerator(_logger, exception);
-                }
-                finally
-                {
-                    if (gateEntered)
-                    {
-                        state.ExitGate();
-                    }
-
-                    // Its generally safer to mark completation *before* we remove the teardown task from the outstanding disposals.
-                    // Since continuations are configured to run asynchronously, this should NOT result in synchronous execution of continuation code.
-
-                    work.TeardownCompletion.TrySetResult();
-
-                    lock (_lock)
-                    {
-                        // Now that the teardown is fully complete, we can finally remove the state
-                        // from the dictionary. Any subsequent MoveNext will return MissingEnumeratorError.
-                        if (_enumerators.TryGetValue(state.RequestId, out var current) && ReferenceEquals(current, state))
-                        {
-                            _enumerators.Remove(state.RequestId);
-                        }
-                    }
+                    LogWarningErrorCancelingEnumerator(_logger, exception);
                 }
             }
-        }
 
-        private async Task WaitWithTimeoutAsync(Task task)
-        {
+            // Then we complete the response-facing task. In-flight MoveNextAsync / StartEnumeration invocations
+            // await this *before* returning their response, and they must NOT be gated on the teardown below.
+            work.DisposalStartedCompletion.TrySetResult();
+
+            // Now we start the teardown, this is serialized against in-flight invocations by the gate.
+            var gateEntered = false;
+
             try
             {
-                await task.WaitAsync(_messagingOptions.ResponseTimeout, _timeProvider).ConfigureAwait(false);
-            }
-            catch (TimeoutException)
-            {
-                // The actual disposal task remains alive and retains responsibility for cleanup.
-                // Request cancellation and disposal responses are therefore bounded, even when actual producer teardown is not!
-                LogWarningErrorDisposingEnumerator(_logger, new TimeoutException("Timed out waiting for observer async enumerator disposal."));
+                // The cancellation signalling above ensures that we wont get stuck
+                // waiting here for the full ResponseTimeout duration.
+                await state.WaitToEnterGateAsync(CancellationToken.None).ConfigureAwait(false);
+
+                gateEntered = true;
+
+                // DisposeAsync must not overlap a running MoveNextAsync, so we wait until a running MoveNextAsync completes fully,
+                // but only up to ResponseTimeout. If the producer ignores cancellation and the wait times out, the
+                // "MoveNextTask is null or { IsCompleted: true }" guard below ensures we abandon instead of calling
+                // DisposeAsync concurrently with the still-pending MoveNextAsync.
+
+                var pendingMoveNextTask = state.MoveNextTask;
+                if (pendingMoveNextTask is not null)
+                {
+                    await WaitWithTimeoutAsync(pendingMoveNextTask, "the producer's pending MoveNextAsync").ConfigureAwait(false);
+                }
+
+                // Then we finalize cancellation (bounded by ResponseTimeout).
+                await WaitWithTimeoutAsync(cancellationTask, "cancellation callbacks to complete").ConfigureAwait(false);
+
+                // Finally we dispose the enumerator, but only if the producer is no longer running a MoveNextAsync.
+                if (pendingMoveNextTask is null or { IsCompleted: true } && state.Enumerator is { } enumerator)
+                {
+                    try
+                    {
+                        await WaitWithTimeoutAsync(enumerator.DisposeAsync().AsTask(), "the enumerator's disposal").ConfigureAwait(false);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogWarningErrorDisposingEnumerator(_logger, exception);
+                    }
+                }
+
+                state.ClientTokenSource.Dispose();
             }
             catch (Exception exception)
             {
+                // Teardown is best-effort since the per-enumerator gate is never disposed,
+                // since a stale request may already be waiting to acquire it.
                 LogWarningErrorDisposingEnumerator(_logger, exception);
             }
-        }
-
-        private async Task WaitUntilCompletedAsync(Task task)
-        {
-            while (!task.IsCompleted)
+            finally
             {
-                try
+                if (gateEntered)
                 {
-                    await task.WaitAsync(_messagingOptions.ResponseTimeout, _timeProvider).ConfigureAwait(false);
+                    state.ExitGate();
                 }
-                catch (TimeoutException)
+
+                // Its generally safer to mark completation *before* we remove the teardown task from the outstanding disposals.
+                // Since continuations are configured to run asynchronously, this should NOT result in synchronous execution of continuation code.
+
+                work.TeardownCompletion.TrySetResult();
+
+                lock (_lock)
                 {
-                    // It should be super rare for this to happen, but in case the producer takes a long time to complete its pending operation
-                    // the teardown worker remains alive and does not call DisposeAsync() concurrently with the pending MoveNextAsync().
-                    // This can become a risk of a deadlock, though callers really are supposed to observe cancellation, and generally not
-                    // have code that hangs. Maybe we should consuder breaking after a wait round, maybe a ceiling like 3?!
-                    LogWarningErrorDisposingEnumerator(_logger, new TimeoutException($"Timed out waiting for disposal. I will try again!"));
-                }
-                catch
-                {
-                    // The task faulted or was canceled, we observe its final outcome below but break out of the loop.
-                    break;
+                    // Now that the teardown is fully complete, we can finally remove the state
+                    // from the dictionary. Any subsequent MoveNext will return MissingEnumeratorError.
+                    if (_enumerators.TryGetValue(state.RequestId, out var current) && ReferenceEquals(current, state))
+                    {
+                        _enumerators.Remove(state.RequestId);
+                    }
                 }
             }
-
+        }
+        private async Task WaitWithTimeoutAsync(Task task, string operationName)
+        {
             try
             {
-                await task.ConfigureAwait(false);
+                // We also pass the shutdown token so that once extension disposal begins (which cancels _shutdownCts),
+                // any in-flight WaitAsync bails out immediately rather than waiting the full ResponseTimeout.
+                await task.WaitAsync(_messagingOptions.ResponseTimeout, _timeProvider, _shutdownCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (task.IsCanceled)
+            {
+                // The awaited operation observed the cancellation! This is expected during normal teardown of a
+                // cancelled enumeration, so no log is justified as this is NOT a failure!
+            }
+            catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+            {
+                // Shutdown interrupted the wait!
+                LogWarningErrorDisposingEnumerator(_logger, new OperationCanceledException($"Shutdown interrupted waiting for {operationName}."));
+            }
+            catch (TimeoutException)
+            {
+                // If this is the disposal task, the worker remains alive and retains responsibility for cleanup.
+                // Request cancellation and disposal responses are therefore bounded even when the underlying operation is not.
+                LogWarningErrorDisposingEnumerator(_logger, new TimeoutException($"Timed out waiting for {operationName}."));
             }
             catch (Exception exception)
             {
@@ -733,9 +709,8 @@ Done:;
 
         public ValueTask DisposeAsync()
         {
-            Task[] teardownTasks;
-            List<DisposalWork> workItems = [];
-            TaskCompletionSource completion;
+            List<EnumeratorState> states = [];
+            TaskCompletionSource? disposalCompletion;
 
             lock (_lock)
             {
@@ -744,101 +719,98 @@ Done:;
                     return new ValueTask(_disposeTask);
                 }
 
-                teardownTasks = new Task[_enumerators.Count];
-                var index = 0;
-
                 foreach (var state in _enumerators.Values)
                 {
-                    GetOrCreateDisposalTask(state, cancel: true, out _, out var disposalWork);
-
-                    if (disposalWork is { } work)
-                    {
-                        workItems.Add(work);
-                    }
-
-                    teardownTasks[index++] = state.TeardownTask!;
+                    states.Add(state);
                 }
 
-                // We do NOT clear _enumerators here. StartDisposal's finally block removes each state
-                // as its teardown completes, preserving the reference checks in MoveNextCoreAsync.
-                // And we create and hand off the promise to dispose this extension
-                // (and all enumerators) to any (potentially concurrent) callers.
+                // We do NOT clear _enumerators here! Instead that happens as teardown completes, preserving the
+                // reference checks in MoveNextCoreAsync. And we create and hand off the promise to dispose this
+                // extension (and all enumerators) to any (potentially concurrent) callers.
 
-                completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                disposalCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-                _disposeTask = completion.Task;
+                _disposeTask = disposalCompletion.Task;
             }
 
-            CompleteDisposeAsync().Ignore();
-
-            return new ValueTask(completion.Task);
-
-            async Task CompleteDisposeAsync()
+            // We signal removal outside the lock so pending MoveNextCoreAsync call can safely acquire _lock in StartEnumeratorDisposal.
+            // This is because the thread cancelling these will execute the parked MoveNext logic. And we need cancellation
+            // to happen synchrounsly so we are sure that we do NOT start the actual disposing before we have singnalled cancellation to them.
+            foreach (var state in states)
             {
-                // We want to yield control to the caller and NOT capture the context.
-                // This is not so important really as the caller thread will just execute the
-                // StartDisposal(work) loop, and each StartDisposal will yield immedialty,
-                // but its better to have it than not.
-                await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+                state.SignalRemoval();
+            }
 
-                foreach (var work in workItems)
-                {
-                    StartDisposal(work);
-                }
+            CompleteExtensionDisposalAsync(states, disposalCompletion).Ignore();
 
+            return new ValueTask(_disposeTask);
+        }
+
+        private async Task CompleteExtensionDisposalAsync(List<EnumeratorState> states, TaskCompletionSource disposalCompletion)
+        {
+            // We want to yield control to the caller and NOT capture the context.
+            // This is not so important really as the caller thread will just execute the
+            // CompleteDisposalWorkAsync(work) loop, and each CompleteDisposalWorkAsync will yield immedialty,
+            // but its better to have it than not.
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
+            foreach (var state in states)
+            {
+                _ = StartEnumeratorDisposal(state);
+            }
+
+            await _shutdownCts.CancelAsync().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+
+            Task? cleanupTask;
+
+            lock (_lock)
+            {
+                cleanupTask = _cleanupTask;
+            }
+
+            if (cleanupTask is not null)
+            {
+                await cleanupTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            }
+
+            try
+            {
+                // If a producer never completes its outstanding MoveNextAsync(), we wait max up to ResponseTimeout.
+                // We deliberately do NOT forcibly abandon the disposal workers though. These retain responsibility for finishing
+                // teardown if the producer eventually completes. This means that extension disposal is NOT a guarantee
+                // that every underlying enumerator has been disposed. Eventually they will though so long as user-code behaves!
+
+                await Task.WhenAll(states.Select(s => s.TeardownTask!))
+                    .WaitAsync(_messagingOptions.ResponseTimeout, _timeProvider)
+                    .ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                // Individual disposal workers remain alive and continue waiting for in-flight producer operations.
+                LogWarningErrorDisposingEnumerator(_logger, new TimeoutException("Timed out waiting for all observer async enumerators to dispose."));
+            }
+            catch (Exception exception)
+            {
+                LogWarningErrorDisposingEnumerator(_logger, exception);
+            }
+            finally
+            {
                 try
                 {
-                    await _shutdownCts.CancelAsync().ConfigureAwait(false);
-                }
-                catch (Exception exception)
-                {
-                    LogWarningErrorCleaningUpEnumerators(_logger, exception);
-                }
-
-                try
-                {
-                    await _cleanupTask.ConfigureAwait(false);
-                }
-                catch (Exception exception)
-                {
-                    LogWarningErrorCleaningUpEnumerators(_logger, exception);
-                }
-
-                try
-                {
-                    // If a producer never completes its outstanding MoveNextAsync(), we wait max up to ResponseTimeout.
-                    // We deliberately do NOT forcibly abandon the disposal workers though. These retain responsibility for finishing
-                    // teardown if the producer eventually completes. This means that extension disposal is NOT a guarantee
-                    // that every underlying enumerator has been disposed. Eventually they will though so long as user-code behaves!
-                    await Task.WhenAll(teardownTasks).WaitAsync(_messagingOptions.ResponseTimeout).ConfigureAwait(false);
-                }
-                catch (TimeoutException)
-                {
-                    // Individual disposal workers remain alive and continue waiting for in-flight producer operations.
-                    LogWarningErrorDisposingEnumerator(_logger, new TimeoutException("Timed out waiting for all observer async enumerators to dispose."));
-                }
-                catch (Exception exception)
-                {
-                    LogWarningErrorDisposingEnumerator(_logger, exception);
+                    _shutdownCts.Dispose();
+                    OnAsyncEnumerableGrainObserverExtensionDisposed(this);
                 }
                 finally
                 {
-                    try
-                    {
-                        _shutdownCts.Dispose();
-                        OnAsyncEnumerableGrainObserverExtensionDisposed(this);
-                    }
-                    finally
-                    {
-                        completion.TrySetResult();
-                    }
+                    disposalCompletion.TrySetResult();
                 }
             }
         }
 
-        private readonly record struct DisposalWork(
-            EnumeratorState State, bool Cancel,
-            TaskCompletionSource Completion, // This should be awaited by in-flight invocations.          
+        private sealed record DisposalWork(
+            EnumeratorState State,
+            bool CancelClientToken, // Whether to cancel the client token in order to request that its MoveNextAsync completes.
+            TaskCompletionSource DisposalStartedCompletion, // This should be awaited by in-flight invocations.          
             TaskCompletionSource TeardownCompletion); // This should be awaited by the extension's own DisposeAsync.
 
         // Contrary to the grain extension the enumerator state here is a class instead of a mutable struct.
@@ -848,10 +820,10 @@ Done:;
         // A request must never start on E1 state and continue on another E2 state.
         // Thats why instead of just checking the id we check also for reference equality!
         [SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification =
-            "EnumeratorState owns a SemaphoreSlim and a CancellationTokenSource that are intentionally never disposed. " +
-            "A stale MoveNextCoreAsync can still be racing (reading RemovalTokenSource.Token in CreateLinkedTokenSource, " +
-            "or a concurrent sibling holding the gate while we do), so disposal would risk ObjectDisposedException. " +
-            "Neither resource holds a native handle so we let the GC collect them instead.")]
+            "EnumeratorState owns a SemaphoreSlim and a CancellationTokenSource which are intentionally never disposed. " +
+            "EnumeratorState can still be referenced by stale or concurrent MoveNextCoreAsync operations after teardown completes. " +
+            "Disposing these resources could race with gate operations or access to RemovalTokenSource.Token, causing ObjectDisposedException. " +
+            "These resources are left for garbage collection once all outstanding references to the state are released.")]
         private sealed class EnumeratorState
         {
             private readonly SemaphoreSlim _gate = new(1, 1);
@@ -861,28 +833,44 @@ Done:;
 
             public required CancellationTokenSource ClientTokenSource { get; init; }
             public CancellationTokenSource RemovalTokenSource { get; } = new();
+            public DisposalWork? DisposalWork;
 
             // These props should be accessed while the gate is held.
-            public IAsyncDisposable? Enumerator { get; set; }
             public bool Seen { get; set; }
+            public IAsyncDisposable? Enumerator { get; set; }
             public Task<bool>? MoveNextTask { get; set; }
 
             // These props should be accessed under the _lock of the extension.
+            public bool IsDisposing => DisposalStartedTask is not null;
 
             /// <summary>
+            /// Represents the initiation of the disposal of this enumerator.
+            /// </summary>
+            /// <remarks>
             /// Fires immediately after cancellation is initiated, unblocking in-flight MoveNext.
-            /// </summary>
-            public Task? DisposalTask { get; set; }
-            public bool IsDisposing => DisposalTask is not null;
+            /// This completes before the producer's DisposeAsync runs; see <see cref="TeardownTask"/> for that.
+            /// </remarks>
+            public Task? DisposalStartedTask { get; set; }
 
             /// <summary>
-            /// Fires when the producer's DisposeAsync completes, unblocking explicit dispose RPCs.
+            /// Represents the full destruction of the enumerator include pending MoveNext calls.
             /// </summary>
+            /// <remarks>Fires when the producer's DisposeAsync completes, unblocking explicit dispose RPCs.</remarks>
             public Task? TeardownTask { get; set; }
 
             public bool TryEnterGate() => _gate.Wait(0);
             public Task WaitToEnterGateAsync(CancellationToken cancellationToken) => _gate.WaitAsync(cancellationToken);
             public void ExitGate() => _gate.Release();
+
+            /// <summary>
+            /// Signals that this enumerator is being removed, unblocking pending MoveNext operations.
+            /// </summary>
+            /// <remarks>
+            /// Cancellation is synchronous because this token is used exclusively for internal coordination.
+            /// Its cancellation registrations execute inline, ensuring removal is signalled before the disposal worker starts.
+            /// Do NOT call this under _lock!
+            /// </remarks>
+            public void SignalRemoval() => RemovalTokenSource.Cancel();
         }
 
         [LoggerMessage(Level = LogLevel.Warning, Message = "Error canceling observer async enumerator.")]

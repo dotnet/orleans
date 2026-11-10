@@ -388,39 +388,15 @@ namespace DefaultCluster.Tests.General
         {
             TestInitialize();
 
-            var result = new AsyncResultHandle();
-            var cancellationToken = TestContext.Current.CancellationToken;
-            Exception? exception = null;
+            observer1 = new SimpleGrainObserver(null, null, Logger);
 
-            this.observer1 = new SimpleGrainObserver(null, null, this.Logger);
-
-            var observerRef = this.GrainFactory.CreateObjectReference<IPingableGrainObserver>(this.observer1);
+            var observerRef = GrainFactory.CreateObjectReference<IPingableGrainObserver>(observer1);
 
             await observerRef.Ping();
 
-            this.GrainFactory.DeleteObjectReference<IPingableGrainObserver>(observerRef);
+            GrainFactory.DeleteObjectReference<IPingableGrainObserver>(observerRef);
 
-            _ = Task.Run(async () =>
-            {
-                while (!result.Done)
-                {
-                    try
-                    {
-                        // We keep sending ping requests until the observer is deregistered, this will trigger the exception.
-                        await observerRef.Ping();
-                        await Task.Delay(20, cancellationToken); // Give the delete message time to propagate
-                    }
-                    catch (Exception ex)
-                    {
-                        exception = ex;
-                        result.Done = true;
-                    }
-                }
-            }, cancellationToken);
-
-            Assert.True(await result.WaitForFinished(timeout), $"Should not timeout waiting {timeout} for the exception.");
-            Assert.NotNull(exception);
-            Assert.IsType<ObserverNotReachableException>(exception);
+            await Assert.ThrowsAsync<ObserverNotReachableException>(observerRef.Ping);
         }
 
         public class DummyObserverGrain : Grain, ISimpleGrainObserver

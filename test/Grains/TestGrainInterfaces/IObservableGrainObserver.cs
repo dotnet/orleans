@@ -15,6 +15,7 @@ public interface IObservableGrainObserver : IGrainObserver
     IAsyncEnumerable<int> GetValuesWithError(int errorIndex, bool waitAfterYield, string errorMessage, CancellationToken cancellationToken = default);
     IAsyncEnumerable<int> SleepyEnumerable(Guid id, TimeSpan delay, CancellationToken cancellationToken = default);
     IAsyncEnumerable<string> GetBlockingEnumerable(CancellationToken cancellationToken = default);
+    IAsyncEnumerable<string> GetGatedEnumerable(CancellationToken cancellationToken = default);
 
     [AlwaysInterleave] ValueTask WaitForCall(Guid id);
     [AlwaysInterleave] ValueTask<HashSet<Guid>> GetCanceledCalls();
