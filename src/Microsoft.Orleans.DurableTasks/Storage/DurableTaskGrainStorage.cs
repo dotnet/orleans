@@ -73,6 +73,8 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
 
     public ReadOnlyMemory<byte> GetAccessLog(TaskId taskId) => _accessLogs.Get(taskId);
 
+    public DurableTaskAccessLogs? PositionHolder => _accessLogs.Journal is null ? null : _accessLogs;
+
     public void AppendAccessLog(TaskId taskId, ReadOnlySpan<byte> records)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);

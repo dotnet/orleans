@@ -34,6 +34,12 @@ internal interface IDurableTaskAccessLogStorage
     /// write captures commits each read with everything which can depend on it.
     /// </remarks>
     void AddPendingRecords(IDurableTaskPendingAccessRecords source);
+
+    /// <summary>
+    /// Gets the logs' holder of positional reads, whose records refer to positions of the journal which stores the logs,
+    /// or <see langword="null"/> when the logs aren't journaled, so every read records its value.
+    /// </summary>
+    Storage.DurableTaskAccessLogs? PositionHolder => null;
 }
 
 /// <summary>Records of accesses to journaled state which an attempt holds before staging them.</summary>
