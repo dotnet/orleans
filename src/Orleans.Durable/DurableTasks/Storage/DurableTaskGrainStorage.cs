@@ -71,7 +71,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         _accessLogs = accessLogs;
     }
 
-    public byte[] GetAccessLog(TaskId taskId) => _accessLogs.Get(taskId);
+    public ReadOnlyMemory<byte> GetAccessLog(TaskId taskId) => _accessLogs.Get(taskId);
 
     public void AppendAccessLog(TaskId taskId, ReadOnlySpan<byte> records)
     {

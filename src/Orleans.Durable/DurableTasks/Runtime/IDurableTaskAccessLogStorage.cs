@@ -17,9 +17,9 @@ internal interface IDurableTaskAccessLogStorage
 {
     /// <summary>
     /// Gets the records of the accesses to journaled state which the attempts of execution <paramref name="taskId"/>
-    /// staged, in order, which later appends don't change.
+    /// staged, in order. Later appends don't change the returned records.
     /// </summary>
-    byte[] GetAccessLog(TaskId taskId);
+    ReadOnlyMemory<byte> GetAccessLog(TaskId taskId);
 
     /// <summary>Appends <paramref name="records"/> to the access log of execution <paramref name="taskId"/>.</summary>
     /// <remarks>The records are staged, and commit with the next write together with the changes staged before them.</remarks>

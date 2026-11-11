@@ -46,15 +46,15 @@ public sealed class DurableTaskAccessLogStorageContractTests
 
         // The append which no write committed is lost with the activation, and the committed records recover.
         storage = await fixture.RestartAsync();
-        Assert.Equal([1, 2], Logs(storage).GetAccessLog(taskId));
+        Assert.Equal([1, 2], Logs(storage).GetAccessLog(taskId).ToArray());
 
         Assert.True(storage.TryGetTask(taskId, out state));
         storage.SetResponse(taskId, state, DurableTaskResponse.Completed);
-        Assert.Empty(Logs(storage).GetAccessLog(taskId));
+        Assert.True(Logs(storage).GetAccessLog(taskId).IsEmpty);
         await storage.WriteAsync(TestCancellation);
 
         storage = await fixture.RestartAsync();
-        Assert.Empty(Logs(storage).GetAccessLog(taskId));
+        Assert.True(Logs(storage).GetAccessLog(taskId).IsEmpty);
     }
 
     [Theory]
@@ -72,11 +72,11 @@ public sealed class DurableTaskAccessLogStorageContractTests
             Logs(storage).AppendAccessLog(taskId, [(byte)i]);
         }
 
-        Assert.Equal([1], returned);
-        Assert.Equal(Enumerable.Range(1, 20).Select(static i => (byte)i), Logs(storage).GetAccessLog(taskId));
+        Assert.Equal([1], returned.ToArray());
+        Assert.Equal(Enumerable.Range(1, 20).Select(static i => (byte)i), Logs(storage).GetAccessLog(taskId).ToArray());
 
         Assert.True(storage.RemoveTask(taskId));
-        Assert.Empty(Logs(storage).GetAccessLog(taskId));
+        Assert.True(Logs(storage).GetAccessLog(taskId).IsEmpty);
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public sealed class DurableTaskAccessLogStorageContractTests
         private readonly IDurableTaskGrainStorage _tasks = Substitute.For<IDurableTaskGrainStorage>();
 
         public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks => _tasks.Tasks;
-        public byte[] GetAccessLog(TaskId taskId) => [];
+        public ReadOnlyMemory<byte> GetAccessLog(TaskId taskId) => default;
         public void AppendAccessLog(TaskId taskId, ReadOnlySpan<byte> records) { }
         public void AddPendingRecords(IDurableTaskPendingAccessRecords source) { }
         public IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId task) => _tasks.GetChildren(task);
