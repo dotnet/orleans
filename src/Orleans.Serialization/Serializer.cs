@@ -573,8 +573,14 @@ namespace Orleans.Serialization
         /// Initializes a new instance of the <see cref="Serializer{T}"/> class.
         /// </summary>
         /// <param name="sessionPool">The session pool.</param>
-        public Serializer(SerializerSessionPool sessionPool) : this(OrleansGeneratedCodeHelper.UnwrapService(null!, sessionPool.CodecProvider.GetCodec<T>()), sessionPool)
+        public Serializer(SerializerSessionPool sessionPool) : this(GetCodec(sessionPool), sessionPool)
         {
+        }
+
+        private static IFieldCodec<T> GetCodec(SerializerSessionPool sessionPool)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(sessionPool);
+            return OrleansGeneratedCodeHelper.UnwrapService(null!, sessionPool.CodecProvider.GetCodec<T>());
         }
 
         /// <summary>
@@ -1026,6 +1032,8 @@ namespace Orleans.Serialization
         /// <param name="sessionPool">The session pool.</param>
         public ValueSerializer(IValueSerializerProvider codecProvider, SerializerSessionPool sessionPool)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(codecProvider);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(sessionPool);
             _sessionPool = sessionPool;
             _codec = OrleansGeneratedCodeHelper.UnwrapService(null!, codecProvider.GetValueSerializer<T>());
         }
@@ -1693,6 +1701,7 @@ namespace Orleans.Serialization
         /// <returns>The deserialized value.</returns>
         public object? Deserialize(Stream source, SerializerSession session, Type type)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(session);
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec(type);
             var field = reader.ReadFieldHeader();
@@ -1723,6 +1732,7 @@ namespace Orleans.Serialization
         /// <returns>The deserialized value.</returns>
         public object? Deserialize(ReadOnlySequence<byte> source, SerializerSession session, Type type)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(session);
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec(type);
             var field = reader.ReadFieldHeader();
@@ -1753,6 +1763,7 @@ namespace Orleans.Serialization
         /// <returns>The deserialized value.</returns>
         public object? Deserialize(ReadOnlySpan<byte> source, SerializerSession session, Type type)
         {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(session);
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec(type);
             var field = reader.ReadFieldHeader();

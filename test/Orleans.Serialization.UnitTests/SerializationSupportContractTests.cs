@@ -170,6 +170,36 @@ public sealed class SerializationSupportContractTests
     }
 
     [Fact]
+    public void SerializerConstructorsRejectNullDependencies()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
+        var codecProvider = serviceProvider.GetRequiredService<CodecProvider>();
+
+        Assert.Throws<ArgumentNullException>("sessionPool", () => new Serializer<int>(null!));
+        Assert.Throws<ArgumentNullException>("codecProvider", () => new ValueSerializer<int>(null!, sessionPool));
+        Assert.Throws<ArgumentNullException>("sessionPool", () => new ValueSerializer<int>(codecProvider, null!));
+    }
+
+    [Fact]
+    public void ObjectSerializer_SessionBasedDeserializeOverloadsRejectNullSession()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<ObjectSerializer>();
+        Action[] deserialize =
+        [
+            () => serializer.Deserialize(Stream.Null, null!, typeof(int)),
+            () => serializer.Deserialize(default(ReadOnlySequence<byte>), null!, typeof(int)),
+            () => serializer.Deserialize(ReadOnlySpan<byte>.Empty, null!, typeof(int))
+        ];
+
+        foreach (var deserializeValue in deserialize)
+        {
+            Assert.Throws<ArgumentNullException>("session", deserializeValue);
+        }
+    }
+
+    [Fact]
     public void SerializationConstructorNotFoundException_NullType_ThrowsWithExactParamName()
     {
         var exception = Assert.Throws<ArgumentNullException>(
