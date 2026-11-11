@@ -66,7 +66,8 @@ namespace Orleans.AzureUtils
                 Trace.TraceInformation(debugInfo);
 #endif
                 int idx1 = rowKey.IndexOf(Seperator, StringComparison.Ordinal);
-                int idx2 = rowKey.LastIndexOf(Seperator);
+                ReadOnlySpan<char> rowKeySpan = rowKey.AsSpan();
+                int idx2 = rowKeySpan.LastIndexOf(Seperator);
 #if DEBUG
                 debugInfo = string.Format(
                     CultureInfo.CurrentCulture,
@@ -75,7 +76,6 @@ namespace Orleans.AzureUtils
                     idx1,
                     idx2);
 #endif
-                ReadOnlySpan<char> rowKeySpan = rowKey.AsSpan();
                 ReadOnlySpan<char> addressStr = rowKeySpan[..idx1];
                 ReadOnlySpan<char> portStr = rowKeySpan.Slice(idx1 + 1, idx2 - idx1 - 1);
                 ReadOnlySpan<char> genStr = rowKeySpan[(idx2 + 1)..];

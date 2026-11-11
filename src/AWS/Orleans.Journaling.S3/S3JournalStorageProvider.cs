@@ -71,7 +71,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
             _options.GetObjectKeyPrefixForCatalog(listingPrefix) ?? string.Empty);
         if (!ordered)
         {
-            var directoryEnd = objectKeyPrefix.LastIndexOf('/') + 1;
+            var directoryEnd = objectKeyPrefix.AsSpan().LastIndexOf('/') + 1;
             objectKeyPrefix = objectKeyPrefix[..directoryEnd];
         }
 

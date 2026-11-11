@@ -20,7 +20,7 @@ Create an ASP.NET Core app which co-hosts an Orleans silo and exposes a grain th
 dotnet new orleans-web --name MyOrleansWebApp
 ```
 
-Both templates target .NET 10 by default. Pass `--framework net8.0` to target .NET 8:
+Both templates target .NET 10 by default. Pass `--framework net8.0` or `--framework net11.0` to select .NET 8 or .NET 11:
 
 ```dotnetcli
 dotnet new orleans --name MyOrleansApp --framework net8.0

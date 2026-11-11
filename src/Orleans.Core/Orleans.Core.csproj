@@ -7,7 +7,7 @@
     <RootNamespace>Orleans</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <EnableSingleFileAnalyzer Condition="'$(TargetFramework)' == 'net10.0'">true</EnableSingleFileAnalyzer>
+    <EnableSingleFileAnalyzer Condition="'$(TargetFramework)' == 'net10.0' or '$(TargetFramework)' == 'net11.0'">true</EnableSingleFileAnalyzer>
   </PropertyGroup>
 
   <ItemGroup>

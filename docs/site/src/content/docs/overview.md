@@ -9,7 +9,7 @@ ms.topic: overview
 
 Orleans is a cross-platform framework for building distributed applications with .NET. It extends familiar C# concepts across a cluster so that application code can address stateful entities by identity without tracking which server currently hosts them.
 
-Orleans libraries target `net8.0` and `net10.0`.
+Orleans libraries target `net8.0`, `net10.0`, and `net11.0`.
 
 > [!NOTE]
 > To upgrade an existing application, see the [Orleans migration guide](migration-guide.md). Version-specific upgrade history is kept in that guide rather than repeated in ordinary documentation.

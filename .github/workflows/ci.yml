@@ -78,7 +78,7 @@ jobs:
     - name: Check CodeGen graph inventory
       shell: pwsh
       run: |
-        foreach ($framework in 'net8.0', 'net10.0') {
+        foreach ($framework in 'net8.0', 'net10.0', 'net11.0') {
           ./.github/scripts/test-codegenerator-graph.ps1 -Framework $framework
         }
     - name: Pack and validate package compatibility
@@ -102,7 +102,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start Redis
@@ -141,7 +141,7 @@ jobs:
       fail-fast: false
       matrix:
         dbversion: ["4.0", "4.1", "5.0"]
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Pre-pull Cassandra test images
@@ -168,7 +168,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start PostgreSQL
@@ -214,7 +214,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start MariaDB
@@ -276,7 +276,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start SQL Server
@@ -323,7 +323,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Test
@@ -338,7 +338,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start Azurite
@@ -378,7 +378,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start Azurite
@@ -442,7 +442,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start Azure Cosmos DB emulator
@@ -498,7 +498,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Pre-pull Consul test images
@@ -527,7 +527,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start ZooKeeper
@@ -567,7 +567,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start DynamoDB Local
@@ -608,7 +608,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Pre-pull S3 test images
@@ -636,7 +636,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start DynamoDB Local
@@ -692,7 +692,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
 #    services:
 #      nats:
 #        image: nats:latest
@@ -744,7 +744,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start Ministack
@@ -803,7 +803,7 @@ jobs:
       matrix:
         suite: [BVT, SlowBVT, Functional]
         os: [ubuntu-24.04, windows-latest]
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Test
@@ -819,7 +819,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-latest]
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Test Code Generator
@@ -835,7 +835,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: ["net8.0", "net10.0"]
+        framework: ["net8.0", "net10.0", "net11.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup Node.js
