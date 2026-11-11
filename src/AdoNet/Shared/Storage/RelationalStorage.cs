@@ -297,7 +297,7 @@ namespace Orleans.Tests.SqlUtils
                 }
                 finally
                 {
-                    cancellationRegistration.Dispose();
+                    await cancellationRegistration.DisposeAsync().ConfigureAwait(false);
                 }
             }
         }
