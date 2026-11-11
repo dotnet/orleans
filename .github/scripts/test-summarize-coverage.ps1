@@ -947,7 +947,7 @@ exit 0
         [IO.File]::WriteAllText($fakeDotnet, @'
 param([Parameter(ValueFromRemainingArguments)] [string[]] $Command)
 if ($env:ORLEANS_GRAPH_FAILURE -eq 'true') { exit 5 }
-if (($Command -join ' ') -notmatch '^test --solution (Orleans.slnx|.github/solutions/CodeGenerator.slnf) --framework net(8|10|11).0 --no-build --filter-query /\[\(Provider=None\)&\(Area=CodeGen\)&\(\(Suite=BVT\)\|\(Suite=SlowBVT\)\|\(Suite=Functional\)\)\] --list-tests json --max-parallel-test-modules 1$') {
+if (($Command -join ' ') -notmatch '^test --solution (Orleans.slnx|.github/solutions/CodeGenerator.slnf) --framework net(10|11).0 --no-build --filter-query /\[\(Provider=None\)&\(Area=CodeGen\)&\(\(Suite=BVT\)\|\(Suite=SlowBVT\)\|\(Suite=Functional\)\)\] --list-tests json --max-parallel-test-modules 1$') {
     throw "Unexpected discovery command: $Command"
 }
 $file = if ($Command[2] -eq 'Orleans.slnx') { $env:ORLEANS_GRAPH_FULL } else { $env:ORLEANS_GRAPH_FOCUSED }
