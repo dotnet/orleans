@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -597,6 +598,51 @@ public class StreamingJsonConverterTests
     #endregion
 
     #region StreamId JSON identity contracts (StreamId.cs)
+
+    [Fact]
+    public void StreamId_CreateRejectsNullStringKeyAndIdentity()
+    {
+        Assert.Throws<ArgumentNullException>("key", () => StreamId.Create(null, (string)null!));
+        Assert.Throws<ArgumentNullException>("key", () => StreamId.Create("orders", (string)null!));
+        Assert.Throws<ArgumentNullException>("streamIdentity", () => StreamId.Create((IStreamIdentity)null!));
+    }
+
+    [Fact]
+    public void StreamId_GetObjectDataRejectsNullAndPreservesLegacyEntries()
+    {
+        var value = StreamId.Create("orders", "order-42");
+        Assert.Throws<ArgumentNullException>("info", () => value.GetObjectData(null!, default));
+
+#pragma warning disable SYSLIB0050 // Exercise the existing ISerializable metadata contract, not formatter serialization.
+        var info = new SerializationInfo(typeof(StreamId), new FormatterConverter());
+#pragma warning restore SYSLIB0050
+        value.GetObjectData(info, default);
+
+        Assert.Equal(3, info.MemberCount);
+        var entries = info.GetEnumerator();
+        Assert.True(entries.MoveNext());
+        Assert.Equal("fk", entries.Name);
+        Assert.Equal(typeof(byte[]), entries.ObjectType);
+        Assert.Equal(value.FullKey.ToArray(), Assert.IsType<byte[]>(entries.Value));
+        Assert.True(entries.MoveNext());
+        Assert.Equal("ki", entries.Name);
+        Assert.Equal(typeof(ushort), entries.ObjectType);
+        Assert.Equal(value.Namespace.Length, (ushort)entries.Value);
+        Assert.True(entries.MoveNext());
+        Assert.Equal("fh", entries.Name);
+        Assert.Equal(typeof(int), entries.ObjectType);
+        Assert.Equal(value.GetHashCode(), (int)entries.Value);
+        Assert.False(entries.MoveNext());
+    }
+
+    [Fact]
+    public void StreamId_JsonConverterRejectsNullWriters()
+    {
+        var converter = new StreamIdJsonConverter();
+        var value = StreamId.Create("orders", "order-42");
+        Assert.Throws<ArgumentNullException>("writer", () => converter.Write(null!, value, null!));
+        Assert.Throws<ArgumentNullException>("writer", () => converter.WriteAsPropertyName(null!, value, null!));
+    }
 
     [Theory]
     [InlineData("orders", "order-42")]
