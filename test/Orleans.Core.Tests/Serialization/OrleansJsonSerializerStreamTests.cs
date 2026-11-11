@@ -10,6 +10,12 @@ namespace NonSilo.Tests.Serialization;
 public class OrleansJsonSerializerStreamTests
 {
     [Fact]
+    public void ConstructorRejectsNullOptions()
+    {
+        Assert.Throws<ArgumentNullException>("options", () => new OrleansJsonSerializer(null!));
+    }
+
+    [Fact]
     public void StreamRoundTrip_SerializesAndDeserializes()
     {
         var serializer = new OrleansJsonSerializer(Options.Create(new OrleansJsonSerializerOptions()));

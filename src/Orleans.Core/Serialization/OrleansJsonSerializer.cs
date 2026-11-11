@@ -33,8 +33,10 @@ namespace Orleans.Serialization
         /// Initializes a new instance of the <see cref="OrleansJsonSerializer"/> class.
         /// </summary>
         /// <param name="options">The configured JSON serializer options.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
         public OrleansJsonSerializer(IOptions<OrleansJsonSerializerOptions> options)
         {
+            ArgumentNullException.ThrowIfNull(options);
             this.settings = options.Value.JsonSerializerSettings;
         }
 
