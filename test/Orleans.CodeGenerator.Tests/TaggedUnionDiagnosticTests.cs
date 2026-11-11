@@ -13,7 +13,7 @@ using static VerifyXunit.Verifier;
 namespace Orleans.CodeGenerator.Tests;
 
 /// <summary>
-/// Tests the source generator's ORLEANS0116 diagnostics for closed type hierarchies and union types.
+/// Tests the source generator's ORLEANS0117 diagnostics for closed type hierarchies and union types.
 /// </summary>
 /// <remarks>
 /// These tests compile closed and union types with <see cref="LanguageVersion.Preview"/>. Union diagnostics which depend on union case types
@@ -38,7 +38,7 @@ public sealed class TaggedUnionDiagnosticTests
             [GenerateSerializer, Case(0)] public sealed record Item<T>([property: Id(0)] T Value) : Outer.NestedBase<T>;
             """);
 
-        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0117");
         AssertGeneratesTaggedUnionCodec(result);
         AssertNoErrors(output);
     }
@@ -54,7 +54,7 @@ public sealed class TaggedUnionDiagnosticTests
             [GenerateSerializer, Case(0)] public sealed record ClassCase<T>([property: Id(0)] T Value) : NullableClassBase<T> where T : class;
             """);
 
-        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0117");
         AssertGeneratesTaggedUnionCodec(result);
         AssertNoErrors(output);
     }
@@ -71,7 +71,7 @@ public sealed class TaggedUnionDiagnosticTests
                 : Related<Y, X> where Y : X;
             """);
 
-        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0117");
         AssertNoErrors(output);
         Assert.Contains("global::Item<U, T>", GetCodec(result, "Codec_Pair").NormalizeWhitespace().ToFullString(), StringComparison.Ordinal);
         Assert.Contains("global::RelatedItem<U, T>", GetCodec(result, "Codec_Related").NormalizeWhitespace().ToFullString(), StringComparison.Ordinal);
@@ -92,7 +92,7 @@ public sealed class TaggedUnionDiagnosticTests
             [GenerateSerializer, Case(0)] public sealed record Item<X>([property: Id(0)] X Value) : Base<X> where X : {{caseConstraint}};
             """);
 
-        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0117");
         AssertGeneratesTaggedUnionCodec(result);
         AssertNoErrors(output);
     }
@@ -111,7 +111,7 @@ public sealed class TaggedUnionDiagnosticTests
             [GenerateSerializer, Case(0)] public sealed record Item<X>([property: Id(0)] X Value) : Base<X> where X : {{constraint}};
             """);
 
-        var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0117");
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Contains("has type parameter constraints which closed type 'Base<T>' does not declare", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
@@ -130,7 +130,7 @@ public sealed class TaggedUnionDiagnosticTests
             }
             """);
 
-        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0117");
         AssertNoErrors(output);
         var copier = GetCodec(result, "Copier_Holder").NormalizeWhitespace().ToFullString();
         if (immutable)
@@ -165,7 +165,7 @@ public sealed class TaggedUnionDiagnosticTests
             [GenerateSerializer, Case(0)] public sealed record Item<X>([property: Id(0)] X Value) : Base<X> where X : {{caseConstraint}};
             """);
 
-        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0117");
         AssertGeneratesTaggedUnionCodec(result);
         AssertNoErrors(output);
     }
@@ -282,7 +282,7 @@ public sealed class TaggedUnionDiagnosticTests
     {
         var (_, result) = Generate(source);
 
-        var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0117");
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Contains(expectedMessage, diagnostic.GetMessage(), StringComparison.Ordinal);
     }

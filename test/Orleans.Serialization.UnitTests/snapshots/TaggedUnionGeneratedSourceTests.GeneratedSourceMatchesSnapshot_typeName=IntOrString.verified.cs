@@ -8,9 +8,8 @@ namespace OrleansCodeGen.Orleans.Serialization.UnitTests.TaggedUnions
     public sealed class Codec_IntOrString : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.UnitTests.TaggedUnions.IntOrString>, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.UnitTests.TaggedUnions.IntOrString>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::Orleans.Serialization.UnitTests.TaggedUnions.IntOrString);
-        [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Serialization.UnitTests.TaggedUnions.IntOrString instance)
-            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Serialization.UnitTests.TaggedUnions.IntOrString instance) where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
             switch (instance)
             {
@@ -23,7 +22,7 @@ namespace OrleansCodeGen.Orleans.Serialization.UnitTests.TaggedUnions
             }
         }
 
-        [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Serialization.UnitTests.TaggedUnions.IntOrString instance)
         {
             var header = global::Orleans.Serialization.Codecs.FieldHeaderCodec.ReadFieldHeader(ref reader);
@@ -49,24 +48,25 @@ namespace OrleansCodeGen.Orleans.Serialization.UnitTests.TaggedUnions
             global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ConsumeEndBaseOrEndObject(ref reader);
         }
 
-        [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, global::Orleans.Serialization.UnitTests.TaggedUnions.IntOrString value)
-            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, global::Orleans.Serialization.UnitTests.TaggedUnions.IntOrString value) where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
             global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.WriteStartUnion(ref writer, fieldIdDelta, expectedType, _codecFieldType);
             Serialize(ref writer, ref value);
             writer.WriteEndObject();
         }
 
-        [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::Orleans.Serialization.UnitTests.TaggedUnions.IntOrString ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
         {
             // Null references and values which encode their runtime type are read as case values, so payloads written for a closed type
             // hierarchy with the same cases, including payloads written before that hierarchy used case identifiers, are readable.
             if (field.IsReference)
                 return ReadCaseValue(ref reader, ref field);
+
             if (field.FieldType is { } fieldType && fieldType != _codecFieldType)
                 return ReadCaseValue(ref reader, ref field);
+
             field.EnsureWireTypeTagDelimited();
             global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(reader.Session);
             global::Orleans.Serialization.UnitTests.TaggedUnions.IntOrString result = default;
@@ -77,7 +77,9 @@ namespace OrleansCodeGen.Orleans.Serialization.UnitTests.TaggedUnions
         private global::Orleans.Serialization.UnitTests.TaggedUnions.IntOrString ReadCaseValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, ref global::Orleans.Serialization.WireProtocol.Field field)
         {
             global::Orleans.Serialization.UnitTests.TaggedUnions.IntOrString instance = default;
-            var value = field.IsReference ? global::Orleans.Serialization.Codecs.ReferenceCodec.ReadReference<object, TReaderInput>(ref reader, field) : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.DeserializeUnexpectedType<TReaderInput, object>(ref reader, ref field);
+            var value = field.IsReference
+                ? global::Orleans.Serialization.Codecs.ReferenceCodec.ReadReference<object, TReaderInput>(ref reader, field)
+                : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.DeserializeUnexpectedType<TReaderInput, object>(ref reader, ref field);
             switch (value)
             {
                 case null:

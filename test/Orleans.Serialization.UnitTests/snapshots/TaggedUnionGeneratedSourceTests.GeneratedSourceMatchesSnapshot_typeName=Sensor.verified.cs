@@ -59,9 +59,8 @@ namespace OrleansCodeGen.Orleans.Serialization.UnitTests.TaggedUnions
                 }
         }
 
-        [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, global::Orleans.Serialization.UnitTests.TaggedUnions.Sensor value)
-            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, global::Orleans.Serialization.UnitTests.TaggedUnions.Sensor value) where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
             // A null value is an empty union field, which is also how an empty union value is written.
             global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.WriteStartUnion(ref writer, fieldIdDelta, expectedType, _codecFieldType);
@@ -89,19 +88,22 @@ namespace OrleansCodeGen.Orleans.Serialization.UnitTests.TaggedUnions
             writer.WriteEndObject();
         }
 
-        [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::Orleans.Serialization.UnitTests.TaggedUnions.Sensor ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
         {
             if (field.IsReference)
                 return global::Orleans.Serialization.Codecs.ReferenceCodec.ReadReference<global::Orleans.Serialization.UnitTests.TaggedUnions.Sensor, TReaderInput>(ref reader, field);
+
             // Values written before the type used case identifiers encode their runtime type in the field header.
             if (field.FieldType is { } fieldType && fieldType != _codecFieldType)
                 return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.DeserializeUnexpectedType<TReaderInput, global::Orleans.Serialization.UnitTests.TaggedUnions.Sensor>(ref reader, ref field);
+
             field.EnsureWireTypeTagDelimited();
             global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(reader.Session);
             var header = global::Orleans.Serialization.Codecs.FieldHeaderCodec.ReadFieldHeader(ref reader);
             if (header.IsEndBaseOrEndObject)
                 return null;
+
             global::Orleans.Serialization.UnitTests.TaggedUnions.Sensor result;
             switch (header.FieldIdDelta)
             {

@@ -42,9 +42,9 @@ public sealed class TaggedUnionCompilerCompatibilityTests
         var producerUnion = output.GetTypeByMetadataName(typeof(ReferencedShallowUnion).FullName!)!;
         Assert.True(LanguageFeatureSymbols.IsUnion(producerUnion));
         var unavailableCases = Assert.Throws<OrleansGeneratorDiagnosticAnalysisException>(() => LanguageFeatureSymbols.GetUnionCaseTypes(producerUnion));
-        Assert.Equal("ORLEANS0116", unavailableCases.Diagnostic.Id);
+        Assert.Equal("ORLEANS0117", unavailableCases.Diagnostic.Id);
         Assert.Null(producerAssembly.GetType("OrleansCodeGen.Orleans.CodeGenerator.Tests.ReferencedTaggedUnions.Copier_ReferencedShallowUnion"));
-        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0117");
         AssertNoErrors(output);
         var copier = GetCodec(result, "Copier_Holder").NormalizeWhitespace().ToFullString();
         Assert.Contains("IDeepCopier<global::Orleans.CodeGenerator.Tests.ReferencedTaggedUnions.ReferencedShallowUnion>", copier, StringComparison.Ordinal);
@@ -101,7 +101,7 @@ public sealed class TaggedUnionCompilerCompatibilityTests
             }
             """);
 
-        var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+        var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0117");
         Assert.Contains("The compiler does not expose the case types of union type 'CustomUnion' to source generators", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 }
