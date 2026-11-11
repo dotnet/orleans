@@ -183,11 +183,11 @@ namespace Orleans.Transactions.TestKit.Consistency
                     if (DateTime.UtcNow > stopAfter)
                         break;
                 }
-                await Task.WhenAll(tasks);
+                var observations = await Task.WhenAll(tasks);
                 var result = new HashSet<Observation>();
-                for (int i = 0; i < count; i++)
+                foreach (var nestedObservations in observations)
                 {
-                    foreach (var x in tasks[i].Result)
+                    foreach (var x in nestedObservations)
                         result.Add(x);
                 }
                 return result.ToArray();
