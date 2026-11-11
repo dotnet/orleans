@@ -687,6 +687,183 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void GrainIdGetObjectDataValidatesInfoAndPreservesLegacyEntries()
+        {
+            var id = GrainId.Create("type", "key");
+            Assert.Throws<ArgumentNullException>("info", () => id.GetObjectData(null!, default));
+
+            foreach (var value in new[] { id, default })
+            {
+#pragma warning disable SYSLIB0050 // Exercise the existing ISerializable metadata contract, not formatter serialization.
+                var info = new SerializationInfo(typeof(GrainId), new FormatterConverter());
+#pragma warning restore SYSLIB0050
+                value.GetObjectData(info, default);
+                Assert.Equal(4, info.MemberCount);
+                var entries = info.GetEnumerator();
+                Assert.True(entries.MoveNext());
+                Assert.Equal("tv", entries.Name);
+                Assert.Equal(value.IsDefault ? typeof(object) : typeof(byte[]), entries.ObjectType);
+                Assert.Equal(value.IsDefault ? null : Encoding.UTF8.GetBytes("type"), (byte[]?)entries.Value);
+                Assert.True(entries.MoveNext());
+                Assert.Equal("th", entries.Name);
+                Assert.Equal(typeof(int), entries.ObjectType);
+                Assert.Equal(value.Type.GetHashCode(), Assert.IsType<int>(entries.Value));
+                Assert.True(entries.MoveNext());
+                Assert.Equal("kv", entries.Name);
+                Assert.Equal(value.IsDefault ? typeof(object) : typeof(byte[]), entries.ObjectType);
+                Assert.Equal(value.IsDefault ? null : Encoding.UTF8.GetBytes("key"), (byte[]?)entries.Value);
+                Assert.True(entries.MoveNext());
+                Assert.Equal("kh", entries.Name);
+                Assert.Equal(typeof(int), entries.ObjectType);
+                Assert.Equal(value.Key.GetHashCode(), Assert.IsType<int>(entries.Value));
+                Assert.False(entries.MoveNext());
+
+                var constructor = typeof(GrainId).GetConstructor(
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                    binder: null, [typeof(SerializationInfo), typeof(StreamingContext)], modifiers: null)!;
+                var restored = Assert.IsType<GrainId>(constructor.Invoke([info, default(StreamingContext)]));
+                Assert.Equal(value.IsDefault ? "/" : "type/key", restored.ToString());
+                Assert.Equal(value.IsDefault, restored.IsDefault);
+                Assert.Equal(value.Type.GetHashCode(), restored.Type.GetHashCode());
+                Assert.Equal(value.Key.GetHashCode(), restored.Key.GetHashCode());
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void GrainIdConverterRejectsNullWriters()
+        {
+            var converter = new GrainIdJsonConverter();
+            Assert.Throws<ArgumentNullException>("writer", () => converter.Write(null!, default, null!));
+            Assert.Throws<ArgumentNullException>("writer", () => converter.WriteAsPropertyName(null!, default, null!));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void GrainIdConverterPreservesJsonTextAndPropertyNames()
+        {
+            var converter = new GrainIdJsonConverter();
+            (GrainId Id, string Json)[] cases =
+            [
+                (GrainId.Create("type", "key"), "\"type/key\""),
+                (default, "\"/\""),
+                (GrainId.Create("type", "é\"\\尾"), "\"type/\\u00E9\\u0022\\\\\\u5C3E\""),
+            ];
+            foreach (var (id, json) in cases)
+            {
+                var buffer = new ArrayBufferWriter<byte>();
+                using (var writer = new Utf8JsonWriter(buffer))
+                {
+                    converter.Write(writer, id, null!);
+                }
+
+                Assert.Equal(json, Encoding.UTF8.GetString(buffer.WrittenSpan));
+                Assert.Equal(json, JsonSerializer.Serialize(id));
+                var parsed = JsonSerializer.Deserialize<GrainId>(json);
+                Assert.Equal(id.Type.AsSpan().ToArray(), parsed.Type.AsSpan().ToArray());
+                Assert.Equal(id.Key.AsSpan().ToArray(), parsed.Key.AsSpan().ToArray());
+
+                var propertyBuffer = new ArrayBufferWriter<byte>();
+                using (var writer = new Utf8JsonWriter(propertyBuffer))
+                {
+                    writer.WriteStartObject();
+                    converter.WriteAsPropertyName(writer, id, null!);
+                    writer.WriteNumberValue(7);
+                    writer.WriteEndObject();
+                }
+
+                var propertyJson = "{" + json + ":7}";
+                Assert.Equal(propertyJson, Encoding.UTF8.GetString(propertyBuffer.WrittenSpan));
+                var entry = Assert.Single(JsonSerializer.Deserialize<Dictionary<GrainId, int>>(propertyJson)!);
+                Assert.Equal(id.Type.AsSpan().ToArray(), entry.Key.Type.AsSpan().ToArray());
+                Assert.Equal(id.Key.AsSpan().ToArray(), entry.Key.Key.AsSpan().ToArray());
+                Assert.Equal(7, entry.Value);
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void UniqueKeyConverterRejectsNullWriteInputs()
+        {
+            var converter = new UniqueKeyJsonConverter();
+            var key = UniqueKey.NewKey(0);
+            var buffer = new ArrayBufferWriter<byte>();
+            using (var writer = new Utf8JsonWriter(buffer))
+            {
+                Assert.Throws<ArgumentNullException>("writer", () => converter.Write(null!, key, null!));
+                Assert.Throws<ArgumentNullException>("value", () => converter.Write(writer, null!, null!));
+                Assert.Equal(0, writer.BytesPending);
+                converter.Write(writer, key, null!);
+            }
+
+            Assert.Equal("\"000000000000000000000000000000000000000000000000\"", Encoding.UTF8.GetString(buffer.WrittenSpan));
+            var propertyBuffer = new ArrayBufferWriter<byte>();
+            using (var writer = new Utf8JsonWriter(propertyBuffer))
+            {
+                writer.WriteStartObject();
+                var bytesPending = writer.BytesPending;
+                Assert.Throws<ArgumentNullException>("writer", () => converter.WriteAsPropertyName(null!, key, null!));
+                Assert.Throws<ArgumentNullException>("value", () => converter.WriteAsPropertyName(writer, null!, null!));
+                Assert.Equal(bytesPending, writer.BytesPending);
+                converter.WriteAsPropertyName(writer, key, null!);
+                writer.WriteNumberValue(7);
+                writer.WriteEndObject();
+            }
+
+            Assert.Equal("{\"000000000000000000000000000000000000000000000000\":7}", Encoding.UTF8.GetString(propertyBuffer.WrittenSpan));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void UniqueKeyConverterPreservesLegacyJsonAndNull()
+        {
+            var converter = new UniqueKeyJsonConverter();
+            (UniqueKey Key, string Json)[] cases =
+            [
+                (UniqueKey.NewKey(0), "\"000000000000000000000000000000000000000000000000\""),
+                (UniqueKey.NewKey(-1, UniqueKey.Category.Grain, 0x12345678), "\"0000000000000000ffffffffffffffff0300000012345678\""),
+                (UniqueKey.NewKey(1UL, 2UL, UniqueKey.Category.KeyExtGrain, 0x12345678, "é\"\\尾"),
+                    "\"000000000000000100000000000000020600000012345678\\u002B\\u00E9\\u0022\\\\\\u5C3E\""),
+            ];
+            foreach (var (key, json) in cases)
+            {
+                var buffer = new ArrayBufferWriter<byte>();
+                using (var writer = new Utf8JsonWriter(buffer))
+                {
+                    converter.Write(writer, key, null!);
+                }
+
+                Assert.Equal(json, Encoding.UTF8.GetString(buffer.WrittenSpan));
+                Assert.Equal(json, JsonSerializer.Serialize(key));
+                var parsed = Assert.IsType<UniqueKey>(JsonSerializer.Deserialize<UniqueKey>(json));
+                Assert.Equal(key.N0, parsed.N0);
+                Assert.Equal(key.N1, parsed.N1);
+                Assert.Equal(key.TypeCodeData, parsed.TypeCodeData);
+                Assert.Equal(key.KeyExt, parsed.KeyExt);
+
+                var propertyBuffer = new ArrayBufferWriter<byte>();
+                using (var writer = new Utf8JsonWriter(propertyBuffer))
+                {
+                    writer.WriteStartObject();
+                    converter.WriteAsPropertyName(writer, key, null!);
+                    writer.WriteNumberValue(7);
+                    writer.WriteEndObject();
+                }
+
+                var propertyJson = "{" + json + ":7}";
+                Assert.Equal(propertyJson, Encoding.UTF8.GetString(propertyBuffer.WrittenSpan));
+                var entry = Assert.Single(JsonSerializer.Deserialize<Dictionary<UniqueKey, int>>(propertyJson)!);
+                Assert.Equal(key.N0, entry.Key.N0);
+                Assert.Equal(key.N1, entry.Key.N1);
+                Assert.Equal(key.TypeCodeData, entry.Key.TypeCodeData);
+                Assert.Equal(key.KeyExt, entry.Key.KeyExt);
+                Assert.Equal(7, entry.Value);
+                Assert.False(key.Equals((UniqueKey?)null));
+                Assert.False(key.Equals((object?)null));
+                Assert.Equal(1, key.CompareTo(null));
+            }
+
+            Assert.Equal("null", JsonSerializer.Serialize<UniqueKey?>(null));
+            Assert.Null(JsonSerializer.Deserialize<UniqueKey>("null"));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void SystemTargetGrainIdRejectsNullAddresses()
         {
             var kind = SystemTargetGrainId.CreateGrainType("boundary");
