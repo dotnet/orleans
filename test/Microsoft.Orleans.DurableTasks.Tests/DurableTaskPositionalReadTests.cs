@@ -71,14 +71,21 @@ public sealed class DurableTaskPositionalReadTests
             Assert.Equal(observed, await replay.RunAsync(steps, replaying: true));
         }, iter: 60);
 
-        Assert.True(positionalRuns > 0, "No run recorded a position.");
+        // Positions are offered only where the journal's codecs reproduce values exactly: the binary format, not JSON.
+        if (format == DurableTaskJournalHarness.OrleansBinary)
+        {
+            Assert.True(positionalRuns > 0, "No run recorded a position.");
+        }
+        else
+        {
+            Assert.Equal(0, positionalRuns);
+        }
     }
 
-    [Theory]
-    [MemberData(nameof(Formats))]
-    public async Task CrashBeforeTheForcedResolutionsSnapshotLeavesHistoryForRecovery(string format)
+    [Fact]
+    public async Task CrashBeforeTheForcedResolutionsSnapshotLeavesHistoryForRecovery()
     {
-        await using var harness = new Harness(format);
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
         List<object?> observed;
         await using (var first = await harness.ActivateAsync())
         {
@@ -103,11 +110,10 @@ public sealed class DurableTaskPositionalReadTests
         Assert.Equal(observed, await replay.RunAsync([Read(1, 0), Write(1, 0, 1), Read(1, 0), Read(4, 0)], replaying: true));
     }
 
-    [Theory]
-    [MemberData(nameof(Formats))]
-    public async Task CrashAfterTheForcedResolutionsSnapshotRecoversValues(string format)
+    [Fact]
+    public async Task CrashAfterTheForcedResolutionsSnapshotRecoversValues()
     {
-        await using var harness = new Harness(format);
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
         List<object?> observed;
         await using (var first = await harness.ActivateAsync())
         {
@@ -131,15 +137,14 @@ public sealed class DurableTaskPositionalReadTests
         Assert.Equal(observed, await replay.RunAsync([Read(0, 0), Write(0, 0, 2), Read(0, 0), Read(6, 0)], replaying: true));
     }
 
-    [Theory]
-    [MemberData(nameof(Formats))]
-    public async Task CrashBeforeTheBarrierIsWrittenLeavesNoRecords(string format)
+    [Fact]
+    public async Task CrashBeforeTheBarrierIsWrittenLeavesNoRecords()
     {
-        await using var harness = new Harness(format);
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
         await using (var first = await harness.ActivateAsync())
         {
             var log = first.CreateLog();
-            first.Run(log, static activation => _ = activation.Dictionary.Count);
+            first.Run(log, static activation => _ = activation.Dictionary.TryGetValue("a", out _));
             log.Flush();
             Assert.True(first.Manager.Positions.HasBarriers);
             harness.Storage.FailNext = Failure.AppendBefore;
@@ -154,7 +159,7 @@ public sealed class DurableTaskPositionalReadTests
     }
 
     [Fact]
-    public async Task MigrationResolvesPositionsAndRecordsValuesUntilItsSnapshot()
+    public async Task MigrationToALossyFormatResolvesPositionsAndRecordsValues()
     {
         var journalId = JournalId.Create("positional-migration", Guid.NewGuid().ToString("N"));
         List<object?> observed;
@@ -172,21 +177,20 @@ public sealed class DurableTaskPositionalReadTests
         Assert.Equal(0, migrating.CountPositionalRecords());
         Assert.Equal(observed, await migrating.RunAsync([Read(1, 0), Write(1, 0, 0), Read(1, 0), Read(3, 1)], replaying: true));
 
-        // Until the migration snapshot, reads record values.
+        // Reads record values until the migration snapshot, and after it too: JSON codecs don't reproduce values exactly.
         var other = TaskId.CreateRoot("other");
         var log = migrating.CreateLog(other);
-        migrating.Run(log, static activation => _ = activation.Dictionary.Count);
+        migrating.Run(log, static activation => _ = activation.Dictionary.TryGetValue("a", out _));
         log.Flush();
         Assert.Null(DurableTaskAccessLog.FindPositionalRecords(migrating.Storage.GetAccessLog(other), []));
         await migrating.Manager.WriteStateAsync(Cancellation);
-        Assert.True(migrating.Manager.Positions.TryGetPosition(out _));
+        Assert.False(migrating.Manager.Positions.TryGetPosition(out _));
     }
 
-    [Theory]
-    [MemberData(nameof(Formats))]
-    public async Task ReadsWhichAttemptsMakeWhileHistoryIsReadResolveAsTheyWereRecorded(string format)
+    [Fact]
+    public async Task ReadsWhichAttemptsMakeWhileHistoryIsReadResolveAsTheyWereRecorded()
     {
-        await using var harness = new Harness(format);
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
         var observed = new List<object?>();
         await using (var first = await harness.ActivateAsync())
         {
@@ -237,11 +241,10 @@ public sealed class DurableTaskPositionalReadTests
         Assert.Equal(observed, replayed);
     }
 
-    [Theory]
-    [MemberData(nameof(Formats))]
-    public async Task DeletionResolvesPendingPositionsFirst(string format)
+    [Fact]
+    public async Task DeletionResolvesPendingPositionsFirst()
     {
-        await using var harness = new Harness(format);
+        await using var harness = new Harness(DurableTaskJournalHarness.OrleansBinary);
         await using var activation = await harness.ActivateAsync();
         activation.Dictionary["a"] = "x";
         await activation.Manager.WriteStateAsync(Cancellation);

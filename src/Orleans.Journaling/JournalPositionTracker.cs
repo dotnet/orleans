@@ -48,6 +48,9 @@ internal sealed partial class JournalPositionTracker
     // Whether a deletion of the journal is replacing its history, so positions aren't offered.
     private bool _suspended;
 
+    // Whether positions can be offered at all: the journal's codecs reproduce values exactly.
+    private readonly bool _offersPositions;
+
     // The entries which recovery read, while it retains them for resolving recovered positional reads.
     private List<(ArcBuffer Data, string FormatKey)>? _recoveredHistory;
 
@@ -56,6 +59,7 @@ internal sealed partial class JournalPositionTracker
         _manager = manager;
         _writer = writer;
         _directoryCodec = directoryCodec;
+        _offersPositions = manager.HasExactCodecs;
         Barriers = new(() => JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, string>>(manager.ServiceProvider, manager.WriteJournalFormatKey));
     }
 
@@ -70,12 +74,13 @@ internal sealed partial class JournalPositionTracker
 
     /// <summary>
     /// Gets the logical position of the journal's next entry, which a positional read records, when the manager offers
-    /// positions: it's ready, no format migration is pending, and no deletion is in progress.
+    /// positions: its journal format's codecs reproduce values exactly, it's ready, no format migration is pending, and no
+    /// deletion is in progress.
     /// </summary>
     /// <remarks>A read observes the entries before the position.</remarks>
     public bool TryGetPosition(out long position)
     {
-        if (_manager.AcceptsPositions && !_suspended)
+        if (_offersPositions && _manager.AcceptsPositions && !_suspended)
         {
             position = _offset + _writer.CommittedEntryCount;
             return true;
