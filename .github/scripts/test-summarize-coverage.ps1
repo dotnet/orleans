@@ -632,6 +632,18 @@ try {
             'Coverage file names must include the complete matrix identity.'
     }
 
+    Invoke-Test 'reports Linux and macOS runtime crashes' {
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        Assert-Matches `
+            $dotnetTestAction `
+            "(?ms)^  - name: Prepare runtime crash reports\r?\n    if: runner\.os != 'Windows'\r?\n.*?'DOTNET_EnableCrashReport=1'" `
+            'Linux and macOS jobs must report crashing managed stacks for every .NET process.'
+        Assert-Equal `
+            2 `
+            ([regex]::Matches($dotnetTestAction, "'--crash-report-if-supported'")).Count `
+            'Both test launch paths must write test host crash reports where the runtime supports them.'
+    }
+
     Invoke-Test 'captures Linux net10 runtime crashes' {
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
         $archiveTestResultsAction = Get-Content -Raw -LiteralPath $archiveTestResultsActionPath
