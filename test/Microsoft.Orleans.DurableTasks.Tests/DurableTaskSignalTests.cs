@@ -621,9 +621,9 @@ public sealed partial class DurableTaskSignalTests
     {
         private readonly Dictionary<TaskId, byte[]> _accessLogs = [];
 
-        public byte[] GetAccessLog(TaskId taskId) => _accessLogs.GetValueOrDefault(taskId) ?? [];
+        public ReadOnlyMemory<byte> GetAccessLog(TaskId taskId) => _accessLogs.GetValueOrDefault(taskId) ?? [];
 
-        public void AppendAccessLog(TaskId taskId, ReadOnlySpan<byte> records) => _accessLogs[taskId] = [.. GetAccessLog(taskId), .. records];
+        public void AppendAccessLog(TaskId taskId, ReadOnlySpan<byte> records) => _accessLogs[taskId] = [.. GetAccessLog(taskId).Span, .. records];
 
         public void AddPendingRecords(IDurableTaskPendingAccessRecords source) => source.Flush();
 

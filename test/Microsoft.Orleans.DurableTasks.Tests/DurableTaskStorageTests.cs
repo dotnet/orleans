@@ -77,15 +77,15 @@ public sealed class DurableTaskStorageTests
         await using (var recovery = await harness.ActivateAsync(cancellationToken))
         {
             var logs = (IDurableTaskAccessLogStorage)recovery.Storage;
-            Assert.Equal([1, 2, 3, 4, 5], logs.GetAccessLog(taskId));
+            Assert.Equal([1, 2, 3, 4, 5], logs.GetAccessLog(taskId).ToArray());
             Assert.True(recovery.Storage.TryGetTask(taskId, out var state));
             recovery.Storage.SetResponse(taskId, state, DurableTaskResponse.Completed);
-            Assert.Empty(logs.GetAccessLog(taskId));
+            Assert.True(logs.GetAccessLog(taskId).IsEmpty);
             await recovery.Storage.WriteAsync(cancellationToken);
         }
 
         await using var completed = await harness.ActivateAsync(cancellationToken);
-        Assert.Empty(((IDurableTaskAccessLogStorage)completed.Storage).GetAccessLog(taskId));
+        Assert.True(((IDurableTaskAccessLogStorage)completed.Storage).GetAccessLog(taskId).IsEmpty);
     }
 
     /// <summary>
