@@ -21,9 +21,7 @@ internal sealed class TlsConnectionFeature : ITlsConnectionFeature, ITlsApplicat
 
     public string HostName { get; set; } = string.Empty;
 
-#if NET10_0_OR_GREATER
 #pragma warning disable SYSLIB0058
-#endif
     public CipherAlgorithmType CipherAlgorithm { get; set; }
 
     public int CipherStrength { get; set; }
@@ -35,9 +33,7 @@ internal sealed class TlsConnectionFeature : ITlsConnectionFeature, ITlsApplicat
     public ExchangeAlgorithmType KeyExchangeAlgorithm { get; set; }
 
     public int KeyExchangeStrength { get; set; }
-#if NET10_0_OR_GREATER
 #pragma warning restore SYSLIB0058
-#endif
 
     public Task<X509Certificate2?> GetRemoteCertificateAsync(CancellationToken cancellationToken)
     {

@@ -251,7 +251,6 @@ public class GeneratedSerializerTests : IDisposable
     }
 #endif
 
-#if NET9_0_OR_GREATER
     [Fact]
     public void GeneratedLibExternalGenericRecordWithPCtorSerializersRoundTripThroughCodec()
     {
@@ -275,7 +274,6 @@ public class GeneratedSerializerTests : IDisposable
         Assert.Equal(original.StarSign, result.StarSign);
         Assert.Same(result.CtorParam, result.BodyParam);
     }
-#endif
 
 #if NET6_0_OR_GREATER
     [Fact]

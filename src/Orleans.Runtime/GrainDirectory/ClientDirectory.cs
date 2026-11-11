@@ -39,11 +39,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     private readonly IClusterMembershipService _clusterMembershipService;
     private readonly SiloMessagingOptions _messagingOptions;
     private readonly CancellationTokenSource _stoppingCts = new();
-#if NET9_0_OR_GREATER
     private readonly Lock _lockObj = new();
-#else
-    private readonly object _lockObj = new();
-#endif
     private readonly GrainId _localHostedClientId;
     private readonly IConnectedClientCollection _connectedClients;
     private Func<Task> _onPublishRegistered = static () => Task.CompletedTask;

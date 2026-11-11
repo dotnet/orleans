@@ -24,7 +24,7 @@
     <PackageValidationBaselineFrameworkToIgnore Include="net8.0" />
   </ItemGroup>
 
-  <PropertyGroup Condition="('$(TargetFramework)' == 'net10.0' or '$(TargetFramework)' == 'net11.0') and ('$(MSBuildProjectName)' == 'Orleans.Core' or '$(MSBuildProjectName)' == 'Orleans.Runtime')">
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Orleans.Core' or '$(MSBuildProjectName)' == 'Orleans.Runtime'">
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
   </PropertyGroup>
 

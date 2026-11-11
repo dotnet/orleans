@@ -30,11 +30,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILocalSiloDetails _localSiloDetails;
         private readonly TimeProvider _timeProvider;
         private readonly CancellationTokenSource _stoppingCancellation = new();
-#if NET9_0_OR_GREATER
         private readonly Lock _lockObj = new();
-#else
-        private readonly object _lockObj = new();
-#endif
         private readonly IAsyncTimer _pingTimer;
         private long? _lastSuccessfulResponseTimestamp;
         private readonly Func<SiloHealthMonitor, ProbeResult, Task> _onProbeResult;

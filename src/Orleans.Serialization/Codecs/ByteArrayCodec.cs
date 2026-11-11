@@ -17,11 +17,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed partial class BitArrayCodec : IFieldCodec<BitArray>
     {
-#if NET10_0_OR_GREATER
-#elif NET8_0_OR_GREATER
-        [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "m_array")]
-        extern static ref int[] GetSetArray(BitArray bitArray);
-#else
+#if !NET10_0_OR_GREATER
         private static int[] GetSetArray(BitArray bitArray) => (typeof(BitArray).GetField("m_array", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(bitArray) as int[])!;
 #endif
 
