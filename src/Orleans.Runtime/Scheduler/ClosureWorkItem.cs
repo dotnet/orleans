@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Scheduler
@@ -25,6 +26,8 @@ namespace Orleans.Runtime.Scheduler
             this.GrainContext = grainContext;
         }
 
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Delegate failures are propagated through the completion task from the scheduler's async-void entry point.")]
         public override async void Execute()
         {
             try
@@ -66,6 +69,8 @@ namespace Orleans.Runtime.Scheduler
             this.GrainContext = grainContext;
         }
 
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Delegate failures are propagated through the completion task from the scheduler's async-void entry point.")]
         public override async void Execute()
         {
             try
@@ -90,6 +95,8 @@ namespace Orleans.Runtime.Scheduler
         public override string Name => name ?? AsyncClosureWorkItem.GetMethodName(closure);
         public Task Task => _completion.Task;
 
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Delegate failures are propagated through the completion task from the scheduler's void entry point.")]
         public override void Execute()
         {
             try
@@ -132,6 +139,8 @@ namespace Orleans.Runtime.Scheduler
             GrainContext = grainContext;
         }
 
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Delegate failures are propagated through the completion task from the scheduler's async-void entry point.")]
         public override async void Execute()
         {
             try
