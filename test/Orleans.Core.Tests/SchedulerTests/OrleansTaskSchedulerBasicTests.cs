@@ -195,6 +195,34 @@ namespace UnitTests.SchedulerTests
             }
         }
 
+        [Theory]
+        [InlineData("task", false)]
+        [InlineData("task", true)]
+        [InlineData("result", false)]
+        [InlineData("result", true)]
+        [InlineData("value-task", false)]
+        [InlineData("value-task", true)]
+        public async Task RunOrQueueTask_PropagatesInlineDelegateFailureThroughCompletionTask(string kind, bool cancellationFailure)
+        {
+            Exception expected = cancellationFailure
+                ? new OperationCanceledException()
+                : new InvalidOperationException("Inline delegate failed.");
+            await _rootContext.QueueTask(async () =>
+            {
+                Assert.Same(_rootContext, RuntimeContext.Current);
+                Task completion = kind switch
+                {
+                    "task" => _rootContext.RunOrQueueTask(() => throw expected),
+                    "result" => _rootContext.RunOrQueueTaskResult<int>(() => throw expected),
+                    "value-task" => _rootContext.RunOrQueueTask<Exception>(static failure => throw failure, expected).AsTask(),
+                    _ => throw new ArgumentOutOfRangeException(nameof(kind))
+                };
+
+                Assert.True(completion.IsFaulted);
+                Assert.Same(expected, await Record.ExceptionAsync(() => completion));
+            }).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+
         [Fact]
         public async Task Sched_SimpleFifoTest()
         {
