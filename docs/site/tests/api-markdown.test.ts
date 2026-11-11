@@ -63,6 +63,10 @@ describe('native API Markdown companions', () => {
     );
   });
 
+  test('omits NuGet links for the unpublished durable HTTP package', () => {
+    expect(nugetHref('Microsoft.Orleans.DurableTasks.Http')).toBeUndefined();
+  });
+
   test('renders member documentation, parameters, returns, exceptions, and examples', () => {
     const markdown = renderMemberKindMarkdown(pkg, grain, 'method', '/orleans/');
 

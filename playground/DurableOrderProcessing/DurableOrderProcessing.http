@@ -1,0 +1,70 @@
+@baseAddress = http://localhost:5000
+
+# A checkout's Idempotency-Key is its order's ID, a lowercase UUID. Each request below reuses one so that retries are
+# visible; generate a new one for each new order.
+@orderId = 6f0a1a52-7a1e-4b3c-9d0f-2b9a4f0d2c11
+
+### Fill alice's basket. A PUT sets an absolute quantity, so it is idempotent without a key.
+PUT {{baseAddress}}/api/buyers/alice/basket/1
+Content-Type: application/json
+
+{ "quantity": 2 }
+
+### Check out the basket as the order {{orderId}}: 202 Accepted with Operation-Location while the order runs. The
+### webhook receives the order's outcome once it ships or is cancelled.
+POST {{baseAddress}}/api/orders
+Content-Type: application/json
+Idempotency-Key: {{orderId}}
+Operation-Callback: {{baseAddress}}/api/webhooks/orders
+
+{ "buyerId": "alice", "cardNumber": "4111111111111111", "address": { "street": "15703 NE 61st Ct", "city": "Redmond", "state": "WA", "country": "U.S.", "zipCode": "98052" } }
+
+### Retry the checkout: the same operation, and no second order.
+POST {{baseAddress}}/api/orders
+Content-Type: application/json
+Idempotency-Key: {{orderId}}
+
+{ "buyerId": "alice", "cardNumber": "4111111111111111", "address": { "street": "15703 NE 61st Ct", "city": "Redmond", "state": "WA", "country": "U.S.", "zipCode": "98052" } }
+
+### Reuse the key for another request: 422 Unprocessable Content.
+POST {{baseAddress}}/api/orders
+Content-Type: application/json
+Idempotency-Key: {{orderId}}
+
+{ "buyerId": "bob", "cardNumber": "4111111111111111", "address": { "street": "15703 NE 61st Ct", "city": "Redmond", "state": "WA", "country": "U.S.", "zipCode": "98052" } }
+
+### Long-poll the order's status monitor.
+GET {{baseAddress}}/api/orders/operations/{{orderId}}
+Prefer: wait=20
+
+### Stream the order's status as server-sent events, until it is terminal.
+GET {{baseAddress}}/api/orders/operations/{{orderId}}/events
+Accept: text/event-stream
+
+### Stream the order's history, a snapshot per version, until it ships or is cancelled.
+GET {{baseAddress}}/api/orders/{{orderId}}/events
+Accept: text/event-stream
+
+### The payment gateway's ledger: one authorization for the order, and the requests which reached it.
+GET {{baseAddress}}/gateway/authorizations
+
+### Ship the paid order. A repeated signal with the same shipment returns 204 again; another shipment returns 409.
+POST {{baseAddress}}/api/orders/operations/{{orderId}}/signals/shipped
+Content-Type: application/json
+
+{ "shipmentId": "0c5d1f5e-9a0e-4f1e-8d7e-3f1a2b4c5d6e" }
+
+### Cancel an order before it is paid, such as one whose card ends in 0003, whose payment the gateway never decides.
+### The workflow voids the authorization and releases the stock.
+POST {{baseAddress}}/api/orders/operations/{{orderId}}:cancel
+Content-Type: application/json
+
+{ "reason": "Cancelled by the buyer." }
+
+### Place an order through Nexus: its Nexus-Request-Id is its ID, and the operation is the same one which
+### /api/orders/operations/{orderId} serves.
+POST {{baseAddress}}/nexus/orders.v1/place-order
+Content-Type: application/json
+Nexus-Request-Id: 0b8e4c9e-1d2a-4f3b-9c4d-5e6f7a8b9c0d
+
+{ "buyerId": "alice", "cardNumber": "4111111111111111", "address": { "street": "15703 NE 61st Ct", "city": "Redmond", "state": "WA", "country": "U.S.", "zipCode": "98052" } }

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CsCheck" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="NSubstitute" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(SourceRoot)docs\site\src\content\docs\snippets\compiled\Grains\MessagingSnippets.cs" Link="Documentation\MessagingSnippets.cs" />
+    <Compile Include="$(SourceRoot)docs\site\src\content\docs\snippets\compiled\Grains\MessagingRecipes.cs" Link="Documentation\MessagingRecipes.cs" />
+    <Compile Include="$(SourceRoot)playground\OrderProcessing\Contracts.cs" Link="Playground\Contracts.cs" />
+    <Compile Include="$(SourceRoot)playground\OrderProcessing\CatalogData.cs" Link="Playground\CatalogData.cs" />
+    <Compile Include="$(SourceRoot)playground\OrderProcessing\Grains\*.cs" Link="Playground\Grains\%(Filename)%(Extension)" />
+    <Compile Include="$(SourceRoot)samples\Messaging\Protocol.cs" Link="Samples\MessagingProtocol.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Messaging\Orleans.Messaging.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+</Project>

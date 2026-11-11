@@ -24,7 +24,10 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
 #endif
     private readonly ArcBufferWriter _buffer = new();
     private int _committedLength;
+    private long _committedEntryCount;
+    private long _stagedChangeCount;
     private bool _hasActiveEntry;
+    private TaskCompletionSource? _activeEntryClosed;
     private bool _disposed;
 
     /// <summary>
@@ -59,6 +62,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             ThrowIfEntryActive();
             _buffer.Reset();
             _committedLength = 0;
+            _committedEntryCount = 0;
         }
     }
 
@@ -183,6 +187,20 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
         }
     }
 
+    /// <summary>
+    /// Gets a task which completes when the active entry closes, or <see langword="null"/> when no entry is active.
+    /// </summary>
+    internal Task? GetActiveEntryClosedTask()
+    {
+        lock (_lock)
+        {
+            ThrowIfDisposed();
+            return _hasActiveEntry
+                ? (_activeEntryClosed ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task
+                : null;
+        }
+    }
+
     internal ArcBuffer GetCommittedBuffer()
     {
         lock (_lock)
@@ -207,6 +225,13 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             }
         }
     }
+
+    /// <summary>
+    /// Gets the number of entries committed since this writer was created or last reset, including entries which
+    /// <see cref="Consume"/> released. Aborted entries don't count.
+    /// </summary>
+    /// <remarks>Read by the code which commits entries: the activation's scheduler, for a manager's writer.</remarks>
+    internal long CommittedEntryCount => _committedEntryCount;
 
     internal void Consume(ArcBuffer buffer)
     {
@@ -260,6 +285,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             {
                 WritePreservedEntry(streamId, entry);
                 _committedLength = _buffer.Length;
+                _committedEntryCount++;
             }
             catch
             {
@@ -267,6 +293,28 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
                 throw;
             }
         }
+    }
+
+    /// <summary>
+    /// Gets or sets a count which advances whenever a state stages a change and never decreases between writes.
+    /// </summary>
+    /// <remarks>The manager restores it after a write captures pending changes, which stages nothing new.</remarks>
+    internal long StagedChangeCount
+    {
+        get
+        {
+            lock (_lock) return _stagedChangeCount;
+        }
+        set
+        {
+            lock (_lock) _stagedChangeCount = value;
+        }
+    }
+
+    /// <summary>Records a change which a state stages in memory and journals when a write captures it.</summary>
+    internal void MarkModified()
+    {
+        lock (_lock) _stagedChangeCount++;
     }
 
     internal void CommitActiveEntry(JournalStreamId streamId)
@@ -279,6 +327,8 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             {
                 FinishEntry(streamId);
                 _committedLength = _buffer.Length;
+                _committedEntryCount++;
+                _stagedChangeCount++;
             }
             catch
             {
@@ -341,6 +391,11 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     private void ClearActiveEntry()
     {
         _hasActiveEntry = false;
+        if (_activeEntryClosed is { } activeEntryClosed)
+        {
+            _activeEntryClosed = null;
+            activeEntryClosed.SetResult();
+        }
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
