@@ -26,7 +26,7 @@ runs:
   using: composite
   steps:
   - name: Prepare runtime crash diagnostics
-    if: runner.os == 'Linux' && inputs.framework == 'net8.0'
+    if: runner.os == 'Linux' && inputs.framework == 'net10.0'
     shell: pwsh
     run: |
       New-Item -ItemType Directory -Force -Path '${{ github.workspace }}/TestResults' | Out-Null

@@ -632,14 +632,14 @@ try {
             'Coverage file names must include the complete matrix identity.'
     }
 
-    Invoke-Test 'captures Linux net8 runtime crashes' {
+    Invoke-Test 'captures Linux net10 runtime crashes' {
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
         $archiveTestResultsAction = Get-Content -Raw -LiteralPath $archiveTestResultsActionPath
         $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
         Assert-Matches `
             $dotnetTestAction `
-            "if: runner\.os == 'Linux' && inputs\.framework == 'net8\.0'" `
-            'Runtime crash dumps must be scoped to Linux net8 test jobs.'
+            "if: runner\.os == 'Linux' && inputs\.framework == 'net10\.0'" `
+            'Runtime crash dumps must be scoped to Linux net10 test jobs.'
         Assert-Matches `
             $dotnetTestAction `
             'DOTNET_DbgEnableMiniDump=1' `
@@ -949,7 +949,7 @@ exit 0
             $env:ORLEANS_GRAPH_FULL = $fullFile
             $env:ORLEANS_GRAPH_FOCUSED = $focusedFile
             $env:ORLEANS_GRAPH_FAILURE = 'false'
-            foreach ($framework in 'net8.0', 'net10.0', 'net11.0') {
+            foreach ($framework in 'net10.0', 'net11.0') {
                 $baseline = @{
                     version = '1.0'
                     testContainers = @(@{
@@ -1020,9 +1020,9 @@ if ((($env:ORLEANS_TEST_FAILURE -eq 'handle' -or $env:ORLEANS_TEST_FAILURE -eq '
     $env:ORLEANS_TEST_FAILURE -eq 'handle-always' -or
     $env:ORLEANS_TEST_FAILURE -eq 'handle-with-results') {
     if ($env:ORLEANS_TEST_FAILURE -eq 'handle-with-results') {
-        $testResults = Join-Path $env:ORLEANS_TEST_RESULT_DIRECTORY 'test/Example.Tests/bin/Debug/net8.0/TestResults'
+        $testResults = Join-Path $env:ORLEANS_TEST_RESULT_DIRECTORY 'test/Example.Tests/bin/Debug/net10.0/TestResults'
         [void] (New-Item -ItemType Directory -Force -Path $testResults)
-        Set-Content -LiteralPath (Join-Path $testResults 'test_results_case_Example.Tests_net8.0_x64.trx') -Value '<TestRun />'
+        Set-Content -LiteralPath (Join-Path $testResults 'test_results_case_Example.Tests_net10.0_x64.trx') -Value '<TestRun />'
     }
 
     if ($env:ORLEANS_TEST_FAILURE -eq 'decorated-handle') {

@@ -134,14 +134,8 @@
     <PackageVersion Include="ZeroFormatter" Version="1.6.4" />
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
   </ItemGroup>
-  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Orleans.Clustering.TestKit'">
-    <PackageVersion Update="System.Collections.Immutable" Version="10.0.0" />
-    <PackageVersion Update="System.IO.Pipelines" Version="10.0.5" />
-    <PackageVersion Update="System.Text.Json" Version="10.0.5" />
-  </ItemGroup>
   <!-- Updates for later TFMs -->
-  <!-- Aspire's .NET 8 test hosts also require .NET 10 dependency versions. -->
-  <ItemGroup Condition=" '$(TargetFramework)' == 'net10.0' or '$(TargetFramework)' == 'net11.0' or ('$(TargetFramework)' == 'net8.0' and ('$(MSBuildProjectName)' == 'Orleans.Azure.Tests' or '$(MSBuildProjectName)' == 'Orleans.Streaming.EventHubs.Tests' or '$(MSBuildProjectName)' == 'Orleans.Transactions.Azure.Test')) ">
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net10.0' or '$(TargetFramework)' == 'net11.0' ">
     <PackageVersion Update="BenchmarkDotNet" Version="0.15.6" />
     <PackageVersion Update="FSharp.Core" Version="10.0.103" />
     <PackageVersion Update="Microsoft.CodeAnalysis.Common" Version="5.0.0" />

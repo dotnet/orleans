@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('net8.0', 'net10.0', 'net11.0')]
+    [ValidateSet('net10.0', 'net11.0')]
     [string] $Framework,
     [string] $DotnetCommand = 'dotnet'
 )

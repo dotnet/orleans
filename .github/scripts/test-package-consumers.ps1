@@ -3,7 +3,7 @@ param(
     [string] $Configuration = 'Release',
     [string] $PackageDirectory,
     [string] $PackageVersion,
-    [string[]] $Frameworks = @('net8.0', 'net10.0', 'net11.0'),
+    [string[]] $Frameworks = @('net10.0', 'net11.0'),
     [string[]] $Consumers = @(),
     [switch] $SkipPack
 )
@@ -152,7 +152,6 @@ public sealed class Greeting
   </PropertyGroup>
   <ItemGroup>
 $references
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" Condition="'`$(TargetFramework)' == 'net8.0'" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14" Condition="'`$(TargetFramework)' == 'net10.0'" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" Condition="'`$(TargetFramework)' == 'net11.0'" />
   </ItemGroup>

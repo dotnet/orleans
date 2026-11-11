@@ -60,7 +60,7 @@ $markdown = @(
     ''
     "Measured $sourceFileDisplay source files across $reportDisplay validated coverage reports."
     ''
-    'Coverage combines every CI test matrix job, including providers, CodeGen, .NET 8/10, Linux, Windows, and macOS, and measures loaded repository source under `src/`.'
+    'Coverage combines every CI test matrix job, including providers, CodeGen, .NET 10/11, Linux, Windows, and macOS, and measures loaded repository source under `src/`.'
     ''
     'This check is report-only while coverage baselines and normal variance are calibrated.'
     ''

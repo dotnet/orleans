@@ -10,7 +10,7 @@
 
   <PropertyGroup>
     <CompatibilityTargetFrameworks>netstandard2.0</CompatibilityTargetFrameworks>
-    <DefaultTargetFrameworks>net8.0;net10.0;net11.0</DefaultTargetFrameworks>
+    <DefaultTargetFrameworks>net10.0;net11.0</DefaultTargetFrameworks>
     <!--
       Package validation checks the packed API and framework assets against the latest release.
       Update this after each stable Orleans release and remove suppressions made obsolete by that baseline.
@@ -18,6 +18,11 @@
     -->
     <OrleansPackageValidationBaselineVersion>10.4.0</OrleansPackageValidationBaselineVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- net8.0 is out of support and is intentionally removed. Delete this once the baseline no longer contains net8.0 assets. -->
+    <PackageValidationBaselineFrameworkToIgnore Include="net8.0" />
+  </ItemGroup>
 
   <PropertyGroup Condition="('$(TargetFramework)' == 'net10.0' or '$(TargetFramework)' == 'net11.0') and ('$(MSBuildProjectName)' == 'Orleans.Core' or '$(MSBuildProjectName)' == 'Orleans.Runtime')">
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>

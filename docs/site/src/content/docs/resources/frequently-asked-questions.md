@@ -21,7 +21,7 @@ Yes. Orleans began in Microsoft Research and has powered production services sin
 
 ### Which .NET target frameworks does Orleans support?
 
-Orleans libraries target `net8.0`, `net10.0`, and `net11.0`.
+Orleans libraries target `net10.0` and `net11.0`.
 
 ### Where do I get help?
 
