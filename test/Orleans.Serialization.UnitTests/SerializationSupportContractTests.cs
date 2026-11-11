@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -118,6 +119,54 @@ public sealed class SerializationSupportContractTests
         Assert.Equal("outer", typedResult.Message);
         Assert.Equal("inner", Assert.IsType<ArgumentException>(typedResult.InnerException).Message);
         Assert.Equal("value", typedResult.Data["key"]);
+    }
+
+    [Fact]
+    public void Serializer_SessionBasedSerializeOverloadsRejectNullSession()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        Action[] serialize =
+        [
+            () =>
+            {
+                Memory<byte> destination = Memory<byte>.Empty;
+                serializer.Serialize(0, ref destination, null!);
+            },
+            () => serializer.Serialize(0, Stream.Null, null!),
+            () => serializer.Serialize<int, ArrayBufferWriter<byte>>(0, new ArrayBufferWriter<byte>(), null!),
+            () =>
+            {
+                Span<byte> destination = stackalloc byte[1];
+                serializer.Serialize(0, ref destination, null!);
+            },
+            () => serializer.Serialize(0, Array.Empty<byte>(), null!)
+        ];
+
+        foreach (var serializeValue in serialize)
+        {
+            Assert.Throws<ArgumentNullException>("session", serializeValue);
+        }
+    }
+
+    [Fact]
+    public void Serializer_SessionBasedDeserializeOverloadsRejectNullSession()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        Action[] deserialize =
+        [
+            () => serializer.Deserialize<int>(Stream.Null, null!),
+            () => serializer.Deserialize<int>(default(ReadOnlySequence<byte>), null!),
+            () => serializer.Deserialize<int>(default(PooledBuffer.BufferSlice), null!),
+            () => serializer.Deserialize<int>(default(ArcBuffer), null!),
+            () => serializer.Deserialize<int>(ReadOnlySpan<byte>.Empty, null!)
+        ];
+
+        foreach (var deserializeValue in deserialize)
+        {
+            Assert.Throws<ArgumentNullException>("session", deserializeValue);
+        }
     }
 
     [Fact]
