@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,6 +22,8 @@ namespace Orleans.BroadcastChannel
         IBroadcastChannelWriter<T> GetChannelWriter<T>(ChannelId streamId);
     }
 
+    [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes",
+        Justification = "Create instantiates this type through ActivatorUtilities for the keyed IBroadcastChannelProvider registration.")]
     internal class BroadcastChannelProvider : IBroadcastChannelProvider
     {
         private readonly string _providerName;
