@@ -1,17 +1,22 @@
 using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
+using Orleans.CodeGenerator.Diagnostics;
 
 namespace Orleans.CodeGenerator;
 
 /// <summary>
-/// Reads closed-type and union information from compilers which support those language features.
+/// Compatibility boundary for closed-type and union symbol APIs across supported compiler versions.
 /// </summary>
 /// <remarks>
 /// The generator is compiled against an older Roslyn API so that it loads in older compilers.
 /// Compilers which predate these features cannot declare closed or union types, but they can reference union types compiled by newer compilers.
 /// Those compilers identify referenced unions by their <c>System.Runtime.CompilerServices.UnionAttribute</c> metadata and expose no case types.
-/// Some preview compilers can declare union types without exposing their case types, so callers must handle unions whose case types are unavailable.
+/// Compilers which declare unions but expose no case types receive an actionable generator diagnostic when those cases are required.
+/// This boundary owns API discovery, metadata recognition, and reporting unavailable case types.
+/// Once the minimum supported Roslyn version exposes all three properties, replace calls with
+/// <c>ITypeSymbol.IsClosed</c>, <c>ITypeSymbol.IsUnion</c>, and <c>ITypeSymbol.UnionCaseTypes</c>, then remove this class
+/// and its unavailable-case-types diagnostic from <see cref="InvalidUnionCaseDiagnostic"/>.
 /// </remarks>
 internal static class LanguageFeatureSymbols
 {
@@ -46,9 +51,20 @@ internal static class LanguageFeatureSymbols
     }
 
     /// <summary>
-    /// Gets the case types of a union type in declaration order, or <see langword="null"/> if the compiler does not expose union case types.
+    /// Gets the case types of a union type in declaration order.
     /// </summary>
-    public static ImmutableArray<ITypeSymbol>? GetUnionCaseTypes(ITypeSymbol type) => UnionCaseTypesAccessor?.Invoke(type);
+    /// <exception cref="OrleansGeneratorDiagnosticAnalysisException">
+    /// The compiler does not expose union case types.
+    /// </exception>
+    public static ImmutableArray<ITypeSymbol> GetUnionCaseTypes(INamedTypeSymbol type)
+    {
+        if (UnionCaseTypesAccessor is { } accessor)
+        {
+            return accessor(type);
+        }
+
+        throw new OrleansGeneratorDiagnosticAnalysisException(InvalidUnionCaseDiagnostic.CreateUnionCaseTypesUnavailableDiagnostic(type));
+    }
 
     private static Func<ITypeSymbol, T>? CreateAccessor<T>(string propertyName)
     {

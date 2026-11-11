@@ -41,7 +41,8 @@ public sealed class TaggedUnionCompilerCompatibilityTests
 
         var producerUnion = output.GetTypeByMetadataName(typeof(ReferencedShallowUnion).FullName!)!;
         Assert.True(LanguageFeatureSymbols.IsUnion(producerUnion));
-        Assert.Null(LanguageFeatureSymbols.GetUnionCaseTypes(producerUnion));
+        var unavailableCases = Assert.Throws<OrleansGeneratorDiagnosticAnalysisException>(() => LanguageFeatureSymbols.GetUnionCaseTypes(producerUnion));
+        Assert.Equal("ORLEANS0116", unavailableCases.Diagnostic.Id);
         Assert.Null(producerAssembly.GetType("OrleansCodeGen.Orleans.CodeGenerator.Tests.ReferencedTaggedUnions.Copier_ReferencedShallowUnion"));
         Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
         AssertNoErrors(output);
