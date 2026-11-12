@@ -295,7 +295,7 @@ namespace Orleans
         /// <inheritdoc/>
         public override async ValueTask<Response> Invoke()
         {
-            Response response;
+            Response? response;
             var transactionInfo = this.TransactionInfo;
             bool startedNewTransaction = false;
             try
@@ -329,7 +329,12 @@ namespace Orleans
                 TransactionContext.Clear();
             }
 
-            if (transactionInfo != null)
+            if (transactionInfo is null)
+            {
+                return response;
+            }
+
+            try
             {
                 transactionInfo.ReconcilePending();
 
@@ -361,13 +366,17 @@ namespace Orleans
 
                 if (transactionException != null)
                 {
-                    response = Response.FromException(transactionException);
+                    return TransactionResponse.Create(Response.FromException(transactionException), transactionInfo);
                 }
 
-                response = TransactionResponse.Create(response, transactionInfo);
+                var result = TransactionResponse.Create(response, transactionInfo);
+                response = null; // The returned wrapper now owns the invocation response.
+                return result;
             }
-
-            return response;
+            finally
+            {
+                response?.Dispose();
+            }
         }
 
         /// <summary>
@@ -407,9 +416,9 @@ namespace Orleans
         /// <summary>
         /// Creates a transaction response which wraps an invocation response.
         /// </summary>
-        /// <param name="response">The invocation response.</param>
+        /// <param name="response">The invocation response whose ownership transfers to the returned wrapper.</param>
         /// <param name="transactionInfo">The transaction information to return with the response.</param>
-        /// <returns>The transaction response.</returns>
+        /// <returns>The transaction response, which the caller disposes to release the wrapped response.</returns>
         public static TransactionResponse Create(Response response, TransactionInfo transactionInfo)
         {
             return new TransactionResponse

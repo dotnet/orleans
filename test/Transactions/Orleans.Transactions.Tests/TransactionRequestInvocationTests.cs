@@ -14,6 +14,104 @@ namespace Orleans.Transactions.Tests;
 [TestCategory("BVT"), TestCategory("Transactions")]
 public class TransactionRequestInvocationTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Invoke_TransfersInvocationResponseToCaller(bool hasTransaction)
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var original = new TrackingResponse();
+        var transactionInfo = hasTransaction ? new TransactionInfo() : null;
+        using var request = new ResponseInvoker(services, original)
+        {
+            TransactionOption = TransactionOption.Supported,
+            TransactionInfo = transactionInfo,
+        };
+
+        using (var response = await request.Invoke())
+        {
+            if (hasTransaction)
+            {
+                var wrapper = Assert.IsType<TransactionResponse>(response);
+                Assert.Same(original, wrapper.InnerResponse);
+                Assert.Same(transactionInfo, wrapper.TransactionInfo);
+            }
+            else
+            {
+                Assert.Same(original, response);
+            }
+
+            Assert.Equal(42, response.GetResult<int>());
+            Assert.Null(response.Exception);
+            Assert.Equal(0, original.DisposeCalls);
+        }
+
+        Assert.Equal(1, original.DisposeCalls);
+    }
+
+    [Theory]
+    [InlineData("Commit")]
+    [InlineData("CommitFailure")]
+    [InlineData("Abort")]
+    [InlineData("ResolutionFailure")]
+    public async Task Invoke_TransfersOrReleasesResponseAfterTransactionCompletion(string outcome)
+    {
+        var transactionInfo = new TransactionInfo { PendingCalls = outcome == "Abort" ? 1 : 0 };
+        var agent = new GatedTransactionAgent(transactionInfo);
+        using var services = new ServiceCollection().AddSerializer()
+            .AddSingleton<ITransactionAgent>(agent).BuildServiceProvider();
+        var original = new TrackingResponse();
+        using var request = new ResponseInvoker(services, original) { TransactionOption = TransactionOption.Create };
+        var invocation = request.Invoke().AsTask();
+        await agent.CompletionStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.False(invocation.IsCompleted);
+        Assert.Equal(0, original.DisposeCalls);
+        Assert.Equal(outcome == "Abort", agent.Aborted);
+        var failure = new InvalidOperationException("resolution failed");
+        if (outcome == "ResolutionFailure")
+        {
+            agent.Completion.SetException(failure);
+            Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => invocation));
+        }
+        else
+        {
+            agent.Completion.SetResult(outcome == "CommitFailure"
+                ? (TransactionalStatus.PrepareTimeout, failure)
+                : (TransactionalStatus.Ok, null));
+            using (var response = await invocation)
+            {
+                var wrapper = Assert.IsType<TransactionResponse>(response);
+                Assert.Same(transactionInfo, wrapper.TransactionInfo);
+                Assert.Null(wrapper.Exception);
+                if (outcome == "Commit")
+                {
+                    Assert.Same(original, wrapper.InnerResponse);
+                    Assert.Equal(42, wrapper.GetResult<int>());
+                    Assert.Null(wrapper.GetException());
+                    Assert.Equal(0, original.DisposeCalls);
+                }
+                else
+                {
+                    Assert.NotSame(original, wrapper.InnerResponse);
+                    if (outcome == "CommitFailure")
+                    {
+                        var exception = Assert.IsType<OrleansTransactionPrepareTimeoutException>(wrapper.GetException());
+                        Assert.Same(failure, exception.InnerException);
+                    }
+                    else
+                    {
+                        Assert.IsType<OrleansOrphanCallException>(wrapper.GetException());
+                    }
+
+                    Assert.Equal(1, original.DisposeCalls);
+                }
+            }
+        }
+
+        Assert.Equal(1, original.DisposeCalls);
+    }
+
     public static IEnumerable<object[]> InvocationCases()
     {
         foreach (var shape in new[] { "ValueTask", "ValueTaskOfInt", "Task", "TaskOfInt" })
@@ -109,6 +207,56 @@ public class TransactionRequestInvocationTests
         }
 
         Assert.Equal(usesValueTask && !synchronousFailure ? 1 : 0, source.GetResultCalls);
+    }
+
+    private sealed class TrackingResponse : Response
+    {
+        public int DisposeCalls { get; private set; }
+        public override object? Result { get; set; } = 42;
+        public override Exception? Exception { get; set; }
+        public override T GetResult<T>() => (T)Result!;
+        public override void Dispose()
+        {
+            DisposeCalls++;
+            Result = null;
+        }
+    }
+
+    private sealed class GatedTransactionAgent(TransactionInfo transactionInfo) : ITransactionAgent
+    {
+        public TaskCompletionSource CompletionStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<(TransactionalStatus Status, Exception? Exception)> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool Aborted { get; private set; }
+
+        public Task<TransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout) => Task.FromResult(transactionInfo);
+
+        public Task<(TransactionalStatus Status, Exception? exception)> Resolve(TransactionInfo info)
+        {
+            Assert.Same(transactionInfo, info);
+            CompletionStarted.SetResult();
+            return Completion.Task;
+        }
+
+        public Task Abort(TransactionInfo info)
+        {
+            Assert.Same(transactionInfo, info);
+            Aborted = true;
+            CompletionStarted.SetResult();
+            return Completion.Task;
+        }
+    }
+
+    private sealed class ResponseInvoker(IServiceProvider services, Response response)
+        : TransactionRequestBase(services.GetRequiredService<Serializer<OrleansTransactionAbortedException>>(), services)
+    {
+        protected override ValueTask<Response> BaseInvoke() => new(response);
+        public override object GetTarget() => throw new NotSupportedException();
+        public override void SetTarget(ITargetHolder holder) => throw new NotSupportedException();
+        public override string GetMethodName() => throw new NotSupportedException();
+        public override string GetInterfaceName() => throw new NotSupportedException();
+        public override string GetActivityName() => throw new NotSupportedException();
+        public override Type GetInterfaceType() => throw new NotSupportedException();
+        public override MethodInfo GetMethod() => throw new NotSupportedException();
     }
 
     private sealed class SingleConsumptionSource : IValueTaskSource, IValueTaskSource<int>
