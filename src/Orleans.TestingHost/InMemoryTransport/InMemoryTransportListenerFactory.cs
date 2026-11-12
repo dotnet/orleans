@@ -193,7 +193,9 @@ internal class InMemoryTransportConnector : MessageTransportConnector
         var pipePair = DuplexPipe.CreatePair();
         var local = new InMemoryMessageTransport(pipePair.Left, _connectionLogger);
         local.Start();
+#pragma warning disable CA2000 // AddConnection transfers the remote transport to AcceptAsync; failed acceptance disposes both transports below.
         var remote = new InMemoryMessageTransport(pipePair.Right, _connectionLogger);
+#pragma warning restore CA2000
         remote.Start();
         try
         {
