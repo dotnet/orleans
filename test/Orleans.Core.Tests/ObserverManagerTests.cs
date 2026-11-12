@@ -16,6 +16,51 @@ namespace NonSilo.Tests;
 [TestArea("Runtime")]
 public sealed class ObserverManagerTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Notify_NullCallback_ThrowsWithoutChangingSubscriptions(bool asynchronous, bool hasObservers)
+    {
+        var now = DateTime.UnixEpoch;
+        var observerManager = new ObserverManager<int, int>(TimeSpan.FromHours(1), NullLogger.Instance)
+        {
+            GetDateTime = () => now,
+        };
+        if (hasObservers)
+        {
+            observerManager.Subscribe(1, 10);
+            now = now.AddHours(2);
+            observerManager.Subscribe(2, 20);
+            observerManager.Subscribe(3, 30);
+        }
+
+        var expectedObservers = observerManager.Observers;
+        var timeReads = 0;
+        observerManager.GetDateTime = () =>
+        {
+            timeReads++;
+            return now;
+        };
+        var predicateCalls = 0;
+        bool Predicate(int observer)
+        {
+            predicateCalls++;
+            return observer != 30;
+        }
+
+        var error = asynchronous
+            ? await Record.ExceptionAsync(() => observerManager.Notify((Func<int, Task>)null!, Predicate))
+            : Record.Exception(() => observerManager.Notify((Action<int>)null!, Predicate));
+
+        Assert.Equal(expectedObservers.OrderBy(entry => entry.Key), observerManager.Observers.OrderBy(entry => entry.Key));
+        Assert.Equal(0, timeReads);
+        Assert.Equal(0, predicateCalls);
+        var exception = Assert.IsType<ArgumentNullException>(error);
+        Assert.Equal("notification", exception.ParamName);
+    }
+
     [Fact]
     public async Task CollectionModified()
     {
