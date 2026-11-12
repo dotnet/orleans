@@ -28,7 +28,7 @@ public sealed class SerializerBuilderExtensionsTests
     public void ConfigureFactoryRejectsNullBuilder()
     {
         var exception = Assert.Throws<ArgumentNullException>(
-            () => SerializerBuilderExtensions.Configure(null!, _ => new ConfigureOptions<TypeManifestOptions>(_ => { })));
+            () => SerializerBuilderExtensions.Configure(null!, (IServiceProvider _) => new ConfigureOptions<TypeManifestOptions>(_ => { })));
 
         Assert.Equal("builder", exception.ParamName);
     }
