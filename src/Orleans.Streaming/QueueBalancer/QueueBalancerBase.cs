@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -70,13 +71,15 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc />
+        [SuppressMessage("Performance", "CA1849:Call async methods when in an async method",
+            Justification = "Shutdown invokes cancellation callbacks on the calling scheduler before joining the membership worker.")]
         public virtual async Task Shutdown()
         {
             try
             {
                 this.cts.Cancel(throwOnFirstException: false);
             }
-            catch (Exception exc)
+            catch (AggregateException exc)
             {
                 LogErrorSignalingShutdownToken(Logger, exc);
             }
