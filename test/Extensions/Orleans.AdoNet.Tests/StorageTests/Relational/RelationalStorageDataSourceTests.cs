@@ -176,6 +176,41 @@ public sealed class RelationalStorageDataSourceTests
     }
 
     [Fact]
+    public async Task ReadAndExecuteAsync_PreserveSqlLikeParameterValuesAsData()
+    {
+        using var fixture = new RelationalStorageLifecycleFixture();
+        fixture.ExecuteSetup(
+            """
+            CREATE TABLE Items(Id INTEGER PRIMARY KEY, Value TEXT NOT NULL);
+            INSERT INTO Items(Value) VALUES ('existing');
+            """);
+        const string value = "'); DELETE FROM Items; --";
+
+        var affected = await fixture.Storage.ExecuteAsync(
+            "INSERT INTO Items(Value) VALUES (@value);",
+            BindValue,
+            cancellationToken: TestContext.Current.CancellationToken);
+        var results = await fixture.Storage.ReadAsync(
+            "SELECT Value FROM Items WHERE Value = @value;",
+            BindValue,
+            (record, _, _) => Task.FromResult(record.GetString(0)),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, affected);
+        Assert.Equal([value], results);
+        Assert.Equal(2L, fixture.ExecuteScalar<long>("SELECT COUNT(*) FROM Items;"));
+        Assert.Equal("existing", fixture.ExecuteScalar<string>("SELECT Value FROM Items WHERE Id = 1;"));
+
+        static void BindValue(System.Data.IDbCommand command)
+        {
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "@value";
+            parameter.Value = value;
+            command.Parameters.Add(parameter);
+        }
+    }
+
+    [Fact]
     public async Task ReadAsync_DisposesResourcesAfterSuccess()
     {
         using var fixture = new RelationalStorageLifecycleFixture();
