@@ -129,38 +129,61 @@ public sealed class NatsConnectionLifetimeTests
             throw Xunit.Sdk.SkipException.ForSkip("Nats Server is not available");
         }
 
+        var providerName = $"{ProviderName}-{Guid.NewGuid():N}";
+        var streamName = $"lifetime-{Guid.NewGuid():N}";
         using var logs = new ConnectionLogs();
-        using var host = CreateHost(logs, silo: silo);
-        var factory = GetFactory(host);
-        var first = await factory.CreateAdapter();
-        var second = await factory.CreateAdapter();
-        Assert.NotSame(first, second);
+        var host = CreateHost(logs, silo: silo, providerName: providerName, streamName: streamName);
+        try
+        {
+            var factory = GetFactory(host, providerName);
+            var first = await factory.CreateAdapter();
+            var second = await factory.CreateAdapter();
+            Assert.NotSame(first, second);
 
-        await first.QueueMessageBatchAsync(StreamId.Create("lifetime", "first"), new[] { 1 }, null!, null!);
-        await second.QueueMessageBatchAsync(StreamId.Create("lifetime", "second"), new[] { 2 }, null!, null!);
-        Assert.Empty(logs.DisposedNames);
+            await first.QueueMessageBatchAsync(StreamId.Create("lifetime", "first"), new[] { 1 }, null!, null!);
+            await second.QueueMessageBatchAsync(StreamId.Create("lifetime", "second"), new[] { 2 }, null!, null!);
+            Assert.Empty(logs.DisposedNames);
 
-        await ((IAsyncDisposable)host).DisposeAsync();
+            await ((IAsyncDisposable)host).DisposeAsync();
 
-        AssertDisposed(logs, 2);
-        await factory.DisposeAsync();
-        AssertDisposed(logs, 2);
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => factory.CreateAdapter());
+            AssertDisposed(logs, 2, providerName);
+            await factory.DisposeAsync();
+            AssertDisposed(logs, 2, providerName);
+            await Assert.ThrowsAsync<ObjectDisposedException>(() => factory.CreateAdapter());
+        }
+        finally
+        {
+            try
+            {
+                await ((IAsyncDisposable)host).DisposeAsync();
+            }
+            finally
+            {
+                await DeleteStream(streamName, TestContext.Current.CancellationToken);
+            }
+        }
     }
 
-    private static NatsAdapterFactory GetFactory(IHost host) =>
-        Assert.IsType<NatsAdapterFactory>(host.Services.GetRequiredKeyedService<IQueueAdapterFactory>(ProviderName));
+    private static NatsAdapterFactory GetFactory(IHost host, string providerName = ProviderName) =>
+        Assert.IsType<NatsAdapterFactory>(host.Services.GetRequiredKeyedService<IQueueAdapterFactory>(providerName));
 
-    private static IHost CreateHost(ConnectionLogs logs, FailingSocketFactory? sockets = null, bool retryOnInitialConnect = false, bool silo = false)
+    private static IHost CreateHost(
+        ConnectionLogs logs,
+        FailingSocketFactory? sockets = null,
+        bool retryOnInitialConnect = false,
+        bool silo = false,
+        string providerName = ProviderName,
+        string? streamName = null)
     {
-        var streamName = $"lifetime-{Guid.NewGuid():N}";
+        streamName ??= $"lifetime-{Guid.NewGuid():N}";
+        var connectionNames = GetConnectionNames(providerName);
         void Configure(NatsOptions options)
         {
             options.StreamName = streamName;
             options.ProducerCount = 2;
             options.NatsClientOptions = NatsTestConstants.NatsClientOptions with
             {
-                Name = ConnectionNames[0],
+                Name = connectionNames[0],
                 LoggerFactory = logs,
                 SocketConnectionFactory = sockets,
                 RetryOnInitialConnect = retryOnInitialConnect,
@@ -171,18 +194,44 @@ public sealed class NatsConnectionLifetimeTests
         var builder = new HostBuilder().ConfigureLogging(logging => logging.ClearProviders());
         if (silo)
         {
-            builder.UseOrleans(builder => builder.UseLocalhostClustering().AddNatsStreams(ProviderName, Configure));
+            builder.UseOrleans(builder => builder.UseLocalhostClustering().AddNatsStreams(providerName, Configure));
         }
         else
         {
-            builder.UseOrleansClient(builder => builder.UseLocalhostClustering().AddNatsStreams(ProviderName, Configure));
+            builder.UseOrleansClient(builder => builder.UseLocalhostClustering().AddNatsStreams(providerName, Configure));
         }
 
         return builder.Build();
     }
 
-    private static void AssertDisposed(ConnectionLogs logs, int poolCount) =>
-        Assert.Equal(Enumerable.Range(0, poolCount).SelectMany(_ => ConnectionNames).Order(), logs.DisposedNames.Order());
+    private static async Task DeleteStream(string streamName, CancellationToken cancellationToken)
+    {
+        using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await using var connection = NatsTestConstants.CreateConnection();
+        try
+        {
+            await connection.ConnectAsync().AsTask().WaitAsync(cleanup.Token);
+            var context = new NatsJSContext(connection);
+            var stream = await context.GetStreamAsync(streamName, cancellationToken: cleanup.Token);
+            await stream.DeleteAsync(cleanup.Token);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Preserve the original test cancellation after bounded cleanup.
+        }
+    }
+
+    private static string[] GetConnectionNames(string providerName) =>
+    [
+        $"Orleans-{providerName}",
+        $"Orleans-{providerName}-Producer-0",
+        $"Orleans-{providerName}-Producer-1",
+    ];
+
+    private static void AssertDisposed(ConnectionLogs logs, int poolCount, string providerName = ProviderName) =>
+        Assert.Equal(
+            Enumerable.Range(0, poolCount).SelectMany(_ => GetConnectionNames(providerName)).Order(),
+            logs.DisposedNames.Order());
 
     private sealed class FailingSocketFactory : INatsSocketConnectionFactory
     {
