@@ -3,6 +3,7 @@ using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -63,6 +64,8 @@ namespace Orleans.Transactions.TestKit.Consistency
         private const double RecursionProbability = .1 - .9 * (1.0 / (10 * 40 - 1));
 
         /// <inheritdoc />
+        [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+            Justification = "Randomness selects transaction conformance operations and test-grain targets.")]
         public async Task<Observation[]> Run(ConsistencyTestOptions options, int depth, string stack, int maxgrain, DateTime stopAfter)
         {
             ArgumentNullException.ThrowIfNull(options);
@@ -159,6 +162,8 @@ namespace Orleans.Transactions.TestKit.Consistency
             });
         }
 
+        [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+            Justification = "Randomness selects transaction conformance operations and test-grain targets.")]
         private async Task<Observation[]> Recurse(ConsistencyTestOptions options, int depth, string stack, Random random, int count, bool parallel, int maxgrain, DateTime stopAfter)
         {
             LogTraceRecurse(logger, MyNumber, TransactionContext.CurrentTransactionId, stack, count, parallel ? "par" : "seq");
