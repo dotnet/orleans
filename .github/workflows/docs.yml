@@ -108,8 +108,9 @@ jobs:
 
       - name: Build samples against local Orleans packages
         shell: pwsh
-        # Keep sample compiler processes isolated through .NET runtime 10.0.12. After the
-        # SDK carries 10.0.13+, validate shared compilation in repeated runs before removal.
+        # Keep sample compiler processes isolated until the SDK's runtime includes the JIT fix
+        # from dotnet/runtime#132395 (shipped in .NET 10.0.13, absent from 11.0.0). Then validate
+        # shared compilation in repeated runs before removal.
         # See #11235, dotnet/roslyn#85656, and dotnet/runtime#132631.
         run: ./samples/Build-Samples.ps1 -Configuration Release -NoIncremental -DisableSharedCompilation
 

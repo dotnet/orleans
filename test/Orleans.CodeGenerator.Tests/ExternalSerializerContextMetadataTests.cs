@@ -243,11 +243,7 @@ public sealed class ExternalSerializerContextMetadataTests
             [new OrleansSerializationSourceGenerator().AsSourceGenerator()], parseOptions: parseOptions,
             optionsProvider: TestCompilationHelper.CreateOptionsProvider(new Dictionary<string, string>
             {
-#if NET8_0
-                ["build_property.TargetFrameworkVersion"] = "v8.0"
-#else
                 ["build_property.TargetFrameworkVersion"] = "v10.0"
-#endif
             }));
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out _, TestContext.Current.CancellationToken);
         return ((CSharpCompilation)output, driver.GetRunResult());

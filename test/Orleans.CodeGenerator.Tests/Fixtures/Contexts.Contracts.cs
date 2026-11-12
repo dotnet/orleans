@@ -1,9 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
-#if NET10_0_OR_GREATER
 using Documentation.SerializerContexts;
-#endif
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Configuration;
@@ -358,7 +356,6 @@ public static partial class ContextContracts
         public ArrayCopier<RecursiveValue?> Array { get; } = array;
     }
 
-#if NET10_0_OR_GREATER
     public static void ReferencedGeneratedModelsTraverseDependencies()
     {
         using var services = CreateServices();
@@ -402,7 +399,6 @@ public static partial class ContextContracts
     {
         [Id(0)] public List<DocumentationPayload<int>> Items { get; set; } = [];
     }
-#endif
 
     public static void NullableArrayAndEnumRoundTrip()
     {
@@ -642,10 +638,8 @@ public static partial class ContextContracts
 [GeneratedContextType<InterfaceTaggedPayload>]
 [GeneratedContextType<AliasedContainer.Payload>]
 [GeneratedContextType<IncidentalPrivateInterfacePayload>]
-#if NET10_0_OR_GREATER
 [GeneratedContextType<ContextContracts.DocumentationEnvelope>]
 [GeneratedContextImport<ApplicationSerializerContext>]
-#endif
 internal partial class SmokeContext : GeneratedContext;
 
 [GeneratedContextType<List<Dictionary<string, int>>>]

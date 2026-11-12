@@ -1097,11 +1097,7 @@ namespace Orleans.Runtime.ReminderService
         {
             private readonly LocalReminderService _shared;
             private readonly CancellationTokenSource _stopCancellation = new();
-#if NET10_0_OR_GREATER
             private readonly System.Threading.Lock _lock = new();
-#else
-            private readonly object _lock = new();
-#endif
             private readonly ReminderIdentity _identity;
             private ReminderEntry? _entry;
             private DateTime? _lastFiredTickTime;

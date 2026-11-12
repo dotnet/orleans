@@ -22,9 +22,7 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
     [Fact] public void CollectionDependenciesHonorSelectedCustomRegistrations() => ContextContracts.CollectionDependenciesHonorSelectedCustomRegistrations();
     [Fact] public void NullableRootCyclesPreserveCopyIdentity() => ContextContracts.NullableRootCyclesPreserveCopyIdentity();
     [Fact] public void NullableRootFailureRollsBackAndRetriesCanonically() => ContextContracts.NullableRootFailureRollsBackAndRetriesCanonically();
-#if NET10_0_OR_GREATER
     [Fact] public void ReferencedGeneratedModelsTraverseDependencies() => ContextContracts.ReferencedGeneratedModelsTraverseDependencies();
-#endif
     [Fact] public void NullableArrayAndEnumRoundTrip() => ContextContracts.NullableArrayAndEnumRoundTrip();
     [Fact] public void RecursiveModelsPreserveIdentity() => ContextContracts.RecursiveModelsPreserveIdentity();
     [Fact] public void MutualRecursionPreservesIdentity() => ContextContracts.MutualRecursionPreservesIdentity();

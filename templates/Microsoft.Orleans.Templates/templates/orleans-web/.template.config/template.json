@@ -27,12 +27,12 @@
       "replaces": "net10.0",
       "choices": [
         {
-          "choice": "net10.0",
-          "description": "Target .NET 10."
+          "choice": "net11.0",
+          "description": "Target .NET 11."
         },
         {
-          "choice": "net8.0",
-          "description": "Target .NET 8."
+          "choice": "net10.0",
+          "description": "Target .NET 10."
         }
       ]
     },

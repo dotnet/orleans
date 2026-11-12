@@ -267,7 +267,7 @@ public class MemoryStorageTests : GrainStorageTestRunner, IClassFixture<MemorySt
 
 ## Requirements
 
-- .NET 8.0 or later
+- .NET 10 or later
 - Orleans 10.0 or later
 - A .NET testing framework with asynchronous test support
 

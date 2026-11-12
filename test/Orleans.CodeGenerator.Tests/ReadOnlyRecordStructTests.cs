@@ -169,25 +169,16 @@ public class ReadOnlyRecordStructTests
         string declaration, bool parameterIds)
     {
         var parameters = $"{(parameterIds ? "[Id(4)] " : "")}byte[] Value, {(parameterIds ? "[Id(9)] " : "")}int Number";
-        string CreateDeclaration(bool positional, bool annotations) => $$"""
+        string CreateDeclaration(bool annotations) => $$"""
             [GenerateSerializer{{(annotations ? "(IncludePrimaryConstructorParameters = true)" : "")}}]
-            {{(annotations && positional ? "[method: ActivatorUtilitiesConstructor]" : "")}}
-            public {{declaration}} TestRecord{{(positional ? $"({parameters})" : "")}}
+            {{(annotations ? "[method: ActivatorUtilitiesConstructor]" : "")}}
+            public {{declaration}} TestRecord({{parameters}})
             {
-                {{(positional ? "" : $$"""
-                [ActivatorUtilitiesConstructor]
-                public TestRecord({{parameters}})
-                {
-                    _storage = Value;
-                    _number = Number;
-                }
-                """)}}
+                [System.NonSerialized]
+                private readonly byte[] _storage = Value;
 
                 [System.NonSerialized]
-                private readonly byte[] _storage{{(positional ? " = Value" : "")}};
-
-                [System.NonSerialized]
-                private readonly int _number{{(positional ? " = Number" : "")}};
+                private readonly int _number = Number;
 
                 public byte[] Value { get => _storage; init => _storage = value; }
                 public int Number { get => _number; init => _number = value; }
@@ -199,18 +190,12 @@ public class ReadOnlyRecordStructTests
                 public TestRecord(byte[] Value) : this(Value, -1) { }
             }
             """;
-#if NET8_0
-        // Roslyn 4.5 predates method-target attributes on positional record structs.
-        const bool positionalProducer = false;
-#else
-        const bool positionalProducer = true;
-#endif
         var producer = await TestCompilationHelper.CreateCompilation($$"""
             using Orleans;
             using Microsoft.Extensions.DependencyInjection;
             namespace TestProject;
 
-            {{CreateDeclaration(positionalProducer, annotations: true)}}
+            {{CreateDeclaration(annotations: true)}}
             """, $"RecordContracts{Guid.NewGuid():N}");
         Assert.DoesNotContain(producer.GetDiagnostics(TestContext.Current.CancellationToken),
             diagnostic => diagnostic.Id == "CS0657");
@@ -235,7 +220,7 @@ public class ReadOnlyRecordStructTests
             using Orleans;
             namespace TestProject
             {
-                {{CreateDeclaration(positional: true, annotations: false)}}
+                {{CreateDeclaration(annotations: false)}}
             }
             """ + RecordRuntimeProbe, $"RecordSource{Guid.NewGuid():N}");
         var (sourceOutput, sourceResult) = GenerateRecordCompilation(source);

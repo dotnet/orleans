@@ -902,11 +902,7 @@ namespace Orleans.Runtime
 
         private sealed class CollectionRegistration(ICollectibleGrainContext context) : IActivationCollectionRegistration
         {
-#if NET10_0_OR_GREATER
             private readonly Lock _lock = new();
-#else
-            private readonly object _lock = new();
-#endif
             private Bucket? _bucket;
             private CollectionRegistrationState _state;
 

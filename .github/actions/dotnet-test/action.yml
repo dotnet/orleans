@@ -25,8 +25,15 @@ inputs:
 runs:
   using: composite
   steps:
+  - name: Prepare runtime crash reports
+    if: runner.os != 'Windows'
+    shell: pwsh
+    # .NET 11 processes, including the SDK test coordinator, write crashing managed stacks to the job log.
+    # Processes with crash dumps enabled write the report as JSON beside the dump.
+    run: |
+      'DOTNET_EnableCrashReport=1' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
   - name: Prepare runtime crash diagnostics
-    if: runner.os == 'Linux' && inputs.framework == 'net8.0'
+    if: runner.os == 'Linux' && inputs.framework == 'net10.0'
     shell: pwsh
     run: |
       New-Item -ItemType Directory -Force -Path '${{ github.workspace }}/TestResults' | Out-Null
@@ -92,6 +99,7 @@ runs:
         '--crashdump'
         '--crashdump-type'
         'Full'
+        '--crash-report-if-supported'
         '--hangdump-type'
         'Heap'
         '--report-trx'
@@ -123,6 +131,7 @@ runs:
         '--crashdump'
         '--crashdump-type'
         'Full'
+        '--crash-report-if-supported'
         '--hangdump-type'
         'Heap'
         '--report-trx'

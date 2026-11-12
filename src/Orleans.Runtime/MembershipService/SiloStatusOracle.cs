@@ -11,11 +11,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly IMembershipManager membershipManager;
         private readonly SiloStatusListenerManager listenerManager;
         private readonly ILogger log;
-#if NET9_0_OR_GREATER
         private readonly Lock cacheUpdateLock = new();
-#else
-        private readonly object cacheUpdateLock = new();
-#endif
         private MembershipTableSnapshot? cachedSnapshot;
         private Dictionary<SiloAddress, SiloStatus> siloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
         private Dictionary<SiloAddress, SiloStatus> siloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();

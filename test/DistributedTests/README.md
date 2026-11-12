@@ -56,12 +56,12 @@ connection string configuration is required.
 
 ### 2. Build the workloads
 
-The Crank configuration defaults to `net8.0` and reads the built applications
+The Crank configuration defaults to `net10.0` and reads the built applications
 from `Artifacts\DistributedTests`:
 
 ```powershell
-dotnet build test\DistributedTests\DistributedTests.Server\DistributedTests.Server.csproj --configuration Release --framework net8.0
-dotnet build test\DistributedTests\DistributedTests.Client\DistributedTests.Client.csproj --configuration Release --framework net8.0
+dotnet build test\DistributedTests\DistributedTests.Server\DistributedTests.Server.csproj --configuration Release --framework net10.0
+dotnet build test\DistributedTests\DistributedTests.Client\DistributedTests.Client.csproj --configuration Release --framework net10.0
 ```
 
 Rebuild both projects after changing Orleans or the distributed-test workloads.
@@ -120,7 +120,7 @@ target account.
 - **Crank reports that `http://localhost:5010` is unavailable**: start the
   Crank agent and verify that no other process is using port `5010`.
 - **The source folder or executable is missing**: build both workloads in
-  `Release` for `net8.0` and confirm that the executable exists under
-  `Artifacts\DistributedTests\<workload>\net8.0`.
+  `Release` for `net10.0` and confirm that the executable exists under
+  `Artifacts\DistributedTests\<workload>\net10.0`.
 - **The workload cannot connect to storage**: confirm that the Azurite container
   is running and that ports `10001` and `10002` are reachable.

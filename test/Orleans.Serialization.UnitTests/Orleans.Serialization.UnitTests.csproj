@@ -43,7 +43,7 @@
   <Target
     Name="CopyNetStandardSerializationAsset"
     AfterTargets="Build"
-    Condition="'$(TargetFramework)' == 'net10.0' and '$(DesignTimeBuild)' != 'true'">
+    Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' != 'true'">
     <MSBuild
       Projects="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj"
       Targets="Build"
