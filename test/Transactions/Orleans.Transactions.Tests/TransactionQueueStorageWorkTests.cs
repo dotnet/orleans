@@ -275,6 +275,13 @@ public class TransactionQueueStorageWorkTests
         Task? stop = null;
         var scheduled = Task.Factory.StartNew(() =>
         {
+            TaskScheduler? observerScheduler = null;
+            var observerThread = 0;
+            using var registration = queue.OnDeactivating.Register(() =>
+            {
+                observerScheduler = TaskScheduler.Current;
+                observerThread = Environment.CurrentManagedThreadId;
+            });
             work = queue.StartStorageWorkAsync();
             if (queueAnotherCycle)
             {
@@ -282,6 +289,8 @@ public class TransactionQueueStorageWorkTests
             }
 
             stop = queue.StopAsync(TestContext.Current.CancellationToken);
+            Assert.Same(scheduler, observerScheduler);
+            Assert.Equal(Environment.CurrentManagedThreadId, observerThread);
             Assert.False(work.IsCompleted);
             Assert.False(stop.IsCompleted);
         }, TestContext.Current.CancellationToken, TaskCreationOptions.None, scheduler);
