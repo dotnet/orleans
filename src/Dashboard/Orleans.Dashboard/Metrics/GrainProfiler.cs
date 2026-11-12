@@ -26,7 +26,7 @@ internal sealed partial class GrainProfiler(
     [SuppressMessage(
         "Usage",
         "CA2213:Disposable fields should be disposed",
-        Justification = "Lifecycle shutdown and dependency-injection disposal both atomically exchange and dispose the timer.")]
+        Justification = "Lifecycle shutdown atomically exchanges and asynchronously disposes the timer, awaiting callbacks. Dependency-injection disposal also exchanges and disposes it.")]
     private Timer? _timer;
     private string? _siloAddress;
     private bool _isEnabled;
@@ -51,10 +51,7 @@ internal sealed partial class GrainProfiler(
     }
 
     private Task OnStop(CancellationToken _)
-    {
-        Interlocked.Exchange(ref _timer, null)?.Dispose();
-        return Task.CompletedTask;
-    }
+        => Interlocked.Exchange(ref _timer, null)?.DisposeAsync().AsTask() ?? Task.CompletedTask;
 
     public void Dispose() => Interlocked.Exchange(ref _timer, null)?.Dispose();
 
