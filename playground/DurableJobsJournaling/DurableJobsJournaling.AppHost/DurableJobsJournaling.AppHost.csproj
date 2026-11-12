@@ -9,6 +9,8 @@
     <Nullable>enable</Nullable>
     <IsAspireHost>true</IsAspireHost>
     <UserSecretsId>809ee43f-2f9d-47ca-a162-ee03f0856c17</UserSecretsId>
+    <!-- This playground uses the existing AppHost orchestration mode (AspireUseCliBundle=false). -->
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
