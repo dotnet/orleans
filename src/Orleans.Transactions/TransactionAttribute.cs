@@ -496,6 +496,8 @@ namespace Orleans
         }
 
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Generated grain invocations return arbitrary user-code failures as responses for transaction abort processing.")]
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -503,7 +505,9 @@ namespace Orleans
                 var resultTask = InvokeInner();
                 if (resultTask.IsCompleted)
                 {
+#pragma warning disable CA1849 // IsCompleted proves this consumes the ValueTask result without blocking, including failure or cancellation.
                     resultTask.GetAwaiter().GetResult();
+#pragma warning restore CA1849
                     return new ValueTask<Response>(Response.Completed);
                 }
 
@@ -515,6 +519,8 @@ namespace Orleans
             }
         }
 
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Awaited user-code failures and cancellation are returned as responses for transaction abort processing.")]
         private static async ValueTask<Response> CompleteInvokeAsync(ValueTask resultTask)
         {
             try
@@ -553,6 +559,8 @@ namespace Orleans
         }
 
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Generated grain invocations return arbitrary user-code failures as responses for transaction abort processing.")]
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -571,6 +579,8 @@ namespace Orleans
             }
         }
 
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Awaited user-code failures and cancellation are returned as responses for transaction abort processing.")]
         private static async ValueTask<Response> CompleteInvokeAsync(ValueTask<TResult> resultTask)
         {
             try
@@ -609,6 +619,8 @@ namespace Orleans
         }
 
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Generated grain invocations return arbitrary user-code failures as responses for transaction abort processing.")]
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -628,6 +640,8 @@ namespace Orleans
             }
         }
 
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Awaited user-code failures and cancellation are returned as responses for transaction abort processing.")]
         private static async ValueTask<Response> CompleteInvokeAsync(Task<TResult> resultTask)
         {
             try
@@ -665,6 +679,8 @@ namespace Orleans
         }
 
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Generated grain invocations return arbitrary user-code failures as responses for transaction abort processing.")]
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -673,7 +689,9 @@ namespace Orleans
                 var status = resultTask.Status;
                 if (resultTask.IsCompleted)
                 {
+#pragma warning disable CA1849 // IsCompleted proves this observes the Task outcome without blocking, including failure or cancellation.
                     resultTask.GetAwaiter().GetResult();
+#pragma warning restore CA1849
                     return new ValueTask<Response>(Response.Completed);
                 }
 
@@ -685,6 +703,8 @@ namespace Orleans
             }
         }
 
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Awaited user-code failures and cancellation are returned as responses for transaction abort processing.")]
         private static async ValueTask<Response> CompleteInvokeAsync(Task resultTask)
         {
             try
