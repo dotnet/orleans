@@ -45,6 +45,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly int maxCacheSize;
         private readonly ILogger logger;
         private readonly List<CacheBucket> cacheCursorHistogram; // for backpressure detection
+        private readonly Func<SimpleQueueCache, StreamId, SimpleQueueCacheCursor>? cursorFactory;
         private const int NUM_CACHE_HISTOGRAM_BUCKETS = 10;
         private readonly int CACHE_HISTOGRAM_MAX_BUCKET_SIZE;
 
@@ -65,11 +66,21 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="cacheSize">Size of the cache.</param>
         /// <param name="logger">The logger.</param>
         public SimpleQueueCache(int cacheSize, ILogger logger)
+            : this(cacheSize, logger, cursorFactory: null)
+        {
+        }
+
+        // Allows tests to observe cursor ownership without exposing a public factory hook.
+        internal SimpleQueueCache(
+            int cacheSize,
+            ILogger logger,
+            Func<SimpleQueueCache, StreamId, SimpleQueueCacheCursor>? cursorFactory)
         {
             cachedMessages = new LinkedList<SimpleQueueCacheItem>();
             maxCacheSize = cacheSize;
 
             this.logger = logger;
+            this.cursorFactory = cursorFactory;
             cacheCursorHistogram = new List<CacheBucket>();
             CACHE_HISTOGRAM_MAX_BUCKET_SIZE = Math.Max(cacheSize / NUM_CACHE_HISTOGRAM_BUCKETS, 1); // we have 10 buckets
         }
@@ -153,7 +164,7 @@ namespace Orleans.Providers.Streams.Common
                 throw cacheMiss.ToException();
             }
 
-            SimpleQueueCacheCursor? cursor = new(this, streamId, logger);
+            SimpleQueueCacheCursor? cursor = CreateCursor(streamId);
             try
             {
                 if (InitializeCursor(cursor, token) is { } racedCacheMiss)
@@ -195,7 +206,7 @@ namespace Orleans.Providers.Streams.Common
                 return QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(cacheMiss);
             }
 
-            SimpleQueueCacheCursor? cursor = new(this, streamId, logger);
+            SimpleQueueCacheCursor? cursor = CreateCursor(streamId);
             try
             {
                 if (InitializeCursor(cursor, token) is { } racedCacheMiss)
@@ -257,7 +268,7 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException(nameof(startPosition), startPosition, "The subscription start position is not defined.");
             }
 
-            SimpleQueueCacheCursor? cursor = new(this, streamId, logger);
+            SimpleQueueCacheCursor? cursor = CreateCursor(streamId);
             try
             {
                 InitializeCursorAtEarliestAvailable(cursor);
@@ -270,6 +281,9 @@ namespace Orleans.Providers.Streams.Common
                 cursor?.Dispose();
             }
         }
+
+        private SimpleQueueCacheCursor CreateCursor(StreamId streamId)
+            => cursorFactory is { } factory ? factory(this, streamId) : new(this, streamId, logger);
 
         private void InitializeCursorAtEarliestAvailable(SimpleQueueCacheCursor cursor)
         {
