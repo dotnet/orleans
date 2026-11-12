@@ -1,5 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Concurrency;
+using Orleans.GrainDirectory;
 using Orleans.Metadata;
+using Orleans.Placement;
 using Orleans.Runtime;
 using Xunit;
 
@@ -55,6 +58,22 @@ public sealed class AttributeGrainPropertiesProviderTests
     }
 
     [Fact]
+    public void BuiltInAttributesComposeMetadataAfterProviderAdmission()
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var properties = new Dictionary<string, string> { ["existing"] = "value" };
+
+        new AttributeGrainPropertiesProvider(services).Populate(typeof(BuiltInPropertyGrain), GrainType.Create("test.grain"), properties);
+
+        Assert.Equal(5, properties.Count);
+        Assert.Equal("value", properties["existing"]);
+        Assert.Equal("true", properties[WellKnownGrainTypeProperties.Reentrant]);
+        Assert.Equal("CanInterleave", properties[WellKnownGrainTypeProperties.MayInterleavePredicate]);
+        Assert.Equal("named-directory", properties[WellKnownGrainTypeProperties.GrainDirectory]);
+        Assert.Equal("1", properties[WellKnownGrainTypeProperties.Immovable]);
+    }
+
+    [Fact]
     public void BindingAttributesPreserveGroupingAndDefaultMapperSentinel()
     {
         using var services = new ServiceCollection().AddSingleton("service-marker").BuildServiceProvider();
@@ -76,6 +95,9 @@ public sealed class AttributeGrainPropertiesProviderTests
     [TestProperties, TestBindings]
     private class BaseGrain { }
     private sealed class DerivedGrain : BaseGrain { }
+
+    [Reentrant, MayInterleave("CanInterleave"), GrainDirectory("named-directory"), Immovable(ImmovableKind.Repartitioner)]
+    private sealed class BuiltInPropertyGrain { }
 
     [AttributeUsage(AttributeTargets.Class, Inherited = true)]
     private sealed class TestPropertiesAttribute : Attribute, IGrainPropertiesProviderAttribute

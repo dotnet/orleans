@@ -278,6 +278,11 @@ namespace Orleans.Metadata
         /// <summary>
         /// Adds grain properties to <paramref name="properties"/>.
         /// </summary>
+        /// <remarks>
+        /// <see cref="AttributeGrainPropertiesProvider"/> validates that <paramref name="grainClass"/> and
+        /// <paramref name="properties"/> are non-null before dispatching to attributes. Direct callers must
+        /// also provide a non-null grain class and properties collection.
+        /// </remarks>
         /// <param name="services">
         /// The service provider.
         /// </param>

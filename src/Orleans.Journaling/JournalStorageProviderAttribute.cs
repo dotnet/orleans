@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Metadata;
 
 namespace Orleans.Journaling;
@@ -24,6 +25,8 @@ public sealed class JournalStorageProviderAttribute(string providerName) : Attri
 
     /// <inheritdoc />
     /// <exception cref="OrleansConfigurationException">The provider name is null, empty, or whitespace.</exception>
+    [SuppressMessage("Design", "CA1062:Validate arguments of public methods",
+        Justification = "AttributeGrainPropertiesProvider validates the grain class and properties collection before dispatching to attributes.")]
     public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
     {
         if (string.IsNullOrWhiteSpace(ProviderName))
