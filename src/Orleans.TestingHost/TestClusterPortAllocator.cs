@@ -290,18 +290,28 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
         Error,
     }
 
-    private readonly record struct MutexAcquisition(MutexAcquisitionResult Result, Exception? Error = null);
+    internal readonly record struct MutexAcquisition(MutexAcquisitionResult Result, Exception? Error = null);
 
-    private class MutexManager
+    internal sealed class MutexManager : IDisposable
     {
         private readonly Dictionary<string, Mutex> _mutexes = [];
         private readonly BlockingCollection<Action> _workItems = [];
         private readonly Thread _thread;
+        private readonly TimeSpan _acquisitionTimeout;
+        private readonly Action? _beforeAcquire;
+        private int _shutdown;
 
         public static MutexManager Instance { get; } = new MutexManager();
 
-        private MutexManager()
+        private MutexManager() : this(TimeSpan.FromSeconds(10))
         {
+        }
+
+        internal MutexManager(TimeSpan acquisitionTimeout, Action? beforeAcquire = null)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(acquisitionTimeout, TimeSpan.Zero);
+            _acquisitionTimeout = acquisitionTimeout;
+            _beforeAcquire = beforeAcquire;
             _thread = new Thread(Run)
             {
                 Name = "MutexManager.Worker",
@@ -313,13 +323,25 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
 
         private void OnAppDomainUnload(object? sender, EventArgs e) => Shutdown();
 
-        private void Shutdown()
+        public void Dispose()
         {
-            _workItems.CompleteAdding();
-            _thread.Join();
+            AppDomain.CurrentDomain.DomainUnload -= OnAppDomainUnload;
+            Shutdown();
         }
 
-        public MutexAcquisition Acquire(string name)
+        private void Shutdown()
+        {
+            if (Interlocked.Exchange(ref _shutdown, 1) != 0)
+            {
+                return;
+            }
+
+            _workItems.CompleteAdding();
+            _thread.Join();
+            _workItems.Dispose();
+        }
+
+        internal MutexAcquisition Acquire(string name)
         {
             var result = new[] { MutexAcquisitionResult.HeldByCurrentProcess };
             var acquiredByRequest = new[] { false };
@@ -329,6 +351,7 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
             {
                 try
                 {
+                    _beforeAcquire?.Invoke();
                     if (!_mutexes.ContainsKey(name))
                     {
                         Mutex? mutex = new(false, name);
@@ -394,7 +417,7 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
             try
             {
                 // Port allocation is synchronous; named mutex acquisition runs on its thread-affine worker.
-                signal.Task.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+                signal.Task.WaitAsync(_acquisitionTimeout).GetAwaiter().GetResult();
             }
             catch (TimeoutException)
             {
