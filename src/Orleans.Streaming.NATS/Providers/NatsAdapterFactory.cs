@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,7 +13,7 @@ using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streaming.NATS;
 
-internal class NatsAdapterFactory : IQueueAdapterFactory
+internal class NatsAdapterFactory : IQueueAdapterFactory, IAsyncDisposable
 {
     private readonly string providerName;
     private readonly NatsOptions natsOptions;
@@ -19,6 +21,8 @@ internal class NatsAdapterFactory : IQueueAdapterFactory
     private readonly ILoggerFactory loggerFactory;
     private readonly HashRingBasedStreamQueueMapper streamQueueMapper;
     private readonly IQueueAdapterCache adapterCache;
+    private readonly HashSet<NatsConnectionManager> connectionManagers = [];
+    private Task? disposalTask;
 
     /// <summary>
     /// Application level failure handler override.
@@ -55,12 +59,47 @@ internal class NatsAdapterFactory : IQueueAdapterFactory
     /// <summary>Creates the NATS based adapter.</summary>
     public virtual async Task<IQueueAdapter> CreateAdapter()
     {
-        var connectionManager = new NatsConnectionManager(this.providerName, this.loggerFactory, this.natsOptions);
-        await connectionManager.Initialize();
+        NatsConnectionManager connectionManager;
+        lock (connectionManagers)
+        {
+            ObjectDisposedException.ThrowIf(disposalTask is not null, this);
+            connectionManager = new NatsConnectionManager(this.providerName, this.loggerFactory, this.natsOptions);
+            connectionManagers.Add(connectionManager);
+        }
 
-        var adapter = new NatsAdapter(this.providerName, this.natsOptions, this.loggerFactory, this.serializer, connectionManager);
+        try
+        {
+            await connectionManager.Initialize();
+            lock (connectionManagers)
+            {
+                ObjectDisposedException.ThrowIf(disposalTask is not null, this);
+                return new NatsAdapter(this.providerName, this.natsOptions, this.loggerFactory, this.serializer, connectionManager);
+            }
+        }
+        catch
+        {
+            try
+            {
+                await connectionManager.DisposeAsync();
+            }
+            finally
+            {
+                lock (connectionManagers)
+                {
+                    connectionManagers.Remove(connectionManager);
+                }
+            }
 
-        return adapter;
+            throw;
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        lock (connectionManagers)
+        {
+            return new(disposalTask ??= Task.WhenAll(connectionManagers.Select(manager => manager.DisposeAsync().AsTask())));
+        }
     }
 
     /// <summary>Creates the adapter cache.</summary>

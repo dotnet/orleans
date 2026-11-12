@@ -93,7 +93,7 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
     public async Task SendAndReceiveFromNats()
     {
         var options = new NatsOptions { StreamName = testStreamName, NatsClientOptions = NatsTestConstants.NatsClientOptions };
-        var adapterFactory = new NatsAdapterFactory(
+        await using var adapterFactory = new NatsAdapterFactory(
             NATS_STREAM_PROVIDER_NAME,
             options,
             new HashRingStreamQueueMapperOptions(),
@@ -124,7 +124,7 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
             PartitionCount = 2,
             ProducerCount = 1,
         };
-        var adapterFactory = new NatsAdapterFactory(
+        await using var adapterFactory = new NatsAdapterFactory(
             providerName,
             options,
             new HashRingStreamQueueMapperOptions { TotalQueueCount = options.PartitionCount },
