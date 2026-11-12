@@ -31,6 +31,25 @@ namespace Orleans.Transactions.Tests;
 public class TransactionQueueStorageWorkTests
 {
     [Theory]
+    [InlineData(null)]
+    [InlineData(ReadIsolation.Serializable)]
+    [InlineData(ReadIsolation.ReadCommitted)]
+    public async Task PerformReadRejectsMissingOperationBeforeTransactionOrQueueAccess(ReadIsolation? isolation)
+    {
+        var state = new TransactionalState<TestState>(
+            null!, new TestGrainContextAccessor(), new TestStateCopier(), null!,
+            NullLogger<TransactionalState<TestState>>.Instance);
+        Assert.Null(TransactionContext.GetTransactionInfo());
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(() => isolation is { } value
+            ? state.PerformRead<TestState>(null!, value)
+            : state.PerformRead<TestState>(null!));
+
+        Assert.Equal("operation", exception.ParamName);
+        Assert.Null(TransactionContext.GetTransactionInfo());
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task ReadCommitted_PendingWriterReturnsCommittedCopyBeforeAbort(bool prepareCommit)
