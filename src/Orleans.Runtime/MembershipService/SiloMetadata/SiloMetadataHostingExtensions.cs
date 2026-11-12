@@ -42,9 +42,10 @@ public static class SiloMetadataHostingExtensions
     /// ORLEANS__METADATA__key1=value1
     /// </remarks>
     /// <returns>The provided silo builder.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="configuration"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="builder"/> or <paramref name="configuration"/> is <see langword="null"/>.</exception>
     public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder, IConfiguration configuration)
     {
+        ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(configuration);
         var metadataConfigSection = configuration.GetSection("Orleans").GetSection("Metadata");
 
@@ -62,9 +63,10 @@ public static class SiloMetadataHostingExtensions
     /// ORLEANS__METADATA__key1=value1
     /// </remarks>
     /// <returns>The provided silo builder.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="configurationSection"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="builder"/> or <paramref name="configurationSection"/> is <see langword="null"/>.</exception>
     public static ISiloBuilder UseSiloMetadata(this ISiloBuilder builder, IConfigurationSection configurationSection)
     {
+        ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(configurationSection);
         var dictionary = configurationSection.Get<Dictionary<string, string>>();
 

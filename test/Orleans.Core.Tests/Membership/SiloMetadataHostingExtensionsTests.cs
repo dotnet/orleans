@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 using Orleans.Hosting;
 using Orleans.Runtime.MembershipService.SiloMetadata;
 using Xunit;
@@ -19,6 +20,30 @@ public sealed class SiloMetadataHostingExtensionsTests
         var exception = Assert.Throws<ArgumentNullException>(() => ((ISiloBuilder)null!).UseSiloMetadata());
 
         Assert.Equal("builder", exception.ParamName);
+    }
+
+    [Fact]
+    public void ConfigurationOverloadRejectsNullBuilderBeforeAccessingConfiguration()
+    {
+        var configuration = Substitute.For<IConfiguration>();
+
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => SiloMetadataHostingExtensions.UseSiloMetadata(null!, configuration));
+
+        Assert.Equal("builder", exception.ParamName);
+        Assert.Empty(configuration.ReceivedCalls());
+    }
+
+    [Fact]
+    public void ConfigurationSectionOverloadRejectsNullBuilderBeforeBindingConfiguration()
+    {
+        var configurationSection = Substitute.For<IConfigurationSection>();
+
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => SiloMetadataHostingExtensions.UseSiloMetadata(null!, configurationSection));
+
+        Assert.Equal("builder", exception.ParamName);
+        Assert.Empty(configurationSection.ReceivedCalls());
     }
 
     [Theory]
