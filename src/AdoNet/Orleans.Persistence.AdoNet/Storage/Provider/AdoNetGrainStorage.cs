@@ -172,17 +172,18 @@ namespace Orleans.Storage
 
         /// <summary>Clear state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.ClearStateAsync{T}(string, GrainId, IGrainState{T})"/>.
+        /// <exception cref="ArgumentNullException"><paramref name="grainState"/> is null.</exception>
         public Task ClearStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
             => ClearStateAsync(grainType, grainReference, grainState, CancellationToken.None);
 
         /// <inheritdoc/>
+        /// <exception cref="ArgumentNullException"><paramref name="grainState"/> is null.</exception>
         public async Task ClearStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            //It assumed these parameters are always valid. If not, an exception will be thrown,
-            //even if not as clear as when using explicitly checked parameters.
             var (grainId, baseGrainType) = GetStorageKey(grainType, grainReference);
+            ArgumentNullException.ThrowIfNull(grainState);
             LogTraceClearingGrainState(serviceId, name, baseGrainType, grainId, grainState.ETag);
 
             if (!grainState.RecordExists && string.IsNullOrWhiteSpace(grainState.ETag))
@@ -245,17 +246,18 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.ReadStateAsync{T}(string, GrainId, IGrainState{T})"/>.
+        /// <exception cref="ArgumentNullException"><paramref name="grainState"/> is null.</exception>
         public Task ReadStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
             => ReadStateAsync(grainType, grainReference, grainState, CancellationToken.None);
 
         /// <inheritdoc/>
+        /// <exception cref="ArgumentNullException"><paramref name="grainState"/> is null.</exception>
         public async Task ReadStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
-            //as with explicitly checked parameters.
             var (grainId, baseGrainType) = GetStorageKey(grainType, grainReference);
+            ArgumentNullException.ThrowIfNull(grainState);
             LogTraceReadingGrainState(serviceId, name, baseGrainType, grainId, grainState.ETag);
 
             try
@@ -315,16 +317,17 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}(string, GrainId, IGrainState{T})"/>
+        /// <exception cref="ArgumentNullException"><paramref name="grainState"/> is null.</exception>
         public Task WriteStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
             => WriteStateAsync(grainType, grainReference, grainState, CancellationToken.None);
 
         /// <inheritdoc/>
+        /// <exception cref="ArgumentNullException"><paramref name="grainState"/> is null.</exception>
         public async Task WriteStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
-            //as with explicitly checked parameters.
+            ArgumentNullException.ThrowIfNull(grainState);
             var data = grainState.State;
             var (grainId, baseGrainType) = GetStorageKey(grainType, grainReference);
             LogTraceWritingGrainState(serviceId, name, baseGrainType, grainId, grainState.ETag);
