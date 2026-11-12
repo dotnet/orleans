@@ -375,7 +375,7 @@ namespace Orleans.Transactions.TestKit.Consistency
         {
             foreach (var transaction in indoubt)
             {
-                if (transaction.Value.Contains("failure during transaction commit"))
+                if (transaction.Value.Contains("failure during transaction commit", StringComparison.Ordinal))
                 {
                     true.Should().BeFalse($"exception during commit {transaction.Key} {transaction.Value}");
                 }
