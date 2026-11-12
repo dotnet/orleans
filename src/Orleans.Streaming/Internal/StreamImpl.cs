@@ -162,7 +162,9 @@ namespace Orleans.Streams
 
             lock (initLock)
             {
+#pragma warning disable CA1508 // Another caller can publish the producer while this caller waits for initLock.
                 if (producerInterface != null)
+#pragma warning restore CA1508
                     return producerInterface;
 
                 if (provider == null)
@@ -179,7 +181,9 @@ namespace Orleans.Streams
             {
                 lock (initLock)
                 {
+#pragma warning disable CA1508 // Another caller can publish the consumer while this caller waits for initLock.
                     if (consumerInterface == null)
+#pragma warning restore CA1508
                     {
                         if (provider == null)
                             provider = GetStreamProvider();

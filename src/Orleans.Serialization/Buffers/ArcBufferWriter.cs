@@ -1315,7 +1315,6 @@ public struct ArcBuffer : IDisposable
             return ReadOnlySequence<byte>.Empty;
         }
 
-        Debug.Assert(first is not null);
         Debug.Assert(previous is not null);
         if (previous == first)
         {

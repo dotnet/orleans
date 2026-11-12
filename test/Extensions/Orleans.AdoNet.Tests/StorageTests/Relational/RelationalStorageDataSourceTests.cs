@@ -246,6 +246,58 @@ public sealed class RelationalStorageDataSourceTests
         Assert.Equal(1, command.ExecuteReaderAsyncCallCount);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReadAsync_KeepsResourcesAliveUntilSelectorCompletes(bool selectorThrows)
+    {
+        using var fixture = new RelationalStorageLifecycleFixture();
+        var selectorStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSelector = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var expected = new InvalidOperationException("Asynchronous selector failure.");
+        var read = fixture.Storage.ReadAsync(
+            "SELECT 17;",
+            parameterProvider: null,
+            async (record, _, cancellationToken) =>
+            {
+                Assert.Equal(TestContext.Current.CancellationToken, cancellationToken);
+                Assert.Equal(17, record.GetInt32(0));
+                selectorStarted.SetResult();
+                return await releaseSelector.Task;
+            },
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        try
+        {
+            await selectorStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+            var connection = fixture.DataSource.Connections[1];
+            var command = Assert.Single(connection.Commands);
+            var reader = Assert.Single(command.Readers);
+            Assert.False(read.IsCompleted);
+            Assert.False(connection.IsDisposed);
+            Assert.False(command.IsDisposed);
+            Assert.False(reader.IsClosed);
+
+            if (selectorThrows)
+            {
+                releaseSelector.SetException(expected);
+                Assert.Same(expected, await Assert.ThrowsAsync<InvalidOperationException>(() => read));
+            }
+            else
+            {
+                releaseSelector.SetResult(29);
+                Assert.Equal([29], await read);
+            }
+
+            AssertOperationDisposed(fixture.DataSource, expectReader: true);
+        }
+        finally
+        {
+            releaseSelector.TrySetResult(29);
+            await ((Task)read).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+    }
+
     [Fact]
     public async Task ReadAsync_RejectsInvalidResultSetIndex()
     {
