@@ -861,14 +861,14 @@ public static class StreamingEvents
         }
     }
 
-    internal static void EmitSubscriptionAttached(string streamProviderName, StreamId streamId, Guid subscriptionId, GrainId consumerGrainId, SiloAddress? siloAddress)
+    internal static void EmitSubscriptionAttached(string streamProviderName, StreamId streamId, Guid subscriptionId, IAddressable consumer, SiloAddress? siloAddress)
     {
         if (!Listener.IsEnabled(nameof(SubscriptionAttached)))
         {
             return;
         }
 
-        Emit(streamProviderName, streamId, subscriptionId, consumerGrainId, siloAddress);
+        Emit(streamProviderName, streamId, subscriptionId, consumer.GetGrainId(), siloAddress);
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(string streamProviderName, StreamId streamId, Guid subscriptionId, GrainId consumerGrainId, SiloAddress? siloAddress)

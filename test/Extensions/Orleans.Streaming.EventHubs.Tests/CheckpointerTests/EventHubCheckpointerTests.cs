@@ -66,16 +66,8 @@ public class EventHubCheckpointerTests
 
     private class TestEventHubQueueCache : IEventHubQueueCache
     {
-        private readonly IStreamQueueCheckpointer<string>? checkpointer;
-
-        public TestEventHubQueueCache(IStreamQueueCheckpointer<string>? checkpointer = null)
-        {
-            this.checkpointer = checkpointer;
-        }
-
         public int DisposeCount { get; private set; }
         public int AddCount { get; private set; }
-        public string? PurgeOffsetToReport { get; set; }
         public object Cursor { get; } = new();
         public object? RefreshedCursor { get; private set; }
         public StreamSequenceToken? RefreshToken { get; private set; }
@@ -117,10 +109,6 @@ public class EventHubCheckpointerTests
 
         public void SignalPurge()
         {
-            if (PurgeOffsetToReport is not null)
-            {
-                checkpointer?.Update(PurgeOffsetToReport, DateTime.UtcNow, TestContext.Current.CancellationToken);
-            }
         }
 
         public void Dispose()
@@ -129,7 +117,7 @@ public class EventHubCheckpointerTests
         }
     }
 
-    private sealed class TestEventHubReceiver : IEventHubReceiver
+    private class TestEventHubReceiver : IEventHubReceiver
     {
         public int CloseCount { get; private set; }
 
@@ -143,6 +131,36 @@ public class EventHubCheckpointerTests
             CloseCount++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class RecoverableEventHubTestReceiver : TestEventHubReceiver, IQueueAdapterReceiverReadRecovery
+    {
+        public Task RecoverReadAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
+    }
+
+    [Theory, TestCategory("BVT")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CustomCacheKeepsLegacyCursorAndCallbackWithEitherTransport(bool recoverableTransport)
+    {
+        var cache = new TestEventHubQueueCache();
+        IEventHubReceiver transport = recoverableTransport ? new RecoverableEventHubTestReceiver() : new TestEventHubReceiver();
+        var checkpointer = new TestCheckpointer();
+        var receiver = await CreateReceiver(checkpointer, cache, transport);
+        Assert.False(receiver.UsesCertifiedDeliveryProgress);
+        var cursor = ((IQueueCache)receiver).TryGetCacheCursor(StreamId.Create("compatibility", "stream"), null).Cursor!;
+        Assert.False(cursor is IQueueCacheCursorProgress);
+
+        UpdateDeliveryProgress(receiver, MakeToken(50));
+        Assert.Equal("50", checkpointer.LastOffset);
+        receiver.UpdateDeliveryProgress(null, DateTime.UtcNow);
+        Assert.Equal("50", checkpointer.LastOffset);
+        Assert.Equal(1, checkpointer.UpdateCount);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
     }
 
     [Fact, TestCategory("BVT")]
@@ -345,11 +363,6 @@ public class EventHubCheckpointerTests
         receiver.UpdateDeliveryProgress(token, DateTime.UtcNow);
     }
 
-    private static void UpdateDeliveryProgressWithNoSubscriptions(EventHubAdapterReceiver receiver)
-    {
-        receiver.UpdateDeliveryProgress(null!, DateTime.UtcNow);
-    }
-
     private static async Task<EventHubAdapterReceiver> CreateReceiver(
         TestCheckpointer checkpointer,
         TestEventHubQueueCache? cache = null,
@@ -370,7 +383,7 @@ public class EventHubCheckpointerTests
 
         var receiver = new EventHubAdapterReceiver(
             settings,
-            cacheFactory: (_, createdCheckpointer, _) => cache ?? new TestEventHubQueueCache(createdCheckpointer),
+            cacheFactory: (_, _, _) => cache ?? new TestEventHubQueueCache(),
             checkpointerFactory: _ => Task.FromResult<IStreamQueueCheckpointer<string>>(checkpointer),
             loggerFactory: Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
             monitor: new Orleans.Streaming.EventHubs.DefaultEventHubReceiverMonitor(
@@ -766,28 +779,31 @@ public class EventHubCheckpointerTests
 
     [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
-    public async Task NoActiveSubscriptions_NoCheckpoint()
+    public async Task LegacyNullProgressPreservesReleasedBehavior()
     {
         var checkpointer = new TestCheckpointer();
         var receiver = await CreateReceiver(checkpointer);
 
-        // No subscription progress is available; cache purge checkpointing is handled directly by the cache.
-        UpdateDeliveryProgressWithNoSubscriptions(receiver);
+        receiver.UpdateDeliveryProgress(null, DateTime.UtcNow);
 
         Assert.Null(checkpointer.LastOffset);
     }
 
     [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
-    public async Task CachePurge_UpdatesCheckpointDirectly()
+    public async Task CustomCachePurge_PreservesLegacyCallbackCheckpointing()
     {
         var checkpointer = new TestCheckpointer();
-        var cache = new TestEventHubQueueCache(checkpointer) { PurgeOffsetToReport = "100" };
+        var cache = new TestEventHubQueueCache();
         var receiver = await CreateReceiver(checkpointer, cache);
 
+        Assert.False(receiver.UsesCertifiedDeliveryProgress);
         receiver.TryPurgeFromCache(out _);
 
+        Assert.Null(checkpointer.LastOffset);
+        UpdateDeliveryProgress(receiver, MakeToken(100));
         Assert.Equal("100", checkpointer.LastOffset);
+        Assert.Equal(1, checkpointer.UpdateCount);
     }
 
     [TestSuite("BVT")]

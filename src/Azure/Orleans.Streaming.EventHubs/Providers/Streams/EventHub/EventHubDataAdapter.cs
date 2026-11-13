@@ -51,7 +51,14 @@ namespace Orleans.Streaming.EventHubs
         /// <returns>The stream sequence token.</returns>
         public virtual StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
         {
-            return new EventHubSequenceTokenV2("", cachedMessage.SequenceNumber, 0);
+            return new EventHubSequenceTokenV2(GetOffset(cachedMessage), cachedMessage.SequenceNumber, 0);
+        }
+
+        int ICacheDataAdapter.Compare(ref CachedMessage cachedMessage, StreamSequenceToken token)
+        {
+            var comparison = EventSequenceTokenCompatibility.Compare(
+                new EventHubSequenceTokenV2("", cachedMessage.SequenceNumber, 0), token);
+            return cachedMessage.SequenceNumber == token.SequenceNumber ? 0 : comparison;
         }
 
         /// <inheritdoc />

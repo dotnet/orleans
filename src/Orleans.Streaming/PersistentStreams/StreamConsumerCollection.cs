@@ -23,6 +23,14 @@ namespace Orleans.Streams
         [NonSerialized]
         public Task? RegistrationTask;
 
+        [NonSerialized]
+        public StreamSequenceToken? LastReadToken;
+
+        [NonSerialized]
+        public StreamSequenceToken? RegistrationToken;
+        [NonSerialized]
+        public IQueueCacheCursor? RegistrationCursor;
+
         public StreamConsumerCollection(DateTime now)
         {
             queueData = new Dictionary<GuidId, StreamConsumerData>();
@@ -57,13 +65,26 @@ namespace Orleans.Streams
             return queueData.TryGetValue(subscriptionId, out data);
         }
 
-        public IEnumerable<StreamConsumerData> AllConsumers()
+        public Dictionary<GuidId, StreamConsumerData>.ValueCollection AllConsumers()
         {
             return queueData.Values;
         }
 
+        public void ReleaseRegistrationCursorIfSettled()
+        {
+            if (StreamRegistered && RegistrationTask is null
+                && queueData.Values.All(static consumer => consumer.IsRegistered
+                    && consumer.PendingHandshakes == 0 && !consumer.HasUnresolvedHandshake))
+            {
+                RegistrationCursor?.Dispose();
+                RegistrationCursor = null;
+            }
+        }
+
         public void DisposeAll(ILogger logger)
         {
+            RegistrationCursor?.Dispose();
+            RegistrationCursor = null;
             foreach (StreamConsumerData consumer in queueData.Values)
             {
                 consumer.SafeDisposeCursor(logger);
@@ -89,6 +110,7 @@ namespace Orleans.Streams
             //    meaning there is nothing for those consumers in the adapter cache.
             // 3) Consumer handshakes have completed and their positions are reconciled.
             if (now - lastActivityTime < inactivityPeriod) return false;
+            if (!StreamRegistered || RegistrationTask is not null) return false;
             return !queueData.Values.Any(data => data.PendingHandshakes != 0 || data.HasUnresolvedHandshake
                 || data.State.Equals(StreamConsumerDataState.Active));
         }
