@@ -759,7 +759,23 @@ Done:;
                 _ = StartEnumeratorDisposal(state);
             }
 
-            await _shutdownCts.CancelAsync().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            // We cancel the cleanup loop directly via _cleanupCts, NOT via _shutdownCts.
+            // _shutdownCts.Token is used by WaitWithTimeoutAsync inside CompleteDisposalWorkAsync
+            // to wait for the producer's pending MoveNextAsync. If we would cancel here it could result
+            // in the iterator's finally block to never run.
+            CancellationTokenSource? cleanupCts;
+
+            lock (_lock)
+            {
+                cleanupCts = _cleanupCts;
+                _cleanupCts = null;
+            }
+
+            if (cleanupCts is not null)
+            {
+                await cleanupCts.CancelAsync().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                // Disposal of the cleanup cts is done implicitly by RunCleanupLoopAsync's using statement.
+            }
 
             Task? cleanupTask;
 
@@ -775,18 +791,12 @@ Done:;
 
             try
             {
-                // If a producer never completes its outstanding MoveNextAsync(), we wait max up to ResponseTimeout.
-                // We deliberately do NOT forcibly abandon the disposal workers though. These retain responsibility for finishing
-                // teardown if the producer eventually completes. This means that extension disposal is NOT a guarantee
-                // that every underlying enumerator has been disposed. Eventually they will though so long as user-code behaves!
-
                 await Task.WhenAll(states.Select(s => s.TeardownTask!))
                     .WaitAsync(_messagingOptions.ResponseTimeout, _timeProvider)
                     .ConfigureAwait(false);
             }
             catch (TimeoutException)
             {
-                // Individual disposal workers remain alive and continue waiting for in-flight producer operations.
                 LogWarningErrorDisposingEnumerator(_logger, new TimeoutException("Timed out waiting for all observer async enumerators to dispose."));
             }
             catch (Exception exception)
@@ -797,7 +807,11 @@ Done:;
             {
                 try
                 {
+                    // Now that the teardown is complete we cancel _shutdownCts.
+                    await _shutdownCts.CancelAsync().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+
                     _shutdownCts.Dispose();
+
                     OnAsyncEnumerableGrainObserverExtensionDisposed(this);
                 }
                 finally

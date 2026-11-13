@@ -1429,7 +1429,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TestTimeout, cancellationToken));
         Assert.Equal("first", enumerator.Current);
 
-        await listener.WaitForExtensionCreatedAsync(cancellationToken);
+        await listener.WaitForExtensionCreatedAsync(cancellationToken).WaitAsync(TestTimeout, cancellationToken);
 
         // Now we wait until the server-side enumerator is parked on its pending MoveNextAsync.
         await observerImpl.BlockingMoveNextStarted.WaitAsync(TestTimeout, cancellationToken);
@@ -1443,7 +1443,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
         GrainFactory.DeleteObjectReference<IObservableGrainObserver>(observerRef);
 
         // We wait for the extension's disposal.
-        await listener.WaitForExtensionDisposedAsync(cancellationToken);
+        await listener.WaitForExtensionDisposedAsync(cancellationToken).WaitAsync(TestTimeout, cancellationToken);
         // Which in turn should cancel the enumerator which is running.
         await observerImpl.BlockingEnumeratorFinished.WaitAsync(TestTimeout, cancellationToken);
 
@@ -1478,7 +1478,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
 
         Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TestTimeout, cancellationToken));
 
-        await listener.WaitForExtensionCreatedAsync(cancellationToken);
+        await listener.WaitForExtensionCreatedAsync(cancellationToken).WaitAsync(TestTimeout, cancellationToken);
         await observerImpl.BlockingMoveNextStarted.WaitAsync(TestTimeout, cancellationToken);
 
         // Now we start a pending MoveNext to keep the gate active and proceed to deregister the observer.
@@ -1486,7 +1486,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
 
         GrainFactory.DeleteObjectReference<IObservableGrainObserver>(observerRef);
 
-        await listener.WaitForExtensionDisposedAsync(cancellationToken);
+        await listener.WaitForExtensionDisposedAsync(cancellationToken).WaitAsync(TestTimeout, cancellationToken);
         await observerImpl.BlockingEnumeratorFinished.WaitAsync(TestTimeout, cancellationToken);
 
         // By now the manager has removed the observer from localObjects on the client.
@@ -1587,7 +1587,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
 
                 if (values.Count == 1)
                 {
-                    await listener.WaitForExtensionCreatedAsync(cts.Token);
+                    await listener.WaitForExtensionCreatedAsync(cts.Token).WaitAsync(TestTimeout, cts.Token);
                 }
 
                 await AdvanceToNextObserverCleanupAsync(listener, cts.Token);
@@ -1629,7 +1629,7 @@ public class AsyncEnumerableObserverCallTests(AsyncEnumerableTestFixture fixture
 
                     if (values.Count == 1)
                     {
-                        await listener.WaitForExtensionCreatedAsync(cts.Token);
+                        await listener.WaitForExtensionCreatedAsync(cts.Token).WaitAsync(TestTimeout, cts.Token);
                     }
 
                     if (values.Count == 3)
