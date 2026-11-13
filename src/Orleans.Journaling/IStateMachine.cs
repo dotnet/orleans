@@ -15,6 +15,7 @@ namespace Orleans.Journaling;
 /// </item>
 /// <item>
 /// When the application requests a write, the journaled state manager calls
+/// <see cref="PrepareWriteAsync"/> to establish the state's persistence prerequisites, then
 /// <see cref="WritePendingEntries"/> (and occasionally <see cref="WriteSnapshot"/>) to materialize
 /// the pending changes, then flushes the journal to durable storage.
 /// </item>
@@ -67,6 +68,25 @@ public interface IStateMachine
     /// This method will be called before any <see cref="WritePendingEntries"/> or <see cref="WriteSnapshot"/> calls.
     /// </remarks>
     void OnRecoveryCompleted() { }
+
+    /// <summary>
+    /// Establishes the persistence prerequisites for this state's pending changes.
+    /// </summary>
+    /// <param name="cancellationToken">The token which cancels preparation when the journal owner stops.</param>
+    /// <returns>A completion representing readiness to capture this state.</returns>
+    /// <remarks>
+    /// The manager prepares every registered state before capturing each append or snapshot, whether or not the state
+    /// has pending changes, so a state can establish prerequisites for changes which other states hold, or fail a write
+    /// whose pending changes must not commit. Preparation is idempotent. After asynchronous
+    /// preparation completes, the manager repeats preparation for all states to include changes
+    /// staged on interleaved turns. Prepared prerequisites complete synchronously on subsequent calls
+    /// and remain valid through capture. A complete synchronous pass flows directly into capture.
+    /// Preparation completes without awaiting another operation on its own journal manager,
+    /// since that operation is serialized behind the current write.
+    /// A failure reports <see cref="JournaledStatePreCommitException"/> and retains pending changes
+    /// for an explicit write retry.
+    /// </remarks>
+    ValueTask PrepareWriteAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 
     /// <summary>
     /// Writes pending state changes to the journal.

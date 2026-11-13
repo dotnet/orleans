@@ -9,10 +9,10 @@
     <OrleansBuildTimeCodeGen Condition="'$(NativeAotSmokeScenario)' != 'DependencyInjection'">true</OrleansBuildTimeCodeGen>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <DefineConstants>$(DefineConstants);NATIVE_AOT_SMOKE</DefineConstants>
-    <EnableTrimAnalyzer Condition="'$(NativeAotSmokeScenario)' == 'Contexts'">true</EnableTrimAnalyzer>
-    <EnableAotAnalyzer Condition="'$(NativeAotSmokeScenario)' == 'Contexts'">true</EnableAotAnalyzer>
-    <ILLinkTreatWarningsAsErrors Condition="'$(NativeAotSmokeScenario)' == 'Contexts'">true</ILLinkTreatWarningsAsErrors>
-    <TrimmerSingleWarn Condition="'$(NativeAotSmokeScenario)' == 'Contexts'">false</TrimmerSingleWarn>
+    <EnableTrimAnalyzer Condition="'$(NativeAotSmokeScenario)' == 'Contexts' or '$(NativeAotSmokeScenario)' == 'Messaging'">true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer Condition="'$(NativeAotSmokeScenario)' == 'Contexts' or '$(NativeAotSmokeScenario)' == 'Messaging'">true</EnableAotAnalyzer>
+    <ILLinkTreatWarningsAsErrors Condition="'$(NativeAotSmokeScenario)' == 'Contexts' or '$(NativeAotSmokeScenario)' == 'Messaging'">true</ILLinkTreatWarningsAsErrors>
+    <TrimmerSingleWarn Condition="'$(NativeAotSmokeScenario)' == 'Contexts' or '$(NativeAotSmokeScenario)' == 'Messaging'">false</TrimmerSingleWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,7 +24,14 @@
                       Condition="'$(NativeAotSmokeScenario)' == 'DependencyInjection' or '$(NativeAotSmokeScenario)' == 'GrainReferences' or '$(NativeAotSmokeScenario)' == 'Silo' or '$(NativeAotSmokeScenario)' == 'GrainActivation'" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj"
                       Condition="'$(NativeAotSmokeScenario)' == 'DependencyInjection' or '$(NativeAotSmokeScenario)' == 'Silo' or '$(NativeAotSmokeScenario)' == 'GrainActivation'" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj">
+      <AdditionalProperties Condition="'$(NativeAotSmokeScenario)' == 'Messaging'">ProduceReferenceAssembly=false</AdditionalProperties>
+    </ProjectReference>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj"
+                      AdditionalProperties="ProduceReferenceAssembly=false"
+                      Condition="'$(NativeAotSmokeScenario)' == 'Messaging'" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Messaging\Orleans.Messaging.csproj"
+                      Condition="'$(NativeAotSmokeScenario)' == 'Messaging'" />
     <ProjectReference Include="$(SourceRoot)docs\site\src\content\docs\host\configuration-guide\snippets\serializer-contexts\SerializerContexts.csproj"
                       Condition="'$(NativeAotSmokeScenario)' == 'Contexts'" />
     <Compile Include="NativeAotEnvironment.cs" />
