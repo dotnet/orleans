@@ -545,12 +545,12 @@ namespace Orleans.Runtime.ReminderService
                     {
                         continue;
                     }
-
-                    // The generation-change task can only complete after the generation advances, so the
-                    // observed reconciliation is complete and its outcome can be read without blocking.
-                    observedTask.GetAwaiter().GetResult();
-                    return;
                 }
+
+                // The generation-change task can only complete after the generation advances, so the
+                // observed reconciliation is complete and its outcome can be read without blocking.
+                await observedTask;
+                return;
             }
         }
 
