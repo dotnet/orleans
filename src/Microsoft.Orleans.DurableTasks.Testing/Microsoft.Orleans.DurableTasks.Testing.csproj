@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.DurableTasks.Testing</PackageId>
+    <Title>Microsoft Orleans Durable Tasks Testing</Title>
+    <Description>Captures the recorded histories of Microsoft Orleans durable tasks and replays them against new code in tests.</Description>
+    <PackageTags>$(PackageTags) DurableTasks Testing Replay Versioning</PackageTags>
+    <IsPackable Condition="'$(PackDurableTaskAdapter)' != 'true'">false</IsPackable>
+    <IsPackable Condition="'$(PackDurableTaskAdapter)' == 'true'">true</IsPackable>
+    <PackageInventoryPackable>true</PackageInventoryPackable>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <!-- Validate framework assets while the first release establishes a package baseline. -->
+    <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenAPITargetDirectory>$(SourceRoot)src\api\Microsoft.Orleans.DurableTasks.Testing\</GenAPITargetDirectory>
+    <GenAPITargetPath>$(GenAPITargetDirectory)$(AssemblyName).cs</GenAPITargetPath>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Durable grain state and Durable Jobs are pre-release. -->
+    <NoWarn>$(NoWarn);ORLEANSEXP005;NU5104</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Microsoft.Orleans.DurableTasks\Microsoft.Orleans.DurableTasks.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

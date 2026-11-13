@@ -7,7 +7,7 @@ ms.topic: reference
 
 # Orleans NuGet packages
 
-All official packages use the `Microsoft.Orleans` prefix and are published on [NuGet.org](https://www.nuget.org/profiles/Orleans). Keep Orleans package versions aligned within an application.
+Official packages use the `Microsoft.Orleans` prefix. Find released packages on [NuGet.org](https://www.nuget.org/profiles/Orleans). Keep Orleans package versions aligned within an application.
 
 ## Start with a metapackage
 
@@ -76,8 +76,12 @@ Memory persistence distributes records across cluster storage grains but isn't d
 | [Microsoft.Orleans.Reminders.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Reminders.Redis) | Redis reminders. |
 | [Microsoft.Orleans.DurableJobs](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs) | Distributed scheduling for durable one-time jobs. |
 | [Microsoft.Orleans.DurableJobs.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.DurableJobs.AzureStorage) | Azure Blob Storage for durable jobs. |
+| `Microsoft.Orleans.Messaging` | Experimental grain-scoped inbox and outbox messaging contracts, awaiting their first NuGet publication. |
+| `Microsoft.Orleans.DurableTasks` | Pre-release alpha durable grain RPC adapter. Awaiting first NuGet publication. |
+| `Microsoft.Orleans.DurableTasks.Abstractions` | Pre-release alpha programming model abstractions for durable asynchronous operations. Awaiting first NuGet publication. |
+| `Microsoft.Orleans.DurableTasks.Testing` | Pre-release alpha test support which replays recorded durable task histories against changed workflow code. Awaiting first NuGet publication. |
 
-Use reminders for recurring durable callbacks and durable jobs for scheduled one-time work. Grain timers are activation-scoped and use the core runtime rather than a provider package.
+Use reminders for recurring durable callbacks and durable jobs for scheduled one-time work. Messaging composes Durable Jobs with Journaling for recoverable, at-least-once grain messages. Grain timers are activation-scoped and use the core runtime rather than a provider package.
 
 ## Streams and broadcast channels
 
