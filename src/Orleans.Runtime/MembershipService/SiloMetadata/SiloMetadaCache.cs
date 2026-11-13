@@ -136,25 +136,38 @@ internal partial class SiloMetadataCache(
 
     public void SetMetadata(SiloAddress siloAddress, SiloMetadata metadata) => _metadata.TryAdd(siloAddress, metadata);
 
-    public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();
+    public void Dispose()
+    {
+        var task = StartDisposal(out var started);
+        // Concurrent synchronous callers, including cancellation callbacks, return while the owner drains.
+        // DisposeAsync always returns the shared task for callers which require completed disposal.
+        if (started || task.IsCompleted)
+        {
+            task.GetAwaiter().GetResult();
+        }
+    }
 
-    public ValueTask DisposeAsync()
+    public ValueTask DisposeAsync() => new(StartDisposal(out _));
+
+    private Task StartDisposal(out bool started)
     {
         TaskCompletionSource completion;
         lock (_cts)
         {
             if (_disposeTask is { } task)
             {
-                return new(task);
+                started = false;
+                return task;
             }
 
             completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
             // Publish completion before cancellation callbacks can reenter disposal.
             _disposeTask = completion.Task;
+            started = true;
         }
 
         _ = DisposeCoreAsync(completion);
-        return new(completion.Task);
+        return completion.Task;
     }
 
     private async Task DisposeCoreAsync(TaskCompletionSource completion)

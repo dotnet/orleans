@@ -22,6 +22,69 @@ public sealed class SiloMetadataCacheTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task ReentrantAndConcurrentSynchronousDisposalReturnsWhileAsyncDisposalDrains(bool synchronousOwner)
+    {
+        var fixture = new Fixture();
+        var token = await fixture.StartAsync();
+        var handle = token.WaitHandle;
+        var reentered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(15));
+        var registration = token.Register(() =>
+        {
+            fixture.Cache.Dispose();
+            reentered.SetResult();
+            releaseCallback.Task.WaitAsync(timeout.Token).GetAwaiter().GetResult();
+        });
+
+        var owner = Task.Factory.StartNew(() =>
+        {
+            if (synchronousOwner)
+            {
+                fixture.Cache.Dispose();
+                return Task.CompletedTask;
+            }
+
+            return fixture.Cache.DisposeAsync().AsTask();
+        }, timeout.Token, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default);
+
+        try
+        {
+            await reentered.Task.WaitAsync(timeout.Token);
+            await Task.Run(fixture.Cache.Dispose, timeout.Token).WaitAsync(timeout.Token);
+            var first = fixture.Cache.DisposeAsync().AsTask();
+            var second = fixture.Cache.DisposeAsync().AsTask();
+            Assert.Same(first, second);
+            Assert.False(owner.IsCompleted);
+            Assert.False(first.IsCompleted);
+            Assert.True(handle.WaitOne(0));
+
+            releaseCallback.SetResult();
+            await fixture.SubscriptionStopping.Task.WaitAsync(timeout.Token);
+            Assert.False(first.IsCompleted);
+            Assert.True(handle.WaitOne(0));
+            fixture.ReleaseSubscription.SetResult();
+            await Task.WhenAll(owner.Unwrap(), first, second).WaitAsync(timeout.Token);
+
+            Assert.Same(first, fixture.Cache.DisposeAsync().AsTask());
+            Assert.Throws<ObjectDisposedException>(() => handle.WaitOne(0));
+        }
+        finally
+        {
+            releaseCallback.TrySetResult();
+            fixture.ReleaseSubscription.TrySetResult();
+            if (reentered.Task.IsCompleted)
+            {
+                await fixture.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
+                registration.Dispose();
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task DisposalDrainsSubscriptionBeforeReleasingCancellation(bool callbackThrows)
     {
         await using var fixture = new Fixture();
@@ -55,6 +118,7 @@ public sealed class SiloMetadataCacheTests
             var failure = await Assert.ThrowsAsync<AggregateException>(() => first);
             Assert.Same(expected, Assert.Single(failure.InnerExceptions));
             Assert.Same(first, fixture.Cache.DisposeAsync().AsTask());
+            Assert.Same(failure, Assert.Throws<AggregateException>(fixture.Cache.Dispose));
         }
         else
         {
