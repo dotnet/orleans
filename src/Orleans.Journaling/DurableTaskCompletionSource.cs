@@ -53,6 +53,9 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     private T? _value;
     private Exception? _exception;
 
+    // Whether the write in flight captured the terminal state. A completed write publishes only the state it captured.
+    private bool _isCompletionCaptured;
+
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
         IJournaledStateManager manager,
@@ -150,13 +153,22 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     }
 
     void IStateMachine.OnRecoveryCompleted() => OnValuePersisted();
-    void IStateMachine.OnWriteCompleted() => OnValuePersisted();
+
+    void IStateMachine.OnWriteCompleted()
+    {
+        if (_isCompletionCaptured)
+        {
+            _isCompletionCaptured = false;
+            OnValuePersisted();
+        }
+    }
 
     void IStateMachine.Reset(JournalStreamWriter writer)
     {
         _status = DurableTaskCompletionSourceStatus.Pending;
         _value = default;
         _exception = null;
+        _isCompletionCaptured = false;
 
         // Reset the task completion source if necessary.
         if (_completion.Task.IsCompleted)
@@ -170,10 +182,15 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
             WriteState(writer);
+            _isCompletionCaptured = true;
         }
     }
 
-    void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter)
+    {
+        WriteState(snapshotWriter);
+        _isCompletionCaptured = _status is not DurableTaskCompletionSourceStatus.Pending;
+    }
 
     private void WriteState(JournalStreamWriter writer)
     {
