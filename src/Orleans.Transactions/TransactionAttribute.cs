@@ -295,7 +295,7 @@ namespace Orleans
         /// <inheritdoc/>
         public override async ValueTask<Response> Invoke()
         {
-            Response response;
+            Response? response;
             var transactionInfo = this.TransactionInfo;
             bool startedNewTransaction = false;
             try
@@ -329,7 +329,12 @@ namespace Orleans
                 TransactionContext.Clear();
             }
 
-            if (transactionInfo != null)
+            if (transactionInfo is null)
+            {
+                return response;
+            }
+
+            try
             {
                 transactionInfo.ReconcilePending();
 
@@ -361,13 +366,17 @@ namespace Orleans
 
                 if (transactionException != null)
                 {
-                    response = Response.FromException(transactionException);
+                    return TransactionResponse.Create(Response.FromException(transactionException), transactionInfo);
                 }
 
-                response = TransactionResponse.Create(response, transactionInfo);
+                var result = TransactionResponse.Create(response, transactionInfo);
+                response = null; // The returned wrapper now owns the invocation response.
+                return result;
             }
-
-            return response;
+            finally
+            {
+                response?.Dispose();
+            }
         }
 
         /// <summary>
@@ -407,9 +416,9 @@ namespace Orleans
         /// <summary>
         /// Creates a transaction response which wraps an invocation response.
         /// </summary>
-        /// <param name="response">The invocation response.</param>
+        /// <param name="response">The invocation response whose ownership transfers to the returned wrapper.</param>
         /// <param name="transactionInfo">The transaction information to return with the response.</param>
-        /// <returns>The transaction response.</returns>
+        /// <returns>The transaction response, which the caller disposes to release the wrapped response.</returns>
         public static TransactionResponse Create(Response response, TransactionInfo transactionInfo)
         {
             return new TransactionResponse
@@ -496,6 +505,8 @@ namespace Orleans
         }
 
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Generated grain invocations return arbitrary user-code failures as responses for transaction abort processing.")]
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -503,7 +514,9 @@ namespace Orleans
                 var resultTask = InvokeInner();
                 if (resultTask.IsCompleted)
                 {
+#pragma warning disable CA1849 // IsCompleted proves this consumes the ValueTask result without blocking, including failure or cancellation.
                     resultTask.GetAwaiter().GetResult();
+#pragma warning restore CA1849
                     return new ValueTask<Response>(Response.Completed);
                 }
 
@@ -515,6 +528,8 @@ namespace Orleans
             }
         }
 
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Awaited user-code failures and cancellation are returned as responses for transaction abort processing.")]
         private static async ValueTask<Response> CompleteInvokeAsync(ValueTask resultTask)
         {
             try
@@ -553,6 +568,8 @@ namespace Orleans
         }
 
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Generated grain invocations return arbitrary user-code failures as responses for transaction abort processing.")]
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -571,6 +588,8 @@ namespace Orleans
             }
         }
 
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Awaited user-code failures and cancellation are returned as responses for transaction abort processing.")]
         private static async ValueTask<Response> CompleteInvokeAsync(ValueTask<TResult> resultTask)
         {
             try
@@ -609,6 +628,8 @@ namespace Orleans
         }
 
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Generated grain invocations return arbitrary user-code failures as responses for transaction abort processing.")]
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -628,6 +649,8 @@ namespace Orleans
             }
         }
 
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Awaited user-code failures and cancellation are returned as responses for transaction abort processing.")]
         private static async ValueTask<Response> CompleteInvokeAsync(Task<TResult> resultTask)
         {
             try
@@ -665,6 +688,8 @@ namespace Orleans
         }
 
         /// <inheritdoc/>
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Generated grain invocations return arbitrary user-code failures as responses for transaction abort processing.")]
         protected sealed override ValueTask<Response> BaseInvoke()
         {
             try
@@ -673,7 +698,9 @@ namespace Orleans
                 var status = resultTask.Status;
                 if (resultTask.IsCompleted)
                 {
+#pragma warning disable CA1849 // IsCompleted proves this observes the Task outcome without blocking, including failure or cancellation.
                     resultTask.GetAwaiter().GetResult();
+#pragma warning restore CA1849
                     return new ValueTask<Response>(Response.Completed);
                 }
 
@@ -685,6 +712,8 @@ namespace Orleans
             }
         }
 
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Awaited user-code failures and cancellation are returned as responses for transaction abort processing.")]
         private static async ValueTask<Response> CompleteInvokeAsync(Task resultTask)
         {
             try
