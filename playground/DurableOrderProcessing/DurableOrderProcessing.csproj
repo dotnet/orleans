@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <NoWarn>$(NoWarn);ORLEANSEXP003;ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.DurableJobs\Orleans.DurableJobs.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Journaling\Orleans.Journaling.csproj" />
+    <ProjectReference Include="..\..\src\Microsoft.Orleans.DurableTasks\Microsoft.Orleans.DurableTasks.csproj" />
+    <ProjectReference Include="..\..\src\Dashboard\Orleans.Dashboard\Orleans.Dashboard.csproj" />
+
+    <!-- The abstractions package carries the replay-safety analyzers; this sample references the project directly. -->
+    <ProjectReference Include="..\..\src\Orleans.DurableTasks.Analyzers\Orleans.DurableTasks.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>
