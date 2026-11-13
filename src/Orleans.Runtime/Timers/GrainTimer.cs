@@ -22,17 +22,18 @@ internal abstract partial class GrainTimer : IGrainTimer
         Justification = "The reusable invocation adapter borrows this timer and owns no disposable resources; the activation owns timer disposal.")]
     private readonly TimerTickInvoker _invoker;
     private TimerState _state;
-    // The timer owns one reference through cancellation; an admitted callback owns one through completion.
-    private byte _cancellationSourceReferences = 1;
     // The current arm while idle; the next delay once a tick is queued. Change replaces it.
     private TimeSpan _dueTime;
     private TimeSpan _period;
 
+    [Flags]
     private enum TimerState : byte
     {
-        Idle,
-        Busy,
-        Disposed
+        Idle = 0,
+        Busy = 1,
+        CallbackRunning = 2,
+        Cancelling = 4,
+        Disposed = 8
     }
 
     public GrainTimer(TimerRegistry shared, IGrainContext grainContext, bool interleave, bool keepAlive)
@@ -77,7 +78,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             lock (_cts)
             {
-                return _state == TimerState.Disposed;
+                return (_state & TimerState.Disposed) != 0;
             }
         }
     }
@@ -139,14 +140,13 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         lock (_cts)
         {
-            if (_state == TimerState.Disposed)
+            if ((_state & TimerState.Disposed) != 0)
             {
                 return new(Response.Completed);
             }
 
             Debug.Assert(_state == TimerState.Busy);
-            Debug.Assert(_cancellationSourceReferences == 1);
-            _cancellationSourceReferences++;
+            _state |= TimerState.CallbackRunning;
         }
 
         var completeSynchronously = true;
@@ -192,8 +192,8 @@ internal abstract partial class GrainTimer : IGrainTimer
         bool queueTick;
         lock (_cts)
         {
-            ReleaseCancellationSource();
-            if (_state == TimerState.Disposed)
+            ReleaseCancellationSource(TimerState.CallbackRunning);
+            if ((_state & TimerState.Disposed) != 0)
             {
                 return;
             }
@@ -209,11 +209,13 @@ internal abstract partial class GrainTimer : IGrainTimer
         }
     }
 
-    private void ReleaseCancellationSource()
+    // Cancellation and an admitted callback each retain the source until their completion.
+    private void ReleaseCancellationSource(TimerState owner)
     {
         Debug.Assert(Monitor.IsEntered(_cts));
-        Debug.Assert(_cancellationSourceReferences > 0);
-        if (--_cancellationSourceReferences == 0)
+        Debug.Assert((_state & owner) != 0);
+        _state &= ~owner;
+        if (_state == TimerState.Disposed)
         {
             _cts.Dispose();
         }
@@ -250,7 +252,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         var queueTick = false;
         lock (_cts)
         {
-            if (_state == TimerState.Disposed)
+            if ((_state & TimerState.Disposed) != 0)
             {
                 return;
             }
@@ -290,13 +292,13 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         lock (_cts)
         {
-            if (_state == TimerState.Disposed)
+            if ((_state & TimerState.Disposed) != 0)
             {
                 return;
             }
 
             // Publish disposal before cancellation, whose registrations can reenter Change/Dispose.
-            _state = TimerState.Disposed;
+            _state = (_state & TimerState.CallbackRunning) | TimerState.Disposed | TimerState.Cancelling;
             _timer.Dispose();
         }
 
@@ -313,7 +315,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             lock (_cts)
             {
-                ReleaseCancellationSource();
+                ReleaseCancellationSource(TimerState.Cancelling);
             }
         }
 

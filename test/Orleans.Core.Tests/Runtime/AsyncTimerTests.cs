@@ -35,6 +35,33 @@ public class AsyncTimerTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Theory, TestCategory("BVT")]
+    [InlineData(1000)]
+    [InlineData(-1)]
+    public async Task NextTick_DisposalAfterAdmissionCancelsDelay(int milliseconds)
+    {
+        AsyncTimer? timer = null;
+        var timeProvider = new DisposingTimeProvider(() =>
+        {
+            Assert.NotNull(timer);
+            timer.Dispose();
+        });
+        using (timer = new AsyncTimer(TimeSpan.FromMilliseconds(milliseconds), "test", NullLogger.Instance, timeProvider))
+        {
+            var source = Assert.IsType<CancellationTokenSource>(
+                typeof(AsyncTimer).GetField("cancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(timer));
+            var waitHandle = source.Token.WaitHandle;
+
+            Assert.False(await timer.NextTick());
+
+            Assert.Throws<ObjectDisposedException>(() => source.Token);
+            Assert.True(waitHandle.SafeWaitHandle.IsClosed);
+            Assert.False(await timer.NextTick());
+        }
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Theory, TestCategory("BVT")]
     [InlineData(0)]
     [InlineData(-2)]
     [InlineData(-1000)]
@@ -144,5 +171,14 @@ public class AsyncTimerTests
         Assert.False(task.IsCompleted);
         timer.Dispose();
         Assert.False(await task);
+    }
+
+    private sealed class DisposingTimeProvider(Action dispose) : FakeTimeProvider
+    {
+        public override DateTimeOffset GetUtcNow()
+        {
+            dispose();
+            return base.GetUtcNow();
+        }
     }
 }

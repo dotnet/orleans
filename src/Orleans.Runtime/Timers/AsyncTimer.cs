@@ -18,8 +18,6 @@ namespace Orleans.Runtime
         [SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
             Justification = "Dispose atomically takes the source with Interlocked.Exchange, then disposes the returned source in finally.")]
         private CancellationTokenSource? cancellation = new CancellationTokenSource();
-        // Pending ticks keep observing cancellation after the owner disposes the source.
-        private readonly CancellationToken _cancellationToken;
         private readonly TimeSpan period;
         private readonly string name;
         private readonly ILogger log;
@@ -29,7 +27,6 @@ namespace Orleans.Runtime
 
         public AsyncTimer(TimeSpan period, string name, ILogger log, TimeProvider timeProvider)
         {
-            _cancellationToken = cancellation.Token;
             this.log = log;
             this.period = period;
             this.name = name;
@@ -43,7 +40,16 @@ namespace Orleans.Runtime
         /// <returns><see langword="true"/> if the timer completed or <see langword="false"/> if the timer was cancelled</returns>
         public async Task<bool> NextTick(TimeSpan? overrideDelay = default)
         {
-            if (Volatile.Read(ref cancellation) is null) return false;
+            var source = Volatile.Read(ref cancellation);
+            if (source is null) return false;
+
+            CancellationToken cancellationToken;
+            lock (source)
+            {
+                // Synchronize token acquisition with disposal; the token remains usable afterwards.
+                if (Volatile.Read(ref cancellation) is null) return false;
+                cancellationToken = source.Token;
+            }
 
             var start = _timeProvider.GetUtcNow().UtcDateTime;
             var delay = overrideDelay switch
@@ -67,14 +73,14 @@ namespace Orleans.Runtime
                 {
                     if (hasAbsoluteDueTime)
                     {
-                        await _timeProvider.DelayUntilAsync(new DateTimeOffset(dueTime), _cancellationToken).ConfigureAwait(false);
+                        await _timeProvider.DelayUntilAsync(new DateTimeOffset(dueTime), cancellationToken).ConfigureAwait(false);
                     }
                     else
                     {
-                        await _timeProvider.DelayAsync(delay, _cancellationToken).ConfigureAwait(false);
+                        await _timeProvider.DelayAsync(delay, cancellationToken).ConfigureAwait(false);
                     }
                 }
-                catch (OperationCanceledException) when (_cancellationToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
                     await Task.Yield();
                     expected = default;
@@ -134,7 +140,10 @@ namespace Orleans.Runtime
             }
             finally
             {
-                source.Dispose();
+                lock (source)
+                {
+                    source.Dispose();
+                }
             }
         }
 
