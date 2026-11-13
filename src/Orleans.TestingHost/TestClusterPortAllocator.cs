@@ -439,10 +439,10 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
 
         private void SignalRelease(string name, bool[]? acquiredByRequest)
         {
-            if (_workItems.IsAddingCompleted) return;
-
             try
             {
+                if (_workItems.IsAddingCompleted) return;
+
                 _workItems.Add(() =>
                 {
                     if ((acquiredByRequest is null || acquiredByRequest[0]) && _mutexes.Remove(name, out var value))

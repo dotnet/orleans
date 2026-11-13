@@ -232,6 +232,15 @@ public class TestClusterPortAllocatorTests
         manager.SignalRelease(name);
     }
 
+    [Fact]
+    public void MutexManager_SignalReleaseAfterDispose_DoesNotThrow()
+    {
+        using var manager = new TestClusterPortAllocator.MutexManager(TimeSpan.FromSeconds(1));
+        manager.Dispose();
+
+        manager.SignalRelease($"Orleans.TestClusterPortAllocatorTests.{Guid.NewGuid():N}");
+    }
+
     private static int GetAvailablePort(int rangeStart, int rangeEnd, int excludedPort = -1)
     {
         for (var port = rangeStart; port < rangeEnd; port++)
