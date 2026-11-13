@@ -21,9 +21,7 @@ internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
     {
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
-        var payloadWriter = Writer.Create(output, session: null!);
-        payloadWriter.WriteVarUInt32(EnqueueCommand);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(output, EnqueueCommand);
         OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
         entry.Commit();
     }
@@ -32,9 +30,7 @@ internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
     public void WriteDequeue(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var payloadWriter = Writer.Create(entry.Writer, session: null!);
-        payloadWriter.WriteVarUInt32(DequeueCommand);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(entry.Writer, DequeueCommand);
         entry.Commit();
     }
 
@@ -42,9 +38,7 @@ internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
     public void WriteClear(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var payloadWriter = Writer.Create(entry.Writer, session: null!);
-        payloadWriter.WriteVarUInt32(ClearCommand);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(entry.Writer, ClearCommand);
         entry.Commit();
     }
 
@@ -54,10 +48,7 @@ internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
-        var payloadWriter = Writer.Create(output, session: null!);
-        payloadWriter.WriteVarUInt32(SnapshotCommand);
-        payloadWriter.WriteVarUInt32((uint)count);
-        payloadWriter.Commit();
+        OrleansBinaryCommandCodecHelpers.WriteHeader(output, SnapshotCommand, (uint)count);
         var written = 0;
         foreach (var item in items)
         {

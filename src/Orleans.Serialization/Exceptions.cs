@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 
 namespace Orleans.Serialization
@@ -288,6 +289,8 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [SuppressMessage("Design", "CA1032:Implement standard exception constructors",
+        Justification = "The referenced type id is required error context and is preserved by the typed constructor and serialization contract.")]
     public sealed class UnknownReferencedTypeException : SerializerException
     {
         /// <summary>
@@ -309,7 +312,7 @@ namespace Orleans.Serialization
 #endif
         private UnknownReferencedTypeException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
-            info.AddValue(nameof(Reference), Reference);
+            Reference = info.GetUInt32(nameof(Reference));
         }
 
         /// <summary>
@@ -326,7 +329,7 @@ namespace Orleans.Serialization
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
-            Reference = info.GetUInt32(nameof(Reference));
+            info.AddValue(nameof(Reference), Reference);
         }
     }
 
@@ -383,6 +386,8 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [SuppressMessage("Design", "CA1032:Implement standard exception constructors",
+        Justification = "The well-known type id is required error context and is preserved by the typed constructor and serialization contract.")]
     public sealed class UnknownWellKnownTypeException : SerializerException
     {
         /// <summary>
@@ -404,7 +409,7 @@ namespace Orleans.Serialization
 #endif
         private UnknownWellKnownTypeException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
-            info.AddValue(nameof(Id), Id);
+            Id = info.GetUInt32(nameof(Id));
         }
 
         /// <summary>
@@ -421,7 +426,7 @@ namespace Orleans.Serialization
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
-            Id = info.GetUInt32(nameof(Id));
+            info.AddValue(nameof(Id), Id);
         }
     }
 

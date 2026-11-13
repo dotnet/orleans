@@ -20,6 +20,15 @@ namespace Orleans.Serialization.UnitTests;
 public sealed class ReferencedAssemblyProviderTests
 {
     [Fact]
+    public void AddAssemblyRejectsNullPartsBeforeInspectingApplicationParts()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => ReferencedAssemblyProvider.AddAssembly(null!, typeof(object).Assembly));
+
+        Assert.Equal("parts", exception.ParamName);
+    }
+
+    [Fact]
     public void AddAssemblyDiscoversGeneratedApplicationPartsWithoutAssemblyFiles()
     {
         var referencedAssembly = typeof(ReferencedAssemblyProviderTests).Assembly;
