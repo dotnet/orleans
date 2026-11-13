@@ -470,7 +470,7 @@ public class EventHubCheckpointerTests
             StreamId.Create("namespace", Guid.NewGuid()),
             MakeToken(1));
         Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
-        var cursor = result.Cursor;
+        using var cursor = result.Cursor;
         Assert.NotNull(cursor);
         var refreshToken = MakeToken(2);
 

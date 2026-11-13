@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace Orleans.Streams
@@ -12,6 +13,8 @@ namespace Orleans.Streams
     {
         private readonly List<T> resources;
         private int lastSelection;
+        [SuppressMessage("Security", "CA5394:Do not use insecure randomness",
+            Justification = "Random ordering and the starting offset spread queue lease attempts. The lease provider establishes ownership independently of this selection order.")]
         public RoundRobinSelector(IEnumerable<T> resources)
         {
             // distinct randomly ordered readonly collection
