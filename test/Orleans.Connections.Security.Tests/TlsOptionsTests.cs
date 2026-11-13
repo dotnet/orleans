@@ -14,6 +14,83 @@ namespace Orleans.Connections.Security.Tests;
 [TestArea("Security")]
 public class TlsOptionsTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void ClientTlsRejectsNullBuilderBeforeLoadingOrValidatingCertificate(int overload)
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+        {
+            IClientBuilder builder = null!;
+            _ = overload switch
+            {
+                0 => builder.UseTls(_ => { }),
+                1 => builder.UseTls((System.Security.Cryptography.X509Certificates.X509Certificate2)null!),
+                2 => builder.UseTls(null!, _ => { }),
+                3 => builder.UseTls(
+                    System.Security.Cryptography.X509Certificates.StoreName.My,
+                    "unused",
+                    false,
+                    System.Security.Cryptography.X509Certificates.StoreLocation.CurrentUser,
+                    _ => { }),
+                _ => throw new ArgumentOutOfRangeException(nameof(overload)),
+            };
+        });
+
+        Assert.Equal("builder", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void SiloTlsRejectsNullBuilderBeforeLoadingOrValidatingCertificate(int overload)
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+        {
+            ISiloBuilder builder = null!;
+            _ = overload switch
+            {
+                0 => builder.UseTls(_ => { }),
+                1 => builder.UseTls((System.Security.Cryptography.X509Certificates.X509Certificate2)null!),
+                2 => builder.UseTls(null!, _ => { }),
+                3 => builder.UseTls(
+                    System.Security.Cryptography.X509Certificates.StoreName.My,
+                    "unused",
+                    false,
+                    System.Security.Cryptography.X509Certificates.StoreLocation.CurrentUser,
+                    _ => { }),
+                _ => throw new ArgumentOutOfRangeException(nameof(overload)),
+            };
+        });
+
+        Assert.Equal("builder", exception.ParamName);
+    }
+
+    [Fact]
+    public void ClientTlsConfigurationPreservesBuilderAndClientOptions()
+    {
+        var services = new ServiceCollection();
+        var builder = new TestClientBuilder(services);
+        var configured = 0;
+        var expectedTimeout = TimeSpan.FromSeconds(17);
+
+        var result = builder.UseTls(options =>
+        {
+            configured++;
+            options.HandshakeTimeout = expectedTimeout;
+        });
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<TlsOptions>>().Value;
+
+        Assert.Same(builder, result);
+        Assert.Equal(1, configured);
+        Assert.Equal(expectedTimeout, options.HandshakeTimeout);
+    }
+
     [Fact]
     public void SiloTlsConfiguration_AppliesOncePerConnectionRole()
     {
@@ -166,6 +243,12 @@ public class TlsOptionsTests
     }
 
     private sealed class TestSiloBuilder(IServiceCollection services) : ISiloBuilder
+    {
+        public IServiceCollection Services { get; } = services;
+        public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
+    }
+
+    private sealed class TestClientBuilder(IServiceCollection services) : IClientBuilder
     {
         public IServiceCollection Services { get; } = services;
         public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
