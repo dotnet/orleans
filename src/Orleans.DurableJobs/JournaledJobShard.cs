@@ -246,10 +246,24 @@ internal sealed class JournaledJobShard : IJobShard
 
         try
         {
-            _shutdownCancellation.Cancel();
-            _pendingOperationSignal.Signal();
-            await _operationProcessor.ConfigureAwait(false);
-            await _stateManager.DisposeAsync();
+            try
+            {
+#pragma warning disable CA1849 // Cancellation callbacks run on the shutdown caller before owned work is drained.
+                _shutdownCancellation.Cancel();
+#pragma warning restore CA1849
+            }
+            finally
+            {
+                _pendingOperationSignal.Signal();
+                try
+                {
+                    await _operationProcessor.ConfigureAwait(false);
+                }
+                finally
+                {
+                    await _stateManager.DisposeAsync();
+                }
+            }
         }
         finally
         {
@@ -282,7 +296,9 @@ internal sealed class JournaledJobShard : IJobShard
             {
                 _shutdownCancellation.Token.ThrowIfCancellationRequested();
 
+#pragma warning disable CA2000 // Submission methods own queued operations in using scopes around their completion tasks.
                 if (!TryDequeueOperation(out var operation) || operation is null)
+#pragma warning restore CA2000
                 {
                     // The queue is authoritative: drain it before waiting for another coalesced signal.
                     await _pendingOperationSignal.WaitAsync().ConfigureAwait(false);
@@ -342,7 +358,9 @@ internal sealed class JournaledJobShard : IJobShard
     {
         lock (_pendingOperationsLock)
         {
+#pragma warning disable CA2000 // Batching borrows operations owned by their submitting using scopes.
             while (_pendingOperations.TryPeek(out var operation) && operation is PendingMutationOperation mutation)
+#pragma warning restore CA2000
             {
                 _pendingOperations.Dequeue();
                 batch.Add(mutation);
