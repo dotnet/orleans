@@ -134,24 +134,6 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         }
 
         /// <summary>
-        /// Gets the copier set which generated proxies of one type share for <paramref name="codecProvider"/>.
-        /// </summary>
-        /// <remarks>
-        /// A <see cref="CodecProvider"/> creates the set on first successful use and returns that instance thereafter.
-        /// A failed creation caches nothing, so a later call retries it.
-        /// </remarks>
-        /// <typeparam name="TCopiers">The generated copier set type, which is unique to its proxy type.</typeparam>
-        /// <param name="codecProvider">The codec provider which resolves the copiers.</param>
-        /// <param name="factory">Creates the copier set by resolving its copiers from the codec provider.</param>
-        /// <returns>The copier set.</returns>
-        public static TCopiers GetProxyCopiers<TCopiers>(ICodecProvider codecProvider, Func<ICodecProvider, TCopiers> factory) where TCopiers : class
-        {
-            ArgumentNullExceptionPolyfill.ThrowIfNull(codecProvider);
-            ArgumentNullExceptionPolyfill.ThrowIfNull(factory);
-            return codecProvider is CodecProvider provider ? provider.GetProxyCopiers(factory) : factory(codecProvider);
-        }
-
-        /// <summary>
         /// Unwraps the provided service if it was wrapped.
         /// </summary>
         /// <typeparam name="TService">The service type.</typeparam>

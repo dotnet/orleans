@@ -161,57 +161,6 @@ public sealed class ProxyCopierResolutionTests(ITestOutputHelper output)
         Assert.Equal(1, secondConstructions);
     }
 
-    [Fact]
-    public void ProxiesShareOneCopierSetPerProxyTypeAndProvider()
-    {
-        using var first = new ServiceCollection().AddSerializer().BuildServiceProvider();
-        using var second = new ServiceCollection().AddSerializer().BuildServiceProvider();
-        var firstProvider = first.GetRequiredService<CodecProvider>();
-        var firstPool = first.GetRequiredService<CopyContextPool>();
-        var copiers = GetCopiers(CreateProxy(firstPool, firstProvider));
-        Assert.Same(copiers, GetCopiers(CreateProxy(firstPool, firstProvider)));
-        Assert.NotSame(copiers, GetCopiers(CreateProxy(second.GetRequiredService<CopyContextPool>(), second.GetRequiredService<CodecProvider>())));
-
-        var genericCopiers = GetCopiers(CreateGenericProxy(firstPool, firstProvider));
-        Assert.NotSame(copiers, genericCopiers);
-        Assert.Same(genericCopiers, GetCopiers(CreateGenericProxy(firstPool, firstProvider)));
-        var primitiveCopiers = GetCopiers(new OrleansCodeGen.Orleans.Serialization.UnitTests.Proxy_IGenericCacheResolutionProxy<int>(firstPool, firstProvider));
-        Assert.NotSame(genericCopiers, primitiveCopiers);
-        Assert.Same(primitiveCopiers, GetCopiers(new OrleansCodeGen.Orleans.Serialization.UnitTests.Proxy_IGenericCacheResolutionProxy<int>(firstPool, firstProvider)));
-    }
-
-    [Fact]
-    public void ProxyCopiersFromAFailedConstructionGraphAreNotShared()
-    {
-        CodecProvider? codecProvider = null;
-        CopyContextPool? pool = null;
-        MyInvokableProxyBase? pendingProxy = null;
-        var calls = 0;
-        var registrations = new ServiceCollection().AddSerializer();
-        registrations.Configure<TypeManifestOptions>(options => options.AddSerializer<CacheResolutionPayload>(
-            _ => throw new NotSupportedException(), _ =>
-            {
-                if (++calls == 1)
-                {
-                    pendingProxy = new OrleansCodeGen.Orleans.Serialization.UnitTests.Proxy_IPendingConstructionProxy(pool!, codecProvider!);
-                    throw new InvalidOperationException("Injected copier construction failure");
-                }
-
-                return new OverrideCopier();
-            }));
-        using var services = registrations.BuildServiceProvider();
-        codecProvider = services.GetRequiredService<CodecProvider>();
-        pool = services.GetRequiredService<CopyContextPool>();
-        Assert.Throws<InvalidOperationException>(() => codecProvider.GetDeepCopier<CacheResolutionPayload>());
-
-        var proxy = new OrleansCodeGen.Orleans.Serialization.UnitTests.Proxy_IPendingConstructionProxy(pool, codecProvider);
-        var copiers = GetCopiers(proxy);
-        Assert.NotSame(GetCopiers(pendingProxy!), copiers);
-        Assert.NotSame(GetCopier<List<int>>(pendingProxy!), GetCopier<List<int>>(proxy));
-        Assert.Same(codecProvider.GetDeepCopier<List<int>>(), GetCopier<List<int>>(proxy));
-        Assert.Same(copiers, GetCopiers(new OrleansCodeGen.Orleans.Serialization.UnitTests.Proxy_IPendingConstructionProxy(pool, codecProvider)));
-    }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -488,14 +437,8 @@ public sealed class ProxyCopierResolutionTests(ITestOutputHelper output)
     private static MyInvokableProxyBase CreateGenericProxy(CopyContextPool pool, CodecProvider provider) =>
         new OrleansCodeGen.Orleans.Serialization.UnitTests.Proxy_IGenericCacheResolutionProxy<CacheResolutionPayload>(pool, provider);
 
-    private static object GetCopiers(MyInvokableProxyBase proxy) =>
-        Assert.Single(proxy.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance)).GetValue(proxy)!;
-
-    private static object GetCopier<T>(MyInvokableProxyBase proxy)
-    {
-        var copiers = GetCopiers(proxy);
-        return Assert.Single(copiers.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance), field => typeof(IDeepCopier<T>).IsAssignableFrom(field.FieldType)).GetValue(copiers)!;
-    }
+    private static object GetCopier<T>(MyInvokableProxyBase proxy) =>
+        Assert.Single(proxy.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance), field => typeof(IDeepCopier<T>).IsAssignableFrom(field.FieldType)).GetValue(proxy)!;
 
     public sealed class TransientDependency { }
     public sealed class ScopedDependency { }
@@ -528,9 +471,4 @@ public interface ICacheResolutionProxy : IMyInvokableBaseType
 public interface IGenericCacheResolutionProxy<T> : IMyInvokableBaseType
 {
     ValueTask Send(T value, List<T> list, T[] array);
-}
-
-public interface IPendingConstructionProxy : IMyInvokableBaseType
-{
-    ValueTask Send(List<int> list);
 }

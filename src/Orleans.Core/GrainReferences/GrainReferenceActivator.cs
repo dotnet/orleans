@@ -362,7 +362,7 @@ namespace Orleans.GrainReferences
         /// </summary>
         private sealed class GrainReferenceActivator : IGrainReferenceActivator
         {
-            private readonly GrainReferenceShared _shared;
+            private GrainReferenceShared _shared;
             private readonly Func<GrainReferenceShared, IdSpan, GrainReference> _create;
 
             /// <summary>
@@ -400,7 +400,27 @@ namespace Orleans.GrainReferences
                 _create = method.CreateDelegate<Func<GrainReferenceShared, IdSpan, GrainReference>>();
             }
 
-            public GrainReference CreateReference(GrainId grainId) => _create(_shared, grainId.Key);
+            public GrainReference CreateReference(GrainId grainId)
+            {
+                var reference = _create(_shared, grainId.Key);
+                if (!ReferenceEquals(reference.Shared, _shared))
+                {
+                    AdoptShared(reference.Shared);
+                }
+
+                return reference;
+            }
+
+            // A generated proxy replaces the shared instance it receives with a derived instance holding its copiers,
+            // and passes that instance through unchanged. Later references reuse it, so the copiers are resolved once.
+            private void AdoptShared(GrainReferenceShared shared)
+            {
+                // Like the codec provider's caches, retain only copiers from completed serializer construction graphs.
+                if (!shared.CodecProvider.IsConstructionPending)
+                {
+                    _shared = shared;
+                }
+            }
         }
     }
 

@@ -17,9 +17,9 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 {
     private const string CopyContextPoolMemberName = "CopyContextPool";
     private const string CodecProviderMemberName = "CodecProvider";
-    private const string CopiersTypeName = "ProxyCopiers";
-    private const string CopiersFieldName = "_copiers";
-    private const string CopiersCodecProviderParameterName = "codecProvider";
+    private const string SharedTypeName = "ProxyShared";
+    private const string SharedBaseTypeName = "global::Orleans.Runtime.GrainReferenceShared";
+    private const string SharedCopierOwner = $"(({SharedTypeName})base.Shared)";
     private readonly IGeneratorServices _generatorServices = generatorServices;
     private readonly CopierGenerator _copierGenerator = copierGenerator;
 
@@ -32,22 +32,26 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
     public ProxyEmissionPlan CreatePlan(ProxyInterfaceDescription interfaceDescription)
     {
         var generatedClassName = GetSimpleClassName(interfaceDescription);
-        var copierFields = GetFieldDescriptions(interfaceDescription);
-        var hasCopiers = copierFields.Count > 0;
-        var methods = CreateProxyMethods(copierFields, interfaceDescription);
-        var (constructors, constructorStatements) = CreateConstructors(generatedClassName, hasCopiers, interfaceDescription.ProxyBaseType);
+        var fieldDescriptions = GetFieldDescriptions(interfaceDescription);
+
+        // Grain reference proxies hold their copiers in a GrainReferenceShared instance which every reference shares.
+        var sharesCopiers = fieldDescriptions.Count > 0
+            && SymbolEqualityComparer.Default.Equals(interfaceDescription.ProxyBaseType, LibraryTypes.GrainReferenceOrDefault);
+        var methods = CreateProxyMethods(fieldDescriptions, sharesCopiers, interfaceDescription);
+        var (constructors, constructorStatements) = CreateConstructors(generatedClassName, fieldDescriptions, sharesCopiers, interfaceDescription.ProxyBaseType);
+        var fields = fieldDescriptions.Select(field => $"{(sharesCopiers ? "public" : "private")} readonly {CodeText.Type(field.FieldType)} {field.FieldName};").ToImmutableArray();
 
         return new ProxyEmissionPlan(
             generatedClassName,
             CodeText.Type(interfaceDescription.ProxyBaseType.ToTypeSyntax()),
             CodeText.Type(interfaceDescription.InterfaceType.ToTypeSyntax()),
             GenericParameterEmissionPlan.Create(interfaceDescription.TypeParameters),
-            hasCopiers ? ImmutableArray.Create($"private readonly {CopiersTypeName} {CopiersFieldName};") : [],
+            sharesCopiers ? [] : fields,
             constructors,
             constructorStatements,
             methods,
-            copierFields.Select(static field => $"public readonly {CodeText.Type(field.FieldType)} {CodeText.Identifier(field.FieldName)};").ToImmutableArray(),
-            copierFields.Select(static field => $"{CodeText.Identifier(field.FieldName)} = {GetServiceExpression(CodeText.Type(field.FieldType), CopiersCodecProviderParameterName)};").ToImmutableArray());
+            sharesCopiers ? fields : [],
+            sharesCopiers ? fieldDescriptions.Select(GetCopierResolutionStatement).ToImmutableArray() : []);
     }
 
     internal static void Write(SourceWriter writer, ProxyEmissionPlan plan)
@@ -88,26 +92,26 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             writer.CloseBlock();
         }
 
-        if (plan.CopierFields.Count > 0)
+        if (plan.SharedFields.Count > 0)
         {
-            WriteCopiers(writer, plan);
+            WriteShared(writer, plan);
         }
 
         writer.CloseBlock();
     }
 
-    private static void WriteCopiers(SourceWriter writer, ProxyEmissionPlan plan)
+    private static void WriteShared(SourceWriter writer, ProxyEmissionPlan plan)
     {
-        writer.WriteLine($"private sealed class {CopiersTypeName}");
+        writer.WriteLine($"private sealed class {SharedTypeName} : {SharedBaseTypeName}");
         writer.OpenBlock();
-        foreach (var field in plan.CopierFields)
+        foreach (var field in plan.SharedFields)
         {
             writer.WriteLine(field);
         }
 
-        writer.WriteLine($"public {CopiersTypeName}(global::Orleans.Serialization.Serializers.ICodecProvider {CopiersCodecProviderParameterName})");
+        writer.WriteLine($"public {SharedTypeName}({SharedBaseTypeName} shared) : base(shared)");
         writer.OpenBlock();
-        foreach (var statement in plan.CopierStatements)
+        foreach (var statement in plan.SharedStatements)
         {
             writer.WriteLine(statement);
         }
@@ -115,6 +119,9 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
         writer.CloseBlock();
         writer.CloseBlock();
     }
+
+    private static string GetCopierResolutionStatement(GeneratedFieldDescription field)
+        => $"{CodeText.Identifier(field.FieldName)} = {GetServiceExpression(CodeText.Type(field.FieldType), CodecProviderMemberName)};";
 
     public static string GetSimpleClassName(ProxyInterfaceDescription interfaceDescription)
         => GetSimpleClassName(interfaceDescription.Name);
@@ -137,6 +144,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 
     private EquatableArray<ProxyMethodEmissionPlan> CreateProxyMethods(
         List<GeneratedFieldDescription> fieldDescriptions,
+        bool sharesCopiers,
         ProxyInterfaceDescription interfaceDescription)
     {
         var res = ImmutableArray.CreateBuilder<ProxyMethodEmissionPlan>(interfaceDescription.Methods.Count);
@@ -154,7 +162,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             ProxyMethodDescription? forwardingMethod)
         {
             var (isAsync, body) = forwardingMethod is null
-                ? CreateAsyncProxyMethodBody(fieldDescriptions, methodDescription)
+                ? CreateAsyncProxyMethodBody(fieldDescriptions, sharesCopiers, methodDescription)
                 : (false, CreateCompatibilityForwardingBody(methodDescription, forwardingMethod));
             var method = methodDescription.Method;
             var declaration = new StringBuilder();
@@ -328,6 +336,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 
     private (bool IsAsync, EquatableArray<string> Body) CreateAsyncProxyMethodBody(
         List<GeneratedFieldDescription> fieldDescriptions,
+        bool sharesCopiers,
         ProxyMethodDescription methodDescription)
     {
         var statements = ImmutableArray.CreateBuilder<string>();
@@ -354,7 +363,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                 hasCopyContext = true;
             }
 
-            var value = _copierGenerator.GenerateMemberCopy(fieldDescriptions, codecs, parameter, CopiersFieldName).Copy($"arg{parameterIndex}", "copyContext");
+            var value = _copierGenerator.GenerateMemberCopy(fieldDescriptions, codecs, parameter, sharesCopiers ? SharedCopierOwner : null).Copy($"arg{parameterIndex}", "copyContext");
             statements.Add($"request.arg{parameterIndex} = {value};");
             parameterIndex++;
         }
@@ -436,9 +445,10 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
         return (isAsync, statements.ToImmutable());
     }
 
-    private static (EquatableArray<string> Declarations, EquatableArray<string> Statements) CreateConstructors(
+    private (EquatableArray<string> Declarations, EquatableArray<string> Statements) CreateConstructors(
         string simpleClassName,
-        bool hasCopiers,
+        List<GeneratedFieldDescription> fieldDescriptions,
+        bool sharesCopiers,
         INamedTypeSymbol baseType)
     {
         if (baseType is null)
@@ -446,10 +456,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             return ([], []);
         }
 
-        // Every proxy of this type shares the copier set which its codec provider resolved once.
-        EquatableArray<string> statements = hasCopiers
-            ? ImmutableArray.Create($"{CopiersFieldName} = OrleansGeneratedCodeHelper.GetProxyCopiers<{CopiersTypeName}>({CodecProviderMemberName}, {CopiersCodecProviderParameterName} => new {CopiersTypeName}({CopiersCodecProviderParameterName}));")
-            : [];
+        EquatableArray<string> statements = sharesCopiers ? [] : fieldDescriptions.Select(GetCopierResolutionStatement).ToImmutableArray();
 
         var declarations = ImmutableArray.CreateBuilder<string>();
         foreach (var member in baseType.GetMembers())
@@ -490,6 +497,12 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                     RefKind.Out => "out ",
                     _ => string.Empty,
                 }).Append("arg").Append(index);
+
+                // References created from the same shared instance reuse the derived instance which holds the copiers.
+                if (sharesCopiers && SymbolEqualityComparer.Default.Equals(method.Parameters[index].Type, LibraryTypes.GrainReferenceSharedOrDefault))
+                {
+                    declaration.Append(" as ").Append(SharedTypeName).Append(" ?? new ").Append(SharedTypeName).Append("(arg").Append(index).Append(')');
+                }
             }
 
             declarations.Add(declaration.Append(')').ToString());

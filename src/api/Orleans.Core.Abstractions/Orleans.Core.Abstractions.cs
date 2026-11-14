@@ -2314,6 +2314,8 @@ namespace Orleans.Runtime
 
         public ushort InterfaceVersion { get { throw null; } }
 
+        protected internal GrainReferenceShared Shared { get { throw null; } }
+
         public virtual TGrainInterface Cast<TGrainInterface>()
             where TGrainInterface : IAddressable { throw null; }
 
@@ -2352,6 +2354,8 @@ namespace Orleans.Runtime
 
     public partial class GrainReferenceShared
     {
+        protected GrainReferenceShared(GrainReferenceShared other) { }
+
         public GrainReferenceShared(GrainType grainType, GrainInterfaceType grainInterfaceType, ushort interfaceVersion, IGrainReferenceRuntime runtime, CodeGeneration.InvokeMethodOptions invokeMethodOptions, Orleans.Serialization.Serializers.CodecProvider codecProvider, Orleans.Serialization.Cloning.CopyContextPool copyContextPool, System.IServiceProvider serviceProvider) { }
 
         public Orleans.Serialization.Serializers.CodecProvider CodecProvider { get { throw null; } }

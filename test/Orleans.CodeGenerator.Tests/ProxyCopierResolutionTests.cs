@@ -33,18 +33,18 @@ public sealed class ProxyCopierResolutionTests
         var proxy = driver.GetRunResult().GeneratedTrees.SelectMany(tree => tree.GetRoot(TestContext.Current.CancellationToken).DescendantNodes())
             .OfType<ClassDeclarationSyntax>().Single(type => type.Identifier.ValueText == "Proxy_IProxyGrain");
         var text = proxy.NormalizeWhitespace().ToFullString();
-        Assert.Contains("private readonly ProxyCopiers _copiers;", text);
-        Assert.Contains("_copiers = OrleansGeneratedCodeHelper.GetProxyCopiers<ProxyCopiers>(CodecProvider, codecProvider => new ProxyCopiers(codecProvider));", text);
-        Assert.Contains("private sealed class ProxyCopiers", text);
+        Assert.Empty(proxy.Members.OfType<FieldDeclarationSyntax>());
+        Assert.Contains("public Proxy_IProxyGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0 as ProxyShared ?? new ProxyShared(arg0), arg1)", text);
+        Assert.Contains("private sealed class ProxyShared : global::Orleans.Runtime.GrainReferenceShared", text);
+        Assert.Contains("public ProxyShared(global::Orleans.Runtime.GrainReferenceShared shared) : base(shared)", text);
         Assert.Contains("public readonly OrleansCodeGen.TestProject.Copier_Payload", text);
         Assert.Contains("public readonly global::Orleans.Serialization.Codecs.ListCopier<global::TestProject.Payload>", text);
         Assert.Contains("public readonly global::Orleans.Serialization.Codecs.ArrayCopier<global::TestProject.Payload>", text);
         Assert.Contains("public readonly global::Orleans.Serialization.Cloning.IDeepCopier<T>", text);
-        Assert.Contains("GetService<OrleansCodeGen.TestProject.Copier_Payload>(this, codecProvider)", text);
-        Assert.Contains("GetService<global::Orleans.Serialization.Cloning.IDeepCopier<T>>(this, codecProvider)", text);
-        Assert.Contains("request.arg0 = _copiers._copier", text);
+        Assert.Contains("GetService<OrleansCodeGen.TestProject.Copier_Payload>(this, CodecProvider)", text);
+        Assert.Contains("GetService<global::Orleans.Serialization.Cloning.IDeepCopier<T>>(this, CodecProvider)", text);
+        Assert.Contains("request.arg0 = ((ProxyShared)base.Shared)._copier", text);
         Assert.DoesNotContain("CodecProvider.GetDeepCopier<", text);
-        Assert.Equal(4, proxy.DescendantNodes().OfType<ClassDeclarationSyntax>().Single().Members.OfType<FieldDeclarationSyntax>().Count());
-        Assert.Single(proxy.Members.OfType<FieldDeclarationSyntax>());
+        Assert.Equal(4, proxy.Members.OfType<ClassDeclarationSyntax>().Single().Members.OfType<FieldDeclarationSyntax>().Count());
     }
 }
