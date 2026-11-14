@@ -200,14 +200,16 @@ public sealed class MongoAspireIntegrationTests
     private static async Task<Dictionary<string, string?>> GetProviderEnvironment(IResource resource, IServiceProvider services)
     {
         var execution = new DistributedApplicationExecutionContext(
-            new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run) { ServiceProvider = services });
+            new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run) { Services = services });
         var values = new Dictionary<string, object>();
         var callback = new EnvironmentCallbackContext(execution, resource, values);
         foreach (var annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
             await annotation.Callback(callback);
         var context = new ValueProviderContext
         {
-            Caller = resource, ExecutionContext = execution, Network = KnownNetworkIdentifiers.LocalhostNetwork
+            Caller = resource,
+            ExecutionContext = execution,
+            Network = KnownNetworkIdentifiers.LocalhostNetwork
         };
         var result = new Dictionary<string, string?>();
         foreach (var (key, value) in values)
