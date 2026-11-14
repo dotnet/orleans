@@ -451,33 +451,35 @@ namespace Orleans.Storage
 
         private async Task<bool> TryHandleIdempotentRetryAsync<T>(BlobClient blob, IGrainState<T> grainState, string? updateToken, string? localHashBase64, RequestFailedException writeConflict, CancellationToken cancellationToken)
         {
+            BlobProperties properties;
             try
             {
-                var properties = await blob.GetPropertiesAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-
-                if (updateToken is not null
-                    && properties.Value.Metadata.TryGetValue(UpdateTokenMetadataKey, out var storedToken)
-                    && storedToken == updateToken
-                    && localHashBase64 is not null
-                    && properties.Value.Metadata.TryGetValue(ContentHashMetadataKey, out var storedHash)
-                    && storedHash == localHashBase64)
-                {
-                    grainState.ETag = properties.Value.ETag.ToString();
-                    grainState.RecordExists = true;
-                    return true;
-                }
-
-                return false;
+                properties = (await blob.GetPropertiesAsync(cancellationToken: cancellationToken).ConfigureAwait(false)).Value;
             }
-            catch (RequestFailedException ex) when (ex.IsNotFound())
+            catch (RequestFailedException ex) when (ex.IsNotFound() && !cancellationToken.IsCancellationRequested)
             {
                 return false;
             }
-            catch (RequestFailedException verificationException)
+            catch (Exception verificationException) when (verificationException is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var details = new AggregateException("The Azure Blob write conflict could not be verified.", writeConflict, verificationException);
                 throw CreateInconsistentStateException(blob, grainState.ETag, details);
             }
+
+            if (updateToken is not null
+                && properties.Metadata.TryGetValue(UpdateTokenMetadataKey, out var storedToken)
+                && storedToken == updateToken
+                && localHashBase64 is not null
+                && properties.Metadata.TryGetValue(ContentHashMetadataKey, out var storedHash)
+                && storedHash == localHashBase64)
+            {
+                grainState.ETag = properties.ETag.ToString();
+                grainState.RecordExists = true;
+                return true;
+            }
+
+            return false;
         }
 
         private Dictionary<string, string>? CreateWriteMetadata(string? updateToken, string? localHashBase64)

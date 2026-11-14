@@ -109,20 +109,22 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
         var currentState = new GrainState<TestState> { State = new TestState { Value = 42 } };
 
         await storage.WriteStateAsync(GrainType, _grainId, currentState);
+        var staleETag = Assert.IsType<string>(currentState.ETag);
 
         var staleState = new GrainState<TestState>
         {
-            ETag = Assert.IsType<string>(currentState.ETag),
+            ETag = staleETag,
             RecordExists = true,
             State = new TestState { Value = 42 },
         };
 
         await storage.WriteStateAsync(GrainType, _grainId, currentState);
         var currentETag = currentState.ETag;
+        Assert.NotEqual(staleETag, currentETag);
 
         await Assert.ThrowsAsync<InconsistentStateException>(
             () => storage.WriteStateAsync(GrainType, _grainId, staleState));
-        Assert.Equal(currentETag, staleState.ETag);
+        Assert.Equal(staleETag, staleState.ETag);
         Assert.True(staleState.RecordExists);
     }
 
