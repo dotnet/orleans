@@ -3,9 +3,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure;
+using Azure.Core;
+using Azure.Core.Pipeline;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -328,6 +332,257 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task IdempotentWrites_RecoverCommittedUpload(bool streaming, bool create)
+    {
+        var serializer = streaming ? new StreamingSerializer() : new BinarySerializer();
+        var storage = CreateStorage(Operation.Write, serializer, out _, enableIdempotentWrites: true);
+        var state = CreateState();
+        if (create)
+        {
+            state.ETag = null;
+            state.RecordExists = false;
+        }
+
+        _blob.FailFirstUploadAfterCommit = true;
+        await storage.WriteStateAsync(GrainType, TestGrainId, state, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, _blob.RequestTokens.Count);
+        Assert.Equal(StoredETag, state.ETag);
+        Assert.True(state.RecordExists);
+        Assert.NotNull(_blob.StoredMetadata);
+        Assert.True(_blob.StoredMetadata.ContainsKey("OrleansUpdateToken"));
+        Assert.True(_blob.StoredMetadata.ContainsKey("ContentSha256"));
+        Assert.Equal(
+            Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(_blob.UploadedContent!.ToMemory().Span)),
+            _blob.StoredMetadata["ContentSha256"]);
+    }
+
+    [Fact]
+    public async Task IdempotentWrites_RecoverCommittedMultiSegmentStreamingUpload()
+    {
+        var payload = new byte[4_096 * 3 + 137];
+        for (var i = 0; i < payload.Length; i++)
+        {
+            payload[i] = (byte)(i % 251);
+        }
+
+        var serializer = new StreamingSerializer(payload);
+        var storage = CreateStorage(Operation.Write, serializer, out _, enableIdempotentWrites: true);
+        var state = CreateState();
+        _blob.FailFirstUploadAfterCommit = true;
+
+        await storage.WriteStateAsync(GrainType, TestGrainId, state, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, _blob.RequestTokens.Count);
+        Assert.Equal(payload, _blob.UploadedContent!.ToArray());
+        Assert.NotNull(_blob.StoredMetadata);
+        Assert.Equal(
+            Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(payload)),
+            _blob.StoredMetadata["ContentSha256"]);
+        Assert.Equal(StoredETag, state.ETag);
+        Assert.True(state.RecordExists);
+    }
+
+    [Fact]
+    public async Task IdempotentWrites_RecoverCommittedUploadThroughSdkRetryPipeline()
+    {
+        using var handler = new IdempotentRetryHttpHandler();
+        using var httpClient = new HttpClient(handler);
+        var clientOptions = new BlobClientOptions
+        {
+            Transport = new HttpClientTransport(httpClient),
+            Retry = { Mode = RetryMode.Fixed, MaxRetries = 1, Delay = TimeSpan.Zero, MaxDelay = TimeSpan.Zero },
+        };
+        var container = new BlobContainerClient(new Uri("https://unit.test/container"), clientOptions);
+        var storage = new AzureBlobGrainStorage(
+            "cancellation-tests",
+            new AzureBlobStorageOptions
+            {
+                GrainStorageSerializer = new BinarySerializer(),
+                EnableIdempotentWrites = true,
+            },
+            new RetryTestContainerFactory(container),
+            _services.GetRequiredService<IActivatorProvider>(),
+            _logger);
+        var state = CreateState();
+
+        await storage.WriteStateAsync(GrainType, TestGrainId, state, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, handler.UploadRequests.Count);
+        Assert.All(handler.UploadRequests, request => Assert.Equal(InitialETag, request.IfMatch));
+        Assert.NotNull(handler.UploadRequests[0].UpdateToken);
+        Assert.Equal(handler.UploadRequests[0].UpdateToken, handler.UploadRequests[1].UpdateToken);
+        Assert.Equal(handler.UploadRequests[0].ContentHash, handler.UploadRequests[1].ContentHash);
+        Assert.Equal(IdempotentRetryHttpHandler.CommittedETag, state.ETag);
+        Assert.True(state.RecordExists);
+    }
+
+    [Fact]
+    public async Task IdempotentWrites_RejectSameProviderStaleWriter()
+    {
+        var storage = CreateStorage(Operation.Write, new BinarySerializer(), out _, enableIdempotentWrites: true);
+        var currentState = CreateState();
+        await storage.WriteStateAsync(GrainType, TestGrainId, currentState, TestContext.Current.CancellationToken);
+
+        var staleETag = currentState.ETag;
+        var staleState = new GrainState<TestState>
+        {
+            ETag = staleETag,
+            RecordExists = true,
+            State = new TestState { Value = currentState.State!.Value },
+        };
+        await storage.WriteStateAsync(GrainType, TestGrainId, currentState, TestContext.Current.CancellationToken);
+
+        var currentETag = currentState.ETag;
+        Assert.NotEqual(staleETag, currentETag);
+        var conflict = new RequestFailedException(412, "Condition failed.", "ConditionNotMet", null);
+        _blob.NextUploadException = conflict;
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.WriteStateAsync(GrainType, TestGrainId, staleState, TestContext.Current.CancellationToken));
+
+        Assert.Same(conflict, exception.InnerException);
+        Assert.Equal(staleETag, staleState.ETag);
+        Assert.True(staleState.RecordExists);
+    }
+
+    [Fact]
+    public async Task IdempotentWrites_RejectHashMismatchForCurrentToken()
+    {
+        _blob.FailFirstUploadAfterCommit = true;
+        _blob.CorruptStoredHashAfterCommit = true;
+        var storage = CreateStorage(Operation.Write, new BinarySerializer(), out _, enableIdempotentWrites: true);
+        var state = CreateState();
+        var originalState = state.State;
+
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.WriteStateAsync(GrainType, TestGrainId, state, TestContext.Current.CancellationToken));
+
+        Assert.Equal(412, Assert.IsType<RequestFailedException>(exception.InnerException).Status);
+        AssertUnchanged(state, originalState);
+    }
+
+    [Fact]
+    public async Task IdempotentWrites_DefaultsOffAndOmitsMetadata()
+    {
+        var storage = CreateStorage(Operation.Write, new BinarySerializer(), out _);
+        var state = CreateState();
+
+        await storage.WriteStateAsync(GrainType, TestGrainId, state, TestContext.Current.CancellationToken);
+
+        Assert.Null(_blob.StoredMetadata);
+    }
+
+    [Fact]
+    public async Task IdempotentTombstoneClear_RecoversCommittedUpload()
+    {
+        var storage = CreateStorage(Operation.Overwrite, new BinarySerializer(), out _, enableIdempotentWrites: true);
+        var state = CreateState();
+        _blob.FailFirstUploadAfterCommit = true;
+
+        await storage.ClearStateAsync(GrainType, TestGrainId, state, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, _blob.RequestTokens.Count);
+        Assert.Equal(StoredETag, state.ETag);
+        Assert.False(state.RecordExists);
+        Assert.Equal(0, state.State!.Value);
+        Assert.NotNull(_blob.StoredMetadata);
+        Assert.Equal(Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(ReadOnlySpan<byte>.Empty)), _blob.StoredMetadata["ContentSha256"]);
+    }
+
+    [Fact]
+    public async Task IdempotentWrites_PreserveOriginalConflictWhenVerificationFails()
+    {
+        var conflict = new RequestFailedException(412, "Condition failed.", "ConditionNotMet", null);
+        var verificationFailure = new RequestFailedException(403, "Access denied.", "AuthorizationFailure", null);
+        _blob.NextUploadException = conflict;
+        _blob.GetPropertiesException = verificationFailure;
+        var storage = CreateStorage(Operation.Write, new BinarySerializer(), out _, enableIdempotentWrites: true);
+        var state = CreateState();
+        var originalState = state.State;
+
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.WriteStateAsync(GrainType, TestGrainId, state, TestContext.Current.CancellationToken));
+
+        var aggregate = Assert.IsType<AggregateException>(exception.InnerException);
+        Assert.Contains(conflict, aggregate.InnerExceptions);
+        Assert.Contains(verificationFailure, aggregate.InnerExceptions);
+        AssertUnchanged(state, originalState);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task IdempotentWrites_PreserveOriginalConflictWhenTransportVerificationFails(bool sdkTimeout)
+    {
+        var conflict = new RequestFailedException(412, "Condition failed.", "ConditionNotMet", null);
+        Exception verificationFailure = sdkTimeout
+            ? new TaskCanceledException("SDK timeout")
+            : new HttpRequestException("Transport failed.");
+        _blob.NextUploadException = conflict;
+        _blob.GetPropertiesException = verificationFailure;
+        var storage = CreateStorage(Operation.Write, new BinarySerializer(), out _, enableIdempotentWrites: true);
+        var state = CreateState();
+        var originalState = state.State;
+
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.WriteStateAsync(GrainType, TestGrainId, state, TestContext.Current.CancellationToken));
+
+        var aggregate = Assert.IsType<AggregateException>(exception.InnerException);
+        Assert.Contains(conflict, aggregate.InnerExceptions);
+        Assert.Contains(verificationFailure, aggregate.InnerExceptions);
+        AssertUnchanged(state, originalState);
+    }
+
+    [Fact]
+    public async Task IdempotentWrites_PropagateCallerCancellationDuringVerification()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var conflict = new RequestFailedException(412, "Condition failed.", "ConditionNotMet", null);
+        _blob.NextUploadException = conflict;
+        _blob.OnRequest = _ =>
+        {
+            if (_blob.RequestTokens.Count == 2)
+            {
+                cancellation.Cancel();
+                return Task.FromException(new HttpRequestException("Transport stopped."));
+            }
+
+            return Task.CompletedTask;
+        };
+        var storage = CreateStorage(Operation.Write, new BinarySerializer(), out _, enableIdempotentWrites: true);
+        var state = CreateState();
+        var originalState = state.State;
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => storage.WriteStateAsync(GrainType, TestGrainId, state, cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        AssertUnchanged(state, originalState);
+        Assert.Empty(_logger.Errors);
+    }
+
+    [Fact]
+    public async Task IdempotentWrites_DoNotVerifyUnrelatedCreateConflict()
+    {
+        var conflict = new RequestFailedException(409, "Lease is missing.", "LeaseIdMissing", null);
+        _blob.NextUploadException = conflict;
+        var storage = CreateStorage(Operation.Write, new BinarySerializer(), out _, enableIdempotentWrites: true);
+        var state = CreateState();
+        state.ETag = null;
+        state.RecordExists = false;
+
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.WriteStateAsync(GrainType, TestGrainId, state, TestContext.Current.CancellationToken));
+
+        Assert.Same(conflict, exception.InnerException);
+        Assert.Single(_blob.RequestTokens);
+    }
+
+    [Theory]
     [InlineData(Operation.Write)]
     [InlineData(Operation.Delete)]
     [InlineData(Operation.Overwrite)]
@@ -440,7 +695,7 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
         AssertSuccessfulState(state, original, operation);
     }
 
-    private IGrainStorage CreateStorage(Operation operation, IGrainStorageSerializer serializer, out TestContainerFactory factory)
+    private IGrainStorage CreateStorage(Operation operation, IGrainStorageSerializer serializer, out TestContainerFactory factory, bool enableIdempotentWrites = false)
     {
         factory = new TestContainerFactory(new TestContainerClient(_blob));
         return new AzureBlobGrainStorage(
@@ -449,6 +704,7 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
             {
                 GrainStorageSerializer = serializer,
                 DeleteStateOnClear = operation != Operation.Overwrite,
+                EnableIdempotentWrites = enableIdempotentWrites,
             },
             factory,
             _services.GetRequiredService<IActivatorProvider>(),
@@ -537,7 +793,7 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
         }
     }
 
-    private sealed class StreamingSerializer : BinarySerializer, IGrainStorageStreamingSerializer
+    private sealed class StreamingSerializer(byte[]? serializedPayload = null) : BinarySerializer, IGrainStorageStreamingSerializer
     {
         public List<CancellationToken> Tokens { get; } = [];
 
@@ -552,7 +808,14 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
                 await operation(cancellationToken);
             }
 
-            await destination.WriteAsync(BinaryData.FromObjectAsJson(input).ToMemory(), cancellationToken);
+            if (serializedPayload is { } payload)
+            {
+                await destination.WriteAsync(payload.AsMemory(), cancellationToken);
+            }
+            else
+            {
+                await destination.WriteAsync(BinaryData.FromObjectAsJson(input).ToMemory(), cancellationToken);
+            }
         }
 
         public async ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
@@ -582,6 +845,91 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
         }
 
         public Task InitializeAsync(BlobServiceClient client) => throw new NotSupportedException();
+    }
+
+    private sealed class RetryTestContainerFactory(BlobContainerClient container) : IBlobContainerFactory
+    {
+        public BlobContainerClient GetBlobContainerClient(GrainId grainId)
+        {
+            Assert.Equal(TestGrainId, grainId);
+            return container;
+        }
+
+        public Task InitializeAsync(BlobServiceClient client) => throw new NotSupportedException();
+    }
+
+    private sealed class IdempotentRetryHttpHandler : HttpMessageHandler
+    {
+        public const string CommittedETag = "\"committed-etag\"";
+
+        private string? _committedUpdateToken;
+        private string? _committedContentHash;
+
+        public List<(string? UpdateToken, string? ContentHash, string? IfMatch)> UploadRequests { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Method == HttpMethod.Put)
+            {
+                var updateToken = GetHeader(request, "x-ms-meta-orleansupdatetoken");
+                var contentHash = GetHeader(request, "x-ms-meta-contentsha256");
+                var ifMatch = GetHeader(request, "If-Match");
+                UploadRequests.Add((updateToken, contentHash, ifMatch));
+
+                if (UploadRequests.Count == 1)
+                {
+                    _committedUpdateToken = updateToken;
+                    _committedContentHash = contentHash;
+                    var transientFailure = new HttpResponseMessage(HttpStatusCode.InternalServerError)
+                    {
+                        Content = new StringContent("<Error><Code>InternalError</Code></Error>"),
+                    };
+                    return Task.FromResult(transientFailure);
+                }
+
+                var conflict = new HttpResponseMessage(HttpStatusCode.PreconditionFailed)
+                {
+                    Content = new StringContent("<Error><Code>ConditionNotMet</Code></Error>"),
+                };
+                conflict.Headers.TryAddWithoutValidation("x-ms-error-code", "ConditionNotMet");
+                conflict.Headers.TryAddWithoutValidation("x-ms-request-id", "retry-conflict");
+                return Task.FromResult(conflict);
+            }
+
+            if (request.Method == HttpMethod.Head)
+            {
+                var properties = new HttpResponseMessage(HttpStatusCode.OK);
+                properties.Headers.TryAddWithoutValidation("ETag", CommittedETag);
+                if (_committedUpdateToken is { } updateToken)
+                {
+                    properties.Headers.TryAddWithoutValidation("x-ms-meta-orleansupdatetoken", updateToken);
+                }
+
+                if (_committedContentHash is { } contentHash)
+                {
+                    properties.Headers.TryAddWithoutValidation("x-ms-meta-contentsha256", contentHash);
+                }
+
+                return Task.FromResult(properties);
+            }
+
+            throw new InvalidOperationException($"Unexpected Azure Blob request: {request.Method} {request.RequestUri}");
+        }
+
+        private static string? GetHeader(HttpRequestMessage request, string name)
+        {
+            if (request.Headers.TryGetValues(name, out var values))
+            {
+                return string.Join(",", values);
+            }
+
+            if (request.Content is { } content && content.Headers.TryGetValues(name, out values))
+            {
+                return string.Join(",", values);
+            }
+
+            return null;
+        }
     }
 
     private sealed class TestContainerClient(TestBlobClient blob) : BlobContainerClient
@@ -626,6 +974,20 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
 
         public bool FailFirstUploadWithMissingContainer { get; set; }
 
+        public bool FailFirstUploadAfterCommit { get; set; }
+
+        public bool CorruptStoredHashAfterCommit { get; set; }
+
+        public RequestFailedException? NextUploadException { get; set; }
+
+        public Exception? GetPropertiesException { get; set; }
+
+        public IDictionary<string, string>? StoredMetadata { get; private set; }
+
+        private string CurrentETag { get; set; } = StoredETag;
+
+        private int UploadCount { get; set; }
+
         public Stream? Content { get; set; }
 
         public long? ContentLength { get; set; }
@@ -633,6 +995,19 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
         public BlobRequestConditions? Conditions { get; private set; }
 
         public BinaryData? UploadedContent { get; private set; }
+
+        public override async Task<Response<BlobProperties>> GetPropertiesAsync(
+            BlobRequestConditions? conditions = null,
+            CancellationToken cancellationToken = default)
+        {
+            await ObserveRequestAsync(cancellationToken);
+            if (GetPropertiesException is { } exception)
+            {
+                throw exception;
+            }
+
+            return Response.FromValue(BlobsModelFactory.BlobProperties(eTag: new ETag(CurrentETag), metadata: StoredMetadata), null!);
+        }
 
         public override async Task<Response<BlobDownloadStreamingResult>> DownloadStreamingAsync(
             BlobDownloadOptions? options = null,
@@ -642,7 +1017,7 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
             var content = Content ?? new MemoryStream(BinaryData.FromObjectAsJson(new TestState { Value = 7 }).ToArray());
             var details = BlobsModelFactory.BlobDownloadDetails(
                 contentLength: ContentLength ?? content.Length,
-                eTag: new ETag(StoredETag));
+                eTag: new ETag(CurrentETag));
             return Response.FromValue(BlobsModelFactory.BlobDownloadStreamingResult(content, details), null!);
         }
 
@@ -654,8 +1029,20 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
             Conditions = options.Conditions;
             await ObserveRequestAsync(cancellationToken);
             ThrowIfContainerMissing();
-            UploadedContent = content;
-            return UploadResponse();
+            if (NextUploadException is { } exception)
+            {
+                NextUploadException = null;
+                throw exception;
+            }
+
+            var response = CommitUpload(content, options);
+            if (FailFirstUploadAfterCommit)
+            {
+                FailFirstUploadAfterCommit = false;
+                throw CreateCommitConflict(options.Conditions);
+            }
+
+            return response;
         }
 
         public override async Task<Response<BlobContentInfo>> UploadAsync(
@@ -666,8 +1053,21 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
             Conditions = options.Conditions;
             await ObserveRequestAsync(cancellationToken);
             ThrowIfContainerMissing();
-            UploadedContent = await BinaryData.FromStreamAsync(content, cancellationToken);
-            return UploadResponse();
+            if (NextUploadException is { } exception)
+            {
+                NextUploadException = null;
+                throw exception;
+            }
+
+            var uploadedContent = await BinaryData.FromStreamAsync(content, cancellationToken);
+            var response = CommitUpload(uploadedContent, options);
+            if (FailFirstUploadAfterCommit)
+            {
+                FailFirstUploadAfterCommit = false;
+                throw CreateCommitConflict(options.Conditions);
+            }
+
+            return response;
         }
 
         public override async Task<Response<bool>> DeleteIfExistsAsync(
@@ -698,8 +1098,28 @@ public sealed class AzureBlobGrainStorageCancellationTests : IDisposable
             }
         }
 
-        private static Response<BlobContentInfo> UploadResponse()
-            => Response.FromValue(BlobsModelFactory.BlobContentInfo(new ETag(StoredETag), default, null, null, null, null, 0), null!);
+        private static RequestFailedException CreateCommitConflict(BlobRequestConditions? conditions)
+            => conditions?.IfNoneMatch == ETag.All
+                ? new RequestFailedException(409, "Blob already exists.", "BlobAlreadyExists", null)
+                : new RequestFailedException(412, "Condition failed.", "ConditionNotMet", null);
+
+        private Response<BlobContentInfo> CommitUpload(BinaryData content, BlobUploadOptions options)
+        {
+            UploadedContent = content;
+            StoredMetadata = options.Metadata;
+            var uploadCount = ++UploadCount;
+            CurrentETag = uploadCount == 1 ? StoredETag : $"\"stored-etag-{uploadCount}\"";
+
+            if (CorruptStoredHashAfterCommit && StoredMetadata is not null)
+            {
+                StoredMetadata = new Dictionary<string, string>(StoredMetadata)
+                {
+                    ["ContentSha256"] = "invalid-hash",
+                };
+            }
+
+            return Response.FromValue(BlobsModelFactory.BlobContentInfo(new ETag(CurrentETag), default, null, null, null, null, 0), null!);
+        }
     }
 
     private sealed class TokenTrackingStream() : MemoryStream(BinaryData.FromObjectAsJson(new TestState { Value = 7 }).ToArray())

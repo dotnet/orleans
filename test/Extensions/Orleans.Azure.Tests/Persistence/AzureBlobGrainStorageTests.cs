@@ -2,9 +2,13 @@
 
 using System;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure;
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -97,6 +101,163 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
         await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
     }
 
+    [Fact, TestCategory("Functional")]
+    public async Task WriteStateAsync_RejectsSameProviderStaleWriter_WhenIdempotentWritesOptionIsEnabled()
+    {
+        var serializer = CreateSetupSerializer();
+        var storage = await CreateStorageAsync(serializer, enableIdempotentWrites: true);
+        var currentState = new GrainState<TestState> { State = new TestState { Value = 42 } };
+
+        await storage.WriteStateAsync(GrainType, _grainId, currentState);
+        var staleETag = Assert.IsType<string>(currentState.ETag);
+
+        var staleState = new GrainState<TestState>
+        {
+            ETag = staleETag,
+            RecordExists = true,
+            State = new TestState { Value = 42 },
+        };
+
+        await storage.WriteStateAsync(GrainType, _grainId, currentState);
+        var currentETag = currentState.ETag;
+        Assert.NotEqual(staleETag, currentETag);
+
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.WriteStateAsync(GrainType, _grainId, staleState));
+        Assert.Equal(staleETag, staleState.ETag);
+        Assert.True(staleState.RecordExists);
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task WriteStateAsync_RetryFromAnotherProvider_ThrowsInconsistentState_WhenIdempotentWritesOptionIsEnabled()
+    {
+        var serializer = CreateSetupSerializer();
+        var firstStorage = await CreateStorageAsync(serializer, enableIdempotentWrites: true);
+        var secondStorage = await CreateStorageAsync(serializer, enableIdempotentWrites: true);
+        var firstState = new GrainState<TestState> { State = new TestState { Value = 42 } };
+        var blob = _container.GetBlobClient(GetBlobName());
+
+        await firstStorage.WriteStateAsync(GrainType, _grainId, firstState);
+
+        var staleETag = Assert.IsType<string>(firstState.ETag);
+        var firstProperties = await blob.GetPropertiesAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(firstProperties.Value.Metadata.TryGetValue("OrleansUpdateToken", out var firstToken));
+
+        var secondState = new GrainState<TestState>
+        {
+            ETag = staleETag,
+            RecordExists = true,
+            State = new TestState { Value = 42 },
+        };
+        await secondStorage.WriteStateAsync(GrainType, _grainId, secondState);
+
+        var secondProperties = await blob.GetPropertiesAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(secondProperties.Value.Metadata.TryGetValue("OrleansUpdateToken", out var secondToken));
+        Assert.NotEqual(firstToken, secondToken);
+
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => firstStorage.WriteStateAsync(GrainType, _grainId, firstState));
+
+        Assert.Contains("Blob storage condition not Satisfied", exception.Message);
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task WriteStateAsync_HashesStreamingOutput_WhenIdempotentWritesOptionIsEnabled()
+    {
+        var serializer = new StreamingOnlyGrainStorageSerializer();
+        var storage = await CreateStorageAsync(serializer, enableIdempotentWrites: true);
+        var grainState = new GrainState<TestState> { State = new TestState { Value = 42 } };
+        var blob = _container.GetBlobClient(GetBlobName());
+
+        await storage.WriteStateAsync(GrainType, _grainId, grainState);
+
+        var properties = await blob.GetPropertiesAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(properties.Value.Metadata.TryGetValue("ContentSha256", out var storedHash));
+        Assert.Equal(
+            Convert.ToBase64String(SHA256.HashData(StreamingOnlyGrainStorageSerializer.SerializedContent.Span)),
+            storedHash);
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task WriteStateAsync_RetryWithDifferentHash_ThrowsInconsistentState_WhenIdempotentWritesOptionIsEnabled()
+    {
+        var serializer = CreateSetupSerializer();
+        var storage = await CreateStorageAsync(serializer, enableIdempotentWrites: true);
+        var grainState = new GrainState<TestState> { State = new TestState { Value = 42 } };
+        var blob = _container.GetBlobClient(GetBlobName());
+
+        await storage.WriteStateAsync(GrainType, _grainId, grainState);
+
+        var initialETag = Assert.IsType<string>(grainState.ETag);
+        var originalContents = serializer.Serialize(grainState.State);
+        var originalHash = ComputeHashBase64(originalContents);
+        var properties = await blob.GetPropertiesAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(properties.Value.Metadata.TryGetValue("OrleansUpdateToken", out var updateToken));
+        Assert.True(properties.Value.Metadata.TryGetValue("ContentSha256", out var storedHash));
+        Assert.Equal(originalHash, storedHash);
+
+        await blob.UploadAsync(
+            originalContents,
+            new BlobUploadOptions
+            {
+                Conditions = new BlobRequestConditions { IfMatch = new ETag(initialETag) },
+                Metadata = new Dictionary<string, string>
+                {
+                    ["OrleansUpdateToken"] = updateToken,
+                    ["ContentSha256"] = originalHash,
+                },
+            },
+            TestContext.Current.CancellationToken);
+
+        grainState.State = new TestState { Value = 99 };
+        grainState.ETag = initialETag;
+
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.WriteStateAsync(GrainType, _grainId, grainState));
+
+        Assert.Contains("Blob storage condition not Satisfied", exception.Message);
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task WriteStateAsync_ThrowsInconsistentState_WhenIdempotentWritesOptionIsDisabled()
+    {
+        var serializer = CreateSetupSerializer();
+        var storage = await CreateStorageAsync(serializer);
+        var grainState = new GrainState<TestState> { State = new TestState { Value = 42 } };
+        var blob = _container.GetBlobClient(GetBlobName());
+
+        await storage.WriteStateAsync(GrainType, _grainId, grainState);
+
+        var initialETag = Assert.IsType<string>(grainState.ETag);
+        var originalContents = serializer.Serialize(grainState.State);
+        var originalHash = ComputeHashBase64(originalContents);
+        var properties = await blob.GetPropertiesAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.False(properties.Value.Metadata.ContainsKey("OrleansUpdateToken"));
+        Assert.False(properties.Value.Metadata.ContainsKey("ContentSha256"));
+
+        await blob.UploadAsync(
+            originalContents,
+            new BlobUploadOptions
+            {
+                Conditions = new BlobRequestConditions { IfMatch = new ETag(initialETag) },
+                Metadata = new Dictionary<string, string>
+                {
+                    ["OrleansUpdateToken"] = Guid.NewGuid().ToString(),
+                    ["ContentSha256"] = originalHash,
+                },
+            },
+            TestContext.Current.CancellationToken);
+
+        grainState.State = new TestState { Value = 99 };
+        grainState.ETag = initialETag;
+
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => storage.WriteStateAsync(GrainType, _grainId, grainState));
+
+        Assert.Contains("Blob storage condition not Satisfied", exception.Message);
+    }
+
     private async Task AssertFailedReadDoesNotMutateStateAsync(
         IGrainStorageSerializer serializer,
         CancellationToken cancellationToken)
@@ -127,7 +288,10 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
         Assert.Equal(123, grainState.State.Value);
     }
 
-    private async Task<AzureBlobGrainStorage> CreateStorageAsync(IGrainStorageSerializer serializer, bool deleteStateOnClear = true)
+    private async Task<AzureBlobGrainStorage> CreateStorageAsync(
+        IGrainStorageSerializer serializer,
+        bool deleteStateOnClear = true,
+        bool? enableIdempotentWrites = null)
     {
         var options = new AzureBlobStorageOptions
         {
@@ -135,6 +299,10 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
             GrainStorageSerializer = serializer,
             DeleteStateOnClear = deleteStateOnClear,
         }.ConfigureTestDefaults();
+        if (enableIdempotentWrites is { } enable)
+        {
+            options.EnableIdempotentWrites = enable;
+        }
 
         var activatorProvider = _services.GetRequiredService<IActivatorProvider>();
         var containerFactory = options.BuildContainerFactory(_services, options);
@@ -153,7 +321,26 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
     private static IGrainStorageSerializer CreateSetupSerializer()
         => new JsonGrainStorageSerializer(new OrleansJsonSerializer(Options.Create(new OrleansJsonSerializerOptions())));
 
+    private static string ComputeHashBase64(BinaryData contents)
+        => Convert.ToBase64String(SHA256.HashData(contents.ToArray()));
+
     private string GetBlobName() => $"{GrainType}-{_grainId}.json";
+
+    private sealed class StreamingOnlyGrainStorageSerializer : IGrainStorageStreamingSerializer
+    {
+        public static ReadOnlyMemory<byte> SerializedContent { get; } = Encoding.UTF8.GetBytes("stream-only-payload");
+
+        public BinaryData Serialize<T>(T? input)
+            => throw new InvalidOperationException("The binary serializer should not be used.");
+
+        public T? Deserialize<T>(BinaryData input) => default;
+
+        public ValueTask SerializeAsync<T>(T? input, Stream destination, CancellationToken cancellationToken = default)
+            => destination.WriteAsync(SerializedContent, cancellationToken);
+
+        public ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
+            => ValueTask.FromResult<T?>(default);
+    }
 
     private sealed class ThrowingBinaryDeserializeSerializer(IGrainStorageSerializer inner) : IGrainStorageSerializer
     {
