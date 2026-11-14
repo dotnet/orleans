@@ -5,14 +5,14 @@ namespace Orleans.Runtime.Placement
 {
     internal class StatelessWorkerDirector : IPlacementDirector
     {
-        public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
+        public async Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            var compatibleSilos = context.GetCompatibleSilos(target);
+            var compatibleSilos = await context.GetCompatibleSilosAsync(target);
 
             // If a valid placement hint was specified, use it.
             if (IPlacementDirector.GetPlacementHint(target.RequestContextData, compatibleSilos) is { } placementHint)
             {
-                return Task.FromResult(placementHint);
+                return placementHint;
             }
 
             // If the current silo is not shutting down, place locally if we are compatible
@@ -22,13 +22,13 @@ namespace Orleans.Runtime.Placement
                 {
                     if (silo.Equals(context.LocalSilo))
                     {
-                        return Task.FromResult(context.LocalSilo);
+                        return context.LocalSilo;
                     }
                 }
             }
 
             // otherwise, place somewhere else
-            return Task.FromResult(compatibleSilos[Random.Shared.Next(compatibleSilos.Length)]);
+            return compatibleSilos[Random.Shared.Next(compatibleSilos.Length)];
         }
     }
 }

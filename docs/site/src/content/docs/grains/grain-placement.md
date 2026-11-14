@@ -151,25 +151,25 @@ The following example gives related grain types an affinity for the same silo wh
 
 First, define the strategy and its attribute:
 
-:::code language="csharp" source="snippets/placement/CustomPlacement.cs" id="custom_placement_strategy":::
+:::code language="csharp" source="../snippets/compiled/Grains/CustomPlacement.cs" id="custom_placement_strategy":::
 
 Placement strategy instances can cross runtime serialization boundaries. Use `[GenerateSerializer]`; if the strategy adds serializable state, assign stable `[Id(n)]` values to its members. The strategy in this example is immutable and has no serialized members.
 
 Next, implement the director:
 
-:::code language="csharp" source="snippets/placement/CustomPlacement.cs" id="custom_placement_director":::
+:::code language="csharp" source="../snippets/compiled/Grains/CustomPlacement.cs" id="custom_placement_director":::
 
-Call <xref:Orleans.Runtime.Placement.IPlacementContext.GetCompatibleSilos*> instead of reconstructing cluster membership. It returns active silos which can host the grain type and satisfy interface-version compatibility, after placement filters have run. The current runtime throws if that process leaves no candidates; the explicit empty-set check also protects the modulo operation in tests or alternate context implementations. <xref:Orleans.Runtime.Placement.IPlacementDirector.GetPlacementHint*> accepts a request hint only when it names one of those candidates, so the example honors valid hints before applying its own policy.
+Await <xref:Orleans.Runtime.Placement.IPlacementContext.GetCompatibleSilosAsync*> instead of reconstructing cluster membership. It returns active silos which can host the grain type and satisfy interface-version compatibility, after placement filters have run. The runtime-provided context honors placement cancellation even when the query token is omitted. The runtime throws if that process leaves no candidates; the explicit empty-set check also protects the modulo operation in tests or alternate context implementations. <xref:Orleans.Runtime.Placement.IPlacementDirector.GetPlacementHint*> accepts a request hint only when it names one of those candidates, so the example honors valid hints before applying its own policy.
 
 The director sorts the candidate addresses before indexing them and uses the grain key's stable, uniform hash. Therefore, two grain types with the same key select the same silo only when they see the same candidate set:
 
-:::code language="csharp" source="snippets/placement/CustomPlacement.cs" id="apply_custom_placement":::
+:::code language="csharp" source="../snippets/compiled/Grains/CustomPlacement.cs" id="apply_custom_placement":::
 
 This is an affinity, not durable pinning. Membership changes, silo restarts, or different compatibility and filter results can change the mapping. Existing activations don't move merely because a later placement decision maps elsewhere. The uniform hash is deterministic across cluster nodes but isn't cryptographic, so don't use placement as an authorization or isolation boundary.
 
 Finally, register the strategy and director on every silo:
 
-:::code language="csharp" source="snippets/placement/CustomPlacement.cs" id="register_custom_placement":::
+:::code language="csharp" source="../snippets/compiled/Grains/CustomPlacement.cs" id="register_custom_placement":::
 
 This overload registers the stateless strategy and the director as keyed singletons. Other overloads can change the strategy lifetime, but the director remains a keyed singleton. Directors must therefore be thread-safe and use singleton-safe dependencies. If a strategy carries attribute configuration, preserve it through <xref:Orleans.Runtime.PlacementStrategy.PopulateGrainProperties*> and <xref:Orleans.Runtime.PlacementStrategy.Initialize*> and use a lifetime which doesn't share mutable configuration between grain types.
 

@@ -113,11 +113,9 @@ namespace Orleans.Runtime.Placement
                 $"Unable to select a candidate from {silos.Length} compatible silos (all are overloaded). All silo stats: {Utils.EnumerableToString(allSiloStats, kvp => $"SiloAddress = {kvp.Key} -> IsOverloaded = {kvp.Value.SiloStats.IsOverloaded}, ActivationCount = {kvp.Value.ActivationCount}, RecentlyUsedActivationCount = {kvp.Value.SiloStats.RecentlyUsedActivationCount}")}");
         }
 
-        public override Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context) => Task.FromResult(OnAddActivationInternal(target, context));
-
-        private SiloAddress OnAddActivationInternal(PlacementTarget target, IPlacementContext context)
+        public override async Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            var compatibleSilos = context.GetCompatibleSilos(target);
+            var compatibleSilos = await context.GetCompatibleSilosAsync(target);
 
             // If a valid placement hint was specified, use it.
             if (IPlacementDirector.GetPlacementHint(target.RequestContextData, compatibleSilos) is { } placementHint)
