@@ -241,14 +241,15 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogLongRunningTurn(Task task, long taskDurationMs)
     {
-        if (Debugger.IsAttached)
+        var logger = Logger;
+        if (Debugger.IsAttached || !logger.IsEnabled(LogLevel.Warning))
         {
             return;
         }
 
         var taskDuration = TimeSpan.FromMilliseconds(taskDurationMs);
         LogWarningLongRunningTurn(
-            Logger,
+            logger,
             (task.AsyncState ?? task).ToString()!,
             GrainContext?.ToString() ?? "Unknown",
             taskDuration.ToString("g"),
