@@ -13,6 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="$(SourceRoot)src\Cassandra\Shared\CassandraIdentifier.cs" Link="CassandraIdentifier.cs" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
     <PackageReference Include="CassandraCSharpDriver" />
   </ItemGroup>
