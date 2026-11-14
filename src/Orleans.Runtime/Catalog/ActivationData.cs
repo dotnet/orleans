@@ -1185,6 +1185,7 @@ internal sealed partial class ActivationData :
 
                     try
                     {
+                        var compatibilityBlocked = false;
                         // Check compatibility before anything reads the body. Interleaving predicates and invocation
                         // decode it lazily, and this silo may lack the generated invokable for a method added in a
                         // newer interface version. The check reads only headers, so an incompatible request is
@@ -1201,25 +1202,26 @@ internal sealed partial class ActivationData :
                                     // them to a new activation, so wait until they start to preserve their order.
                                     // Running requests must also finish first: a deactivating activation stops dispatching
                                     // interleaved requests, including cancellation of this one.
-                                    ++i;
-                                    continue;
+                                    compatibilityBlocked = true;
                                 }
+                                else
+                                {
+                                    // Add this activation to cache invalidation headers.
+                                    message.AddToCacheInvalidationHeader(Address, validAddress: null);
 
-                                // Add this activation to cache invalidation headers.
-                                message.AddToCacheInvalidationHeader(Address, validAddress: null);
+                                    var reason = new DeactivationReason(
+                                        DeactivationReasonCode.IncompatibleRequest,
+                                        $"Received incompatible request for interface {message.InterfaceType} version {message.InterfaceVersion}. This activation supports interface version {currentVersion}.");
 
-                                var reason = new DeactivationReason(
-                                    DeactivationReasonCode.IncompatibleRequest,
-                                    $"Received incompatible request for interface {message.InterfaceType} version {message.InterfaceVersion}. This activation supports interface version {currentVersion}.");
+                                    var activityContext = message.RequestContextData.TryGetActivityContext();
 
-                                var activityContext = message.RequestContextData.TryGetActivityContext();
-
-                                Deactivate(reason, activityContext, cancellationToken: default);
-                                return;
+                                    Deactivate(reason, activityContext, cancellationToken: default);
+                                    return;
+                                }
                             }
                         }
 
-                        if (!MayInvokeRequest(message))
+                        if (compatibilityBlocked || !MayInvokeRequest(message))
                         {
                             // The activation is not able to process this message right now, so try the next message.
                             ++i;
@@ -2612,7 +2614,14 @@ internal sealed partial class ActivationData :
             {
                 // A waiting request has not been invoked, so it is cancelled from its headers alone. Reading its body
                 // here would decode it, which fails for a request this silo cannot decode.
-                _shared.InternalRuntime.RuntimeClient.SendResponse(message!, Response.FromException(new OperationCanceledException()));
+                try
+                {
+                    _shared.InternalRuntime.RuntimeClient.SendResponse(message!, Response.FromException(new OperationCanceledException()));
+                }
+                finally
+                {
+                    message!.Dispose();
+                }
                 didCancel = true;
             }
             else if (message?.BodyObject is IInvokable request)

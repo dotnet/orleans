@@ -16,6 +16,7 @@ using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Session;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Diagnostics;
+using Orleans.Versions.Compatibility;
 using Xunit;
 
 namespace UnitTests.ActivationsLifeCycleTests;
@@ -1618,6 +1619,102 @@ public sealed class RetirementHandoffTests
         Assert.True(await stages.StoppedAfterRelease.WaitAsync(Timeout, Cancellation));
         await stopping.WaitAsync(Timeout, Cancellation);
         Assert.Null(catalog.FindTarget(grain.GetGrainId()));
+    }
+
+    [Fact]
+    public async Task CancellingQueuedSerializedRequest_ReleasesItsBuffer()
+    {
+        await using var cluster = await DeployAsync();
+        var caller = cluster.Silos[0];
+        var target = cluster.Silos[1];
+        var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+        await PlaceOnAsync(target, () => grain.GetLocation());
+        var running = grain.Block().AsTask();
+        try
+        {
+            await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
+            var activation = Assert.IsType<ActivationData>(FindActivation(target, grain.GetGrainId()));
+            using var buffer = new ArcBufferWriter();
+            buffer.Write(new byte[20_000]);
+            var body = target.ServiceProvider.GetRequiredService<MessageHandlerShared>().GetReceiveMessageHandler();
+            body.Initialize(default, buffer.ConsumeSlice(buffer.Length));
+            var sender = GrainId.Create("test", "caller");
+            var request = new Message
+            {
+                Direction = Message.Directions.Request,
+                TargetGrain = grain.GetGrainId(),
+                SendingGrain = sender,
+                SendingSilo = caller.SiloAddress,
+                Id = new(123456),
+            };
+            request.SetMessageReadRequest(body);
+            var page = body.Body.First!;
+            var version = page.Version;
+            activation.ReceiveMessage(request);
+            await WaitUntilAsync(() => activation.WaitingCount == 1);
+
+            await ((IGrainCallCancellationExtension)activation)
+                .CancelRequestAsync(sender, request.Id, CancellationToken.None).AsTask().WaitAsync(Timeout, Cancellation);
+
+            Assert.Equal(0, activation.WaitingCount);
+            Assert.Null(request._bodyObject);
+            Assert.NotEqual(version, page.Version);
+        }
+        finally
+        {
+            state.ReleaseBlock.TrySetResult();
+            await running.WaitAsync(Timeout, Cancellation);
+        }
+    }
+
+    [Fact]
+    public async Task IncompatibleQueuedRequest_StillDetectsStuckActivation()
+    {
+        var maxRequestProcessingTime = TimeSpan.FromSeconds(1);
+        await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
+        {
+            silo.Configure<SiloMessagingOptions>(options => options.MaxRequestProcessingTime = maxRequestProcessingTime);
+            silo.Configure<GrainVersioningOptions>(options => options.DefaultCompatibilityStrategy = nameof(StrictVersionCompatible));
+        }));
+        var caller = cluster.Silos[0];
+        var target = cluster.Silos[1];
+        var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+        await PlaceOnAsync(target, () => grain.GetLocation());
+        var running = grain.Block().AsTask();
+        try
+        {
+            await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
+            var activation = Assert.IsType<ActivationData>(FindActivation(target, grain.GetGrainId()));
+            await Task.Delay(maxRequestProcessingTime * 2, Cancellation);
+            var interfaceType = target.ServiceProvider.GetRequiredService<GrainInterfaceTypeResolver>()
+                .GetGrainInterfaceType(typeof(IRetirementHandoffGrain));
+            var request = new Message
+            {
+                Direction = Message.Directions.Request,
+                TargetGrain = grain.GetGrainId(),
+                SendingGrain = GrainId.Create("test", "caller"),
+                SendingSilo = caller.SiloAddress,
+                Id = new(123457),
+                InterfaceType = interfaceType,
+                InterfaceVersion = ushort.MaxValue,
+            };
+            activation.ReceiveMessage(request);
+
+            await WaitUntilAsync(() => FindActivation(target, grain.GetGrainId()) is null);
+            Assert.Equal(ActivationState.Deactivating, activation.State);
+            Assert.True(activation.IsCurrentlyExecuting);
+        }
+        finally
+        {
+            state.ReleaseBlock.TrySetResult();
+            await running.WaitAsync(Timeout, Cancellation);
+        }
     }
 
     [Fact]
